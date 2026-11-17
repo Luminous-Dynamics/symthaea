@@ -52,3 +52,14 @@ It does not compute litres, kWh, cost, water quality, temperature, pressure, spr
 ## Nonclaims
 
 This integration map and adapter do not establish matched physical experiments, product superiority, recirculation hygiene, accessible design certification, regulatory compliance, water savings, heat recovery or affordability.
+
+
+## Wet-room and room-mode integration
+
+- Symthaea [AQUA-WETROOM-ENVELOPE-001 #12702](https://github.com/Luminous-Dynamics/symthaea/issues/12702) owns the Aqua product-level zone/mode matrix, envelope/ventilation/pressure interfaces, commissioning requirements, accessible circulation and room heat-cascade boundary.
+- Aqua shower aerosol exposure and wet-side component research consumes the independent 2025/2026 microbial/aerosol literature and competent laboratory assessments; Mycelix #6100 remains water assessment authority.
+- ASHRAE natatorium guidance and Sol-Atlas #765/#766/#770/#772 remain the method and owner references for pool rooms. Aqua does not extend pool thermal/evaporation results to showers or steam rooms.
+- Symtropy #4531 remains the owner of the unoccupied room-scale integrated test-cell architecture and cross-service event traces.
+- ISO 21542:2021 is an accessibility/usability design reference; local building/accessibility professionals determine applicability and approval.
+
+The room-mode contract records the required evidence and return-to-ready state for shower, bath, accessible bathing, sauna, steam, plunge/whirlpool, pool, cleaning and maintenance. It does not become a new scheduler or safety controller.
