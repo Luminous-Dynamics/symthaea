@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "programme": "PLASMA-ENERGY-001",
-  "generated_date": "2026-11-16",
+  "generated_date": "2026-11-17",
   "claim_ceiling": "SOURCE_REGISTER_ONLY_NO_LUMINOUS_REPRODUCTION_OR_PHYSICAL_RESULT",
   "rules": {
     "missing_auxiliary_energy_is_zero": false,
@@ -4086,6 +4086,80 @@
       ],
       "luminous_reproduction": false,
       "technology_family": "NON_PLASMA_MICROWAVE_HEATING"
+    },
+    {
+      "case_id": "CH4-PULSED-PLASMA-ENERGY-DEPOSITION-TIMESCALE-2026",
+      "lane": "METHANE_PLASMA_PULSE_WIDTH_SELECTIVITY",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Energy Deposition Timescale Controls Chemistry in Pulsed Methane Plasmas",
+        "publisher": "Journal of the American Chemical Society",
+        "publication_date": "2026-10-21",
+        "volume": "148",
+        "issue": "43",
+        "pages": "46877-46892",
+        "doi": "10.1021/jacs.6c13735",
+        "url": "https://doi.org/10.1021/jacs.6c13735",
+        "pmid": "42911403"
+      },
+      "configuration": {
+        "process": "nonoxidative pulsed methane plasma conversion",
+        "plasma_regime": "pulsed discharge; nanosecond-to-millisecond energy-deposition timescales",
+        "pulse_energy_range_mJ": [
+          10,
+          50
+        ],
+        "measured_species": [
+          "CH4",
+          "H2",
+          "C2H2",
+          "C2H4",
+          "other C2 species"
+        ],
+        "study_scope": "pulse-width dependence of plasma characteristics, gas temperature, reaction mechanism, methane conversion, selectivity and product-specific energy"
+      },
+      "operating_points": [
+        {
+          "operating_point_id": "CH4-PULSE-100US-SPECIFIC-ENERGY",
+          "pulse_width_us": 100,
+          "methane_conversion_energy_cost_kJ_per_mol_CH4": 377,
+          "acetylene_specific_energy_kWh_per_kg": 15,
+          "hydrogen_specific_energy_kWh_per_kg": 40,
+          "qualifier": "source-reported specific-energy requirements and conversion energy-cost context for the 100 microsecond discharge condition; preserve product denominators separately"
+        }
+      ],
+      "regime_observations": [
+        {
+          "observation_id": "CH4-PULSE-NANOSECOND-C2-SELECTIVITY",
+          "pulse_regime": "nanosecond",
+          "overall_C2_selectivity_lower_bound_fraction": 0.7,
+          "ethylene_selectivity_upper_reported_fraction": 0.2,
+          "qualifier": "nanosecond discharges gave the highest overall C2 selectivity; up to 20% C2H4 reported. Do not attach the 100 microsecond energy values to this observation."
+        },
+        {
+          "observation_id": "CH4-PULSE-LONGER-PULSE-THERMAL-DOMINANCE",
+          "pulse_regime": "longer_pulses_up_to_millisecond",
+          "chemistry_character": "predominantly thermal",
+          "qualifier": "the source reports a shift from mixed electron-impact/thermal dissociation at nanosecond duration toward predominantly thermal chemistry at longer duration"
+        },
+        {
+          "observation_id": "CH4-PULSE-TEMPERATURE-SELECTIVITY",
+          "metric": "gas_temperature_effect",
+          "effect": "higher_gas_temperature_favors_C2H2_over_C2H4",
+          "qualifier": "source-reported direction of selectivity shift; no universal transfer outside the studied reactor and chemistry"
+        }
+      ],
+      "source_conclusion": "The study systematically varies pulsed energy deposition from nanosecond to millisecond timescales (10–50 mJ per pulse). Nanosecond pulses produce the highest overall C2 selectivity (>70%) with up to 20% C2H4, while longer pulses are predominantly thermal. At 100 microseconds, reported specific energy requirements are 15 kWh/kg C2H2 and 40 kWh/kg H2, with methane conversion energy cost near 377 kJ/mol CH4. Pulse width and energy can be used to tailor product selectivity.",
+      "comparison_status": "SOURCE_SPECIFIC_PULSED_PLASMA_EXPERIMENT_NOT_MATCHED_TO_OTHER_REACTORS",
+      "blockers": [
+        "The nanosecond C2-selectivity observation and 100 microsecond product-specific energy metrics are distinct and cannot be combined as one operating point.",
+        "The 15 kWh/kg C2H2 and 40 kWh/kg H2 values have different product denominators and cannot be interchanged.",
+        "The exact source-to-grid electrical boundary, pulse-forming-network losses and reactor coupling efficiency need reconstruction.",
+        "Complete feed/product carbon and hydrogen closure, gas sampling recovery, condensables, aerosols and solid-carbon balance require source-data review.",
+        "Product purification, pressure, accepted delivery and long-duration duty are not inferred from the abstract-level source summary.",
+        "This study is not the DBD + pulsed resistive-heating + CO2 regeneration reactor in CH4-PLASMA-PULSED-HEATING-REGEN-2026."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -4658,6 +4732,31 @@
       "control_id": "NC-PATH-008",
       "condition": "Use independently sampled route-level electricity/price assumptions and report paired dominance as though shared scenario uncertainty had been modeled.",
       "expected_disposition": "REJECT_UNPAIRED_EXOGENOUS_SCENARIOS"
+    },
+    {
+      "control_id": "NC-CH4-PULSE-001",
+      "condition": "Attach nanosecond >70% overall C2 selectivity and up-to-20% C2H4 to the 100 microsecond 15 kWh/kg C2H2 or 40 kWh/kg H2 specific-energy observations.",
+      "expected_disposition": "REJECT_OPERATING_POINT_MISMATCH"
+    },
+    {
+      "control_id": "NC-CH4-PULSE-002",
+      "condition": "Swap or merge the 15 kWh/kg C2H2 and 40 kWh/kg H2 values without preserving their product-specific denominators.",
+      "expected_disposition": "REJECT_FUNCTIONAL_UNIT_MISMATCH"
+    },
+    {
+      "control_id": "NC-CH4-PULSE-003",
+      "condition": "Treat 377 kJ/mol CH4 as a complete wall-plug-to-accepted-product plant energy metric without reconciling its source denominator and meter boundary.",
+      "expected_disposition": "BLOCKED_INCOMPLETE_ENERGY_BOUNDARY"
+    },
+    {
+      "control_id": "NC-CH4-PULSE-004",
+      "condition": "Assume nanosecond selectivity transfers to longer pulses, different pressures, feed mixtures or other plasma architectures without validation.",
+      "expected_disposition": "REJECT_REGIME_TRANSFER"
+    },
+    {
+      "control_id": "NC-CH4-PULSE-005",
+      "condition": "Treat optical-emission intensity or a synthetic time trace as quantitative product yield or accepted gas delivery.",
+      "expected_disposition": "REJECT_MEASURAND_AND_EVIDENCE_CLASS_MISMATCH"
     }
   ],
   "derived_reference_checks": [
@@ -5335,6 +5434,44 @@
         "ALLOCATION",
         "AVOIDED_PRODUCT_CREDIT"
       ]
+    },
+    {
+      "target_id": "CH4-PULSE-CHEMISTRY-TIMESCALE-001",
+      "lane": "METHANE_PLASMA_PULSE_WIDTH_SELECTIVITY",
+      "status": "RESEARCH_TARGET_NOT_RESULT",
+      "comparator_case_ids": [
+        "CH4-PULSED-PLASMA-ENERGY-DEPOSITION-TIMESCALE-2026",
+        "METHANE-PYROLYSIS-MICROWAVE-REFERENCE-2026",
+        "METHANE-PYROLYSIS-SHOCK-WAVE-REFERENCE-2026",
+        "CH4-PLASMA-PULSED-HEATING-REGEN-2026"
+      ],
+      "metric_contract": [
+        "pulse_width_s",
+        "energy_per_pulse_mJ",
+        "repetition_rate_Hz",
+        "grid_to_reactor_energy",
+        "methane_conversion_fraction",
+        "H2_yield_and_selectivity",
+        "C2H2_yield_and_selectivity",
+        "C2H4_yield_and_selectivity",
+        "other_species_and_condensables",
+        "carbon_and_hydrogen_balance_residuals",
+        "product_specific_energy_kWh_per_kg_product",
+        "accepted_product_purity_and_pressure",
+        "quench_and_sampling_response"
+      ],
+      "claim_guards": {
+        "pulse_width_and_energy_per_pulse_are_separate_dimensions": true,
+        "nanosecond_selectivity_and_100us_energy_values_must_not_be_cross_paired": true,
+        "C2H2_and_H2_specific_energy_denominators_must_remain_distinct": true,
+        "time_aligned_voltage_current_diagnostic_and_product_measurements_required": true,
+        "thermal_only_and_longer_pulse_controls_required": true,
+        "carbon_hydrogen_and_species_closure_required": true,
+        "grid_side_energy_boundary_required_for_system_efficiency": true,
+        "distinct_reactor_architectures_are_not_interchangeable": true
+      },
+      "success_gate": "Reproduce the source pulse-width-dependent species/selectivity trends with independent time-aligned and species-resolved measurements, then demonstrate a matched Pareto advantage on a named accepted product without mixing pulse-width operating points.",
+      "rationale": "The JACS 2026 paper demonstrates that pulse timescale changes methane-plasma chemistry, making time-domain selectivity a first-class engineering variable. The current source results are configuration-specific; source-faithful reproduction and matched controls precede any superiority claim."
     }
   ]
 }
