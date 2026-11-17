@@ -15,14 +15,8 @@ pub enum BaselineError {
     EmptyHistory,
     NonFiniteObservation,
     InvalidAutoregressionOrder,
-    InsufficientSamples {
-        required: usize,
-        actual: usize,
-    },
-    InsufficientForecastContext {
-        required: usize,
-        actual: usize,
-    },
+    InsufficientSamples { required: usize, actual: usize },
+    InsufficientForecastContext { required: usize, actual: usize },
     InvalidRidgePenalty,
     RankDeficientDesign,
     NumericalFailure,
@@ -306,11 +300,7 @@ fn solve_least_squares_qr(
             column_norm
         };
 
-        let mut reflector: Vec<f64> = matrix
-            .iter()
-            .skip(pivot)
-            .map(|row| row[pivot])
-            .collect();
+        let mut reflector: Vec<f64> = matrix.iter().skip(pivot).map(|row| row[pivot]).collect();
         reflector[0] -= alpha;
 
         let reflector_norm = reflector
@@ -356,10 +346,7 @@ fn solve_least_squares_qr(
     let max_diagonal = (0..column_count)
         .map(|index| matrix[index][index].abs())
         .fold(0.0_f64, f64::max);
-    let rank_tolerance = max_diagonal
-        * f64::EPSILON
-        * (row_count + column_count) as f64
-        * 8.0;
+    let rank_tolerance = max_diagonal * f64::EPSILON * (row_count + column_count) as f64 * 8.0;
 
     let mut coefficients = vec![0.0; column_count];
     for row in (0..column_count).rev() {
@@ -422,9 +409,7 @@ mod tests {
         let mut expected = Vec::new();
         for _ in 0..5 {
             let time = expected_context.len();
-            let next = 0.25
-                + 1.25 * expected_context[time - 1]
-                - 0.8 * expected_context[time - 2];
+            let next = 0.25 + 1.25 * expected_context[time - 1] - 0.8 * expected_context[time - 2];
             expected_context.push(next);
             expected.push(next);
         }
