@@ -265,7 +265,18 @@
       "reported_record_count": 155,
       "reported_metric": null,
       "metric_interpretation": "computed high-Tc candidate benchmark; do not merge targets with experimental specimen records",
-      "local_reproducibility_status": "not_reproduced; source-specific exclusion rules and structures require audit"
+      "local_reproducibility_status": "not_reproduced; count, license, exact source records, CIFs, label provenance and grouped split manifests unresolved; tracked in #12635",
+      "hosted_readme_record_count": 140,
+      "count_reconciliation": "open_discrepancy: paper text reports 155 samples; current Hugging Face card category counts sum to 140; one top-level JSON object contains material-keyed records. Verify source revision and per-material IDs before admission.",
+      "license_status": "not_declared_in_visible_Hugging_Face_card_metadata; redistribution_not_authorized",
+      "source_snapshot": {
+        "repository": "https://huggingface.co/datasets/xiao-qi/HTSC-2025",
+        "viewed_at": "2026-11-17",
+        "data_file": "HTSC-2025.json",
+        "data_file_size_reported": "166 kB",
+        "card_metadata_warning": "empty_or_missing_yaml_metadata",
+        "material_count_requires_direct_parse": true
+      }
     }
   ],
   "required_future_fields": [
