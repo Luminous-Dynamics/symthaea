@@ -200,3 +200,23 @@ The room family should use common *interfaces* without forcing identical fixture
 ## 9. Claim ceiling
 
 These archetypes are conceptual spatial patterns, not dimensioned designs, P&IDs, construction drawings, accessibility certification, building approval or proof of user outcomes. No human trial, purchase, procurement or construction is authorized by this document.
+
+
+## 10. Bathing fountains and water-feature distinction
+
+Treat human-contact water features as distinct product/process classes:
+
+| Class | User contact | Product boundary | Core design implications |
+|---|---|---|---|
+| Decorative / non-contact fountain | none intended | landscape / visual water feature | prevent unintended entry; separate service and drainage; landscape water-quality and maintenance rules |
+| Interactive spray / bathing fountain | water spray/jets contact users; no standing water in activity zone | spray/play venue; single-pass or recirculated | spray/impact, aerosol, slip, drainage, runoff, source, backflow, collection tank and treatment differ by system |
+| Immersive bathing / hydrotherapy pool | standing/captured water | aquatic venue / pool or spa | turnover, filtration/disinfection, residual, sampling, egress, maintenance and water budget |
+
+CDC's 2024 fifth-edition MAHC defines interactive water-play venues as sprayed/jetted features where water contacts bathers whether single-pass or recirculated. The MAHC is public aquatic-venue model guidance, not automatically local law. CDC warns that decorative fountains entered by the public should either be managed as splash pads or be protected from entry. The category must be identified before a water feature is designed or operated for bathing.
+
+Sources:
+- https://www.cdc.gov/model-aquatic-health-code/php/our-work/index.html
+- https://www.cdc.gov/model-aquatic-health-code/media/pdfs/2024/11/5th-Ed-MAHC-Code-508.pdf
+- https://www.cdc.gov/healthy-swimming/toolkit/operating-public-pools-hot-tubs-and-splash-pads.html
+
+Sol-Atlas #765/#766/#770/#772 retains pool and landscape water-feature thermal / evaporation / microclimate modelling. Aqua owns only user-facing bathing task, feature geometry, access and room integration. Mycelix #6100 remains the water-use assessment authority.
