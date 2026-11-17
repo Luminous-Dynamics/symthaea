@@ -427,7 +427,9 @@ impl OpticalHealthModel {
         thresholds: &OpticalHealthThresholds,
     ) -> Result<HealthAction, OpticalHealthError> {
         validate_reading(reading)?;
-        if reading.observed_at_seconds < self.last_event_time_seconds {
+        if reading.observed_at_seconds < self.last_event_time_seconds
+            || reading.observed_at_seconds < self.last_observation_time_seconds
+        {
             return Err(OpticalHealthError::StaleReading);
         }
         if thresholds
@@ -889,6 +891,21 @@ mod tests {
             Err(OpticalHealthError::TimeWentBackwards)
         );
         value.apply_deposition(event("valid-event", 21)).unwrap();
+    }
+
+    #[test]
+    fn an_older_reading_cannot_override_a_newer_inspection() {
+        let mut value = model();
+        let older = value.inspect("reading-old", 20, 4).unwrap();
+        let newer = value.inspect("reading-new", 21, 4).unwrap();
+        assert_eq!(
+            value.decide(&older, &thresholds()),
+            Err(OpticalHealthError::StaleReading)
+        );
+        assert_eq!(
+            value.decide(&newer, &thresholds()),
+            Ok(HealthAction::Continue)
+        );
     }
 
     #[test]
