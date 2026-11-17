@@ -12,8 +12,8 @@
 use std::fmt;
 
 use symmetry_quotient_reference::{
-    FiniteActionV1, QuotientCertificateV1, QuotientErrorV1, SearchProblemV1,
-    QualificationBudgetV1, verify_certificate,
+    FiniteActionV1, QualificationBudgetV1, QuotientCertificateV1, QuotientErrorV1, SearchProblemV1,
+    verify_certificate,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,9 +39,7 @@ impl QueryKindV1 {
     pub const fn aggregation_law(self) -> AggregationLawV1 {
         match self {
             Self::Exists => AggregationLawV1::BooleanAny,
-            Self::Minimum | Self::Maximum => {
-                AggregationLawV1::ExtremeValueWithCompleteTieLift
-            }
+            Self::Minimum | Self::Maximum => AggregationLawV1::ExtremeValueWithCompleteTieLift,
             Self::Enumerate => AggregationLawV1::CompleteMemberLift,
             Self::Count => AggregationLawV1::OrbitCardinalityCount,
             Self::WeightedSum => AggregationLawV1::OrbitCardinalityWeightedSum,
@@ -260,8 +258,7 @@ pub fn evaluate_quotient_query(
     budget: QualificationBudgetV1,
 ) -> Result<QueryReceiptV1, QueryErrorV1> {
     validate_query_shape(problem, query)?;
-    verify_certificate(problem, action, quotient, budget)
-        .map_err(QueryErrorV1::BaseQuotient)?;
+    verify_certificate(problem, action, quotient, budget).map_err(QueryErrorV1::BaseQuotient)?;
 
     let candidate_count = problem.candidate_ids.len();
     let orbit_count = quotient.orbits.len();
@@ -285,9 +282,7 @@ pub fn evaluate_quotient_query(
 
         let included = representative.included;
         let (representative_objective, representative_weight) = match query.kind {
-            QueryKindV1::Minimum | QueryKindV1::Maximum => {
-                (Some(representative.objective), None)
-            }
+            QueryKindV1::Minimum | QueryKindV1::Maximum => (Some(representative.objective), None),
             QueryKindV1::WeightedSum => (None, Some(representative.weight)),
             QueryKindV1::Exists | QueryKindV1::Enumerate | QueryKindV1::Count => (None, None),
         };
@@ -310,9 +305,7 @@ pub fn evaluate_quotient_query(
                 )
             }
             QueryKindV1::WeightedSum => Some(0),
-            QueryKindV1::Minimum
-            | QueryKindV1::Maximum
-            | QueryKindV1::Enumerate => None,
+            QueryKindV1::Minimum | QueryKindV1::Maximum | QueryKindV1::Enumerate => None,
         };
 
         contributions.push(OrbitContributionV1 {
@@ -349,7 +342,12 @@ pub fn evaluate_quotient_query(
                 for orbit in &quotient.orbits {
                     let row = &query.rows[orbit.representative_index];
                     if row.included && row.objective == value {
-                        ids.extend(orbit.members.iter().map(|member| member.candidate_id.clone()));
+                        ids.extend(
+                            orbit
+                                .members
+                                .iter()
+                                .map(|member| member.candidate_id.clone()),
+                        );
                     }
                 }
                 sorted_ids(ids)
@@ -374,7 +372,12 @@ pub fn evaluate_quotient_query(
                 .orbits
                 .iter()
                 .filter(|orbit| query.rows[orbit.representative_index].included)
-                .flat_map(|orbit| orbit.members.iter().map(|member| member.candidate_id.clone()))
+                .flat_map(|orbit| {
+                    orbit
+                        .members
+                        .iter()
+                        .map(|member| member.candidate_id.clone())
+                })
                 .collect();
             QueryOutcomeV1::Enumerate(sorted_ids(ids))
         }
@@ -382,7 +385,9 @@ pub fn evaluate_quotient_query(
             let count = contributions.iter().try_fold(0u64, |total, item| {
                 let contribution = u64::try_from(item.additive_contribution.unwrap_or(0))
                     .map_err(|_| QueryErrorV1::ArithmeticOverflow)?;
-                total.checked_add(contribution).ok_or(QueryErrorV1::ArithmeticOverflow)
+                total
+                    .checked_add(contribution)
+                    .ok_or(QueryErrorV1::ArithmeticOverflow)
             })?;
             QueryOutcomeV1::Count(count)
         }
@@ -565,8 +570,7 @@ mod tests {
                 let mut action = vec![0; 16];
                 for source in 0..4 {
                     for target in 0..4 {
-                        action[source * 4 + target] =
-                            permutation[source] * 4 + permutation[target];
+                        action[source * 4 + target] = permutation[source] * 4 + permutation[target];
                     }
                 }
                 action
@@ -585,9 +589,7 @@ mod tests {
     }
 
     fn fixture() -> (SearchProblemV1, FiniteActionV1, QuotientCertificateV1) {
-        let candidate_ids: Vec<String> = (0..16)
-            .map(|index| format!("pair-{index:02}"))
-            .collect();
+        let candidate_ids: Vec<String> = (0..16).map(|index| format!("pair-{index:02}")).collect();
         let semantics = CandidateSemanticsV1 {
             in_search_domain: true,
             admissible: true,
@@ -603,12 +605,7 @@ mod tests {
             candidate_ids,
         };
         let action = d4_action();
-        let result = compile_quotient(
-            &problem,
-            &action,
-            QualificationBudgetV1::default(),
-        )
-        .unwrap();
+        let result = compile_quotient(&problem, &action, QualificationBudgetV1::default()).unwrap();
         let CompileOutcomeV1::Authorized(certificate) = result else {
             panic!("the D4 query fixture must admit an exact quotient");
         };
@@ -699,11 +696,18 @@ mod tests {
         assert_eq!(receipt.orbit_count, 3);
         assert_eq!(receipt.original_candidate_count, 16);
         assert_eq!(
-            receipt.orbit_contributions.iter().map(|item| item.orbit_size).collect::<Vec<_>>(),
+            receipt
+                .orbit_contributions
+                .iter()
+                .map(|item| item.orbit_size)
+                .collect::<Vec<_>>(),
             vec![4, 8, 4]
         );
         assert_ne!(12, receipt.orbit_count as u64);
-        assert_ne!(12, (action.group.multiplication.len() * receipt.orbit_count) as u64);
+        assert_ne!(
+            12,
+            (action.group.multiplication.len() * receipt.orbit_count) as u64
+        );
     }
 
     #[test]
@@ -724,12 +728,20 @@ mod tests {
             &query(QueryKindV1::Maximum, rows),
         );
 
-        let QueryOutcomeV1::Minimum { value, candidate_ids } = minimum.result else {
+        let QueryOutcomeV1::Minimum {
+            value,
+            candidate_ids,
+        } = minimum.result
+        else {
             panic!("expected minimum result");
         };
         assert_eq!(value, Some(0));
         assert_eq!(candidate_ids.len(), 4);
-        let QueryOutcomeV1::Maximum { value, candidate_ids } = maximum.result else {
+        let QueryOutcomeV1::Maximum {
+            value,
+            candidate_ids,
+        } = maximum.result
+        else {
             panic!("expected maximum result");
         };
         assert_eq!(value, Some(2));
