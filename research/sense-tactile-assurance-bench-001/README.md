@@ -31,6 +31,24 @@ Every run binds:
 
 A URI or receipt ID is only a reference. The consuming verifier must retrieve and validate the actual evidence artifact. The schema does not make reference independence true merely because two IDs differ.
 
+## Dataset, code and checkpoint rights
+
+Treat access, training, redistribution and commercial-use permission as separate fields for every dataset, codebase and checkpoint. A project being publicly visible or described as "open" is not a sufficient rights determination.
+
+The current OpenNeoData release card declares **CC BY-NC-SA 4.0** for its data and code. The official card also requires gated access and declarations that the user will use it only for non-commercial research and will not redistribute the dataset. The Creative Commons deed prohibits commercial use and imposes attribution and ShareAlike conditions. Sources:
+- [OpenNeoData official dataset card](https://huggingface.co/datasets/NeoteAIEmbodied/OpenNeoData)
+- [OpenNeoData official README / access gate](https://huggingface.co/datasets/NeoteAIEmbodied/OpenNeoData/blob/main/README.md)
+- [CC BY-NC-SA 4.0 deed](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+
+Therefore:
+- Do not use OpenNeoData for commercial Luminous model training or product development under the currently declared license.
+- Do not redistribute copies, mirrors, transformed copies or dataset-derived artefacts without a separate rights review and applicable permission.
+- Treat non-commercial research use as subject to the publisher's gated access terms and attribution / ShareAlike obligations.
+- Record code and checkpoint rights independently; the dataset license must not be assumed to cover every model weight or project component.
+- Keep the OpenNeoData comparator as paper-/project-reported or non-commercial-only until the exact dataset revision, access agreement, intended use, code and checkpoint licenses are reviewed.
+
+The schema requires a separate rights disposition for dataset, comparator code and checkpoint. Unknown or pending is an acceptable state; silently assuming permission is not.
+
 ## Transfer taxonomy
 
 Use exact categories and disclose target adaptation:
