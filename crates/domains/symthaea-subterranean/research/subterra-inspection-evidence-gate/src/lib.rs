@@ -1136,6 +1136,7 @@ mod tests {
     fn one_rejected_candidate_aborts_the_entire_campaign_build() {
         let mut stale = candidate();
         stale.manifest.observation_captured_at_unix_ms = NOW - 3_600_001;
+        stale.manifest.candidate_id = "candidate-2026-015".into();
         stale.option.option_id = "support-08-stale-followup".into();
         stale.manifest.option_id = "support-08-stale-followup".into();
         let mut stale_context = context();
