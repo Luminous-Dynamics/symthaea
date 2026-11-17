@@ -50,11 +50,18 @@ Every factor's outcome intervals must themselves define a feasible likelihood di
 
 ## Dependence is a first-class trust boundary
 
-Different source names are not evidence of independence. Factors sharing an optical path, power supply, clock, firmware, upstream provider, test fixture, operator or calibration regime are modeled as one joint factor when acquired together. Separate factors are multiplied only when the evaluator holds a certificate for the **exact set of factor IDs and dependence groups** used, with a declared conditioning scope (including the hypothesis), independent authority, action scope, and validity at both observation and decision time. This binds the qualification to the actual channels and the variables under which independence is asserted.
+Different source names are not evidence of independence. Factors sharing an optical path, power supply, clock, firmware, upstream provider, test fixture, operator or calibration regime belong to the same dependence group. The evaluator first bounds the probability of the *joint observed event* within each group using sharp Fréchet inequalities. For marginal event intervals \([l_j,u_j]\) and \(n\) observed channels:
 
-Pairwise independence is deliberately insufficient for three or more factors: pairwise-independent variables need not be mutually independent. A certificate must cover the exact factorization set, exact factor IDs and declared conditioning scope, not a collection of pairwise name comparisons. A certificate whose conditioning scope does not include the hypothesis is invalid. If no exact-set qualification exists, the evaluator refuses the factorization and the decision cannot be justified.
+    lower_joint = max(0, sum_j(l_j) - (n - 1) * 10000)
+    upper_joint = min_j(u_j)
 
-v0.1 uses a conservative fail-closed rule for unqualified dependence: evidence from the unqualified set is not multiplied or used to narrow the prior. A later version may add a joint-channel copula / partial-dependence ambiguity set; it must not silently default to independence.
+These bounds are sharp for an intersection when only the marginal event probabilities are known. They do not assume independence. The likelihood endpoints are rounded outward in integer basis points.
+
+Across different dependence groups, the evaluator multiplies group-level intervals only when an evaluator-held certificate covers the **exact set of factor IDs and dependence groups**, with a declared conditioning scope (including the hypothesis), independent authority, action scope, and validity at both observation and decision time. Within each group, the observations still use Fréchet bounds; the certificate only qualifies independence *between* groups.
+
+If no exact-set qualification exists, the evaluator uses unrestricted Fréchet bounds across all acquired channels instead of discarding the observations or multiplying them as independent. This is a conservative partial-identification fallback. The nominal point-product remains visible only as a naive independence comparator; it does not authorize an action. A decision is justified using the combined prior and likelihood ambiguity bounds, plus a positive lower bound on evidence support.
+
+Pairwise independence is deliberately insufficient for three or more groups: pairwise-independent variables need not be mutually independent. A certificate must cover the exact factorization set, exact factor IDs and declared conditioning scope, not a collection of pairwise name comparisons. A certificate whose conditioning scope does not include the hypothesis is invalid. When the exact set is not qualified, the evaluator reports the Fréchet mode and does not multiply across groups.
 
 ## Calibration lifecycle semantics
 
@@ -73,9 +80,9 @@ The evaluator does not verify a real calibration authority, cryptographic signat
 
 1. Point-likelihood optimism: nominal posterior risk is below a reversible envelope while the robust likelihood/prior bound exceeds it.
 2. Joint correlated sensor: two optical sources share a path; the joint likelihood model is used without multiplying their individual likelihoods.
-3. False independence: two different source names in one dependence group are submitted as separate factors; the evaluator refuses the product.
+3. False independence: two different source names in one dependence group are submitted as separate factors; the evaluator uses their Fréchet joint-event bounds rather than multiplying them independently.
 4. Qualified factorization: two distinct groups combine only under an exact-set mutual conditional-independence certificate in scope.
-5. Three-way factorization: pairwise certificates alone do not authorize a three-group product.
+5. Three-way factorization: pairwise certificates alone do not authorize a three-group product; the evaluator falls back to an unrestricted Fréchet bound.
 6. Calibration expired after observation but before decision.
 7. Calibration revoked after observation but before decision.
 8. False-positive / false-negative channel outcomes with held-out likelihood intervals.
@@ -101,9 +108,11 @@ The fixture therefore tests an interaction effect: neither uncertainty layer ind
 
 A drift-widened optical channel is a second, different failure mode: nominal risk is 1.82%, prior-only robust risk 6.39%, likelihood-only robust risk 9.10%, and combined robust risk 26.48%. The evaluator does not detect drift itself; it demonstrates that once independent calibration work widens the declared likelihood intervals, stale point-confidence can no longer justify the action.
 
-A joint optical-pair channel with common-mode uncertainty gives 0.84% nominal and 5.55% worst-case risk, which remains inside the 7% reversible envelope. In contrast, acquiring the two optical devices as separate factors while both share the same dependence group is rejected; their observations do not narrow the hypothesis set. A separate build-pipeline/runtime pair is combined only under an evaluator-held exact-set mutual conditional-independence certificate and yields 0.15% worst-case risk. The three-factor negative control includes all three pairwise certificates among the selected groups, each bound to its exact factor IDs and conditioning scope, but deliberately omits a three-way certificate; the evaluator still rejects factorization, because pairwise independence does not establish mutual independence of the full set.
+A joint optical-pair channel with common-mode uncertainty gives 0.84% nominal and 5.55% worst-case risk, which remains inside the 7% reversible envelope. In contrast, acquiring the two optical devices as separate factors while both share the same dependence group uses an unrestricted Fréchet intersection bound: the naive independence baseline is 0.12%, but the worst-case posterior risk is 11.54%, so the 7% envelope rejects the action. The evidence is not thrown away; the evaluator reports a 34.50% lower evidence-support bound and the decision remains unjustified.
 
-The other fixture controls reject expired and revoked calibration, an output impossible under the hidden actual world, zero evidence-support lower bound, future evidence and an incomplete three-group factorization certificate. Always-act fails the irreversible release gate; always-abstain fails the read-only positive control.
+A separate build-pipeline/runtime pair is combined only under an evaluator-held exact-set mutual conditional-independence certificate and yields 0.15% worst-case risk. The three-factor negative control includes all three pairwise certificates among the selected groups, each bound to its exact factor IDs and conditioning scope, but deliberately omits a three-way certificate. The evaluator does not multiply the factors: it falls back to unrestricted Fréchet bounds, yielding 3.57% worst-case risk on this fixture. This happens to remain inside the reversible envelope; the method is not designed to force abstention whenever independence is unknown.
+
+The other fixture controls reject expired and revoked calibration, an output impossible under the hidden actual world, zero evidence-support lower bound and future evidence. Always-act fails the irreversible release gate; always-abstain fails the read-only positive control.
 
 These values are synthetic calculations from the checked-in fixture, not empirical incident frequencies, calibrated field probabilities, measured execution costs, Rust execution results or model-agent trials. The complete expected report is committed beside the split candidate and oracle fixtures. The report includes prior-only, likelihood-only and combined robust-risk ablations so later changes cannot hide which uncertainty layer caused a rejection.
 
