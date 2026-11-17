@@ -16,7 +16,7 @@ use subterra_robust_survival_referee::{
     evaluate_policy_robustly,
 };
 use subterra_survival_reference::{
-    ActionStatus, CostPrices, MeasurementAction, MeasurementOutcome, MissionDecision,
+    CostPrices, MeasurementAction, MeasurementOutcome, MissionDecision,
     OutcomeKind, PlanMetrics, PlannerConfig, PlanningError, PlanningProblem,
     PlanningReport, ResourceBudget, ResourceCost, RiskLimits, plan_survival_conditioned,
 };
@@ -214,16 +214,22 @@ fn assess_action(
     let mut expected_loss = 0.0;
     let mut expected_entropy = 0.0;
     for outcome in &action.outcomes {
-        if outcome.kind != OutcomeKind::Observation {
-            continue;
-        }
-        let (probability, posterior) = posterior_and_probability(belief, &outcome.likelihood_by_hypothesis)?;
+        let (probability, posterior) =
+            posterior_and_probability(belief, &outcome.likelihood_by_hypothesis)?;
         if probability <= 0.0 {
             continue;
         }
         expected_entropy += probability * entropy(&posterior);
-        let (_, posterior_risk) = best_decision(problem, &posterior)?;
-        expected_loss += probability * posterior_risk;
+        let branch_risk = if outcome.kind == OutcomeKind::Observation {
+            best_decision(problem, &posterior)?.1
+        } else {
+            let terminal_losses = outcome
+                .terminal_loss_by_hypothesis
+                .as_deref()
+                .ok_or(AdapterError::InvalidAction)?;
+            expected_loss(&posterior, terminal_losses)?
+        };
+        expected_loss += probability * branch_risk;
     }
     let information_gain = prior_entropy - expected_entropy;
     if !information_gain.is_finite() || !expected_loss.is_finite() {
@@ -451,8 +457,11 @@ mod tests {
         case.evaluation_models[0].problem.actions[1].external_gate_passed = false;
         case.evaluation_models[1].problem.actions[1].external_gate_passed = false;
         let report = evaluate_inspection_case(&case).unwrap();
-        assert_ne!(report.planner.policy.measurement_action_id.as_deref(), Some("pipe_cable_decision_evidence"));
-        assert!(!report.robust_policy_admissible);
+        assert_ne!(
+            report.planner.policy.measurement_action_id.as_deref(),
+            Some("pipe_cable_decision_evidence")
+        );
+        assert!(report.planner.policy.measurement_action_id.is_none());
     }
 
     #[test]
