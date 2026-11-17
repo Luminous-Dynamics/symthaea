@@ -1,0 +1,488 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/robot_lightshell_benchmark_v0_1.schema.json",
+  "title": "Robot Lightshell Comparative Benchmark Manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "benchmark_state",
+    "claim_scope",
+    "platform",
+    "application_profile",
+    "matched_candidates",
+    "metric_registry",
+    "hard_gates",
+    "test_runs",
+    "evidence_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_state": {
+      "enum": [
+        "proposed",
+        "inputs_pending",
+        "frozen",
+        "running",
+        "complete",
+        "invalidated"
+      ]
+    },
+    "claim_scope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platform_id",
+        "article_revision",
+        "geometry_state"
+      ],
+      "properties": {
+        "platform_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "article_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "geometry_state": {
+          "enum": [
+            "unknown",
+            "simplified_fixture",
+            "cad_revision_bound",
+            "as_built_metrology_bound"
+          ]
+        },
+        "geometry_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^(sha256:[a-fA-F0-9]{64})?$"
+        },
+        "joint_or_zone_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "application_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operating_domain",
+        "task_profile",
+        "hazard_profile",
+        "coverage_boundary",
+        "human_proximity"
+      ],
+      "properties": {
+        "operating_domain": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "task_profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hazard_profile": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "coverage_boundary": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "human_proximity": {
+          "enum": [
+            "none_declared",
+            "nearby_people",
+            "shared_workspace",
+            "direct_contact_intended",
+            "unknown"
+          ]
+        },
+        "cleaning_profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "matched_candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_id",
+          "architecture",
+          "availability",
+          "comparability",
+          "description",
+          "material_lot_refs"
+        ],
+        "properties": {
+          "candidate_id": {
+            "enum": [
+              "B0",
+              "B1",
+              "B2",
+              "L1",
+              "L2",
+              "L3"
+            ]
+          },
+          "architecture": {
+            "enum": [
+              "bare_platform",
+              "rigid_or_production_cover",
+              "commercial_textile_cover",
+              "textile_only",
+              "textile_plus_spacer",
+              "textile_spacer_plus_local_guard"
+            ]
+          },
+          "availability": {
+            "enum": [
+              "unknown",
+              "planned",
+              "available",
+              "unavailable",
+              "not_applicable"
+            ]
+          },
+          "comparability": {
+            "enum": [
+              "unassessed",
+              "matched",
+              "partially_matched",
+              "not_comparable"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "material_lot_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "article_revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "coverage_boundary_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deviation_notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "metric_registry": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "unit",
+          "measurement_boundary",
+          "comparison_direction",
+          "target_value",
+          "baseline_value",
+          "hard_gate"
+        ],
+        "properties": {
+          "metric_id": {
+            "enum": [
+              "coverage_fraction",
+              "added_mass",
+              "mass_per_covered_area",
+              "com_shift",
+              "inertia_shift",
+              "rom_delta",
+              "minimum_clearance",
+              "fabric_migration",
+              "joint_energy_delta",
+              "peak_temperature_delta",
+              "cooling_margin_delta",
+              "transmitted_force",
+              "transmitted_acceleration",
+              "transmitted_strain",
+              "residual_deformation",
+              "abrasion_cycles_to_endpoint",
+              "seam_fatigue_cycles",
+              "attachment_retention",
+              "snag_events",
+              "sensor_occlusion",
+              "perception_error_delta",
+              "install_time",
+              "remove_time",
+              "inspection_time",
+              "clean_time",
+              "repair_time",
+              "cost_per_accepted_service_hour",
+              "replacement_material_mass",
+              "qualified_recovery_fraction"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "measurement_boundary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "comparison_direction": {
+            "enum": [
+              "higher_is_better",
+              "lower_is_better",
+              "within_declared_band",
+              "informational"
+            ]
+          },
+          "target_value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "baseline_value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "hard_gate": {
+            "type": "boolean"
+          },
+          "method_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uncertainty_model_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "hard_gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "gate_id",
+          "condition",
+          "state",
+          "acceptance_rule_ref"
+        ],
+        "properties": {
+          "gate_id": {
+            "enum": [
+              "pinch_shear_clearance",
+              "required_rom",
+              "cable_hose_bend",
+              "thermal_cooling",
+              "sensor_fov_calibration",
+              "retention_detachment_snag",
+              "emergency_service_access",
+              "actuation_task_nonregression",
+              "evidence_integrity"
+            ]
+          },
+          "condition": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "unknown",
+              "not_run",
+              "pass",
+              "fail",
+              "not_applicable"
+            ]
+          },
+          "acceptance_rule_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewer_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "test_runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "run_id",
+          "candidate_id",
+          "stage",
+          "status",
+          "protocol_revision",
+          "instrument_refs",
+          "calibration_refs",
+          "raw_data_digest",
+          "acceptance_rule_ref"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "candidate_id": {
+            "enum": [
+              "B0",
+              "B1",
+              "B2",
+              "L1",
+              "L2",
+              "L3"
+            ]
+          },
+          "stage": {
+            "enum": [
+              "coupon",
+              "fit_screen",
+              "module",
+              "integrated_robot",
+              "lifecycle"
+            ]
+          },
+          "status": {
+            "enum": [
+              "planned",
+              "not_run",
+              "inconclusive",
+              "failed",
+              "passed",
+              "invalidated"
+            ]
+          },
+          "protocol_revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "instrument_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "calibration_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "raw_data_digest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^(sha256:[a-fA-F0-9]{64})?$"
+          },
+          "acceptance_rule_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deviation_notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "evidence_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw_data_retained",
+        "configuration_bound",
+        "calibration_required",
+        "uncertainty_required",
+        "simulation_not_physical_qualification",
+        "supplier_claims_not_independent_qualification"
+      ],
+      "properties": {
+        "raw_data_retained": {
+          "const": true
+        },
+        "configuration_bound": {
+          "const": true
+        },
+        "calibration_required": {
+          "const": true
+        },
+        "uncertainty_required": {
+          "const": true
+        },
+        "simulation_not_physical_qualification": {
+          "const": true
+        },
+        "supplier_claims_not_independent_qualification": {
+          "const": true
+        }
+      }
+    }
+  }
+}
