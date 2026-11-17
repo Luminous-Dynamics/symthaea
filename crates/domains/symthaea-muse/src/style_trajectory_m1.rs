@@ -14,14 +14,21 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use symthaea_music_theory::{
-    AssertedObligationState, Duration, GrammarPlanEvidence, GrammarStructuralTrace,
-    MusicalIntent, Score, ScoreValidationConfig, ScoreValidationIssue, Style,
+    AssertedObligationState, Duration, Emphasis, GrammarPlanEvidence, GrammarStructuralTrace,
+    MusicalIntent, Score, ScoreValidationConfig, ScoreValidationIssue, Style, VoiceRole,
     StyleTrajectoryPlanV1, StyleTrajectorySegmentV1, StyleTrajectoryTransitionV1,
     StyleTransitionMode, TheoryValidationReport, ValidationSeverity,
     compose_with_grammar_plan, validate_score,
 };
 use symthaea_music_theory::score_validation::is_universal_invariant;
 use symthaea_muse_protocol::catalog::{CATALOG, StyleStatus};
+use symthaea_muse_protocol::{
+    EvidenceBasis, EvidenceStatus, ListenCompositionBundle, MeterPoint, MotifDefinition,
+    MusicalTime, SymbolicNoteEvent, TempoPoint, TraceVerificationIssue,
+    TraceVerificationReport, VerificationStatus,
+};
+
+use crate::analyst::{composer_trace_from_theory, verify_composer_trace};
 
 use crate::style_trajectory_admission::{
     SOURCE_SCORE_DIGEST_SCHEMA_V1, StyleTrajectoryAdmissionError,
@@ -65,6 +72,11 @@ pub enum StyleTrajectoryM1Error {
         style: String,
         issues: Vec<ScoreValidationIssue>,
     },
+    IndependentTraceVerificationFailed {
+        style: String,
+        issues: Vec<TraceVerificationIssue>,
+        verification_status: VerificationStatus,
+    },
     ScoreSerializationFailed {
         reason: String,
     },
@@ -85,6 +97,8 @@ pub struct StyleTrajectoryM1SegmentV1 {
     pub grammar_plan: GrammarPlanEvidence,
     /// ScoreEventRef values in this trace are local to this segment Score.
     pub grammar_trace: GrammarStructuralTrace,
+    /// Independently checks composer assertions against score-derived Listen events.
+    pub trace_verification: TraceVerificationReport,
     pub validation: TheoryValidationReport,
 }
 
@@ -159,6 +173,18 @@ pub fn realize_classical_to_minimalism_m1(
     let classical_validation = validate_universal_invariants(Style::Classical, &classical.score)?;
     let minimalism_validation =
         validate_universal_invariants(Style::Minimalism, &minimalism.score)?;
+    let classical_trace_verification = verify_trace_independently(
+        Style::Classical,
+        &intent,
+        &classical.score,
+        &classical.trace,
+    )?;
+    let minimalism_trace_verification = verify_trace_independently(
+        Style::Minimalism,
+        &intent,
+        &minimalism.score,
+        &minimalism.trace,
+    )?;
 
     let classical_length = classical.score.total_beats;
     let minimalism_start = classical_length;
@@ -209,6 +235,7 @@ pub fn realize_classical_to_minimalism_m1(
             score: classical.score.clone(),
             grammar_plan: classical.plan.clone(),
             grammar_trace: classical.trace.clone(),
+            trace_verification: classical_trace_verification,
             validation: classical_validation,
         },
         StyleTrajectoryM1SegmentV1 {
@@ -220,6 +247,7 @@ pub fn realize_classical_to_minimalism_m1(
             score: minimalism.score.clone(),
             grammar_plan: minimalism.plan.clone(),
             grammar_trace: minimalism.trace.clone(),
+            trace_verification: minimalism_trace_verification,
             validation: minimalism_validation,
         },
     ];
@@ -339,6 +367,134 @@ fn verify_typed_grammar(
     Ok(())
 }
 
+fn verify_trace_independently(
+    style: Style,
+    intent: &MusicalIntent,
+    score: &Score,
+    trace: &GrammarStructuralTrace,
+) -> Result<TraceVerificationReport, StyleTrajectoryM1Error> {
+    let digest = score_sha256(score)?;
+    let public_trace = composer_trace_from_theory(trace, &digest, 0, None);
+    let composition = listen_bundle_for_score(style, intent, score);
+    let report = verify_composer_trace(&public_trace, &composition, &digest, 0);
+    if !report.issues.is_empty()
+        || report.evidence.verification_status != VerificationStatus::Verified
+    {
+        return Err(StyleTrajectoryM1Error::IndependentTraceVerificationFailed {
+            style: format!("{style:?}"),
+            issues: report.issues.clone(),
+            verification_status: report.evidence.verification_status.clone(),
+        });
+    }
+    Ok(report)
+}
+
+/// Build the same score-event identity projection used by Muse Studio and
+/// the existing Analyst flagship-verification tests. IDs are role-local
+/// ordinals scoped to this frozen segment Score, never global EventIds.
+fn listen_bundle_for_score(
+    style: Style,
+    intent: &MusicalIntent,
+    score: &Score,
+) -> ListenCompositionBundle {
+    let mut notes = Vec::with_capacity(score.notes.len());
+    for role in [
+        VoiceRole::Bass,
+        VoiceRole::Harmony,
+        VoiceRole::CounterMelody,
+        VoiceRole::Melody,
+    ] {
+        let role_slug = match role {
+            VoiceRole::Melody => "melody",
+            VoiceRole::Harmony => "harmony",
+            VoiceRole::Bass => "bass",
+            VoiceRole::CounterMelody => "counter",
+        };
+        let role_label = format!("{role:?}");
+        for (index, note) in score.voice(role).into_iter().enumerate() {
+            let onset = note.onset.beats();
+            let duration_beats = note.duration.beats();
+            notes.push(SymbolicNoteEvent {
+                id: format!("score-{role_slug}-{index}"),
+                midi: note.pitch.midi(),
+                pitch_name: format!("{:?}", note.pitch),
+                onset: musical_time(onset, score.tempo_bpm),
+                duration_ticks: (duration_beats * 480.0).round() as u64,
+                duration_beats,
+                duration_seconds: note.duration.seconds(score.tempo_bpm as f64),
+                velocity: note.velocity,
+                voice_role: role_label.clone(),
+                emphasis: match note.emphasis {
+                    Emphasis::Normal => "normal",
+                    Emphasis::Climax => "climax",
+                    Emphasis::Cadential => "cadential",
+                    Emphasis::PhraseStart => "phrase-start",
+                }
+                .into(),
+                section_intensity: note.section_intensity,
+            });
+        }
+    }
+
+    // The trace verifier needs the same motif-family identity named by
+    // composer_trace_from_theory. The definition is recipe-derived metadata;
+    // actual occurrence validity is still checked against score event IDs.
+    let motif = style.spec().motif(intent.arousal, intent.seed);
+    let pitched: Vec<_> = motif
+        .notes
+        .iter()
+        .filter_map(|note| note.degree.map(|degree| (degree, note.duration.beats())))
+        .collect();
+    let motif_definition = MotifDefinition {
+        id: "motif-primary".into(),
+        label: format!("{style:?} primary recipe motif"),
+        degrees: pitched.iter().map(|item| item.0).collect(),
+        durations_beats: pitched.iter().map(|item| item.1).collect(),
+        basis: EvidenceBasis {
+            status: EvidenceStatus::Observed,
+            source_method: "builtin-style-spec-motif-v1".into(),
+            confidence: None,
+            limitations: vec![
+                "The definition records the configured source motif; it is not a listener-recognition claim.".into(),
+            ],
+        },
+    };
+
+    ListenCompositionBundle {
+        ticks_per_beat: 480,
+        duration_ticks: (score.total_beats.beats() * 480.0).round() as u64,
+        duration_beats: score.total_beats.beats(),
+        duration_seconds: score.seconds(),
+        form_kind: format!("{:?}", style.grammar_family()),
+        tempo_map: vec![TempoPoint {
+            at: musical_time(0.0, score.tempo_bpm),
+            bpm: score.tempo_bpm,
+        }],
+        meter_map: vec![MeterPoint {
+            at: musical_time(0.0, score.tempo_bpm),
+            numerator: score.meter,
+            denominator: 4,
+        }],
+        sections: Vec::new(),
+        phrases: Vec::new(),
+        notes,
+        motif_definitions: vec![motif_definition],
+        motif_occurrences: Vec::new(),
+        cadences: Vec::new(),
+        sonorities: Vec::new(),
+        orchestration: Vec::new(),
+        resonance: None,
+    }
+}
+
+fn musical_time(beats: f64, tempo_bpm: f32) -> MusicalTime {
+    MusicalTime {
+        tick: (beats.max(0.0) * 480.0).round() as u64,
+        beats,
+        seconds: beats * 60.0 / tempo_bpm.max(1.0) as f64,
+    }
+}
+
 fn validate_universal_invariants(
     style: Style,
     score: &Score,
@@ -444,6 +600,10 @@ mod tests {
         })));
         assert!(result.composed_validation.issues.iter().all(|issue| {
             issue.severity != ValidationSeverity::Fatal || !is_universal_invariant(issue.rule)
+        }));
+        assert!(result.segments.iter().all(|segment| segment.trace_verification.issues.is_empty()));
+        assert!(result.segments.iter().all(|segment| {
+            segment.trace_verification.evidence.verification_status == VerificationStatus::Verified
         }));
         assert!(!result.segments[1].score.has_part_identity());
     }
