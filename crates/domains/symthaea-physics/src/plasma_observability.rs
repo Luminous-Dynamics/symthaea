@@ -853,6 +853,49 @@ mod tests {
     }
 
     #[test]
+    fn measurement_source_digest_and_calibration_identity_are_mandatory() {
+        let missing_digest = base_frame(vec![
+            channel(
+                "density",
+                "interferometer",
+                ObservationDisposition::Measured {
+                    value: 0.9,
+                    units: "10^20 m^-3".to_owned(),
+                    source_id: "interferometer-01".to_owned(),
+                    source_digest: "not-a-digest".to_owned(),
+                    calibration: CalibrationIdentity {
+                        calibration_id: "calibration-density-01".to_owned(),
+                        calibration_revision: "2026-11-01".to_owned(),
+                    },
+                    observed_at_ns: 100,
+                },
+            ),
+            channel("temperature", "thomson", measured(4.0, 100)),
+        ]);
+        assert!(missing_digest.validate().is_err());
+
+        let missing_calibration = base_frame(vec![
+            channel(
+                "density",
+                "interferometer",
+                ObservationDisposition::Measured {
+                    value: 0.9,
+                    units: "10^20 m^-3".to_owned(),
+                    source_id: "interferometer-01".to_owned(),
+                    source_digest: "4".repeat(64),
+                    calibration: CalibrationIdentity {
+                        calibration_id: String::new(),
+                        calibration_revision: "2026-11-01".to_owned(),
+                    },
+                    observed_at_ns: 100,
+                },
+            ),
+            channel("temperature", "thomson", measured(4.0, 100)),
+        ]);
+        assert!(missing_calibration.validate().is_err());
+    }
+
+    #[test]
     fn counts_preserve_measured_and_synthetic_as_separate_categories() {
         let frame = base_frame(vec![
             channel("density", "interferometer", measured(0.9, 100)),
