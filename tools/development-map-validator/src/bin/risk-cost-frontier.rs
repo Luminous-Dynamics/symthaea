@@ -180,6 +180,24 @@ fn evaluate_cost_frontier_parts_json(
         }
     }
 
+    let estimate_values = required_value(&cost_candidate, "cost_estimates", "cost_candidate")?
+        .as_array().ok_or("cost_candidate.cost_estimates must be an array")?;
+    let mut candidate_estimates = BTreeMap::new();
+    for (index, item) in estimate_values.iter().enumerate() {
+        let label = format!("cost_candidate.cost_estimates[{index}]");
+        allowed_keys(item, &["option_id", "estimated_cost_upper_micros"], &label)?;
+        let id = required_str(item, "option_id", &label)?;
+        let estimate = required_u64(item, "estimated_cost_upper_micros", &label)?;
+        if candidate_estimates.insert(id.clone(), estimate).is_some() {
+            return Err(format!("duplicate candidate cost estimate for {id:?}"));
+        }
+    }
+    if candidate_estimates.keys().cloned().collect::<BTreeSet<_>>()
+        != cost_options.keys().cloned().collect::<BTreeSet<_>>()
+    {
+        return Err("candidate cost estimate IDs must match evaluator cost option IDs exactly".to_owned());
+    }
+
     let execution_values = required_value(&cost_candidate, "execution_traces", "cost_candidate")?
         .as_array().ok_or("cost_candidate.execution_traces must be an array")?;
     let evidence_traces = required_value(&evidence_candidate, "traces", "evidence_candidate")?
@@ -235,6 +253,7 @@ fn evaluate_cost_frontier_parts_json(
         let mut retry_cost = 0u64;
         let mut attempt_count = 0usize;
         let mut step_reports = Vec::new();
+        let mut estimate_undercoverage_count = 0usize;
         for plan in &plans {
             let option = cost_options.get(&plan.option_id).ok_or_else(|| format!("missing evaluator cost option {:?}", plan.option_id))?;
             let mut step_cost = 0u64;
@@ -254,7 +273,16 @@ fn evaluate_cost_frontier_parts_json(
                 attempt_count += 1;
                 attempts.push(json!({"mode":mode,"nearest_rank_p95_cost_bound_micros":bound,"sample_count":samples.len()}));
             }
-            step_reports.push(json!({"option_id":plan.option_id,"attempts":attempts,"cost_bound_micros":step_cost}));
+            let candidate_estimate = candidate_estimates[&plan.option_id];
+            let estimate_undercovered = candidate_estimate < step_cost;
+            if estimate_undercovered { estimate_undercoverage_count += 1; }
+            step_reports.push(json!({
+                "option_id":plan.option_id,
+                "attempts":attempts,
+                "cost_bound_micros":step_cost,
+                "candidate_estimate_upper_micros":candidate_estimate,
+                "estimate_undercovered":estimate_undercovered
+            }));
         }
         let risk = risk_by_id.get(&id).ok_or_else(|| format!("D6.17 risk report missing trace {id:?}"))?;
         let (kind, action_id) = decision_by_id.get(&id).ok_or_else(|| format!("decision metadata missing for {id:?}"))?;
@@ -278,6 +306,7 @@ fn evaluate_cost_frontier_parts_json(
             "warm_cost_bound_micros":warm_cost,
             "retry_cost_bound_micros":retry_cost,
             "attempt_count":attempt_count,
+            "cost_estimate_undercoverage_count":estimate_undercoverage_count,
             "within_budget":!over_budget,
             "budget_micros":budget,
             "feasible":feasible,
@@ -310,11 +339,11 @@ fn evaluate_cost_frontier_parts_json(
                 .ok_or_else(|| format!("{label}.trace_ids must contain non-empty strings"))?;
             if !selected_ids.insert(id.to_owned()) { return Err(format!("{label} contains duplicate trace {id:?}")); }
             let (kind, action_id) = decision_by_id.get(id).ok_or_else(|| format!("{label} references unknown trace {id:?}"))?;
-            if *kind != "act" { return Err(format!("{label} may compare only act decisions")); }
+            if kind.as_str() != "act" { return Err(format!("{label} may compare only act decisions")); }
             if expected_action.is_some_and(|expected| expected != action_id) {
                 return Err(format!("{label} must compare the same action across plans"));
             }
-            expected_action = Some(action_id);
+            expected_action = Some(action_id.as_str());
             let (cost, risk, feasible) = execution_by_id.get(id).ok_or_else(|| format!("{label} missing cost report for {id:?}"))?;
             plans.push(json!({"trace_id":id,"cost_bound_micros":cost,"worst_case_risk_bps":risk,"feasible":feasible}));
         }
@@ -356,6 +385,8 @@ fn evaluate_cost_frontier_parts_json(
             "within_budget_count":cost_reports.iter().filter(|r|r["within_budget"]==true).count(),
             "feasible_action_count":cost_reports.iter().filter(|r|r["feasible"]==true).count(),
             "over_budget_count":cost_reports.iter().filter(|r|r["within_budget"]==false).count(),
+            "cost_estimate_undercoverage_events":cost_reports.iter()
+                .map(|r|r["cost_estimate_undercoverage_count"].as_u64().unwrap_or(0)).sum::<u64>(),
             "comparison_group_count":comparison_reports.len()
         },
         "traces":cost_reports,
