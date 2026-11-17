@@ -12,7 +12,7 @@
       "action_id": "bounded-probe",
       "irreversible": false,
       "hard_gate": false,
-      "max_residual_risk_bps": 1200
+      "max_residual_risk_bps": 700
     },
     {
       "action_id": "inspect-readonly",
