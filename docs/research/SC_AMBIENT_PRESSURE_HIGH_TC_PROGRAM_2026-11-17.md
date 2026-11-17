@@ -551,3 +551,17 @@ The registry now contains 16 source records, 10 material/candidate records and 1
 - YNbTiZrHf experimental Tc/Jc/Hc2 and microstructure reference, with theoretical depairing current explicitly marked as calculated rather than measured.
 
 The exact-count Rust test assertions have been updated to 16 / 10 / 12. The observation-event schema continues to require one source-linked, condition-bound event for each property assertion; sample identity remains unresolved where the original article mapping has not yet been extracted.
+
+
+## 31. Process history is now separate from measurement conditions
+
+The condition-bound observation-event schema now optionally carries an ordered \`process_history\`. It models the operation, command target, actual execution values, execution state, sensor evidence source and sequence. This is needed for metastable states such as pressure-quenched Hg1223: the sample can be treated at ~18.9 GPa and then measured at 0 GPa after decompression.
+
+The process-history auditor enforces:
+- planned/commanded steps cannot carry actual execution values;
+- sensor-verified steps require actual values, a resolvable source, a source locator and measured/controller readback semantics;
+- process step IDs are unique and sequence numbers strictly increase;
+- process treatment pressure does not overwrite the pressure at which the property was measured;
+- a measured ambient state remains explicit at 0 GPa; a later/earlier treatment history does not silently turn unknown measurement pressure into ambient.
+
+The synthetic PQP fixture includes an 18.9 GPa hold and decompression to 0 GPa before a 151 K observed onset, solely as a schema plumbing case. It is not a real data record or validation result.
