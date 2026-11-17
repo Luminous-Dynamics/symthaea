@@ -2,6 +2,7 @@ name: PITB Clustered Benchmark Statistics
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - "tools/pitb-clustered-benchmark-stats/**"
       - "tools/pitb-sorrydb-audit/schema/sorrydb-proof-run-v0.schema.json"
@@ -13,6 +14,7 @@ permissions:
 
 jobs:
   paired-cluster-bootstrap-contract:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
