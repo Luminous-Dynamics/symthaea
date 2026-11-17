@@ -1,0 +1,49 @@
+name: Chaos Reference Suite
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "research/chaos-reference-suite/**"
+      - ".github/workflows/chaos-reference-suite.yml"
+  push:
+    branches:
+      - "research/chaos-reference-suite-v0"
+    paths:
+      - "research/chaos-reference-suite/**"
+      - ".github/workflows/chaos-reference-suite.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chaos-reference-suite-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Standalone chaos reference crate
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/chaos-reference-suite/Cargo.toml -- --check
+
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path research/chaos-reference-suite/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run all tests and targets
+        run: cargo test --manifest-path research/chaos-reference-suite/Cargo.toml --all-targets
+
+      - name: Generate frozen fixture sample
+        run: |
+          cargo run --manifest-path research/chaos-reference-suite/Cargo.toml --bin chaos-fixtures -- 128 20261116 > chaos-fixtures.csv
+          test -s chaos-fixtures.csv
