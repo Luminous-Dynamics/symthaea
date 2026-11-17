@@ -542,6 +542,24 @@ mod tests {
     }
 
     #[test]
+    fn candidate_option_id_must_match_expected_and_manifest() {
+        let mut item = candidate();
+        item.manifest.option_id = "another-action".into();
+        let report = admit_candidate(&item, &context());
+        assert!(report.rejection_reasons.contains(&RejectionReason::OptionIdMismatch));
+        assert!(report.admitted_option.is_none());
+    }
+
+    #[test]
+    fn source_dataset_digest_must_match_frozen_context() {
+        let mut item = candidate();
+        item.manifest.source_dataset_digest = "sha256:substituted-dataset".into();
+        let report = admit_candidate(&item, &context());
+        assert!(report.rejection_reasons.contains(&RejectionReason::SourceDatasetMismatch));
+        assert!(report.admitted_option.is_none());
+    }
+
+    #[test]
     fn missing_required_digest_is_rejected() {
         let mut item = candidate();
         item.manifest.sensor_model_digest.clear();
