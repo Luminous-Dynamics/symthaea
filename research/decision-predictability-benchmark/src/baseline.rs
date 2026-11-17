@@ -454,9 +454,7 @@ mod tests {
         let mut history = vec![0.7e-180, -0.2e-180];
         for _ in 0..100 {
             let time = history.len();
-            let next = 0.25e-180
-                + 1.25 * history[time - 1]
-                - 0.8 * history[time - 2];
+            let next = 0.25e-180 + 1.25 * history[time - 1] - 0.8 * history[time - 2];
             history.push(next);
         }
 
