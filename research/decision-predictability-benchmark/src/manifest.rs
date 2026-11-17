@@ -948,9 +948,9 @@ mod tests {
             "\n",
         );
         let without_schema = VALID.replacen(schema_line, "", 1);
-        let generator_line = concat!("      ", r#""generator":"#, "\n");
+        let task_line = concat!("      ", r#""task":{"#);
         let reordered =
-            without_schema.replacen(generator_line, &format!("{schema_line}{generator_line}"), 1);
+            without_schema.replacen(task_line, &format!("{schema_line}{task_line}"), 1);
         let left = parse_and_validate(VALID.as_bytes()).unwrap();
         let right = parse_and_validate(reordered.as_bytes()).unwrap();
         assert_eq!(left.canonical_sha256(), right.canonical_sha256());
