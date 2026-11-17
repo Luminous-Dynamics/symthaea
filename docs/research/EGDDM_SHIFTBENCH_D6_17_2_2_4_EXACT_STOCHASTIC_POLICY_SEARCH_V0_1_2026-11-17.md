@@ -31,7 +31,7 @@ it enumerates all policy trees in the registered finite class:
 2. Every acquisition node may select any option not already used on its current path.
 3. Every registered outcome must have exactly one child branch.
 4. Each outcome branch may independently choose its own next measurement or stop.
-5. The maximum acquisition depth is the candidate tree-depth limit minus the terminal stop node.
+5. The scorer counts root depth as zero, so the maximum acquisition count on a path equals the candidate max-depth value; a terminal stop is allowed at that depth.
 6. Trees above the scorer's 64-node limit are excluded from the legal search class and counted.
 7. Each tree is passed to D6.17.2.2.1; policy feasibility is determined by its robust-risk and budget checks.
 
