@@ -119,6 +119,26 @@ No external dataset is required. Use hand-calculated fixtures and the current re
 
 Targets (proposed): exact agreement on hand-computable cases; zero accepted policies with any supplied-model gate/risk/resource violation; deterministic report under input ordering; no model-specific policy substitution.
 
+### B0.5 — DARPA SubT artifact-reporting known-answer replay
+
+Tracker: [#12593 — DARPA-SUBT-ARTIFACT-GROUND-TRUTH-001](https://github.com/Luminous-Dynamics/symthaea/issues/12593).
+
+Use the source-pinned round CSVs as a *report evaluator*, not as a mapping or SLAM dataset. The first slice can use the 40-row Prize round and the 80-row combined table; retain the three round-specific files and the 10 source type strings.
+
+- Generate synthetic candidate reports with exact truth, 3-D offsets around and beyond 5 m, wrong class labels, duplicates, omitted detections and false positives.
+- Score correct-class localization using the exact official round rule once its source/round applicability is pinned; until then call any implementation a local 5 m scoring proxy, not official-score parity.
+- Compare unlimited reports with the historical fixed report allowance, then measure precision/recall and abstention as the report budget tightens.
+- Preserve DARPA frame and source-native type names; all transform and alias mappings are separate, versioned artifacts.
+- Ground truth is evaluator-only. Candidate generation cannot see coordinates, class labels or PCD-derived privileged observations.
+
+Report per-round denominators, per-class precision/recall, 3-D error distribution, 5 m success fraction under the specified rule, duplicate/false-positive rate, report-budget use, abstention, and exact score replay. This benchmark isolates reporting semantics and decision quality; it does not qualify upstream perception, localization, comms or safety.
+
+### B0.6 — decision and report value under bounded evidence
+
+Use the B0.5 artifact truth to generate a *frozen* synthetic evidence/action ledger: each candidate report is tied to an observation provenance record, sensor/pose uncertainty, class hypothesis and optional unknown/abstain disposition. Compare a fixed-priority reporter, confidence-threshold reporter, entropy/IG reporter, EVSI reporter, and the survival-conditioned/refereed policy under identical report and resource budgets.
+
+The key metric is **accepted correct reports per scarce report slot / robot-hour**, subject to zero false acceptance in the seeded critical negative-control cases. The report score must not be a proxy for safety, and the synthetic evidence ledger is not a substitute for raw field sensor data.
+
 ### B1 — CAVERS localization-to-decision replay
 
 Freeze the exact dataset version, selected sequences, download manifest, sensor calibration/metadata, frame conventions, timestamp synchronization, ground-truth availability and evaluation code. Use a sequence-level split, not random frame split.
