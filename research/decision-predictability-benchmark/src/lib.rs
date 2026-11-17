@@ -336,7 +336,8 @@ pub fn evaluate_decisions(sets: &[InformationSet]) -> Result<DecisionRisk, Metri
         policy_risk += set.probability * expected_losses[chosen_action];
     }
 
-    if !bayes_risk.is_finite() || !policy_risk.is_finite() || !perfect_information_risk.is_finite() {
+    if !bayes_risk.is_finite() || !policy_risk.is_finite() || !perfect_information_risk.is_finite()
+    {
         return Err(MetricError::NonFiniteValue("aggregate decision risk"));
     }
 
