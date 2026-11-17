@@ -127,7 +127,7 @@ fn augment_candidate_and_oracle(
     for (factor_id,unknown_row) in unknown_rows{
         for root in [&mut candidate_aug,&mut oracle_aug]{
             let factors=root["factors"].as_array_mut().ok_or("factors must be an array")?;
-            let factor=factors.iter_mut().find(|f|f["factor_id"]==*factor_id)
+            let factor=factors.iter_mut().find(|f|f["factor_id"].as_str()==Some(factor_id.as_str()))
                 .ok_or_else(||format!("unknown-channel policy references missing factor {factor_id:?}"))?;
             factor["likelihoods"].as_array_mut().ok_or("factor.likelihoods must be an array")?
                 .push(unknown_row.clone());
