@@ -31,5 +31,19 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Validate Draft 2020-12 schema and manifest
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("research/symmetry-discovery-benchmark-001")
+          schema = json.loads((root / "schemas/case_manifest.schema.json").read_text())
+          manifest = json.loads((root / "fixtures/v0.1/cases.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(manifest)
+          PY
       - name: Validate exact fixture group/actions and polynomial stabilizers
         run: python3 -I research/symmetry-discovery-benchmark-001/validate_cases.py
