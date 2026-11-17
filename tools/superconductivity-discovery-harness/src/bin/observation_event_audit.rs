@@ -78,6 +78,30 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
             ));
         }
 
+        let locator = event
+            .pointer("/source/locator")
+            .and_then(Value::as_object)
+            .ok_or_else(|| format!("{observation_id}: missing source locator"))?;
+        let locator_fields = [
+            "page",
+            "section",
+            "table",
+            "figure",
+            "supplementary_file",
+            "row_or_record_id",
+        ];
+        if !locator_fields.iter().any(|field| {
+            locator
+                .get(*field)
+                .is_some_and(|value| match value {
+                    Value::String(text) => !text.trim().is_empty(),
+                    Value::Number(number) => number.as_u64().is_some_and(|n| n > 0),
+                    _ => false,
+                })
+        }) {
+            return Err(format!("{observation_id}: source locator must identify page, section, table, figure, supplement or source row"));
+        }
+
         let assertion = event
             .get("assertion")
             .ok_or_else(|| format!("{observation_id}: missing assertion"))?;
@@ -137,8 +161,17 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
                     }
                 }
 
-                if property == "Tc" && criterion.is_none() {
-                    return Err(format!("{observation_id}: observed Tc requires an explicit criterion field"));
+                if property == "Tc"
+                    && criterion.is_none_or(|value| value == "not_applicable")
+                {
+                    return Err(format!(
+                        "{observation_id}: observed Tc requires a meaningful measurement criterion"
+                    ));
+                }
+                if property == "Tc"
+                    && value.as_f64().is_some_and(|measurement| measurement < 0.0)
+                {
+                    return Err(format!("{observation_id}: observed Tc cannot be negative"));
                 }
             }
             "calculated" | "predicted" => {
@@ -370,6 +403,27 @@ mod tests {
     fn predicted_value_cannot_claim_observed_detection() {
         let (_, mut fixture) = committed_inputs();
         fixture["observations"][3]["assertion"]["detection_status"] = json!("detected");
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn source_locator_is_required_and_must_be_nonempty() {
+        let (_, mut fixture) = committed_inputs();
+        fixture["observations"][0]["source"]["locator"] = json!({});
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn observed_tc_cannot_use_not_applicable_criterion() {
+        let (_, mut fixture) = committed_inputs();
+        fixture["observations"][0]["assertion"]["tc_criterion"] = json!("not_applicable");
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn negative_observed_tc_fails_closed() {
+        let (_, mut fixture) = committed_inputs();
+        fixture["observations"][0]["assertion"]["value"] = json!(-1.0);
         assert!(audit_mutated(fixture).is_err());
     }
 
