@@ -29,7 +29,10 @@ impl fmt::Display for NgrcError {
             Self::InvalidHistory => write!(formatter, "NG-RC history is empty or non-finite"),
             Self::InvalidDelayCount => write!(formatter, "NG-RC delay count is outside 1..=16"),
             Self::InvalidDelaySpacing => write!(formatter, "NG-RC delay spacing must be positive"),
-            Self::InvalidRidgePenalty => write!(formatter, "NG-RC ridge penalty must be finite and non-negative"),
+            Self::InvalidRidgePenalty => write!(
+                formatter,
+                "NG-RC ridge penalty must be finite and non-negative"
+            ),
             Self::InsufficientSamples { required, actual } => write!(
                 formatter,
                 "NG-RC requires at least {required} observations; received {actual}"
@@ -39,7 +42,9 @@ impl fmt::Display for NgrcError {
                 "NG-RC requires {required} context observations; received {actual}"
             ),
             Self::LinearSolveFailure => write!(formatter, "NG-RC readout solve failed"),
-            Self::NumericalFailure => write!(formatter, "NG-RC arithmetic produced a non-finite value"),
+            Self::NumericalFailure => {
+                write!(formatter, "NG-RC arithmetic produced a non-finite value")
+            }
         }
     }
 }
@@ -94,7 +99,9 @@ impl UniformDelayNgrc {
             let value = features
                 .iter()
                 .zip(self.coefficients.iter())
-                .fold(0.0, |sum, (feature, coefficient)| coefficient.mul_add(*feature, sum));
+                .fold(0.0, |sum, (feature, coefficient)| {
+                    coefficient.mul_add(*feature, sum)
+                });
             if !value.is_finite() {
                 return Err(NgrcError::NumericalFailure);
             }
@@ -141,7 +148,11 @@ pub fn fit_uniform_delay_ngrc(
         });
     }
 
-    let penalty_rows = if ridge_penalty > 0.0 { feature_count - 1 } else { 0 };
+    let penalty_rows = if ridge_penalty > 0.0 {
+        feature_count - 1
+    } else {
+        0
+    };
     let mut matrix = Vec::with_capacity(target_rows + penalty_rows);
     let mut target = Vec::with_capacity(target_rows + penalty_rows);
 
@@ -188,15 +199,23 @@ fn features_at(
 ) -> Result<Vec<f64>, NgrcError> {
     let mut taps = Vec::with_capacity(delay_count);
     for tap in 0..delay_count {
-        let offset = tap.checked_mul(delay_spacing).ok_or(NgrcError::NumericalFailure)?;
-        let index = origin.checked_sub(offset).ok_or(NgrcError::InsufficientForecastContext {
-            required: context_span(delay_count, delay_spacing)? + 1,
-            actual: origin + 1,
-        })?;
-        taps.push(*history.get(index).ok_or(NgrcError::InsufficientForecastContext {
-            required: context_span(delay_count, delay_spacing)? + 1,
-            actual: history.len(),
-        })?);
+        let offset = tap
+            .checked_mul(delay_spacing)
+            .ok_or(NgrcError::NumericalFailure)?;
+        let index = origin
+            .checked_sub(offset)
+            .ok_or(NgrcError::InsufficientForecastContext {
+                required: context_span(delay_count, delay_spacing)? + 1,
+                actual: origin + 1,
+            })?;
+        taps.push(
+            *history
+                .get(index)
+                .ok_or(NgrcError::InsufficientForecastContext {
+                    required: context_span(delay_count, delay_spacing)? + 1,
+                    actual: history.len(),
+                })?,
+        );
     }
 
     let mut features = Vec::with_capacity(1 + delay_count + (delay_count * (delay_count + 1)) / 2);
