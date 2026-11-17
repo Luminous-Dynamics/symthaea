@@ -352,6 +352,107 @@
             "string",
             "null"
           ]
+        },
+        "external_catalog": {
+          "type": "object",
+          "required": [
+            "library_id",
+            "external_record_id",
+            "api_version",
+            "data_version",
+            "snapshot_id"
+          ],
+          "properties": {
+            "library_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "external_record_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "api_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "data_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "snapshot_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "retrieved_at": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            },
+            "etag": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "x_data_version": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "external_parent_ids": {
+              "type": "object",
+              "properties": {
+                "paper_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "material_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sample_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "state_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "result_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "event_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            "query_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[a-fA-F0-9]{64}$"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
