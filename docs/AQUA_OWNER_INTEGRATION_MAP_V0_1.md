@@ -87,3 +87,11 @@ The room-mode contract records the required evidence and return-to-ready state f
 - The benchmark consumes Symtropy's native thermofluid/heat-pump/resource-closure outputs and Mycelix metrology; it does not implement a parallel heat-pump or thermal solver.
 - Key comparator insight: the 2026 DWHR/HP coupling paper reports study-specific global COP results up to 6.3 experimentally / 8.0 simulated, while some topologies incurred static heat loss and reduced HP COP; the unbalanced mixer-side configuration performed best in that study. Aqua must reproduce the result rather than assuming transferability.
 - See `docs/AQUA_DHW_CASCADE_BENCHMARK_V0_1.md`.
+
+
+## Adaptive experience and profile authority
+
+- Symthaea [AQUA-ADAPTIVE-EXPERIENCE-001 #12712](https://github.com/Luminous-Dynamics/symthaea/issues/12712) owns task-aware user-experience requirements, explicit preference/profile semantics, guest/shared-user handling, recommendation evaluation and human-factors protocol.
+- Symthaea may recommend or recall only device-qualified settings. Fixture-local deterministic constraints and independent physical safety interlocks remain authoritative; profile, model and network loss must fall back to manual operation.
+- Mycelix consent/identity/authorization evidence is consumed where required; no identity/profile record becomes physical safety authority.
+- KOHLER Anthem / Anthem+ / DTV already provide multi-outlet control, presets and app/voice integration. Aqua's research claim must therefore be about privacy, agency, task outcomes and evidence-qualified bounded adaptation, not "AI presets" alone.
