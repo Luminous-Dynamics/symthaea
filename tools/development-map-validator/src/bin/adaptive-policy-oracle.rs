@@ -561,6 +561,11 @@ mod tests{
  #[test]fn candidate_cannot_change_world_probability_bounds(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["candidate_view"]["hypothesis_bounds"][0]["upper_probability_bps"]=json!(9999);assert!(evaluate_adaptive_policy_json(&b.to_string()).unwrap_err().contains("differ from evaluator-authoritative"));}
  #[test]fn missing_observation_branch_is_rejected(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["candidate_view"]["policy_tree"]["nodes"][0]["branches"].as_object_mut().unwrap().remove("fail");assert!(evaluate_adaptive_policy_json(&b.to_string()).unwrap_err().contains("cover every factor outcome"));}
  #[test]fn repeated_option_on_a_path_is_rejected(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["candidate_view"]["policy_tree"]["nodes"][1]["option_id"]=json!("gate-a");assert!(evaluate_adaptive_policy_json(&b.to_string()).unwrap_err().contains("repeats option"));}
+ #[test]fn defer_leaf_must_select_explicitly_read_only_action(){
+  let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
+  b["candidate_view"]["policy_tree"]["nodes"][3]["action_id"]=json!("release");
+  assert!(evaluate_adaptive_policy_json(&b.to_string()).unwrap_err().contains("explicitly read-only"));
+ }
  #[test]fn more_than_one_global_safe_defer_action_is_rejected(){
   let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
   let extra=json!({"action_id":"inspect-second","read_only":true,"irreversible":false,"hard_gate":false,"max_residual_risk_bps":0});
