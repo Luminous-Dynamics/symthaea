@@ -405,5 +405,5 @@ mod tests {
             fixture.reference_probe_observation(0, 3, 0.1),
             Err(ProbeDenial::ProbeUnavailable)
         );
-    
+    }
 }
