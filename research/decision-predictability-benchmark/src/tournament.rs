@@ -510,8 +510,7 @@ fn evaluate_series(fixture: &FixtureTrajectory, channel: Channel, output: &mut S
                 })
                 .map(|(_, _, rmse)| *rmse);
             let skill = reference_rmse
-                .filter(|reference| *reference > 0.0 && reference.is_finite())
-                .map(|reference| 1.0 - metrics.rmse / reference);
+                .and_then(|reference| skill_vs_reference_rmse(metrics.rmse, reference, development_scale));
 
             write_metric_row(
                 output,
@@ -673,6 +672,23 @@ fn error_metrics(prediction: &[f64], truth: &[f64], scale: f64) -> ErrorMetrics 
     let nrmse = rmse / scale;
 
     ErrorMetrics { mae, rmse, nrmse }
+}
+
+/// Compute skill relative to a reference model only when its error is
+/// material relative to the signal scale. When the reference is already
+/// effectively exact, the ratio is numerically unstable and not informative.
+fn skill_vs_reference_rmse(candidate_rmse: f64, reference_rmse: f64, signal_scale: f64) -> Option<f64> {
+    if !candidate_rmse.is_finite()
+        || candidate_rmse < 0.0
+        || !reference_rmse.is_finite()
+        || !signal_scale.is_finite()
+        || signal_scale <= 0.0
+        || reference_rmse <= 1e-12 * signal_scale
+    {
+        return None;
+    }
+    let skill = 1.0 - candidate_rmse / reference_rmse;
+    skill.is_finite().then_some(skill)
 }
 
 /// Return inclusive 1-based lead-time bins, clipped to the actual horizon.
@@ -886,6 +902,13 @@ mod tests {
         assert!(!result.lines().any(|line| {
             line.starts_with("ar_fixture,known_regime,x,") && line.ends_with(",ok")
         }));
+    }
+
+    #[test]
+    fn persistence_skill_is_undefined_when_reference_error_is_negligible() {
+        assert_eq!(skill_vs_reference_rmse(0.1, 0.2, 1.0), Some(0.5));
+        assert_eq!(skill_vs_reference_rmse(0.1, 1e-15, 1.0), None);
+        assert_eq!(skill_vs_reference_rmse(0.1, f64::NAN, 1.0), None);
     }
 
     #[test]
