@@ -1,0 +1,56 @@
+name: Subterra Robust Survival Referee
+
+on:
+  push:
+    branches:
+      - research/subterra-robust-survival-referee-v0-1
+    paths:
+      - "crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/**"
+      - "crates/domains/symthaea-subterranean/research/subterra-survival-planner/**"
+      - ".github/workflows/subterra-robust-survival-referee.yml"
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/**"
+      - "crates/domains/symthaea-subterranean/research/subterra-survival-planner/**"
+      - ".github/workflows/subterra-robust-survival-referee.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Exact-head format, tests and strict Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out exact commit
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust 1.96.0 toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting without mutating source
+        run: |
+          cargo fmt --manifest-path crates/domains/symthaea-subterranean/research/subterra-survival-planner/Cargo.toml -- --check
+          cargo fmt --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml -- --check
+
+      - name: Test survival-planner dependency
+        run: cargo test --manifest-path crates/domains/symthaea-subterranean/research/subterra-survival-planner/Cargo.toml --all-targets
+
+      - name: Test robust survival policy referee
+        run: cargo test --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml --all-targets
+
+      - name: Run strict Clippy
+        run: |
+          cargo clippy --manifest-path crates/domains/symthaea-subterranean/research/subterra-survival-planner/Cargo.toml --all-targets -- -D warnings
+          cargo clippy --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml --all-targets -- -D warnings
+
+      - name: Preserve evidence ceiling
+        if: always()
+        run: echo "PASS applies only to standalone finite-model reference tests; it is not physical, analogue, flight or planetary qualification."
