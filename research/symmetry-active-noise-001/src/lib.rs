@@ -610,7 +610,6 @@ pub fn verify_persistent_noise_receipt(
     Ok(())
 }
 
-
 /// Closed interval with exact signed fixed-point endpoints.
 ///
 /// The scale is supplied by the problem contract (for example, micrometres,
@@ -631,7 +630,10 @@ impl FixedIntervalV1 {
     }
 
     pub fn point(value: i128) -> Self {
-        Self { lower: value, upper: value }
+        Self {
+            lower: value,
+            upper: value,
+        }
     }
 
     pub fn intersection(self, other: Self) -> Option<Self> {
@@ -692,7 +694,10 @@ impl BoundedIntervalProblemV1 {
                     hypothesis_id: self.hypothesis_ids[hypothesis_index].clone(),
                 });
             }
-            if by_probe.iter().any(|interval| interval.lower > interval.upper) {
+            if by_probe
+                .iter()
+                .any(|interval| interval.lower > interval.upper)
+            {
                 return Err(NoiseErrorV1::InvalidInterval);
             }
         }
@@ -978,23 +983,24 @@ pub fn replay_shared_additive_bias(
     let mut feasible_bias_by_hypothesis =
         vec![Some(problem.global_bias_interval); problem.hypothesis_ids.len()];
     let mut snapshots = Vec::with_capacity(observations.len() + 1);
-    snapshots.push(shared_bias_snapshot(problem, &feasible_bias_by_hypothesis, 0));
+    snapshots.push(shared_bias_snapshot(
+        problem,
+        &feasible_bias_by_hypothesis,
+        0,
+    ));
 
     for (observation_index, observation) in observations.iter().enumerate() {
         if observation.observed.lower > observation.observed.upper {
             return Err(NoiseErrorV1::InvalidInterval);
         }
         let probe_index = resolve_probe(&problem.probes, &observation.probe_id)?;
-        for (hypothesis_index, feasible_bias) in
-            feasible_bias_by_hypothesis.iter_mut().enumerate()
+        for (hypothesis_index, feasible_bias) in feasible_bias_by_hypothesis.iter_mut().enumerate()
         {
             let Some(current) = *feasible_bias else {
                 continue;
             };
             let nominal = problem.nominal_predictions_by_hypothesis[hypothesis_index][probe_index];
-            let allowed_bias = observation
-                .observed
-                .checked_subtract(nominal)?;
+            let allowed_bias = observation.observed.checked_subtract(nominal)?;
             *feasible_bias = current.intersection(allowed_bias);
         }
         snapshots.push(shared_bias_snapshot(
@@ -1306,7 +1312,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn bounded_numeric_intervals_retain_overlapping_hypotheses_only() {
         let problem = BoundedIntervalProblemV1 {
@@ -1314,8 +1319,16 @@ mod tests {
             quantity_unit_id: "millimetre-integer".to_owned(),
             hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned()],
             probes: vec![
-                NoiseProbeV1 { probe_id: "p0".to_owned(), cost: 1, admissible: true },
-                NoiseProbeV1 { probe_id: "p1".to_owned(), cost: 1, admissible: true },
+                NoiseProbeV1 {
+                    probe_id: "p0".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p1".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
             ],
             predicted_intervals_by_hypothesis: vec![
                 vec![
@@ -1379,13 +1392,18 @@ mod tests {
             quantity_unit_id: "millimetre-integer".to_owned(),
             hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned()],
             probes: vec![
-                NoiseProbeV1 { probe_id: "p0".to_owned(), cost: 1, admissible: true },
-                NoiseProbeV1 { probe_id: "p1".to_owned(), cost: 1, admissible: true },
+                NoiseProbeV1 {
+                    probe_id: "p0".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p1".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
             ],
-            nominal_predictions_by_hypothesis: vec![
-                vec![0, 0],
-                vec![0, 10],
-            ],
+            nominal_predictions_by_hypothesis: vec![vec![0, 0], vec![0, 10]],
             global_bias_interval: FixedIntervalV1::new(-5, 5).unwrap(),
         };
         let observations = vec![
@@ -1399,7 +1417,10 @@ mod tests {
             },
         ];
         let receipt = replay_shared_additive_bias(&problem, &observations).unwrap();
-        assert_eq!(receipt.snapshots[1].active_hypothesis_ids, vec!["H-A", "H-B"]);
+        assert_eq!(
+            receipt.snapshots[1].active_hypothesis_ids,
+            vec!["H-A", "H-B"]
+        );
         assert_eq!(receipt.final_active_hypothesis_ids, vec!["H-B"]);
         assert_eq!(
             receipt.snapshots[2].hypotheses[0].feasible_global_bias_interval,
