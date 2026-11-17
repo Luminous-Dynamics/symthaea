@@ -409,20 +409,18 @@ pub fn one_sided_jacobi_svd(
 
     let mut completed_sweeps = 0usize;
     let mut converged = tall_columns <= 1;
-    let mut maximum_correlation = 0.0_f64;
 
     for sweep in 0..profile.jacobi_max_sweeps {
         let mut changed = false;
-        maximum_correlation = 0.0;
 
         for left in 0..tall_columns {
             for right in (left + 1)..tall_columns {
                 let mut alpha = 0.0_f64;
                 let mut beta = 0.0_f64;
                 let mut gamma = 0.0_f64;
-                for row in 0..tall_rows {
-                    let a = work[row][left];
-                    let b = work[row][right];
+                for work_row in work.iter().take(tall_rows) {
+                    let a = work_row[left];
+                    let b = work_row[right];
                     alpha += a * a;
                     beta += b * b;
                     gamma += a * b;
@@ -434,7 +432,6 @@ pub fn one_sided_jacobi_svd(
                 }
                 let denominator = product.sqrt();
                 let correlation = gamma.abs() / denominator;
-                maximum_correlation = maximum_correlation.max(correlation);
                 if correlation <= profile.jacobi_relative_tolerance {
                     continue;
                 }
@@ -449,11 +446,11 @@ pub fn one_sided_jacobi_svd(
                 let cosine = 1.0 / (1.0 + tangent * tangent).sqrt();
                 let sine = cosine * tangent;
 
-                for row in 0..tall_rows {
-                    let a = work[row][left];
-                    let b = work[row][right];
-                    work[row][left] = cosine * a - sine * b;
-                    work[row][right] = sine * a + cosine * b;
+                for work_row in work.iter_mut().take(tall_rows) {
+                    let a = work_row[left];
+                    let b = work_row[right];
+                    work_row[left] = cosine * a - sine * b;
+                    work_row[right] = sine * a + cosine * b;
                 }
                 changed = true;
             }
@@ -467,15 +464,15 @@ pub fn one_sided_jacobi_svd(
     }
 
     // Recompute the final orthogonality defect after the last rotation sweep.
-    maximum_correlation = 0.0;
+    let mut maximum_correlation = 0.0_f64;
     for left in 0..tall_columns {
         for right in (left + 1)..tall_columns {
             let mut alpha = 0.0_f64;
             let mut beta = 0.0_f64;
             let mut gamma = 0.0_f64;
-            for row in 0..tall_rows {
-                let a = work[row][left];
-                let b = work[row][right];
+            for work_row in work.iter().take(tall_rows) {
+                let a = work_row[left];
+                let b = work_row[right];
                 alpha += a * a;
                 beta += b * b;
                 gamma += a * b;
