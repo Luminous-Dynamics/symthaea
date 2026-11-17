@@ -348,7 +348,10 @@ fn validate_profile(profile: &DecisionEnvelopeProfile) -> Vec<DecisionEnvelopeDi
             &profile.sign_convention_ref,
             DecisionEnvelopeDiagnostic::EmptySignConvention,
         ),
-        (&profile.time_basis_ref, DecisionEnvelopeDiagnostic::EmptyTimeBasis),
+        (
+            &profile.time_basis_ref,
+            DecisionEnvelopeDiagnostic::EmptyTimeBasis,
+        ),
         (
             &profile.normalization_contract_ref,
             DecisionEnvelopeDiagnostic::EmptyNormalizationContract,
@@ -391,7 +394,10 @@ fn validate_model(
             &model.solver_revision,
             DecisionEnvelopeDiagnostic::EmptySolverRevision,
         ),
-        (&model.run_receipt_ref, DecisionEnvelopeDiagnostic::EmptyRunReceipt),
+        (
+            &model.run_receipt_ref,
+            DecisionEnvelopeDiagnostic::EmptyRunReceipt,
+        ),
         (
             &model.output_evidence_ref,
             DecisionEnvelopeDiagnostic::EmptyOutputEvidence,
@@ -712,7 +718,10 @@ mod tests {
         input.models[1].run_id = input.models[0].run_id.clone();
         input.models[1].dependencies.run_id = input.models[1].run_id.clone();
         let report = evaluate_decision_envelope(&input);
-        assert_eq!(report.disposition, DecisionEnvelopeDisposition::IncompleteOrNotComparable);
+        assert_eq!(
+            report.disposition,
+            DecisionEnvelopeDisposition::IncompleteOrNotComparable
+        );
         assert!(
             report
                 .diagnostics
