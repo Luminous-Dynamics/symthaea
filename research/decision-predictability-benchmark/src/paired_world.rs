@@ -33,6 +33,7 @@ pub struct CandidateEpisode {
     pub primary_observations: Vec<PrimarySensorObservation>,
     pub reference_probe_available: bool,
     pub reference_probe_cost: f64,
+    pub reference_probe_latency_steps: u32,
     pub decision_deadline_step: u32,
 }
 
@@ -54,6 +55,16 @@ pub struct EvaluatorWorld {
     pub mechanism: WorldMechanism,
     pub reference_probe_value: f64,
     pub action_losses: [f64; 3],
+}
+
+/// Why a requested reference observation was not admitted.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProbeDenial {
+    UnknownWorld,
+    ProbeUnavailable,
+    InvalidBudget,
+    InsufficientBudget,
+    DecisionDeadlineMissed,
 }
 
 /// Paired-world fixture. Candidate and evaluator records are separately
@@ -83,21 +94,48 @@ impl PairedWorldFixture {
         self.prior_physical_hazard_probability
     }
 
-    /// Materialize the independently authorized reference-probe observation
-    /// for the selected evaluator world. The returned value contains no
-    /// mechanism label.
+    /// Materialize a reference-probe observation only when the probe is
+    /// available, its cost fits the remaining budget, and its result arrives
+    /// no later than the declared decision deadline.
+    ///
+    /// The returned observation contains no mechanism label. This simple
+    /// benchmark step counter is not a substitute for the event-time and
+    /// clock-domain contract owned by the broader observation-event work.
     pub fn reference_probe_observation(
         &self,
         world_index: usize,
-    ) -> Option<PrimarySensorObservation> {
-        let world = self.evaluator_worlds.get(world_index)?;
-        let episode = self.candidate_episodes.get(world_index)?;
+        requested_at_step: u32,
+        remaining_budget: f64,
+    ) -> Result<PrimarySensorObservation, ProbeDenial> {
+        let world = self
+            .evaluator_worlds
+            .get(world_index)
+            .ok_or(ProbeDenial::UnknownWorld)?;
+        let episode = self
+            .candidate_episodes
+            .get(world_index)
+            .ok_or(ProbeDenial::UnknownWorld)?;
+
         if !episode.reference_probe_available {
-            return None;
+            return Err(ProbeDenial::ProbeUnavailable);
+        }
+        if !remaining_budget.is_finite() || remaining_budget < 0.0 {
+            return Err(ProbeDenial::InvalidBudget);
+        }
+        if !episode.reference_probe_cost.is_finite() || episode.reference_probe_cost < 0.0 {
+            return Err(ProbeDenial::InvalidBudget);
+        }
+        if remaining_budget < episode.reference_probe_cost {
+            return Err(ProbeDenial::InsufficientBudget);
         }
 
-        Some(PrimarySensorObservation {
-            time_step: episode.decision_deadline_step,
+        let result_step = requested_at_step.saturating_add(episode.reference_probe_latency_steps);
+        if result_step > episode.decision_deadline_step {
+            return Err(ProbeDenial::DecisionDeadlineMissed);
+        }
+
+        Ok(PrimarySensorObservation {
+            time_step: result_step,
             sensor_id: "independent_reference",
             value: world.reference_probe_value,
         })
@@ -145,6 +183,7 @@ pub fn canonical_paired_world_fixture() -> PairedWorldFixture {
         primary_observations: observations.clone(),
         reference_probe_available: true,
         reference_probe_cost: 0.1,
+        reference_probe_latency_steps: 1,
         decision_deadline_step: 4,
     };
 
@@ -219,15 +258,15 @@ mod tests {
         assert_ne!(worlds[0].mechanism, worlds[1].mechanism);
         assert_eq!(
             fixture
-                .reference_probe_observation(0)
-                .expect("probe available")
+                .reference_probe_observation(0, 3, 0.1)
+                .expect("probe should meet deadline and budget")
                 .value,
             10.0
         );
         assert_eq!(
             fixture
-                .reference_probe_observation(1)
-                .expect("probe available")
+                .reference_probe_observation(1, 3, 0.1)
+                .expect("probe should meet deadline and budget")
                 .value,
             0.0
         );
@@ -327,4 +366,35 @@ mod tests {
         assert!((value.gross_value - 0.0).abs() < 1e-12);
         assert!((value.net_value + 0.05).abs() < 1e-12);
     }
+    #[test]
+    fn reference_probe_is_denied_when_budget_is_insufficient() {
+        let fixture = canonical_paired_world_fixture();
+        assert_eq!(
+            fixture.reference_probe_observation(0, 3, 0.05),
+            Err(ProbeDenial::InsufficientBudget)
+        );
+    }
+
+    #[test]
+    fn reference_probe_is_denied_when_result_arrives_after_deadline() {
+        let fixture = canonical_paired_world_fixture();
+        assert_eq!(
+            fixture.reference_probe_observation(0, 4, 0.1),
+            Err(ProbeDenial::DecisionDeadlineMissed)
+        );
+    }
+
+    #[test]
+    fn reference_probe_rejects_invalid_budget_and_world_identity() {
+        let fixture = canonical_paired_world_fixture();
+        assert_eq!(
+            fixture.reference_probe_observation(0, 3, f64::NAN),
+            Err(ProbeDenial::InvalidBudget)
+        );
+        assert_eq!(
+            fixture.reference_probe_observation(2, 3, 0.1),
+            Err(ProbeDenial::UnknownWorld)
+        );
+    }
+
 }
