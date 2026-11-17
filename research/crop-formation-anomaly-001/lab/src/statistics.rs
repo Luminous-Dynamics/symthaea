@@ -40,11 +40,7 @@ pub fn upper_tail_max_p_value(observed_max: f64, null_maxima: &[f64]) -> Option<
 /// dependence between observations; cluster-level sampling must be used when
 /// examples share an event, source, or acquisition session.
 pub fn wilson_interval(successes: usize, total: usize, z: f64) -> Option<(f64, f64)> {
-    if total == 0
-        || successes > total
-        || !z.is_finite()
-        || z <= 0.0
-    {
+    if total == 0 || successes > total || !z.is_finite() || z <= 0.0 {
         return None;
     }
 
@@ -75,7 +71,7 @@ mod tests {
     #[test]
     fn maximum_statistic_uses_plus_one_and_counts_ties() {
         let nulls = [0.1, 0.3, 0.7, 0.9];
-        assert_eq!(upper_tail_max_p_value(0.7, &nulls), Some(0.4));
+        assert_eq!(upper_tail_max_p_value(0.7, &nulls), Some(0.6));
         assert_eq!(upper_tail_max_p_value(1.0, &nulls), Some(0.2));
         assert_eq!(upper_tail_max_p_value(0.0, &nulls), Some(1.0));
         assert_eq!(upper_tail_max_p_value(f64::NAN, &nulls), None);
