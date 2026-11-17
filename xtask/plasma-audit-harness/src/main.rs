@@ -43,8 +43,7 @@ fn main() -> anyhow::Result<()> {
     );
 
     let voi_fixture = std::fs::read_to_string(
-        repository_root
-            .join("xtask/plasma-audit-harness/fixtures/plasma-voi-synthetic-v0.json"),
+        repository_root.join("xtask/plasma-audit-harness/fixtures/plasma-voi-synthetic-v0.json"),
     )?;
     let voi = xtask::plasma_experiment_voi::evaluate_manifest_json(&voi_fixture)
         .map_err(anyhow::Error::msg)?;
