@@ -132,7 +132,7 @@ The standalone `coupled_campaign.rs` module now composes the material-regime and
 Causal order:
 1. Inspect current source-reference, process-path, witness and QCM state.
 2. Apply the health decision gate.
-3. Read current process-optic transmission at the selected process band.
+3. Read current process-optic transmission at an explicitly selected spectral band (ultraviolet, visible, near-infrared or shortwave-infrared); the model does not hard-code a universal visible-band laser.
 4. Apply the pulse using that current transmission.
 5. Convert simulated material emissions into a deposition event.
 6. Apply independently declared transfer factors to process optic, witness and QCM.
