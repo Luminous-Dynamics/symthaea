@@ -281,6 +281,8 @@
           "certificate_id",
           "authority",
           "dependence_groups",
+          "conditioning_scope",
+          "factor_ids",
           "action_ids",
           "valid_from",
           "valid_until",
@@ -327,6 +329,27 @@
           },
           "mutual_conditional_independence": {
             "const": true
+          },
+          "factor_ids": {
+            "type": "array",
+            "minItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "conditioning_scope": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "contains": {
+              "const": "hypothesis"
+            }
           }
         }
       }
