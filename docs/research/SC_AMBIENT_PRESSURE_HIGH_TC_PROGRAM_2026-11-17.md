@@ -509,3 +509,45 @@ A new research work package, [SC-SYNTHESIS-FIRST-001 #12671](https://github.com/
 The registry records this as a framework reference, not an empirical superconductivity benchmark. Its cited <2% realisation estimate for >50,000 low-enthalpy phases is a review-level motivation and must not be reused as a superconductivity-specific success rate.
 
 The protocol-first work is connected to the condition-bound observation-event schema and GuidedMatDiffusion phase-realization audit. It separates planned procedures, issued commands, measured execution deviations, realized structure/phase and subsequent property observations.
+
+
+## 28. Pressure-quench record: ambient-pressure 151 K metastable Hg1223
+
+A major update to the ambient-pressure discovery programme is the PNAS 2026 report by Deng et al., *Ambient-pressure 151-K superconductivity in HgBa2Ca2Cu3O8+δ via pressure quench* (DOI 10.1073/pnas.2536178123).
+
+The result is a pressure-engineered metastable phase:
+- Initial Hg1223 crystals had an ambient-pressure transition near 133 K.
+- Pressure-quench points span approximately 10.1–29.7 GPa at 4.2 K.
+- Following rapid decompression to ambient pressure, post-quench resistive-onset transitions of 147–151 K were reported. The 151 K case used P_Q=18.9 GPa and T_Q=4.2 K, with 151 K on warming / 150 K on cooling.
+- A separate retrieved specimen after 10.1 GPa / 4.2 K PQP exhibited approximately 78% superconducting volume fraction by DC magnetization at a lower Tc around 140 K.
+- Synchrotron XRD retained tetragonal Hg1223 but observed peak broadening consistent with pressure-induced strain/defects.
+- A 149 K phase persisted inside the DAC at 77 K for at least three days, but warming/thermal cycling degrades the retained Tc. One report describes 147 K falling to 143 K after cycling to room temperature; phase degradation above 200 K is reported.
+- A ~172 K transition from a separate sample was not reproduced and remains unresolved; it is not counted as a discovery.
+
+The 151 K result is specifically a **resistive onset** after a high-pressure quench. It is not a 151 K zero-resistance or heat-capacity transition. The 78% magnetic-volume result is a different specimen at a lower transition temperature. Ambient-pressure operation after PQP is not ambient-pressure synthesis, and the metastable phase currently has no conductor/device qualification.
+
+Sources: https://doi.org/10.1073/pnas.2536178123 and https://www.aps.anl.gov/APS-Science-Highlight/2026-11-04/pressure-quenching-produces-record-setting-151-kelvin
+
+The new [SC-PRESSURE-QUENCH-001 #12672](https://github.com/Luminous-Dynamics/symthaea/issues/12672) focuses on protocol reproduction, P_Q/T_Q/decompression-rate dependence, phase retention, magnetic fraction, specimen identity, aging, thermal stability and scale-up beyond 100–130 μm DAC samples. This is now a major candidate path to ambient-pressure high-Tc operation, but not room-temperature superconductivity.
+
+## 29. High-entropy superconductors as a microstructure engineering path
+
+Idczak et al. reported bulk type-II superconductivity in nominal YNbTiZrHf in Physical Review B 114, 094507 (11 August 2026; DOI 10.1103/k1yr-t59z):
+- Tc about 6.1 K;
+- Jc about 45 kA/cm²;
+- μ0Hc2 about 12.5 T;
+- BCC matrix with minor Y-rich hexagonal precipitates;
+- dominant surface pinning with secondary point contribution, and a δTc-to-δl pinning crossover as field increases;
+- estimated depairing current density about 21 MA/cm², over two orders of magnitude above measured Jc.
+
+The gap between estimated depairing current and measured current is a useful research clue, not evidence that the theoretical current is achievable. This material offers a different near-term target than RTSC: tune microstructure and vortex pinning while preserving phase connectivity, bulk transition, and in-field current transport.
+
+New child: [HEA-SC-MICROSTRUCTURE-001 #12673](https://github.com/Luminous-Dynamics/symthaea/issues/12673). It asks for exact condition extraction, independent-batch reproduction, matrix/precipitate characterization, matched Jc(B,T,theta), and application comparison before any claim of conductor performance.
+
+## 30. Updated registry state
+
+The registry now contains 16 source records, 10 material/candidate records and 12 benchmark catalogs. New records preserve:
+- Hg1223 pressure-quench resistive onset, post-quench pressure path and separate magnetic-volume observation;
+- YNbTiZrHf experimental Tc/Jc/Hc2 and microstructure reference, with theoretical depairing current explicitly marked as calculated rather than measured.
+
+The exact-count Rust test assertions have been updated to 16 / 10 / 12. The observation-event schema continues to require one source-linked, condition-bound event for each property assertion; sample identity remains unresolved where the original article mapping has not yet been extracted.
