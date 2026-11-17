@@ -117,7 +117,6 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
                     "{observation_id}: X-Data-Version must match the declared external data_version"
                 ));
             }
-            let external_record_id = external.get("external_record_id").and_then(Value::as_str);
             if let Some(parents) = external.get("external_parent_ids").and_then(Value::as_object) {
                 for (parent_field, event_path) in [
                     ("material_id", "/material/material_id"),
