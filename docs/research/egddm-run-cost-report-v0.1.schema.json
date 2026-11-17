@@ -6,6 +6,8 @@
   "additionalProperties": false,
   "required": [
     "adjudication_status",
+    "billing_currency",
+    "quantile_method",
     "run_count",
     "complete_cost_run_count",
     "complete_wall_run_count",
@@ -289,6 +291,13 @@
     "claim_ceiling": {
       "type": "string",
       "minLength": 1
+    },
+    "billing_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "quantile_method": {
+      "const": "nearest_rank"
     }
   }
 }
