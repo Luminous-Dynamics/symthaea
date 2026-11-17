@@ -2,8 +2,8 @@ use std::hint::black_box;
 use std::time::{Duration, Instant};
 
 use symthaea_irregular_event_contract::{
-    EventArrivalClassification, EventRecord, Measurement, SourceKey, SourceProgressOperation,
-    SourceProgressRevision, SourceWatermarkLedger,
+    CompletenessReport, EventArrivalClassification, EventRecord, Measurement, SourceKey,
+    SourceProgressOperation, SourceProgressRevision, SourceWatermarkLedger,
 };
 
 const INDEXED_REPETITIONS: usize = 51;
@@ -24,6 +24,16 @@ fn percentile_micros(samples: &mut [Duration], percentile: f64) -> f64 {
         .saturating_sub(1)
         .min(samples.len() - 1);
     samples[rank].as_secs_f64() * 1_000_000.0
+}
+
+fn same_completeness_semantics(left: &CompletenessReport, right: &CompletenessReport) -> bool {
+    left.interval_start_us == right.interval_start_us
+        && left.interval_end_exclusive_us == right.interval_end_exclusive_us
+        && left.known_at_us == right.known_at_us
+        && left.verdict == right.verdict
+        && left.sources == right.sources
+        && left.blocked_sources == right.blocked_sources
+        && left.late_breaches == right.late_breaches
 }
 
 fn source_key(source_id: usize) -> SourceKey {
@@ -181,16 +191,9 @@ fn run_case(
     let scanned = linear_scan_query()
         .map_err(|error| format!("warm linear-scan query: {error}"))?;
     let verified = verified_query().map_err(|error| format!("warm verified query: {error}"))?;
-    let same_semantics = |left: &_, right: &_| {
-        left.interval_start_us == right.interval_start_us
-            && left.interval_end_exclusive_us == right.interval_end_exclusive_us
-            && left.known_at_us == right.known_at_us
-            && left.verdict == right.verdict
-            && left.sources == right.sources
-            && left.blocked_sources == right.blocked_sources
-            && left.late_breaches == right.late_breaches
-    };
-    if !same_semantics(&warm, &scanned) || !same_semantics(&warm, verified.report()) {
+    if !same_completeness_semantics(&warm, &scanned)
+        || !same_completeness_semantics(&warm, verified.report())
+    {
         return Err(format!(
             "indexed, linear-scan and verified reports differ: events={event_count}, sources={source_count}, width={interval_width}, known_at={known_at_us}"
         ));
