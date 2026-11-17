@@ -94,21 +94,22 @@ fn augment_candidate_and_oracle(
         if total_known_nominal!=SCALE {
             return Err("known nominal prior must sum to 10000 before contamination augmentation".to_owned());
         }
-        let target=SCALE-nominal_reserve;
+        let lower_target=SCALE-reserve;
+        let nominal_target=SCALE-nominal_reserve;
         let mut floors=Vec::new();
         let mut allocated=0u64;
         for (index,bound) in bounds.iter_mut().enumerate() {
             let lower=required_u64(bound,"lower_probability_bps","hypothesis bound")?;
             let nominal=required_u64(bound,"nominal_probability_bps","hypothesis bound")?;
-            bound["lower_probability_bps"]=json!(((lower as u128*target as u128)/SCALE as u128) as u64);
-            let product=nominal as u128*target as u128;
+            bound["lower_probability_bps"]=json!(((lower as u128*lower_target as u128)/SCALE as u128) as u64);
+            let product=nominal as u128*nominal_target as u128;
             let floor=(product/SCALE as u128) as u64;
             let remainder=(product%SCALE as u128) as u64;
             bound["nominal_probability_bps"]=json!(floor);
             floors.push((index,remainder));
             allocated=allocated.checked_add(floor).ok_or("scaled nominal prior overflow")?;
         }
-        let mut leftover=target.checked_sub(allocated).ok_or("scaled nominal allocation exceeded target")?;
+        let mut leftover=nominal_target.checked_sub(allocated).ok_or("scaled nominal allocation exceeded target")?;
         floors.sort_by(|a,b|b.1.cmp(&a.1).then_with(||a.0.cmp(&b.0)));
         for (index,_) in floors {
             if leftover==0 {break;}
