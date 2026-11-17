@@ -1232,10 +1232,8 @@ pub fn bounded_interval_pair_identifiability(
         if !probe.admissible {
             continue;
         }
-        let interval_a =
-            problem.predicted_intervals_by_hypothesis[hypothesis_a][probe_index];
-        let interval_b =
-            problem.predicted_intervals_by_hypothesis[hypothesis_b][probe_index];
+        let interval_a = problem.predicted_intervals_by_hypothesis[hypothesis_a][probe_index];
+        let interval_b = problem.predicted_intervals_by_hypothesis[hypothesis_b][probe_index];
         if interval_a.intersection(interval_b).is_none() {
             separating.push(probe);
         } else {
@@ -1627,13 +1625,30 @@ mod tests {
             quantity_unit_id: "millimetre-integer".to_owned(),
             hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned(), "H-C".to_owned()],
             probes: vec![
-                NoiseProbeV1 { probe_id: "p0".to_owned(), cost: 2, admissible: true },
-                NoiseProbeV1 { probe_id: "p1".to_owned(), cost: 1, admissible: true },
+                NoiseProbeV1 {
+                    probe_id: "p0".to_owned(),
+                    cost: 2,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p1".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
             ],
             predicted_intervals_by_hypothesis: vec![
-                vec![FixedIntervalV1::new(0, 10).unwrap(), FixedIntervalV1::new(0, 10).unwrap()],
-                vec![FixedIntervalV1::new(5, 15).unwrap(), FixedIntervalV1::new(20, 30).unwrap()],
-                vec![FixedIntervalV1::new(6, 9).unwrap(), FixedIntervalV1::new(8, 9).unwrap()],
+                vec![
+                    FixedIntervalV1::new(0, 10).unwrap(),
+                    FixedIntervalV1::new(0, 10).unwrap(),
+                ],
+                vec![
+                    FixedIntervalV1::new(5, 15).unwrap(),
+                    FixedIntervalV1::new(20, 30).unwrap(),
+                ],
+                vec![
+                    FixedIntervalV1::new(6, 9).unwrap(),
+                    FixedIntervalV1::new(8, 9).unwrap(),
+                ],
             ],
         };
         let report = bounded_interval_pair_identifiability(&problem, 0, 1).unwrap();
@@ -1653,8 +1668,16 @@ mod tests {
             quantity_unit_id: "millimetre-integer".to_owned(),
             hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned()],
             probes: vec![
-                NoiseProbeV1 { probe_id: "p0".to_owned(), cost: 2, admissible: true },
-                NoiseProbeV1 { probe_id: "p1".to_owned(), cost: 1, admissible: true },
+                NoiseProbeV1 {
+                    probe_id: "p0".to_owned(),
+                    cost: 2,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p1".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
             ],
             nominal_predictions_by_hypothesis: vec![vec![0, 0], vec![0, 10]],
             global_bias_interval: FixedIntervalV1::new(-100, 100).unwrap(),
