@@ -208,7 +208,7 @@ impl TrainOnlyStandardizer {
                 eligible_partition_counts.entry(window.entity_id).or_default()[partition_index] += 1;
             }
         }
-        if eligible_partition_counts.values().any(|counts| counts.iter().any(|count| *count == 0)) {
+        if eligible_partition_counts.values().any(|counts| counts.contains(&0)) {
             return Err(ScalerError::InvalidSplitPlan);
         }
 
