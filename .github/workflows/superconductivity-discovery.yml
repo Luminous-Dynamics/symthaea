@@ -37,7 +37,8 @@ jobs:
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
-          # Keep this focused harness independent of the root workspace.
+        with:
+          components: rustfmt, clippy
       - name: Test registry auditor and negative controls
         run: cargo test --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_registry_audit
 
