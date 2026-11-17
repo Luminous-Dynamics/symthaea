@@ -180,6 +180,20 @@ fn risk_for_path(candidate:&Value,oracle:&Value,steps:&[Step],representative:&st
  let report=noisy_channel::evaluate_noisy_channel_parts_json(&cv.to_string(),&ov.to_string())?;
  Ok(report["traces"][0].clone())
 }
+fn canonical_defer_action(
+ actions:&BTreeMap<String,Action>,
+ worlds:&BTreeMap<String,World>
+)->Result<String,String>{
+ let matches:Vec<String>=actions.iter().filter(|(id,action)|{
+  !action.irreversible&&!action.hard_gate&&action.max_risk==0
+   &&worlds.values().all(|world|world.safe_actions.contains(*id))
+ }).map(|(id,_)|id.clone()).collect();
+ if matches.len()!=1{
+  return Err(format!("exact policy oracle requires exactly one evaluator-safe read-only defer action; found {}",matches.len()));
+ }
+ Ok(matches[0].clone())
+}
+
 fn parse_candidate_oracle(candidate:&Value,oracle:&Value)->Result<(BTreeMap<String,Bounds>,BTreeMap<String,Action>,BTreeMap<String,OptionDef>,BTreeMap<String,World>,BTreeMap<String,BTreeSet<String>>,String,u64,usize),String>{
  allowed(candidate,&["scenario_id","decision_cutoff","budget_micros","max_depth","actions","hypothesis_bounds","options","factors","policy_tree"],"candidate_view")?;
  allowed(oracle,&["actual_hypothesis_id","decision_cutoff","budget_micros","actions","hypothesis_bounds","options","factors","hypothesis_safety","calibrations","factorization_certificates","worlds","cost_options"],"oracle")?;
@@ -190,6 +204,7 @@ fn parse_candidate_oracle(candidate:&Value,oracle:&Value)->Result<(BTreeMap<Stri
  let bounds=parse_world_bounds(candidate)?;let actions=parse_actions(candidate)?;let options=parse_options(candidate,oracle)?;
  let ids=bounds.keys().cloned().collect::<BTreeSet<_>>();let option_ids=options.keys().cloned().collect::<BTreeSet<_>>();
  let worlds=parse_worlds(oracle,&ids,&option_ids,&actions)?;
+ let _defer_action=canonical_defer_action(&actions,&worlds)?;
  let safe_values=val(oracle,"hypothesis_safety","oracle")?.as_array().ok_or("hypothesis_safety must be array")?;
  let safety:BTreeMap<String,BTreeSet<String>>=safe_values.iter().map(|x|Ok((s(x,"hypothesis_id","safety")?,x["safe_actions"].as_array().ok_or("safe_actions must be array")?.iter().map(|a|a.as_str().ok_or("safe action must be string").map(str::to_owned)).collect::<Result<BTreeSet<_>,_>>()?))).collect::<Result<_,String>>()?;
  if safety.keys().cloned().collect::<BTreeSet<_>>()!=ids {
@@ -354,10 +369,7 @@ fn enumerate_policies(
 )->Result<Vec<SubPolicy>,String>{
  if *total_generated>MAX_POLICIES{return Err("exact policy enumeration cap reached".to_owned());}
  let mut output=Vec::new();
- let defer_action=actions.iter().find(|(id,a)|{
-  !a.irreversible&&!a.hard_gate&&a.max_risk==0
-   &&worlds.values().all(|w|w.safe_actions.contains(*id))
- }).map(|(id,_)|id.clone()).ok_or("no registered read-only zero-risk action safe in every evaluator world")?;
+ let defer_action=canonical_defer_action(actions,worlds)?;
  let defer_id=format!("stop-defer-{}",*counter);*counter+=1;
  output.push(SubPolicy{root:defer_id.clone(),nodes:vec![json!({"node_id":defer_id,"kind":"stop","decision_kind":"defer","action_id":defer_action,"claimed_residual_risk_bps":0})]});
  if !remaining.is_empty(){
@@ -438,6 +450,17 @@ pub fn evaluate_adaptive_policy_json(raw:&str)->Result<Value,String>{
  let candidate=val(&bundle,"candidate_view","bundle")?;let oracle=val(&bundle,"oracle","bundle")?;
  let (bounds,actions,options,worlds,outcomes,actual,budget,max_depth)=parse_candidate_oracle(candidate,oracle)?;
  let tree=parse_nodes(val(candidate,"policy_tree","candidate_view")?,&options,&outcomes,&actions)?;
+ let defer_action=canonical_defer_action(&actions,&worlds)?;
+ for node in tree.nodes.values(){
+  if node.kind=="stop"{
+   if node.decision_kind.as_deref()==Some("defer")&&node.action_id.as_deref()!=Some(defer_action.as_str()){
+    return Err("defer leaves must use the evaluator's canonical read-only action".to_owned());
+   }
+   if node.decision_kind.as_deref()==Some("act")&&node.action_id.as_deref()==Some(defer_action.as_str()){
+    return Err("canonical defer action cannot be submitted as an act leaf".to_owned());
+   }
+  }
+ }
  let submitted=evaluate_policy(candidate,oracle,&tree,&bounds,&actions,&options,&worlds,budget,"release")?;
  let (optimal,optimal_count,optimal_tree)=evaluate_exact(candidate,oracle,&bounds,&actions,&options,&worlds,&outcomes,budget,max_depth)?;
  let cutoff_raw=s(candidate,"decision_cutoff","candidate_view")?;
