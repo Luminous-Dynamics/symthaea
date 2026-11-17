@@ -111,3 +111,20 @@ For mechanics, align masses, constraints, constitutive/contact models, integrato
 ## Claim boundary
 
 This protocol is a benchmark contract, not evidence that Symthaea currently beats LieFlow, SymFP, COLT 2026 methods, soft-equivariant transformers, JMLR noisy ODT/ASRN, MuJoCo, Chrono, Pinocchio or Drake. Any superiority claim requires matched baseline executions on the frozen corpus.
+
+
+## Exact fixture validator
+
+Run the test-only validator (the production system remains Rust-first):
+
+    python3 -m pip install jsonschema==4.26.0
+    python3 -I research/symmetry-discovery-benchmark-001/tools/validate_fixtures.py
+
+It validates the Draft 2020-12 manifest and then independently checks:
+- all 64 entries of the frozen D4 multiplication table;
+- exact identity, two-sided inverses, closure and associativity;
+- unordered point-set stabilizers using exact decimal-to-rational parsing;
+- polynomial invariance under each group matrix using exact rational coefficient expansion;
+- the expected subgroup label for every frozen case.
+
+The workflow runs this against the exact triggering revision and is guarded against draft PR execution. This is fixture qualification only; no external learner baseline is run by it.
