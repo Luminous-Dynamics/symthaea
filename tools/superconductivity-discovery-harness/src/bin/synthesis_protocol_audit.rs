@@ -62,7 +62,9 @@ fn load_observation_events(
             .filter(|text| !text.trim().is_empty())
             .ok_or_else(|| "fixture_source_ids must contain non-empty strings".to_owned())?;
         if !observation_sources.insert(source_id.to_owned()) {
-            return Err(format!("duplicate observation fixture source id: {source_id}"));
+            return Err(format!(
+                "duplicate observation fixture source id: {source_id}"
+            ));
         }
         if !protocol_source_ids.contains(source_id) {
             return Err(format!(
@@ -87,14 +89,19 @@ fn load_observation_events(
             ));
         }
         if event.get("fixture_only").and_then(Value::as_bool) != Some(true) {
-            return Err(format!("observation fixture event[{index}] is not fixture_only"));
+            return Err(format!(
+                "observation fixture event[{index}] is not fixture_only"
+            ));
         }
         let event_id = event
             .get("observation_id")
             .and_then(Value::as_str)
             .filter(|text| !text.trim().is_empty())
             .ok_or_else(|| format!("observation fixture event[{index}] requires observation_id"))?;
-        if event_map.insert(event_id.to_owned(), event.clone()).is_some() {
+        if event_map
+            .insert(event_id.to_owned(), event.clone())
+            .is_some()
+        {
             return Err(format!("duplicate observation event id: {event_id}"));
         }
         let source_id = event
@@ -423,9 +430,13 @@ fn validate_protocol(
             let event_id = event_ref
                 .as_str()
                 .filter(|text| !text.trim().is_empty())
-                .ok_or_else(|| format!("{outcome_id}: characterization event IDs must be non-empty strings"))?;
+                .ok_or_else(|| {
+                    format!("{outcome_id}: characterization event IDs must be non-empty strings")
+                })?;
             if !linked_events.insert(event_id.to_owned()) {
-                return Err(format!("{outcome_id}: duplicate characterization event id {event_id}"));
+                return Err(format!(
+                    "{outcome_id}: duplicate characterization event id {event_id}"
+                ));
             }
             linked_characterization_event_count += 1;
             let event = observation_events.get(event_id).ok_or_else(|| {
@@ -597,7 +608,8 @@ fn main() {
         fixture_path,
         observation_schema_path,
         observation_fixture_path,
-    ) else {
+    )
+    else {
         usage(&args[0]);
         process::exit(2);
     };
