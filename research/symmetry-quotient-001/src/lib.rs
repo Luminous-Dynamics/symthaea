@@ -239,6 +239,38 @@ pub struct MultiEnvironmentVerificationReceiptV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContextualEnvironmentQuotientV1 {
+    /// Must equal the exact environment_id used to qualify this subgroup.
+    pub context_id: String,
+    pub task_preserving_subgroup: CommonTaskPreservingSubgroupV1,
+    pub certificate: QuotientCertificateV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContextualMultiEnvironmentCertificateV1 {
+    pub schema_version: u32,
+    pub problem_id: String,
+    pub ambient_action_id: String,
+    /// Canonically ordered exactly as the declared environment list.
+    pub environment_quotients: Vec<ContextualEnvironmentQuotientV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContextualEnvironmentVerificationV1 {
+    pub context_id: String,
+    pub preserving_subgroup_order: usize,
+    pub orbit_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContextualMultiEnvironmentVerificationReceiptV1 {
+    pub problem_id: String,
+    pub ambient_group_order: usize,
+    pub candidate_count: usize,
+    pub environments: Vec<ContextualEnvironmentVerificationV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QuotientErrorV1 {
     InvalidIdentifier,
     EmptyGroup,
@@ -1181,6 +1213,147 @@ pub fn compile_multi_environment_quotient(
     })
 }
 
+fn contextual_stage_budget(
+    problem: &MultiEnvironmentProblemV1,
+    budget: QualificationBudgetV1,
+) -> Result<QualificationBudgetV1, QuotientErrorV1> {
+    let stage_count = problem
+        .environments
+        .len()
+        .checked_mul(3)
+        .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+    if stage_count == 0 {
+        return Err(QuotientErrorV1::InvalidEnvironmentCount);
+    }
+    // Reserve equal cost envelopes for each local subgroup qualification,
+    // quotient compile, and the later independent per-context replay.
+    let maximum_work_units = budget.maximum_work_units / stage_count;
+    if maximum_work_units == 0 {
+        return Err(QuotientErrorV1::WorkBudgetExceeded);
+    }
+    Ok(QualificationBudgetV1 {
+        maximum_work_units,
+        ..budget
+    })
+}
+
+/// Compile a symmetry atlas: each known environment gets its own exact
+/// task-preserving subgroup and quotient certificate. No environment borrows
+/// another environment's pruning authority; callers must select the proof
+/// whose context_id exactly matches the active operating context.
+pub fn compile_contextual_multi_environment_quotient(
+    problem: &MultiEnvironmentProblemV1,
+    ambient_action: &FiniteActionV1,
+    budget: QualificationBudgetV1,
+) -> Result<ContextualMultiEnvironmentCertificateV1, QuotientErrorV1> {
+    validate_multi_environment_problem(problem, budget)?;
+    let stage_budget = contextual_stage_budget(problem, budget)?;
+    let mut environment_quotients = Vec::with_capacity(problem.environments.len());
+    for environment in &problem.environments {
+        let local_problem = MultiEnvironmentProblemV1 {
+            problem_id: problem.problem_id.clone(),
+            candidate_ids: problem.candidate_ids.clone(),
+            environments: vec![environment.clone()],
+        };
+        let subgroup = qualify_common_task_preserving_subgroup(
+            &local_problem,
+            ambient_action,
+            stage_budget,
+        )?;
+        let search_problem = SearchProblemV1 {
+            problem_id: format!("{}::{}", problem.problem_id, environment.environment_id),
+            candidate_ids: problem.candidate_ids.clone(),
+            semantics: environment.semantics.clone(),
+        };
+        let outcome = compile_quotient(
+            &search_problem,
+            &subgroup.restricted_action,
+            stage_budget,
+        )?;
+        let CompileOutcomeV1::Authorized(certificate) = outcome else {
+            return Err(QuotientErrorV1::TaskSemanticsMismatch);
+        };
+        environment_quotients.push(ContextualEnvironmentQuotientV1 {
+            context_id: environment.environment_id.clone(),
+            task_preserving_subgroup: subgroup,
+            certificate,
+        });
+    }
+    Ok(ContextualMultiEnvironmentCertificateV1 {
+        schema_version: 1,
+        problem_id: problem.problem_id.clone(),
+        ambient_action_id: ambient_action.action_id.clone(),
+        environment_quotients,
+    })
+}
+
+/// Replay every environment-local subgroup and quotient. Context ordering and
+/// exact context IDs are checked; using one context's certificate for another
+/// environment is rejected rather than silently reinterpreted.
+pub fn verify_contextual_multi_environment_quotient(
+    problem: &MultiEnvironmentProblemV1,
+    ambient_action: &FiniteActionV1,
+    certificate: &ContextualMultiEnvironmentCertificateV1,
+    budget: QualificationBudgetV1,
+) -> Result<ContextualMultiEnvironmentVerificationReceiptV1, QuotientErrorV1> {
+    if certificate.schema_version != 1
+        || certificate.problem_id != problem.problem_id
+        || certificate.ambient_action_id != ambient_action.action_id
+        || certificate.environment_quotients.len() != problem.environments.len()
+    {
+        return Err(QuotientErrorV1::EnvironmentCertificateMismatch);
+    }
+    let expected = compile_contextual_multi_environment_quotient(
+        problem,
+        ambient_action,
+        budget,
+    )?;
+    if *certificate != expected {
+        return Err(QuotientErrorV1::EnvironmentCertificateMismatch);
+    }
+    let stage_budget = contextual_stage_budget(problem, budget)?;
+    let mut environments = Vec::with_capacity(problem.environments.len());
+    for (environment, quotient) in problem
+        .environments
+        .iter()
+        .zip(certificate.environment_quotients.iter())
+    {
+        if quotient.context_id != environment.environment_id
+            || quotient.task_preserving_subgroup.preserving_environment_ids
+                != vec![environment.environment_id.clone()]
+        {
+            return Err(QuotientErrorV1::EnvironmentCertificateMismatch);
+        }
+        let search_problem = SearchProblemV1 {
+            problem_id: format!("{}::{}", problem.problem_id, environment.environment_id),
+            candidate_ids: problem.candidate_ids.clone(),
+            semantics: environment.semantics.clone(),
+        };
+        let receipt = verify_certificate(
+            &search_problem,
+            &quotient.task_preserving_subgroup.restricted_action,
+            &quotient.certificate,
+            stage_budget,
+        )?;
+        environments.push(ContextualEnvironmentVerificationV1 {
+            context_id: environment.environment_id.clone(),
+            preserving_subgroup_order: quotient
+                .task_preserving_subgroup
+                .restricted_action
+                .group
+                .multiplication
+                .len(),
+            orbit_count: receipt.orbit_count,
+        });
+    }
+    Ok(ContextualMultiEnvironmentVerificationReceiptV1 {
+        problem_id: problem.problem_id.clone(),
+        ambient_group_order: ambient_action.group.multiplication.len(),
+        candidate_count: problem.candidate_ids.len(),
+        environments,
+    })
+}
+
 /// Independently reconstruct the common subgroup and every environment
 /// quotient. Mutated environment semantics, subgroup witnesses, exclusions,
 /// orbit certificates, or environment ordering are rejected.
@@ -1507,6 +1680,121 @@ mod tests {
         assert_eq!(receipt.common_subgroup_order, 1);
         assert_eq!(receipt.per_environment_orbit_counts.len(), 3);
         assert!(receipt.per_environment_orbit_counts.iter().all(|entry| entry.1 == 16));
+    }
+
+    #[test]
+    fn contextual_symmetry_atlas_preserves_each_environment_local_stabilizer() {
+        let action = d4_action();
+        let mut candidate_ids = Vec::with_capacity(16);
+        let mut d4_semantics = Vec::with_capacity(16);
+        let mut c4_semantics = Vec::with_capacity(16);
+        let mut c1_semantics = Vec::with_capacity(16);
+        for source in 0usize..4 {
+            for target in 0usize..4 {
+                let delta = (target + 4 - source) % 4;
+                candidate_ids.push(format!("p{source}{target}"));
+                d4_semantics.push(semantics(0, 0, "same-boundary", "same-output"));
+                c4_semantics.push(semantics(
+                    delta as i64,
+                    delta as i64,
+                    "rotating-boundary",
+                    "oriented-output",
+                ));
+                c1_semantics.push(semantics(
+                    (source * 4 + target) as i64,
+                    0,
+                    "asymmetric-boundary",
+                    "unique-output",
+                ));
+            }
+        }
+        let problem = MultiEnvironmentProblemV1 {
+            problem_id: "square-search-symmetry-atlas-v1".to_owned(),
+            candidate_ids,
+            environments: vec![
+                TaskEnvironmentV1 {
+                    environment_id: "isotropic".to_owned(),
+                    semantics: d4_semantics,
+                },
+                TaskEnvironmentV1 {
+                    environment_id: "rotating-regime".to_owned(),
+                    semantics: c4_semantics,
+                },
+                TaskEnvironmentV1 {
+                    environment_id: "asymmetric-regime".to_owned(),
+                    semantics: c1_semantics,
+                },
+            ],
+        };
+
+        let atlas = compile_contextual_multi_environment_quotient(
+            &problem,
+            &action,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            atlas
+                .environment_quotients
+                .iter()
+                .map(|entry| entry.task_preserving_subgroup.retained_ambient_elements.clone())
+                .collect::<Vec<_>>(),
+            vec![vec![0, 1, 2, 3, 4, 5, 6, 7], vec![0, 1, 2, 3], vec![0]]
+        );
+        let receipt = verify_contextual_multi_environment_quotient(
+            &problem,
+            &action,
+            &atlas,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            receipt
+                .environments
+                .iter()
+                .map(|entry| (entry.context_id.as_str(), entry.preserving_subgroup_order, entry.orbit_count))
+                .collect::<Vec<_>>(),
+            vec![
+                ("isotropic", 8, 3),
+                ("rotating-regime", 4, 4),
+                ("asymmetric-regime", 1, 16),
+            ]
+        );
+    }
+
+    #[test]
+    fn contextual_atlas_rejects_a_quotient_relabelled_for_another_environment() {
+        let action = d4_action();
+        let problem = MultiEnvironmentProblemV1 {
+            problem_id: "context-bound-certificate-v1".to_owned(),
+            candidate_ids: (0..16).map(|index| format!("p{index:02}")).collect(),
+            environments: vec![
+                TaskEnvironmentV1 {
+                    environment_id: "context-a".to_owned(),
+                    semantics: vec![semantics(1, 1, "boundary", "output"); 16],
+                },
+                TaskEnvironmentV1 {
+                    environment_id: "context-b".to_owned(),
+                    semantics: vec![semantics(2, 2, "boundary", "output"); 16],
+                },
+            ],
+        };
+        let mut atlas = compile_contextual_multi_environment_quotient(
+            &problem,
+            &action,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        atlas.environment_quotients[0].context_id = "context-b".to_owned();
+        assert_eq!(
+            verify_contextual_multi_environment_quotient(
+                &problem,
+                &action,
+                &atlas,
+                QualificationBudgetV1::default(),
+            ),
+            Err(QuotientErrorV1::EnvironmentCertificateMismatch)
+        );
     }
 
     #[test]
