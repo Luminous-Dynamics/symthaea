@@ -439,6 +439,7 @@ impl EvidenceBoundCampaign {
 /// exact frozen context. A single rejected candidate aborts the whole build;
 /// callers cannot accidentally continue with a partial, silently filtered set.
 pub fn build_evidence_bound_campaign(
+    campaign_id: String,
     mut candidates: Vec<CandidateInspectionOption>,
     expected_contexts: &[ExpectedInspectionContext],
     decisions: Vec<DecisionRequirement>,
@@ -499,7 +500,7 @@ pub fn build_evidence_bound_campaign(
     }
 
     let problem = CampaignProblem {
-        campaign_id: "evidence-bound-subterra-campaign".into(),
+        campaign_id,
         decisions,
         deployment_bundles,
         options: admitted_options,
@@ -909,6 +910,7 @@ mod tests {
     #[test]
     fn campaign_builder_retains_manifests_and_optimizes_only_admitted_options() {
         let built = build_evidence_bound_campaign(
+            "accepted-test-campaign".into(),
             vec![candidate()],
             &[context()],
             campaign_decisions(),
@@ -933,9 +935,14 @@ mod tests {
     fn one_rejected_candidate_aborts_the_entire_campaign_build() {
         let mut stale = candidate();
         stale.manifest.observation_captured_at_unix_ms = NOW - 3_600_001;
+        stale.option.option_id = "support-08-stale-followup".into();
+        stale.manifest.option_id = "support-08-stale-followup".into();
+        let mut stale_context = context();
+        stale_context.option_id = "support-08-stale-followup".into();
         let result = build_evidence_bound_campaign(
+            "campaign-with-one-stale-option".into(),
             vec![candidate(), stale],
-            &[context()],
+            &[context(), stale_context],
             campaign_decisions(),
             campaign_bundles(),
             campaign_budget(),
@@ -953,6 +960,7 @@ mod tests {
     #[test]
     fn campaign_builder_rejects_missing_and_duplicate_contexts() {
         let missing = build_evidence_bound_campaign(
+            "missing-context-campaign".into(),
             vec![candidate()],
             &[],
             campaign_decisions(),
@@ -969,6 +977,7 @@ mod tests {
         );
 
         let duplicate = build_evidence_bound_campaign(
+            "duplicate-context-campaign".into(),
             vec![candidate()],
             &[context(), context()],
             campaign_decisions(),
