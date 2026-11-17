@@ -121,13 +121,13 @@ fn validate_comparison(
     for (label, event, accepted_properties, accepted_scopes) in [
         (
             "pairing",
-            *pairing,
+            pairing,
             vec!["pairing_energy", "pair_transfer_effective_charge"],
             vec!["local_probe", "mesoscopic"],
         ),
         (
             "coherence",
-            *coherence,
+            coherence,
             vec![
                 "superfluid_stiffness",
                 "superfluid_density",
@@ -199,7 +199,7 @@ fn validate_comparison(
     let batch_id = nonempty_text(&comparison, "batch_id")?;
     let state_id = nonempty_text(&comparison, "state_id")?;
 
-    for (label, event) in [("pairing", *pairing), ("coherence", *coherence)] {
+    for (label, event) in [("pairing", pairing), ("coherence", coherence)] {
         let observed_material = event
             .pointer("/material/material_id")
             .and_then(Value::as_str);
@@ -230,7 +230,7 @@ fn validate_comparison(
     let fixed_conditions = comparison
         .get("fixed_conditions")
         .ok_or_else(|| format!("{comparison_id}: missing fixed_conditions"))?;
-    for (label, event) in [("pairing", *pairing), ("coherence", *coherence)] {
+    for (label, event) in [("pairing", pairing), ("coherence", coherence)] {
         for (fixture_field, event_path) in [
             ("pressure", "/conditions/pressure"),
             ("magnetic_field_t", "/conditions/magnetic_field_t"),
@@ -244,7 +244,13 @@ fn validate_comparison(
             let actual = event
                 .pointer(event_path)
                 .ok_or_else(|| format!("{comparison_id}/{label}: event missing {event_path}"))?;
-            if expected != actual {
+            let matches = if fixture_field == "pressure" {
+                expected.get("semantics") == actual.get("semantics")
+                    && expected.get("value_gpa") == actual.get("value_gpa")
+            } else {
+                expected == actual
+            };
+            if !matches {
                 return Err(format!(
                     "{comparison_id}: {label} event does not match fixed condition {fixture_field}"
                 ));
