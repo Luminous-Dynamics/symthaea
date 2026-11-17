@@ -317,11 +317,12 @@ fn factorization_valid(
             if !all_sources.insert(source.clone()) { return false; }
         }
     }
+    let factor_ids: BTreeSet<String> = acquired.iter().map(|f| f.factor_id.clone()).collect();
     certificates.iter().any(|(_,cert)| {
         cert.authority.trim() != ""
             && cert.mutual
             && cert.groups == groups
-            && cert.factor_ids == acquired.iter().map(|f| f.factor_id.clone()).collect()
+            && cert.factor_ids == factor_ids
             && cert.conditioning_scope.contains("hypothesis")
             && cert.action_ids.contains(action_id)
             && acquired.iter().all(|f| cert.valid_from <= f.at)
