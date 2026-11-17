@@ -318,3 +318,33 @@ The first dedicated registry workflow run, associated with earlier feature-branc
 - Corrective changes: the five reported formatting deltas were applied in the registry auditor; the environment receipt now records cargo_lock=not-generated when Cargo.lock does not exist. The metrics runner is included in the updated test/format/clippy steps.
 
 The corrected source/workflow changes are present in later branch commits, but the next exact-head dedicated workflow result has not yet been observed here. Therefore no Rust build/test/clippy success is claimed. Preserve the first failure as part of the evidence chain.
+
+
+## 15. End-to-end BEE-NET baseline and experimental follow-up — 17 November 2026
+
+The current external SOTA baseline is an integrated discovery pipeline, not only a Tc regression metric.
+
+- The BEE-NET paper reports a 1.22 million candidate pool, reduced through staged Eg, Ef, BEE-NET, M3GNet hull, DFT relaxation and final α²F(ω) calculations to 741 dynamically and thermodynamically stable compounds with DFT-confirmed Tc > 5 K.
+- The final high-accuracy step used 866 α²F(ω) calculations and reports 86% precision; 69 of the 741 have predicted Tc >= 20 K.
+- The model itself reports 0.87 K MAE against DFT-based Allen–Dynes calculations and 99.4% true-negative rate. Those are computational-label metrics, not experimental Tc prediction accuracy.
+- The paper experimentally followed Be2Hf2Nb and Be2HfNb2. For Be2Hf2Nb, the study reports a 3.18 K resistive onset, one specific-heat jump with ΔC/(γTc)=1.44, and a sample fully superconducting below approximately 2 K. For Be2HfNb2, the reported onset is 4.24 K, the slight resistivity drop near 9 K is attributed to trace Nb, and two distinct specific-heat jumps indicate a multiphase sample with superconducting secondary phase. The latter should not be treated as an unambiguous single-phase bulk material.
+- A parent Be2Nb3 control is also reported at 2.3 K with ΔC/(γTc)=1.42.
+- The paper's own retrospective analysis identifies M3GNet hull-energy underprediction of approximately 140 meV/atom. The permissive gate helped recall but carries a measurable stability-classification cost; correcting the bias was estimated to reduce recall to at most 52%.
+
+Primary source: https://www.nature.com/articles/s41524-026-01964-8
+
+The machine-readable registry now records these three Be–Nb–Hf material cases, keeping DFT Tc predictions distinct from measured transition observations and preserving the different bulk/multiphase evidence. See [SC-DISCOVERY-TOURNAMENT-001 #12634](https://github.com/Luminous-Dynamics/symthaea/issues/12634), [BEE-NET-REPRO-001 #12619](https://github.com/Luminous-Dynamics/symthaea/issues/12619), and the new [BEE-NET-PIPELINE-VOI-001 #12644](https://github.com/Luminous-Dynamics/symthaea/issues/12644).
+
+### Training-data count reconciliation
+
+A second BEE-NET artifact discrepancy is now explicit: the article methods describe 7,000 α²F(ω) training records with an 80/20 split, while the current public README inventory describes 5,241 records (4,192 training / 1,049 test). These may reflect different dataset versions or scopes. They must not be silently treated as identical; #12619 now tracks reconciliation of exact row identity and release provenance.
+
+## 16. Experimental multi-property benchmark — AutoSuperCon
+
+The 11 November 2026 AutoSuperCon preprint reports 20,354 observations over 6,793 superconductors and eight measured properties: Tc, Hc, Hc1, Hc2, Jc, coherence length ξ, penetration depth λ, and superconducting gap Δ. It extracts entries from more than 47,000 arXiv preprints and a digitized Roberts (1976) survey, preserving conditions such as pressure, specimen form, temperature and field orientation.
+
+Reported validation includes R²=0.96 against NIMS SuperCon for 2,439 overlapping Tc materials (median deviation 0.25 K, 3.5% relative) and a much smaller critical-field comparison to Roberts (24 matched values, R²log=0.90). Its composition models report R²log=0.83 / median absolute error 1.6 K for Tc, and R²log=0.69 for Hc2 within known families. Crucially, leave-one-family-out tests fail strongly on cuprates and iron-based superconductors, demonstrating that random/within-family scores do not establish new-family discovery.
+
+Source: https://arxiv.org/abs/2611.15627
+
+The new [AUTOSUPERCON-REPRO-001 #12642](https://github.com/Luminous-Dynamics/symthaea/issues/12642) requires official data rights/release, source-span audit, measurement condition completeness, specimen identity, extraction calibration and family-held-out reproduction before its records enter the tournament. The source register includes the paper's reported counts and metrics, but no AutoSuperCon raw data have been ingested or claimed as reproduced.
