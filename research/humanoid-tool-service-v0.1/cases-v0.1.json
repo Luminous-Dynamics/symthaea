@@ -28,7 +28,29 @@
       "standard",
       "decoy"
     ],
-    "note": "Published protocol reference only; no upstream source, checkpoint, license, or execution has been verified by this manifest."
+    "note": "Pinned upstream source and dataset revisions observed 2026-11-17. Code is MIT; ToolBook is CC BY-NC 4.0; third-party assets retain separate terms. Runtime/resource values are upstream estimates, not Luminous measurements. No upstream or Symthaea benchmark run is claimed. The Unitree G1 32-state/36-action decoupled_v1 interface is not assumed equivalent to Symthaea DMC21/Dexterous53.",
+    "upstream_repository": "SNU-PI/HumanoidToolBench",
+    "upstream_commit": "3fec9bd36933a1648ff7f95468c983f3452243a0",
+    "upstream_code_license": "MIT",
+    "toolbook_license": "CC-BY-NC-4.0",
+    "toolbook_simulation_revision": "8b2cd31e107b64cb13f812ea217a63a20845c78a",
+    "toolbook_real_g1_revision": "47eca9322bb53fa1c685363271a87d2e414cb0e8",
+    "simulator": "MuJoCo 3.11.0",
+    "python_version": "3.10",
+    "observation_dimension": 32,
+    "action_dimension": 36,
+    "action_contract": "decoupled_v1",
+    "control_hz": 50,
+    "policy_steps_per_episode": 3000,
+    "success_hold_steps": 50,
+    "official_episodes_per_condition": 100,
+    "official_seed_start": 10000,
+    "official_seed_end_inclusive": 10099,
+    "estimated_setup_download_gb": 4,
+    "estimated_disk_gb": 9,
+    "estimated_first_checkpoint_download_gb": 2,
+    "upstream_estimated_hours_per_condition": 2,
+    "upstream_estimated_days_all_18_sequential": 1.5
   },
   "published_task_cells": [
     {
@@ -47,7 +69,12 @@
       "episode_plan": {
         "simulation_episodes_per_policy": 100,
         "physical_trials": null,
-        "training_seeds_target": 5
+        "training_seeds_target": 5,
+        "seed_start": 10000,
+        "seed_end_inclusive": 10099,
+        "max_policy_steps": 3000,
+        "control_hz": 50,
+        "success_hold_steps": 50
       },
       "primary_outcomes": [
         "tool_selection",
@@ -56,7 +83,10 @@
         "task_effect",
         "verified_task_success"
       ],
-      "notes": "Preserve official standard-set composition and scoring."
+      "notes": "Preserve official standard-set composition and scoring.",
+      "upstream_mode_token": "S",
+      "official_environment_id": "humanoidtoolbench/G1BallMove-LL0-S",
+      "official_success_predicate": "correct_tool_body_lifted_at_least_0.08_m_and_held_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-BALLMOVE-L0-DECOY",
@@ -74,7 +104,12 @@
       "episode_plan": {
         "simulation_episodes_per_policy": 100,
         "physical_trials": null,
-        "training_seeds_target": 5
+        "training_seeds_target": 5,
+        "seed_start": 10000,
+        "seed_end_inclusive": 10099,
+        "max_policy_steps": 3000,
+        "control_hz": 50,
+        "success_hold_steps": 50
       },
       "primary_outcomes": [
         "tool_selection",
@@ -83,7 +118,10 @@
         "task_effect",
         "verified_task_success"
       ],
-      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity."
+      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity.",
+      "upstream_mode_token": "R",
+      "official_environment_id": "humanoidtoolbench/G1BallMove-LL0-R",
+      "official_success_predicate": "correct_tool_body_lifted_at_least_0.08_m_and_held_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-BALLMOVE-L1-STANDARD",
@@ -101,7 +139,12 @@
       "episode_plan": {
         "simulation_episodes_per_policy": 100,
         "physical_trials": null,
-        "training_seeds_target": 5
+        "training_seeds_target": 5,
+        "seed_start": 10000,
+        "seed_end_inclusive": 10099,
+        "max_policy_steps": 3000,
+        "control_hz": 50,
+        "success_hold_steps": 50
       },
       "primary_outcomes": [
         "tool_selection",
@@ -110,7 +153,10 @@
         "task_effect",
         "verified_task_success"
       ],
-      "notes": "Preserve official standard-set composition and scoring."
+      "notes": "Preserve official standard-set composition and scoring.",
+      "upstream_mode_token": "S",
+      "official_environment_id": "humanoidtoolbench/G1BallMove-LL1-S",
+      "official_success_predicate": "ball_center_inside_0.12_m_target_ring_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-BALLMOVE-L1-DECOY",
@@ -128,7 +174,12 @@
       "episode_plan": {
         "simulation_episodes_per_policy": 100,
         "physical_trials": null,
-        "training_seeds_target": 5
+        "training_seeds_target": 5,
+        "seed_start": 10000,
+        "seed_end_inclusive": 10099,
+        "max_policy_steps": 3000,
+        "control_hz": 50,
+        "success_hold_steps": 50
       },
       "primary_outcomes": [
         "tool_selection",
@@ -137,7 +188,10 @@
         "task_effect",
         "verified_task_success"
       ],
-      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity."
+      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity.",
+      "upstream_mode_token": "R",
+      "official_environment_id": "humanoidtoolbench/G1BallMove-LL1-R",
+      "official_success_predicate": "ball_center_inside_0.12_m_target_ring_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-BALLMOVE-L2-STANDARD",
@@ -157,7 +211,12 @@
       "episode_plan": {
         "simulation_episodes_per_policy": 100,
         "physical_trials": null,
-        "training_seeds_target": 5
+        "training_seeds_target": 5,
+        "seed_start": 10000,
+        "seed_end_inclusive": 10099,
+        "max_policy_steps": 3000,
+        "control_hz": 50,
+        "success_hold_steps": 50
       },
       "primary_outcomes": [
         "tool_selection",
@@ -166,7 +225,10 @@
         "task_effect",
         "verified_task_success"
       ],
-      "notes": "Preserve official standard-set composition and scoring."
+      "notes": "Preserve official standard-set composition and scoring.",
+      "upstream_mode_token": "S",
+      "official_environment_id": "humanoidtoolbench/G1BallMove-LL2-S",
+      "official_success_predicate": "ball_center_inside_0.12_m_target_ring_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-BALLMOVE-L2-DECOY",
@@ -186,7 +248,12 @@
       "episode_plan": {
         "simulation_episodes_per_policy": 100,
         "physical_trials": null,
-        "training_seeds_target": 5
+        "training_seeds_target": 5,
+        "seed_start": 10000,
+        "seed_end_inclusive": 10099,
+        "max_policy_steps": 3000,
+        "control_hz": 50,
+        "success_hold_steps": 50
       },
       "primary_outcomes": [
         "tool_selection",
@@ -195,7 +262,10 @@
         "task_effect",
         "verified_task_success"
       ],
-      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity."
+      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity.",
+      "upstream_mode_token": "R",
+      "official_environment_id": "humanoidtoolbench/G1BallMove-LL2-R",
+      "official_success_predicate": "ball_center_inside_0.12_m_target_ring_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-BALLRETRIEVE-L0-STANDARD",
@@ -213,7 +283,12 @@
       "episode_plan": {
         "simulation_episodes_per_policy": 100,
         "physical_trials": null,
-        "training_seeds_target": 5
+        "training_seeds_target": 5,
+        "seed_start": 10000,
+        "seed_end_inclusive": 10099,
+        "max_policy_steps": 3000,
+        "control_hz": 50,
+        "success_hold_steps": 50
       },
       "primary_outcomes": [
         "tool_selection",
@@ -222,7 +297,10 @@
         "task_effect",
         "verified_task_success"
       ],
-      "notes": "Preserve official standard-set composition and scoring."
+      "notes": "Preserve official standard-set composition and scoring.",
+      "upstream_mode_token": "S",
+      "official_environment_id": "humanoidtoolbench/G1BallRetrieve-LL0-S",
+      "official_success_predicate": "correct_tool_body_lifted_at_least_0.08_m_and_held_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-BALLRETRIEVE-L0-DECOY",
@@ -240,7 +318,12 @@
       "episode_plan": {
         "simulation_episodes_per_policy": 100,
         "physical_trials": null,
-        "training_seeds_target": 5
+        "training_seeds_target": 5,
+        "seed_start": 10000,
+        "seed_end_inclusive": 10099,
+        "max_policy_steps": 3000,
+        "control_hz": 50,
+        "success_hold_steps": 50
       },
       "primary_outcomes": [
         "tool_selection",
@@ -249,7 +332,10 @@
         "task_effect",
         "verified_task_success"
       ],
-      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity."
+      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity.",
+      "upstream_mode_token": "R",
+      "official_environment_id": "humanoidtoolbench/G1BallRetrieve-LL0-R",
+      "official_success_predicate": "correct_tool_body_lifted_at_least_0.08_m_and_held_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-BALLRETRIEVE-L1-STANDARD",
@@ -267,7 +353,12 @@
       "episode_plan": {
         "simulation_episodes_per_policy": 100,
         "physical_trials": null,
-        "training_seeds_target": 5
+        "training_seeds_target": 5,
+        "seed_start": 10000,
+        "seed_end_inclusive": 10099,
+        "max_policy_steps": 3000,
+        "control_hz": 50,
+        "success_hold_steps": 50
       },
       "primary_outcomes": [
         "tool_selection",
@@ -276,7 +367,10 @@
         "task_effect",
         "verified_task_success"
       ],
-      "notes": "Preserve official standard-set composition and scoring."
+      "notes": "Preserve official standard-set composition and scoring.",
+      "upstream_mode_token": "S",
+      "official_environment_id": "humanoidtoolbench/G1BallRetrieve-LL1-S",
+      "official_success_predicate": "ball_center_inside_0.12_m_target_ring_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-BALLRETRIEVE-L1-DECOY",
@@ -294,7 +388,12 @@
       "episode_plan": {
         "simulation_episodes_per_policy": 100,
         "physical_trials": null,
-        "training_seeds_target": 5
+        "training_seeds_target": 5,
+        "seed_start": 10000,
+        "seed_end_inclusive": 10099,
+        "max_policy_steps": 3000,
+        "control_hz": 50,
+        "success_hold_steps": 50
       },
       "primary_outcomes": [
         "tool_selection",
@@ -303,7 +402,10 @@
         "task_effect",
         "verified_task_success"
       ],
-      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity."
+      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity.",
+      "upstream_mode_token": "R",
+      "official_environment_id": "humanoidtoolbench/G1BallRetrieve-LL1-R",
+      "official_success_predicate": "ball_center_inside_0.12_m_target_ring_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-BALLRETRIEVE-L2-STANDARD",
@@ -323,7 +425,12 @@
       "episode_plan": {
         "simulation_episodes_per_policy": 100,
         "physical_trials": null,
-        "training_seeds_target": 5
+        "training_seeds_target": 5,
+        "seed_start": 10000,
+        "seed_end_inclusive": 10099,
+        "max_policy_steps": 3000,
+        "control_hz": 50,
+        "success_hold_steps": 50
       },
       "primary_outcomes": [
         "tool_selection",
@@ -332,7 +439,10 @@
         "task_effect",
         "verified_task_success"
       ],
-      "notes": "Preserve official standard-set composition and scoring."
+      "notes": "Preserve official standard-set composition and scoring.",
+      "upstream_mode_token": "S",
+      "official_environment_id": "humanoidtoolbench/G1BallRetrieve-LL2-S",
+      "official_success_predicate": "ball_center_inside_0.12_m_target_ring_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-BALLRETRIEVE-L2-DECOY",
@@ -352,7 +462,12 @@
       "episode_plan": {
         "simulation_episodes_per_policy": 100,
         "physical_trials": null,
-        "training_seeds_target": 5
+        "training_seeds_target": 5,
+        "seed_start": 10000,
+        "seed_end_inclusive": 10099,
+        "max_policy_steps": 3000,
+        "control_hz": 50,
+        "success_hold_steps": 50
       },
       "primary_outcomes": [
         "tool_selection",
@@ -361,7 +476,10 @@
         "task_effect",
         "verified_task_success"
       ],
-      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity."
+      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity.",
+      "upstream_mode_token": "R",
+      "official_environment_id": "humanoidtoolbench/G1BallRetrieve-LL2-R",
+      "official_success_predicate": "ball_center_inside_0.12_m_target_ring_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-ICEBREAK-L0-STANDARD",
@@ -379,7 +497,12 @@
       "episode_plan": {
         "simulation_episodes_per_policy": 100,
         "physical_trials": null,
-        "training_seeds_target": 5
+        "training_seeds_target": 5,
+        "seed_start": 10000,
+        "seed_end_inclusive": 10099,
+        "max_policy_steps": 3000,
+        "control_hz": 50,
+        "success_hold_steps": 50
       },
       "primary_outcomes": [
         "tool_selection",
@@ -388,7 +511,10 @@
         "task_effect",
         "verified_task_success"
       ],
-      "notes": "Preserve official standard-set composition and scoring."
+      "notes": "Preserve official standard-set composition and scoring.",
+      "upstream_mode_token": "S",
+      "official_environment_id": "humanoidtoolbench/G1IceBreak-LL0-S",
+      "official_success_predicate": "correct_tool_body_lifted_at_least_0.08_m_and_held_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-ICEBREAK-L0-DECOY",
@@ -406,7 +532,12 @@
       "episode_plan": {
         "simulation_episodes_per_policy": 100,
         "physical_trials": null,
-        "training_seeds_target": 5
+        "training_seeds_target": 5,
+        "seed_start": 10000,
+        "seed_end_inclusive": 10099,
+        "max_policy_steps": 3000,
+        "control_hz": 50,
+        "success_hold_steps": 50
       },
       "primary_outcomes": [
         "tool_selection",
@@ -415,7 +546,10 @@
         "task_effect",
         "verified_task_success"
       ],
-      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity."
+      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity.",
+      "upstream_mode_token": "R",
+      "official_environment_id": "humanoidtoolbench/G1IceBreak-LL0-R",
+      "official_success_predicate": "correct_tool_body_lifted_at_least_0.08_m_and_held_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-ICEBREAK-L1-STANDARD",
@@ -433,7 +567,12 @@
       "episode_plan": {
         "simulation_episodes_per_policy": 100,
         "physical_trials": null,
-        "training_seeds_target": 5
+        "training_seeds_target": 5,
+        "seed_start": 10000,
+        "seed_end_inclusive": 10099,
+        "max_policy_steps": 3000,
+        "control_hz": 50,
+        "success_hold_steps": 50
       },
       "primary_outcomes": [
         "tool_selection",
@@ -442,7 +581,10 @@
         "task_effect",
         "verified_task_success"
       ],
-      "notes": "Preserve official standard-set composition and scoring."
+      "notes": "Preserve official standard-set composition and scoring.",
+      "upstream_mode_token": "S",
+      "official_environment_id": "humanoidtoolbench/G1IceBreak-LL1-S",
+      "official_success_predicate": "both_ice_blocks_broken_shards_spread_at_least_0.03_m_and_predicate_held_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-ICEBREAK-L1-DECOY",
@@ -460,7 +602,12 @@
       "episode_plan": {
         "simulation_episodes_per_policy": 100,
         "physical_trials": null,
-        "training_seeds_target": 5
+        "training_seeds_target": 5,
+        "seed_start": 10000,
+        "seed_end_inclusive": 10099,
+        "max_policy_steps": 3000,
+        "control_hz": 50,
+        "success_hold_steps": 50
       },
       "primary_outcomes": [
         "tool_selection",
@@ -469,7 +616,10 @@
         "task_effect",
         "verified_task_success"
       ],
-      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity."
+      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity.",
+      "upstream_mode_token": "R",
+      "official_environment_id": "humanoidtoolbench/G1IceBreak-LL1-R",
+      "official_success_predicate": "both_ice_blocks_broken_shards_spread_at_least_0.03_m_and_predicate_held_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-ICEBREAK-L2-STANDARD",
@@ -489,7 +639,12 @@
       "episode_plan": {
         "simulation_episodes_per_policy": 100,
         "physical_trials": null,
-        "training_seeds_target": 5
+        "training_seeds_target": 5,
+        "seed_start": 10000,
+        "seed_end_inclusive": 10099,
+        "max_policy_steps": 3000,
+        "control_hz": 50,
+        "success_hold_steps": 50
       },
       "primary_outcomes": [
         "tool_selection",
@@ -498,7 +653,10 @@
         "task_effect",
         "verified_task_success"
       ],
-      "notes": "Preserve official standard-set composition and scoring."
+      "notes": "Preserve official standard-set composition and scoring.",
+      "upstream_mode_token": "S",
+      "official_environment_id": "humanoidtoolbench/G1IceBreak-LL2-S",
+      "official_success_predicate": "both_ice_blocks_broken_shards_spread_at_least_0.03_m_and_predicate_held_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-ICEBREAK-L2-DECOY",
@@ -518,7 +676,12 @@
       "episode_plan": {
         "simulation_episodes_per_policy": 100,
         "physical_trials": null,
-        "training_seeds_target": 5
+        "training_seeds_target": 5,
+        "seed_start": 10000,
+        "seed_end_inclusive": 10099,
+        "max_policy_steps": 3000,
+        "control_hz": 50,
+        "success_hold_steps": 50
       },
       "primary_outcomes": [
         "tool_selection",
@@ -527,7 +690,10 @@
         "task_effect",
         "verified_task_success"
       ],
-      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity."
+      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity.",
+      "upstream_mode_token": "R",
+      "official_environment_id": "humanoidtoolbench/G1IceBreak-LL2-R",
+      "official_success_predicate": "both_ice_blocks_broken_shards_spread_at_least_0.03_m_and_predicate_held_for_50_consecutive_steps"
     }
   ],
   "extension_strata": {
