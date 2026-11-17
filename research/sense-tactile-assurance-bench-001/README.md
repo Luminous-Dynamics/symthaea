@@ -1,6 +1,6 @@
 # SENSE-TACTILE-ASSURANCE-BENCH-001
 
-Versioned manifest and scorecard contract for tactile measurement, transfer, prediction and decision-value experiments.
+Schema version 0.2.0 of the versioned manifest and scorecard contract for tactile measurement, transfer, prediction and decision-value experiments.
 
 ## Why this exists
 
