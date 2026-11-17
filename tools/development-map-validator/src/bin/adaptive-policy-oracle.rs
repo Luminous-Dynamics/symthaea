@@ -196,7 +196,8 @@ fn risk_for_path(candidate:&Value,oracle:&Value,steps:&[Step],representative:&st
  let cv=json!({"scenario_id":candidate["scenario_id"],"decision_cutoff":candidate["decision_cutoff"],"actions":candidate_actions,"hypothesis_bounds":candidate["hypothesis_bounds"],"options":candidate["options"],"factors":candidate["factors"],"traces":[trace]});
  let ov=json!({"actual_hypothesis_id":representative,"decision_cutoff":oracle["decision_cutoff"],"actions":oracle_actions,"hypothesis_bounds":oracle["hypothesis_bounds"],"options":oracle["options"],"factors":oracle["factors"],"hypothesis_safety":oracle["hypothesis_safety"],"calibrations":oracle["calibrations"],"factorization_certificates":oracle["factorization_certificates"]});
  let report=noisy_channel::evaluate_noisy_channel_parts_json(&cv.to_string(),&ov.to_string())?;
- Ok(report["traces"][0].clone())
+ let traces=report["traces"].as_array().ok_or("D6.17 evaluator returned no trace array")?;
+ traces.first().cloned().ok_or_else(||"D6.17 evaluator returned an empty trace report".to_owned())
 }
 fn canonical_defer_action(
  actions:&BTreeMap<String,Action>,
@@ -276,14 +277,19 @@ fn evaluate_policy(candidate:&Value,oracle:&Value,tree:&PolicyTree,bounds:&BTree
    if depth.saturating_sub(1)>candidate["max_depth"].as_u64().unwrap_or(0) as usize{
     return Err("submitted policy exceeds candidate max_depth".to_owned());
    }
-   let node=&tree.nodes[&node_id];
+   let node=tree.nodes.get(&node_id).ok_or_else(||format!("policy references missing node {node_id:?}"))?;
    if node.kind=="stop"{
-    let path=LeafPath{leaf_id:node.id.clone(),steps:steps.clone(),decision_kind:node.decision_kind.clone().unwrap(),action_id:node.action_id.clone().unwrap(),claimed:node.claimed,world_ids:vec![world_id.clone()],cost:total};
+    let decision_kind=node.decision_kind.clone().ok_or_else(||format!("stop node {:?} has no decision kind",node.id))?;
+    let action_id=node.action_id.clone().ok_or_else(||format!("stop node {:?} has no action ID",node.id))?;
+    let path=LeafPath{leaf_id:node.id.clone(),steps:steps.clone(),decision_kind,action_id,claimed:node.claimed,world_ids:vec![world_id.clone()],cost:total};
     leaf_paths.entry(node.id.clone()).and_modify(|p|p.world_ids.push(world_id.clone())).or_insert(path);
     world_leaf.insert(world_id.clone(),node.id.clone());world_costs.insert(world_id.clone(),total);max_path=max_path.max(total);break;
    }
-   let option=node.option_id.as_ref().unwrap();if !seen.insert(option.clone()){return Err(format!("policy repeats option {option:?} on path for {world_id:?}"));}
-   let at_raw=node.at.as_ref().unwrap();let at=parse_time(at_raw,"policy acquisition at")?;let opt=&options[option];
+   let option=node.option_id.as_ref().ok_or_else(||format!("acquire node {:?} has no option ID",node.id))?;
+   if !seen.insert(option.clone()){return Err(format!("policy repeats option {option:?} on path for {world_id:?}"));}
+   let at_raw=node.at.as_ref().ok_or_else(||format!("acquire node {:?} has no timestamp",node.id))?;
+   let at=parse_time(at_raw,"policy acquisition at")?;
+   let opt=options.get(option).ok_or_else(||format!("policy references unknown option {option:?}"))?;
    if &at<&opt.available_at||at>cutoff{return Err(format!("option {option:?} is not available at submitted timestamp"));}
    if previous.as_ref().is_some_and(|t|&at<t){return Err("acquisition times must be nondecreasing on each path".to_owned());}
    previous=Some(at);
@@ -332,18 +338,22 @@ fn evaluate_policy(candidate:&Value,oracle:&Value,tree:&PolicyTree,bounds:&BTree
  }
  let mut coverage=0u64;let mut unsafe_worlds=0usize;
  for (world_id,leaf_id) in &world_leaf{
-  let path=&leaf_paths[leaf_id];
+  let path=leaf_paths.get(leaf_id).ok_or_else(||format!("missing leaf path {leaf_id:?}"))?;
+  let world=worlds.get(world_id).ok_or_else(||format!("missing world {world_id:?}"))?;
+  let bound=bounds.get(world_id).ok_or_else(||format!("missing prior bound for {world_id:?}"))?;
   if path.decision_kind=="act"{
-   if !worlds[world_id].safe_actions.contains(&path.action_id){unsafe_worlds+=1;}
+   if !world.safe_actions.contains(&path.action_id){unsafe_worlds+=1;}
    if path.action_id==target_action
-    &&worlds[world_id].safe_actions.contains(target_action)
+    &&world.safe_actions.contains(target_action)
     &&leaf_feasible.get(leaf_id)==Some(&true)
    {
-    coverage+=bounds[world_id].nominal;
+    coverage+=bound.nominal;
    }
   }
  }
- let nominal_cost:u128=bounds.iter().map(|(id,b)|b.nominal as u128*world_costs[id] as u128).sum();
+ let nominal_cost:u128=bounds.iter().map(|(id,b)|{
+  b.nominal as u128*world_costs.get(id).copied().unwrap_or(0) as u128
+ }).sum();
  let nominal_cost=((nominal_cost+SCALE as u128-1)/SCALE as u128) as u64;
  let worst_expected=nearest_rank_expected_cost(bounds,&world_costs)?;
  let feasible=robust_violations==0&&budget_violations==0;
@@ -537,7 +547,13 @@ fn main(){
  let args:Vec<String>=env::args().skip(1).collect();
  if args.len()!=1||args[0]=="--help"||args[0]=="-h"{eprintln!("Usage: adaptive-policy-oracle <candidate-and-oracle-bundle.json>");process::exit(if args.len()==1{0}else{2});}
  let raw=match fs::read_to_string(&args[0]){Ok(v)=>v,Err(e)=>{eprintln!("ERROR D6.17.2.1-IO-001 {}: {e}",args[0]);process::exit(2)}};
- match evaluate_adaptive_policy_json(&raw){Ok(v)=>println!("{}",serde_json::to_string_pretty(&v).unwrap()),Err(e)=>{eprintln!("ERROR D6.17.2.1-EVALUATION-001: {e}");process::exit(1)}}
+ match evaluate_adaptive_policy_json(&raw){
+  Ok(v)=>match serde_json::to_string_pretty(&v){
+   Ok(text)=>println!("{text}"),
+   Err(error)=>{eprintln!("ERROR D6.17.2.1-JSON-001: {error}");process::exit(2)}
+  },
+  Err(error)=>{eprintln!("ERROR D6.17.2.1-EVALUATION-001: {error}");process::exit(1)}
+ }
 }
 
 #[cfg(test)]
