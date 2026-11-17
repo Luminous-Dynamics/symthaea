@@ -5,6 +5,9 @@
 
 #![deny(unsafe_code)]
 
+pub mod lightshell_qualification;
+pub mod lightshell_spacer_doe;
+
 use serde::{Deserialize, Serialize};
 use symthaea_broca::{BrocaConfig, BrocaGenerator, ThoughtChannels};
 use symthaea_causal_reasoning::causal_calculus::StructuralCausalModel;
