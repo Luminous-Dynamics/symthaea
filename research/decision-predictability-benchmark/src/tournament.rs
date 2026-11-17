@@ -9,6 +9,7 @@
 //! replicates.
 
 use crate::baseline::{FittedBaseline, fit_linear_ar, fit_mean, fit_persistence};
+use crate::ngrc::{NgrcError, UniformDelayNgrc, fit_uniform_delay_ngrc};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -241,11 +242,33 @@ fn parse_value(value: &str, line: usize, field: &'static str) -> Result<f64, Tou
     Ok(parsed)
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct NgrcConfig {
+    delay_count: usize,
+    delay_spacing: usize,
+    ridge_penalty: f64,
+}
+
 #[derive(Clone, Debug)]
 struct ModelSpec {
     name: String,
     order: Option<usize>,
+    ngrc_config: Option<NgrcConfig>,
     validation_nrmse: Option<f64>,
+}
+
+enum FittedModel {
+    Baseline(FittedBaseline),
+    Ngrc(UniformDelayNgrc),
+}
+
+impl FittedModel {
+    fn forecast(&self, history: &[f64], horizon: usize) -> Result<Vec<f64>, ()> {
+        match self {
+            Self::Baseline(model) => model.forecast(history, horizon).map_err(|_| ()),
+            Self::Ngrc(model) => model.forecast(history, horizon).map_err(|_| ()),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -304,6 +327,9 @@ pub fn evaluate_fixture_csv(input: &str) -> Result<String, TournamentError> {
     );
     output.push_str(
         "# ar_selection=minimum_full_validation_rollout_nrmse_over_orders_1_2_4_8;no_test_tuning\n",
+    );
+    output.push_str(
+        "# ngrc_selection=uniform_delay_taps_1_2_3_4,spacing_1_2,ridge_0_1e-8_1e-5;validation_only\n",
     );
     output.push_str("# nrmse=rmse_divided_by_development_population_standard_deviation\n");
     output.push_str("# scope=within_trajectory_same_regime_continuation_only;not_held_out_family_generalization\n");
@@ -400,6 +426,7 @@ fn evaluate_series(fixture: &FixtureTrajectory, channel: Channel, output: &mut S
         validation_specs.push(ModelSpec {
             name: name.to_owned(),
             order,
+            ngrc_config: None,
             validation_nrmse: score,
         });
     }
@@ -413,6 +440,7 @@ fn evaluate_series(fixture: &FixtureTrajectory, channel: Channel, output: &mut S
         validation_specs.push(ModelSpec {
             name: format!("ar{order}"),
             order: Some(order),
+            ngrc_config: None,
             validation_nrmse: score,
         });
     }
@@ -429,12 +457,62 @@ fn evaluate_series(fixture: &FixtureTrajectory, channel: Channel, output: &mut S
         final_specs.push(ModelSpec {
             name: "ar_tuned".to_owned(),
             order: Some(order),
+            ngrc_config: None,
             validation_nrmse: Some(score),
         });
     } else {
         final_specs.push(ModelSpec {
             name: "ar_tuned".to_owned(),
             order: None,
+            ngrc_config: None,
+            validation_nrmse: None,
+        });
+    }
+
+    // Uniform-delay NG-RC configuration is selected on validation only.
+    // Test data remains sealed until the single fixed-origin final evaluation.
+    let mut eligible_ngrc = Vec::new();
+    for delay_count in [1, 2, 3, 4] {
+        for delay_spacing in [1, 2] {
+            for ridge_penalty in [0.0, 1e-8, 1e-5] {
+                let config = NgrcConfig {
+                    delay_count,
+                    delay_spacing,
+                    ridge_penalty,
+                };
+                if let Some(score) = validation_score_ngrc(
+                    config,
+                    training,
+                    validation,
+                    validation_scale,
+                ) {
+                    eligible_ngrc.push((config, score));
+                }
+            }
+        }
+    }
+    let selected_ngrc = eligible_ngrc.into_iter().min_by(|left, right| {
+        left.1
+            .total_cmp(&right.1)
+            .then_with(|| left.0.delay_count.cmp(&right.0.delay_count))
+            .then_with(|| left.0.delay_spacing.cmp(&right.0.delay_spacing))
+            .then_with(|| left.0.ridge_penalty.total_cmp(&right.0.ridge_penalty))
+    });
+    if let Some((config, score)) = selected_ngrc {
+        final_specs.push(ModelSpec {
+            name: format!(
+                "ngrc_tuned_d{}_s{}_r{}",
+                config.delay_count, config.delay_spacing, config.ridge_penalty
+            ),
+            order: None,
+            ngrc_config: Some(config),
+            validation_nrmse: Some(score),
+        });
+    } else {
+        final_specs.push(ModelSpec {
+            name: "ngrc_tuned".to_owned(),
+            order: None,
+            ngrc_config: None,
             validation_nrmse: None,
         });
     }
@@ -443,10 +521,12 @@ fn evaluate_series(fixture: &FixtureTrajectory, channel: Channel, output: &mut S
     let mut failed = Vec::new();
 
     for spec in final_specs {
-        if spec.name == "ar_tuned" && spec.order.is_none() {
+        if (spec.name == "ar_tuned" && spec.order.is_none())
+            || (spec.name == "ngrc_tuned" && spec.ngrc_config.is_none())
+        {
             failed.push(FailedForecast {
                 spec,
-                status: "no_eligible_ar_order",
+                status: "no_eligible_validation_configuration",
             });
             continue;
         }
@@ -566,11 +646,38 @@ fn validation_score(
     metrics.nrmse.is_finite().then_some(metrics.nrmse)
 }
 
-fn fit_spec(
-    spec: &ModelSpec,
+fn validation_score_ngrc(
+    config: NgrcConfig,
     history: &[f64],
-) -> Result<FittedBaseline, crate::baseline::BaselineError> {
+    validation: &[f64],
+    scale: f64,
+) -> Option<f64> {
+    let fitted = fit_uniform_delay_ngrc(
+        history,
+        config.delay_count,
+        config.delay_spacing,
+        config.ridge_penalty,
+    )
+    .ok()?;
+    let forecast = fitted.forecast(history, validation.len()).ok()?;
+    let metrics = error_metrics(&forecast, validation, scale);
+    metrics.nrmse.is_finite().then_some(metrics.nrmse)
+}
+
+fn fit_spec(spec: &ModelSpec, history: &[f64]) -> Result<FittedModel, ()> {
+    if let Some(config) = spec.ngrc_config {
+        return fit_uniform_delay_ngrc(
+            history,
+            config.delay_count,
+            config.delay_spacing,
+            config.ridge_penalty,
+        )
+        .map(FittedModel::Ngrc)
+        .map_err(|_| ());
+    }
     fit_named_model(&spec.name, spec.order, history)
+        .map(FittedModel::Baseline)
+        .map_err(|_| ())
 }
 
 fn fit_named_model(
