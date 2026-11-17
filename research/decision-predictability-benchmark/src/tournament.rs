@@ -373,10 +373,8 @@ fn evaluate_series(fixture: &FixtureTrajectory, channel: Channel, output: &mut S
 
     let validation_scale = population_std(training);
     let development_scale = population_std(development);
-    if !validation_scale.is_finite()
-        || validation_scale <= 0.0
-        || !development_scale.is_finite()
-        || development_scale <= 0.0
+    if !scale_is_resolved(training, validation_scale)
+        || !scale_is_resolved(development, development_scale)
     {
         write_status_row(
             output,
@@ -391,7 +389,7 @@ fn evaluate_series(fixture: &FixtureTrajectory, channel: Channel, output: &mut S
                 origin_step: development_end.saturating_sub(1),
                 validation_nrmse: None,
             },
-            "constant_or_unscaled_channel",
+            "constant_or_below_resolution_channel",
         );
         return;
     }
@@ -590,6 +588,21 @@ fn fit_named_model(
         ),
         _ => Err(crate::baseline::BaselineError::NumericalFailure),
     }
+}
+
+/// Whether observed variation exceeds a conservative floating-point
+/// resolution floor relative to the channel magnitude. This prevents tiny
+/// rounding jitter around a mathematical fixed point from receiving a
+/// misleading normalized forecast score.
+fn scale_is_resolved(values: &[f64], scale: f64) -> bool {
+    let magnitude = values
+        .iter()
+        .map(|value| value.abs())
+        .fold(0.0_f64, f64::max);
+    magnitude.is_finite()
+        && magnitude > 0.0
+        && scale.is_finite()
+        && scale > 16.0 * f64::EPSILON * magnitude
 }
 
 fn population_std(values: &[f64]) -> f64 {
@@ -848,11 +861,31 @@ mod tests {
         let result = evaluate_fixture_csv(&csv_for(&values)).unwrap();
         assert!(result.lines().any(|line| {
             line.starts_with("ar_fixture,known_regime,y,none,")
-                && line.ends_with("constant_or_unscaled_channel")
+                && line.ends_with("constant_or_below_resolution_channel")
         }));
         assert!(result.lines().any(|line| {
             line.starts_with("ar_fixture,known_regime,z,none,")
-                && line.ends_with("constant_or_unscaled_channel")
+                && line.ends_with("constant_or_below_resolution_channel")
+        }));
+    }
+
+    #[test]
+    fn below_resolution_fixed_point_jitter_is_marked_inconclusive() {
+        let values: Vec<f64> = (0..120)
+            .map(|index| match index % 3 {
+                0 => 0.6,
+                1 => 0.6 + f64::EPSILON / 2.0,
+                _ => 0.6 - f64::EPSILON / 2.0,
+            })
+            .collect();
+        let result = evaluate_fixture_csv(&csv_for(&values)).unwrap();
+        assert!(result.lines().any(|line| {
+            line.starts_with("ar_fixture,known_regime,x,none,")
+                && line.ends_with("constant_or_below_resolution_channel")
+        }));
+        assert!(!result.lines().any(|line| {
+            line.starts_with("ar_fixture,known_regime,x,")
+                && line.ends_with(",ok")
         }));
     }
 
