@@ -247,6 +247,6 @@ Targets must be frozen before held-out evaluation. If an approach fails, preserv
 
 ## 9. Claim ceiling
 
-The alpha exactly evaluates a submitted finite policy over the registered finite joint-outcome credal kernels, bounded prior and fixed evaluator costs. It does not optimize over the full policy space, establish empirical calibration, validate cross-hypothesis shared-latent ambiguity, model stochastic execution cost, prove hypothesis completeness, authenticate oracle ownership, or authorize real-world actions.
+The alpha exactly evaluates a submitted finite policy over the registered finite joint-outcome credal kernels, bounded prior and fixed evaluator costs. Robust posterior risk, coverage and unsafe-mass envelopes assume independent per-hypothesis kernel ambiguity sets (a product/rectangular model). It does not optimize over the full policy space, establish empirical calibration, validate cross-hypothesis shared-latent ambiguity, model stochastic execution cost, prove hypothesis completeness, authenticate oracle ownership, or authorize real-world actions.
 
 Rust compilation, tests, rustfmt, Clippy and CI have not been executed here. Keep this branch draft until exact-head toolchain validation and independent fixture replay.
