@@ -55,3 +55,19 @@ This makes the safe symmetry regime explicit:
 It is still exact, finite and discrete. No approximate/soft symmetry receives pruning authority. An empty common quotient beyond identity simply means no search reduction was qualified across the declared environment family.
 
 Tests cover D4-to-C4 intersection (with witness records for the four excluded reflections), a third asymmetric environment that shrinks the common subgroup to identity, and rejection of a forged common-subgroup witness. The per-environment certificates are replayed separately.
+
+
+## Contextual symmetry atlas (new v0.3 direction)
+
+The common-subgroup compiler above is the correct choice when one quotient must remain valid across the entire declared environment family. It may be conservative when the operating context is known before search.
+
+The new `compile_contextual_multi_environment_quotient` therefore constructs a separate, context-bound subgroup and quotient for each environment. Each certificate carries the exact `context_id`, its local task-preserving subgroup, and its own quotient certificate. The verifier recomputes and replays every local subgroup and quotient; relabelling one context's certificate for another is rejected.
+
+The hand-auditable D4 ordered-pair fixture now distinguishes:
+- isotropic context: D4 retained, 3 orbits over 16 candidates;
+- rotating-regime context: C4 retained, 4 orbits;
+- asymmetric context: C1 retained, 16 singleton orbits.
+
+This is not permission to reuse a C4 certificate in the isotropic or asymmetric context. The caller must present the certificate whose exact context ID matches the active environment. A missing or unknown context should abstain rather than inherit another environment's pruning permission.
+
+The common-intersection compiler remains available and returns C1 for the same three-environment family. The contextual atlas demonstrates the more useful alternative: **preserve the maximal exact symmetry locally, while binding pruning authority to the operating context**. Both approaches are exact finite-group constructions; neither accepts soft/spectral proposals as proof.
