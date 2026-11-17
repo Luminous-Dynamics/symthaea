@@ -4,7 +4,7 @@
 **Parent:** [AQUA-BATHING-SERVICE-001 #12660](https://github.com/Luminous-Dynamics/symthaea/issues/12660)  
 **Related:** #12692 shower spray, #12693 washstation, #12694 thermal suite, #12702 wet-room envelope, #12703 wet-path hygiene, #12709 DHW cascade, #12712 adaptive experience.
 
-## 1. Product thesis
+## Product thesis
 
 Luminous Aqua should be a **family of serviceable bathing modules**, not a single expensive smart bathroom appliance.
 
@@ -16,7 +16,7 @@ The product is built from three separable assemblies:
 
 A product can be installed with no Symthaea connection, no cloud account, no camera, no microphone and no personal profile. Essential bathing service and independent safety functions still work.
 
-## 2. Reference system for the first physical design article
+## Reference system for the first physical design article
 
 The first engineering article should be deliberately modest:
 
@@ -31,7 +31,7 @@ The first engineering article should be deliberately modest:
 
 **Not in the first article:** human recirculating shower use, greywater treatment, public/bathing fountain, pool, steam, sauna or plunge operation. These are separate products and evidence classes.
 
-## 3. Physical architecture
+## Physical architecture
 
 ### A. Water circuit classes
 
@@ -59,7 +59,6 @@ flowchart LR
   Bidet --> Waste
   Waste --> DWHR[Indirect drain heat exchanger]
   DWHR --> Sewer[Lawful drain / sewer]
-  Cold[Potable cold branch] --> DWHR
   DWHR -. indirect heat only .-> Preheat[Preheated potable side]
   Preheat --> Mixer
   Grey[Separate WaterLoop train] --> NonPotable[Named non-potable end use]
@@ -78,7 +77,7 @@ The dotted thermal transfer represents heat only across a physically separated h
 
 Recovered heat is credited at the useful receiving boundary after parasitic electricity, pressure loss, fouling, tank/pipe loss and time mismatch. Never credit it once at the exchanger and again at the heater.
 
-## 4. Fixture module contracts
+## Fixture module contracts
 
 | Module | Replaceable / inspectable subassemblies | Product-specific test owner |
 |---|---|---|
@@ -94,7 +93,7 @@ Recovered heat is credited at the useful receiving boundary after parasitic elec
 
 A replaceable cartridge is not a hygienic pass by itself. The cleaning method, post-clean inspection, sampling and requalification path must be tested.
 
-## 5. Service spine and interfaces
+## Service spine and interfaces
 
 The service spine should be reachable from a dry maintenance side wherever site geometry permits. It should group:
 - labelled potable branch isolation and pressure/temperature measurement taps;
@@ -108,7 +107,7 @@ The service spine should be reachable from a dry maintenance side wherever site 
 
 Every physical connection should have a versioned interface entry with: medium class, direction, nominal/rated envelope, isolation method, drain-down/cleaning path, material compatibility, measurement boundary and owner evidence. This is an interface schedule, not a new generic telemetry or physical-connection ontology.
 
-## 6. Control and evidence authority
+## Control and evidence authority
 
 | Function | Authority |
 |---|---|
@@ -124,7 +123,7 @@ Every physical connection should have a versioned interface entry with: medium c
 
 Unknown, stale, contradictory or out-of-envelope evidence cannot be interpreted as approval. AI cannot override interlocks, temperature limits, water quality, emergency isolation or user choice.
 
-## 7. Product configurations
+## Product configurations
 
 ### AQS-1 — Essential / compact
 Shower + basin, with optional bidet/personal wash after local professional review. Prioritize a repairable service spine, direct-flow efficiency and reliable low-pressure operation.
@@ -140,7 +139,7 @@ Individually isolated shower bays, serviceable cartridges, dry-side plant, acces
 
 These are product bundles, not four mutually exclusive styles or a one-size-fits-all floor plan.
 
-## 8. Design gates
+## Design gates
 
 1. Requirements and user journeys frozen for the named archetype.
 2. Potable / recirculation / greywater / pool / wastewater diagram reviewed for the exact configuration.
@@ -151,15 +150,18 @@ These are product bundles, not four mutually exclusive styles or a one-size-fits
 7. Unoccupied room-scale and fixture bench at Symtropy #4531 with fault injection.
 8. Independent human-factors and hygiene gates before any occupied or human-exposure trial.
 
-## 9. First stop / continue decision
+## First stop / continue decision
 
 Start with AQS-1 direct-flow shower + basin + service spine + optional indirect DWHR. Select direct-flow, nozzle geometry and DWHR topology using matched evidence. Advance to bidet and bath modules only after the first fixture interfaces and wet-path cleaning design are stable. Add recirculation / aquatic / steam / sauna only after independent class-specific hygiene, electrical, thermal and exposure reviews.
 
-## 10. Claim ceiling
+## Claim ceiling
 
 This architecture is a modular design reference, not a released product, approved plumbing/electrical plan, certified accessible layout, validated water-quality system, measured efficiency result or authorization to purchase/build/occupy. All product modules remain subject to their own qualification and applicable local review.
 
-
-## 11. AQS-1 interface and fault contract
+## AQS-1 interface and fault contract
 
 The first direct-flow reference article's interface register, measurement topology, matched-service test gates, fault/stop contract and unoccupied validation sequence are defined in [AQUA_AQS1_INTERFACE_AND_FAULT_CONTRACT_V0_1.md](AQUA_AQS1_INTERFACE_AND_FAULT_CONTRACT_V0_1.md). It is a conceptual engineering contract, not a released P&ID, construction design, completed FMEA or approval.
+
+## Bounded bathing service compiler
+
+The optional experience layer may translate an explicit user-selected task into an inspectable candidate plan using only exact, qualified fixture capabilities. The plan is advisory; it cannot control or widen physical limits, authorize water use or replace manual operation. The schema, abstention rules, negative controls and baseline comparison protocol are defined in [AQUA_BOUNDED_BATHING_SERVICE_COMPILER_V0_1.md](AQUA_BOUNDED_BATHING_SERVICE_COMPILER_V0_1.md), tracked in [#12749](https://github.com/Luminous-Dynamics/symthaea/issues/12749).
