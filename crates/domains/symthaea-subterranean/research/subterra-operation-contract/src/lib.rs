@@ -1491,7 +1491,7 @@ mod tests {
         let history = registry.attempt(AttemptId(11)).unwrap().history();
         assert_eq!(history.len(), 2);
         assert!(matches!(
-            history[1].event,
+            &history[1].event,
             OperationEvent::CommandIssued {
                 command_digest: EvidenceDigest([10; 32]),
                 idempotency_key: EvidenceDigest([11; 32]),
