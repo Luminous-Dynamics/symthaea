@@ -79,3 +79,11 @@ The room-mode contract records the required evidence and return-to-ready state f
 - Symthaea [AQUA-WASHSTATION-BENCHMARK-001](https://github.com/Luminous-Dynamics/symthaea/blob/research/aqua-competitor-ledger-v0.1-20261117/docs/AQUA_WASHSTATION_BENCHMARK_V0_1.md) defines separate bath, bidet and basin task comparators and evidence boundaries.
 - EPA WaterSense published private-lavatory reference is 1.5 gpm max at 60 psi / 414 kPa and 0.8 gpm min at 20 psi / 138 kPa. The draft 1.2 gpm v2.0 revision is not approved: EPA paused work in February 2025.
 - ASME A112.4.2-2021 / CSA B45.16:21 supplies relevant bidet backflow, temperature, spray-pressure, lifecycle and self-clean test references; local applicability remains for qualified South African review.
+
+
+## Whole-system DHW / heat-cascade integration
+
+- Symthaea [AQUA-DHW-CASCADE-001 #12709](https://github.com/Luminous-Dynamics/symthaea/issues/12709) compares hot-water source, heat-pump/storage, shower drain-water recovery topology, mixer placement and standby/distribution effects against a matched bathing service.
+- The benchmark consumes Symtropy's native thermofluid/heat-pump/resource-closure outputs and Mycelix metrology; it does not implement a parallel heat-pump or thermal solver.
+- Key comparator insight: the 2026 DWHR/HP coupling paper reports study-specific global COP results up to 6.3 experimentally / 8.0 simulated, while some topologies incurred static heat loss and reduced HP COP; the unbalanced mixer-side configuration performed best in that study. Aqua must reproduce the result rather than assuming transferability.
+- See `docs/AQUA_DHW_CASCADE_BENCHMARK_V0_1.md`.
