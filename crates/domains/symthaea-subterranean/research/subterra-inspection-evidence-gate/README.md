@@ -29,6 +29,10 @@ Admission means only "eligible for downstream planning under these declared bind
 
 ## Integration
 
-The gate returns an admitted candidate wrapper containing both the original campaign option and the complete evidence manifest only after all checks pass. Rejected options do not contribute to downstream EVSI or resource optimization. The same frozen context and admission report should be preserved with the campaign plan for later independent audit.
+The gate returns an admitted candidate wrapper containing both the original campaign option and the complete evidence manifest only after all checks pass.
+
+The `build_evidence_bound_campaign` constructor takes the complete candidate set and frozen per-option contexts. It builds the campaign input only if **every** supplied option is admitted; one rejected option aborts construction rather than silently filtering the set. The returned `EvidenceBoundCampaign` retains all candidate manifests. Its `optimize` method returns the campaign report, all admitted evidence manifests, and the exact evidence manifests corresponding to selected options.
+
+The same frozen contexts, admission result and campaign evidence bundle should be retained for later independent audit. Direct construction of the lower-level campaign crate remains possible; production integration should use this evidence-bound builder as its admission boundary.
 
 The synthetic example uses fake digests and deliberately does not claim that a real external verifier or rights service ran.
