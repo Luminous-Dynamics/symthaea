@@ -121,3 +121,14 @@ Each assertion can declare a measurement scope: `local_probe`, `mesoscopic`, `bu
 The auditor refuses to promote a local-probe pairing signal to bulk Tc, or to use a spectroscopic gap as a Tc criterion. Observed pairing energy is represented in meV and must identify an experimental scope. The smoke fixture has separate synthetic local pairing and bulk stiffness events. These are schema tests, not observations from the cited paper.
 
 The Niu et al. Science 2026 Bi2212 shot-noise study reports STM measurements at cryogenic base temperatures of 4.2 K, 2.3 K and 0.3 K, with a heterogeneous pairing-onset energy scale up to ~70 meV. That energy is not a Tc. The experiment did not directly measure pair transfer at 300 K or demonstrate bulk room-temperature superconductivity. Preprint: arXiv:2409.15928 (first submitted 24 September 2024); Science DOI: 10.1126/science.adt3444.
+
+
+## Disorder screening and phase-coherence benchmark references
+
+New source records distinguish:
+- metallic outer planes screening dopant disorder while remaining metallic and weakly proximitized;
+- single-plane Bi-2201 as a dimensionality-reduction control;
+- checkerboard spatial-order threshold as one family-specific phase-coherence mechanism;
+- field-free stiffness-tensor and resonator kinetic-inductance metrology.
+
+A local gap or ARPES spectral signature does not establish a new Tc. The surface-doped F0223 state is not assigned a Tc in this registry. For stiffness extraction from resonator kinetic inductance, retain geometry, current-distribution and electrodynamic assumptions; do not convert with a universal geometry-free constant.
