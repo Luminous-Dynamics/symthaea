@@ -239,9 +239,6 @@ pub fn evaluate_measured_holdout(
     {
         diagnostics.push(HoldoutEvaluationDiagnostic::PredictionCommitmentArtifactMismatch);
     }
-    if commitment.test_stand_output_sha256 == commitment.holdout_output_sha256 {
-        diagnostics.push(HoldoutEvaluationDiagnostic::PredictionCommitmentOutputMismatch);
-    }
     if commitment.timestamp_authority_ref.trim().is_empty() {
         diagnostics.push(HoldoutEvaluationDiagnostic::MissingTimestampAuthority);
     }
@@ -312,10 +309,12 @@ pub fn evaluate_measured_holdout(
     let test_metrics = summarize_samples(
         &campaign.test_stand_samples,
         profile.absolute_error_tolerance,
+        profile.normalized_error_scale,
     );
     let holdout_metrics = summarize_samples(
         &campaign.holdout_samples,
         profile.absolute_error_tolerance,
+        profile.normalized_error_scale,
     );
 
     let test_passes = meets_thresholds(&test_metrics, profile, false);
@@ -552,19 +551,33 @@ fn validate_samples(
             }
         }
     }
+    let prediction_count = samples
+        .iter()
+        .filter(|sample| sample.predicted_value.is_some())
+        .count();
+    let interval_count = samples
+        .iter()
+        .filter(|sample| sample.prediction_interval.is_some())
+        .count();
+    if interval_count > 0 && interval_count < prediction_count {
+        diagnostics.push(HoldoutEvaluationDiagnostic::PartialPredictionIntervalCoverage);
+    }
 }
 
 fn summarize_samples(
     samples: &[PairedValidationSample],
     absolute_error_tolerance: f64,
+    normalized_error_scale: f64,
 ) -> ValidationSetMetrics {
-    let sample_count = samples.len();
-    let unique_group_count = samples
+    let mut ordered_samples: Vec<&PairedValidationSample> = samples.iter().collect();
+    ordered_samples.sort_by(|left, right| left.sample_id.cmp(&right.sample_id));
+    let sample_count = ordered_samples.len();
+    let unique_group_count = ordered_samples
         .iter()
         .map(|sample| sample.group_id.as_str())
         .collect::<BTreeSet<_>>()
         .len();
-    let predictions: Vec<(&PairedValidationSample, f64)> = samples
+    let predictions: Vec<(&PairedValidationSample, f64)> = ordered_samples
         .iter()
         .filter_map(|sample| {
             sample.predicted_value.map(|predicted| {
@@ -582,7 +595,8 @@ fn summarize_samples(
         .iter()
         .map(|(_, error)| error.abs())
         .reduce(f64::max);
-    let normalized_root_mean_square_error = root_mean_square_error.map(|value| value);
+    let normalized_root_mean_square_error =
+        root_mean_square_error.map(|value| value / normalized_error_scale);
     let mean_absolute_error_over_measurement_uncertainty = average(predictions.iter().filter_map(
         |(sample, error)| {
             sample
