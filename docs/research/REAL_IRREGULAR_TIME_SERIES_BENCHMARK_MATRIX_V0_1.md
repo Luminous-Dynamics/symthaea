@@ -115,6 +115,18 @@ These public surfaces are inconsistent. Preserve every source URL, retrieval dat
 
 The TSFM.ai mirror reports that its FEV-Bench point-accuracy MASE-skill view (data loaded 15 Nov 2026) has TimeRSI-1.5 at 41.44, ci-proto at 40.80 and TimeRSI at 40.58. Its GIFT-Eval page ranks grouped probabilistic slices by average MASE rank and is led by Taichu-TimeSeries-Agent-v2, STRIDE with Synapse and RegLab-AH-2. Its BOOM telemetry view is led by Toto 2.0 models on CRPS. Those are different datasets, metrics and aggregation procedures; they should not be mixed into a single table as though ranks were interchangeable: https://tsfm.ai/benchmarks .
 
+### 17 Nov 2026 FEV-Bench live-view update
+
+Two live FEV-Bench surfaces were rechecked on 17 November. They rank different metrics and their observations must not be reconciled into a single leaderboard:
+
+**Point-accuracy MASE skill** — TSFM.ai's current 52-entry view lists TimeRSI-1.5 at 41.44, ci-proto 40.80, TimeRSI 40.58, TimeH2O-v1 39.95, Timestral-209M 39.49, Simons-297M 37.85 and TimesFM-3 37.82. This is MASE skill, not SQL win rate: https://tsfm.ai/benchmarks/fev-bench
+
+**SQL win rate** — The Aggregate's daily-refreshed 16 Nov snapshot lists ci-proto 90.00%, TimeH2O-v1 89.65%, Timestral-209M 87.06%, t0-gamma 84.68%, Simons-297M 81.97%, TimesFM-3 79.26%, Chronos-2 72.24%, and Toto-2.0-2.5B 69.44%: https://theaggregate.ai/benchmark?slug=fev-bench-sql
+
+**Conflicting live vendor dashboard** — H2O's current live dashboard retrieved on 17 Nov displays TimeH2O-v1 91.50%, Timestral-209M 89.00%, t0-gamma 87.40%, TimesFM-3 82.00%, Chronos-2 75.80% and Toto-2.0-2.5B 72.20%: https://h2oai.github.io/benchmarks/ . This conflicts with its GitHub README data read 13 Nov and with the Aggregate snapshot. Keep it as a separate live-surface observation; do not average it with the dated dataset or choose the most favorable number.
+
+All three observations are pinned in the machine-readable comparator snapshot with source type, metric, date and qualification caveat. This matters for Symthaea's benchmark design: report the official FEV task-level skill and win-rate metrics separately, then separately report irregularity, calibration, decision regret, completeness safety and system cost. A competitor's lead on one FEV metric is not a universal win across every forecasting or decision task.
+
 ### Machine-readable comparator snapshot
 
 The exact score observations above are now pinned separately in
