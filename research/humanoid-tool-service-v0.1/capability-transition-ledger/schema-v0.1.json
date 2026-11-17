@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/humanoid-capability-transition-ledger-v0.1.json",
+  "title": "Humanoid capability transition event ledger v0.1",
+  "description": "One episode's evidence for five HumanoidToolBench interaction milestones. Missing instrumentation is distinct from an instrumented absent event. All timestamps are source-provided nanoseconds in the declared episode clock domain.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "episode_id",
+    "policy_id",
+    "split_id",
+    "scenario_id",
+    "execution_level",
+    "tool_set_mode",
+    "clock_domain_id",
+    "source_id",
+    "events"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "episode_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "execution_level": {
+      "enum": [
+        "L0_SELECTION_PICKUP",
+        "L1_STATIONARY_USE",
+        "L2_MOBILE_USE"
+      ]
+    },
+    "tool_set_mode": {
+      "enum": [
+        "STANDARD",
+        "DECOY"
+      ]
+    },
+    "clock_domain_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "events": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_contact",
+        "correct_first_contact",
+        "correct_tool_lift",
+        "tool_target_contact",
+        "task_success"
+      ],
+      "properties": {
+        "candidate_contact": {
+          "$ref": "#/$defs/eventEvidence"
+        },
+        "correct_first_contact": {
+          "$ref": "#/$defs/eventEvidence"
+        },
+        "correct_tool_lift": {
+          "$ref": "#/$defs/eventEvidence"
+        },
+        "tool_target_contact": {
+          "$ref": "#/$defs/eventEvidence"
+        },
+        "task_success": {
+          "$ref": "#/$defs/eventEvidence"
+        }
+      }
+    },
+    "independent_verifier_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Separate verifier identity required when task_success is instrumented; distinct from policy_id and source_id."
+    }
+  },
+  "$defs": {
+    "eventEvidence": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "const": "NOT_INSTRUMENTED"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "const": "INSTRUMENTED_ABSENT"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "timestamp_ns"
+          ],
+          "properties": {
+            "status": {
+              "const": "OCCURRED"
+            },
+            "timestamp_ns": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "events": {
+            "properties": {
+              "task_success": {
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "INSTRUMENTED_ABSENT",
+                      "OCCURRED"
+                    ]
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "independent_verifier_id"
+        ]
+      }
+    }
+  ]
+}

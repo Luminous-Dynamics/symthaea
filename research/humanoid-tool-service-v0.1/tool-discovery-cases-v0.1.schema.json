@@ -1,0 +1,324 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Active Tool Discovery synthetic protocol manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "programme_id",
+    "evidence_class",
+    "status",
+    "source_subject",
+    "generator_contract",
+    "families",
+    "cases",
+    "metrics",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "programme_id": {
+      "const": "HUM-TOOL-DISCOVERY-001"
+    },
+    "evidence_class": {
+      "const": "synthetic_protocol_fixture"
+    },
+    "status": {
+      "const": "protocol_only_not_executed"
+    },
+    "source_subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "parent_issue",
+        "child_issue",
+        "branch"
+      ],
+      "properties": {
+        "repository": {
+          "const": "Luminous-Dynamics/symthaea"
+        },
+        "parent_issue": {
+          "const": 12657
+        },
+        "child_issue": {
+          "const": 12701
+        },
+        "branch": {
+          "const": "research/humanoid-tool-service-v0-1"
+        }
+      }
+    },
+    "generator_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family_count",
+        "case_count",
+        "variants_per_family",
+        "allowed_probe_families",
+        "forbidden_probe_families",
+        "oracle_separation",
+        "note"
+      ],
+      "properties": {
+        "family_count": {
+          "const": 6
+        },
+        "case_count": {
+          "const": 24
+        },
+        "variants_per_family": {
+          "const": 4
+        },
+        "allowed_probe_families": {
+          "type": "array",
+          "minItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "forbidden_probe_families": {
+          "type": "array",
+          "minItems": 7,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "oracle_separation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "families": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "family_id",
+          "name",
+          "affordances",
+          "probe_envelope"
+        ],
+        "properties": {
+          "family_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "affordances": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "probe_envelope": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 24,
+      "maxItems": 24,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "family_id",
+          "tool_instance_id",
+          "split",
+          "visible_candidate_observation",
+          "hidden_oracle",
+          "interaction_budget",
+          "expected_disposition",
+          "paired_counterfactual_group",
+          "oracle_seed"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string"
+          },
+          "family_id": {
+            "type": "string"
+          },
+          "tool_instance_id": {
+            "type": "string"
+          },
+          "split": {
+            "enum": [
+              "development",
+              "confirmatory_same_family",
+              "confirmatory_transfer",
+              "negative_control"
+            ]
+          },
+          "visible_candidate_observation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "description",
+              "shape_profile",
+              "language_label",
+              "instruction",
+              "candidate_must_not_receive"
+            ],
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "shape_profile": {
+                "type": "object"
+              },
+              "language_label": {
+                "type": "string"
+              },
+              "instruction": {
+                "type": "string"
+              },
+              "candidate_must_not_receive": {
+                "type": "array",
+                "minItems": 5,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "hidden_oracle": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "tool_family",
+              "available_affordances",
+              "physical_parameter_ranges",
+              "target_task",
+              "expected_success_condition",
+              "safe_probe"
+            ],
+            "properties": {
+              "tool_family": {
+                "type": "string"
+              },
+              "available_affordances": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "physical_parameter_ranges": {
+                "type": "object"
+              },
+              "target_task": {
+                "type": "string"
+              },
+              "expected_success_condition": {
+                "type": "string"
+              },
+              "safe_probe": {
+                "type": "string"
+              }
+            }
+          },
+          "interaction_budget": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "max_active_probes",
+              "max_plan_revisions",
+              "hard_stop_on_force_or_energy_envelope_breach",
+              "no_destructive_probe",
+              "no_live_human_contact"
+            ],
+            "properties": {
+              "max_active_probes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5
+              },
+              "max_plan_revisions": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "hard_stop_on_force_or_energy_envelope_breach": {
+                "const": true
+              },
+              "no_destructive_probe": {
+                "const": true
+              },
+              "no_live_human_contact": {
+                "const": true
+              }
+            }
+          },
+          "expected_disposition": {
+            "type": "string"
+          },
+          "paired_counterfactual_group": {
+            "type": "string"
+          },
+          "oracle_seed": {
+            "type": "integer",
+            "minimum": 41000,
+            "maximum": 41023
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_ceiling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "synthetic_contract_only",
+        "physical_tool_properties_established",
+        "material_strength_established",
+        "safe_load_established",
+        "physical_tool_competence_established"
+      ],
+      "properties": {
+        "synthetic_contract_only": {
+          "const": true
+        },
+        "physical_tool_properties_established": {
+          "const": false
+        },
+        "material_strength_established": {
+          "const": false
+        },
+        "safe_load_established": {
+          "const": false
+        },
+        "physical_tool_competence_established": {
+          "const": false
+        }
+      }
+    }
+  }
+}

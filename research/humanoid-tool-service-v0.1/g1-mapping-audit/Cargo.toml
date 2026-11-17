@@ -1,0 +1,9 @@
+[package]
+name = "g1-decoupled-v1-audit"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Pure, non-actuating Rust audit primitives for the HumanoidToolBench G1 decoupled_v1 policy contract"
+
+[workspace]

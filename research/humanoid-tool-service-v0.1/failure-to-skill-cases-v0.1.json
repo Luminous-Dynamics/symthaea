@@ -1,0 +1,2243 @@
+{
+  "schema_version": "0.1.0",
+  "programme_id": "HUM-FAILURE-TO-SKILL-001",
+  "evidence_class": "synthetic_protocol_fixture",
+  "status": "protocol_only_not_executed",
+  "source_subject": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "parent_issue": 12657,
+    "child_issue": 12706,
+    "agentic_issue": 12685,
+    "branch": "research/humanoid-tool-service-v0-1"
+  },
+  "evaluator_contract": {
+    "case_count": 30,
+    "skill_family_count": 6,
+    "variants_per_family": 5,
+    "principle": "Failed episode produces evidence and a candidate correction, never an automatic overwrite or live skill mutation.",
+    "oracle_separation": "This file is evaluator-owned. The candidate sees candidate_visible_episode and the bounded budgets only; hidden_evaluator_oracle, split identity and expected disposition must never be exposed to the candidate process.",
+    "promotion_gate": "Promotion requires exact failed-case replay, counterfactual control, held-out transfer, protected skill retention, independent verifier and complete applicability/provenance.",
+    "data_note": "All traces and family descriptions are invented synthetic protocol fixtures. They are not measured robot episodes or empirical failure prevalence."
+  },
+  "skill_families": [
+    {
+      "skill_family_id": "CONTACT",
+      "name": "contact_approach",
+      "representative_failure": "tool working end misses target due to an incorrect approach frame",
+      "protected_skill": "known-safe non-contact reach task"
+    },
+    {
+      "skill_family_id": "GRASP",
+      "name": "grasp_retention",
+      "representative_failure": "tool slips because grasp pose is outside the stable contact patch",
+      "protected_skill": "previously qualified low-force power grasp"
+    },
+    {
+      "skill_family_id": "ORIENTATION",
+      "name": "tool_orientation",
+      "representative_failure": "driver fails to engage fastener due to working-end angular misalignment",
+      "protected_skill": "previously qualified rotary alignment skill"
+    },
+    {
+      "skill_family_id": "INSERTION",
+      "name": "force_limited_insertion",
+      "representative_failure": "fixture rejects insertion due to lateral offset and contact force rises",
+      "protected_skill": "previously qualified low-force seating task"
+    },
+    {
+      "skill_family_id": "MOBILE",
+      "name": "mobile_reposition",
+      "representative_failure": "tool target becomes unreachable after stance shift and base yaw drift",
+      "protected_skill": "previously qualified stationary reach"
+    },
+    {
+      "skill_family_id": "CALIBRATION",
+      "name": "perception_calibration",
+      "representative_failure": "camera extrinsic drift makes estimated contact pose stale",
+      "protected_skill": "previously qualified tactile-only contact task"
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "FTS-CONTACT-VALID_CORRECTION",
+      "skill_family_id": "CONTACT",
+      "skill_family": "contact_approach",
+      "split": "development_confirmatory_pair",
+      "initial_skill": {
+        "skill_id": "skill.contact.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.contact.synthetic.v1",
+        "protected_skill_id": "skill.contact.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic contact_approach interaction with an observed failure",
+        "failure_trace_description": "tool working end misses target due to an incorrect approach frame",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "tool working end misses target due to an incorrect approach frame",
+        "true_correction_or_non_correction": "correct working_end_to_target frame transform",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": false,
+        "applicability_mismatch": false,
+        "protected_skill_regression": false,
+        "expected_disposition": "candidate_only_until_independent_replay_transfer_and_retention_pass",
+        "independent_replay_condition": "same causal failure is removed under the candidate delta on a fresh replay state",
+        "transfer_condition": "new instance and target geometry within the declared skill envelope",
+        "retention_condition": "protected skills remain within frozen non-inferiority margin"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "candidate_only_until_independent_replay_transfer_and_retention_pass",
+      "oracle_seed": 51000
+    },
+    {
+      "case_id": "FTS-CONTACT-IRRELEVANT_CONFOUND",
+      "skill_family_id": "CONTACT",
+      "skill_family": "contact_approach",
+      "split": "counterfactual_control",
+      "initial_skill": {
+        "skill_id": "skill.contact.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.contact.synthetic.v1",
+        "protected_skill_id": "skill.contact.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic contact_approach interaction with an observed failure",
+        "failure_trace_description": "tool working end misses target due to an incorrect approach frame",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "tool working end misses target due to an incorrect approach frame",
+        "true_correction_or_non_correction": "correct working_end_to_target frame transform",
+        "counterfactual_confounds": "camera color/lighting changes without geometric transform change",
+        "poisoned_evidence": false,
+        "applicability_mismatch": false,
+        "protected_skill_regression": false,
+        "expected_disposition": "no_skill_change_or_abstain",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "no_skill_change_or_abstain",
+      "oracle_seed": 51001
+    },
+    {
+      "case_id": "FTS-CONTACT-POISONED_RECORD",
+      "skill_family_id": "CONTACT",
+      "skill_family": "contact_approach",
+      "split": "memory_integrity_negative_control",
+      "initial_skill": {
+        "skill_id": "skill.contact.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.contact.synthetic.v1",
+        "protected_skill_id": "skill.contact.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic contact_approach interaction with an observed failure",
+        "failure_trace_description": "tool working end misses target due to an incorrect approach frame",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "tool working end misses target due to an incorrect approach frame",
+        "true_correction_or_non_correction": "correct working_end_to_target frame transform",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": true,
+        "applicability_mismatch": false,
+        "protected_skill_regression": false,
+        "expected_disposition": "reject_memory_record_and_preserve_prior_skill",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "reject_memory_record_and_preserve_prior_skill",
+      "oracle_seed": 51002
+    },
+    {
+      "case_id": "FTS-CONTACT-WRONG_EMBODIMENT",
+      "skill_family_id": "CONTACT",
+      "skill_family": "contact_approach",
+      "split": "applicability_negative_control",
+      "initial_skill": {
+        "skill_id": "skill.contact.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.contact.synthetic.v1",
+        "protected_skill_id": "skill.contact.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic contact_approach interaction with an observed failure",
+        "failure_trace_description": "tool working end misses target due to an incorrect approach frame",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "tool working end misses target due to an incorrect approach frame",
+        "true_correction_or_non_correction": "correct working_end_to_target frame transform",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": false,
+        "applicability_mismatch": true,
+        "protected_skill_regression": false,
+        "expected_disposition": "reject_transfer_or_request_requalification",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "reject_transfer_or_request_requalification",
+      "oracle_seed": 51003
+    },
+    {
+      "case_id": "FTS-CONTACT-RETENTION_REGRESSION",
+      "skill_family_id": "CONTACT",
+      "skill_family": "contact_approach",
+      "split": "retention_negative_control",
+      "initial_skill": {
+        "skill_id": "skill.contact.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.contact.synthetic.v1",
+        "protected_skill_id": "skill.contact.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic contact_approach interaction with an observed failure",
+        "failure_trace_description": "tool working end misses target due to an incorrect approach frame",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "tool working end misses target due to an incorrect approach frame",
+        "true_correction_or_non_correction": "correct working_end_to_target frame transform",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": false,
+        "applicability_mismatch": false,
+        "protected_skill_regression": true,
+        "expected_disposition": "reject_candidate_and_keep_previous_version",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "reject_candidate_and_keep_previous_version",
+      "oracle_seed": 51004
+    },
+    {
+      "case_id": "FTS-GRASP-VALID_CORRECTION",
+      "skill_family_id": "GRASP",
+      "skill_family": "grasp_retention",
+      "split": "development_confirmatory_pair",
+      "initial_skill": {
+        "skill_id": "skill.grasp.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.grasp.synthetic.v1",
+        "protected_skill_id": "skill.grasp.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic grasp_retention interaction with an observed failure",
+        "failure_trace_description": "tool slips because grasp pose is outside the stable contact patch",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "tool slips because grasp pose is outside the stable contact patch",
+        "true_correction_or_non_correction": "shift grasp centre into measured stable patch",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": false,
+        "applicability_mismatch": false,
+        "protected_skill_regression": false,
+        "expected_disposition": "candidate_only_until_independent_replay_transfer_and_retention_pass",
+        "independent_replay_condition": "same causal failure is removed under the candidate delta on a fresh replay state",
+        "transfer_condition": "new instance and target geometry within the declared skill envelope",
+        "retention_condition": "protected skills remain within frozen non-inferiority margin"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "candidate_only_until_independent_replay_transfer_and_retention_pass",
+      "oracle_seed": 51005
+    },
+    {
+      "case_id": "FTS-GRASP-IRRELEVANT_CONFOUND",
+      "skill_family_id": "GRASP",
+      "skill_family": "grasp_retention",
+      "split": "counterfactual_control",
+      "initial_skill": {
+        "skill_id": "skill.grasp.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.grasp.synthetic.v1",
+        "protected_skill_id": "skill.grasp.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic grasp_retention interaction with an observed failure",
+        "failure_trace_description": "tool slips because grasp pose is outside the stable contact patch",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "tool slips because grasp pose is outside the stable contact patch",
+        "true_correction_or_non_correction": "shift grasp centre into measured stable patch",
+        "counterfactual_confounds": "object texture changes but friction/contact patch remains unchanged",
+        "poisoned_evidence": false,
+        "applicability_mismatch": false,
+        "protected_skill_regression": false,
+        "expected_disposition": "no_skill_change_or_abstain",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "no_skill_change_or_abstain",
+      "oracle_seed": 51006
+    },
+    {
+      "case_id": "FTS-GRASP-POISONED_RECORD",
+      "skill_family_id": "GRASP",
+      "skill_family": "grasp_retention",
+      "split": "memory_integrity_negative_control",
+      "initial_skill": {
+        "skill_id": "skill.grasp.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.grasp.synthetic.v1",
+        "protected_skill_id": "skill.grasp.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic grasp_retention interaction with an observed failure",
+        "failure_trace_description": "tool slips because grasp pose is outside the stable contact patch",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "tool slips because grasp pose is outside the stable contact patch",
+        "true_correction_or_non_correction": "shift grasp centre into measured stable patch",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": true,
+        "applicability_mismatch": false,
+        "protected_skill_regression": false,
+        "expected_disposition": "reject_memory_record_and_preserve_prior_skill",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "reject_memory_record_and_preserve_prior_skill",
+      "oracle_seed": 51007
+    },
+    {
+      "case_id": "FTS-GRASP-WRONG_EMBODIMENT",
+      "skill_family_id": "GRASP",
+      "skill_family": "grasp_retention",
+      "split": "applicability_negative_control",
+      "initial_skill": {
+        "skill_id": "skill.grasp.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.grasp.synthetic.v1",
+        "protected_skill_id": "skill.grasp.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic grasp_retention interaction with an observed failure",
+        "failure_trace_description": "tool slips because grasp pose is outside the stable contact patch",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "tool slips because grasp pose is outside the stable contact patch",
+        "true_correction_or_non_correction": "shift grasp centre into measured stable patch",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": false,
+        "applicability_mismatch": true,
+        "protected_skill_regression": false,
+        "expected_disposition": "reject_transfer_or_request_requalification",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "reject_transfer_or_request_requalification",
+      "oracle_seed": 51008
+    },
+    {
+      "case_id": "FTS-GRASP-RETENTION_REGRESSION",
+      "skill_family_id": "GRASP",
+      "skill_family": "grasp_retention",
+      "split": "retention_negative_control",
+      "initial_skill": {
+        "skill_id": "skill.grasp.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.grasp.synthetic.v1",
+        "protected_skill_id": "skill.grasp.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic grasp_retention interaction with an observed failure",
+        "failure_trace_description": "tool slips because grasp pose is outside the stable contact patch",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "tool slips because grasp pose is outside the stable contact patch",
+        "true_correction_or_non_correction": "shift grasp centre into measured stable patch",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": false,
+        "applicability_mismatch": false,
+        "protected_skill_regression": true,
+        "expected_disposition": "reject_candidate_and_keep_previous_version",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "reject_candidate_and_keep_previous_version",
+      "oracle_seed": 51009
+    },
+    {
+      "case_id": "FTS-ORIENTATION-VALID_CORRECTION",
+      "skill_family_id": "ORIENTATION",
+      "skill_family": "tool_orientation",
+      "split": "development_confirmatory_pair",
+      "initial_skill": {
+        "skill_id": "skill.orientation.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.orientation.synthetic.v1",
+        "protected_skill_id": "skill.orientation.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic tool_orientation interaction with an observed failure",
+        "failure_trace_description": "driver fails to engage fastener due to working-end angular misalignment",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "driver fails to engage fastener due to working-end angular misalignment",
+        "true_correction_or_non_correction": "align working axis and bit profile",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": false,
+        "applicability_mismatch": false,
+        "protected_skill_regression": false,
+        "expected_disposition": "candidate_only_until_independent_replay_transfer_and_retention_pass",
+        "independent_replay_condition": "same causal failure is removed under the candidate delta on a fresh replay state",
+        "transfer_condition": "new instance and target geometry within the declared skill envelope",
+        "retention_condition": "protected skills remain within frozen non-inferiority margin"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "candidate_only_until_independent_replay_transfer_and_retention_pass",
+      "oracle_seed": 51010
+    },
+    {
+      "case_id": "FTS-ORIENTATION-IRRELEVANT_CONFOUND",
+      "skill_family_id": "ORIENTATION",
+      "skill_family": "tool_orientation",
+      "split": "counterfactual_control",
+      "initial_skill": {
+        "skill_id": "skill.orientation.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.orientation.synthetic.v1",
+        "protected_skill_id": "skill.orientation.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic tool_orientation interaction with an observed failure",
+        "failure_trace_description": "driver fails to engage fastener due to working-end angular misalignment",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "driver fails to engage fastener due to working-end angular misalignment",
+        "true_correction_or_non_correction": "align working axis and bit profile",
+        "counterfactual_confounds": "handle colour/label changes with same bit interface",
+        "poisoned_evidence": false,
+        "applicability_mismatch": false,
+        "protected_skill_regression": false,
+        "expected_disposition": "no_skill_change_or_abstain",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "no_skill_change_or_abstain",
+      "oracle_seed": 51011
+    },
+    {
+      "case_id": "FTS-ORIENTATION-POISONED_RECORD",
+      "skill_family_id": "ORIENTATION",
+      "skill_family": "tool_orientation",
+      "split": "memory_integrity_negative_control",
+      "initial_skill": {
+        "skill_id": "skill.orientation.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.orientation.synthetic.v1",
+        "protected_skill_id": "skill.orientation.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic tool_orientation interaction with an observed failure",
+        "failure_trace_description": "driver fails to engage fastener due to working-end angular misalignment",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "driver fails to engage fastener due to working-end angular misalignment",
+        "true_correction_or_non_correction": "align working axis and bit profile",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": true,
+        "applicability_mismatch": false,
+        "protected_skill_regression": false,
+        "expected_disposition": "reject_memory_record_and_preserve_prior_skill",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "reject_memory_record_and_preserve_prior_skill",
+      "oracle_seed": 51012
+    },
+    {
+      "case_id": "FTS-ORIENTATION-WRONG_EMBODIMENT",
+      "skill_family_id": "ORIENTATION",
+      "skill_family": "tool_orientation",
+      "split": "applicability_negative_control",
+      "initial_skill": {
+        "skill_id": "skill.orientation.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.orientation.synthetic.v1",
+        "protected_skill_id": "skill.orientation.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic tool_orientation interaction with an observed failure",
+        "failure_trace_description": "driver fails to engage fastener due to working-end angular misalignment",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "driver fails to engage fastener due to working-end angular misalignment",
+        "true_correction_or_non_correction": "align working axis and bit profile",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": false,
+        "applicability_mismatch": true,
+        "protected_skill_regression": false,
+        "expected_disposition": "reject_transfer_or_request_requalification",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "reject_transfer_or_request_requalification",
+      "oracle_seed": 51013
+    },
+    {
+      "case_id": "FTS-ORIENTATION-RETENTION_REGRESSION",
+      "skill_family_id": "ORIENTATION",
+      "skill_family": "tool_orientation",
+      "split": "retention_negative_control",
+      "initial_skill": {
+        "skill_id": "skill.orientation.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.orientation.synthetic.v1",
+        "protected_skill_id": "skill.orientation.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic tool_orientation interaction with an observed failure",
+        "failure_trace_description": "driver fails to engage fastener due to working-end angular misalignment",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "driver fails to engage fastener due to working-end angular misalignment",
+        "true_correction_or_non_correction": "align working axis and bit profile",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": false,
+        "applicability_mismatch": false,
+        "protected_skill_regression": true,
+        "expected_disposition": "reject_candidate_and_keep_previous_version",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "reject_candidate_and_keep_previous_version",
+      "oracle_seed": 51014
+    },
+    {
+      "case_id": "FTS-INSERTION-VALID_CORRECTION",
+      "skill_family_id": "INSERTION",
+      "skill_family": "force_limited_insertion",
+      "split": "development_confirmatory_pair",
+      "initial_skill": {
+        "skill_id": "skill.insertion.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.insertion.synthetic.v1",
+        "protected_skill_id": "skill.insertion.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic force_limited_insertion interaction with an observed failure",
+        "failure_trace_description": "fixture rejects insertion due to lateral offset and contact force rises",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "fixture rejects insertion due to lateral offset and contact force rises",
+        "true_correction_or_non_correction": "correct insertion axis and bounded compliance",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": false,
+        "applicability_mismatch": false,
+        "protected_skill_regression": false,
+        "expected_disposition": "candidate_only_until_independent_replay_transfer_and_retention_pass",
+        "independent_replay_condition": "same causal failure is removed under the candidate delta on a fresh replay state",
+        "transfer_condition": "new instance and target geometry within the declared skill envelope",
+        "retention_condition": "protected skills remain within frozen non-inferiority margin"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "candidate_only_until_independent_replay_transfer_and_retention_pass",
+      "oracle_seed": 51015
+    },
+    {
+      "case_id": "FTS-INSERTION-IRRELEVANT_CONFOUND",
+      "skill_family_id": "INSERTION",
+      "skill_family": "force_limited_insertion",
+      "split": "counterfactual_control",
+      "initial_skill": {
+        "skill_id": "skill.insertion.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.insertion.synthetic.v1",
+        "protected_skill_id": "skill.insertion.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic force_limited_insertion interaction with an observed failure",
+        "failure_trace_description": "fixture rejects insertion due to lateral offset and contact force rises",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "fixture rejects insertion due to lateral offset and contact force rises",
+        "true_correction_or_non_correction": "correct insertion axis and bounded compliance",
+        "counterfactual_confounds": "fixture colour changes but geometry remains same",
+        "poisoned_evidence": false,
+        "applicability_mismatch": false,
+        "protected_skill_regression": false,
+        "expected_disposition": "no_skill_change_or_abstain",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "no_skill_change_or_abstain",
+      "oracle_seed": 51016
+    },
+    {
+      "case_id": "FTS-INSERTION-POISONED_RECORD",
+      "skill_family_id": "INSERTION",
+      "skill_family": "force_limited_insertion",
+      "split": "memory_integrity_negative_control",
+      "initial_skill": {
+        "skill_id": "skill.insertion.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.insertion.synthetic.v1",
+        "protected_skill_id": "skill.insertion.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic force_limited_insertion interaction with an observed failure",
+        "failure_trace_description": "fixture rejects insertion due to lateral offset and contact force rises",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "fixture rejects insertion due to lateral offset and contact force rises",
+        "true_correction_or_non_correction": "correct insertion axis and bounded compliance",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": true,
+        "applicability_mismatch": false,
+        "protected_skill_regression": false,
+        "expected_disposition": "reject_memory_record_and_preserve_prior_skill",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "reject_memory_record_and_preserve_prior_skill",
+      "oracle_seed": 51017
+    },
+    {
+      "case_id": "FTS-INSERTION-WRONG_EMBODIMENT",
+      "skill_family_id": "INSERTION",
+      "skill_family": "force_limited_insertion",
+      "split": "applicability_negative_control",
+      "initial_skill": {
+        "skill_id": "skill.insertion.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.insertion.synthetic.v1",
+        "protected_skill_id": "skill.insertion.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic force_limited_insertion interaction with an observed failure",
+        "failure_trace_description": "fixture rejects insertion due to lateral offset and contact force rises",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "fixture rejects insertion due to lateral offset and contact force rises",
+        "true_correction_or_non_correction": "correct insertion axis and bounded compliance",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": false,
+        "applicability_mismatch": true,
+        "protected_skill_regression": false,
+        "expected_disposition": "reject_transfer_or_request_requalification",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "reject_transfer_or_request_requalification",
+      "oracle_seed": 51018
+    },
+    {
+      "case_id": "FTS-INSERTION-RETENTION_REGRESSION",
+      "skill_family_id": "INSERTION",
+      "skill_family": "force_limited_insertion",
+      "split": "retention_negative_control",
+      "initial_skill": {
+        "skill_id": "skill.insertion.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.insertion.synthetic.v1",
+        "protected_skill_id": "skill.insertion.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic force_limited_insertion interaction with an observed failure",
+        "failure_trace_description": "fixture rejects insertion due to lateral offset and contact force rises",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "fixture rejects insertion due to lateral offset and contact force rises",
+        "true_correction_or_non_correction": "correct insertion axis and bounded compliance",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": false,
+        "applicability_mismatch": false,
+        "protected_skill_regression": true,
+        "expected_disposition": "reject_candidate_and_keep_previous_version",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "reject_candidate_and_keep_previous_version",
+      "oracle_seed": 51019
+    },
+    {
+      "case_id": "FTS-MOBILE-VALID_CORRECTION",
+      "skill_family_id": "MOBILE",
+      "skill_family": "mobile_reposition",
+      "split": "development_confirmatory_pair",
+      "initial_skill": {
+        "skill_id": "skill.mobile.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.mobile.synthetic.v1",
+        "protected_skill_id": "skill.mobile.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic mobile_reposition interaction with an observed failure",
+        "failure_trace_description": "tool target becomes unreachable after stance shift and base yaw drift",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "tool target becomes unreachable after stance shift and base yaw drift",
+        "true_correction_or_non_correction": "re-estimate base-to-workcell frame before reposition",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": false,
+        "applicability_mismatch": false,
+        "protected_skill_regression": false,
+        "expected_disposition": "candidate_only_until_independent_replay_transfer_and_retention_pass",
+        "independent_replay_condition": "same causal failure is removed under the candidate delta on a fresh replay state",
+        "transfer_condition": "new instance and target geometry within the declared skill envelope",
+        "retention_condition": "protected skills remain within frozen non-inferiority margin"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "candidate_only_until_independent_replay_transfer_and_retention_pass",
+      "oracle_seed": 51020
+    },
+    {
+      "case_id": "FTS-MOBILE-IRRELEVANT_CONFOUND",
+      "skill_family_id": "MOBILE",
+      "skill_family": "mobile_reposition",
+      "split": "counterfactual_control",
+      "initial_skill": {
+        "skill_id": "skill.mobile.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.mobile.synthetic.v1",
+        "protected_skill_id": "skill.mobile.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic mobile_reposition interaction with an observed failure",
+        "failure_trace_description": "tool target becomes unreachable after stance shift and base yaw drift",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "tool target becomes unreachable after stance shift and base yaw drift",
+        "true_correction_or_non_correction": "re-estimate base-to-workcell frame before reposition",
+        "counterfactual_confounds": "floor texture changes but base localization remains valid",
+        "poisoned_evidence": false,
+        "applicability_mismatch": false,
+        "protected_skill_regression": false,
+        "expected_disposition": "no_skill_change_or_abstain",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "no_skill_change_or_abstain",
+      "oracle_seed": 51021
+    },
+    {
+      "case_id": "FTS-MOBILE-POISONED_RECORD",
+      "skill_family_id": "MOBILE",
+      "skill_family": "mobile_reposition",
+      "split": "memory_integrity_negative_control",
+      "initial_skill": {
+        "skill_id": "skill.mobile.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.mobile.synthetic.v1",
+        "protected_skill_id": "skill.mobile.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic mobile_reposition interaction with an observed failure",
+        "failure_trace_description": "tool target becomes unreachable after stance shift and base yaw drift",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "tool target becomes unreachable after stance shift and base yaw drift",
+        "true_correction_or_non_correction": "re-estimate base-to-workcell frame before reposition",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": true,
+        "applicability_mismatch": false,
+        "protected_skill_regression": false,
+        "expected_disposition": "reject_memory_record_and_preserve_prior_skill",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "reject_memory_record_and_preserve_prior_skill",
+      "oracle_seed": 51022
+    },
+    {
+      "case_id": "FTS-MOBILE-WRONG_EMBODIMENT",
+      "skill_family_id": "MOBILE",
+      "skill_family": "mobile_reposition",
+      "split": "applicability_negative_control",
+      "initial_skill": {
+        "skill_id": "skill.mobile.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.mobile.synthetic.v1",
+        "protected_skill_id": "skill.mobile.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic mobile_reposition interaction with an observed failure",
+        "failure_trace_description": "tool target becomes unreachable after stance shift and base yaw drift",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "tool target becomes unreachable after stance shift and base yaw drift",
+        "true_correction_or_non_correction": "re-estimate base-to-workcell frame before reposition",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": false,
+        "applicability_mismatch": true,
+        "protected_skill_regression": false,
+        "expected_disposition": "reject_transfer_or_request_requalification",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "reject_transfer_or_request_requalification",
+      "oracle_seed": 51023
+    },
+    {
+      "case_id": "FTS-MOBILE-RETENTION_REGRESSION",
+      "skill_family_id": "MOBILE",
+      "skill_family": "mobile_reposition",
+      "split": "retention_negative_control",
+      "initial_skill": {
+        "skill_id": "skill.mobile.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.mobile.synthetic.v1",
+        "protected_skill_id": "skill.mobile.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic mobile_reposition interaction with an observed failure",
+        "failure_trace_description": "tool target becomes unreachable after stance shift and base yaw drift",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "tool target becomes unreachable after stance shift and base yaw drift",
+        "true_correction_or_non_correction": "re-estimate base-to-workcell frame before reposition",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": false,
+        "applicability_mismatch": false,
+        "protected_skill_regression": true,
+        "expected_disposition": "reject_candidate_and_keep_previous_version",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "reject_candidate_and_keep_previous_version",
+      "oracle_seed": 51024
+    },
+    {
+      "case_id": "FTS-CALIBRATION-VALID_CORRECTION",
+      "skill_family_id": "CALIBRATION",
+      "skill_family": "perception_calibration",
+      "split": "development_confirmatory_pair",
+      "initial_skill": {
+        "skill_id": "skill.calibration.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.calibration.synthetic.v1",
+        "protected_skill_id": "skill.calibration.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic perception_calibration interaction with an observed failure",
+        "failure_trace_description": "camera extrinsic drift makes estimated contact pose stale",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "camera extrinsic drift makes estimated contact pose stale",
+        "true_correction_or_non_correction": "invalidate camera-linked skill and request recalibration",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": false,
+        "applicability_mismatch": false,
+        "protected_skill_regression": false,
+        "expected_disposition": "candidate_only_until_independent_replay_transfer_and_retention_pass",
+        "independent_replay_condition": "same causal failure is removed under the candidate delta on a fresh replay state",
+        "transfer_condition": "new instance and target geometry within the declared skill envelope",
+        "retention_condition": "protected skills remain within frozen non-inferiority margin"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "candidate_only_until_independent_replay_transfer_and_retention_pass",
+      "oracle_seed": 51025
+    },
+    {
+      "case_id": "FTS-CALIBRATION-IRRELEVANT_CONFOUND",
+      "skill_family_id": "CALIBRATION",
+      "skill_family": "perception_calibration",
+      "split": "counterfactual_control",
+      "initial_skill": {
+        "skill_id": "skill.calibration.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.calibration.synthetic.v1",
+        "protected_skill_id": "skill.calibration.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic perception_calibration interaction with an observed failure",
+        "failure_trace_description": "camera extrinsic drift makes estimated contact pose stale",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "camera extrinsic drift makes estimated contact pose stale",
+        "true_correction_or_non_correction": "invalidate camera-linked skill and request recalibration",
+        "counterfactual_confounds": "image brightness changes without extrinsic movement",
+        "poisoned_evidence": false,
+        "applicability_mismatch": false,
+        "protected_skill_regression": false,
+        "expected_disposition": "no_skill_change_or_abstain",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "no_skill_change_or_abstain",
+      "oracle_seed": 51026
+    },
+    {
+      "case_id": "FTS-CALIBRATION-POISONED_RECORD",
+      "skill_family_id": "CALIBRATION",
+      "skill_family": "perception_calibration",
+      "split": "memory_integrity_negative_control",
+      "initial_skill": {
+        "skill_id": "skill.calibration.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.calibration.synthetic.v1",
+        "protected_skill_id": "skill.calibration.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic perception_calibration interaction with an observed failure",
+        "failure_trace_description": "camera extrinsic drift makes estimated contact pose stale",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "camera extrinsic drift makes estimated contact pose stale",
+        "true_correction_or_non_correction": "invalidate camera-linked skill and request recalibration",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": true,
+        "applicability_mismatch": false,
+        "protected_skill_regression": false,
+        "expected_disposition": "reject_memory_record_and_preserve_prior_skill",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "reject_memory_record_and_preserve_prior_skill",
+      "oracle_seed": 51027
+    },
+    {
+      "case_id": "FTS-CALIBRATION-WRONG_EMBODIMENT",
+      "skill_family_id": "CALIBRATION",
+      "skill_family": "perception_calibration",
+      "split": "applicability_negative_control",
+      "initial_skill": {
+        "skill_id": "skill.calibration.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.calibration.synthetic.v1",
+        "protected_skill_id": "skill.calibration.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic perception_calibration interaction with an observed failure",
+        "failure_trace_description": "camera extrinsic drift makes estimated contact pose stale",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "camera extrinsic drift makes estimated contact pose stale",
+        "true_correction_or_non_correction": "invalidate camera-linked skill and request recalibration",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": false,
+        "applicability_mismatch": true,
+        "protected_skill_regression": false,
+        "expected_disposition": "reject_transfer_or_request_requalification",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "reject_transfer_or_request_requalification",
+      "oracle_seed": 51028
+    },
+    {
+      "case_id": "FTS-CALIBRATION-RETENTION_REGRESSION",
+      "skill_family_id": "CALIBRATION",
+      "skill_family": "perception_calibration",
+      "split": "retention_negative_control",
+      "initial_skill": {
+        "skill_id": "skill.calibration.v1",
+        "version": 1,
+        "status": "previously_qualified_synthetic_skill",
+        "applicability_profile": "profile.calibration.synthetic.v1",
+        "protected_skill_id": "skill.calibration.retention.v1"
+      },
+      "candidate_visible_episode": {
+        "task_description": "Synthetic perception_calibration interaction with an observed failure",
+        "failure_trace_description": "camera extrinsic drift makes estimated contact pose stale",
+        "visible_observations": [
+          "pre_state",
+          "requested_action",
+          "post_state",
+          "contact_or_task_effect_observation",
+          "sensor_quality_and_freshness"
+        ],
+        "evidence_integrity": "all candidate-visible episode fields are bound to a synthetic event identity; candidate must check coherence before proposing a correction",
+        "allowed_candidate_outputs": [
+          "candidate_skill_delta",
+          "no_change",
+          "abstain",
+          "request_bounded_probe",
+          "revoke_applicability"
+        ],
+        "candidate_must_not_receive": [
+          "hidden_causal_label",
+          "hidden_counterfactual_outcome",
+          "split_label",
+          "oracle_promotion_disposition",
+          "protected_skill_oracle_result"
+        ]
+      },
+      "hidden_evaluator_oracle": {
+        "causal_failure_description": "camera extrinsic drift makes estimated contact pose stale",
+        "true_correction_or_non_correction": "invalidate camera-linked skill and request recalibration",
+        "counterfactual_confounds": null,
+        "poisoned_evidence": false,
+        "applicability_mismatch": false,
+        "protected_skill_regression": true,
+        "expected_disposition": "reject_candidate_and_keep_previous_version",
+        "independent_replay_condition": "oracle-defined control disposition; no candidate may promote based on the original episode alone",
+        "transfer_condition": "not applicable or fail closed",
+        "retention_condition": "reject if protected-skill regression is observed"
+      },
+      "candidate_budget": {
+        "max_failure_replays": 3,
+        "max_counterfactual_tests": 2,
+        "max_heldout_transfer_tests": 2,
+        "max_protected_skill_tests": 2,
+        "max_active_observations": 4,
+        "max_plan_revisions": 8,
+        "max_candidate_skill_versions": 2
+      },
+      "required_promotion_evidence": [
+        "exact_candidate_and_baseline_digest",
+        "source_episode_and_observation_digests",
+        "embodiment_tool_grasp_and_calibration_applicability",
+        "counterfactual_replay_receipt",
+        "heldout_transfer_receipt",
+        "protected_skill_retention_receipt",
+        "independent_postcondition_verifier",
+        "preconditions_postconditions_parameter_envelope_and_invalidation_rules"
+      ],
+      "expected_disposition": "reject_candidate_and_keep_previous_version",
+      "oracle_seed": 51029
+    }
+  ],
+  "metrics": [
+    "same_failure_repeat_rate",
+    "recovery_after_informative_observation",
+    "candidate_correction_precision",
+    "candidate_correction_recall",
+    "false_promotion_rate",
+    "false_revocation_rate",
+    "independent_replay_success",
+    "heldout_same_family_transfer",
+    "harmful_transfer",
+    "protected_skill_retention",
+    "poisoned_and_stale_memory_rejection",
+    "model_calls_probe_cost_wall_clock_compute_energy"
+  ],
+  "claim_ceiling": {
+    "synthetic_contract_only": true,
+    "physical_skill_learning_established": false,
+    "live_skill_promotion_authorized": false,
+    "robot_capability_improvement_established": false,
+    "safety_qualification_established": false
+  }
+}

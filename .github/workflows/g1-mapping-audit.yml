@@ -1,0 +1,36 @@
+name: G1 decoupled v1 mapping audit
+
+on:
+  pull_request:
+    paths:
+      - "research/humanoid-tool-service-v0.1/g1-mapping-audit/**"
+      - "research/humanoid-tool-service-v0.1/g1-decoupled-v1-mapping.json"
+      - ".github/workflows/g1-mapping-audit.yml"
+  push:
+    branches:
+      - "research/humanoid-tool-service-v0-1"
+    paths:
+      - "research/humanoid-tool-service-v0.1/g1-mapping-audit/**"
+      - "research/humanoid-tool-service-v0.1/g1-decoupled-v1-mapping.json"
+      - ".github/workflows/g1-mapping-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: g1-mapping-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pure-mapping-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/humanoid-tool-service-v0.1/g1-mapping-audit/Cargo.toml -- --check
+      - name: Run golden and negative-control tests
+        run: cargo test --manifest-path research/humanoid-tool-service-v0.1/g1-mapping-audit/Cargo.toml --locked
