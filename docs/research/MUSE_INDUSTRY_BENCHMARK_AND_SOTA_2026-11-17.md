@@ -174,3 +174,8 @@ These are prospective targets. They are not current performance claims.
 - Suno, v6 model and editing documentation: https://help.suno.com/en/articles/5782977
 - MIREX 2026, symbolic music generation task: https://www.music-ir.org/mirex/wiki/2026:Symbolic_Music_Generation
 - MIREX 2026, CMI RewardBench task/results: https://www.music-ir.org/mirex/wiki/2026:CMI-RewardBench
+
+
+## Additional enabling architecture — exact score-time maps
+
+Issue #12722 now tracks a versioned score-time map for notated tempo and meter changes. This is intentionally separate from #11355's expressive performance clock. The current M1 experiment (#12721) remains same-tempo/same-meter; a broader tempo/meter transition is not claimed until exact score-beat-to-nominal-seconds mapping, meter boundaries, legacy Score migration and performance-clock composition are independently verified.
