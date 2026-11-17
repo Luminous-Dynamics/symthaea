@@ -1,0 +1,22 @@
+{
+  "adjudication_status": "finite_stochastic_policy_search",
+  "search_complete": true,
+  "optimality_claim": "exact_optimum_over_registered_finite_tree_class",
+  "generated_policy_count": 74,
+  "evaluated_policy_count": 74,
+  "invalid_node_limit_policy_count": 0,
+  "best_policy": {
+    "robust_coverage_lower_bps": 5000,
+    "nominal_coverage_bps": 6000,
+    "worst_case_expected_cost_micros": 1420,
+    "nominal_expected_cost_micros": 1300,
+    "worst_case_path_cost_micros": 1500
+  },
+  "exact_regret": {
+    "robust_coverage_shortfall_bps": 0,
+    "nominal_coverage_shortfall_bps": 0,
+    "worst_case_cost_excess_micros": 0,
+    "nominal_cost_excess_micros": 0,
+    "worst_path_cost_excess_micros": 0
+  }
+}
