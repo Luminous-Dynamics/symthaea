@@ -8,8 +8,18 @@ A thin Rust adapter over the existing `subterra-survival-reference` planner and 
 - computes per-action expected information gain and one-step gross EVSI;
 - invokes the existing finite-horizon planner for a contingent policy;
 - independently evaluates that exact policy across supplied model scenarios;
+- requires the exact primary model to be present in the referee's model set;
+- exposes referee cache-mismatch counts when candidate branch probabilities/posteriors do not match a shifted model;
 - keeps resource cost vectors separate from decision-loss units;
 - includes a synthetic case demonstrating high EIG / zero EVSI versus lower EIG / positive EVSI.
+
+## Run the synthetic comparison
+
+```sh
+cargo run --manifest-path Cargo.toml --example synthetic_evsi --offline
+```
+
+The example reports no-test risk, entropy-greedy selection, myopic EVSI selection, the finite-horizon planner's choice, robust multi-model evaluation and expected resources for three task labels: pipe/cable, drawpoint volume and support verification.
 
 ## Verify
 
