@@ -8,7 +8,7 @@
 // Explicit indices keep finite multiplication/action tables auditable.
 #![allow(clippy::needless_range_loop)]
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -386,6 +386,368 @@ fn validate_group(
         inverses[element] = inverse.ok_or(QuotientErrorV1::MissingInverse)?;
     }
     Ok(ValidatedGroupV1 { inverses, checks })
+}
+
+
+/// Resource limits for the exhaustive finite subgroup lattice oracle.
+///
+/// The oracle is intended for small reference groups used to generate exact
+/// benchmark labels. It never truncates a lattice: exceeding any budget is an
+/// explicit error, not a partial list presented as complete.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SubgroupLatticeBudgetV1 {
+    pub maximum_group_order: usize,
+    pub maximum_subgroups: usize,
+    pub maximum_work_units: u64,
+}
+
+impl Default for SubgroupLatticeBudgetV1 {
+    fn default() -> Self {
+        Self {
+            maximum_group_order: 64,
+            maximum_subgroups: 65_536,
+            maximum_work_units: 50_000_000,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SubgroupLatticeErrorV1 {
+    InvalidBudget,
+    GroupOrderExceedsBitmask,
+    SubgroupCountExceeded,
+    WorkBudgetExceeded,
+    ArithmeticOverflow,
+    InvalidGroup(QuotientErrorV1),
+    ReceiptMismatch,
+}
+
+impl fmt::Display for SubgroupLatticeErrorV1 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl std::error::Error for SubgroupLatticeErrorV1 {}
+
+/// One exact subgroup. Elements and generators are sorted by group index.
+///
+/// The generator list is a witness: closing it under the supplied group's
+/// multiplication and inverse operations must reproduce the element list.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubgroupV1 {
+    pub elements: Vec<usize>,
+    pub generators: Vec<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubgroupLatticeEvidenceV1 {
+    pub group_axiom_checks: usize,
+    pub generated_closure_calls: usize,
+    /// Includes group checks, generated-closure work, containment and maximality scans.
+    pub total_work_units: u64,
+    pub containment_checks: u64,
+    pub maximality_checks: u64,
+    pub complete_lattice: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubgroupLatticeReceiptV1 {
+    pub schema_version: u32,
+    pub group_id: String,
+    pub group_order: usize,
+    pub group_contract_bytes: Vec<u8>,
+    pub budget: SubgroupLatticeBudgetV1,
+    /// Sorted by subgroup order, then by the element bitmask.
+    pub subgroups: Vec<SubgroupV1>,
+    /// Indices into subgroups; each is maximal among proper subgroups.
+    pub maximal_proper_subgroup_indices: Vec<usize>,
+    pub evidence: SubgroupLatticeEvidenceV1,
+}
+
+fn append_subgroup_bytes(target: &mut Vec<u8>, value: &[u8]) {
+    target.extend_from_slice(&(value.len() as u64).to_le_bytes());
+    target.extend_from_slice(value);
+}
+
+fn finite_group_canonical_bytes(group: &FiniteGroupV1) -> Vec<u8> {
+    let mut bytes = b"luminous.finite_group.v1\\0".to_vec();
+    append_subgroup_bytes(&mut bytes, group.group_id.as_bytes());
+    bytes.extend_from_slice(&(group.identity as u64).to_le_bytes());
+    bytes.extend_from_slice(&(group.multiplication.len() as u64).to_le_bytes());
+    for row in &group.multiplication {
+        bytes.extend_from_slice(&(row.len() as u64).to_le_bytes());
+        for product in row {
+            bytes.extend_from_slice(&(*product as u64).to_le_bytes());
+        }
+    }
+    bytes
+}
+
+fn spend_subgroup_work(
+    work_units: &mut u64,
+    maximum: u64,
+    amount: u64,
+) -> Result<(), SubgroupLatticeErrorV1> {
+    *work_units = work_units
+        .checked_add(amount)
+        .ok_or(SubgroupLatticeErrorV1::ArithmeticOverflow)?;
+    if *work_units > maximum {
+        return Err(SubgroupLatticeErrorV1::WorkBudgetExceeded);
+    }
+    Ok(())
+}
+
+fn subgroup_mask_to_elements(mask: u64, group_order: usize) -> Vec<usize> {
+    (0..group_order)
+        .filter(|element| mask & (1_u64 << element) != 0)
+        .collect()
+}
+
+/// Compute the closure of an existing subgroup plus one additional generator.
+fn close_generated_subgroup(
+    group: &FiniteGroupV1,
+    inverses: &[usize],
+    initial_mask: u64,
+    generator: usize,
+    work_units: &mut u64,
+    maximum_work_units: u64,
+) -> Result<u64, SubgroupLatticeErrorV1> {
+    let order = group.multiplication.len();
+    let mut mask = initial_mask | (1_u64 << generator) | (1_u64 << group.identity);
+    loop {
+        let previous = mask;
+        for left in 0..order {
+            if mask & (1_u64 << left) == 0 {
+                continue;
+            }
+            spend_subgroup_work(work_units, maximum_work_units, 1)?;
+            mask |= 1_u64 << inverses[left];
+            for right in 0..order {
+                if mask & (1_u64 << right) == 0 {
+                    continue;
+                }
+                spend_subgroup_work(work_units, maximum_work_units, 1)?;
+                mask |= 1_u64 << group.multiplication[left][right];
+            }
+        }
+        if mask == previous {
+            return Ok(mask);
+        }
+    }
+}
+
+/// Exhaustively enumerate every subgroup of a finite group of order at most 64.
+///
+/// Starting from the identity subgroup, repeatedly adjoin one element and
+/// close under products and inverses. Every finite subgroup has a finite
+/// generating set, so this reaches the complete lattice. A BTreeMap deduplicates
+/// equal subgroups reached through different generating sets. All validation,
+/// closure, containment and maximality work consumes an explicit budget.
+pub fn enumerate_subgroup_lattice(
+    group: &FiniteGroupV1,
+    budget: SubgroupLatticeBudgetV1,
+) -> Result<SubgroupLatticeReceiptV1, SubgroupLatticeErrorV1> {
+    if budget.maximum_group_order == 0
+        || budget.maximum_group_order > 64
+        || budget.maximum_subgroups == 0
+        || budget.maximum_work_units == 0
+    {
+        return Err(SubgroupLatticeErrorV1::InvalidBudget);
+    }
+
+    let order = group.multiplication.len();
+    if order > 64 {
+        return Err(SubgroupLatticeErrorV1::GroupOrderExceedsBitmask);
+    }
+    if order == 0 || order > budget.maximum_group_order {
+        return Err(SubgroupLatticeErrorV1::InvalidGroup(
+            if order == 0 {
+                QuotientErrorV1::EmptyGroup
+            } else {
+                QuotientErrorV1::GroupOrderExceeded
+            },
+        ));
+    }
+
+    let validation_budget = QualificationBudgetV1 {
+        maximum_group_order: budget.maximum_group_order,
+        maximum_candidates: 1,
+        maximum_work_units: usize::MAX,
+    };
+    let validated = validate_group(group, validation_budget)
+        .map_err(SubgroupLatticeErrorV1::InvalidGroup)?;
+    let mut total_work_units = u64::try_from(validated.checks)
+        .map_err(|_| SubgroupLatticeErrorV1::ArithmeticOverflow)?;
+    if total_work_units > budget.maximum_work_units {
+        return Err(SubgroupLatticeErrorV1::WorkBudgetExceeded);
+    }
+
+    let full_mask = if order == 64 {
+        u64::MAX
+    } else {
+        (1_u64 << order) - 1
+    };
+    let identity_mask = 1_u64 << group.identity;
+
+    // Each map value is a deterministic generating witness for its subgroup.
+    let mut known: BTreeMap<u64, Vec<usize>> = BTreeMap::new();
+    let mut queue = VecDeque::new();
+    known.insert(identity_mask, Vec::new());
+    queue.push_back(identity_mask);
+
+    let mut generated_closure_calls = 0usize;
+    while let Some(current_mask) = queue.pop_front() {
+        let current_generators = known
+            .get(&current_mask)
+            .cloned()
+            .ok_or(SubgroupLatticeErrorV1::ReceiptMismatch)?;
+
+        for generator in 0..order {
+            if current_mask & (1_u64 << generator) != 0 {
+                continue;
+            }
+            generated_closure_calls = generated_closure_calls
+                .checked_add(1)
+                .ok_or(SubgroupLatticeErrorV1::ArithmeticOverflow)?;
+            let closure = close_generated_subgroup(
+                group,
+                &validated.inverses,
+                current_mask,
+                generator,
+                &mut total_work_units,
+                budget.maximum_work_units,
+            )?;
+            if known.contains_key(&closure) {
+                continue;
+            }
+            if known.len() >= budget.maximum_subgroups {
+                return Err(SubgroupLatticeErrorV1::SubgroupCountExceeded);
+            }
+            let mut generators = current_generators.clone();
+            generators.push(generator);
+            generators.sort_unstable();
+            generators.dedup();
+            known.insert(closure, generators);
+            queue.push_back(closure);
+        }
+    }
+
+    if !known.contains_key(&full_mask) {
+        return Err(SubgroupLatticeErrorV1::ReceiptMismatch);
+    }
+
+    let mut ordered_masks: Vec<u64> = known.keys().copied().collect();
+    ordered_masks.sort_by_key(|mask| (mask.count_ones(), *mask));
+    let mut subgroups = Vec::with_capacity(ordered_masks.len());
+    for mask in &ordered_masks {
+        let generators = known
+            .get(mask)
+            .cloned()
+            .ok_or(SubgroupLatticeErrorV1::ReceiptMismatch)?;
+        subgroups.push(SubgroupV1 {
+            elements: subgroup_mask_to_elements(*mask, order),
+            generators,
+        });
+    }
+
+    let mut maximal_proper_subgroup_indices = Vec::new();
+    let mut containment_checks = 0u64;
+    let mut maximality_checks = 0u64;
+    for (index, subgroup_mask) in ordered_masks.iter().copied().enumerate() {
+        if subgroup_mask == full_mask {
+            continue;
+        }
+        let mut has_intermediate = false;
+        for other_mask in ordered_masks.iter().copied() {
+            if other_mask == subgroup_mask || other_mask == full_mask {
+                continue;
+            }
+            spend_subgroup_work(&mut total_work_units, budget.maximum_work_units, 1)?;
+            containment_checks = containment_checks
+                .checked_add(1)
+                .ok_or(SubgroupLatticeErrorV1::ArithmeticOverflow)?;
+            let contains = subgroup_mask & !other_mask == 0;
+            if contains {
+                spend_subgroup_work(&mut total_work_units, budget.maximum_work_units, 1)?;
+                maximality_checks = maximality_checks
+                    .checked_add(1)
+                    .ok_or(SubgroupLatticeErrorV1::ArithmeticOverflow)?;
+                has_intermediate = true;
+            }
+        }
+        if !has_intermediate {
+            maximal_proper_subgroup_indices.push(index);
+        }
+    }
+
+    Ok(SubgroupLatticeReceiptV1 {
+        schema_version: 1,
+        group_id: group.group_id.clone(),
+        group_order: order,
+        group_contract_bytes: finite_group_canonical_bytes(group),
+        budget,
+        subgroups,
+        maximal_proper_subgroup_indices,
+        evidence: SubgroupLatticeEvidenceV1 {
+            group_axiom_checks: validated.checks,
+            generated_closure_calls,
+            total_work_units,
+            containment_checks,
+            maximality_checks,
+            complete_lattice: true,
+        },
+    })
+}
+
+/// Recomputes the complete lattice, generator witnesses and maximal-subgroup
+/// labels from the exact multiplication table and budget.
+pub fn verify_subgroup_lattice_receipt(
+    group: &FiniteGroupV1,
+    receipt: &SubgroupLatticeReceiptV1,
+) -> Result<(), SubgroupLatticeErrorV1> {
+    if receipt.schema_version != 1
+        || receipt.group_id != group.group_id
+        || receipt.group_order != group.multiplication.len()
+        || receipt.group_contract_bytes != finite_group_canonical_bytes(group)
+        || !receipt.evidence.complete_lattice
+    {
+        return Err(SubgroupLatticeErrorV1::ReceiptMismatch);
+    }
+    let replayed = enumerate_subgroup_lattice(group, receipt.budget)?;
+    if *receipt != replayed {
+        return Err(SubgroupLatticeErrorV1::ReceiptMismatch);
+    }
+
+    let validation_budget = QualificationBudgetV1 {
+        maximum_group_order: receipt.budget.maximum_group_order,
+        maximum_candidates: 1,
+        maximum_work_units: usize::MAX,
+    };
+    let validated = validate_group(group, validation_budget)
+        .map_err(SubgroupLatticeErrorV1::InvalidGroup)?;
+    for subgroup in &receipt.subgroups {
+        let mut mask = 1_u64 << group.identity;
+        let mut work_units = u64::try_from(validated.checks)
+            .map_err(|_| SubgroupLatticeErrorV1::ArithmeticOverflow)?;
+        for generator in &subgroup.generators {
+            if *generator >= group.multiplication.len() {
+                return Err(SubgroupLatticeErrorV1::ReceiptMismatch);
+            }
+            mask = close_generated_subgroup(
+                group,
+                &validated.inverses,
+                mask,
+                *generator,
+                &mut work_units,
+                receipt.budget.maximum_work_units,
+            )?;
+        }
+        if subgroup_mask_to_elements(mask, group.multiplication.len()) != subgroup.elements {
+            return Err(SubgroupLatticeErrorV1::ReceiptMismatch);
+        }
+    }
+    Ok(())
 }
 
 fn validate_problem(
@@ -960,6 +1322,117 @@ mod tests {
             panic!("expected an exact task-preserving quotient");
         };
         (problem, action, certificate)
+    }
+
+
+    #[test]
+    fn d4_subgroup_lattice_matches_exact_known_structure() {
+        let group = d4_action().group;
+        let receipt =
+            enumerate_subgroup_lattice(&group, SubgroupLatticeBudgetV1::default()).unwrap();
+        assert_eq!(receipt.subgroups.len(), 10);
+        let mut orders: Vec<usize> = receipt
+            .subgroups
+            .iter()
+            .map(|subgroup| subgroup.elements.len())
+            .collect();
+        orders.sort_unstable();
+        assert_eq!(orders, vec![1, 2, 2, 2, 2, 2, 4, 4, 4, 8]);
+        assert_eq!(receipt.maximal_proper_subgroup_indices.len(), 3);
+        assert!(receipt.maximal_proper_subgroup_indices.iter().all(|index| {
+            receipt.subgroups[*index].elements.len() == 4
+        }));
+        for subgroup in &receipt.subgroups {
+            assert!(!subgroup.generators.iter().any(|generator| {
+                !subgroup.elements.contains(generator)
+            }));
+        }
+        verify_subgroup_lattice_receipt(&group, &receipt).unwrap();
+    }
+
+    #[test]
+    fn cyclic_c4_lattice_has_one_unique_maximal_proper_subgroup() {
+        let group = FiniteGroupV1 {
+            group_id: "C4-subgroup-lattice-fixture".to_owned(),
+            identity: 0,
+            multiplication: vec![
+                vec![0, 1, 2, 3],
+                vec![1, 2, 3, 0],
+                vec![2, 3, 0, 1],
+                vec![3, 0, 1, 2],
+            ],
+        };
+        let receipt =
+            enumerate_subgroup_lattice(&group, SubgroupLatticeBudgetV1::default()).unwrap();
+        assert_eq!(receipt.subgroups.len(), 3);
+        assert_eq!(receipt.maximal_proper_subgroup_indices.len(), 1);
+        let maximal = &receipt.subgroups[receipt.maximal_proper_subgroup_indices[0]];
+        assert_eq!(maximal.elements, vec![0, 2]);
+        verify_subgroup_lattice_receipt(&group, &receipt).unwrap();
+    }
+
+    #[test]
+    fn subgroup_lattice_work_and_subgroup_count_budgets_fail_closed() {
+        let group = d4_action().group;
+        assert_eq!(
+            enumerate_subgroup_lattice(
+                &group,
+                SubgroupLatticeBudgetV1 {
+                    maximum_group_order: 8,
+                    maximum_subgroups: 2,
+                    maximum_work_units: 1_000_000,
+                }
+            ),
+            Err(SubgroupLatticeErrorV1::SubgroupCountExceeded)
+        );
+        assert_eq!(
+            enumerate_subgroup_lattice(
+                &group,
+                SubgroupLatticeBudgetV1 {
+                    maximum_group_order: 8,
+                    maximum_subgroups: 100,
+                    maximum_work_units: 1,
+                }
+            ),
+            Err(SubgroupLatticeErrorV1::WorkBudgetExceeded)
+        );
+    }
+
+    #[test]
+    fn subgroup_lattice_receipt_rejects_forgery_and_group_mutation() {
+        let group = d4_action().group;
+        let mut receipt =
+            enumerate_subgroup_lattice(&group, SubgroupLatticeBudgetV1::default()).unwrap();
+        verify_subgroup_lattice_receipt(&group, &receipt).unwrap();
+        receipt.maximal_proper_subgroup_indices.pop();
+        assert_eq!(
+            verify_subgroup_lattice_receipt(&group, &receipt),
+            Err(SubgroupLatticeErrorV1::ReceiptMismatch)
+        );
+
+        let original =
+            enumerate_subgroup_lattice(&group, SubgroupLatticeBudgetV1::default()).unwrap();
+        let mut changed = group.clone();
+        changed.group_id = "same-table-different-group-identity".to_owned();
+        assert_eq!(
+            verify_subgroup_lattice_receipt(&changed, &original),
+            Err(SubgroupLatticeErrorV1::ReceiptMismatch)
+        );
+    }
+
+    #[test]
+    fn subgroup_lattice_rejects_non_groups_using_the_shared_group_validator() {
+        let group = FiniteGroupV1 {
+            group_id: "not-a-group".to_owned(),
+            identity: 0,
+            multiplication: vec![vec![0, 1], vec![1, 1]],
+        };
+        assert_eq!(
+            enumerate_subgroup_lattice(&group, SubgroupLatticeBudgetV1::default()),
+            Err(SubgroupLatticeErrorV1::InvalidGroup(
+                QuotientErrorV1::MultiplicationTableNotLatin
+            ))
+        );
     }
 
     #[test]
