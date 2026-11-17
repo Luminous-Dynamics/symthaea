@@ -1,11 +1,12 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Cross-domain bridge: Fusion Digital Twin → Safety Agent
+//! Cross-domain research adapter: fusion prototype output → generic SafetyAgent metrics.
 //!
-//! Maps `FusionTwinOutput` (disruption risk, free energy, action) into
-//! `SafetyMetrics` so the Safety Agent can monitor fusion operations
-//! through the same NRC-grade framework used for consciousness monitoring.
+//! This adapter converts uncalibrated reference-surprise and latent-similarity values
+//! into generic software metrics. It is not an NRC/IEC regulatory qualification,
+//! plant safety case, validated disruption monitor, or hardware interlock. Its gate
+//! result is a software policy disposition only.
 //!
 //! # Feature gates
 //!
@@ -15,11 +16,10 @@ use super::agent::{SafetyAgent, SafetyAssessment, SafetyLevel, SafetyMetrics};
 use super::gate::{SafetyGateResult, safety_gate};
 use symthaea_physics::fusion_twin::{DisruptionRisk, FusionTwinOutput, PlasmaFepAction};
 
-/// Adapter that translates Fusion Digital Twin outputs into Safety Agent inputs.
+/// Prototype adapter that maps fusion research metrics into a generic SafetyAgent.
 ///
-/// Enables unified safety monitoring across consciousness + fusion domains.
-/// A single `SafetyAgent` can consume both consciousness snapshots AND
-/// fusion twin outputs, producing a combined safety assessment.
+/// Its assessment is not a physical plasma safety determination and must not be used
+/// as actuator authorization or substituted for an independent protection system.
 pub struct FusionSafetyAdapter {
     agent: SafetyAgent,
     cycle: usize,
@@ -39,7 +39,7 @@ impl FusionSafetyAdapter {
         Self { agent, cycle: 0 }
     }
 
-    /// Convert a `FusionTwinOutput` into `SafetyMetrics`.
+    /// Convert prototype FusionTwinOutput values into generic software metrics.
     ///
     /// Mapping:
     /// - `consciousness_level` ← 1.0 - free_energy (higher FE = less "conscious" of plasma state)
@@ -73,9 +73,9 @@ impl FusionSafetyAdapter {
         self.agent.assess(metrics)
     }
 
-    /// Check whether a fusion operation should be allowed given the twin's output.
+    /// Apply the generic software gate to the prototype heuristic risk bucket.
     ///
-    /// Maps `DisruptionRisk` to `SafetyLevel`, then applies the safety gate.
+    /// This is not a facility interlock or plant-operation authorization.
     pub fn gate_operation(&self, output: &FusionTwinOutput, is_risky: bool) -> SafetyGateResult {
         let level = disruption_risk_to_safety_level(output.disruption_risk);
         safety_gate(level, is_risky)
