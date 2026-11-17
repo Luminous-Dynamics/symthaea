@@ -1,0 +1,40 @@
+name: D2D Analytic Fixture
+
+on:
+  pull_request:
+    paths:
+      - "research/d2d-analytic-v0.1/**"
+      - ".github/workflows/d2d-analytic.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/d2d-analytic-v0.1/**"
+      - ".github/workflows/d2d-analytic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analytic-fixture:
+    name: Compile, test and run analytic D2D fixture
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install repository-pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/d2d-analytic-v0.1/Cargo.toml -- --check
+
+      - name: Run known-truth protocol tests
+        run: cargo test --manifest-path research/d2d-analytic-v0.1/Cargo.toml
+
+      - name: Run deterministic experiment demonstration
+        run: cargo run --manifest-path research/d2d-analytic-v0.1/Cargo.toml
+
+      - name: Run Clippy
+        run: cargo clippy --manifest-path research/d2d-analytic-v0.1/Cargo.toml --all-targets -- -D warnings
