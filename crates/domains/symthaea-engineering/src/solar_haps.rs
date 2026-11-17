@@ -607,6 +607,36 @@ mod tests {
     }
 
     #[test]
+    fn battery_charge_and_discharge_losses_are_accounted_separately() {
+        let mut config = base_config();
+        config.battery_capacity_wh = 4000.0;
+        config.initial_soc_wh = 1500.0;
+        config.minimum_reserve_wh = 500.0;
+        config.charge_efficiency = 0.8;
+        config.discharge_efficiency = 0.9;
+        config.max_charge_power_w = 100.0;
+
+        let mut profile = day_night_profile(0.0);
+        for interval in profile.iter_mut().skip(12) {
+            interval.incident_irradiance_w_m2 = 0.0;
+            interval.station_keeping_power_w = 100.0;
+        }
+
+        let result = evaluate_day(&config, &profile).unwrap();
+        assert!((result.total_battery_charge_input_wh - 1200.0).abs() < 1.0e-8);
+        assert!((result.total_battery_energy_stored_wh - 960.0).abs() < 1.0e-8);
+        assert!((result.total_battery_discharge_output_wh - 1200.0).abs() < 1.0e-8);
+        assert!(
+            (result.total_battery_discharge_withdrawn_wh - (1200.0 / 0.9)).abs() < 1.0e-8
+        );
+        assert!(result.reserve_respected);
+        assert!(result.own_service_continuous);
+        assert!(!result.daily_energy_cycle_closed);
+        assert!(!result.export_service_admissible);
+        assert!(result.total_pv_bus_ledger_residual_wh.abs() < 1.0e-8);
+    }
+
+    #[test]
     fn profile_must_cover_exactly_twenty_four_hours() {
         let mut profile = day_night_profile(0.0);
         profile.pop();
