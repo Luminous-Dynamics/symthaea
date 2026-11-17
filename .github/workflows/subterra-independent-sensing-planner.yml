@@ -1,0 +1,29 @@
+name: Subterra independent sensing planner
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/subterra-independent-sensing-planner.yml"
+      - "crates/domains/symthaea-subterranean/research/subterra-independent-sensing-planner/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact commit
+        uses: actions/checkout@v4
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --manifest-path crates/domains/symthaea-subterranean/research/subterra-independent-sensing-planner/Cargo.toml -- --check
+      - name: Run tests
+        run: cargo test --manifest-path crates/domains/symthaea-subterranean/research/subterra-independent-sensing-planner/Cargo.toml --all-targets --offline
+      - name: Run synthetic independent sensing planner
+        run: cargo run --manifest-path crates/domains/symthaea-subterranean/research/subterra-independent-sensing-planner/Cargo.toml --example synthetic_independent_sensing --offline
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path crates/domains/symthaea-subterranean/research/subterra-independent-sensing-planner/Cargo.toml --all-targets --offline -- -D warnings
