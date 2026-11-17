@@ -1,0 +1,172 @@
+{
+  "actual_hypothesis_id": "known-safe",
+  "decision_cutoff": "2026-11-17T10:00:00Z",
+  "actions": [
+    {
+      "action_id": "release",
+      "irreversible": true,
+      "hard_gate": true,
+      "max_residual_risk_bps": 0
+    },
+    {
+      "action_id": "deploy",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 500
+    },
+    {
+      "action_id": "inspect-readonly",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 0
+    }
+  ],
+  "hypothesis_bounds": [
+    {
+      "hypothesis_id": "known-safe",
+      "lower_probability_bps": 9000,
+      "upper_probability_bps": 10000,
+      "nominal_probability_bps": 10000
+    }
+  ],
+  "options": [
+    {
+      "option_id": "generic-sensor",
+      "available_at": "2026-11-17T09:00:00Z",
+      "factor_id": "generic-sensor"
+    },
+    {
+      "option_id": "discriminating-test",
+      "available_at": "2026-11-17T09:00:00Z",
+      "factor_id": "discriminating-test"
+    }
+  ],
+  "factors": [
+    {
+      "factor_id": "generic-sensor",
+      "dependence_group": "generic-sensor-path",
+      "source_ids": [
+        "generic-sensor"
+      ],
+      "calibration_ref": "generic-cal",
+      "likelihoods": [
+        {
+          "hypothesis_id": "known-safe",
+          "outcomes": {
+            "pass": {
+              "lower_likelihood_bps": 9000,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 9900
+            },
+            "fail": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 1000,
+              "nominal_likelihood_bps": 100
+            }
+          }
+        }
+      ]
+    },
+    {
+      "factor_id": "discriminating-test",
+      "dependence_group": "independent-test-fixture",
+      "source_ids": [
+        "independent-discriminator"
+      ],
+      "calibration_ref": "discriminator-cal",
+      "likelihoods": [
+        {
+          "hypothesis_id": "known-safe",
+          "outcomes": {
+            "pass": {
+              "lower_likelihood_bps": 9000,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 9900
+            },
+            "fail": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 1000,
+              "nominal_likelihood_bps": 100
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "hypothesis_safety": [
+    {
+      "hypothesis_id": "known-safe",
+      "safe_actions": [
+        "release",
+        "deploy",
+        "inspect-readonly"
+      ]
+    }
+  ],
+  "calibrations": [
+    {
+      "calibration_id": "generic-cal",
+      "authority": "independent-calibration-lab",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "valid_until": "2026-12-01T00:00:00Z",
+      "revoked_at": null,
+      "factor_ids": [
+        "generic-sensor"
+      ]
+    },
+    {
+      "calibration_id": "discriminator-cal",
+      "authority": "independent-metrology-lab",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "valid_until": "2026-12-01T00:00:00Z",
+      "revoked_at": null,
+      "factor_ids": [
+        "discriminating-test"
+      ]
+    }
+  ],
+  "factorization_certificates": [],
+  "open_world_policy": {
+    "unknown_hypothesis_id": "unknown-world",
+    "contamination_reserve_bps": 1000,
+    "read_only_action_ids": [
+      "inspect-readonly"
+    ],
+    "unknown_safe_action_ids": [
+      "inspect-readonly"
+    ],
+    "policy_version": "d6.18-contamination-reserve-v0.1",
+    "unknown_channel_likelihoods": [
+      {
+        "factor_id": "generic-sensor",
+        "outcomes": {
+          "pass": {
+            "lower_likelihood_bps": 0,
+            "upper_likelihood_bps": 10000,
+            "nominal_likelihood_bps": 9500
+          },
+          "fail": {
+            "lower_likelihood_bps": 0,
+            "upper_likelihood_bps": 10000,
+            "nominal_likelihood_bps": 500
+          }
+        }
+      },
+      {
+        "factor_id": "discriminating-test",
+        "outcomes": {
+          "pass": {
+            "lower_likelihood_bps": 0,
+            "upper_likelihood_bps": 500,
+            "nominal_likelihood_bps": 200
+          },
+          "fail": {
+            "lower_likelihood_bps": 9500,
+            "upper_likelihood_bps": 10000,
+            "nominal_likelihood_bps": 9800
+          }
+        }
+      }
+    ]
+  }
+}
