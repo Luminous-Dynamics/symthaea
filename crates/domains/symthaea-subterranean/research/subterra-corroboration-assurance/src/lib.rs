@@ -153,6 +153,7 @@ pub enum RejectionReason {
     OptionIdMismatch,
     ClaimIdMismatch,
     VerifierIdentityMismatch,
+    VerifierReusesAcquisitionIdentity,
     RightsPurposeMismatch,
     RightsDenied,
     RightsUnknown,
@@ -501,6 +502,13 @@ pub fn admit_corroboration_portfolio(
         &mut reasons,
         !anchor_source_found,
         RejectionReason::AnchorEvidenceSourceMissing,
+    );
+
+    add_if(
+        &mut reasons,
+        source_ids.contains(assessment.verifier.verifier_id.as_str())
+            || source_ids.contains(assessment.verifier_id.as_str()),
+        RejectionReason::VerifierReusesAcquisitionIdentity,
     );
 
     let mut closures_by_source = BTreeMap::new();
@@ -1023,6 +1031,17 @@ mod tests {
         let report = admit_corroboration_portfolio(&item, &expected(), policy());
         assert!(report.rejection_reasons.contains(&RejectionReason::DependencyGraphMismatch));
         assert!(report.rejection_reasons.contains(&RejectionReason::VerifierReceiptMismatch));
+    }
+
+    #[test]
+    fn verifier_cannot_reuse_an_acquisition_source_identity() {
+        let mut item = candidate();
+        item.assessment.verifier_id = "robot-a-thermal".into();
+        item.assessment.verifier.verifier_id = "robot-a-thermal".into();
+        let report = admit_corroboration_portfolio(&item, &expected(), policy());
+        assert!(report.rejection_reasons.contains(
+            &RejectionReason::VerifierReusesAcquisitionIdentity
+        ));
     }
 
     #[test]
