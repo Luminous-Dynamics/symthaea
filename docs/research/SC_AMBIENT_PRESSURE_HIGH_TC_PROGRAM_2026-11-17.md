@@ -721,3 +721,9 @@ New screening/coherence sources are:
 The observation-event smoke fixture has seven synthetic events; the synthesis-protocol smoke fixture has one synthetic run and one outcome. The pair/coherence comparison fixture links its synthetic local pairing-energy event and synthetic bulk stiffness event on the same synthetic specimen. All such fixtures are plumbing tests only, not empirical measurements.
 
 The registry auditor's exact count assertions now expect 23 / 13 / 18. All identifiers, source links, JSON parsing and fixture semantics have been checked by retrieving the branch files. Hosted Rust compilation, tests and Clippy remain pending until the exact-head workflow reports success.
+
+## 39. Measurement scope is mandatory
+
+The observation-event schema now requires measurement_scope for every assertion. An observed Tc must explicitly declare mesoscopic, bulk or device; local_probe and unknown are rejected. Pairing energy remains a separate observed property in meV and requires a local/mesoscopic/bulk measurement scope. Calculated/predicted values retain their own model scope.
+
+The auditor adds negative controls for omitted and unknown scope on observed Tc. The claim boundary is now fail-closed: an unscoped transition is not promoted into bulk evidence by default.
