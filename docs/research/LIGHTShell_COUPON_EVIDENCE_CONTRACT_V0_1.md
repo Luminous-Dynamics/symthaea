@@ -41,7 +41,7 @@ Do not compare paper-level results with Lightshell results unless specimen geome
 
 ## P0 negative controls
 
-Authored test cases cover duplicate specimen/run IDs; unknown specimen links; available specimens missing lot/process/conditioning/geometry; missing instrument/calibration; malformed raw-data digest; vibration curve absence; frequency points not strictly increasing; resonance assessment omission; expanded uncertainty without coverage factor; failed/inconclusive reasons; planned runs accidentally carrying measurements; complete campaigns with pending runs; and unknown fields.
+Authored test cases cover empty campaigns; duplicate specimen/run IDs; unknown specimen links; available specimens missing lot/process/conditioning/geometry; missing instrument/calibration; malformed raw-data digest; vibration curve absence; frequency points not strictly increasing; resonance assessment omission; expanded uncertainty without coverage factor; failed/inconclusive reasons and candidate-scoped adverse evidence; explicit invalidated-candidate reporting; missing calibration; metric/family mismatch; planned runs accidentally carrying measurements; complete campaigns with pending runs; and unknown fields.
 
 ## Benchmark programme
 
