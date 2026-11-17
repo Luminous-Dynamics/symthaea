@@ -405,7 +405,15 @@
       "material_formula": "Bi2Sr2CaCu2O8+delta",
       "method": "local shot-noise spectroscopy / noise-STM (electron-pair microscope)",
       "reported_pairing_energy_mev_max": 70,
-      "primary_claim_boundary": "Paper reports pseudogap energy coincident with pairing onset energy in Bi2212, spatially heterogeneous up to ~70 meV. This is a local pairing-energy scale, not a 70 meV measured bulk gap or a directly measured room-temperature transition. It does not demonstrate 300 K zero resistance, Meissner response or bulk superconductivity. Authors interpret pair formation as potentially persisting above Tc and identify global phase coherence as a likely bottleneck."
+      "primary_claim_boundary": "Science paper reports local shot-noise measurements in Bi2212 at cryogenic STM base temperatures of 4.2 K, 2.3 K and 0.3 K, associating the pseudogap energy with pairing-onset energy and reporting spatially heterogeneous values up to ~70 meV. This is an energy scale, not a transition temperature. Pairing at 300 K is an interpretation/extrapolation, not a direct 300 K measurement. The study does not demonstrate 300 K zero resistance, Meissner response or bulk phase coherence. Local pairing is kept separate from bulk Tc and superfluid stiffness.",
+      "arxiv_id": "2409.15928",
+      "preprint_first_submitted": "2024-09-24",
+      "reported_measurement_temperatures_k": [
+        0.3,
+        2.3,
+        4.2
+      ],
+      "measurement_scope": "local_probe"
     },
     {
       "source_id": "metallic_reservoir_phase_stiffness_2026",
