@@ -238,6 +238,21 @@ fn resources_dominate(left: &ResourceVector, right: &ResourceVector) -> bool {
 }
 
 fn portfolio_dominates(left: &AcquisitionPortfolio, right: &AcquisitionPortfolio) -> bool {
+    // Bundle identity is a discrete campaign-composition dimension: a locally
+    // more expensive bundle may be shared across other claims later. Do not
+    // discard portfolios with different bundle sets during per-claim pruning.
+    let same_bundle_set = left.selected_deployment_bundles.len()
+        == right.selected_deployment_bundles.len()
+        && left
+            .selected_deployment_bundles
+            .iter()
+            .zip(&right.selected_deployment_bundles)
+            .all(|(left, right)| {
+                left.bundle_id == right.bundle_id && left.bundle_digest == right.bundle_digest
+            });
+    if !same_bundle_set {
+        return false;
+    }
     let no_worse = resources_dominate(&left.resources, &right.resources)
         && left.mission_interruption_upper_ppm <= right.mission_interruption_upper_ppm
         && left.robot_loss_upper_ppm <= right.robot_loss_upper_ppm;
@@ -1239,6 +1254,58 @@ mod tests {
                 "bundle-1".into()
             ))
         );
+    }
+
+    #[test]
+    fn different_bundle_sets_are_preserved_as_distinct_pareto_dimensions() {
+        let mut options = vec![
+            option("a-x", "source-a-x", vec![dep("robot", "a-x")]),
+            option("b-x", "source-b-x", vec![dep("robot", "b-x")]),
+            option("a-y", "source-a-y", vec![dep("robot", "a-y")]),
+            option("b-y", "source-b-y", vec![dep("robot", "b-y")]),
+        ];
+        options[0].deployment_bundle_id = "bundle-x".into();
+        options[1].deployment_bundle_id = "bundle-x".into();
+        options[2].deployment_bundle_id = "bundle-y".into();
+        options[3].deployment_bundle_id = "bundle-y".into();
+        options[2].deployment_bundle_digest = "sha256:bundle-y".into();
+        options[3].deployment_bundle_digest = "sha256:bundle-y".into();
+        options[2].deployment_bundle_resource_model_digest = "sha256:bundle-resource-model-y".into();
+        options[3].deployment_bundle_resource_model_digest = "sha256:bundle-resource-model-y".into();
+        options[2].deployment_bundle_assessment_digest = "sha256:bundle-assessment-y".into();
+        options[3].deployment_bundle_assessment_digest = "sha256:bundle-assessment-y".into();
+        let mut bundles = bundle_costs();
+        bundles[0].bundle_id = "bundle-x".into();
+        let mut bundle_y = bundles[0].clone();
+        bundle_y.bundle_id = "bundle-y".into();
+        bundle_y.bundle_digest = "sha256:bundle-y".into();
+        bundle_y.resource_model_digest = "sha256:bundle-resource-model-y".into();
+        bundle_y.assessment_digest = "sha256:bundle-assessment-y".into();
+        bundle_y.fixed_resources = ResourceVector::default();
+        bundles.push(bundle_y);
+
+        let report = plan_independent_acquisition_portfolio(
+            options,
+            &bundles,
+            &expected(),
+            &verifier(),
+            policy(),
+            &budget(),
+        )
+        .unwrap();
+        let bundle_sets = report
+            .pareto_frontier
+            .iter()
+            .map(|portfolio| {
+                portfolio
+                    .selected_deployment_bundles
+                    .iter()
+                    .map(|bundle| bundle.bundle_id.as_str())
+                    .collect::<Vec<_>>()
+            })
+            .collect::<BTreeSet<_>>();
+        assert!(bundle_sets.contains(&vec!["bundle-x"]));
+        assert!(bundle_sets.contains(&vec!["bundle-y"]));
     }
 
     #[test]
