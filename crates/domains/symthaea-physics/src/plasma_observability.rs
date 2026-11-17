@@ -12,6 +12,37 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub const PLASMA_OBSERVATION_SCHEMA: &str = "luminous.plasma-observation-frame.v0.1";
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CalibrationIdentity {
+    pub calibration_id: String,
+    pub calibration_revision: String,
+}
+
+impl CalibrationIdentity {
+    fn validate(&self, channel_id: &str) -> Result<(), ObservationContractError> {
+        if self.calibration_id.trim().is_empty() || self.calibration_revision.trim().is_empty() {
+            return Err(ObservationContractError::new(format!(
+                "channel {channel_id} has incomplete calibration identity"
+            )));
+        }
+        Ok(())
+    }
+}
+
+fn validate_sha256(value: &str, field: &str, channel_id: &str) -> Result<(), ObservationContractError> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(ObservationContractError::new(format!(
+            "channel {channel_id} {field} must be 64 lowercase hexadecimal characters"
+        )));
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObservationContractError {
     pub message: String,
@@ -40,6 +71,8 @@ pub enum ObservationDisposition {
         value: f64,
         units: String,
         source_id: String,
+        source_digest: String,
+        calibration: CalibrationIdentity,
         observed_at_ns: u64,
     },
     Synthetic {
@@ -55,6 +88,8 @@ pub enum ObservationDisposition {
         value: f64,
         units: String,
         source_id: String,
+        source_digest: String,
+        calibration: CalibrationIdentity,
         observed_at_ns: u64,
         latency_ns: u64,
     },
@@ -62,6 +97,8 @@ pub enum ObservationDisposition {
         value: f64,
         units: String,
         source_id: String,
+        source_digest: String,
+        calibration: CalibrationIdentity,
         observed_at_ns: u64,
         reason: String,
     },
@@ -106,11 +143,15 @@ impl ObservationDisposition {
                 value,
                 units,
                 source_id,
+                source_digest,
+                calibration,
                 observed_at_ns,
             } => {
                 finite_value(*value)?;
                 non_empty(units, "units")?;
                 non_empty(source_id, "source_id")?;
+                validate_sha256(source_digest, "source_digest", channel_id)?;
+                calibration.validate(channel_id)?;
                 check_timestamp(*observed_at_ns)?;
             }
             Self::Synthetic {
@@ -141,12 +182,16 @@ impl ObservationDisposition {
                 value,
                 units,
                 source_id,
+                source_digest,
+                calibration,
                 observed_at_ns,
                 latency_ns,
             } => {
                 finite_value(*value)?;
                 non_empty(units, "units")?;
                 non_empty(source_id, "source_id")?;
+                validate_sha256(source_digest, "source_digest", channel_id)?;
+                calibration.validate(channel_id)?;
                 check_timestamp(*observed_at_ns)?;
                 let expected_latency = frame_time_ns - observed_at_ns;
                 if *latency_ns == 0 || *latency_ns != expected_latency {
@@ -159,6 +204,8 @@ impl ObservationDisposition {
                 value,
                 units,
                 source_id,
+                source_digest,
+                calibration,
                 observed_at_ns,
                 reason,
             } => {
@@ -166,6 +213,8 @@ impl ObservationDisposition {
                 non_empty(units, "units")?;
                 non_empty(source_id, "source_id")?;
                 non_empty(reason, "reason")?;
+                validate_sha256(source_digest, "source_digest", channel_id)?;
+                calibration.validate(channel_id)?;
                 check_timestamp(*observed_at_ns)?;
             }
         }
@@ -226,6 +275,9 @@ pub struct MeasuredValue {
     value: f64,
     units: String,
     source_id: String,
+    source_digest: String,
+    calibration_id: String,
+    calibration_revision: String,
     observed_at_ns: u64,
 }
 
@@ -248,6 +300,18 @@ impl MeasuredValue {
 
     pub fn source_id(&self) -> &str {
         &self.source_id
+    }
+
+    pub fn source_digest(&self) -> &str {
+        &self.source_digest
+    }
+
+    pub fn calibration_id(&self) -> &str {
+        &self.calibration_id
+    }
+
+    pub fn calibration_revision(&self) -> &str {
+        &self.calibration_revision
     }
 
     pub fn observed_at_ns(&self) -> u64 {
@@ -451,6 +515,8 @@ impl PlasmaObservationFrame {
                     value,
                     units,
                     source_id,
+                    source_digest,
+                    calibration,
                     observed_at_ns,
                 } => values.push(MeasuredValue {
                     channel_id: channel.channel_id.clone(),
@@ -458,6 +524,9 @@ impl PlasmaObservationFrame {
                     value: *value,
                     units: units.clone(),
                     source_id: source_id.clone(),
+                    source_digest: source_digest.clone(),
+                    calibration_id: calibration.calibration_id.clone(),
+                    calibration_revision: calibration.calibration_revision.clone(),
                     observed_at_ns: *observed_at_ns,
                 }),
                 disposition => blocked_channels.push(BlockedChannel {
@@ -504,6 +573,11 @@ mod tests {
             value,
             units: "10^20 m^-3".to_owned(),
             source_id: "interferometer-01".to_owned(),
+            source_digest: "d".repeat(64),
+            calibration: CalibrationIdentity {
+                calibration_id: "calibration-density-01".to_owned(),
+                calibration_revision: "2026-11-01".to_owned(),
+            },
             observed_at_ns,
         }
     }
@@ -543,6 +617,11 @@ mod tests {
                     value: 4.0,
                     units: "keV".to_owned(),
                     source_id: "thomson-01".to_owned(),
+                    source_digest: "e".repeat(64),
+                    calibration: CalibrationIdentity {
+                        calibration_id: "calibration-temperature-01".to_owned(),
+                        calibration_revision: "2026-11-01".to_owned(),
+                    },
                     observed_at_ns: 100,
                 },
             ),
@@ -622,6 +701,11 @@ mod tests {
                     value: 0.9,
                     units: "10^20 m^-3".to_owned(),
                     source_id: "interferometer-01".to_owned(),
+                    source_digest: "f".repeat(64),
+                    calibration: CalibrationIdentity {
+                        calibration_id: "calibration-density-01".to_owned(),
+                        calibration_revision: "2026-11-01".to_owned(),
+                    },
                     observed_at_ns: 90,
                     latency_ns: 10,
                 },
@@ -633,6 +717,11 @@ mod tests {
                     value: 4.0,
                     units: "keV".to_owned(),
                     source_id: "thomson-01".to_owned(),
+                    source_digest: "1".repeat(64),
+                    calibration: CalibrationIdentity {
+                        calibration_id: "calibration-temperature-01".to_owned(),
+                        calibration_revision: "2026-11-01".to_owned(),
+                    },
                     observed_at_ns: 100,
                     reason: "calibration drift suspected".to_owned(),
                 },
@@ -666,6 +755,11 @@ mod tests {
                         value: 4.0,
                         units: "keV".to_owned(),
                         source_id: "thomson-01".to_owned(),
+                        source_digest: "2".repeat(64),
+                        calibration: CalibrationIdentity {
+                            calibration_id: "calibration-temperature-01".to_owned(),
+                            calibration_revision: "2026-11-01".to_owned(),
+                        },
                         observed_at_ns: 100,
                     },
                 ),
@@ -734,6 +828,11 @@ mod tests {
                     value: 0.9,
                     units: "10^20 m^-3".to_owned(),
                     source_id: "interferometer-01".to_owned(),
+                    source_digest: "f".repeat(64),
+                    calibration: CalibrationIdentity {
+                        calibration_id: "calibration-density-01".to_owned(),
+                        calibration_revision: "2026-11-01".to_owned(),
+                    },
                     observed_at_ns: 90,
                     latency_ns: 5,
                 },
