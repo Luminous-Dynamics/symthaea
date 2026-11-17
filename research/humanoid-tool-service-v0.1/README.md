@@ -164,6 +164,15 @@ Symthaea's hypothesis is to combine:
 
 Related programme: [HUM-AGENTIC-POLICY-001 #12685](https://github.com/Luminous-Dynamics/symthaea/issues/12685).
 
+
+### Physical humanoid frontier: where we should compete
+
+The public industry picture has moved beyond isolated dexterity demos. Figure reports Helix 2.5 at 56% zero-shot success across three whole-body behaviors in 30 unseen homes, versus 9% from scratch with the same task-specific data; Google DeepMind reports Gemini Robotics 2.5 across 200+ tasks and 96% in a Mercedes-Benz automotive-kitting proof-of-concept with Apptronik Apollo 2. These are vendor-reported, task-specific results and not a common leaderboard. ULTRA remains the closer real-G1 whole-body controller comparator; AMP1 is the agentic planner comparator; HumanoidToolBench is the direct G1 tool selection/use benchmark.
+
+A particularly revealing HumanoidToolBench result is the L1-to-L2 mobile gap: FastWAM's standard BallMove success falls from 76% stationary to 9% mobile, while the benchmark records candidate contact, correct first contact, correct-tool lift, tool-target contact and task completion as separate events. A secondary extraction of the paper's event table shows high interaction rates can coexist with much lower verified task success. That is the key opportunity for Symthaea: do not optimize one terminal score while remaining blind to why the task failed.
+
+Our next benchmark improvement is a **capability-transition ledger**: event timestamps, capture completeness, transition incidence, conditional conversion, time-to-transition, stage-specific recovery/intervention cost and verified terminal outcome. HLB should use it to choose targeted reinspection, affordance probing, regrasp/reorientation, contact adjustment or mobile repositioning. The five-event graph must not be treated as a mandatory funnel; keep out-of-order events and repeated attempts. See section 3E of [the benchmark protocol](protocol-v0.1.md).
+
 ## Active tool affordance discovery
 
 [HUM-TOOL-DISCOVERY-001 #12701](https://github.com/Luminous-Dynamics/symthaea/issues/12701) asks whether Symthaea can identify what an unfamiliar tool can physically do, not merely classify its name or choose among known objects.
