@@ -268,3 +268,24 @@ A focused, standalone Rust audit harness now accompanies the reference corpus:
 Run commands and claim limits are documented in [the harness README](https://github.com/Luminous-Dynamics/symthaea/blob/research/sc-ambient-pressure-001/tools/superconductivity-discovery-harness/README.md). A path-scoped exact-head workflow was added at [.github/workflows/superconductivity-discovery.yml](https://github.com/Luminous-Dynamics/symthaea/blob/research/sc-ambient-pressure-001/.github/workflows/superconductivity-discovery.yml).
 
 **Execution status:** the source, schema and negative-control tests have been authored; the Rust binary has not yet been compiled or run in this environment. The workflow is intended to provide the first exact-head compiler/test/clippy receipt. No test pass is claimed until that receipt reports success.
+
+
+## 11. HTSC-2025 benchmark admission audit — 17 November 2026
+
+The public [HTSC-2025 Hugging Face dataset](https://huggingface.co/datasets/xiao-qi/HTSC-2025) is now recorded as a promising but **not yet admitted** external benchmark.
+
+- The paper describes 155 samples in its benchmark overview; the current Hugging Face README table totals 140 material entries (19 + 12 + 23 + 15 + 18 + 53). The viewer shows one top-level JSON row containing material-keyed records and a 166 kB JSON file. This count discrepancy is unresolved; no count is asserted as canonical until per-material keys are reconciled.
+- The visible Hugging Face dataset card displays an empty/missing YAML metadata warning and no visible license field. The paper's article license must not be assumed to grant rights to independently hosted JSON/CIF files. Do not mirror or redistribute upstream records until data rights are clarified.
+- The paper's own protocol uses DFT-computed Tc targets for theoretically predicted BCS candidates, and says test benchmark materials should be excluded from training to prevent leakage. These metrics do not measure experimental Tc and should not be pooled with the ambient nickelate specimen evidence.
+
+Child work package: [HTSC-2025-REPRO-001 #12635](https://github.com/Luminous-Dynamics/symthaea/issues/12635), which covers count reconciliation, rights, CIF/source provenance, canonical record IDs, exact split reconstruction and grouped holdouts.
+
+The registry now preserves paper-reported count 155 separately from hosted README table count 140, marks license status as unresolved / redistribution unauthorized, and keeps the HTSC-2025 record out of any admitted or reproduced leaderboard. This is a source-audit update; no raw hosted CIF/JSON content was copied into Symthaea.
+
+## 12. Genome-inspired AI reproduction gate — 17 November 2026
+
+The 29 October 2026 *Scientific Reports* early-access paper reports a 53,196-record DataG Non-Sc set, 10 ML and 9 neural models, and high-Tc predictions from ICSD / COD / Materials Project. Its reported Pu-based and hydride candidates remain computational predictions. The source says this early-access article version may be replaced automatically by the final Version of Record.
+
+Child work package: [GENOME-SC-AI-REPRO-001 #12636](https://github.com/Luminous-Dynamics/symthaea/issues/12636). Before admitting it, require original data artifacts, data rights, label provenance, exact splits, candidate list, checkpoints, code and training environment. Plutonium candidates remain computational-only for the general programme pending specialist institutional radiological review.
+
+The programme now has separate reproducibility tracks for BEE-NET (#12619), HTSC-2025 (#12635) and genome-inspired AI (#12636). Their tasks and label spaces remain distinct.
