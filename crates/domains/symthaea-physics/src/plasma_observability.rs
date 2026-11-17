@@ -260,12 +260,45 @@ pub enum AbstentionReason {
     Invalid,
     Delayed,
     Degraded,
+    WrongUnits,
+    Stale,
+    UnapprovedSource,
+    CalibrationMismatch,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockedChannel {
     pub channel_id: String,
     pub reason: AbstentionReason,
+}
+
+/// Requirements for admitting one measured channel to a specific decision.
+///
+/// This gate checks measurement provenance and time validity only. Passing it
+/// does not prove that the downstream physical quantity is observable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecisionChannelRequirement {
+    pub channel_id: String,
+    pub expected_units: String,
+    pub max_age_ns: u64,
+    pub allowed_source_ids: Vec<String>,
+    pub calibration: CalibrationIdentity,
+}
+
+impl DecisionChannelRequirement {
+    fn validate(&self) -> Result<(), ObservationContractError> {
+        if self.channel_id.trim().is_empty()
+            || self.expected_units.trim().is_empty()
+            || self.max_age_ns == 0
+            || self.allowed_source_ids.is_empty()
+            || self.allowed_source_ids.iter().any(|source| source.trim().is_empty())
+        {
+            return Err(ObservationContractError::new(
+                "decision channel requirement is incomplete",
+            ));
+        }
+        self.calibration.validate(&self.channel_id)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -466,6 +499,99 @@ impl PlasmaObservationFrame {
             }
         }
         Ok(counts)
+    }
+
+    /// Admit a decision only when every required channel is directly measured
+    /// and matches its declared units, freshness, source and calibration.
+    ///
+    /// This is a measurement-quality gate. Even a returned
+    /// MeasuredInputsAvailable result does not establish physical
+    /// identifiability or observability; those require separate analysis.
+    pub fn evaluate_decision_requirements(
+        &self,
+        requirements: &[DecisionChannelRequirement],
+    ) -> Result<DecisionInputGate, ObservationContractError> {
+        if requirements.is_empty() {
+            return Err(ObservationContractError::new(
+                "a decision must declare at least one channel requirement",
+            ));
+        }
+        for requirement in requirements {
+            requirement.validate()?;
+        }
+
+        let mut seen = BTreeSet::new();
+        for requirement in requirements {
+            if !seen.insert(requirement.channel_id.as_str()) {
+                return Err(ObservationContractError::new(format!(
+                    "duplicate decision requirement: {}",
+                    requirement.channel_id
+                )));
+            }
+        }
+
+        let required_ids: Vec<&str> = requirements
+            .iter()
+            .map(|requirement| requirement.channel_id.as_str())
+            .collect();
+        let gate = self.evaluate_decision_gate(&required_ids)?;
+        let DecisionInputGate::MeasuredInputsAvailable(inputs) = gate else {
+            return Ok(gate);
+        };
+
+        let requirements_by_id: BTreeMap<&str, &DecisionChannelRequirement> = requirements
+            .iter()
+            .map(|requirement| (requirement.channel_id.as_str(), requirement))
+            .collect();
+        let mut blocked_channels = Vec::new();
+
+        for value in inputs.values() {
+            let requirement = requirements_by_id
+                .get(value.channel_id())
+                .copied()
+                .ok_or_else(|| {
+                    ObservationContractError::new(format!(
+                        "missing requirement for measured channel {}",
+                        value.channel_id()
+                    ))
+                })?;
+
+            let reason = if value.units() != requirement.expected_units {
+                Some(AbstentionReason::WrongUnits)
+            } else if self.frame_time_ns.saturating_sub(value.observed_at_ns())
+                > requirement.max_age_ns
+            {
+                Some(AbstentionReason::Stale)
+            } else if !requirement
+                .allowed_source_ids
+                .iter()
+                .any(|source_id| source_id == value.source_id())
+            {
+                Some(AbstentionReason::UnapprovedSource)
+            } else if value.calibration_id() != requirement.calibration.calibration_id
+                || value.calibration_revision() != requirement.calibration.calibration_revision
+            {
+                Some(AbstentionReason::CalibrationMismatch)
+            } else {
+                None
+            };
+
+            if let Some(reason) = reason {
+                blocked_channels.push(BlockedChannel {
+                    channel_id: value.channel_id().to_owned(),
+                    reason,
+                });
+            }
+        }
+
+        if blocked_channels.is_empty() {
+            Ok(DecisionInputGate::MeasuredInputsAvailable(inputs))
+        } else {
+            Ok(DecisionInputGate::Abstain {
+                frame_id: self.frame_id.clone(),
+                blocked_channels,
+            })
+        }
     }
 
     /// Admit a decision only when all required channels are directly measured.
@@ -899,6 +1025,133 @@ mod tests {
             channel("temperature", "thomson", measured(4.0, 100)),
         ]);
         assert!(missing_calibration.validate().is_err());
+    }
+
+    fn density_requirement() -> DecisionChannelRequirement {
+        DecisionChannelRequirement {
+            channel_id: "density".to_owned(),
+            expected_units: "10^20 m^-3".to_owned(),
+            max_age_ns: 20,
+            allowed_source_ids: vec!["interferometer-01".to_owned()],
+            calibration: CalibrationIdentity {
+                calibration_id: "calibration-density-01".to_owned(),
+                calibration_revision: "2026-11-01".to_owned(),
+            },
+        }
+    }
+
+    #[test]
+    fn decision_requirements_admit_matching_fresh_calibrated_measurement() {
+        let frame = base_frame(vec![
+            channel("density", "interferometer", measured(0.9, 95)),
+            channel("temperature", "thomson", measured(4.0, 100)),
+        ]);
+        let gate = frame
+            .evaluate_decision_requirements(&[density_requirement()])
+            .expect("valid requirement should evaluate");
+        let DecisionInputGate::MeasuredInputsAvailable(inputs) = gate else {
+            panic!("matching measured channel should be available");
+        };
+        assert_eq!(inputs.values().len(), 1);
+        assert_eq!(inputs.values()[0].channel_id(), "density");
+    }
+
+    #[test]
+    fn stale_measurement_abstains() {
+        let frame = base_frame(vec![
+            channel("density", "interferometer", measured(0.9, 70)),
+            channel("temperature", "thomson", measured(4.0, 100)),
+        ]);
+        let gate = frame
+            .evaluate_decision_requirements(&[density_requirement()])
+            .expect("valid frame should evaluate");
+        let DecisionInputGate::Abstain { blocked_channels, .. } = gate else {
+            panic!("stale measurement must not be admitted");
+        };
+        assert_eq!(blocked_channels[0].reason, AbstentionReason::Stale);
+    }
+
+    #[test]
+    fn units_source_and_calibration_must_match_the_decision_contract() {
+        let cases = [
+            (
+                "wrong-units",
+                ObservationDisposition::Measured {
+                    value: 0.9,
+                    units: "m^-3".to_owned(),
+                    source_id: "interferometer-01".to_owned(),
+                    source_digest: "5".repeat(64),
+                    calibration: CalibrationIdentity {
+                        calibration_id: "calibration-density-01".to_owned(),
+                        calibration_revision: "2026-11-01".to_owned(),
+                    },
+                    observed_at_ns: 100,
+                },
+                AbstentionReason::WrongUnits,
+            ),
+            (
+                "wrong-source",
+                ObservationDisposition::Measured {
+                    value: 0.9,
+                    units: "10^20 m^-3".to_owned(),
+                    source_id: "unknown-interferometer".to_owned(),
+                    source_digest: "6".repeat(64),
+                    calibration: CalibrationIdentity {
+                        calibration_id: "calibration-density-01".to_owned(),
+                        calibration_revision: "2026-11-01".to_owned(),
+                    },
+                    observed_at_ns: 100,
+                },
+                AbstentionReason::UnapprovedSource,
+            ),
+            (
+                "wrong-calibration",
+                ObservationDisposition::Measured {
+                    value: 0.9,
+                    units: "10^20 m^-3".to_owned(),
+                    source_id: "interferometer-01".to_owned(),
+                    source_digest: "7".repeat(64),
+                    calibration: CalibrationIdentity {
+                        calibration_id: "calibration-density-01".to_owned(),
+                        calibration_revision: "unregistered-revision".to_owned(),
+                    },
+                    observed_at_ns: 100,
+                },
+                AbstentionReason::CalibrationMismatch,
+            ),
+        ];
+
+        for (case_id, disposition, expected_reason) in cases {
+            let frame = base_frame(vec![
+                channel("density", "interferometer", disposition),
+                channel("temperature", "thomson", measured(4.0, 100)),
+            ]);
+            let gate = frame
+                .evaluate_decision_requirements(&[density_requirement()])
+                .unwrap_or_else(|error| panic!("{case_id}: {error}"));
+            let DecisionInputGate::Abstain { blocked_channels, .. } = gate else {
+                panic!("{case_id}: measurement mismatch must abstain");
+            };
+            assert_eq!(blocked_channels[0].reason, expected_reason, "{case_id}");
+        }
+    }
+
+    #[test]
+    fn requirements_must_be_explicit_and_unique() {
+        let frame = base_frame(vec![
+            channel("density", "interferometer", measured(0.9, 100)),
+            channel("temperature", "thomson", measured(4.0, 100)),
+        ]);
+        assert!(frame.evaluate_decision_requirements(&[]).is_err());
+        let requirement = density_requirement();
+        assert!(
+            frame
+                .evaluate_decision_requirements(&[requirement.clone(), requirement])
+                .is_err()
+        );
+        let mut invalid = density_requirement();
+        invalid.allowed_source_ids.clear();
+        assert!(frame.evaluate_decision_requirements(&[invalid]).is_err());
     }
 
     #[test]
