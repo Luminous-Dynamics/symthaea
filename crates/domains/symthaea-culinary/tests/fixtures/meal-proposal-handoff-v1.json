@@ -1,0 +1,61 @@
+{
+  "fixture_bundle_id": "meal-proposal-handoff-v1",
+  "status": "synthetic_schema_and_validator_cases_only",
+  "cases": [
+    {
+      "case_id": "explicit-user-meal-proposal",
+      "expected": "valid",
+      "description": "User constraints, exact ingredient quantities, proposal tasks and source references are explicit."
+    },
+    {
+      "case_id": "unknown-quantity-with-reason",
+      "expected": "valid",
+      "description": "Unknown household quantity is retained as unknown with a planning-blocker uncertainty."
+    },
+    {
+      "case_id": "unknown-quantity-without-reason",
+      "expected": "invalid",
+      "description": "Unknown ingredient quantity without a matching uncertainty record is rejected."
+    },
+    {
+      "case_id": "mass-volume-dimension-mismatch",
+      "expected": "invalid",
+      "description": "A quantity marked mass but expressed in litres is rejected."
+    },
+    {
+      "case_id": "supplier-listing-without-receipt",
+      "expected": "valid",
+      "description": "An absent local lot reference remains absent; supplier listing does not create household inventory."
+    },
+    {
+      "case_id": "duplicate-ingredient-or-task-id",
+      "expected": "invalid",
+      "description": "Duplicate ingredient/task identity is rejected."
+    },
+    {
+      "case_id": "unknown-ingredient-or-fact-reference",
+      "expected": "invalid",
+      "description": "Task and ingredient references must resolve inside the proposal."
+    },
+    {
+      "case_id": "cyclic-task-dependencies",
+      "expected": "invalid",
+      "description": "Task dependency cycles are rejected before downstream compilation."
+    },
+    {
+      "case_id": "stale-fact-validity-window",
+      "expected": "invalid",
+      "description": "A fact validity end before observation time is rejected; current freshness remains an as-of evaluation."
+    },
+    {
+      "case_id": "invalid-budget-currency",
+      "expected": "invalid",
+      "description": "A budget amount requires a three-letter uppercase currency code."
+    },
+    {
+      "case_id": "hardware-assignment-not-in-proposal-shape",
+      "expected": "forbidden",
+      "description": "No appliance/module assignment, device resource ID, actuator or command field exists in this proposal contract."
+    }
+  ]
+}
