@@ -19,7 +19,10 @@ const OPAQUE_ID_HEX_LENGTH: usize = 32;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ManifestError {
     EmptyInput,
-    InputTooLarge { actual: usize, maximum: usize },
+    InputTooLarge {
+        actual: usize,
+        maximum: usize,
+    },
     InvalidJson(String),
     UnsupportedSchema(String),
     InvalidField(&'static str),
@@ -29,12 +32,32 @@ pub enum ManifestError {
     EmptyCollection(&'static str),
     DuplicateValue(&'static str),
     UnknownAxis(String),
-    GroupRoleOverlap { axis: String, group: String },
-    GroupRoleMismatch { scenario: String, axis: String, role: String },
-    MissingAxisMembership { scenario: String, axis: String },
-    MissingDeclaredGroup { axis: String, group: String },
-    UnreferencedDeclaredGroup { axis: String, group: String },
-    InsufficientIndependentUnits { role: String, actual: usize, minimum: usize },
+    GroupRoleOverlap {
+        axis: String,
+        group: String,
+    },
+    GroupRoleMismatch {
+        scenario: String,
+        axis: String,
+        role: String,
+    },
+    MissingAxisMembership {
+        scenario: String,
+        axis: String,
+    },
+    MissingDeclaredGroup {
+        axis: String,
+        group: String,
+    },
+    UnreferencedDeclaredGroup {
+        axis: String,
+        group: String,
+    },
+    InsufficientIndependentUnits {
+        role: String,
+        actual: usize,
+        minimum: usize,
+    },
     CanonicalizationFailure,
 }
 
@@ -42,7 +65,9 @@ impl fmt::Display for ManifestError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::EmptyInput => write!(f, "manifest input is empty"),
-            Self::InputTooLarge { actual, maximum } => write!(f, "manifest is {actual} bytes; maximum is {maximum}"),
+            Self::InputTooLarge { actual, maximum } => {
+                write!(f, "manifest is {actual} bytes; maximum is {maximum}")
+            }
             Self::InvalidJson(reason) => write!(f, "invalid manifest JSON: {reason}"),
             Self::UnsupportedSchema(schema) => write!(f, "unsupported manifest schema: {schema}"),
             Self::InvalidField(field) => write!(f, "invalid manifest field: {field}"),
@@ -52,12 +77,35 @@ impl fmt::Display for ManifestError {
             Self::EmptyCollection(field) => write!(f, "empty manifest collection: {field}"),
             Self::DuplicateValue(field) => write!(f, "duplicate manifest value: {field}"),
             Self::UnknownAxis(axis) => write!(f, "unknown split axis: {axis}"),
-            Self::GroupRoleOverlap { axis, group } => write!(f, "group {group} overlaps split roles on {axis}"),
-            Self::GroupRoleMismatch { scenario, axis, role } => write!(f, "scenario {scenario} assigns {axis} to a role other than {role}"),
-            Self::MissingAxisMembership { scenario, axis } => write!(f, "scenario {scenario} has no membership for {axis}"),
-            Self::MissingDeclaredGroup { axis, group } => write!(f, "scenario group {group} on {axis} is not declared for its role"),
-            Self::UnreferencedDeclaredGroup { axis, group } => write!(f, "declared group {group} on {axis} has no scenario"),
-            Self::InsufficientIndependentUnits { role, actual, minimum } => write!(f, "{role} has {actual} independent units; minimum is {minimum}"),
+            Self::GroupRoleOverlap { axis, group } => {
+                write!(f, "group {group} overlaps split roles on {axis}")
+            }
+            Self::GroupRoleMismatch {
+                scenario,
+                axis,
+                role,
+            } => write!(
+                f,
+                "scenario {scenario} assigns {axis} to a role other than {role}"
+            ),
+            Self::MissingAxisMembership { scenario, axis } => {
+                write!(f, "scenario {scenario} has no membership for {axis}")
+            }
+            Self::MissingDeclaredGroup { axis, group } => write!(
+                f,
+                "scenario group {group} on {axis} is not declared for its role"
+            ),
+            Self::UnreferencedDeclaredGroup { axis, group } => {
+                write!(f, "declared group {group} on {axis} has no scenario")
+            }
+            Self::InsufficientIndependentUnits {
+                role,
+                actual,
+                minimum,
+            } => write!(
+                f,
+                "{role} has {actual} independent units; minimum is {minimum}"
+            ),
             Self::CanonicalizationFailure => write!(f, "canonical JSON serialization failed"),
         }
     }
@@ -178,11 +226,29 @@ impl SplitAxis {
     }
 
     fn all_groups(&self) -> impl Iterator<Item = (&str, SplitRole)> {
-        self.train_group_ids.iter().map(|id| (id.as_str(), SplitRole::Train))
-            .chain(self.validation_group_ids.iter().map(|id| (id.as_str(), SplitRole::Validation)))
-            .chain(self.confirmatory_test_group_ids.iter().map(|id| (id.as_str(), SplitRole::ConfirmatoryTest)))
-            .chain(self.negative_control_group_ids.iter().map(|id| (id.as_str(), SplitRole::NegativeControl)))
-            .chain(self.positive_control_group_ids.iter().map(|id| (id.as_str(), SplitRole::PositiveControl)))
+        self.train_group_ids
+            .iter()
+            .map(|id| (id.as_str(), SplitRole::Train))
+            .chain(
+                self.validation_group_ids
+                    .iter()
+                    .map(|id| (id.as_str(), SplitRole::Validation)),
+            )
+            .chain(
+                self.confirmatory_test_group_ids
+                    .iter()
+                    .map(|id| (id.as_str(), SplitRole::ConfirmatoryTest)),
+            )
+            .chain(
+                self.negative_control_group_ids
+                    .iter()
+                    .map(|id| (id.as_str(), SplitRole::NegativeControl)),
+            )
+            .chain(
+                self.positive_control_group_ids
+                    .iter()
+                    .map(|id| (id.as_str(), SplitRole::PositiveControl)),
+            )
     }
 }
 
