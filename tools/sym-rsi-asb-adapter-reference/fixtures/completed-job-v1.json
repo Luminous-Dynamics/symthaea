@@ -1,0 +1,23 @@
+{
+  "ok": true,
+  "replayed": false,
+  "job": {
+    "job_id": "job-0001",
+    "stage": 1,
+    "status": "completed",
+    "designs": [
+      "d-01",
+      "d-02"
+    ],
+    "results": [
+      {
+        "design_id": "d-01",
+        "activity": 0.7
+      },
+      {
+        "design_id": "d-02",
+        "activity": 0.4
+      }
+    ]
+  }
+}

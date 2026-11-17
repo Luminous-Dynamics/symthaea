@@ -1,0 +1,47 @@
+{
+  "ok": true,
+  "api_version": 1,
+  "campaign_id": "fixture/catalog-v1",
+  "source": "fixture-source",
+  "objective": "Select a bounded batch and rank unmeasured designs.",
+  "design_id_field": "design_id",
+  "measurements": [
+    {
+      "name": "activity",
+      "description": "Synthetic fixture measurement",
+      "higher_is_better": true
+    }
+  ],
+  "stages": [
+    {
+      "stage": 1,
+      "label": "Round one",
+      "batch_size": 2,
+      "catalog_size": 3
+    },
+    {
+      "stage": 2,
+      "label": "Round two",
+      "batch_size": 2,
+      "catalog_size": 3
+    }
+  ],
+  "budget": {
+    "unit": "measured designs",
+    "total": 4
+  },
+  "deliverable": {
+    "kind": "js-predictor",
+    "format_version": 1,
+    "max_bytes": 4096,
+    "input_field": "sequence",
+    "description": "Synthetic fixture predictor",
+    "requires": "all stages completed"
+  },
+  "design_space": {
+    "kind": "catalog",
+    "shared_pool": true,
+    "description": "One shared synthetic fixture pool",
+    "rules": "Each design may be measured once."
+  }
+}
