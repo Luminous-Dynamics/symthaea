@@ -1117,13 +1117,13 @@ pub fn bounded_pair_identifiability(
         if !probe.admissible {
             continue;
         }
-        let allowed_a: BTreeSet<u32> = problem.allowed_outcomes_by_hypothesis
-            [hypothesis_a][probe_index]
+        let allowed_a: BTreeSet<u32> = problem.allowed_outcomes_by_hypothesis[hypothesis_a]
+            [probe_index]
             .iter()
             .copied()
             .collect();
-        let allowed_b: BTreeSet<u32> = problem.allowed_outcomes_by_hypothesis
-            [hypothesis_b][probe_index]
+        let allowed_b: BTreeSet<u32> = problem.allowed_outcomes_by_hypothesis[hypothesis_b]
+            [probe_index]
             .iter()
             .copied()
             .collect();
@@ -1170,18 +1170,17 @@ pub fn persistent_pair_identifiability(
             if !probe.admissible {
                 continue;
             }
-            let outcome_a = problem.predicted_outcomes_by_hypothesis[hypothesis_a]
-                [probe_index][state_index];
-            let outcome_b = problem.predicted_outcomes_by_hypothesis[hypothesis_b]
-                [probe_index][state_index];
+            let outcome_a =
+                problem.predicted_outcomes_by_hypothesis[hypothesis_a][probe_index][state_index];
+            let outcome_b =
+                problem.predicted_outcomes_by_hypothesis[hypothesis_b][probe_index][state_index];
             common_signature.push((probe.probe_id.clone(), outcome_a));
             if outcome_a != outcome_b {
                 distinguishing.push((probe, outcome_a, outcome_b));
             }
         }
         distinguishing.sort_by(|left, right| {
-            (left.0.cost, left.0.probe_id.as_str())
-                .cmp(&(right.0.cost, right.0.probe_id.as_str()))
+            (left.0.cost, left.0.probe_id.as_str()).cmp(&(right.0.cost, right.0.probe_id.as_str()))
         });
         if let Some((probe, outcome_a, outcome_b)) = distinguishing.first() {
             state_witnesses.push(PersistentStateWitnessV1 {
