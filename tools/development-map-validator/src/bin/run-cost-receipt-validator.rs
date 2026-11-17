@@ -343,7 +343,7 @@ fn evaluate(raw:&str)->Result<Value,String>{
   "run_count":metrics.len(),
   "complete_cost_run_count":complete_cost.len(),
   "complete_wall_run_count":complete_wall.len(),
-  "censored_or_incomplete_run_count":metrics.len().saturating_sub(complete_cost.len()),
+  "censored_or_incomplete_run_count":metrics.iter().filter(|m|!m.complete_cost||!m.complete_wall).count(),
   "queued_attempt_count":queued,
   "unknown_execution_count":unknown,
   "retry_count":retries,
