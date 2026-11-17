@@ -105,3 +105,47 @@ Not yet implemented:
 - value-of-information experiment selection.
 
 The current 10,000-draw pathway fixture remains synthetic software-test input. The real NH3, methane and biogas-to-hydrogen source groups remain `NOT_YET_MATCHED` and correctly abstain. Do not interpret the synthetic baselines or probability intervals as a physical route ranking.
+
+
+## v0.2 experiment-selection tranche — expected value of sample information
+
+The isolated harness now includes `xtask/src/plasma_experiment_voi.rs`, a deterministic finite-state EVSI evaluator. It answers a narrower question than the pathway selector:
+
+> Given a decision with explicit prior state probabilities and action losses, which proposed measurement is expected to reduce decision loss enough to justify its declared cost and fit within a fixed budget?
+
+For each measurement outcome, the evaluator computes:
+- outcome probability from the prior and declared likelihoods;
+- posterior state probabilities by Bayes' rule;
+- the minimum posterior expected loss across the available actions;
+- expected post-measurement loss across all outcomes;
+- expected value of sample information (EVSI) = prior optimal expected loss − expected post-measurement optimal expected loss;
+- net expected value = EVSI − measurement cost.
+
+It selects the affordable measurement with the highest positive net expected value. If none is affordable and positive, it returns `ABSTAIN_NO_POSITIVE_NET_EVSI`.
+
+### Synthetic fixture
+
+`xtask/plasma-audit-harness/fixtures/plasma-voi-synthetic-v0.json` has two equally likely synthetic states (plasma route better / incumbent better), two actions and two candidate measurements. The high-information measurement has 90% state-conditional discrimination and an invented cost of 0.05 synthetic decision-loss units. Hand calculation:
+- prior optimal expected loss = 0.50;
+- expected posterior optimal loss = 0.10;
+- EVSI = 0.40;
+- net EVSI after cost = 0.35.
+
+A lower-information measurement has a net-negative value and is not selected. These numbers are deliberately invented to verify the algorithm; they are not estimates of laboratory information, route probabilities or real experimental cost.
+
+### Refusal and input requirements
+
+The evaluator refuses:
+- non-synthetic evidence classes;
+- unnormalized prior probabilities;
+- duplicate state/action/measurement/outcome identities;
+- action loss vectors with missing state entries or negative/non-finite losses;
+- outcome likelihoods outside [0,1], with missing state entries, or that do not sum to one per state;
+- decision-loss and measurement-cost units that differ;
+- invalid budget or measurement costs.
+
+### Remaining scientific limitations
+
+This is an **EVSI arithmetic prototype**, not a calibrated experiment planner. Real use requires independently evidenced priors, likelihoods, measurement repeatability/sensitivity, correlations, experiment cost, sample-selection effects and decision-loss units. The finite-state likelihood table must be trained/validated on separate data; it cannot be inferred from the same synthetic fixture. It does not yet compare EVSI selection against random, space-filling, uncertainty-only, fixed-ratio or expected-value-of-perfect-information baselines, and it does not schedule or authorize a physical experiment.
+
+The existing v0.2 Monte Carlo pathway selector remains separate: it evaluates pathway uncertainty and Pareto outcomes; this EVSI module evaluates the value of a proposed observation. Both remain synthetic-only until source-resolved empirical inputs and sealed validation are available.
