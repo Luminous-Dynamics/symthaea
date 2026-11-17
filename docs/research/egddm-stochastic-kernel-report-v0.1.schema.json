@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-stochastic-kernel-report-v0.1.schema.json",
+  "title": "EGDDM D6.17.2.2 stochastic joint-kernel validation report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "adjudication_status",
+    "decision_cutoff",
+    "hypothesis_count",
+    "option_count",
+    "factor_count",
+    "joint_row_count",
+    "joint_kernel_count",
+    "marginal_check_count",
+    "pairwise_dependence_check_count",
+    "marginal_checks",
+    "pairwise_dependence",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adjudication_status": {
+      "const": "synthetic_known_answer_stochastic_joint_kernel_validation"
+    },
+    "decision_cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "hypothesis_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 64
+    },
+    "option_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 6
+    },
+    "factor_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 6
+    },
+    "joint_row_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "joint_kernel_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "marginal_check_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "pairwise_dependence_check_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "marginal_checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hypothesis_id",
+          "option_id",
+          "factor_id",
+          "outcome",
+          "joint_kernel_marginal_lower_bps",
+          "joint_kernel_marginal_upper_bps",
+          "nominal_probability_bps",
+          "registered_channel_lower_bps",
+          "registered_channel_upper_bps",
+          "registered_channel_nominal_bps"
+        ],
+        "properties": {
+          "hypothesis_id": {
+            "type": "string"
+          },
+          "option_id": {
+            "type": "string"
+          },
+          "factor_id": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "joint_kernel_marginal_lower_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "joint_kernel_marginal_upper_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "nominal_probability_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "registered_channel_lower_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "registered_channel_upper_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "registered_channel_nominal_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        }
+      }
+    },
+    "pairwise_dependence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hypothesis_id",
+          "left_option_id",
+          "left_outcome",
+          "right_option_id",
+          "right_outcome",
+          "joint_lower_bps",
+          "joint_upper_bps",
+          "joint_nominal_bps",
+          "frechet_lower_bps",
+          "frechet_upper_bps",
+          "frechet_width_bps",
+          "joint_width_bps"
+        ],
+        "properties": {
+          "hypothesis_id": {
+            "type": "string"
+          },
+          "left_option_id": {
+            "type": "string"
+          },
+          "left_outcome": {
+            "type": "string"
+          },
+          "right_option_id": {
+            "type": "string"
+          },
+          "right_outcome": {
+            "type": "string"
+          },
+          "joint_lower_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "joint_upper_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "joint_nominal_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "frechet_lower_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "frechet_upper_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "frechet_width_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "joint_width_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

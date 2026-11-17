@@ -1,0 +1,121 @@
+{
+  "scenario_id": "d6-17-2-2-common-cause-joint-kernel-v0.1",
+  "adjudication_status": "synthetic_known_answer_stochastic_joint_kernel_validation",
+  "decision_cutoff": "2026-11-17T10:00:00Z",
+  "hypothesis_count": 1,
+  "option_count": 2,
+  "factor_count": 2,
+  "joint_row_count": 4,
+  "joint_kernel_count": 1,
+  "marginal_check_count": 4,
+  "pairwise_dependence_check_count": 4,
+  "marginal_checks": [
+    {
+      "hypothesis_id": "system",
+      "option_id": "gate-a",
+      "factor_id": "gate-a-factor",
+      "outcome": "fail",
+      "joint_kernel_marginal_lower_bps": 4000,
+      "joint_kernel_marginal_upper_bps": 6000,
+      "nominal_probability_bps": 5000,
+      "registered_channel_lower_bps": 4000,
+      "registered_channel_upper_bps": 6000,
+      "registered_channel_nominal_bps": 5000
+    },
+    {
+      "hypothesis_id": "system",
+      "option_id": "gate-a",
+      "factor_id": "gate-a-factor",
+      "outcome": "pass",
+      "joint_kernel_marginal_lower_bps": 4000,
+      "joint_kernel_marginal_upper_bps": 6000,
+      "nominal_probability_bps": 5000,
+      "registered_channel_lower_bps": 4000,
+      "registered_channel_upper_bps": 6000,
+      "registered_channel_nominal_bps": 5000
+    },
+    {
+      "hypothesis_id": "system",
+      "option_id": "gate-b",
+      "factor_id": "gate-b-factor",
+      "outcome": "fail",
+      "joint_kernel_marginal_lower_bps": 4000,
+      "joint_kernel_marginal_upper_bps": 6000,
+      "nominal_probability_bps": 5000,
+      "registered_channel_lower_bps": 4000,
+      "registered_channel_upper_bps": 6000,
+      "registered_channel_nominal_bps": 5000
+    },
+    {
+      "hypothesis_id": "system",
+      "option_id": "gate-b",
+      "factor_id": "gate-b-factor",
+      "outcome": "pass",
+      "joint_kernel_marginal_lower_bps": 4000,
+      "joint_kernel_marginal_upper_bps": 6000,
+      "nominal_probability_bps": 5000,
+      "registered_channel_lower_bps": 4000,
+      "registered_channel_upper_bps": 6000,
+      "registered_channel_nominal_bps": 5000
+    }
+  ],
+  "pairwise_dependence": [
+    {
+      "hypothesis_id": "system",
+      "left_option_id": "gate-a",
+      "left_outcome": "fail",
+      "right_option_id": "gate-b",
+      "right_outcome": "fail",
+      "joint_lower_bps": 4000,
+      "joint_upper_bps": 5000,
+      "joint_nominal_bps": 4500,
+      "frechet_lower_bps": 0,
+      "frechet_upper_bps": 6000,
+      "frechet_width_bps": 6000,
+      "joint_width_bps": 1000
+    },
+    {
+      "hypothesis_id": "system",
+      "left_option_id": "gate-a",
+      "left_outcome": "fail",
+      "right_option_id": "gate-b",
+      "right_outcome": "pass",
+      "joint_lower_bps": 0,
+      "joint_upper_bps": 1000,
+      "joint_nominal_bps": 500,
+      "frechet_lower_bps": 0,
+      "frechet_upper_bps": 6000,
+      "frechet_width_bps": 6000,
+      "joint_width_bps": 1000
+    },
+    {
+      "hypothesis_id": "system",
+      "left_option_id": "gate-a",
+      "left_outcome": "pass",
+      "right_option_id": "gate-b",
+      "right_outcome": "fail",
+      "joint_lower_bps": 0,
+      "joint_upper_bps": 1000,
+      "joint_nominal_bps": 500,
+      "frechet_lower_bps": 0,
+      "frechet_upper_bps": 6000,
+      "frechet_width_bps": 6000,
+      "joint_width_bps": 1000
+    },
+    {
+      "hypothesis_id": "system",
+      "left_option_id": "gate-a",
+      "left_outcome": "pass",
+      "right_option_id": "gate-b",
+      "right_outcome": "pass",
+      "joint_lower_bps": 4000,
+      "joint_upper_bps": 5000,
+      "joint_nominal_bps": 4500,
+      "frechet_lower_bps": 0,
+      "frechet_upper_bps": 6000,
+      "frechet_width_bps": 6000,
+      "joint_width_bps": 1000
+    }
+  ],
+  "claim_ceiling": "Validates evaluator-owned bounded-simplex distributions over complete joint outcome vectors and verifies conservative marginal consistency with registered D6.17 channel likelihood intervals. It does not establish calibration of those kernels against real observations, prove model completeness, estimate transition drift, solve an adaptive policy, authorize actions, or make a production reliability claim."
+}

@@ -1,0 +1,118 @@
+{
+  "candidate_view": {
+    "scenario_id": "d6-17-2-2-common-cause-joint-kernel-v0.1",
+    "decision_cutoff": "2026-11-17T10:00:00Z",
+    "options": [
+      {
+        "option_id": "gate-a",
+        "factor_id": "gate-a-factor"
+      },
+      {
+        "option_id": "gate-b",
+        "factor_id": "gate-b-factor"
+      }
+    ],
+    "factors": [
+      {
+        "factor_id": "gate-a-factor",
+        "dependence_group": "shared-controller",
+        "source_ids": [
+          "gate-a-sensor"
+        ],
+        "calibration_ref": "gate-a-cal",
+        "likelihoods": [
+          {
+            "hypothesis_id": "system",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 4000,
+                "upper_likelihood_bps": 6000,
+                "nominal_likelihood_bps": 5000
+              },
+              "fail": {
+                "lower_likelihood_bps": 4000,
+                "upper_likelihood_bps": 6000,
+                "nominal_likelihood_bps": 5000
+              }
+            }
+          }
+        ]
+      },
+      {
+        "factor_id": "gate-b-factor",
+        "dependence_group": "shared-controller",
+        "source_ids": [
+          "gate-b-sensor"
+        ],
+        "calibration_ref": "gate-b-cal",
+        "likelihoods": [
+          {
+            "hypothesis_id": "system",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 4000,
+                "upper_likelihood_bps": 6000,
+                "nominal_likelihood_bps": 5000
+              },
+              "fail": {
+                "lower_likelihood_bps": 4000,
+                "upper_likelihood_bps": 6000,
+                "nominal_likelihood_bps": 5000
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "oracle": {
+    "world_kernels": [
+      {
+        "hypothesis_id": "system",
+        "kernel_id": "common-cause-two-gate-v1",
+        "authority": "independent-stochastic-evaluation-lab",
+        "valid_from": "2026-11-01T00:00:00Z",
+        "valid_until": "2026-12-01T00:00:00Z",
+        "revoked_at": null,
+        "joint_outcomes": [
+          {
+            "outcomes": {
+              "gate-a": "pass",
+              "gate-b": "pass"
+            },
+            "lower_probability_bps": 4000,
+            "upper_probability_bps": 5000,
+            "nominal_probability_bps": 4500
+          },
+          {
+            "outcomes": {
+              "gate-a": "pass",
+              "gate-b": "fail"
+            },
+            "lower_probability_bps": 0,
+            "upper_probability_bps": 1000,
+            "nominal_probability_bps": 500
+          },
+          {
+            "outcomes": {
+              "gate-a": "fail",
+              "gate-b": "pass"
+            },
+            "lower_probability_bps": 0,
+            "upper_probability_bps": 1000,
+            "nominal_probability_bps": 500
+          },
+          {
+            "outcomes": {
+              "gate-a": "fail",
+              "gate-b": "fail"
+            },
+            "lower_probability_bps": 4000,
+            "upper_probability_bps": 5000,
+            "nominal_probability_bps": 4500
+          }
+        ]
+      }
+    ]
+  }
+}
