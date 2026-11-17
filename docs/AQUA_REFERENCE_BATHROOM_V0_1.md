@@ -148,3 +148,71 @@ Core function must remain locally available during internet/cloud failure. A los
 - G6: human-factors validation and local approvals complete before occupied pilot.
 
 This document does not authorize a construction drawing, product manufacture, procurement, installation, occupied use or regulatory claim.
+
+
+## 10. Room-mode composition and wet-room envelope v0.2
+
+Cross-cutting child: [AQUA-WETROOM-ENVELOPE-001 #12702](https://github.com/Luminous-Dynamics/symthaea/issues/12702).
+
+The reference bathroom is a modular *suite*, not an assumption that every fixture can occupy one undifferentiated wet room. Compose the following distinct environments only when the project profile needs them:
+
+| Environment | Primary physical concern | Design/qualification owner |
+|---|---|---|
+| Dry entry / changing / recovery | accessible circulation, slip transfer and moisture carryover | Aqua + applicable accessibility / building review |
+| Shower / wet room | transient spray/aerosols, drainage, local extraction, waterproofing | Aqua product contract + qualified HVAC/plumbing |
+| Bath / basin / bidet | task ergonomics, splash, scald, backflow and cleanability | Aqua fixture profiles + qualified plumbing |
+| Dry sauna | heater sizing, radiant/air stratification, ventilation, clearances and egress | AquaThermal + heater/room specialist |
+| Steam / hammam | near-saturated moisture, vapor migration, waterproofing, condensate, generator scale and drainage | AquaThermal + qualified envelope/HVAC specialist |
+| Cold plunge / whirlpool | immersion-water treatment, biofilm, aerosol, temperature and user egress | separate Mycelix water assessment + aquatic-health authority |
+| Pool / natatorium | evaporation, high dew point, negative pressure, air distribution and pool chemistry | Sol-Atlas #765/#766/#770/#772 + qualified natatorium engineer |
+
+ASHRAE natatorium guidance says pool spaces require a holistic envelope/HVAC approach and that negative pressure, humidity, ventilation, air distribution, evaporation, chemistry and condensation must be addressed together. Its natatorium pressure advice is not a universal setpoint for a shower, sauna or steam room. Apply the method only to the relevant pool-room class and obtain qualified local design. https://handbook.ashrae.org/Handbooks/A23/IP/A23_Ch06/A23_Ch06_ip.aspx
+
+### Mode contract
+
+Every active mode declares its active zones, allowed simultaneous fixtures, water/thermal/electric load profile, room moisture load, ventilation/exhaust state, drainage route, access path, required owner evidence and return-to-ready condition.
+
+| Mode | Active modules | Required room response | Exit / recovery |
+|---|---|---|---|
+| Quick hygiene | basin + optional short direct-flow rinse | local wet-zone extraction; preserve dry circulation path | drain clear; wet surfaces recover within declared operating envelope |
+| Full shower | shower / handheld | transient aerosol and humidity capture; count first-use transient as well as steady state | drain, clean/purge as applicable, humidity dry-out |
+| Bath | tub + rinse basin | account for fill heat, drain heat and splash/moisture | drain and inspect; no hidden standing water |
+| Seated / assisted bathing | selected accessible fixture modules | transfer clearances, reachable controls and assistant space retained | safe egress and user control confirmed |
+| Sauna | dry sauna only | dedicated heater/ventilation profile and independent high-limit | local shutoff; post-session ventilation/cool-down |
+| Steam / hammam | sealed steam zone only | vapor envelope, condensate drainage and dedicated ventilation profile | dry-out / purge and envelope inspection |
+| Plunge / whirlpool | separate immersion water class | independently qualified treatment, circulation and aerosol controls | sanitation/monitoring and maintenance state current |
+| Pool occupancy | pool/natatorium | qualified humidity, pressure, air distribution and chemistry profile | setback and moisture recovery |
+| Cleaning / service | selected isolated zone | local lockout, drainage, access and chemical compatibility | independent inspection/requalification before release |
+
+### Heat cascade and utility boundaries
+
+Evaluate only indirect, separately metered exchanges:
+1. Shower/bath drain heat exchanger → incoming potable water preheat.
+2. Dehumidifier/heat-pump condenser recovery → closed thermal storage or a separately isolated preheat stage.
+3. Thermal storage → scheduled hot-water or space/sauna demand where temperature grade and availability support it.
+4. Pool condenser heat recovery → pool load/headroom only through Sol-Atlas's finite heat/water budget and a separate closed heat-exchange boundary.
+
+Do not create a common fluid path between drain, potable, shower recirculation, greywater, immersion or pool water. Credit useful recovery only at the receiving boundary after parasitic energy, temperature mismatch, pressure loss, fouling and storage/distribution loss.
+
+### Exposure-aware ventilation
+
+The 2026 shower-aerosol modelling study reports that hot-shower aerosol concentrations peaked in the first two minutes in the studied conditions and that ventilation effects differed between hot and cold showers. This is a reason to measure event transients and source-capture effectiveness, not a universal exposure threshold or a guarantee that ventilation alone makes recirculated water safe. https://doi.org/10.1016/j.buildenv.2025.112825
+
+The 2026 opportunistic-pathogen review recommends assessing water, biofilms and aerosols across shower hoses, heads and pipes, including Legionella, Mycobacterium and Pseudomonas. A bulk-water sample or clean-looking spray is not a complete exposure assessment. https://doi.org/10.1016/j.jes.2026.02.034
+
+### Accessibility and usability
+
+ISO 21542:2021 is the published international reference for accessibility/usability in the built environment. Its residential-unit recommendations include turning/transfer space, reinforcement for future supports, reachable shower controls, step-free shower access and slip-resistant surfaces. Confirm the current controlled standard and local South African requirements for every project; this architecture is not an accessibility certificate. https://www.iso.org/standard/71860.html
+
+### Commissioning evidence
+
+The room is not released because each fixture works independently. Commission the coupled room modes with:
+- pressure/airflow direction and ventilation state verified for each mode;
+- surface temperature/dew point and condensation inspection across declared weather/design conditions;
+- flow, temperature, electricity, drainage and useful heat metering;
+- wet/dry circulation and accessible egress checks;
+- leak, fan, blocked drain, power-loss and network-loss fault injection;
+- post-use drying, cleaning and service access;
+- exact owner receipts and configuration hashes.
+
+No occupied prototype or construction authorization follows from this conceptual update.
