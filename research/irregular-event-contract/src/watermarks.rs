@@ -1043,7 +1043,7 @@ mod tests {
     #[test]
     fn completeness_report_binds_the_exact_progress_record_and_policy() {
         let mut ledger = SourceWatermarkLedger::default();
-        let revision = progress(41, 1, 3, 7, 25, 100, false);
+        let revision = progress(41, 1, 1, 1, 25, 100, false);
         ledger.append(revision).unwrap();
 
         let report = ledger.completeness(1, &[source(1)], 0, 100, 25).unwrap();
@@ -1060,7 +1060,7 @@ mod tests {
     fn arrival_without_visible_progress_is_unqualified_not_on_time() {
         let mut ledger = SourceWatermarkLedger::default();
         assert_eq!(
-            ledger.record_event_arrival(event(1, 1, 50, 20), 20),
+            ledger.record_event_arrival(event(1, 1, 10, 20), 20),
             Ok(EventArrivalClassification::NoPriorProgress)
         );
         assert!(ledger.late_breaches().is_empty());
@@ -1071,7 +1071,7 @@ mod tests {
         let mut ledger = SourceWatermarkLedger::default();
         ledger.append(progress(1, 1, 1, 1, 10, 50, false)).unwrap();
         assert_eq!(
-            ledger.record_event_arrival(event(2, 1, 50, 20), 20),
+            ledger.record_event_arrival(event(2, 1, 20, 20), 20),
             Ok(EventArrivalClassification::OnTime)
         );
     }
@@ -1079,7 +1079,7 @@ mod tests {
     #[test]
     fn late_breach_binds_the_exact_policy_revision_that_qualified_it() {
         let mut ledger = SourceWatermarkLedger::default();
-        let mut revision = progress(41, 1, 3, 7, 10, 100, false);
+        let mut revision = progress(41, 1, 1, 1, 10, 100, false);
         revision.policy_sha256 = [9; 32];
         ledger.append(revision).unwrap();
         let classification = ledger
@@ -1111,20 +1111,20 @@ mod tests {
             ])
             .unwrap();
         ledger
-            .record_event_arrival(event(1, 1, 50, 20), 20)
+            .record_event_arrival(event(1, 1, 10, 20), 20)
             .unwrap();
         ledger
-            .record_event_arrival(event(2, 2, 60, 30), 30)
+            .record_event_arrival(event(2, 2, 20, 30), 30)
             .unwrap();
         ledger
-            .record_event_arrival(event(3, 1, 150, 40), 40)
+            .record_event_arrival(event(3, 1, 150, 150), 150)
             .unwrap();
 
         let indexed = ledger
-            .completeness(1, &[source(1), source(2)], 0, 100, 40)
+            .completeness(1, &[source(1), source(2)], 0, 100, 150)
             .unwrap();
         let scanned = ledger
-            .completeness_linear_scan_reference(1, &[source(1), source(2)], 0, 100, 40)
+            .completeness_linear_scan_reference(1, &[source(1), source(2)], 0, 100, 150)
             .unwrap();
 
         assert_eq!(indexed.interval_start_us, scanned.interval_start_us);
@@ -1153,14 +1153,14 @@ mod tests {
             ])
             .unwrap();
         ledger
-            .record_event_arrival(event(1, 1, 50, 20), 20)
+            .record_event_arrival(event(1, 1, 50, 50), 50)
             .unwrap();
 
         let indexed = ledger
-            .completeness(1, &[source(1), source(2)], 0, 100, 20)
+            .completeness(1, &[source(1), source(2)], 0, 100, 50)
             .unwrap();
         let audited = ledger
-            .completeness_verified(1, &[source(1), source(2)], 0, 100, 20)
+            .completeness_verified(1, &[source(1), source(2)], 0, 100, 50)
             .unwrap();
         assert_eq!(indexed, *audited.report());
         assert_eq!(indexed.verdict, CompletenessVerdict::Contested);
@@ -1175,18 +1175,18 @@ mod tests {
         let mut ledger = SourceWatermarkLedger::default();
         ledger
             .append_batch([
-                progress(1, 1, 1, 1, 10, 100, false),
+                progress(1, 1, 1, 1, 10, 300, false),
                 progress(2, 2, 1, 1, 10, 100, false),
             ])
             .unwrap();
         ledger
-            .record_event_arrival(event(1, 2, 50, 20), 20)
+            .record_event_arrival(event(1, 2, 50, 50), 50)
             .unwrap();
         ledger
-            .record_event_arrival(event(2, 1, 200, 30), 30)
+            .record_event_arrival(event(2, 1, 200, 200), 200)
             .unwrap();
 
-        let report = ledger.completeness(1, &[source(1)], 0, 100, 30).unwrap();
+        let report = ledger.completeness(1, &[source(1)], 0, 100, 200).unwrap();
         assert_eq!(report.verdict, CompletenessVerdict::Complete);
         assert!(report.late_breaches.is_empty());
         assert_eq!(
@@ -1212,8 +1212,8 @@ mod tests {
         for index in 0..48_u64 {
             let modality_id = (index % 3 + 1) as u32;
             let event_time_us = ((index * 37 + 11) % 180) as i64;
-            let recorded_at_us = 20 + index as i64;
-            let record = event(index + 10, modality_id, event_time_us, 20);
+            let recorded_at_us = 200 + index as i64;
+            let record = event(index + 10, modality_id, event_time_us, event_time_us);
             ledger
                 .record_event_arrival(record, recorded_at_us)
                 .expect("unique arrival with availability no later than receipt");
@@ -1228,7 +1228,7 @@ mod tests {
             vec![source(1), source(2), source(3)],
         ];
         let intervals = [(0, 40), (40, 80), (80, 120), (120, 180), (0, 180)];
-        let knowledge_times = [10, 20, 28, 40, 55, 67];
+        let knowledge_times = [10, 20, 200, 220, 235, 247, 300];
 
         for required in &source_sets {
             for (start, end) in intervals {
@@ -1261,7 +1261,7 @@ mod tests {
             .record_event_arrival(event(2, 1, 20, 20), 30)
             .unwrap();
         ledger
-            .record_event_arrival(event(3, 1, 30, 20), 40)
+            .record_event_arrival(event(3, 1, 30, 30), 40)
             .unwrap();
 
         let before_first = ledger.completeness(1, &[source(1)], 0, 100, 15).unwrap();
@@ -1327,7 +1327,7 @@ mod tests {
         ledger.append(progress(2, 1, 1, 2, 30, 100, false)).unwrap();
         assert_eq!(
             ledger
-                .completeness(1, &[source(1)], 0, 100, 20)
+                .completeness(1, &[source(1)], 0, 100, 50)
                 .unwrap()
                 .verdict,
             CompletenessVerdict::Incomplete
@@ -1345,16 +1345,16 @@ mod tests {
     fn event_below_prior_exclusive_watermark_is_preserved_as_breach() {
         let mut ledger = SourceWatermarkLedger::default();
         ledger.append(progress(1, 1, 1, 1, 10, 100, false)).unwrap();
-        let event = event(1, 1, 50, 20);
+        let event = event(1, 1, 50, 50);
         assert_eq!(
-            ledger.record_event_arrival(event, 20),
+            ledger.record_event_arrival(event, 50),
             Ok(EventArrivalClassification::Late(
                 LateEventKind::BelowExclusiveWatermark {
                     progress: SourceProgressEvidence::from(progress(1, 1, 1, 1, 10, 100, false)),
                 }
             ))
         );
-        let report = ledger.completeness(1, &[source(1)], 0, 100, 20).unwrap();
+        let report = ledger.completeness(1, &[source(1)], 0, 100, 50).unwrap();
         assert_eq!(report.verdict, CompletenessVerdict::Contested);
         assert_eq!(report.late_breaches.len(), 1);
     }
@@ -1364,7 +1364,7 @@ mod tests {
         let mut ledger = SourceWatermarkLedger::default();
         ledger.append(progress(1, 1, 1, 1, 10, 100, false)).unwrap();
         assert_eq!(
-            ledger.record_event_arrival(event(1, 1, 100, 20), 20),
+            ledger.record_event_arrival(event(1, 1, 100, 100), 100),
             Ok(EventArrivalClassification::OnTime)
         );
         assert!(ledger.late_breaches().is_empty());
@@ -1471,7 +1471,7 @@ mod tests {
     #[test]
     fn unqualified_arrival_is_single_use_and_cannot_be_reclassified_after_watermark_advance() {
         let mut ledger = SourceWatermarkLedger::default();
-        let original = event(1, 1, 50, 20);
+        let original = event(1, 1, 10, 20);
         assert_eq!(
             ledger.record_event_arrival(original, 20),
             Ok(EventArrivalClassification::NoPriorProgress)
@@ -1490,11 +1490,11 @@ mod tests {
         let mut ledger = SourceWatermarkLedger::default();
         ledger.append(progress(1, 1, 1, 1, 10, 100, false)).unwrap();
         ledger
-            .record_event_arrival(event(1, 1, 50, 20), 20)
+            .record_event_arrival(event(1, 1, 50, 50), 50)
             .unwrap();
         assert_eq!(
             ledger
-                .completeness(1, &[source(1)], 0, 100, 19)
+                .completeness(1, &[source(1)], 0, 100, 49)
                 .unwrap()
                 .verdict,
             CompletenessVerdict::Complete
@@ -1511,7 +1511,7 @@ mod tests {
     #[test]
     fn progress_cannot_be_backdated_behind_previously_recorded_event_arrival() {
         let mut ledger = SourceWatermarkLedger::default();
-        let observed = event(1, 1, 50, 20);
+        let observed = event(1, 1, 10, 20);
         assert_eq!(
             ledger.record_event_arrival(observed, 20),
             Ok(EventArrivalClassification::NoPriorProgress)
@@ -1535,8 +1535,8 @@ mod tests {
         let before_digest = ledger.state_sha256();
         let before_revisions = ledger.revisions().to_vec();
 
-        let valid_first = event(2, 1, 50, 20);
-        let mut invalid_second = event(3, 1, 60, 30);
+        let valid_first = event(2, 1, 10, 20);
+        let mut invalid_second = event(3, 1, 20, 30);
         invalid_second.available_at_us = 21;
         assert_eq!(
             ledger.record_event_arrival_batch([valid_first, invalid_second], 20),
@@ -1581,8 +1581,8 @@ mod tests {
         ];
         left.append_batch(revisions).unwrap();
         right.append_batch(revisions).unwrap();
-        left.record_event_arrival(event(1, 1, 50, 20), 20).unwrap();
-        right.record_event_arrival(event(1, 1, 50, 20), 20).unwrap();
+        left.record_event_arrival(event(1, 1, 10, 20), 20).unwrap();
+        right.record_event_arrival(event(1, 1, 10, 20), 20).unwrap();
         assert_eq!(left.state_sha256(), right.state_sha256());
         assert_eq!(left.verify_consistency(), Ok(()));
     }
