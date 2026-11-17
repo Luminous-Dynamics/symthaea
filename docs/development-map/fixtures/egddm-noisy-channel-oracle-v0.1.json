@@ -1,0 +1,1036 @@
+{
+  "actual_hypothesis_id": "safe",
+  "decision_cutoff": "2026-11-17T10:00:00Z",
+  "actions": [
+    {
+      "action_id": "release",
+      "irreversible": true,
+      "hard_gate": true,
+      "max_residual_risk_bps": 0
+    },
+    {
+      "action_id": "bounded-probe",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 700
+    },
+    {
+      "action_id": "inspect-readonly",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 0
+    }
+  ],
+  "hypothesis_bounds": [
+    {
+      "hypothesis_id": "safe",
+      "lower_probability_bps": 5000,
+      "upper_probability_bps": 7000,
+      "nominal_probability_bps": 6000
+    },
+    {
+      "hypothesis_id": "hazard-a",
+      "lower_probability_bps": 500,
+      "upper_probability_bps": 2500,
+      "nominal_probability_bps": 1500
+    },
+    {
+      "hypothesis_id": "hazard-b",
+      "lower_probability_bps": 500,
+      "upper_probability_bps": 2500,
+      "nominal_probability_bps": 1500
+    },
+    {
+      "hypothesis_id": "hazard-ab",
+      "lower_probability_bps": 500,
+      "upper_probability_bps": 3000,
+      "nominal_probability_bps": 1000
+    }
+  ],
+  "options": [
+    {
+      "option_id": "optical-primary",
+      "available_at": "2026-11-17T09:00:00Z",
+      "factor_id": "opt-a-only"
+    },
+    {
+      "option_id": "optical-secondary",
+      "available_at": "2026-11-17T09:00:00Z",
+      "factor_id": "opt-b-only"
+    },
+    {
+      "option_id": "optical-joint",
+      "available_at": "2026-11-17T09:00:00Z",
+      "factor_id": "optical-pair-joint"
+    },
+    {
+      "option_id": "software-test",
+      "available_at": "2026-11-17T09:00:00Z",
+      "factor_id": "software-test"
+    },
+    {
+      "option_id": "runtime-check",
+      "available_at": "2026-11-17T09:00:00Z",
+      "factor_id": "runtime-observer"
+    },
+    {
+      "option_id": "stale-check",
+      "available_at": "2026-11-17T09:00:00Z",
+      "factor_id": "stale-check"
+    },
+    {
+      "option_id": "revoked-check",
+      "available_at": "2026-11-17T09:00:00Z",
+      "factor_id": "revoked-check"
+    },
+    {
+      "option_id": "impossible-check",
+      "available_at": "2026-11-17T09:00:00Z",
+      "factor_id": "impossible-check"
+    },
+    {
+      "option_id": "weak-check",
+      "available_at": "2026-11-17T09:00:00Z",
+      "factor_id": "weak-check"
+    },
+    {
+      "option_id": "drift-check",
+      "available_at": "2026-11-17T09:00:00Z",
+      "factor_id": "drifted-optical"
+    }
+  ],
+  "factors": [
+    {
+      "factor_id": "opt-a-only",
+      "dependence_group": "optical-common-path",
+      "source_ids": [
+        "optical-primary"
+      ],
+      "calibration_ref": "optical-cal",
+      "likelihoods": [
+        {
+          "hypothesis_id": "safe",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 8500,
+              "upper_likelihood_bps": 9800,
+              "nominal_likelihood_bps": 9500
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 200,
+              "upper_likelihood_bps": 1500,
+              "nominal_likelihood_bps": 500
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-a",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 800,
+              "upper_likelihood_bps": 2400,
+              "nominal_likelihood_bps": 1500
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 7600,
+              "upper_likelihood_bps": 9200,
+              "nominal_likelihood_bps": 8500
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-b",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 800,
+              "upper_likelihood_bps": 2400,
+              "nominal_likelihood_bps": 1500
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 7600,
+              "upper_likelihood_bps": 9200,
+              "nominal_likelihood_bps": 8500
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-ab",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 400,
+              "upper_likelihood_bps": 1600,
+              "nominal_likelihood_bps": 800
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 8200,
+              "upper_likelihood_bps": 9600,
+              "nominal_likelihood_bps": 9200
+            }
+          }
+        }
+      ]
+    },
+    {
+      "factor_id": "opt-b-only",
+      "dependence_group": "optical-common-path",
+      "source_ids": [
+        "optical-secondary"
+      ],
+      "calibration_ref": "optical-cal",
+      "likelihoods": [
+        {
+          "hypothesis_id": "safe",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 8400,
+              "upper_likelihood_bps": 9700,
+              "nominal_likelihood_bps": 9400
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 300,
+              "upper_likelihood_bps": 1600,
+              "nominal_likelihood_bps": 600
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-a",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 700,
+              "upper_likelihood_bps": 2300,
+              "nominal_likelihood_bps": 1400
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 7700,
+              "upper_likelihood_bps": 9300,
+              "nominal_likelihood_bps": 8600
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-b",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 700,
+              "upper_likelihood_bps": 2300,
+              "nominal_likelihood_bps": 1400
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 7700,
+              "upper_likelihood_bps": 9300,
+              "nominal_likelihood_bps": 8600
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-ab",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 350,
+              "upper_likelihood_bps": 1500,
+              "nominal_likelihood_bps": 750
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 8300,
+              "upper_likelihood_bps": 9650,
+              "nominal_likelihood_bps": 9250
+            }
+          }
+        }
+      ]
+    },
+    {
+      "factor_id": "optical-pair-joint",
+      "dependence_group": "optical-common-path",
+      "source_ids": [
+        "optical-primary",
+        "optical-secondary"
+      ],
+      "calibration_ref": "optical-cal",
+      "likelihoods": [
+        {
+          "hypothesis_id": "safe",
+          "outcomes": {
+            "clear|clear": {
+              "lower_likelihood_bps": 9000,
+              "upper_likelihood_bps": 9800,
+              "nominal_likelihood_bps": 9500
+            },
+            "clear|cloudy": {
+              "lower_likelihood_bps": 100,
+              "upper_likelihood_bps": 600,
+              "nominal_likelihood_bps": 300
+            },
+            "cloudy|clear": {
+              "lower_likelihood_bps": 100,
+              "upper_likelihood_bps": 600,
+              "nominal_likelihood_bps": 100
+            },
+            "cloudy|cloudy": {
+              "lower_likelihood_bps": 100,
+              "upper_likelihood_bps": 600,
+              "nominal_likelihood_bps": 100
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-a",
+          "outcomes": {
+            "clear|clear": {
+              "lower_likelihood_bps": 500,
+              "upper_likelihood_bps": 1000,
+              "nominal_likelihood_bps": 700
+            },
+            "clear|cloudy": {
+              "lower_likelihood_bps": 2500,
+              "upper_likelihood_bps": 4500,
+              "nominal_likelihood_bps": 3000
+            },
+            "cloudy|clear": {
+              "lower_likelihood_bps": 2500,
+              "upper_likelihood_bps": 4500,
+              "nominal_likelihood_bps": 3000
+            },
+            "cloudy|cloudy": {
+              "lower_likelihood_bps": 2500,
+              "upper_likelihood_bps": 4500,
+              "nominal_likelihood_bps": 3300
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-b",
+          "outcomes": {
+            "clear|clear": {
+              "lower_likelihood_bps": 500,
+              "upper_likelihood_bps": 1000,
+              "nominal_likelihood_bps": 700
+            },
+            "clear|cloudy": {
+              "lower_likelihood_bps": 2500,
+              "upper_likelihood_bps": 4500,
+              "nominal_likelihood_bps": 3000
+            },
+            "cloudy|clear": {
+              "lower_likelihood_bps": 2500,
+              "upper_likelihood_bps": 4500,
+              "nominal_likelihood_bps": 3000
+            },
+            "cloudy|cloudy": {
+              "lower_likelihood_bps": 2500,
+              "upper_likelihood_bps": 4500,
+              "nominal_likelihood_bps": 3300
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-ab",
+          "outcomes": {
+            "clear|clear": {
+              "lower_likelihood_bps": 300,
+              "upper_likelihood_bps": 900,
+              "nominal_likelihood_bps": 500
+            },
+            "clear|cloudy": {
+              "lower_likelihood_bps": 2500,
+              "upper_likelihood_bps": 4500,
+              "nominal_likelihood_bps": 2800
+            },
+            "cloudy|clear": {
+              "lower_likelihood_bps": 2500,
+              "upper_likelihood_bps": 4500,
+              "nominal_likelihood_bps": 3000
+            },
+            "cloudy|cloudy": {
+              "lower_likelihood_bps": 2500,
+              "upper_likelihood_bps": 4500,
+              "nominal_likelihood_bps": 3700
+            }
+          }
+        }
+      ]
+    },
+    {
+      "factor_id": "software-test",
+      "dependence_group": "build-pipeline",
+      "source_ids": [
+        "ci-test-oracle"
+      ],
+      "calibration_ref": "software-cal",
+      "likelihoods": [
+        {
+          "hypothesis_id": "safe",
+          "outcomes": {
+            "pass": {
+              "lower_likelihood_bps": 9000,
+              "upper_likelihood_bps": 9900,
+              "nominal_likelihood_bps": 9800
+            },
+            "fail": {
+              "lower_likelihood_bps": 100,
+              "upper_likelihood_bps": 1000,
+              "nominal_likelihood_bps": 200
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-a",
+          "outcomes": {
+            "pass": {
+              "lower_likelihood_bps": 300,
+              "upper_likelihood_bps": 700,
+              "nominal_likelihood_bps": 500
+            },
+            "fail": {
+              "lower_likelihood_bps": 9300,
+              "upper_likelihood_bps": 9700,
+              "nominal_likelihood_bps": 9500
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-b",
+          "outcomes": {
+            "pass": {
+              "lower_likelihood_bps": 300,
+              "upper_likelihood_bps": 700,
+              "nominal_likelihood_bps": 500
+            },
+            "fail": {
+              "lower_likelihood_bps": 9300,
+              "upper_likelihood_bps": 9700,
+              "nominal_likelihood_bps": 9500
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-ab",
+          "outcomes": {
+            "pass": {
+              "lower_likelihood_bps": 100,
+              "upper_likelihood_bps": 400,
+              "nominal_likelihood_bps": 200
+            },
+            "fail": {
+              "lower_likelihood_bps": 9600,
+              "upper_likelihood_bps": 9900,
+              "nominal_likelihood_bps": 9800
+            }
+          }
+        }
+      ]
+    },
+    {
+      "factor_id": "runtime-observer",
+      "dependence_group": "runtime-host",
+      "source_ids": [
+        "runtime-probe"
+      ],
+      "calibration_ref": "runtime-cal",
+      "likelihoods": [
+        {
+          "hypothesis_id": "safe",
+          "outcomes": {
+            "healthy": {
+              "lower_likelihood_bps": 9000,
+              "upper_likelihood_bps": 9900,
+              "nominal_likelihood_bps": 9700
+            },
+            "degraded": {
+              "lower_likelihood_bps": 100,
+              "upper_likelihood_bps": 1000,
+              "nominal_likelihood_bps": 300
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-a",
+          "outcomes": {
+            "healthy": {
+              "lower_likelihood_bps": 300,
+              "upper_likelihood_bps": 800,
+              "nominal_likelihood_bps": 500
+            },
+            "degraded": {
+              "lower_likelihood_bps": 9200,
+              "upper_likelihood_bps": 9700,
+              "nominal_likelihood_bps": 9500
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-b",
+          "outcomes": {
+            "healthy": {
+              "lower_likelihood_bps": 300,
+              "upper_likelihood_bps": 800,
+              "nominal_likelihood_bps": 500
+            },
+            "degraded": {
+              "lower_likelihood_bps": 9200,
+              "upper_likelihood_bps": 9700,
+              "nominal_likelihood_bps": 9500
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-ab",
+          "outcomes": {
+            "healthy": {
+              "lower_likelihood_bps": 100,
+              "upper_likelihood_bps": 500,
+              "nominal_likelihood_bps": 250
+            },
+            "degraded": {
+              "lower_likelihood_bps": 9500,
+              "upper_likelihood_bps": 9900,
+              "nominal_likelihood_bps": 9750
+            }
+          }
+        }
+      ]
+    },
+    {
+      "factor_id": "stale-check",
+      "dependence_group": "external-stale",
+      "source_ids": [
+        "stale-ci-provider"
+      ],
+      "calibration_ref": "stale-cal",
+      "likelihoods": [
+        {
+          "hypothesis_id": "safe",
+          "outcomes": {
+            "pass": {
+              "lower_likelihood_bps": 9000,
+              "upper_likelihood_bps": 9900,
+              "nominal_likelihood_bps": 9800
+            },
+            "fail": {
+              "lower_likelihood_bps": 100,
+              "upper_likelihood_bps": 1000,
+              "nominal_likelihood_bps": 200
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-a",
+          "outcomes": {
+            "pass": {
+              "lower_likelihood_bps": 300,
+              "upper_likelihood_bps": 700,
+              "nominal_likelihood_bps": 500
+            },
+            "fail": {
+              "lower_likelihood_bps": 9300,
+              "upper_likelihood_bps": 9700,
+              "nominal_likelihood_bps": 9500
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-b",
+          "outcomes": {
+            "pass": {
+              "lower_likelihood_bps": 300,
+              "upper_likelihood_bps": 700,
+              "nominal_likelihood_bps": 500
+            },
+            "fail": {
+              "lower_likelihood_bps": 9300,
+              "upper_likelihood_bps": 9700,
+              "nominal_likelihood_bps": 9500
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-ab",
+          "outcomes": {
+            "pass": {
+              "lower_likelihood_bps": 100,
+              "upper_likelihood_bps": 400,
+              "nominal_likelihood_bps": 200
+            },
+            "fail": {
+              "lower_likelihood_bps": 9600,
+              "upper_likelihood_bps": 9900,
+              "nominal_likelihood_bps": 9800
+            }
+          }
+        }
+      ]
+    },
+    {
+      "factor_id": "revoked-check",
+      "dependence_group": "external-revoked",
+      "source_ids": [
+        "revoked-attestation"
+      ],
+      "calibration_ref": "revoked-cal",
+      "likelihoods": [
+        {
+          "hypothesis_id": "safe",
+          "outcomes": {
+            "pass": {
+              "lower_likelihood_bps": 9000,
+              "upper_likelihood_bps": 9900,
+              "nominal_likelihood_bps": 9800
+            },
+            "fail": {
+              "lower_likelihood_bps": 100,
+              "upper_likelihood_bps": 1000,
+              "nominal_likelihood_bps": 200
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-a",
+          "outcomes": {
+            "pass": {
+              "lower_likelihood_bps": 300,
+              "upper_likelihood_bps": 700,
+              "nominal_likelihood_bps": 500
+            },
+            "fail": {
+              "lower_likelihood_bps": 9300,
+              "upper_likelihood_bps": 9700,
+              "nominal_likelihood_bps": 9500
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-b",
+          "outcomes": {
+            "pass": {
+              "lower_likelihood_bps": 300,
+              "upper_likelihood_bps": 700,
+              "nominal_likelihood_bps": 500
+            },
+            "fail": {
+              "lower_likelihood_bps": 9300,
+              "upper_likelihood_bps": 9700,
+              "nominal_likelihood_bps": 9500
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-ab",
+          "outcomes": {
+            "pass": {
+              "lower_likelihood_bps": 100,
+              "upper_likelihood_bps": 400,
+              "nominal_likelihood_bps": 200
+            },
+            "fail": {
+              "lower_likelihood_bps": 9600,
+              "upper_likelihood_bps": 9900,
+              "nominal_likelihood_bps": 9800
+            }
+          }
+        }
+      ]
+    },
+    {
+      "factor_id": "impossible-check",
+      "dependence_group": "impossible-channel",
+      "source_ids": [
+        "adversarial-emitter"
+      ],
+      "calibration_ref": "impossible-cal",
+      "likelihoods": [
+        {
+          "hypothesis_id": "safe",
+          "outcomes": {
+            "hazard-only": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 0,
+              "nominal_likelihood_bps": 0
+            },
+            "ordinary": {
+              "lower_likelihood_bps": 10000,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 10000
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-a",
+          "outcomes": {
+            "hazard-only": {
+              "lower_likelihood_bps": 9000,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 9500
+            },
+            "ordinary": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 1000,
+              "nominal_likelihood_bps": 500
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-b",
+          "outcomes": {
+            "hazard-only": {
+              "lower_likelihood_bps": 9000,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 9500
+            },
+            "ordinary": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 1000,
+              "nominal_likelihood_bps": 500
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-ab",
+          "outcomes": {
+            "hazard-only": {
+              "lower_likelihood_bps": 9500,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 9800
+            },
+            "ordinary": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 500,
+              "nominal_likelihood_bps": 200
+            }
+          }
+        }
+      ]
+    },
+    {
+      "factor_id": "weak-check",
+      "dependence_group": "weak-channel",
+      "source_ids": [
+        "unqualified-sensor"
+      ],
+      "calibration_ref": "weak-cal",
+      "likelihoods": [
+        {
+          "hypothesis_id": "safe",
+          "outcomes": {
+            "pass": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 5000
+            },
+            "fail": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 5000
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-a",
+          "outcomes": {
+            "pass": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 5000
+            },
+            "fail": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 5000
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-b",
+          "outcomes": {
+            "pass": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 5000
+            },
+            "fail": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 5000
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-ab",
+          "outcomes": {
+            "pass": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 5000
+            },
+            "fail": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 5000
+            }
+          }
+        }
+      ]
+    },
+    {
+      "factor_id": "drifted-optical",
+      "dependence_group": "optical-drifted-path",
+      "source_ids": [
+        "drifted-optical-sensor"
+      ],
+      "calibration_ref": "drift-cal",
+      "likelihoods": [
+        {
+          "hypothesis_id": "safe",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 5000,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 8000
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 5000,
+              "nominal_likelihood_bps": 2000
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-a",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 5000,
+              "nominal_likelihood_bps": 2000
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 5000,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 8000
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-b",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 5000,
+              "nominal_likelihood_bps": 2000
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 5000,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 8000
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-ab",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 3000,
+              "nominal_likelihood_bps": 1000
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 7000,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 9000
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "hypothesis_safety": [
+    {
+      "hypothesis_id": "safe",
+      "safe_actions": [
+        "release",
+        "bounded-probe",
+        "inspect-readonly"
+      ]
+    },
+    {
+      "hypothesis_id": "hazard-a",
+      "safe_actions": [
+        "bounded-probe",
+        "inspect-readonly"
+      ]
+    },
+    {
+      "hypothesis_id": "hazard-b",
+      "safe_actions": [
+        "bounded-probe",
+        "inspect-readonly"
+      ]
+    },
+    {
+      "hypothesis_id": "hazard-ab",
+      "safe_actions": [
+        "inspect-readonly"
+      ]
+    }
+  ],
+  "calibrations": [
+    {
+      "calibration_id": "optical-cal",
+      "authority": "independent-metrology-lab",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "valid_until": "2026-12-01T00:00:00Z",
+      "revoked_at": null,
+      "factor_ids": [
+        "opt-a-only",
+        "opt-b-only",
+        "optical-pair-joint"
+      ]
+    },
+    {
+      "calibration_id": "software-cal",
+      "authority": "independent-build-assurance-lab",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "valid_until": "2026-12-01T00:00:00Z",
+      "revoked_at": null,
+      "factor_ids": [
+        "software-test"
+      ]
+    },
+    {
+      "calibration_id": "runtime-cal",
+      "authority": "independent-runtime-assurance-lab",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "valid_until": "2026-12-01T00:00:00Z",
+      "revoked_at": null,
+      "factor_ids": [
+        "runtime-observer"
+      ]
+    },
+    {
+      "calibration_id": "stale-cal",
+      "authority": "independent-stale-test-lab",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "valid_until": "2026-11-17T09:30:00Z",
+      "revoked_at": null,
+      "factor_ids": [
+        "stale-check"
+      ]
+    },
+    {
+      "calibration_id": "revoked-cal",
+      "authority": "independent-revocation-test-lab",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "valid_until": "2026-12-01T00:00:00Z",
+      "revoked_at": "2026-11-17T09:50:00Z",
+      "factor_ids": [
+        "revoked-check"
+      ]
+    },
+    {
+      "calibration_id": "impossible-cal",
+      "authority": "independent-adversarial-channel-lab",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "valid_until": "2026-12-01T00:00:00Z",
+      "revoked_at": null,
+      "factor_ids": [
+        "impossible-check"
+      ]
+    },
+    {
+      "calibration_id": "weak-cal",
+      "authority": "independent-low-information-lab",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "valid_until": "2026-12-01T00:00:00Z",
+      "revoked_at": null,
+      "factor_ids": [
+        "weak-check"
+      ]
+    },
+    {
+      "calibration_id": "drift-cal",
+      "authority": "independent-drift-characterization-lab",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "valid_until": "2026-12-01T00:00:00Z",
+      "revoked_at": null,
+      "factor_ids": [
+        "drifted-optical"
+      ]
+    }
+  ],
+  "factorization_certificates": [
+    {
+      "certificate_id": "mutual-build-runtime-v1",
+      "authority": "independent-dependence-adjudication-board",
+      "dependence_groups": [
+        "build-pipeline",
+        "runtime-host"
+      ],
+      "action_ids": [
+        "bounded-probe"
+      ],
+      "valid_from": "2026-11-01T00:00:00Z",
+      "valid_until": "2026-12-01T00:00:00Z",
+      "revoked_at": null,
+      "mutual_conditional_independence": true,
+      "factor_ids": [
+        "software-test",
+        "runtime-observer"
+      ],
+      "conditioning_scope": [
+        "hypothesis",
+        "deployment_configuration",
+        "shared_time_window",
+        "registered_common_cause_state"
+      ]
+    },
+    {
+      "certificate_id": "pair-optical-build",
+      "authority": "independent-dependence-adjudication-board",
+      "dependence_groups": [
+        "optical-common-path",
+        "build-pipeline"
+      ],
+      "action_ids": [
+        "bounded-probe"
+      ],
+      "valid_from": "2026-11-01T00:00:00Z",
+      "valid_until": "2026-12-01T00:00:00Z",
+      "revoked_at": null,
+      "mutual_conditional_independence": true,
+      "factor_ids": [
+        "opt-a-only",
+        "software-test"
+      ],
+      "conditioning_scope": [
+        "hypothesis",
+        "deployment_configuration",
+        "shared_time_window",
+        "registered_common_cause_state"
+      ]
+    },
+    {
+      "certificate_id": "pair-optical-runtime",
+      "authority": "independent-dependence-adjudication-board",
+      "dependence_groups": [
+        "optical-common-path",
+        "runtime-host"
+      ],
+      "action_ids": [
+        "bounded-probe"
+      ],
+      "valid_from": "2026-11-01T00:00:00Z",
+      "valid_until": "2026-12-01T00:00:00Z",
+      "revoked_at": null,
+      "mutual_conditional_independence": true,
+      "factor_ids": [
+        "opt-a-only",
+        "runtime-observer"
+      ],
+      "conditioning_scope": [
+        "hypothesis",
+        "deployment_configuration",
+        "shared_time_window",
+        "registered_common_cause_state"
+      ]
+    }
+  ]
+}
