@@ -183,13 +183,25 @@ pub struct DecisionEnvelopePlan {
 /// engineering threshold. Invalid/OOD/non-converged members are not filtered
 /// out: the threshold envelope becomes incomplete.
 pub fn evaluate_decision_envelope(plan: &DecisionEnvelopePlan) -> DecisionEnvelopeReport {
+    // Canonicalize the model set before validation, pair construction and
+    // reporting. Sorting only the final model-decision vector is insufficient:
+    // pair orientation would otherwise depend on caller input order.
+    let mut models: Vec<&ModelEnvelopeInput> = plan.models.iter().collect();
+    models.sort_by(|left, right| {
+        (&left.run_id, &left.solver_id, &left.output_sha256).cmp(&(
+            &right.run_id,
+            &right.solver_id,
+            &right.output_sha256,
+        ))
+    });
+
     let mut diagnostics = validate_profile(&plan.profile);
-    if plan.models.len() < 2 {
+    if models.len() < 2 {
         diagnostics.push(DecisionEnvelopeDiagnostic::TooFewModels);
     }
 
     let mut seen_runs = BTreeSet::new();
-    for model in &plan.models {
+    for model in &models {
         validate_model(&plan.profile, model, &mut diagnostics);
         if !seen_runs.insert(model.run_id.as_str()) {
             diagnostics.push(DecisionEnvelopeDiagnostic::DuplicateRunIdentity);
@@ -198,10 +210,10 @@ pub fn evaluate_decision_envelope(plan: &DecisionEnvelopePlan) -> DecisionEnvelo
 
     let mut dependence_reports = Vec::new();
     if diagnostics.is_empty() {
-        for first_index in 0..plan.models.len() {
-            for second_index in (first_index + 1)..plan.models.len() {
-                let first = &plan.models[first_index];
-                let second = &plan.models[second_index];
+        for first_index in 0..models.len() {
+            for second_index in (first_index + 1)..models.len() {
+                let first = models[first_index];
+                let second = models[second_index];
                 match compare_observable_dependencies(
                     &first.dependencies,
                     &second.dependencies,
@@ -233,8 +245,6 @@ pub fn evaluate_decision_envelope(plan: &DecisionEnvelopePlan) -> DecisionEnvelo
     let mut maximum = None::<f64>;
 
     if diagnostics.is_empty() {
-        let mut models: Vec<&ModelEnvelopeInput> = plan.models.iter().collect();
-        models.sort_by(|left, right| left.run_id.cmp(&right.run_id));
         for model in models {
             minimum = Some(minimum.map_or(model.normalized_value, |value| {
                 value.min(model.normalized_value)
@@ -758,14 +768,38 @@ mod tests {
     }
 
     #[test]
-    fn incomplete_dependency_inventory_is_unknown_not_independent() {
+    fn incomplete_inventory_preserves_known_shared_dependencies_and_flags_completeness() {
         let mut input = plan(&[("run-process", 120.0), ("run-saras", 130.0)]);
         input.models[1].dependencies.complete_observables.clear();
         let report = evaluate_decision_envelope(&input);
+        let assessment = &report.dependence_reports[0].assessment;
         assert_eq!(
-            report.dependence_reports[0].assessment.state,
+            assessment.state,
+            super::super::evidence_dependence::ObservableDependenceState::SharedDependencyFound
+        );
+        assert!(assessment.first_inventory_complete);
+        assert!(!assessment.second_inventory_complete);
+        assert_eq!(assessment.shared_dependencies.len(), 1);
+    }
+
+    #[test]
+    fn incomplete_inventory_without_discovered_overlap_remains_unknown() {
+        let mut input = plan(&[("run-process", 120.0), ("run-saras", 130.0)]);
+        input.models[1].dependencies.complete_observables.clear();
+        input.models[1].dependencies.dependencies[0]
+            .dependency
+            .content_sha256 = Some(sha('e'));
+        input.models[1].dependencies.dependencies[0]
+            .dependency
+            .node_id = "different-assumption".to_string();
+        let report = evaluate_decision_envelope(&input);
+        let assessment = &report.dependence_reports[0].assessment;
+        assert_eq!(
+            assessment.state,
             super::super::evidence_dependence::ObservableDependenceState::UnknownDependencyInventory
         );
+        assert!(!assessment.second_inventory_complete);
+        assert!(assessment.shared_dependencies.is_empty());
     }
 
     #[test]
