@@ -1,0 +1,13 @@
+[package]
+name = "crop-formation-lab"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Dependency-free reference algorithms for crop-formation geometry and decoder qualification"
+
+[lib]
+name = "crop_formation_lab"
+path = "src/lib.rs"
+
+[workspace]
+# Keep this research crate isolated from Symthaea's very large root workspace.
