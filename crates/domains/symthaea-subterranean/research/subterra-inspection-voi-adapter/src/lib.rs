@@ -16,9 +16,9 @@ use subterra_robust_survival_referee::{
     evaluate_policy_robustly,
 };
 use subterra_survival_reference::{
-    CostPrices, MeasurementAction, MeasurementOutcome, MissionDecision,
-    OutcomeKind, PlanMetrics, PlannerConfig, PlanningError, PlanningProblem,
-    PlanningReport, ResourceBudget, ResourceCost, RiskLimits, plan_survival_conditioned,
+    CostPrices, MeasurementAction, MeasurementOutcome, MissionDecision, OutcomeKind, PlanMetrics,
+    PlannerConfig, PlanningError, PlanningProblem, PlanningReport, ResourceBudget, ResourceCost,
+    RiskLimits, plan_survival_conditioned,
 };
 
 const EPSILON: f64 = 1.0e-10;
@@ -112,7 +112,11 @@ fn expected_loss(belief: &[f64], losses: &[f64]) -> Result<f64, AdapterError> {
         return Err(AdapterError::InvalidDecisionLoss);
     }
     let value = belief.iter().zip(losses).map(|(p, l)| p * l).sum::<f64>();
-    if value.is_finite() { Ok(value) } else { Err(AdapterError::NumericalFailure("expected loss")) }
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(AdapterError::NumericalFailure("expected loss"))
+    }
 }
 
 fn best_decision(problem: &PlanningProblem, belief: &[f64]) -> Result<(String, f64), AdapterError> {
@@ -121,7 +125,10 @@ fn best_decision(problem: &PlanningProblem, belief: &[f64]) -> Result<(String, f
     let mut best: Option<(String, f64)> = None;
     for decision in decisions {
         let risk = expected_loss(belief, &decision.loss_by_hypothesis)?;
-        if best.as_ref().is_none_or(|(_, current)| risk < *current - EPSILON) {
+        if best
+            .as_ref()
+            .is_none_or(|(_, current)| risk < *current - EPSILON)
+        {
             best = Some((decision.id.clone(), risk));
         }
     }
@@ -129,7 +136,11 @@ fn best_decision(problem: &PlanningProblem, belief: &[f64]) -> Result<(String, f
 }
 
 fn entropy(probabilities: &[f64]) -> f64 {
-    probabilities.iter().filter(|p| **p > 0.0).map(|p| -p * p.ln()).sum()
+    probabilities
+        .iter()
+        .filter(|p| **p > 0.0)
+        .map(|p| -p * p.ln())
+        .sum()
 }
 
 fn posterior_and_probability(
@@ -139,14 +150,22 @@ fn posterior_and_probability(
     if belief.len() != likelihood.len() {
         return Err(AdapterError::InvalidPriorOrLikelihood);
     }
-    let probability = belief.iter().zip(likelihood).map(|(p, l)| p * l).sum::<f64>();
+    let probability = belief
+        .iter()
+        .zip(likelihood)
+        .map(|(p, l)| p * l)
+        .sum::<f64>();
     if !probability.is_finite() || probability < 0.0 {
         return Err(AdapterError::NumericalFailure("outcome probability"));
     }
     if probability <= 0.0 {
         return Ok((0.0, vec![0.0; belief.len()]));
     }
-    let posterior = belief.iter().zip(likelihood).map(|(p, l)| p * l / probability).collect::<Vec<_>>();
+    let posterior = belief
+        .iter()
+        .zip(likelihood)
+        .map(|(p, l)| p * l / probability)
+        .collect::<Vec<_>>();
     let sum = posterior.iter().sum::<f64>();
     if !sum.is_finite() || (sum - 1.0).abs() > 1.0e-8 {
         return Err(AdapterError::NumericalFailure("posterior normalization"));
@@ -161,27 +180,53 @@ fn validate_adapter_inputs(problem: &PlanningProblem) -> Result<Vec<f64>, Adapte
     let mut sum = 0.0;
     let mut ids = BTreeSet::new();
     for h in &problem.hypotheses {
-        if h.id.trim().is_empty() || !ids.insert(h.id.as_str()) || !h.prior_probability.is_finite() || !(0.0..=1.0).contains(&h.prior_probability) {
+        if h.id.trim().is_empty()
+            || !ids.insert(h.id.as_str())
+            || !h.prior_probability.is_finite()
+            || !(0.0..=1.0).contains(&h.prior_probability)
+        {
             return Err(AdapterError::InvalidPriorOrLikelihood);
         }
         sum += h.prior_probability;
     }
-    if !sum.is_finite() || (sum - 1.0).abs() > 1.0e-8 || !ids.contains("unknown") || problem.hypotheses.iter().find(|h| h.id == "unknown").is_some_and(|h| h.prior_probability <= 0.0) {
+    if !sum.is_finite()
+        || (sum - 1.0).abs() > 1.0e-8
+        || !ids.contains("unknown")
+        || problem
+            .hypotheses
+            .iter()
+            .find(|h| h.id == "unknown")
+            .is_some_and(|h| h.prior_probability <= 0.0)
+    {
         return Err(AdapterError::InvalidPriorOrLikelihood);
     }
-    let belief = problem.hypotheses.iter().map(|h| h.prior_probability).collect::<Vec<_>>();
+    let belief = problem
+        .hypotheses
+        .iter()
+        .map(|h| h.prior_probability)
+        .collect::<Vec<_>>();
     for decision in &problem.decisions {
-        if decision.loss_by_hypothesis.len() != belief.len() || decision.loss_by_hypothesis.iter().any(|v| !v.is_finite() || *v < 0.0) {
+        if decision.loss_by_hypothesis.len() != belief.len()
+            || decision
+                .loss_by_hypothesis
+                .iter()
+                .any(|v| !v.is_finite() || *v < 0.0)
+        {
             return Err(AdapterError::InvalidDecisionLoss);
         }
     }
     for action in &problem.actions {
-        if action.id.trim().is_empty() || action.modality.trim().is_empty() || action.outcomes.is_empty() {
+        if action.id.trim().is_empty()
+            || action.modality.trim().is_empty()
+            || action.outcomes.is_empty()
+        {
             return Err(AdapterError::InvalidAction);
         }
         let mut totals = vec![0.0; belief.len()];
         for outcome in &action.outcomes {
-            if outcome.id.trim().is_empty() || outcome.likelihood_by_hypothesis.len() != belief.len() {
+            if outcome.id.trim().is_empty()
+                || outcome.likelihood_by_hypothesis.len() != belief.len()
+            {
                 return Err(AdapterError::InvalidPriorOrLikelihood);
             }
             for (index, probability) in outcome.likelihood_by_hypothesis.iter().enumerate() {
@@ -191,7 +236,10 @@ fn validate_adapter_inputs(problem: &PlanningProblem) -> Result<Vec<f64>, Adapte
                 totals[index] += probability;
             }
         }
-        if totals.iter().any(|total| !total.is_finite() || (*total - 1.0).abs() > 1.0e-8) {
+        if totals
+            .iter()
+            .any(|total| !total.is_finite() || (*total - 1.0).abs() > 1.0e-8)
+        {
             return Err(AdapterError::InvalidPriorOrLikelihood);
         }
     }
@@ -255,7 +303,9 @@ fn planner_config_to_referee(case: &InspectionCase) -> RefereeConfig {
     }
 }
 
-pub fn evaluate_inspection_case(case: &InspectionCase) -> Result<InspectionCaseReport, AdapterError> {
+pub fn evaluate_inspection_case(
+    case: &InspectionCase,
+) -> Result<InspectionCaseReport, AdapterError> {
     if case.case_id.trim().is_empty() {
         return Err(AdapterError::EmptyCaseId);
     }
@@ -278,18 +328,40 @@ pub fn evaluate_inspection_case(case: &InspectionCase) -> Result<InspectionCaseR
         prior_entropy_nats: prior_entropy,
     };
 
-    let mut action_baselines = case.primary_model.actions.iter()
-        .map(|action| assess_action(&case.primary_model, &belief, action, no_test_risk, prior_entropy, case.budget))
+    let mut action_baselines = case
+        .primary_model
+        .actions
+        .iter()
+        .map(|action| {
+            assess_action(
+                &case.primary_model,
+                &belief,
+                action,
+                no_test_risk,
+                prior_entropy,
+                case.budget,
+            )
+        })
         .collect::<Result<Vec<_>, _>>()?;
     action_baselines.sort_by(|a, b| a.action_id.cmp(&b.action_id));
 
-    let entropy_greedy_action_id = action_baselines.iter()
+    let entropy_greedy_action_id = action_baselines
+        .iter()
         .filter(|a| a.eligible)
-        .max_by(|a, b| a.expected_information_gain_nats.total_cmp(&b.expected_information_gain_nats).then_with(|| b.action_id.cmp(&a.action_id)))
+        .max_by(|a, b| {
+            a.expected_information_gain_nats
+                .total_cmp(&b.expected_information_gain_nats)
+                .then_with(|| b.action_id.cmp(&a.action_id))
+        })
         .map(|a| a.action_id.clone());
-    let myopic_evsi_action_id = action_baselines.iter()
+    let myopic_evsi_action_id = action_baselines
+        .iter()
         .filter(|a| a.eligible && a.gross_evsi > EPSILON)
-        .max_by(|a, b| a.gross_evsi.total_cmp(&b.gross_evsi).then_with(|| b.action_id.cmp(&a.action_id)))
+        .max_by(|a, b| {
+            a.gross_evsi
+                .total_cmp(&b.gross_evsi)
+                .then_with(|| b.action_id.cmp(&a.action_id))
+        })
         .map(|a| a.action_id.clone());
 
     let planner: PlanningReport = plan_survival_conditioned(
@@ -297,15 +369,18 @@ pub fn evaluate_inspection_case(case: &InspectionCase) -> Result<InspectionCaseR
         case.budget,
         case.prices,
         case.planner_config,
-    ).map_err(|e: PlanningError| AdapterError::Planner(e.to_string()))?;
+    )
+    .map_err(|e: PlanningError| AdapterError::Planner(e.to_string()))?;
 
     let planner_gross_evsi = no_test_risk - planner.metrics.expected_decision_loss;
     let robust: RobustPolicyReport = evaluate_policy_robustly(
         &case.evaluation_models,
         &planner.policy,
         planner_config_to_referee(case),
-    ).map_err(|e: RefereeError| AdapterError::Referee(e.to_string()))?;
-    let robust_policy_admissible = robust.disposition == PolicyDisposition::AdmissibleAcrossSuppliedModels
+    )
+    .map_err(|e: RefereeError| AdapterError::Referee(e.to_string()))?;
+    let robust_policy_admissible = robust.disposition
+        == PolicyDisposition::AdmissibleAcrossSuppliedModels
         && robust.all_external_gates_passed
         && robust.all_supported_paths_within_budget
         && robust.all_models_within_risk_limits;
@@ -350,7 +425,12 @@ fn action(
                 terminal_loss_by_hypothesis: None,
             },
         ],
-        cost: ResourceCost { energy_j: energy, duration_s: 10.0, data_bytes: 100.0, exposure_units: 0.01 },
+        cost: ResourceCost {
+            energy_j: energy,
+            duration_s: 10.0,
+            data_bytes: 100.0,
+            exposure_units: 0.01,
+        },
         external_gate_passed: true,
     }
 }
@@ -361,19 +441,45 @@ fn action(
 /// fixture, not a real sensor-performance model.
 pub fn synthetic_decision_boundary_case(task: InspectionTask) -> InspectionCase {
     let hypotheses = vec![
-        subterra_survival_reference::Hypothesis { id: "good_variant_a".into(), prior_probability: 0.45 },
-        subterra_survival_reference::Hypothesis { id: "good_variant_b".into(), prior_probability: 0.45 },
-        subterra_survival_reference::Hypothesis { id: "consequential_defect".into(), prior_probability: 0.08 },
-        subterra_survival_reference::Hypothesis { id: "unknown".into(), prior_probability: 0.02 },
+        subterra_survival_reference::Hypothesis {
+            id: "good_variant_a".into(),
+            prior_probability: 0.45,
+        },
+        subterra_survival_reference::Hypothesis {
+            id: "good_variant_b".into(),
+            prior_probability: 0.45,
+        },
+        subterra_survival_reference::Hypothesis {
+            id: "consequential_defect".into(),
+            prior_probability: 0.08,
+        },
+        subterra_survival_reference::Hypothesis {
+            id: "unknown".into(),
+            prior_probability: 0.02,
+        },
     ];
     let decisions = vec![
-        MissionDecision { id: "continue_monitoring".into(), loss_by_hypothesis: vec![0.0, 0.0, 100.0, 50.0] },
-        MissionDecision { id: "hold_for_specialist_review".into(), loss_by_hypothesis: vec![10.0, 10.0, 10.0, 0.0] },
+        MissionDecision {
+            id: "continue_monitoring".into(),
+            loss_by_hypothesis: vec![0.0, 0.0, 100.0, 50.0],
+        },
+        MissionDecision {
+            id: "hold_for_specialist_review".into(),
+            loss_by_hypothesis: vec![10.0, 10.0, 10.0, 0.0],
+        },
     ];
     let (task_prefix, high_modality, low_modality) = match task {
-        InspectionTask::PipeCable => ("pipe_cable", "high_resolution_rgb", "thermal_or_acoustic_followup"),
-        InspectionTask::DrawpointVolume => ("drawpoint", "dense_depth_cloud", "alternate_stand_off_view"),
-        InspectionTask::SupportVerification => ("support", "surface_rgb_scan", "independent_metrology"),
+        InspectionTask::PipeCable => (
+            "pipe_cable",
+            "high_resolution_rgb",
+            "thermal_or_acoustic_followup",
+        ),
+        InspectionTask::DrawpointVolume => {
+            ("drawpoint", "dense_depth_cloud", "alternate_stand_off_view")
+        }
+        InspectionTask::SupportVerification => {
+            ("support", "surface_rgb_scan", "independent_metrology")
+        }
     };
     let high_information = action(
         &format!("{task_prefix}_high_eig"),
@@ -393,22 +499,70 @@ pub fn synthetic_decision_boundary_case(task: InspectionTask) -> InspectionCase 
         [0.90, 0.10],
         35.0,
     );
-    let problem = PlanningProblem { hypotheses, decisions, actions: vec![high_information, low_information_high_value] };
-    let model = ModelScenario { model_id: "nominal_synthetic".into(), problem: problem.clone() };
+    let problem = PlanningProblem {
+        hypotheses,
+        decisions,
+        actions: vec![high_information, low_information_high_value],
+    };
+    let model = ModelScenario {
+        model_id: "nominal_synthetic".into(),
+        problem: problem.clone(),
+    };
     let mut shifted = problem.clone();
     shifted.hypotheses[2].prior_probability = 0.10;
     shifted.hypotheses[0].prior_probability = 0.44;
     shifted.hypotheses[1].prior_probability = 0.44;
     let robust_models = vec![
         model,
-        ModelScenario { model_id: "shifted_prior_synthetic".into(), problem: shifted },
+        ModelScenario {
+            model_id: "shifted_prior_synthetic".into(),
+            problem: shifted,
+        },
     ];
-    let budget = ResourceBudget { energy_j: 500.0, duration_s: 120.0, data_bytes: 2_000.0, exposure_units: 0.2 };
-    let prices = CostPrices { energy_per_j: 0.0, time_per_s: 0.0, data_per_byte: 0.0, exposure_per_unit: 0.0 };
-    let risk_limits = RiskLimits { maximum_mission_interruption_probability: 0.10, maximum_robot_loss_probability: 0.05 };
-    let planner_config = PlannerConfig { horizon_steps: 1, maximum_search_nodes: 10_000, maximum_actions: 8, maximum_outcomes_per_action: 8, risk_limits };
-    let referee_config = RefereeConfig { resource_budget: budget, cost_prices: prices, risk_limits, maximum_models: 8, maximum_policy_nodes: 10_000, maximum_policy_depth: 8 };
-    InspectionCase { case_id: format!("{}_high_eig_zero_evsi_vs_low_eig_positive_evsi", task.as_str()), task, primary_model: problem, evaluation_models: robust_models, budget, prices, planner_config, referee_config }
+    let budget = ResourceBudget {
+        energy_j: 500.0,
+        duration_s: 120.0,
+        data_bytes: 2_000.0,
+        exposure_units: 0.2,
+    };
+    let prices = CostPrices {
+        energy_per_j: 0.0,
+        time_per_s: 0.0,
+        data_per_byte: 0.0,
+        exposure_per_unit: 0.0,
+    };
+    let risk_limits = RiskLimits {
+        maximum_mission_interruption_probability: 0.10,
+        maximum_robot_loss_probability: 0.05,
+    };
+    let planner_config = PlannerConfig {
+        horizon_steps: 1,
+        maximum_search_nodes: 10_000,
+        maximum_actions: 8,
+        maximum_outcomes_per_action: 8,
+        risk_limits,
+    };
+    let referee_config = RefereeConfig {
+        resource_budget: budget,
+        cost_prices: prices,
+        risk_limits,
+        maximum_models: 8,
+        maximum_policy_nodes: 10_000,
+        maximum_policy_depth: 8,
+    };
+    InspectionCase {
+        case_id: format!(
+            "{}_high_eig_zero_evsi_vs_low_eig_positive_evsi",
+            task.as_str()
+        ),
+        task,
+        primary_model: problem,
+        evaluation_models: robust_models,
+        budget,
+        prices,
+        planner_config,
+        referee_config,
+    }
 }
 
 #[cfg(test)]
@@ -419,30 +573,54 @@ mod tests {
     fn high_entropy_gain_can_have_zero_decision_value() {
         let case = synthetic_decision_boundary_case(InspectionTask::PipeCable);
         let report = evaluate_inspection_case(&case).unwrap();
-        let high = report.myopic_action_baselines.iter().find(|a| a.action_id.ends_with("high_eig")).unwrap();
+        let high = report
+            .myopic_action_baselines
+            .iter()
+            .find(|a| a.action_id.ends_with("high_eig"))
+            .unwrap();
         assert!(high.expected_information_gain_nats > 0.5);
         assert!(high.gross_evsi.abs() < 1.0e-8);
-        assert_eq!(report.entropy_greedy_action_id.as_deref(), Some(high.action_id.as_str()));
-        assert_ne!(report.myopic_evsi_action_id.as_deref(), Some(high.action_id.as_str()));
+        assert_eq!(
+            report.entropy_greedy_action_id.as_deref(),
+            Some(high.action_id.as_str())
+        );
+        assert_ne!(
+            report.myopic_evsi_action_id.as_deref(),
+            Some(high.action_id.as_str())
+        );
     }
 
     #[test]
     fn modest_information_can_have_positive_decision_value() {
         let case = synthetic_decision_boundary_case(InspectionTask::PipeCable);
         let report = evaluate_inspection_case(&case).unwrap();
-        let high = report.myopic_action_baselines.iter().find(|a| a.action_id.ends_with("high_eig")).unwrap();
-        let decision = report.myopic_action_baselines.iter().find(|a| a.action_id.ends_with("decision_evidence")).unwrap();
+        let high = report
+            .myopic_action_baselines
+            .iter()
+            .find(|a| a.action_id.ends_with("high_eig"))
+            .unwrap();
+        let decision = report
+            .myopic_action_baselines
+            .iter()
+            .find(|a| a.action_id.ends_with("decision_evidence"))
+            .unwrap();
         assert!(decision.expected_information_gain_nats < high.expected_information_gain_nats);
         assert!(decision.expected_information_gain_nats > 0.0);
         assert!(decision.gross_evsi > 0.0);
-        assert_eq!(report.myopic_evsi_action_id.as_deref(), Some(decision.action_id.as_str()));
+        assert_eq!(
+            report.myopic_evsi_action_id.as_deref(),
+            Some(decision.action_id.as_str())
+        );
     }
 
     #[test]
     fn bounded_planner_selects_decision_relevant_evidence_not_entropy_only() {
         let case = synthetic_decision_boundary_case(InspectionTask::PipeCable);
         let report = evaluate_inspection_case(&case).unwrap();
-        assert_eq!(report.planner.policy.measurement_action_id.as_deref(), report.myopic_evsi_action_id.as_deref());
+        assert_eq!(
+            report.planner.policy.measurement_action_id.as_deref(),
+            report.myopic_evsi_action_id.as_deref()
+        );
         assert!(report.planner_gross_evsi > 0.0);
         assert!(report.robust_policy_admissible);
         assert_eq!(report.robust.model_count, 2);
@@ -483,7 +661,11 @@ mod tests {
 
     #[test]
     fn same_policy_is_refereed_across_pipe_drawpoint_and_support_adapters() {
-        for task in [InspectionTask::PipeCable, InspectionTask::DrawpointVolume, InspectionTask::SupportVerification] {
+        for task in [
+            InspectionTask::PipeCable,
+            InspectionTask::DrawpointVolume,
+            InspectionTask::SupportVerification,
+        ] {
             let report = evaluate_inspection_case(&synthetic_decision_boundary_case(task)).unwrap();
             assert_eq!(report.task, task);
             assert!(report.robust_policy_admissible);
@@ -508,6 +690,9 @@ mod tests {
     fn missing_or_zero_prior_unknown_hypothesis_is_rejected() {
         let mut case = synthetic_decision_boundary_case(InspectionTask::PipeCable);
         case.primary_model.hypotheses[3].prior_probability = 0.0;
-        assert_eq!(validate_adapter_inputs(&case.primary_model), Err(AdapterError::InvalidPriorOrLikelihood));
+        assert_eq!(
+            validate_adapter_inputs(&case.primary_model),
+            Err(AdapterError::InvalidPriorOrLikelihood)
+        );
     }
 }
