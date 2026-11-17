@@ -1,0 +1,293 @@
+{
+  "schema_version": "0.1.0",
+  "registry_id": "SC-DISCOVERY-REFERENCE-CASES-2026-11-17",
+  "created_at": "2026-11-17",
+  "purpose": "Small, source-pinned semantic/control corpus for superconductivity discovery benchmarking. This is not a complete candidate database or a model training set.",
+  "claim_ceiling": "Literature-reported experimental observations and computational predictions are recorded separately. No prediction in this file is an experimentally confirmed superconductor.",
+  "units": {
+    "temperature": "K",
+    "pressure": "GPa",
+    "hull_distance": "meV/atom"
+  },
+  "source_register": [
+    {
+      "source_id": "zhou_2026_ambient_nickelate_films",
+      "doi": "10.1093/nsr/nwag151",
+      "url": "https://doi.org/10.1093/nsr/nwag151",
+      "published": "2026-03-10",
+      "source_type": "peer_reviewed_experimental_report",
+      "title": "Superconductivity onset above 60 K in ambient-pressure nickelate films",
+      "primary_claim_boundary": "Ambient-pressure epitaxial thin films; reported onset, zero-resistance and diamagnetic transition temperatures remain distinct."
+    },
+    {
+      "source_id": "liu_2026_bulk_pressurized_nickelate",
+      "doi": "10.1038/s41586-025-09954-4",
+      "url": "https://doi.org/10.1038/s41586-025-09954-4",
+      "published": "2025-12-02",
+      "source_type": "peer_reviewed_experimental_report",
+      "title": "Bulk superconductivity up to 96 K in pressurized nickelate single crystals",
+      "primary_claim_boundary": "Crystals synthesized at ambient pressure; superconducting state measured under approximately 20-22 GPa. Do not call this ambient-pressure operation."
+    },
+    {
+      "source_id": "du_2026_hydrogen_unit_hydrides",
+      "doi": "10.1016/j.mtphys.2026.102142",
+      "url": "https://doi.org/10.1016/j.mtphys.2026.102142",
+      "published": "2026-08",
+      "source_type": "computational_prediction",
+      "title": "High-temperature superconductivity at pressures below 30 GPa via hydrogen-unit metal embedding",
+      "primary_claim_boundary": "Predicted electron-phonon superconductivity; no experimental synthesis or measured transition is encoded."
+    },
+    {
+      "source_id": "gashmard_2026_genome_ai",
+      "doi": "10.1038/s41598-026-76977-w",
+      "url": "https://doi.org/10.1038/s41598-026-76977-w",
+      "published": "2026-10-29",
+      "source_type": "peer_reviewed_early_access_computational_prediction",
+      "title": "Genome-inspired AI for extrapolative discovery of high-temperature superconductors",
+      "primary_claim_boundary": "Model predictions over crystal databases; candidate Tc values are not experimental observations. Early-access article version; data, split and checkpoint reproducibility must be audited."
+    },
+    {
+      "source_id": "bee_net_2026",
+      "doi": "10.1038/s41524-026-01964-8",
+      "url": "https://www.nature.com/articles/s41524-026-01964-8",
+      "published": "2026",
+      "source_type": "computational_workflow_with_two_synthesized_candidates",
+      "title": "Developing a complete AI-accelerated workflow for superconductor discovery",
+      "primary_claim_boundary": "Reported 0.87 K Tc MAE is against DFT/Allen-Dynes computational labels, not measured experimental Tc. Two synthesized candidates are reported by the paper; exact candidates and artifacts require full source audit."
+    },
+    {
+      "source_id": "htsc_2025",
+      "doi": "10.1088/1674-1056/adf042",
+      "url": "https://doi.org/10.1088/1674-1056/adf042",
+      "published": "2025",
+      "source_type": "computational_benchmark_dataset",
+      "title": "HTSC-2025: A benchmark dataset of ambient-pressure high-temperature superconductors for AI-driven critical temperature prediction",
+      "primary_claim_boundary": "155-material benchmark; labels and structural-system splits are computational and must not be merged with specimen-level experimental Tc."
+    },
+    {
+      "source_id": "matbench_discovery_2025",
+      "doi": "10.1038/s42256-025-01055-1",
+      "url": "https://doi.org/10.1038/s42256-025-01055-1",
+      "published": "2025-06-23",
+      "source_type": "materials_discovery_benchmark_methodology",
+      "title": "A framework to evaluate machine learning crystal stability predictions",
+      "primary_claim_boundary": "Methodological comparator for prospective campaign metrics and budgeted candidate ranking; its crystal-stability DAF values are not superconductivity performance."
+    }
+  ],
+  "candidate_records": [
+    {
+      "candidate_id": "SC-EXP-NI-LAPR-FILM-2026",
+      "formula": "(La,Pr)3Ni2O7",
+      "family": "bilayer nickelate",
+      "form": "epitaxial thin film",
+      "source_ids": [
+        "zhou_2026_ambient_nickelate_films"
+      ],
+      "evidence_class": "experimental_report",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [
+        {
+          "observable": "onset",
+          "value_k": 63,
+          "status": "reported"
+        },
+        {
+          "observable": "zero_resistance",
+          "value_k": 37,
+          "status": "reported"
+        },
+        {
+          "observable": "diamagnetic_transition_onset",
+          "value_k": 23,
+          "status": "reported"
+        }
+      ],
+      "tc_prediction": null,
+      "bulk_thermodynamic_transition_k": null,
+      "sample_identity_resolution": "Paper-level values recorded; exact specimen/batch mapping for each observable must be extracted from full text and supplement before specimen-level fusion.",
+      "phase_and_process_notes": "Compressive epitaxial strain on SrLaAlO4; extreme non-equilibrium gigantic-oxidative atomic-layer-by-layer epitaxy.",
+      "engineering_readiness": "thin-film research result; no long-length conductor or device qualification encoded",
+      "safety_review": "not_assessed_by_this_registry"
+    },
+    {
+      "candidate_id": "SC-EXP-LA2SMNI2O7-PRESSURE-2026",
+      "formula": "La2SmNi2O7-delta",
+      "family": "bilayer nickelate",
+      "form": "bulk single crystal",
+      "source_ids": [
+        "liu_2026_bulk_pressurized_nickelate"
+      ],
+      "evidence_class": "experimental_report",
+      "operating_pressure_gpa": 21.6,
+      "synthesis_pressure_gpa": 0,
+      "tc_observations": [
+        {
+          "observable": "onset",
+          "value_k": 92,
+          "pressure_gpa": 21.6,
+          "status": "reported"
+        },
+        {
+          "observable": "zero_resistance",
+          "value_k": 73,
+          "pressure_gpa": 21.6,
+          "status": "reported"
+        },
+        {
+          "observable": "meissner_response_temperature",
+          "value_k": 60,
+          "pressure_gpa": 20.6,
+          "status": "reported"
+        }
+      ],
+      "tc_prediction": null,
+      "bulk_thermodynamic_transition_k": null,
+      "sample_identity_resolution": "Paper-level composition and pressure values recorded; exact specimen identity across transport and magnetic measurements must be checked in source data.",
+      "phase_and_process_notes": "Ambient-pressure crystal synthesis does not imply ambient-pressure superconducting operation; superconducting observations require approximately 20-22 GPa.",
+      "engineering_readiness": "high-pressure bulk research result; not ambient-pressure conductor",
+      "safety_review": "pressure_equipment_and_material_review_required_for_any_experiment"
+    },
+    {
+      "candidate_id": "SC-PRED-CAAUH6-2026",
+      "formula": "CaAuH6",
+      "family": "metal-embedded hydrogen-unit hydride",
+      "form": "predicted crystal structure",
+      "source_ids": [
+        "du_2026_hydrogen_unit_hydrides"
+      ],
+      "evidence_class": "computational_prediction",
+      "operating_pressure_gpa": null,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [],
+      "tc_prediction": [
+        {
+          "value_k": 44,
+          "pressure_gpa": 0,
+          "method": "electron_phonon_calculation",
+          "status": "predicted"
+        },
+        {
+          "value_k": 70,
+          "pressure_gpa": 30,
+          "method": "electron_phonon_calculation",
+          "status": "predicted"
+        }
+      ],
+      "hull_distance_mev_atom": null,
+      "dynamical_stability": "source abstract reports ambient-pressure dynamical stability for a subset of screened compounds; candidate-specific evidence must be extracted before admission",
+      "decompression_retention": "not experimentally demonstrated",
+      "engineering_readiness": "computational candidate only",
+      "safety_review": "qualified_hydrogen_and_high_pressure_review_required_before_any_experimental_consideration"
+    },
+    {
+      "candidate_id": "SC-PRED-ACBEH6-2026",
+      "formula": "AcBeH6",
+      "family": "metal-embedded hydrogen-unit hydride",
+      "form": "predicted metastable crystal structure",
+      "source_ids": [
+        "du_2026_hydrogen_unit_hydrides"
+      ],
+      "evidence_class": "computational_prediction",
+      "operating_pressure_gpa": 30,
+      "synthesis_pressure_gpa": 30,
+      "tc_observations": [],
+      "tc_prediction": [
+        {
+          "value_k": 52,
+          "pressure_gpa": 30,
+          "method": "electron_phonon_calculation",
+          "status": "predicted"
+        }
+      ],
+      "hull_distance_mev_atom": 131,
+      "dynamical_stability": "reported metastable R-3m phase at the calculated pressure; not an experimental phase confirmation",
+      "decompression_retention": "not demonstrated",
+      "engineering_readiness": "computational candidate only",
+      "safety_review": "actinium-containing candidate; computational_only_in_general_programme_pending_specialist_institutional_review"
+    },
+    {
+      "candidate_id": "SC-PRED-PU2CO17-GENOME-AI-2026",
+      "formula": "Pu2Co17",
+      "family": "actinide-containing intermetallic",
+      "form": "database structure screened by machine learning",
+      "source_ids": [
+        "gashmard_2026_genome_ai"
+      ],
+      "evidence_class": "machine_learning_prediction",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [],
+      "tc_prediction": [
+        {
+          "value_k": 89,
+          "pressure_gpa": 0,
+          "method": "genome_inspired_machine_learning",
+          "status": "predicted_approximate"
+        }
+      ],
+      "bulk_thermodynamic_transition_k": null,
+      "decompression_retention": "not_applicable_to_reported_ambient_pressure_prediction_but_not_experimentally_verified",
+      "engineering_readiness": "computational candidate only",
+      "safety_review": "plutonium_containing_radioactive_candidate; exclude from ordinary experimental shortlist; computational_only_pending_specialist_institutional_review"
+    }
+  ],
+  "benchmark_catalogs": [
+    {
+      "catalog_id": "BEE-NET-2026",
+      "source_ids": [
+        "bee_net_2026"
+      ],
+      "reported_record_count": 5241,
+      "reported_test_count": 1049,
+      "reported_metric": {
+        "name": "Tc_MAE_vs_DFT_Allen_Dynes",
+        "value_k": 0.87
+      },
+      "metric_interpretation": "computational-label regression only; not experimental Tc accuracy",
+      "local_reproducibility_status": "not_reproduced; artifact and split closure tracked in Symthaea issue #12619"
+    },
+    {
+      "catalog_id": "DataG-Non-Sc-2026",
+      "source_ids": [
+        "gashmard_2026_genome_ai"
+      ],
+      "reported_record_count": 53196,
+      "reported_metric": null,
+      "metric_interpretation": "new non-superconductor dataset in the 29 October 2026 paper; dataset contents, schema, licenses and split manifest are not yet independently ingested",
+      "local_reproducibility_status": "not_reproduced; request exact dataset, model weights, source code, split manifest and negative-label definition"
+    },
+    {
+      "catalog_id": "HTSC-2025",
+      "source_ids": [
+        "htsc_2025"
+      ],
+      "reported_record_count": 155,
+      "reported_metric": null,
+      "metric_interpretation": "computed high-Tc candidate benchmark; do not merge targets with experimental specimen records",
+      "local_reproducibility_status": "not_reproduced; source-specific exclusion rules and structures require audit"
+    }
+  ],
+  "required_future_fields": [
+    "exact specimen_or_batch_id",
+    "source_revision_and_raw_data_digest",
+    "composition_stoichiometry_and_impurity_inventory",
+    "structure_prototype_and_phase_fraction",
+    "measurement_geometry_and_calibration",
+    "pressure_temperature_field_current_conditions",
+    "uncertainty_and_detection_limits",
+    "independent_replication_lineage",
+    "synthesis_route_and_process_window",
+    "phase_retention_after_pressure_release",
+    "Jc_B_T_theta_and_Je_for_engineering_translation",
+    "manufacturing_length_yield_jointing_and_cost",
+    "safety_and_critical_materials_review"
+  ],
+  "non_goals": [
+    "This registry is not a complete superconductivity database.",
+    "This registry is not a model training set or a leaderboard.",
+    "No experimental synthesis instructions are provided.",
+    "No candidate is authorized for experimental work by appearing here.",
+    "No calculated or machine-learning Tc is an observed transition."
+  ]
+}
