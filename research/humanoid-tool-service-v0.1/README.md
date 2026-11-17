@@ -234,6 +234,7 @@ Longer term, the two tracks can share validated tool semantics, fault knowledge 
 ## Deliverables
 
 - `protocol-v0.1.md`: preregisterable comparison and claim-boundary protocol, including agentic SOTA, human assistance and active tool discovery.
+- `hlb-humanoid-ablation-v0.1.md`: source-audited HLB architecture decision, MLP/GRU/HDC-LTC/agent/ULTRA ablation matrix, benchmark targets, dependencies and claim ceilings; tracked by [HUM-HLB-ABLATION-001 #12723](https://github.com/Luminous-Dynamics/symthaea/issues/12723).
 - `cases-v0.1.json` / `schema-v0.1.json`: exact 18-cell benchmark anchor, eight service-case definitions and negative controls.
 - `g1-decoupled-v1-mapping.json` / `g1-decoupled-v1-mapping.schema.json`: exact G1 state/action mapping and source-traced raw-qpos producer chain.
 - `g1-mapping-audit/`: dependency-free Rust mapping primitives, golden/negative-control tests and focused workflow.
