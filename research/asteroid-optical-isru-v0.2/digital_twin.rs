@@ -1629,6 +1629,17 @@ mod tests {
             ),
             Err(TwinError::DuplicateJob("failure-one".to_string()))
         );
+        api.launch_stage(
+            "failure-two",
+            "train-a",
+            StageKind::Characterization,
+            "spectrometer-a",
+        )
+        .unwrap();
+        assert!(matches!(
+            api.advance_next_event().unwrap(),
+            Some(TwinTransition::Failed { job_id, .. }) if job_id == "failure-two"
+        ));
     }
 
     #[test]
