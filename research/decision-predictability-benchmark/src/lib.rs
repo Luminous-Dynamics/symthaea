@@ -170,7 +170,13 @@ pub fn horizon_in_lyapunov_times(
     if horizon < 0.0 {
         return Err(MetricError::NegativeValue("forecast horizon"));
     }
-    Ok(horizon / reference.lyapunov_time()?)
+    let normalized = horizon / reference.lyapunov_time()?;
+    if !normalized.is_finite() {
+        return Err(MetricError::NonFiniteValue(
+            "Lyapunov-normalized forecast horizon",
+        ));
+    }
+    Ok(normalized)
 }
 
 /// Conditional state probabilities and losses for every available action
@@ -696,4 +702,18 @@ mod tests {
             ))
         );
     }
+    #[test]
+    fn normalized_horizon_rejects_overflow() {
+        let reference = QualifiedLyapunovReference {
+            lambda_max: f64::MAX,
+            qualification: EstimatorQualification::Reliable,
+        };
+        assert_eq!(
+            horizon_in_lyapunov_times(f64::MAX, reference),
+            Err(MetricError::NonFiniteValue(
+                "Lyapunov-normalized forecast horizon"
+            ))
+        );
+    }
+
 }
