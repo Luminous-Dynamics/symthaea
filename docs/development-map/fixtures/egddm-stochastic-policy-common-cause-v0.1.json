@@ -1,0 +1,422 @@
+{
+  "candidate_view": {
+    "scenario_id": "d6-17-2-2-1-common-cause-adaptive-policy-v0.1",
+    "decision_cutoff": "2026-11-17T10:00:00Z",
+    "budget_micros": 1600,
+    "max_depth": 3,
+    "actions": [
+      {
+        "action_id": "release",
+        "read_only": false,
+        "irreversible": true,
+        "hard_gate": true,
+        "max_residual_risk_bps": 0
+      },
+      {
+        "action_id": "inspect-readonly",
+        "read_only": true,
+        "irreversible": false,
+        "hard_gate": false,
+        "max_residual_risk_bps": 0
+      }
+    ],
+    "hypothesis_bounds": [
+      {
+        "hypothesis_id": "safe-world",
+        "lower_probability_bps": 8000,
+        "upper_probability_bps": 9500,
+        "nominal_probability_bps": 9000
+      },
+      {
+        "hypothesis_id": "common-cause-hazard",
+        "lower_probability_bps": 500,
+        "upper_probability_bps": 2000,
+        "nominal_probability_bps": 1000
+      }
+    ],
+    "options": [
+      {
+        "option_id": "gate-a",
+        "available_at": "2026-11-17T09:00:00Z",
+        "factor_id": "gate-a-factor"
+      },
+      {
+        "option_id": "gate-b",
+        "available_at": "2026-11-17T09:00:00Z",
+        "factor_id": "gate-b-factor"
+      }
+    ],
+    "factors": [
+      {
+        "factor_id": "gate-a-factor",
+        "dependence_group": "shared-controller",
+        "source_ids": [
+          "gate-a-sensor"
+        ],
+        "calibration_ref": "gate-a-cal",
+        "likelihoods": [
+          {
+            "hypothesis_id": "safe-world",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 4000,
+                "upper_likelihood_bps": 6000,
+                "nominal_likelihood_bps": 5000
+              },
+              "fail": {
+                "lower_likelihood_bps": 4000,
+                "upper_likelihood_bps": 6000,
+                "nominal_likelihood_bps": 5000
+              }
+            }
+          },
+          {
+            "hypothesis_id": "common-cause-hazard",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              },
+              "fail": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              }
+            }
+          }
+        ]
+      },
+      {
+        "factor_id": "gate-b-factor",
+        "dependence_group": "shared-controller",
+        "source_ids": [
+          "gate-b-sensor"
+        ],
+        "calibration_ref": "gate-b-cal",
+        "likelihoods": [
+          {
+            "hypothesis_id": "safe-world",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 4000,
+                "upper_likelihood_bps": 6000,
+                "nominal_likelihood_bps": 5000
+              },
+              "fail": {
+                "lower_likelihood_bps": 4000,
+                "upper_likelihood_bps": 6000,
+                "nominal_likelihood_bps": 5000
+              }
+            }
+          },
+          {
+            "hypothesis_id": "common-cause-hazard",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              },
+              "fail": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "policy_tree": {
+      "root_node_id": "gate-a-root",
+      "nodes": [
+        {
+          "node_id": "gate-a-root",
+          "kind": "acquire",
+          "option_id": "gate-a",
+          "at": "2026-11-17T09:01:00Z",
+          "branches": {
+            "pass": "gate-b-after-a-pass",
+            "fail": "defer-after-a-fail"
+          }
+        },
+        {
+          "node_id": "gate-b-after-a-pass",
+          "kind": "acquire",
+          "option_id": "gate-b",
+          "at": "2026-11-17T09:02:00Z",
+          "branches": {
+            "pass": "release-after-b-pass",
+            "fail": "defer-after-b-fail"
+          }
+        },
+        {
+          "node_id": "release-after-b-pass",
+          "kind": "stop",
+          "decision_kind": "act",
+          "action_id": "release",
+          "claimed_residual_risk_bps": 0
+        },
+        {
+          "node_id": "defer-after-a-fail",
+          "kind": "stop",
+          "decision_kind": "defer",
+          "action_id": "inspect-readonly",
+          "claimed_residual_risk_bps": 0
+        },
+        {
+          "node_id": "defer-after-b-fail",
+          "kind": "stop",
+          "decision_kind": "defer",
+          "action_id": "inspect-readonly",
+          "claimed_residual_risk_bps": 0
+        }
+      ]
+    }
+  },
+  "oracle": {
+    "actual_hypothesis_id": "safe-world",
+    "decision_cutoff": "2026-11-17T10:00:00Z",
+    "budget_micros": 1600,
+    "actions": [
+      {
+        "action_id": "release",
+        "read_only": false,
+        "irreversible": true,
+        "hard_gate": true,
+        "max_residual_risk_bps": 0
+      },
+      {
+        "action_id": "inspect-readonly",
+        "read_only": true,
+        "irreversible": false,
+        "hard_gate": false,
+        "max_residual_risk_bps": 0
+      }
+    ],
+    "hypothesis_bounds": [
+      {
+        "hypothesis_id": "safe-world",
+        "lower_probability_bps": 8000,
+        "upper_probability_bps": 9500,
+        "nominal_probability_bps": 9000
+      },
+      {
+        "hypothesis_id": "common-cause-hazard",
+        "lower_probability_bps": 500,
+        "upper_probability_bps": 2000,
+        "nominal_probability_bps": 1000
+      }
+    ],
+    "options": [
+      {
+        "option_id": "gate-a",
+        "available_at": "2026-11-17T09:00:00Z",
+        "factor_id": "gate-a-factor"
+      },
+      {
+        "option_id": "gate-b",
+        "available_at": "2026-11-17T09:00:00Z",
+        "factor_id": "gate-b-factor"
+      }
+    ],
+    "factors": [
+      {
+        "factor_id": "gate-a-factor",
+        "dependence_group": "shared-controller",
+        "source_ids": [
+          "gate-a-sensor"
+        ],
+        "calibration_ref": "gate-a-cal",
+        "likelihoods": [
+          {
+            "hypothesis_id": "safe-world",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 4000,
+                "upper_likelihood_bps": 6000,
+                "nominal_likelihood_bps": 5000
+              },
+              "fail": {
+                "lower_likelihood_bps": 4000,
+                "upper_likelihood_bps": 6000,
+                "nominal_likelihood_bps": 5000
+              }
+            }
+          },
+          {
+            "hypothesis_id": "common-cause-hazard",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              },
+              "fail": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              }
+            }
+          }
+        ]
+      },
+      {
+        "factor_id": "gate-b-factor",
+        "dependence_group": "shared-controller",
+        "source_ids": [
+          "gate-b-sensor"
+        ],
+        "calibration_ref": "gate-b-cal",
+        "likelihoods": [
+          {
+            "hypothesis_id": "safe-world",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 4000,
+                "upper_likelihood_bps": 6000,
+                "nominal_likelihood_bps": 5000
+              },
+              "fail": {
+                "lower_likelihood_bps": 4000,
+                "upper_likelihood_bps": 6000,
+                "nominal_likelihood_bps": 5000
+              }
+            }
+          },
+          {
+            "hypothesis_id": "common-cause-hazard",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              },
+              "fail": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "hypothesis_safety": [
+      {
+        "hypothesis_id": "safe-world",
+        "safe_actions": [
+          "release",
+          "inspect-readonly"
+        ]
+      },
+      {
+        "hypothesis_id": "common-cause-hazard",
+        "safe_actions": [
+          "inspect-readonly"
+        ]
+      }
+    ],
+    "calibrations": [
+      {
+        "calibration_id": "gate-a-cal",
+        "authority": "independent-stochastic-evaluation-lab",
+        "valid_from": "2026-11-01T00:00:00Z",
+        "valid_until": "2026-12-01T00:00:00Z",
+        "revoked_at": null,
+        "factor_ids": [
+          "gate-a-factor"
+        ]
+      },
+      {
+        "calibration_id": "gate-b-cal",
+        "authority": "independent-stochastic-evaluation-lab",
+        "valid_from": "2026-11-01T00:00:00Z",
+        "valid_until": "2026-12-01T00:00:00Z",
+        "revoked_at": null,
+        "factor_ids": [
+          "gate-b-factor"
+        ]
+      }
+    ],
+    "billing_currency": "USD",
+    "cost_options": [
+      {
+        "option_id": "gate-a",
+        "cost_micros": 700
+      },
+      {
+        "option_id": "gate-b",
+        "cost_micros": 800
+      }
+    ],
+    "world_kernels": [
+      {
+        "hypothesis_id": "safe-world",
+        "kernel_id": "common-cause-safe-v1",
+        "authority": "independent-stochastic-evaluation-lab",
+        "valid_from": "2026-11-01T00:00:00Z",
+        "valid_until": "2026-12-01T00:00:00Z",
+        "revoked_at": null,
+        "joint_outcomes": [
+          {
+            "outcomes": {
+              "gate-a": "pass",
+              "gate-b": "pass"
+            },
+            "lower_probability_bps": 4000,
+            "upper_probability_bps": 5000,
+            "nominal_probability_bps": 4500
+          },
+          {
+            "outcomes": {
+              "gate-a": "pass",
+              "gate-b": "fail"
+            },
+            "lower_probability_bps": 0,
+            "upper_probability_bps": 1000,
+            "nominal_probability_bps": 500
+          },
+          {
+            "outcomes": {
+              "gate-a": "fail",
+              "gate-b": "pass"
+            },
+            "lower_probability_bps": 0,
+            "upper_probability_bps": 1000,
+            "nominal_probability_bps": 500
+          },
+          {
+            "outcomes": {
+              "gate-a": "fail",
+              "gate-b": "fail"
+            },
+            "lower_probability_bps": 4000,
+            "upper_probability_bps": 5000,
+            "nominal_probability_bps": 4500
+          }
+        ]
+      },
+      {
+        "hypothesis_id": "common-cause-hazard",
+        "kernel_id": "common-cause-hazard-v1",
+        "authority": "independent-stochastic-evaluation-lab",
+        "valid_from": "2026-11-01T00:00:00Z",
+        "valid_until": "2026-12-01T00:00:00Z",
+        "revoked_at": null,
+        "joint_outcomes": [
+          {
+            "outcomes": {
+              "gate-a": "fail",
+              "gate-b": "fail"
+            },
+            "lower_probability_bps": 10000,
+            "upper_probability_bps": 10000,
+            "nominal_probability_bps": 10000
+          }
+        ]
+      }
+    ]
+  }
+}

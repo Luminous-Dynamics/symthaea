@@ -1,0 +1,150 @@
+{
+  "scenario_id": "d6-17-2-2-1-common-cause-adaptive-policy-v0.1",
+  "adjudication_status": "stochastic_joint_kernel_adaptive_policy_scoring",
+  "ambiguity_model": {
+    "cross_hypothesis_kernel_shape": "independent_per_hypothesis_product_set",
+    "assumption": "Each hypothesis-specific joint-kernel credal set may vary independently across hypotheses, alongside the bounded prior set. This assumption applies to robust leaf risk, aggregate coverage, unsafe-action mass and expected-cost envelopes. Shared latent coupling across hypotheses is not represented."
+  },
+  "billing_currency": "USD",
+  "world_count": 2,
+  "joint_row_count": 5,
+  "option_count": 2,
+  "leaf_count": 3,
+  "max_depth": 3,
+  "kernel_provenance": [
+    {
+      "hypothesis_id": "common-cause-hazard",
+      "kernel_id": "common-cause-hazard-v1",
+      "authority": "independent-stochastic-evaluation-lab"
+    },
+    {
+      "hypothesis_id": "safe-world",
+      "kernel_id": "common-cause-safe-v1",
+      "authority": "independent-stochastic-evaluation-lab"
+    }
+  ],
+  "submitted_policy": {
+    "policy_feasible": true,
+    "nominal_justified_action_coverage_bps": 4050,
+    "nominal_unsafe_action_mass_bps": 0,
+    "unnecessary_abstention_bps": 0,
+    "risk_violation_leaf_count": 0,
+    "over_budget_leaf_count": 0,
+    "actual_hypothesis_unsafe_probability_nominal_bps": 0,
+    "actual_hypothesis_unsafe_probability_upper_bps": 0,
+    "worst_case_path_cost_micros": 1500,
+    "nominal_expected_cost_micros": 1060,
+    "worst_case_expected_cost_micros": 1156,
+    "budget_micros": 1600,
+    "leaf_reports": [
+      {
+        "leaf_node_id": "defer-after-a-fail",
+        "decision_kind": "defer",
+        "action_id": "inspect-readonly",
+        "acquisition_options": [
+          "gate-a"
+        ],
+        "joint_row_count": 3,
+        "nominal_path_probability_bps": 5500,
+        "nominal_posterior_risk_bps": 0,
+        "worst_case_posterior_risk_bps": 0,
+        "evidence_support_lower_bps": 4300,
+        "actual_hypothesis_path_possible": true,
+        "action_justified": true,
+        "path_cost_micros": 700,
+        "within_budget": true,
+        "target_action_counterfactual": {
+          "nominal_risk_bps": 1819,
+          "robust_risk_bps": 3847,
+          "support_lower_bps": 4300
+        },
+        "claimed_residual_risk_bps": 0,
+        "claimed_risk_understatement": false
+      },
+      {
+        "leaf_node_id": "defer-after-b-fail",
+        "decision_kind": "defer",
+        "action_id": "inspect-readonly",
+        "acquisition_options": [
+          "gate-a",
+          "gate-b"
+        ],
+        "joint_row_count": 1,
+        "nominal_path_probability_bps": 450,
+        "nominal_posterior_risk_bps": 0,
+        "worst_case_posterior_risk_bps": 0,
+        "evidence_support_lower_bps": 0,
+        "actual_hypothesis_path_possible": true,
+        "action_justified": true,
+        "path_cost_micros": 1500,
+        "within_budget": true,
+        "target_action_counterfactual": {
+          "nominal_risk_bps": 0,
+          "robust_risk_bps": 10000,
+          "support_lower_bps": 0
+        },
+        "claimed_residual_risk_bps": 0,
+        "claimed_risk_understatement": false
+      },
+      {
+        "leaf_node_id": "release-after-b-pass",
+        "decision_kind": "act",
+        "action_id": "release",
+        "acquisition_options": [
+          "gate-a",
+          "gate-b"
+        ],
+        "joint_row_count": 1,
+        "nominal_path_probability_bps": 4050,
+        "nominal_posterior_risk_bps": 0,
+        "worst_case_posterior_risk_bps": 0,
+        "evidence_support_lower_bps": 3200,
+        "actual_hypothesis_path_possible": true,
+        "action_justified": true,
+        "path_cost_micros": 1500,
+        "within_budget": true,
+        "target_action_counterfactual": null,
+        "claimed_residual_risk_bps": 0,
+        "claimed_risk_understatement": false
+      }
+    ],
+    "justified_action_coverage_bounds_bps": {
+      "lower": 3200,
+      "nominal": 4050,
+      "upper": 4750
+    },
+    "unsafe_action_mass_bounds_bps": {
+      "lower": 0,
+      "nominal": 0,
+      "upper": 0
+    }
+  },
+  "expected_cost": {
+    "assumption": "Per-hypothesis joint-kernel credal sets are independent across hypotheses; the evaluator then optimizes the outer prior credal set. Cross-hypothesis shared latent ambiguity requires a coupled joint set.",
+    "nominal_expected_cost_micros": 1060,
+    "worst_case_expected_cost_micros": 1156,
+    "full_revalidation_cost_micros": 1500,
+    "nominal_savings_vs_full_revalidation_micros": 440,
+    "conditional_world_cost_bounds": [
+      {
+        "hypothesis_id": "common-cause-hazard",
+        "nominal_conditional_cost_numerator": 7000000,
+        "worst_case_conditional_cost_numerator": 7000000,
+        "nominal_expected_cost_micros": 700,
+        "worst_case_expected_cost_micros": 700,
+        "nominal_conditional_cost_numerator_bps_micros": 7000000,
+        "worst_case_conditional_cost_numerator_bps_micros": 7000000
+      },
+      {
+        "hypothesis_id": "safe-world",
+        "nominal_conditional_cost_numerator": 11000000,
+        "worst_case_conditional_cost_numerator": 11800000,
+        "nominal_expected_cost_micros": 1100,
+        "worst_case_expected_cost_micros": 1180,
+        "nominal_conditional_cost_numerator_bps_micros": 11000000,
+        "worst_case_conditional_cost_numerator_bps_micros": 11800000
+      }
+    ]
+  },
+  "claim_ceiling": "Exact evaluation of a submitted finite adaptive policy over the evaluator-owned finite joint-outcome credal kernels and bounded prior set. Branch event intervals and conditional expected costs are exact for the registered bounded-simplex sets. Robust leaf risk, aggregate coverage, unsafe-action mass and expected-cost envelopes assume kernel ambiguity sets are independent across hypotheses. It does not optimize over all policies, model stochastic execution costs, authenticate joint-kernel calibration, establish model completeness, or authorize production actions."
+}

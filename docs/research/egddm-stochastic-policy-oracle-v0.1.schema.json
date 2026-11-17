@@ -1,0 +1,416 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-stochastic-policy-oracle-v0.1.schema.json",
+  "title": "EGDDM D6.17.2.2.1 evaluator stochastic joint-kernel oracle v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "actual_hypothesis_id",
+    "decision_cutoff",
+    "budget_micros",
+    "billing_currency",
+    "actions",
+    "hypothesis_bounds",
+    "options",
+    "factors",
+    "hypothesis_safety",
+    "calibrations",
+    "world_kernels",
+    "cost_options"
+  ],
+  "properties": {
+    "actual_hypothesis_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision_cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "budget_micros": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "billing_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action_id",
+          "read_only",
+          "irreversible",
+          "hard_gate",
+          "max_residual_risk_bps"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "read_only": {
+            "type": "boolean"
+          },
+          "irreversible": {
+            "type": "boolean"
+          },
+          "hard_gate": {
+            "type": "boolean"
+          },
+          "max_residual_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        }
+      }
+    },
+    "hypothesis_bounds": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hypothesis_id",
+          "lower_probability_bps",
+          "upper_probability_bps",
+          "nominal_probability_bps"
+        ],
+        "properties": {
+          "hypothesis_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "lower_probability_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "upper_probability_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "nominal_probability_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        }
+      }
+    },
+    "options": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "option_id",
+          "available_at",
+          "factor_id"
+        ],
+        "properties": {
+          "option_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "available_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "factor_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "factors": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "factor_id",
+          "dependence_group",
+          "source_ids",
+          "calibration_ref",
+          "likelihoods"
+        ],
+        "properties": {
+          "factor_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dependence_group": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "calibration_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "likelihoods": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "hypothesis_id",
+                "outcomes"
+              ],
+              "properties": {
+                "hypothesis_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "outcomes": {
+                  "type": "object",
+                  "minProperties": 2,
+                  "maxProperties": 4,
+                  "additionalProperties": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "lower_likelihood_bps",
+                      "upper_likelihood_bps",
+                      "nominal_likelihood_bps"
+                    ],
+                    "properties": {
+                      "lower_likelihood_bps": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      },
+                      "upper_likelihood_bps": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      },
+                      "nominal_likelihood_bps": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "hypothesis_safety": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hypothesis_id",
+          "safe_actions"
+        ],
+        "properties": {
+          "hypothesis_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "safe_actions": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "calibrations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "calibration_id",
+          "authority",
+          "valid_from",
+          "valid_until",
+          "revoked_at",
+          "factor_ids"
+        ],
+        "properties": {
+          "calibration_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "authority": {
+            "type": "string",
+            "minLength": 1
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "valid_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "factor_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "world_kernels": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hypothesis_id",
+          "kernel_id",
+          "authority",
+          "valid_from",
+          "valid_until",
+          "revoked_at",
+          "joint_outcomes"
+        ],
+        "properties": {
+          "hypothesis_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kernel_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "authority": {
+            "type": "string",
+            "minLength": 1
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "valid_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "joint_outcomes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4096,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcomes",
+                "lower_probability_bps",
+                "upper_probability_bps",
+                "nominal_probability_bps"
+              ],
+              "properties": {
+                "outcomes": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "lower_probability_bps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                "upper_probability_bps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                "nominal_probability_bps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "cost_options": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "option_id",
+          "cost_micros"
+        ],
+        "properties": {
+          "option_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cost_micros": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,429 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-stochastic-policy-report-v0.1.schema.json",
+  "title": "EGDDM D6.17.2.2.1 stochastic adaptive policy scoring report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "adjudication_status",
+    "ambiguity_model",
+    "billing_currency",
+    "world_count",
+    "joint_row_count",
+    "option_count",
+    "leaf_count",
+    "max_depth",
+    "kernel_provenance",
+    "submitted_policy",
+    "expected_cost",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adjudication_status": {
+      "const": "stochastic_joint_kernel_adaptive_policy_scoring"
+    },
+    "billing_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "world_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 64
+    },
+    "joint_row_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "option_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 6
+    },
+    "leaf_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 64
+    },
+    "max_depth": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "kernel_provenance": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hypothesis_id",
+          "kernel_id",
+          "authority"
+        ],
+        "properties": {
+          "hypothesis_id": {
+            "type": "string"
+          },
+          "kernel_id": {
+            "type": "string"
+          },
+          "authority": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "submitted_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_feasible",
+        "nominal_justified_action_coverage_bps",
+        "nominal_unsafe_action_mass_bps",
+        "unnecessary_abstention_bps",
+        "risk_violation_leaf_count",
+        "over_budget_leaf_count",
+        "actual_hypothesis_unsafe_probability_nominal_bps",
+        "actual_hypothesis_unsafe_probability_upper_bps",
+        "worst_case_path_cost_micros",
+        "nominal_expected_cost_micros",
+        "worst_case_expected_cost_micros",
+        "budget_micros",
+        "leaf_reports",
+        "justified_action_coverage_bounds_bps",
+        "unsafe_action_mass_bounds_bps"
+      ],
+      "properties": {
+        "policy_feasible": {
+          "type": "boolean"
+        },
+        "nominal_justified_action_coverage_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "nominal_unsafe_action_mass_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "unnecessary_abstention_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "risk_violation_leaf_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "over_budget_leaf_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "actual_hypothesis_unsafe_probability_nominal_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "actual_hypothesis_unsafe_probability_upper_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "worst_case_path_cost_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "nominal_expected_cost_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "worst_case_expected_cost_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "budget_micros": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "leaf_reports": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "leaf_node_id",
+              "decision_kind",
+              "action_id",
+              "acquisition_options",
+              "joint_row_count",
+              "claimed_residual_risk_bps",
+              "claimed_risk_understatement",
+              "nominal_path_probability_bps",
+              "nominal_posterior_risk_bps",
+              "worst_case_posterior_risk_bps",
+              "evidence_support_lower_bps",
+              "actual_hypothesis_path_possible",
+              "action_justified",
+              "path_cost_micros",
+              "within_budget",
+              "target_action_counterfactual"
+            ],
+            "properties": {
+              "leaf_node_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "decision_kind": {
+                "enum": [
+                  "act",
+                  "defer"
+                ]
+              },
+              "action_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "acquisition_options": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "joint_row_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "claimed_residual_risk_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "claimed_risk_understatement": {
+                "type": "boolean"
+              },
+              "nominal_path_probability_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "nominal_posterior_risk_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "worst_case_posterior_risk_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "evidence_support_lower_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "actual_hypothesis_path_possible": {
+                "type": "boolean"
+              },
+              "action_justified": {
+                "type": "boolean"
+              },
+              "path_cost_micros": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "within_budget": {
+                "type": "boolean"
+              },
+              "target_action_counterfactual": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "nominal_risk_bps",
+                      "worst_case_risk_bps",
+                      "support_lower_bps"
+                    ],
+                    "properties": {
+                      "nominal_risk_bps": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      },
+                      "worst_case_risk_bps": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      },
+                      "support_lower_bps": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "justified_action_coverage_bounds_bps": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lower",
+            "nominal",
+            "upper"
+          ],
+          "properties": {
+            "lower": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "nominal": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "upper": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            }
+          }
+        },
+        "unsafe_action_mass_bounds_bps": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lower",
+            "nominal",
+            "upper"
+          ],
+          "properties": {
+            "lower": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "nominal": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "upper": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            }
+          }
+        }
+      }
+    },
+    "expected_cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assumption",
+        "nominal_expected_cost_micros",
+        "worst_case_expected_cost_micros",
+        "full_revalidation_cost_micros",
+        "nominal_savings_vs_full_revalidation_micros",
+        "conditional_world_cost_bounds"
+      ],
+      "properties": {
+        "assumption": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nominal_expected_cost_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "worst_case_expected_cost_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "full_revalidation_cost_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "nominal_savings_vs_full_revalidation_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "conditional_world_cost_bounds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "hypothesis_id",
+              "nominal_expected_cost_micros",
+              "worst_case_expected_cost_micros",
+              "nominal_conditional_cost_numerator_bps_micros",
+              "worst_case_conditional_cost_numerator_bps_micros"
+            ],
+            "properties": {
+              "hypothesis_id": {
+                "type": "string"
+              },
+              "nominal_expected_cost_micros": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "worst_case_expected_cost_micros": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "nominal_conditional_cost_numerator_bps_micros": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "worst_case_conditional_cost_numerator_bps_micros": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ambiguity_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cross_hypothesis_kernel_shape",
+        "assumption"
+      ],
+      "properties": {
+        "cross_hypothesis_kernel_shape": {
+          "const": "independent_per_hypothesis_product_set"
+        },
+        "assumption": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
