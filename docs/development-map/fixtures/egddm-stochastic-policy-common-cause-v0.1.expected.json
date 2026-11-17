@@ -13,13 +13,13 @@
   "max_depth": 3,
   "kernel_provenance": [
     {
-      "hypothesis_id": "safe-world",
-      "kernel_id": "common-cause-safe-v1",
+      "hypothesis_id": "common-cause-hazard",
+      "kernel_id": "common-cause-hazard-v1",
       "authority": "independent-stochastic-evaluation-lab"
     },
     {
-      "hypothesis_id": "common-cause-hazard",
-      "kernel_id": "common-cause-hazard-v1",
+      "hypothesis_id": "safe-world",
+      "kernel_id": "common-cause-safe-v1",
       "authority": "independent-stochastic-evaluation-lab"
     }
   ],
@@ -127,15 +127,6 @@
     "nominal_savings_vs_full_revalidation_micros": 440,
     "conditional_world_cost_bounds": [
       {
-        "hypothesis_id": "safe-world",
-        "nominal_conditional_cost_numerator": 11000000,
-        "worst_case_conditional_cost_numerator": 11800000,
-        "nominal_expected_cost_micros": 1100,
-        "worst_case_expected_cost_micros": 1180,
-        "nominal_conditional_cost_numerator_bps_micros": 11000000,
-        "worst_case_conditional_cost_numerator_bps_micros": 11800000
-      },
-      {
         "hypothesis_id": "common-cause-hazard",
         "nominal_conditional_cost_numerator": 7000000,
         "worst_case_conditional_cost_numerator": 7000000,
@@ -143,6 +134,15 @@
         "worst_case_expected_cost_micros": 700,
         "nominal_conditional_cost_numerator_bps_micros": 7000000,
         "worst_case_conditional_cost_numerator_bps_micros": 7000000
+      },
+      {
+        "hypothesis_id": "safe-world",
+        "nominal_conditional_cost_numerator": 11000000,
+        "worst_case_conditional_cost_numerator": 11800000,
+        "nominal_expected_cost_micros": 1100,
+        "worst_case_expected_cost_micros": 1180,
+        "nominal_conditional_cost_numerator_bps_micros": 11000000,
+        "worst_case_conditional_cost_numerator_bps_micros": 11800000
       }
     ]
   },
