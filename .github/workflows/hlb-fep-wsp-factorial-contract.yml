@@ -4,21 +4,12 @@ on:
   pull_request:
     branches: [main, research/swi-001-weight-space-introspection]
     types: [opened, synchronize, reopened, ready_for_review]
+    # Run the PR validator only when the PR carries the validator prerequisite.
+    # HLB factorial PRs include this file in their diff; generic FEP/HDC source changes
+    # on target branches without the example must not trigger a guaranteed missing-file
+    # failure. The dedicated factorial branch remains covered by the push trigger below.
     paths:
-      - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
       - "crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs"
-      - "crates/core/symthaea-core/Cargo.toml"
-      - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
-      - "docs/research/hlb-fep-wsp-factorial-v1.json"
-      - "crates/core/symthaea-fep/src/hierarchical_information_gain.rs"
-      - "crates/core/symthaea-fep/src/lib.rs"
-      - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
-      - "crates/core/symthaea-core/src/hdc/mod.rs"
-      - "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs"
-      - "crates/core/symthaea-core/src/weight_space_program.rs"
-      - "src/dynamics/cfc/weight_program_adapter.rs"
-      - "src/dynamics/cfc/mod.rs"
-      - "src/dynamics/cfc/network.rs"
   push:
     branches: [research/hlb-fep-wsp-factorial-v2]
     paths:
