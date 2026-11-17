@@ -1,0 +1,677 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/culinary/MealProposalV1.schema.json",
+  "title": "MealProposalV1",
+  "description": "User-reviewable culinary proposal from Symthaea to downstream validation. No appliance/module assignment, schedule, device command or actuation authority is present.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "proposal_id",
+    "revision",
+    "title",
+    "source",
+    "constraints",
+    "ingredients",
+    "tasks",
+    "facts",
+    "uncertainties",
+    "review_state",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "proposal_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "constraints": {
+      "$ref": "#/$defs/constraints"
+    },
+    "ingredients": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ingredient"
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/task"
+      }
+    },
+    "facts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/fact"
+      }
+    },
+    "uncertainties": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/uncertainty"
+      }
+    },
+    "review_state": {
+      "enum": [
+        "proposed",
+        "human_reviewed",
+        "accepted",
+        "rejected"
+      ]
+    },
+    "claim_ceiling": {
+      "const": "A user-reviewable culinary proposal with scoped source references and explicit uncertainty; not verified household inventory, nutrition/health advice, food-safety approval, equipment compatibility, a schedule, or actuation authority."
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_ref",
+        "content_digest_sha256",
+        "license_ref",
+        "attribution",
+        "evidence_class"
+      ],
+      "properties": {
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_digest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "license_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "attribution": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "evidence_class": {
+          "enum": [
+            "user_specified",
+            "observed",
+            "measured",
+            "published",
+            "vendor_declared",
+            "modelled",
+            "simulated"
+          ]
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "servings",
+        "time_budget_ms",
+        "budget_minor_units",
+        "currency_code",
+        "preferred_cuisine_tags",
+        "user_declared_exclusions",
+        "user_declared_preferences"
+      ],
+      "properties": {
+        "servings": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "time_budget_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "budget_minor_units": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "currency_code": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Z]{3}$"
+        },
+        "preferred_cuisine_tags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "user_declared_exclusions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "user_declared_preferences": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "budget_minor_units": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "budget_minor_units"
+            ]
+          },
+          "then": {
+            "properties": {
+              "currency_code": {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "quantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dimension",
+        "value",
+        "decimal_places",
+        "unit"
+      ],
+      "properties": {
+        "dimension": {
+          "enum": [
+            "mass",
+            "volume",
+            "count"
+          ]
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "decimal_places": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6
+        },
+        "unit": {
+          "enum": [
+            "milligram",
+            "gram",
+            "kilogram",
+            "millilitre",
+            "litre",
+            "piece",
+            "count"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "dimension": {
+                "const": "mass"
+              }
+            },
+            "required": [
+              "dimension"
+            ]
+          },
+          "then": {
+            "properties": {
+              "unit": {
+                "enum": [
+                  "milligram",
+                  "gram",
+                  "kilogram"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "dimension": {
+                "const": "volume"
+              }
+            },
+            "required": [
+              "dimension"
+            ]
+          },
+          "then": {
+            "properties": {
+              "unit": {
+                "enum": [
+                  "millilitre",
+                  "litre"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "dimension": {
+                "const": "count"
+              }
+            },
+            "required": [
+              "dimension"
+            ]
+          },
+          "then": {
+            "properties": {
+              "unit": {
+                "enum": [
+                  "piece",
+                  "count"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ingredient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ingredient_id",
+        "display_name",
+        "quantity_state",
+        "quantity",
+        "food_state",
+        "product_lot_ref",
+        "fact_refs"
+      ],
+      "properties": {
+        "ingredient_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "quantity_state": {
+          "enum": [
+            "explicit",
+            "unknown",
+            "not_required"
+          ]
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "food_state": {
+          "enum": [
+            "raw",
+            "cooked",
+            "dried",
+            "frozen",
+            "drained",
+            "rehydrated",
+            "fermented",
+            "other",
+            "unknown"
+          ]
+        },
+        "product_lot_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "fact_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "quantity_state": {
+                "const": "explicit"
+              }
+            },
+            "required": [
+              "quantity_state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "quantity": {
+                "$ref": "#/$defs/quantity"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "quantity_state": {
+                "enum": [
+                  "unknown",
+                  "not_required"
+                ]
+              }
+            },
+            "required": [
+              "quantity_state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "quantity": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "description",
+        "action_label",
+        "ingredient_refs",
+        "depends_on",
+        "estimated_duration_min_ms",
+        "estimated_duration_max_ms",
+        "evidence_refs"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "action_label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "ingredient_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "depends_on": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "estimated_duration_min_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "estimated_duration_max_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "evidence_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fact_id",
+        "ingredient_id",
+        "kind",
+        "scope",
+        "value",
+        "unit",
+        "basis",
+        "source_ref",
+        "source_record_id",
+        "source_version",
+        "evidence_class",
+        "observed_at_epoch_ms",
+        "valid_until_epoch_ms",
+        "market_ref",
+        "license_ref"
+      ],
+      "properties": {
+        "fact_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "ingredient_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "price",
+            "nutrient",
+            "ingredient_identity",
+            "package",
+            "allergen_declaration",
+            "availability",
+            "quality",
+            "process_property",
+            "other"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "generic_ingredient",
+            "product_sku",
+            "supplier_lot",
+            "recipe_process",
+            "market_basket"
+          ]
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "array"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "basis": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_class": {
+          "enum": [
+            "user_specified",
+            "observed",
+            "measured",
+            "published",
+            "vendor_declared",
+            "modelled",
+            "simulated"
+          ]
+        },
+        "observed_at_epoch_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "valid_until_epoch_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "market_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "license_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field_path",
+        "reason",
+        "impact"
+      ],
+      "properties": {
+        "field_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "impact": {
+          "enum": [
+            "planning_blocker",
+            "candidate_scoring_only",
+            "informational"
+          ]
+        }
+      }
+    }
+  }
+}
