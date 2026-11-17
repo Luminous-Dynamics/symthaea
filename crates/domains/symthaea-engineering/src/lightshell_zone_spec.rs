@@ -229,6 +229,13 @@ impl ZoneSpecManifest {
                         format!("{requirement_path}.function_id"),
                         "Requirement references an unknown functional role.",
                     );
+                } else if !functions.contains(requirement.function_id.as_str()) {
+                    push(
+                        &mut findings,
+                        "requirement_function_not_declared",
+                        format!("{requirement_path}.function_id"),
+                        "Every requirement must belong to a functional role declared by its zone.",
+                    );
                 }
                 if !is_known_metric(&requirement.metric_id) {
                     push(
@@ -479,6 +486,8 @@ fn is_known_function(value: &str) -> bool {
             | "cleanability"
             | "sensor_accommodation"
             | "repairability"
+            | "mass_budget"
+            | "seam_integrity"
     )
 }
 
@@ -536,6 +545,8 @@ fn function_supports_metric(function_id: &str, metric_id: &str) -> bool {
         "cleanability" => metric_id == "cleaning_residue_fraction",
         "sensor_accommodation" => metric_id == "sensor_occlusion_fraction",
         "repairability" => metric_id == "repair_time_min",
+        "mass_budget" => metric_id == "added_mass_g",
+        "seam_integrity" => metric_id == "seam_strength_n",
         _ => false,
     }
 }
@@ -666,6 +677,37 @@ mod tests {
         manifest["zones"][0]["functions"][0] = json!("magic_absorption");
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|item| item.code == "unknown_function"));
+    }
+
+    #[test]
+    fn requirement_cannot_smuggle_undeclared_function_into_zone() {
+        let mut manifest = proposed_manifest();
+        manifest["zones"][0]["requirements"][0]["function_id"] = json!("vibration_isolation");
+        manifest["zones"][0]["requirements"][0]["metric_id"] = json!("vibration_transmissibility_ratio");
+        manifest["zones"][0]["requirements"][0]["unit"] = json!("ratio");
+        manifest["zones"][0]["requirements"][0]["direction"] = json!("lower_is_better");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|item| item.code == "requirement_function_not_declared"));
+    }
+
+    #[test]
+    fn mass_and_seam_integrity_metrics_have_explicit_roles() {
+        let mut manifest = proposed_manifest();
+        manifest["zones"][0]["functions"] = json!(["mass_budget", "seam_integrity"]);
+        manifest["zones"][0]["requirements"] = json!([
+            {
+                "function_id": "mass_budget", "metric_id": "added_mass_g", "unit": "g",
+                "direction": "lower_is_better", "hard_gate": false,
+                "lower_bound": null, "upper_bound": null, "method_ref": null, "acceptance_rule_ref": null
+            },
+            {
+                "function_id": "seam_integrity", "metric_id": "seam_strength_n", "unit": "N",
+                "direction": "higher_is_better", "hard_gate": false,
+                "lower_bound": null, "upper_bound": null, "method_ref": null, "acceptance_rule_ref": null
+            }
+        ]);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.is_valid(), "{:?}", report.findings);
     }
 
     #[test]
