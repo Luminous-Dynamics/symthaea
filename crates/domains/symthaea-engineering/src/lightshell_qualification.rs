@@ -15,6 +15,38 @@ const REQUIRED_METRICS: [&str; 4] = [
     "joint_energy_delta",
     "peak_temperature_delta",
 ];
+const KNOWN_METRICS: [&str; 29] = [
+    "coverage_fraction",
+    "added_mass",
+    "mass_per_covered_area",
+    "com_shift",
+    "inertia_shift",
+    "rom_delta",
+    "minimum_clearance",
+    "fabric_migration",
+    "joint_energy_delta",
+    "peak_temperature_delta",
+    "cooling_margin_delta",
+    "transmitted_force",
+    "transmitted_acceleration",
+    "transmitted_strain",
+    "residual_deformation",
+    "abrasion_cycles_to_endpoint",
+    "seam_fatigue_cycles",
+    "attachment_retention",
+    "snag_events",
+    "sensor_occlusion",
+    "perception_error_delta",
+    "install_time",
+    "remove_time",
+    "inspection_time",
+    "clean_time",
+    "repair_time",
+    "cost_per_accepted_service_hour",
+    "replacement_material_mass",
+    "qualified_recovery_fraction",
+];
+
 const REQUIRED_GATES: [&str; 9] = [
     "pinch_shear_clearance",
     "required_rom",
@@ -196,6 +228,19 @@ impl BenchmarkManifest {
                 "Unknown benchmark lifecycle state.",
             );
         }
+        if self
+            .platform
+            .geometry_digest
+            .as_deref()
+            .is_some_and(|digest| !is_sha256_digest(digest))
+        {
+            push(
+                &mut findings,
+                "invalid_geometry_digest",
+                "platform.geometry_digest",
+                "A supplied geometry digest must use sha256: followed by 64 hexadecimal characters.",
+            );
+        }
         if !matches!(
             self.platform.geometry_state.as_str(),
             "unknown" | "simplified_fixture" | "cad_revision_bound" | "as_built_metrology_bound"
@@ -224,6 +269,30 @@ impl BenchmarkManifest {
                     "duplicate_candidate",
                     &path,
                     "Candidate IDs must be unique.",
+                );
+            }
+            if !matches!(
+                candidate.architecture.as_str(),
+                "bare_platform"
+                    | "rigid_or_production_cover"
+                    | "commercial_textile_cover"
+                    | "textile_only"
+                    | "textile_plus_spacer"
+                    | "textile_spacer_plus_local_guard"
+            ) {
+                push(
+                    &mut findings,
+                    "invalid_candidate_architecture",
+                    format!("{path}.architecture"),
+                    "Unknown candidate architecture.",
+                );
+            }
+            if candidate.description.trim().is_empty() {
+                push(
+                    &mut findings,
+                    "candidate_missing_description",
+                    format!("{path}.description"),
+                    "Candidate description must be non-empty.",
                 );
             }
             if !matches!(
@@ -264,6 +333,28 @@ impl BenchmarkManifest {
         let mut metric_keys = HashSet::new();
         for (index, metric) in self.metric_registry.iter().enumerate() {
             let path = format!("metric_registry[{index}]");
+            if !KNOWN_METRICS.contains(&metric.metric_id.as_str()) {
+                push(
+                    &mut findings,
+                    "unknown_metric_id",
+                    format!("{path}.metric_id"),
+                    "Unknown metric identifier.",
+                );
+            }
+            if !matches!(
+                metric.comparison_direction.as_str(),
+                "higher_is_better"
+                    | "lower_is_better"
+                    | "within_declared_band"
+                    | "informational"
+            ) {
+                push(
+                    &mut findings,
+                    "invalid_metric_direction",
+                    format!("{path}.comparison_direction"),
+                    "Unknown metric comparison direction.",
+                );
+            }
             if !candidates.contains_key(metric.candidate_id.as_str()) {
                 push(
                     &mut findings,
@@ -288,12 +379,18 @@ impl BenchmarkManifest {
                     "Metric unit and measurement boundary must be explicit.",
                 );
             }
-            if metric.observed_value.is_some_and(|value| !value.is_finite()) {
+            if metric
+                .observed_value
+                .into_iter()
+                .chain(metric.target_value)
+                .chain(metric.baseline_value)
+                .any(|value| !value.is_finite())
+            {
                 push(
                     &mut findings,
                     "non_finite_metric",
                     &path,
-                    "Observed metric values must be finite.",
+                    "Observed, target and baseline metric values must be finite.",
                 );
             }
         }
@@ -336,6 +433,14 @@ impl BenchmarkManifest {
                     "duplicate_candidate_gate",
                     &path,
                     "A candidate may have only one row per hard-gate ID.",
+                );
+            }
+            if gate.condition.trim().is_empty() {
+                push(
+                    &mut findings,
+                    "gate_missing_condition",
+                    format!("{path}.condition"),
+                    "Hard-gate condition must be explicit.",
                 );
             }
             if !matches!(
@@ -434,16 +539,31 @@ impl BenchmarkManifest {
                         "A passed test requires a protocol revision, instruments, calibration references, SHA-256 raw-data digest and acceptance-rule reference.",
                     );
                 }
-                if candidates
-                    .get(run.candidate_id.as_str())
-                    .is_some_and(|candidate| candidate.availability != "available")
-                {
-                    push(
-                        &mut findings,
-                        "passed_test_candidate_not_available",
-                        &path,
-                        "A passed physical test requires the exact candidate article to be admitted as available.",
-                    );
+                if let Some(candidate) = candidates.get(run.candidate_id.as_str()) {
+                    if candidate.availability != "available" {
+                        push(
+                            &mut findings,
+                            "passed_test_candidate_not_available",
+                            &path,
+                            "A passed physical test requires the exact candidate article to be admitted as available.",
+                        );
+                    }
+                    if candidate.article_revision.as_deref().unwrap_or("").trim().is_empty() {
+                        push(
+                            &mut findings,
+                            "passed_test_without_article_revision",
+                            &path,
+                            "A passed physical test must bind the exact candidate article revision.",
+                        );
+                    }
+                    if candidate.candidate_id != "B0" && candidate.material_lot_refs.is_empty() {
+                        push(
+                            &mut findings,
+                            "passed_test_without_material_lot",
+                            &path,
+                            "A covered candidate's passed physical test must bind one or more material-lot references.",
+                        );
+                    }
                 }
             }
         }
@@ -577,6 +697,9 @@ impl BenchmarkManifest {
         candidates: &HashMap<&str, &Candidate>,
         gate_keys: &HashSet<(&str, &str)>,
     ) -> Vec<String> {
+        if !matches!(self.benchmark_state.as_str(), "frozen" | "running" | "complete") {
+            return Vec::new();
+        }
         let baseline = match candidates.get("B0") {
             Some(candidate)
                 if candidate.availability == "available" && candidate.comparability == "matched" =>
@@ -723,6 +846,10 @@ mod tests {
             .expect("candidate exists");
         candidate.availability = "available".into();
         candidate.comparability = "matched".into();
+        candidate.article_revision = Some(format!("article-{candidate_id}-r1"));
+        if candidate_id != "B0" {
+            candidate.material_lot_refs = vec![format!("material-lot-{candidate_id}-001")];
+        }
         candidate.coverage_boundary_ref = Some("coverage:forearm-elbow-v1".into());
 
         for gate in manifest
