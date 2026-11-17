@@ -1,0 +1,173 @@
+{
+  "scenario_id": "d6.17-noisy-channels-correlated-sources-v0.1",
+  "decision_cutoff": "2026-11-17T10:00:00Z",
+  "budget_micros": 1800,
+  "execution_traces": [
+    {
+      "trace_id": "noisy-point-estimate-false-safe",
+      "acquisitions": [
+        {
+          "option_id": "optical-primary",
+          "modes": [
+            "cold"
+          ]
+        }
+      ]
+    },
+    {
+      "trace_id": "correlated-sensors-not-independent",
+      "acquisitions": [
+        {
+          "option_id": "optical-primary",
+          "modes": [
+            "cold"
+          ]
+        },
+        {
+          "option_id": "optical-secondary",
+          "modes": [
+            "cold"
+          ]
+        }
+      ]
+    },
+    {
+      "trace_id": "joint-common-mode-model",
+      "acquisitions": [
+        {
+          "option_id": "optical-joint",
+          "modes": [
+            "cold",
+            "warm"
+          ]
+        }
+      ]
+    },
+    {
+      "trace_id": "qualified-independent-factors",
+      "acquisitions": [
+        {
+          "option_id": "software-test",
+          "modes": [
+            "cold"
+          ]
+        },
+        {
+          "option_id": "runtime-check",
+          "modes": [
+            "cold"
+          ]
+        }
+      ]
+    },
+    {
+      "trace_id": "calibration-expired-before-decision",
+      "acquisitions": [
+        {
+          "option_id": "stale-check",
+          "modes": [
+            "cold"
+          ]
+        }
+      ]
+    },
+    {
+      "trace_id": "calibration-revoked-before-decision",
+      "acquisitions": [
+        {
+          "option_id": "revoked-check",
+          "modes": [
+            "cold"
+          ]
+        }
+      ]
+    },
+    {
+      "trace_id": "impossible-output-for-actual-world",
+      "acquisitions": [
+        {
+          "option_id": "impossible-check",
+          "modes": [
+            "cold"
+          ]
+        }
+      ]
+    },
+    {
+      "trace_id": "zero-evidence-support",
+      "acquisitions": [
+        {
+          "option_id": "weak-check",
+          "modes": [
+            "cold"
+          ]
+        }
+      ]
+    },
+    {
+      "trace_id": "future-evidence",
+      "acquisitions": [
+        {
+          "option_id": "optical-primary",
+          "modes": [
+            "cold"
+          ]
+        }
+      ]
+    },
+    {
+      "trace_id": "always-act-release",
+      "acquisitions": []
+    },
+    {
+      "trace_id": "always-abstain-readonly",
+      "acquisitions": []
+    },
+    {
+      "trace_id": "three-group-certificate-mismatch",
+      "acquisitions": [
+        {
+          "option_id": "optical-primary",
+          "modes": [
+            "cold"
+          ]
+        },
+        {
+          "option_id": "software-test",
+          "modes": [
+            "cold"
+          ]
+        },
+        {
+          "option_id": "runtime-check",
+          "modes": [
+            "cold"
+          ]
+        }
+      ]
+    },
+    {
+      "trace_id": "drift-widened-channel-bounds",
+      "acquisitions": [
+        {
+          "option_id": "drift-check",
+          "modes": [
+            "cold",
+            "retry"
+          ]
+        }
+      ]
+    }
+  ],
+  "comparison_groups": [
+    {
+      "comparison_id": "bounded-probe-verification-strategies",
+      "trace_ids": [
+        "correlated-sensors-not-independent",
+        "joint-common-mode-model",
+        "qualified-independent-factors",
+        "three-group-certificate-mismatch"
+      ]
+    }
+  ]
+}
