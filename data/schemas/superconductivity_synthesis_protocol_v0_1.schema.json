@@ -1,0 +1,637 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json",
+  "title": "Superconductivity Synthesis Protocol and Execution Record v0.1",
+  "description": "Separate intended protocol, issued commands, measured execution and realized phase outcomes.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "protocol_revision",
+    "target_material",
+    "planned_steps",
+    "execution_runs",
+    "outcome_records",
+    "rights_review",
+    "fixture_only"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "protocol_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protocol_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_only": {
+      "type": "boolean"
+    },
+    "target_material": {
+      "type": "object",
+      "required": [
+        "formula_as_reported",
+        "target_state"
+      ],
+      "properties": {
+        "material_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "formula_as_reported": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_structure": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target_properties": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "protocol_source": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "document_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_locator": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-fA-F0-9]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "precursors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "precursor_id",
+          "identity_status"
+        ],
+        "properties": {
+          "precursor_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "formula_as_reported": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_lot_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "purity_percent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 100
+          },
+          "quantity_value": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "quantity_unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "identity_status": {
+            "enum": [
+              "verified",
+              "reported",
+              "nominal",
+              "unknown"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "planned_steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "step_id",
+          "sequence",
+          "operation",
+          "inputs",
+          "outputs",
+          "setpoints"
+        ],
+        "properties": {
+          "step_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "operation": {
+            "enum": [
+              "add",
+              "mix",
+              "mill",
+              "grind",
+              "dry",
+              "press",
+              "deposit",
+              "heat",
+              "hold",
+              "cool",
+              "quench",
+              "anneal",
+              "filter",
+              "wash",
+              "reduce",
+              "oxidize",
+              "transfer",
+              "characterize",
+              "pressure_hold",
+              "decompress",
+              "other"
+            ]
+          },
+          "inputs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "setpoints": {
+            "type": "object",
+            "properties": {
+              "temperature_k": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "pressure_gpa": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "duration_s": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "heating_rate_k_min": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "cooling_rate_k_min": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "pressure_rate_gpa_s": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "atmosphere": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "flow_rate": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "pH": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 14
+              },
+              "geometry": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "notes": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "safety_review_required": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "execution_runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "run_id",
+          "status",
+          "instrument_ids",
+          "steps"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "planned",
+              "running",
+              "completed",
+              "failed",
+              "aborted",
+              "incomplete"
+            ]
+          },
+          "instrument_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "automation_revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "operator_role": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "step_id",
+                "execution_state",
+                "actual",
+                "actual_evidence"
+              ],
+              "properties": {
+                "step_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "execution_state": {
+                  "enum": [
+                    "commanded",
+                    "executed_unverified",
+                    "sensor_verified",
+                    "failed",
+                    "aborted",
+                    "skipped"
+                  ]
+                },
+                "actual": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "temperature_k": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "minimum": 0
+                    },
+                    "pressure_gpa": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "minimum": 0
+                    },
+                    "duration_s": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "minimum": 0
+                    },
+                    "heating_rate_k_min": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "cooling_rate_k_min": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "pressure_rate_gpa_s": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "atmosphere": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "flow_rate": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "minimum": 0
+                    },
+                    "pH": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "minimum": 0,
+                      "maximum": 14
+                    },
+                    "notes": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "actual_evidence": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "evidence_kind": {
+                      "enum": [
+                        "sensor_trace",
+                        "controller_log",
+                        "operator_log",
+                        "unknown"
+                      ]
+                    },
+                    "source_id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "source_locator": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "digest_sha256": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "pattern": "^[a-fA-F0-9]{64}$"
+                    }
+                  },
+                  "required": [
+                    "evidence_kind"
+                  ],
+                  "additionalProperties": false
+                },
+                "failure_reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "outcome_records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "outcome_id",
+          "run_id",
+          "sample_id",
+          "realized_phases",
+          "characterization_event_ids"
+        ],
+        "properties": {
+          "outcome_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "run_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sample_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "realized_phases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "phase_id",
+                "identity_status",
+                "phase_fraction_percent"
+              ],
+              "properties": {
+                "phase_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "identity_status": {
+                  "enum": [
+                    "refined",
+                    "identified",
+                    "tentative",
+                    "unresolved"
+                  ]
+                },
+                "formula": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "structure": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "phase_fraction_percent": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "microstructure_notes": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "yield_fraction": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "characterization_event_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failure_mode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rights_review": {
+            "enum": [
+              "cleared_for_metadata",
+              "cleared_for_derived_data",
+              "restricted",
+              "pending",
+              "unknown"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "rights_review": {
+      "enum": [
+        "cleared_for_metadata",
+        "cleared_for_derived_data",
+        "restricted",
+        "pending",
+        "unknown"
+      ]
+    }
+  },
+  "additionalProperties": false
+}
