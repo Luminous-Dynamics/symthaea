@@ -380,7 +380,7 @@ fn validate_type_label(value: &str) -> Result<(), RefereeError> {
 fn validate_inputs(
     ground_truth: &[GroundTruthArtifact],
     reports: &[CandidateReport],
-    profile: ReportProfile,
+    profile: &ReportProfile,
 ) -> Result<(), RefereeError> {
     profile.validate()?;
     if ground_truth.is_empty() {
@@ -506,7 +506,7 @@ pub fn evaluate_reports(
     reports: &[CandidateReport],
     profile: ReportProfile,
 ) -> Result<EvaluationReport, RefereeError> {
-    validate_inputs(ground_truth, reports, profile)?;
+    validate_inputs(ground_truth, reports, &profile)?;
     let (selected, budget_excluded_report_ids) = select_reports(reports, profile.maximum_reports);
 
     // Sort source records by stable ID so input-order permutation does not
@@ -726,7 +726,7 @@ pub fn evaluate_systems_final_stream(
         maximum_reports: Some(report_limit),
         localization_tolerance_m: 5.0,
     };
-    validate_inputs(ground_truth, reports, scoring_profile)?;
+    validate_inputs(ground_truth, reports, &scoring_profile)?;
     let (selected, budget_rejected_report_ids) = select_reports(reports, Some(report_limit));
 
     let mut ordered_truth = ground_truth.iter().collect::<Vec<_>>();
