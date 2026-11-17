@@ -1,0 +1,23 @@
+{
+  "schema_version": "0.1.0",
+  "comparison_id": "fixture-bi2212-local-pair-to-bulk-stiffness",
+  "fixture_only": true,
+  "material_id": "fixture-bi2212",
+  "sample_id": "fixture-bi2212-sample-a",
+  "batch_id": "fixture-bi2212-batch-a",
+  "state_id": "fixture-bi2212-pseudogap",
+  "pairing_observation_id": "fixture-local-pairing-energy",
+  "coherence_observation_id": "fixture-bulk-superfluid-stiffness",
+  "matching_basis": "same_specimen",
+  "fixed_conditions": {
+    "pressure": {
+      "semantics": "explicit_ambient",
+      "value_gpa": 0
+    },
+    "magnetic_field_t": 0,
+    "field_orientation": null,
+    "doping_state": "synthetic underdoped state",
+    "strain_state": null
+  },
+  "claim_ceiling": "Synthetic same-specimen linkage only. Pairing energy in meV is not converted to Tc and does not establish bulk superconductivity."
+}
