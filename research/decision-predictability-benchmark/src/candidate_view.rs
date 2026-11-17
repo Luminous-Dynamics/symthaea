@@ -30,6 +30,7 @@ pub enum CandidateViewError {
     ObservationAfterAsOfTime,
     DuplicateTicket,
     UnknownScenario,
+    TaskContractMismatch,
 }
 
 impl fmt::Display for CandidateViewError {
@@ -44,6 +45,7 @@ impl fmt::Display for CandidateViewError {
             Self::ObservationAfterAsOfTime => write!(formatter, "candidate packet contains an observation after its as-of time"),
             Self::DuplicateTicket => write!(formatter, "candidate ticket is already bound in this evaluator run"),
             Self::UnknownScenario => write!(formatter, "scenario ID is not present in the validated manifest"),
+            Self::TaskContractMismatch => write!(formatter, "candidate task contract digest does not match the validated manifest"),
         }
     }
 }
@@ -218,6 +220,9 @@ impl EvaluatorTicketBook {
         scenario_id: &str,
     ) -> Result<(), CandidateViewError> {
         packet.validate()?;
+        if packet.task_contract_digest != manifest.manifest().task.task_contract_digest {
+            return Err(CandidateViewError::TaskContractMismatch);
+        }
         if self.bindings.contains_key(&packet.ticket) {
             return Err(CandidateViewError::DuplicateTicket);
         }
@@ -384,6 +389,20 @@ mod tests {
         assert_eq!(
             book.bind_from_manifest(&packet, &manifest, "ffffffffffffffffffffffffffffffff"),
             Err(CandidateViewError::UnknownScenario)
+        );
+        assert!(book.is_empty());
+    }
+
+    #[test]
+    fn evaluator_book_rejects_task_contract_mismatch() {
+        let manifest = validated_manifest();
+        let scenario_id = manifest.manifest().scenarios[2].scenario_id.clone();
+        let mut packet = packet(TICKET);
+        packet.task_contract_digest = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_owned();
+        let mut book = EvaluatorTicketBook::default();
+        assert_eq!(
+            book.bind_from_manifest(&packet, &manifest, &scenario_id),
+            Err(CandidateViewError::TaskContractMismatch)
         );
         assert!(book.is_empty());
     }
