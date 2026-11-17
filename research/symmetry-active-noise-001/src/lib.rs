@@ -99,6 +99,7 @@ pub enum NoiseErrorV1 {
     },
     ReceiptMismatch,
     InvalidDeterministicInput,
+    EmptyQuantityUnitId,
     InvalidInterval,
     IntervalArithmeticOverflow,
 }
@@ -666,6 +667,8 @@ pub struct IntervalObservationV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BoundedIntervalProblemV1 {
     pub problem_id: String,
+    /// Stable unit-and-scale identifier (for example, "micrometre-integer").
+    pub quantity_unit_id: String,
     pub hypothesis_ids: Vec<String>,
     pub probes: Vec<NoiseProbeV1>,
     /// [hypothesis][probe] -> closed interval of allowed exact outcomes.
@@ -675,6 +678,9 @@ pub struct BoundedIntervalProblemV1 {
 impl BoundedIntervalProblemV1 {
     pub fn validate(&self) -> Result<(), NoiseErrorV1> {
         validate_identifiers(&self.problem_id, &self.hypothesis_ids, &self.probes)?;
+        if self.quantity_unit_id.trim().is_empty() {
+            return Err(NoiseErrorV1::EmptyQuantityUnitId);
+        }
         if self.predicted_intervals_by_hypothesis.len() != self.hypothesis_ids.len() {
             return Err(NoiseErrorV1::BoundedHypothesisCountMismatch);
         }
@@ -696,6 +702,7 @@ impl BoundedIntervalProblemV1 {
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let mut bytes = b"luminous.symm_active_noise.bounded_intervals.v1\\0".to_vec();
         append_string(&mut bytes, &self.problem_id);
+        append_string(&mut bytes, &self.quantity_unit_id);
         bytes.extend_from_slice(&(self.hypothesis_ids.len() as u64).to_le_bytes());
         for hypothesis_id in &self.hypothesis_ids {
             append_string(&mut bytes, hypothesis_id);
@@ -850,6 +857,8 @@ pub fn verify_bounded_interval_receipt(
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SharedAdditiveBiasProblemV1 {
     pub problem_id: String,
+    /// Stable unit-and-scale identifier for both predictions and observations.
+    pub quantity_unit_id: String,
     pub hypothesis_ids: Vec<String>,
     pub probes: Vec<NoiseProbeV1>,
     /// Nominal exact prediction [hypothesis][probe].
@@ -861,6 +870,9 @@ pub struct SharedAdditiveBiasProblemV1 {
 impl SharedAdditiveBiasProblemV1 {
     pub fn validate(&self) -> Result<(), NoiseErrorV1> {
         validate_identifiers(&self.problem_id, &self.hypothesis_ids, &self.probes)?;
+        if self.quantity_unit_id.trim().is_empty() {
+            return Err(NoiseErrorV1::EmptyQuantityUnitId);
+        }
         if self.global_bias_interval.lower > self.global_bias_interval.upper {
             return Err(NoiseErrorV1::InvalidInterval);
         }
@@ -882,6 +894,7 @@ impl SharedAdditiveBiasProblemV1 {
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let mut bytes = b"luminous.symm_active_noise.shared_additive_bias.v1\\0".to_vec();
         append_string(&mut bytes, &self.problem_id);
+        append_string(&mut bytes, &self.quantity_unit_id);
         bytes.extend_from_slice(&(self.hypothesis_ids.len() as u64).to_le_bytes());
         for hypothesis_id in &self.hypothesis_ids {
             append_string(&mut bytes, hypothesis_id);
@@ -1298,6 +1311,7 @@ mod tests {
     fn bounded_numeric_intervals_retain_overlapping_hypotheses_only() {
         let problem = BoundedIntervalProblemV1 {
             problem_id: "numeric-bounded-interval-v1".to_owned(),
+            quantity_unit_id: "millimetre-integer".to_owned(),
             hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned()],
             probes: vec![
                 NoiseProbeV1 { probe_id: "p0".to_owned(), cost: 1, admissible: true },
@@ -1333,6 +1347,7 @@ mod tests {
     fn repeated_numeric_observations_intersect_the_same_probe_interval() {
         let problem = BoundedIntervalProblemV1 {
             problem_id: "numeric-repeat-intersection-v1".to_owned(),
+            quantity_unit_id: "millimetre-integer".to_owned(),
             hypothesis_ids: vec!["H-A".to_owned()],
             probes: vec![NoiseProbeV1 {
                 probe_id: "p0".to_owned(),
@@ -1361,6 +1376,7 @@ mod tests {
     fn one_shared_additive_bias_must_explain_every_probe() {
         let problem = SharedAdditiveBiasProblemV1 {
             problem_id: "shared-numeric-bias-v1".to_owned(),
+            quantity_unit_id: "millimetre-integer".to_owned(),
             hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned()],
             probes: vec![
                 NoiseProbeV1 { probe_id: "p0".to_owned(), cost: 1, admissible: true },
@@ -1400,6 +1416,7 @@ mod tests {
     fn shared_bias_repetition_does_not_allow_a_fresh_nuisance_value() {
         let problem = SharedAdditiveBiasProblemV1 {
             problem_id: "shared-bias-repeat-v1".to_owned(),
+            quantity_unit_id: "millimetre-integer".to_owned(),
             hypothesis_ids: vec!["H-A".to_owned()],
             probes: vec![NoiseProbeV1 {
                 probe_id: "p0".to_owned(),
@@ -1425,6 +1442,28 @@ mod tests {
     }
 
     #[test]
+    fn numeric_interval_unit_scale_is_required_and_receipt_bound() {
+        let mut problem = SharedAdditiveBiasProblemV1 {
+            problem_id: "numeric-unit-contract-v1".to_owned(),
+            quantity_unit_id: String::new(),
+            hypothesis_ids: vec!["H-A".to_owned()],
+            probes: vec![NoiseProbeV1 {
+                probe_id: "p0".to_owned(),
+                cost: 1,
+                admissible: true,
+            }],
+            nominal_predictions_by_hypothesis: vec![vec![0]],
+            global_bias_interval: FixedIntervalV1::new(0, 1).unwrap(),
+        };
+        assert_eq!(problem.validate(), Err(NoiseErrorV1::EmptyQuantityUnitId));
+        problem.quantity_unit_id = "millimetre-integer".to_owned();
+        problem.validate().unwrap();
+        let original = problem.canonical_bytes();
+        problem.quantity_unit_id = "micrometre-integer".to_owned();
+        assert_ne!(original, problem.canonical_bytes());
+    }
+
+    #[test]
     fn interval_endpoints_reject_reversal_and_checked_bias_arithmetic_overflow() {
         assert_eq!(
             FixedIntervalV1::new(5, 4),
@@ -1432,6 +1471,7 @@ mod tests {
         );
         let problem = SharedAdditiveBiasProblemV1 {
             problem_id: "interval-overflow-v1".to_owned(),
+            quantity_unit_id: "millimetre-integer".to_owned(),
             hypothesis_ids: vec!["H-A".to_owned()],
             probes: vec![NoiseProbeV1 {
                 probe_id: "p0".to_owned(),
@@ -1455,6 +1495,7 @@ mod tests {
     fn identical_observation_models_remain_ambiguous() {
         let problem = BoundedIntervalProblemV1 {
             problem_id: "observationally-equivalent-symmetries-v1".to_owned(),
+            quantity_unit_id: "millimetre-integer".to_owned(),
             hypothesis_ids: vec!["H-rotation".to_owned(), "H-reflection".to_owned()],
             probes: vec![NoiseProbeV1 {
                 probe_id: "non-identifying-probe".to_owned(),
