@@ -1,0 +1,13 @@
+[package]
+name = "darpa-artifact-report-referee"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "One-to-one spatial and class referee for bounded underground artifact reports"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
