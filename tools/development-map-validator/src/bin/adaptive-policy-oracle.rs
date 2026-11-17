@@ -312,14 +312,15 @@ fn enumerate_policies(
    &&worlds.values().all(|w|w.safe_actions.contains(*id))
  }).map(|(id,_)|id.clone()).ok_or("no registered read-only zero-risk action safe in every evaluator world")?;
  let defer_id=format!("stop-defer-{}",*counter);*counter+=1;
- output.push(SubPolicy{root:defer_id.clone(),nodes:vec![json!({"node_id":defer_id,"kind":"stop","decision_kind":"defer","action_id":defer_action,"claimed_residual_risk_bps":SCALE})]});
+ output.push(SubPolicy{root:defer_id.clone(),nodes:vec![json!({"node_id":defer_id,"kind":"stop","decision_kind":"defer","action_id":defer_action,"claimed_residual_risk_bps":0})]});
  if !remaining.is_empty(){
   for action_id in actions.keys(){
    if action_id==&defer_action{continue;}
    let risk=risk_for_path(candidate,oracle,steps,&remaining[0],action_id,SCALE)?;
    if risk["evidence_accepted"]==true&&risk["robust_action_justified"]==true{
+    let justified_risk=risk["worst_case_posterior_risk_bps"].as_u64().unwrap_or(SCALE);
     let id=format!("stop-act-{}",*counter);*counter+=1;
-    output.push(SubPolicy{root:id.clone(),nodes:vec![json!({"node_id":id,"kind":"stop","decision_kind":"act","action_id":action_id,"claimed_residual_risk_bps":SCALE})]});
+    output.push(SubPolicy{root:id.clone(),nodes:vec![json!({"node_id":id,"kind":"stop","decision_kind":"act","action_id":action_id,"claimed_residual_risk_bps":justified_risk})]});
    }
   }
  }
