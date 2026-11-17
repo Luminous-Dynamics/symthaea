@@ -92,6 +92,11 @@
       "option_id": "weak-check",
       "available_at": "2026-11-17T09:00:00Z",
       "factor_id": "weak-check"
+    },
+    {
+      "option_id": "drift-check",
+      "available_at": "2026-11-17T09:00:00Z",
+      "factor_id": "drifted-optical"
     }
   ],
   "factors": [
@@ -765,6 +770,76 @@
           }
         }
       ]
+    },
+    {
+      "factor_id": "drifted-optical",
+      "dependence_group": "optical-drifted-path",
+      "source_ids": [
+        "drifted-optical-sensor"
+      ],
+      "calibration_ref": "drift-cal",
+      "likelihoods": [
+        {
+          "hypothesis_id": "safe",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 5000,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 8000
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 5000,
+              "nominal_likelihood_bps": 2000
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-a",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 5000,
+              "nominal_likelihood_bps": 2000
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 5000,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 8000
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-b",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 5000,
+              "nominal_likelihood_bps": 2000
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 5000,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 8000
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-ab",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 3000,
+              "nominal_likelihood_bps": 1000
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 7000,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 9000
+            }
+          }
+        }
+      ]
     }
   ],
   "traces": [
@@ -954,6 +1029,21 @@
         "kind": "act",
         "action_id": "bounded-probe",
         "claimed_residual_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "drift-widened-channel-bounds",
+      "acquisitions": [
+        {
+          "option_id": "drift-check",
+          "observed_value": "clear",
+          "at": "2026-11-17T09:40:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "bounded-probe",
+        "claimed_residual_risk_bps": 180
       }
     }
   ]
