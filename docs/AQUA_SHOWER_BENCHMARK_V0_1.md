@@ -36,7 +36,7 @@ Freeze exact SKU, market variant, installation and configuration before testing.
 | Arm | Role | Evidence to acquire before test |
 |---|---|---|
 | C0 — premium once-through shower | Quality control | Exact head/valve, flow curve, pressure compensation, installation instructions |
-| C1 — efficient once-through showerhead | Efficiency baseline | WaterSense-labelled model where available or exact local-market equivalent; confirm spray and pressure method |
+| C1 — efficient once-through showerhead | Efficiency baseline | WaterSense-labelled model where available or exact local-market equivalent; confirm spray and pressure method |\n| C1-SA — local pressure-compensating showerhead | South African comparator | Reproduce local 150 / 300 kPa test points; CLASP's 2022 sample and 2025 WRC synthesis are context, not substitute for a named SKU test |\n| C1-CR — independent lab-tested direct-flow head | High-performing direct-flow comparator | Freeze an exact 2026-tested model with public measured flow around 1.5–1.6 gpm; use comparable coverage, force and temperature-drop methods |\n| C1-HS — Hansgrohe EcoSmart+ | Premium local-market comparator | Confirm exact model and actual flow curve; the family claim is ≤6 L/min at 3 bar, not independent test evidence |
 | C2 — KOHLER Anthem EvoCycle | Commercial recirculation frontier | Current installation/operating/cleaning manuals, exact Cycle/Standard mode, base/fixture requirements, service and filter intervals |
 | C3 — Orbital Shower | Commercial recirculation comparator | Exact market model, duration basis for ~20 L statement, cleaning/maintenance, fresh-water and energy boundaries |
 | T0 — Luminous direct-flow test article | Our low-flow architecture | Frozen nozzle/spray geometry and valve/heat-recovery configuration |
@@ -49,7 +49,7 @@ Vendor figures are not substituted for test results. If a comparator's boundary 
 
 Before collecting confirmation data, preregister:
 - inlet water temperature and its stability/uncertainty;
-- static and dynamic supply pressure at defined reference locations;
+- static and dynamic supply pressure at defined reference locations; include at least 150 and 300 kPa to align with the South African CLASP proposal, then add any exact comparator-specific standard points such as 3 bar;
 - ambient air temperature and relative humidity;
 - room airflow/ventilation state;
 - exact spray mode, nozzle geometry, head height/orientation and measured spray pattern;
@@ -152,7 +152,7 @@ Targets are experimental hypotheses, not product claims.
 
 | Metric | Initial hypothesis |
 |---|---|
-| Direct-flow fresh-water rate | ≤6.0 L/min at a declared operating point, while meeting the selected independent spray/pressure criteria |
+| Direct-flow primary target | ≤6.0 L/min at 300 kPa, while meeting the selected independent spray/pressure criteria and maintaining acceptable performance at 150 kPa |\n| Direct-flow stretch target | ≤4.5 L/min at 300 kPa, with matched spray force, spray coverage, temperature stability and task outcome; stretch target, not a published standard |
 | Recirculation 10-minute service | ≤18 L fresh water including startup, active use, after-session cleaning and purge |
 | Whole-service fresh-water saving | ≥80% against matched 2.5 US gpm once-through control, only when all-in boundary and comfort/hygiene gates pass |
 | System-level drain heat recovery | ≥60% useful recovery after declared fouling/maintenance, with all parasitic energy and upstream losses counted |
@@ -195,7 +195,7 @@ No human recirculation trial is permitted until:
 - an independent specialist defines the exposure assessment and applicable acceptance limits;
 - all water-contact materials and treatment stages have an evidence-backed envelope;
 - sample locations, timing, methods, laboratory competence, detection limits and uncertainty are preregistered;
-- biofilm, aerosol, stagnation, cleaning, post-use disinfection and cross-user carryover are addressed;
+- biofilm, aerosol, stagnation, cleaning, post-use disinfection and cross-user carryover are addressed across water, biofilm and aerosol phases and across shower hoses, showerheads and pipes;\n- the risk-based microbiological panel is selected by competent specialists. Published reviews identify fecal indicators (E. coli, total coliforms, enterococci), heterotrophic plate counts, Pseudomonas aeruginosa and Legionella spp. as important candidates; supplementary organisms and viruses/protozoa may be relevant to the specific treatment/exposure question. This list is not a universal pass/fail panel;
 - fault injection proves no unqualified water reaches the shower outlet;
 - a competent safety review admits the exact tested configuration and operating envelope.
 
@@ -222,3 +222,27 @@ Turbidity, ORP, pH, conductivity, temperature, UV intensity, ozone residual or f
 - **Gate 6:** field pilot only after local professional approvals and an explicit stop/continue decision.
 
 Passing one gate does not imply another. A queued/skipped workflow is not a pass; an exact-head failure remains a failure until repaired and rerun.
+
+
+## 12. South African comparator protocol addendum
+
+The CLASP South African showerhead study measured 19 models across approximately 250–550 kPa, with spray patterns recorded at 300 kPa. The report recommends considering 150 and 300 kPa test points; WRC's 2025 summary reports pressure-compensating models averaging 6.6 L/min at 300 kPa and fixed-orifice models averaging roughly 24–27 L/min. Aqua's controlled bench should include:
+- 150 kPa low-pressure operation;
+- 300 kPa reference operation;
+- 3 bar for direct comparison with Hansgrohe EcoSmart+ product-family claims;
+- 500 kPa as a high-pressure stress point where the exact test article and installed components are rated for it.
+
+Use the same declared inlet temperature, water chemistry, nozzle orientation and task profile across comparator arms. Do not treat CLASP's anonymized 19-product population averages as the measured result of a named comparator.
+
+The 2026 Consumer Reports laboratory programme tests coverage, force, water consumption, temperature drop and usability. Aqua should record the same dimensions where methods can be obtained and reproduced. An exact CR product/model may be included as an external reference only after its market variant is identified and physically tested in the Aqua rig.
+
+## 13. Recirculation exposure addendum
+
+The 2025 review of recirculating-shower microbial indicators reports limited study of water quality in this emerging category and identifies bacterial indicators and waterborne pathogens that may matter. A 2026 review expands the system view to water, biofilms and aerosols across hoses, showerheads and pipes, with opportunistic pathogens including Legionella, Mycobacterium and Pseudomonas. This supports a stronger research gate: treatment performance in bulk water alone cannot be assumed to establish user exposure safety.
+
+Sources:
+- Pérez Guillemette & Albrechtsen (2025), https://doi.org/10.1016/j.scitotenv.2025.178610
+- Ren et al. (2026), https://doi.org/10.1016/j.jes.2026.02.034
+- CLASP South African showerhead report, https://www.clasp.ngo/research/all/south-african-shower-heads-testing-report/
+- WRC 2025 water-efficiency update, https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf
+- Consumer Reports 2026 lab testing, https://www.consumerreports.org/home-garden/showerheads/best-showerheads-of-the-year-a7580523069/
