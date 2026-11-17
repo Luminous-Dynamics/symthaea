@@ -1018,3 +1018,10 @@ It requires direct product-side H2 flow and purity measurement, sample-train/ana
 Proposed target (not achieved): ≤1 s 90% settling at a declared accepted-H2 delivery boundary, ≤5% flow overshoot, and ≤5% increase in grid-to-accepted-H2 specific energy during a frozen transient profile. The 1.31 ms / 1.10 ms source diagnostic figures are reproduction points only and cannot satisfy the product-service target.
 
 Dedicated issue: [AMMONIA-CRACK-DYNAMIC-SERVICE-001 #12488](https://github.com/Luminous-Dynamics/symthaea/issues/12488).
+
+
+## 9.17 Pulse-width controlled methane chemistry — 2026-11-17
+
+Lim and Gordon, *Energy Deposition Timescale Controls Chemistry in Pulsed Methane Plasmas*, JACS 148(43), 46877–46892 (2026), DOI https://doi.org/10.1021/jacs.6c13735, is recorded as a separate lab-experiment case. It studies 10–50 mJ/pulse and nanosecond-to-millisecond energy-deposition timescales. Nanosecond pulses produce the highest reported overall C2 selectivity (>70%) and up to 20% C2H4; longer pulses are predominantly thermal. At 100 μs, the source reports 15 kWh/kg C2H2 and 40 kWh/kg H2, plus approximately 377 kJ/mol CH4 conversion energy cost. These are distinct measurands and pulse conditions.
+
+New benchmark target `CH4-PULSE-CHEMISTRY-TIMESCALE-001` requires species-resolved product balances, time-aligned diagnostics, distinct product-specific energy denominators, and matched thermal/longer-pulse comparators. The source is not merged with the PPH catalyst regeneration case #12430.
