@@ -161,6 +161,12 @@ A 2026 shower-system review recommends assessing opportunistic pathogens across 
 
 
 
+### Exact once-through and recirculation system comparators
+
+The first named local once-through comparator is Hansgrohe Activera Select S 95 2jet EcoSmart, SKU 28087000: the official South African datasheet lists 7.2 L/min Rain and 6.5 L/min ImpactRain at 3 bar, 0.5 bar minimum flow pressure, FlexPower adjustment and a 40°C SafetyStop. Aqua's 6.0 L/min target must be tested against these spray modes separately; it is not an automatic superiority result. [Hansgrohe South Africa datasheet](https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28087000).
+
+Orbital's support documentation lists a 2–10 bar inlet range, a continuously powered 230 VAC / 16 A core, and recurring filter / descaling / drain maintenance. Exact regional installation, supply capacity, service contract, consumables and maintenance evidence are part of the matched system comparison. These are vendor-declared requirements, not measured reliability or lifecycle-cost results. [Installation requirements](https://support.orbital-systems.com/en/19639-installation-requirements.html) · [Home maintenance intervals](https://support.orbital-systems.com/user-guide/en/16856-maintenance-routines---notifications.html).
+
 ### Competitive position: know which frontier we are and are not pursuing
 
 AQS-1's direct-flow first article is **not** expected to beat the leading recirculating shower on advertised fresh-water volume. At its 6.0 L/min target, a 10-minute active shower uses 60 L before warm-up or other service overhead. KOHLER publishes an EvoCycle example of 5 US gallons / 18.9 L fresh water for a 10-minute Cycle Mode session and a 0.75-US-gallon / 2.84 L Rapid Clean cycle recommended after each shower (about 21.8 L combined before periodic deep-clean inputs). That is a manufacturer-published claim, not independent field qualification, but the order of magnitude matters: direct-flow cannot honestly claim water-use superiority against that stated recirculation mode.
