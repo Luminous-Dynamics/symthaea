@@ -114,15 +114,26 @@ fn validate_context(receipt:&Value,approved:&Value,label:&str)->Result<(),String
  }
  Ok(())
 }
-fn validate_attempts(receipt:&Value,approved_options:&BTreeSet<String>,run_started:Option<DateTime<FixedOffset>>,run_finished:Option<DateTime<FixedOffset>>,label:&str)->Result<(Vec<Attempt>,RunMetrics),String>{
+fn validate_attempts(
+ receipt:&Value,
+ approved_options:&BTreeSet<String>,
+ run_started:Option<DateTime<FixedOffset>>,
+ run_finished:Option<DateTime<FixedOffset>>,
+ queued_at:DateTime<FixedOffset>,
+ label:&str
+)->Result<RunMetrics,String>{
  let rows=get(receipt,"attempts",label)?.as_array().ok_or("attempts must be an array")?;
  if rows.is_empty()||rows.len()>MAX_ATTEMPTS{return Err(format!("{label}.attempts must contain 1..={MAX_ATTEMPTS} events"));}
- let mut attempts=Vec::new();let mut ids=BTreeSet::new();let mut by_id:BTreeMap<String,Attempt>=BTreeMap::new();
- let mut attempt_numbers:BTreeMap<String,u64>=BTreeMap::new();let mut option_costs:BTreeMap<String,Vec<u64>>=BTreeMap::new();
- let mut previous_hash="".to_owned();let mut previous_queue:Option<DateTime<FixedOffset>>=None;
+ let mut seen_ids=BTreeSet::new();
+ let mut event_state:BTreeMap<String,(String,u64,String)>=BTreeMap::new();
+ let mut attempt_numbers:BTreeMap<String,u64>=BTreeMap::new();
+ let mut option_costs:BTreeMap<String,Vec<u64>>=BTreeMap::new();
+ let mut previous_hash=String::new();
+ let mut previous_queue:Option<DateTime<FixedOffset>>=None;
  let mut queued_count=0u64;let mut unknown_count=0u64;let mut retry_count=0u64;
- let mut run_cost=0u64;let mut cost_complete=true;let mut wall_complete=true;
- let mut earliest_started:Option<DateTime<FixedOffset>>=None;let mut latest_completed:Option<DateTime<FixedOffset>>=None;
+ let mut total_cost=0u64;let mut cost_complete=true;let mut wall_complete=true;
+ let mut earliest_started:Option<DateTime<FixedOffset>>=None;
+ let mut latest_completed:Option<DateTime<FixedOffset>>=None;
  for (index,row) in rows.iter().enumerate(){
   let l=format!("{label}.attempts[{index}]");
   allowed(row,&[
@@ -132,7 +143,7 @@ fn validate_attempts(receipt:&Value,approved_options:&BTreeSet<String>,run_start
    "previous_event_sha256","event_sha256"
   ],&l)?;
   let event_id=string(row,"event_id",&l)?;
-  if !ids.insert(event_id.clone()){return Err(format!("{label} has duplicate event ID {event_id:?}"));}
+  if !seen_ids.insert(event_id.clone()){return Err(format!("{label} has duplicate event ID {event_id:?}"));}
   if uint(row,"sequence",&l)?!=index as u64{return Err(format!("{l}.sequence must be contiguous and zero-based"));}
   let option=string(row,"option_id",&l)?;
   if !approved_options.contains(&option){return Err(format!("{l} references unapproved option {option:?}"));}
@@ -146,81 +157,82 @@ fn validate_attempts(receipt:&Value,approved_options:&BTreeSet<String>,run_start
    return Err(format!("{l}.status is invalid"));
   }
   if !["pass","fail","unknown","not_applicable"].contains(&result.as_str()){return Err(format!("{l}.result is invalid"));}
-  let queued_at=timestamp(&string(row,"queued_at",&l)?,&format!("{l}.queued_at"))?;
-  if previous_queue.is_some_and(|previous|queued_at<previous){return Err(format!("{label} attempt queue times regress"));}
-  previous_queue=Some(queued_at);
-  let started_at=optional_time(row,"started_at",&l)?;
-  let completed_at=optional_time(row,"completed_at",&l)?;
-  let elapsed_ms=nullable_uint(row,"elapsed_ms",&l)?;
-  let price_micros=nullable_uint(row,"price_micros",&l)?;
+  let event_queued=timestamp(&string(row,"queued_at",&l)?,&format!("{l}.queued_at"))?;
+  if previous_queue.is_some_and(|previous|event_queued<previous){return Err(format!("{label} attempt queue times regress"));}
+  previous_queue=Some(event_queued);
+  let started=optional_time(row,"started_at",&l)?;
+  let completed=optional_time(row,"completed_at",&l)?;
+  let elapsed=nullable_uint(row,"elapsed_ms",&l)?;
+  let price=nullable_uint(row,"price_micros",&l)?;
   let cpu=uint(row,"cpu_ms",&l)?;let gpu=uint(row,"gpu_ms",&l)?;let network=uint(row,"network_bytes",&l)?;
-  if let Some(start)=started_at{
-   if start<queued_at{return Err(format!("{l}.started_at precedes queued_at"));}
+  if let Some(start)=started{
+   if start<event_queued{return Err(format!("{l}.started_at precedes attempt queued_at"));}
    if run_started.is_some_and(|x|start<x){return Err(format!("{l}.started_at precedes run_started_at"));}
    earliest_started=Some(earliest_started.map_or(start,|x|x.min(start)));
   }
-  if let Some(end)=completed_at{
-   if started_at.is_none_or(|start|end<start){return Err(format!("{l}.completed_at requires a nondecreasing started_at"));}
+  if let Some(end)=completed{
+   let start=started.ok_or_else(||format!("{l}.completed_at requires started_at"))?;
+   if end<start{return Err(format!("{l}.completed_at precedes started_at"));}
    if run_finished.is_some_and(|x|end>x){return Err(format!("{l}.completed_at follows run_finished_at"));}
    latest_completed=Some(latest_completed.map_or(end,|x|x.max(end)));
-   let actual=(end-started_at.unwrap_or(end)).num_milliseconds().max(0) as u64;
-   if elapsed_ms!=Some(actual){return Err(format!("{l}.elapsed_ms does not match the timestamp interval"));}
-  }else if elapsed_ms.is_some(){return Err(format!("{l}.elapsed_ms must be null when completed_at is null"));}
+   let actual=(end-start).num_milliseconds().max(0) as u64;
+   if elapsed!=Some(actual){return Err(format!("{l}.elapsed_ms does not match the timestamp interval"));}
+  }else if elapsed.is_some(){return Err(format!("{l}.elapsed_ms must be null when completed_at is null"));}
   let retry_of=nullable_string(row,"retry_of_event_id",&l)?;
   if attempt_no==1{
    if mode=="retry"||retry_of.is_some(){return Err(format!("{l} first attempt cannot be a retry"));}
   }else{
    if mode!="retry"{return Err(format!("{l} subsequent attempt must use retry mode"));}
    let parent_id=retry_of.as_ref().ok_or_else(||format!("{l} retry requires retry_of_event_id"))?;
-   let parent=by_id.get(parent_id).ok_or_else(||format!("{l} retry parent must be a prior event"))?;
-   if parent.option_id!=option||parent.status!="failed"||parent.attempt_no+1!=attempt_no{
-    return Err(format!("{l} may retry only the immediately preceding definitive failure for the same option"));
+   let (parent_option,parent_number,parent_status)=event_state.get(parent_id)
+    .ok_or_else(||format!("{l} retry parent must be a prior event"))?;
+   if parent_option!=&option||parent_status!="failed"||parent_number+1!=attempt_no{
+    return Err(format!("{l} may retry only the immediately preceding definitive failure for the same option; unknown outcomes require reconciliation"));
    }
    retry_count+=1;
   }
   if mode!="retry"&&retry_of.is_some(){return Err(format!("{l} non-retry event cannot set retry_of_event_id"));}
   match status.as_str(){
    "completed"=>{
-    if started_at.is_none()||completed_at.is_none()||!matches!(result.as_str(),"pass"|"fail"){
+    if started.is_none()||completed.is_none()||!matches!(result.as_str(),"pass"|"fail"){
      return Err(format!("{l} completed status requires start/end times and a pass/fail result"));
     }
    },
    "failed"=>{
-    if started_at.is_none()||completed_at.is_none()||result!="unknown"{
+    if started.is_none()||completed.is_none()||result!="unknown"{
      return Err(format!("{l} failed status requires completed execution and unknown result"));
     }
    },
    "timeout"=>{
-    if started_at.is_none()||result!="unknown"{return Err(format!("{l} timeout requires started execution and unknown result"));}
-    if completed_at.is_none(){wall_complete=false;}
+    if started.is_none()||result!="unknown"{return Err(format!("{l} timeout requires started execution and unknown result"));}
+    if completed.is_none(){wall_complete=false;}
    },
    "cancelled"=>{
-    if started_at.is_none()||result!="unknown"{return Err(format!("{l} cancelled status requires started execution and unknown result"));}
-    if completed_at.is_none(){wall_complete=false;}
+    if started.is_none()||result!="unknown"{return Err(format!("{l} cancelled status requires started execution and unknown result"));}
+    if completed.is_none(){wall_complete=false;}
    },
    "skipped"=>{
-    if started_at.is_some()||completed_at.is_some()||elapsed_ms.is_some()||price_micros!=Some(0)||cpu!=0||gpu!=0||network!=0||result!="not_applicable"{
+    if started.is_some()||completed.is_some()||elapsed.is_some()||price!=Some(0)||cpu!=0||gpu!=0||network!=0||result!="not_applicable"{
      return Err(format!("{l} skipped status must have no execution and zero cost"));
     }
    },
    "queued"=>{
-    if started_at.is_some()||completed_at.is_some()||elapsed_ms.is_some()||price_micros.is_some()||cpu!=0||gpu!=0||network!=0||result!="not_applicable"{
+    if started.is_some()||completed.is_some()||elapsed.is_some()||price.is_some()||cpu!=0||gpu!=0||network!=0||result!="not_applicable"{
      return Err(format!("{l} queued status must have no execution and unknown cost"));
     }
     queued_count+=1;cost_complete=false;wall_complete=false;
    },
    "unknown"=>{
     if result!="unknown"{return Err(format!("{l} unknown status requires unknown result"));}
-    unknown_count+=1;cost_complete=false;
-    if started_at.is_none()||completed_at.is_none(){wall_complete=false;}
+    unknown_count+=1;cost_complete=false;wall_complete=false;
    },
-   _=>return Err("unreachable status".to_owned())
+   _=>return Err("unreachable attempt status".to_owned())
   }
   if status!="skipped"&&status!="queued"{
-   if started_at.is_none(){return Err(format!("{l} executed attempt requires started_at"));}
-   if price_micros.is_none(){cost_complete=false;}
-   if let Some(cost)=price_micros{
-    run_cost=run_cost.checked_add(cost).ok_or_else(||format!("{label} trajectory cost overflow"))?;
+   if started.is_none(){return Err(format!("{l} executed attempt requires started_at"));}
+   if price.is_none(){cost_complete=false;}
+   if let Some(cost)=price{
+    total_cost=total_cost.checked_add(cost).ok_or_else(||format!("{label} trajectory cost overflow"))?;
     if cost>0{
      let _=string(row,"billing_record_ref",&l)?;
      digest_hex(&string(row,"billing_record_sha256",&l)?,&format!("{l}.billing_record_sha256"))?;
@@ -229,43 +241,43 @@ fn validate_attempts(receipt:&Value,approved_options:&BTreeSet<String>,run_start
      option_costs.entry(option.clone()).or_default().push(cost);
     }
    }
-   if let Some(evidence)=nullable_string(row,"evidence_digest_sha256",&l)?{digest_hex(&evidence,&format!("{l}.evidence_digest_sha256"))?;}
-   if matches!(result.as_str(),"pass"|"fail"){
-    let evidence=nullable_string(row,"evidence_digest_sha256",&l)?;
-    if evidence.is_none(){return Err(format!("{l} pass/fail result requires evidence digest"));}
+   let evidence=nullable_string(row,"evidence_digest_sha256",&l)?;
+   if let Some(digest)=evidence.as_ref(){digest_hex(digest,&format!("{l}.evidence_digest_sha256"))?;}
+   if matches!(result.as_str(),"pass"|"fail")&&evidence.is_none(){
+    return Err(format!("{l} pass/fail result requires evidence digest"));
    }
   }
-  let prev=nullable_string(row,"previous_event_sha256",&l)?;
+  let previous=nullable_string(row,"previous_event_sha256",&l)?;
   if index==0{
-   if prev.is_some(){return Err(format!("{l} first event previous_event_sha256 must be null"));}
-  }else if prev.as_deref()!=Some(previous_hash.as_str()){
+   if previous.is_some(){return Err(format!("{l} first event previous_event_sha256 must be null"));}
+  }else if previous.as_deref()!=Some(previous_hash.as_str()){
    return Err(format!("{l} event hash chain predecessor mismatch"));
   }
   let event_hash=checked_digest(row,"event_sha256",&l)?;
-  previous_hash=event_hash.clone();
-  let attempt=Attempt{event_id:event_id.clone(),option_id:option,attempt_no,mode,status,result,queued_at,started_at,completed_at,elapsed_ms,price_micros,event_sha256:event_hash};
-  by_id.insert(event_id,attempt.clone());attempts.push(attempt);
+  previous_hash=event_hash;
+  event_state.insert(event_id,(option,attempt_no,status));
  }
- if let Some(run_start)=run_started{
-  if earliest_started.is_some_and(|x|x<run_start){return Err(format!("{label} run_started_at follows an attempt start"));}
+ if let Some(start)=run_started{
+  if earliest_started.is_some_and(|x|x<start){return Err(format!("{label} run_started_at follows an attempt start"));}
  }else if earliest_started.is_some(){return Err(format!("{label} attempts started but run_started_at is null"));}
- if let Some(run_end)=run_finished{
-  if latest_completed.is_some_and(|x|x>run_end){return Err(format!("{label} run_finished_at precedes an attempt completion"));}
- }else{cost_complete=false;wall_complete=false;}
- let cost=if cost_complete{Some(run_cost)}else{None};
- let wall=match(run_started,run_finished){
-  (Some(start),Some(end)) if wall_complete&&end>=start=>Some((end-start).num_milliseconds() as u64),
+ if let Some(finish)=run_finished{
+  if finish<queued_at{return Err(format!("{label} run_finished_at precedes queued_at"));}
+  if latest_completed.is_some_and(|x|x>finish){return Err(format!("{label} run_finished_at precedes an attempt completion"));}
+ }else{
+  cost_complete=false;wall_complete=false;
+ }
+ let cost_micros=if cost_complete{Some(total_cost)}else{None};
+ let wall_ms=match(run_started,run_finished){
+  (Some(start),Some(finish)) if wall_complete&&finish>=start=>Some((finish-start).num_milliseconds() as u64),
   _=>None
  };
- let queue=match(run_started,Some(queued_at_for_receipt(receipt_label_placeholder()))){
-  _=>None
- };
- let _=queue;
- let _=attempts;
- unreachable!()
-}
-fn receipt_label_placeholder()->DateTime<FixedOffset>{
- DateTime::parse_from_rfc3339("2000-01-01T00:00:00Z").expect("constant timestamp")
+ let queue_delay_ms=run_started.map(|start|(start-queued_at).num_milliseconds().max(0) as u64);
+ Ok(RunMetrics{
+  run_id:String::new(),task_family:String::new(),paired_seed:0,
+  cost_micros,wall_ms,queue_delay_ms,
+  complete_cost:cost_micros.is_some(),complete_wall:wall_ms.is_some(),
+  queued_attempts:queued_count,unknown_attempts:unknown_count,retries:retry_count,option_costs
+ })
 }
 fn evaluate(raw:&str)->Result<Value,String>{
  let bundle:Value=serde_json::from_str(raw).map_err(|e|format!("invalid JSON: {e}"))?;
