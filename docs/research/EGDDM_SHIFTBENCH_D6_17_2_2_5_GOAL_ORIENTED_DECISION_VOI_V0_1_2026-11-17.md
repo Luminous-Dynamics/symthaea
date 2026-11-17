@@ -90,7 +90,13 @@ The fixture contains:
 
 At the current evidence state, release has 5,000 bps posterior hazard risk and is not qualified. The read-only defer has robust and nominal loss of 1,000 micro-USD.
 
-For either gate, a pass can qualify release under the 4,500-bps envelope; a fail does not qualify release and must defer. The two legal rules are therefore:
+For either gate, a pass can qualify release under the 4,500-bps envelope; a fail does not qualify release and must defer.
+
+For the gate-a branches, the independent arithmetic check gives:
+- pass: worst shared-latent posterior hazard risk 4,231 bps, below the 4,500-bps envelope, so release is permitted;
+- fail: worst shared-latent posterior hazard risk 5,834 bps, above the envelope, so release is prohibited and the policy must defer.
+
+The current stop action release has 5,000 bps prior hazard risk and is therefore not qualified; the global read-only defer is the only legal immediate stop action. The two legal rules are therefore:
 - pass → release; fail → inspect/defer;
 - both outcomes → inspect/defer.
 
