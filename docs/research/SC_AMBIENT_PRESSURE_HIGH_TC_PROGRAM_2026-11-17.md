@@ -727,3 +727,11 @@ The registry auditor's exact count assertions now expect 23 / 13 / 18. All ident
 The observation-event schema now requires measurement_scope for every assertion. An observed Tc must explicitly declare mesoscopic, bulk or device; local_probe and unknown are rejected. Pairing energy remains a separate observed property in meV and requires a local/mesoscopic/bulk measurement scope. Calculated/predicted values retain their own model scope.
 
 The auditor adds negative controls for omitted and unknown scope on observed Tc. The claim boundary is now fail-closed: an unscoped transition is not promoted into bulk evidence by default.
+
+## 40. External literature-library lineage is mandatory for database imports
+
+The observation-event schema now supports source.external_catalog with library ID, external record ID, API version, dataset version, snapshot ID, retrieval time, ETag, X-Data-Version and parent paper/material/sample/state/result IDs.
+
+For extraction_method=database_import, the Rust auditor fails closed unless external catalog identity is retained. It checks that X-Data-Version equals the declared data_version and that external parent material, sample, state and result IDs match the imported event's own IDs.
+
+The new synthetic SCLib-shaped event is a plumbing fixture, not a real SCLib record. It does not copy any external dataset or third-party paper content. It establishes the lossless lineage requirement that #12669 will use during any future lawful, snapshot-pinned data import.
