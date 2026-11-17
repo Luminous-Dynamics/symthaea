@@ -42,7 +42,9 @@ fn build_ledger(
         return Err("event_count must be nonzero and divisible by source_count".to_owned());
     }
     if late_rate_basis_points > 10_000 {
-        return Err("late-event rate must be in the inclusive range 0..=10000 basis points".to_owned());
+        return Err(
+            "late-event rate must be in the inclusive range 0..=10000 basis points".to_owned(),
+        );
     }
     let per_source_count = event_count / source_count;
     if per_source_count < *INTERVAL_WIDTHS.iter().max().unwrap_or(&1) {
