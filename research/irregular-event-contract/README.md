@@ -247,3 +247,6 @@ at the requested cutoff and whose source-time validity covers the timestamp.
 The full history can be replayed and its digest reproduced. A caller cannot
 silently substitute a future calibration or reuse a calibration that does not
 cover the queried source time.
+
+
+Clock event ordering now has a three-valued contract: definitely late, definitely not late, or ambiguous when mapped uncertainty intervals overlap. Same-source/same-calibration comparisons preserve the exclusive equality boundary; cross-revision comparisons retain both calibration digests. It remains a pure comparison primitive pending adapter integration into the source-watermark receipt.
