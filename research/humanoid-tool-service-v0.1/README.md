@@ -182,6 +182,18 @@ The producer chain and blob IDs are recorded in the mapping manifest. The crate 
 
 **Important distinction:** this resolves the raw-qpos ordering blocker for the pinned simulation source. It does not yet provide a UEC v2 platform implementation, runtime adapter conformance, real-G1 hardware binding, physical calibration, safety qualification or actuator authority. The Rust tests are authored but have not been executed in this environment.
 
+## Failure-to-skill learning and protected capability retention
+
+A second child programme, [HUM-FAILURE-TO-SKILL-001 #12706](https://github.com/Luminous-Dynamics/symthaea/issues/12706), measures whether a failed interaction can produce a reusable correction without promoting an unverified episode or degrading older skills.
+
+Its synthetic corpus includes 30 cases across six skill families. Each family contains a causal-correction case, irrelevant confound, poisoned memory record, wrong-embodiment/stale applicability case and protected-skill regression case.
+
+Artifacts:
+- [30-case failure-to-skill corpus](failure-to-skill-cases-v0.1.json)
+- [Corpus schema](failure-to-skill-cases-v0.1.schema.json)
+
+Promotion is candidate-only until independent replay, counterfactual testing, held-out transfer, protected-skill retention and verifier evidence all pass. No live controller or skill is modified by this research tranche.
+
 ## Human-augmented repair is a parallel delivery path
 
 Symthaea should be useful before its humanoid is physically qualified to perform every repair itself.
@@ -204,6 +216,7 @@ Longer term, the two tracks can share validated tool semantics, fault knowledge 
 - `g1-decoupled-v1-mapping.json` / `g1-decoupled-v1-mapping.schema.json`: exact G1 state/action mapping and source-traced raw-qpos producer chain.
 - `g1-mapping-audit/`: dependency-free Rust mapping primitives, golden/negative-control tests and focused workflow.
 - `tool-discovery-cases-v0.1.json` / `tool-discovery-cases-v0.1.schema.json`: 24 synthetic active-affordance discovery cases across six tool families.
+- `failure-to-skill-cases-v0.1.json` / `failure-to-skill-cases-v0.1.schema.json`: 30 synthetic cases for causal skill correction, poisoned memory, applicability and protected-skill retention.
 
 These artifacts define a prospective benchmark. They do not indicate that benchmark episodes were run or that any task has been solved.
 
