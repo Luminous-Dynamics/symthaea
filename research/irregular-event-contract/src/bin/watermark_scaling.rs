@@ -238,7 +238,7 @@ fn run_case(
         let started = Instant::now();
         let report =
             black_box(verified_query().map_err(|error| format!("verified query: {error}"))?);
-        black_box(report.verdict);
+        black_box(report.report().verdict);
         verified_samples.push(started.elapsed());
     }
 
