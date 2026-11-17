@@ -78,7 +78,9 @@
                     "fluid_chemical_barrier",
                     "cleanability",
                     "sensor_accommodation",
-                    "repairability"
+                    "repairability",
+                    "mass_budget",
+                    "seam_integrity"
                   ]
                 },
                 "metric_id": {
