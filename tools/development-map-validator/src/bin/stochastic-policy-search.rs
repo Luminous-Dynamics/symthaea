@@ -203,15 +203,19 @@ fn evaluate(raw:&str)->Result<Value,String>{
  if cap==0||cap>MAX_POLICY_CAP{return Err(format!("max_generated_policies must be in 1..={MAX_POLICY_CAP}"));}
  let max_depth=uint(candidate,"max_depth","candidate_view")? as usize;
  if max_depth==0||max_depth>5{return Err("max_depth must be in 1..=5".to_owned());}
+ let decision_cutoff=string(candidate,"decision_cutoff","candidate_view")?;
  let options_raw=get(candidate,"options","candidate_view")?.as_array().ok_or("candidate options must be array")?;
  if options_raw.is_empty()||options_raw.len()>MAX_OPTIONS{return Err("search candidate must contain 1..=6 options".to_owned());}
  let mut option_times=BTreeMap::new();let mut option_factors=BTreeMap::new();
  for (i,row) in options_raw.iter().enumerate(){
   let label=format!("candidate_view.options[{i}]");
   let id=string(row,"option_id",&label)?;
-  let at=string(row,"available_at",&label)?;
+  let _available_at=string(row,"available_at",&label)?;
   let factor=string(row,"factor_id",&label)?;
-  if option_times.insert(id.clone(),at).is_some(){return Err(format!("duplicate option {id:?}"));}
+  // Search scores policy order, not wall-clock scheduling. Every selected
+  // measurement is represented as available at the registered decision
+  // cutoff, so a later tree depth never receives a regressing timestamp.
+  if option_times.insert(id.clone(),decision_cutoff.clone()).is_some(){return Err(format!("duplicate option {id:?}"));}
   option_factors.insert(id,factor);
  }
  let factor_rows=get(candidate,"factors","candidate_view")?.as_array().ok_or("candidate factors must be array")?;
