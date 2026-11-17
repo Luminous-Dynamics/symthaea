@@ -262,6 +262,13 @@ pub fn evaluate_inspection_case(case: &InspectionCase) -> Result<InspectionCaseR
     if case.evaluation_models.is_empty() {
         return Err(AdapterError::MissingEvaluationModels);
     }
+    if !case
+        .evaluation_models
+        .iter()
+        .any(|model| model.problem == case.primary_model)
+    {
+        return Err(AdapterError::MissingPrimaryModel);
+    }
     let belief = validate_adapter_inputs(&case.primary_model)?;
     let (no_test_decision, no_test_risk) = best_decision(&case.primary_model, &belief)?;
     let prior_entropy = entropy(&belief);
@@ -439,6 +446,39 @@ mod tests {
         assert!(report.planner_gross_evsi > 0.0);
         assert!(report.robust_policy_admissible);
         assert_eq!(report.robust.model_count, 2);
+    }
+
+    #[test]
+    fn independent_referee_detects_cached_branches_under_prior_shift() {
+        let report = evaluate_inspection_case(
+            &synthetic_decision_boundary_case(InspectionTask::PipeCable),
+        )
+        .unwrap();
+        let shifted = report
+            .robust
+            .per_model
+            .iter()
+            .find(|model| model.model_id == "shifted_prior_synthetic")
+            .unwrap();
+        assert!(shifted.cached_branch_mismatches > 0);
+        assert!(shifted.external_gates_passed);
+        assert!(shifted.all_supported_paths_within_budget);
+    }
+
+    #[test]
+    fn primary_policy_model_must_be_in_the_referee_model_set() {
+        let mut case = synthetic_decision_boundary_case(InspectionTask::PipeCable);
+        case.evaluation_models.clear();
+        assert_eq!(
+            evaluate_inspection_case(&case),
+            Err(AdapterError::MissingEvaluationModels)
+        );
+        let mut case = synthetic_decision_boundary_case(InspectionTask::PipeCable);
+        case.evaluation_models.retain(|model| model.model_id != "nominal_synthetic");
+        assert_eq!(
+            evaluate_inspection_case(&case),
+            Err(AdapterError::MissingPrimaryModel)
+        );
     }
 
     #[test]
