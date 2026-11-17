@@ -133,13 +133,6 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
                         }
                     }
                 }
-                if let Some(parent_result) = parents.get("result_id").and_then(Value::as_str) {
-                    if Some(parent_result) != external_record_id {
-                        return Err(format!(
-                            "{observation_id}: external result_id must match external_record_id"
-                        ));
-                    }
-                }
             }
         }
 
@@ -724,11 +717,12 @@ mod tests {
     }
 
     #[test]
-    fn imported_external_result_id_must_match_record_id() {
+    fn external_api_record_and_parent_result_ids_remain_distinct() {
         let (_, mut fixture) = committed_inputs();
         fixture["observations"][7]["source"]["external_catalog"]
-            ["external_parent_ids"]["result_id"] = json!("different-result");
-        assert!(audit_mutated(fixture).is_err());
+            ["external_parent_ids"]["result_id"] = json!("fixture-parent-result-019");
+        let receipt = audit_mutated(fixture).unwrap();
+        assert_eq!(receipt["status"], "pass");
     }
 
     #[test]
