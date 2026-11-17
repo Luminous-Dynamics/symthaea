@@ -395,13 +395,6 @@ impl BenchmarkManifest {
             }
         }
 
-        if let Some(baseline) = self
-            .metric_registry
-            .iter()
-            .find(|metric| metric.candidate_id == "B0" && metric.metric_id == "added_mass")
-        {
-            let _ = baseline;
-        }
         for candidate in self.matched_candidates.iter().filter(|candidate| {
             candidate.candidate_id != "B0" && candidate.comparability == "matched"
         }) {
