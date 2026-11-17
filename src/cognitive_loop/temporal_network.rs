@@ -19,6 +19,7 @@ use ndarray::Array1;
 ///
 /// This allows the CognitiveLoopService to use CfC, HdcLtcUnified, or
 /// HierarchicalCfC as the temporal prediction backend, selected at runtime.
+#[derive(Clone)]
 #[allow(dead_code)] // RESERVED(future): temporal network routing
 pub(super) enum TemporalNetwork {
     /// CfC (Closed-form Continuous-time) network
@@ -156,7 +157,35 @@ impl TemporalNetwork {
         }
     }
 
-    /// Whether `predict_forward` on this backend leaves live state untouched.
+    /// Forecast on a private model fork, leaving the live model untouched.
+    ///
+    /// The underlying backends have different native forecast semantics:
+    /// CfC and HierarchicalCfC advance their state, while HdcLtc uses an
+    /// internal snapshot/restore buffer. This method gives callers one safe
+    /// contract by cloning the complete backend before invoking its native
+    /// predictor. The clone includes weights, optimizer state, recurrent
+    /// hidden state, hierarchical feedback context and scratch buffers.
+    ///
+    /// This is intentionally a correctness-first implementation. Full model
+    /// cloning can be expensive, especially for high-dimensional HDC-LTC
+    /// networks. Callers making many forecasts should benchmark this cost
+    /// against a future backend-specific immutable snapshot/fork optimization.
+    pub fn predict_forward_isolated(
+        &self,
+        input: &Array1<f32>,
+        horizon: f32,
+    ) -> Result<Array1<f32>> {
+        if !horizon.is_finite() || horizon < 0.0 {
+            anyhow::bail!("forecast horizon must be finite and non-negative");
+        }
+        let mut fork = self.clone();
+        fork.predict_forward(input, horizon)
+    }
+
+    /// Whether the backend's native `predict_forward` on this backend leaves live state untouched.
+    ///
+    /// This describes the native mutable API, not `predict_forward_isolated`,
+    /// which preserves live state for every cloneable backend.
     ///
     /// True for HdcLtc (its predict_forward snapshots/restores internally).
     /// False for classic CfC (predict_forward advances state; callers must
@@ -374,5 +403,107 @@ impl TemporalNetwork {
         } else {
             None
         }
+    }
+}
+
+
+#[cfg(test)]
+mod isolated_forecast_tests {
+    use super::*;
+    use crate::dynamics::cfc::CfCNetworkConfig;
+    use crate::dynamics::hierarchical_cfc::HierarchicalCfCConfig;
+    use crate::hdc_ltc_bridge::HdcLtcBridgeConfig;
+
+    fn input_for(dimension: usize, step: usize) -> Array1<f32> {
+        Array1::from_iter((0..dimension).map(|index| {
+            (((index + step * 3) as f32) * 0.031).sin() * 0.2
+        }))
+    }
+
+    fn backend_fixtures() -> Vec<(TemporalNetwork, usize)> {
+        let cfc_config = CfCNetworkConfig::default();
+        let cfc_dimension = cfc_config.input_dim;
+
+        let hdc_config = HdcLtcBridgeConfig::fast();
+        let hdc_dimension = hdc_config.input_dim;
+
+        let hierarchical_config = HierarchicalCfCConfig::default();
+        let hierarchical_dimension = hierarchical_config.input_dim;
+
+        vec![
+            (TemporalNetwork::CfC(CfCNetwork::new(cfc_config)), cfc_dimension),
+            (
+                TemporalNetwork::HdcLtc(HdcLtcBridge::new(hdc_config)),
+                hdc_dimension,
+            ),
+            (
+                TemporalNetwork::HierarchicalCfC(HierarchicalCfC::new(hierarchical_config)),
+                hierarchical_dimension,
+            ),
+        ]
+    }
+
+    fn assert_observable_state_equal(left: &TemporalNetwork, right: &TemporalNetwork) {
+        assert_eq!(left.read_state().unwrap(), right.read_state().unwrap());
+        assert_eq!(left.flattened_tau(), right.flattened_tau());
+        assert_eq!(left.state_diversity().to_bits(), right.state_diversity().to_bits());
+        assert_eq!(left.backend_type(), right.backend_type());
+    }
+
+    #[test]
+    fn isolated_forecasts_preserve_live_state_and_future_trajectory_for_every_backend() {
+        for (mut live, dimension) in backend_fixtures() {
+            let mut control = live.clone();
+
+            // Build a non-trivial live state before forecasting.
+            for step in 0..4 {
+                let input = input_for(dimension, step);
+                live.step(&input, 0.05).unwrap();
+                control.step(&input, 0.05).unwrap();
+            }
+            assert_observable_state_equal(&live, &control);
+
+            // Forecast multiple horizons in both orders. All forecasts must
+            // leave the original trajectory equivalent to an unqueried clone.
+            for horizon in [0.0_f32, 0.1, 1.0, 10.0] {
+                let prediction = live
+                    .predict_forward_isolated(&input_for(dimension, 7), horizon)
+                    .unwrap();
+                assert!(!prediction.is_empty());
+                assert!(prediction.iter().all(|value| value.is_finite()));
+                assert_observable_state_equal(&live, &control);
+            }
+
+            for horizon in [10.0_f32, 1.0, 0.1, 0.0] {
+                let first = live
+                    .predict_forward_isolated(&input_for(dimension, 9), horizon)
+                    .unwrap();
+                let second = live
+                    .predict_forward_isolated(&input_for(dimension, 9), horizon)
+                    .unwrap();
+                assert_eq!(first, second, "forecast replay must be deterministic");
+                assert_observable_state_equal(&live, &control);
+            }
+
+            // Future live outputs must remain identical, catching hidden
+            // hierarchical feedback-state mutations that read_state alone
+            // would not necessarily expose.
+            for step in 4..10 {
+                let input = input_for(dimension, step);
+                live.step(&input, 0.05).unwrap();
+                control.step(&input, 0.05).unwrap();
+                assert_observable_state_equal(&live, &control);
+            }
+        }
+    }
+
+    #[test]
+    fn isolated_forecast_rejects_invalid_horizons() {
+        let mut fixtures = backend_fixtures();
+        let (network, dimension) = fixtures.remove(0);
+        let input = input_for(dimension, 0);
+        assert!(network.predict_forward_isolated(&input, -0.1).is_err());
+        assert!(network.predict_forward_isolated(&input, f32::NAN).is_err());
+        assert!(network.predict_forward_isolated(&input, f32::INFINITY).is_err());
     }
 }
