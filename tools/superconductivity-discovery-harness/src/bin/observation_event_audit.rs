@@ -122,12 +122,16 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
                 .filter(|value| !value.trim().is_empty())
                 .ok_or_else(|| format!("{observation_id}: process step requires step_id"))?;
             if !process_step_ids.insert(step_id.to_owned()) {
-                return Err(format!("{observation_id}: duplicate process step id {step_id}"));
+                return Err(format!(
+                    "{observation_id}: duplicate process step id {step_id}"
+                ));
             }
             let sequence = step
                 .get("sequence")
                 .and_then(Value::as_u64)
-                .ok_or_else(|| format!("{observation_id}/{step_id}: sequence must be a non-negative integer"))?;
+                .ok_or_else(|| {
+                    format!("{observation_id}/{step_id}: sequence must be a non-negative integer")
+                })?;
             if previous_sequence.is_some_and(|previous| sequence <= previous) {
                 return Err(format!(
                     "{observation_id}: process step sequence must be strictly increasing"
@@ -142,9 +146,9 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
             let actual = step
                 .get("actual")
                 .ok_or_else(|| format!("{observation_id}/{step_id}: missing actual field"))?;
-            let actual_source = step
-                .get("actual_source")
-                .ok_or_else(|| format!("{observation_id}/{step_id}: missing actual_source field"))?;
+            let actual_source = step.get("actual_source").ok_or_else(|| {
+                format!("{observation_id}/{step_id}: missing actual_source field")
+            })?;
 
             match state {
                 "planned" | "commanded" => {
@@ -170,10 +174,15 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
                     let source = actual_source
                         .as_object()
                         .ok_or_else(|| format!("{observation_id}/{step_id}: sensor_verified step requires actual_source"))?;
-                    let source_id = source
-                        .get("source_id")
-                        .and_then(Value::as_str)
-                        .ok_or_else(|| format!("{observation_id}/{step_id}: actual_source requires source_id"))?;
+                    let source_id =
+                        source
+                            .get("source_id")
+                            .and_then(Value::as_str)
+                            .ok_or_else(|| {
+                                format!(
+                                    "{observation_id}/{step_id}: actual_source requires source_id"
+                                )
+                            })?;
                     if !source_ids.contains(source_id) {
                         return Err(format!(
                             "{observation_id}/{step_id}: unresolved process evidence source {source_id}"
@@ -183,7 +192,10 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
                         .get("measurement_status")
                         .and_then(Value::as_str)
                         .ok_or_else(|| format!("{observation_id}/{step_id}: actual_source requires measurement_status"))?;
-                    if !matches!(measurement_status, "sensor_measured" | "controller_readback") {
+                    if !matches!(
+                        measurement_status,
+                        "sensor_measured" | "controller_readback"
+                    ) {
                         return Err(format!(
                             "{observation_id}/{step_id}: sensor_verified requires sensor_measured or controller_readback evidence"
                         ));
@@ -191,13 +203,17 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
                     let locator = source
                         .get("locator")
                         .and_then(Value::as_object)
-                        .ok_or_else(|| format!("{observation_id}/{step_id}: actual_source requires locator"))?;
+                        .ok_or_else(|| {
+                            format!("{observation_id}/{step_id}: actual_source requires locator")
+                        })?;
                     let has_locator = ["page", "section", "table", "figure", "row_or_record_id"]
                         .iter()
                         .any(|field| {
                             locator.get(*field).is_some_and(|value| match value {
                                 Value::String(text) => !text.trim().is_empty(),
-                                Value::Number(number) => number.as_u64().is_some_and(|number| number > 0),
+                                Value::Number(number) => {
+                                    number.as_u64().is_some_and(|number| number > 0)
+                                }
                                 _ => false,
                             })
                         });
@@ -218,7 +234,11 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
                         ));
                     }
                 }
-                other => return Err(format!("{observation_id}/{step_id}: unsupported execution_state {other}")),
+                other => {
+                    return Err(format!(
+                        "{observation_id}/{step_id}: unsupported execution_state {other}"
+                    ));
+                }
             }
         }
 
@@ -579,8 +599,7 @@ mod tests {
     #[test]
     fn planned_process_step_cannot_contain_actual_execution() {
         let (_, mut fixture) = committed_inputs();
-        fixture["observations"][4]["process_history"][0]["execution_state"] =
-            json!("planned");
+        fixture["observations"][4]["process_history"][0]["execution_state"] = json!("planned");
         assert!(audit_mutated(fixture).is_err());
     }
 
@@ -603,7 +622,10 @@ mod tests {
     fn high_pressure_treatment_does_not_change_ambient_measurement_pressure() {
         let (_, mut fixture) = committed_inputs();
         let event = &fixture["observations"][4];
-        assert_eq!(event["conditions"]["pressure"]["semantics"], "explicit_ambient");
+        assert_eq!(
+            event["conditions"]["pressure"]["semantics"],
+            "explicit_ambient"
+        );
         assert_eq!(event["conditions"]["pressure"]["value_gpa"], 0.0);
         assert_eq!(event["process_history"][0]["actual"]["pressure_gpa"], 18.9);
         assert_eq!(event["process_history"][1]["actual"]["pressure_gpa"], 0.0);
