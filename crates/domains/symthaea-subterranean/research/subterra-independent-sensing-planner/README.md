@@ -4,7 +4,7 @@ A deterministic, bounded exact planner for selecting a set of acquisition paths 
 
 ## What changes
 
-The planner does not maximize sensor count or sum per-sensor EVSI. It enumerates feasible subsets whose transitive claim-critical dependency closures are pairwise disjoint and disjoint from the independent verifier. It returns a Pareto frontier over energy, time, data, exposure, interruption-risk and robot-loss upper bounds. Units remain separate; no guessed scalar score is used.
+The planner does not maximize sensor count or sum per-sensor EVSI. It enumerates feasible subsets whose transitive claim-critical dependency closures are pairwise disjoint and disjoint from the independent verifier. It returns a Pareto frontier over energy, time, data, exposure, interruption-risk and robot-loss upper bounds. Units remain separate; no guessed scalar score is used. Each option binds a deployment-bundle ID/digest and external resource-model/assessment. The planner charges each unique bundle's fixed mobilisation resources once per selected portfolio, and reports variable source resources, shared fixed resources and the total separately.
 
 A joint EVSI/value estimate may be attached by a later integration only when its exact selected source set and non-additive likelihood/factorization are assessed upstream. This planner is an admissibility/feasibility optimizer, not a joint Bayesian value estimator.
 
