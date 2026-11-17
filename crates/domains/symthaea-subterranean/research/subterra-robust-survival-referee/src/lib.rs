@@ -1573,8 +1573,16 @@ mod tests {
             config(),
         )
         .unwrap();
-        let zero_model = report.per_model.iter().find(|metric| metric.model_id == "zero").unwrap();
-        let positive_model = report.per_model.iter().find(|metric| metric.model_id == "positive").unwrap();
+        let zero_model = report
+            .per_model
+            .iter()
+            .find(|metric| metric.model_id == "zero")
+            .unwrap();
+        let positive_model = report
+            .per_model
+            .iter()
+            .find(|metric| metric.model_id == "positive")
+            .unwrap();
         assert!(zero_model.robot_loss_probability.abs() < 1.0e-12);
         assert!((positive_model.robot_loss_probability - 0.02).abs() < 1.0e-8);
         assert!(
@@ -1664,8 +1672,14 @@ mod tests {
         };
         let report = evaluate_policy_robustly(
             &[
-                ModelScenario { model_id: "model-a".into(), problem: model_a },
-                ModelScenario { model_id: "model-b".into(), problem: model_b },
+                ModelScenario {
+                    model_id: "model-a".into(),
+                    problem: model_a,
+                },
+                ModelScenario {
+                    model_id: "model-b".into(),
+                    problem: model_b,
+                },
             ],
             &shared_policy,
             config(),
@@ -1684,9 +1698,12 @@ mod tests {
             report.disposition,
             PolicyDisposition::AdmissibleAcrossSuppliedModels
         );
-        assert!(report.per_model.iter().all(|metric| {
-            (metric.robot_loss_probability - 0.02).abs() < 1.0e-8
-        }));
+        assert!(
+            report
+                .per_model
+                .iter()
+                .all(|metric| { (metric.robot_loss_probability - 0.02).abs() < 1.0e-8 })
+        );
     }
 
     #[test]
