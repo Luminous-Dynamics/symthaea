@@ -1,0 +1,198 @@
+{
+  "schema_version": "subterra-independent-sensing-benchmark.v0.1",
+  "status": "synthetic_research_protocol_not_a_field_result",
+  "source_graph_owner": "Mycelix LEX-NET-030",
+  "fault_profile_owner": "Mycelix QUAL-001E",
+  "resource_and_bundle_assessment_owner": "Symtropy",
+  "planner_owner": "Symthaea",
+  "claim_boundary": "feasibility under a complete declared dependency/fault model and externally assessed resource/risk/bundle envelopes",
+  "scenario_dimensions": {
+    "candidate_options": [1, 2, 3, 4, 5, 6, 7, 8],
+    "required_independent_sources": [1, 2, 3],
+    "robots": [1, 2, 3, 4],
+    "modalities_per_robot": [1, 2, 3, 4],
+    "transitive_dependency_depth": [1, 2, 3, 4, 5],
+    "deployment_bundle_count": [1, 2, 3, 4],
+    "inventory_dispositions": ["complete_within_declared_scope", "incomplete", "unknown"]
+  },
+  "hard_resource_dimensions": [
+    "energy_millijoules",
+    "duration_milliseconds",
+    "data_bytes",
+    "exposure_milliunits"
+  ],
+  "hard_risk_dimensions": [
+    "mission_interruption_upper_ppm",
+    "robot_loss_upper_ppm"
+  ],
+  "common_cause_dimensions": [
+    "robot_platform",
+    "power_bus",
+    "battery_and_charger",
+    "clock_and_time_sync",
+    "localization_and_map",
+    "compute_and_runtime",
+    "network_and_relay",
+    "fleet_manager_and_authority",
+    "sensor_firmware_and_hardware",
+    "calibration_lab_and_reference",
+    "training_data_and_annotation"
+  ],
+  "cases": [
+    {
+      "case_id": "ISP-001",
+      "name": "two_modalities_share_one_platform_power_clock_and_map",
+      "candidate_count": 3,
+      "required_sources": 2,
+      "expected": "planner_excludes_the_shared_pair_and_selects_the_third_independent_path"
+    },
+    {
+      "case_id": "ISP-002",
+      "name": "different_robots_share_transitive_localization_anchor",
+      "candidate_count": 3,
+      "required_sources": 2,
+      "expected": "transitive_overlap_creates_pair_conflict"
+    },
+    {
+      "case_id": "ISP-003",
+      "name": "different_vendors_share_calibration_reference",
+      "candidate_count": 3,
+      "required_sources": 2,
+      "expected": "shared_calibration_dependency_blocks_independent_pair"
+    },
+    {
+      "case_id": "ISP-004",
+      "name": "independent_acquisition_and_independent_verifier",
+      "candidate_count": 3,
+      "required_sources": 2,
+      "expected": "one_or_more_feasible_portfolios_with_exact_pareto_frontier"
+    },
+    {
+      "case_id": "ISP-005",
+      "name": "verifier_shares_claim_critical_dependency",
+      "candidate_count": 3,
+      "required_sources": 2,
+      "expected": "overlapping_candidate_rejected"
+    },
+    {
+      "case_id": "ISP-006",
+      "name": "unknown_or_incomplete_required_source_inventory",
+      "candidate_count": 4,
+      "required_sources": 2,
+      "expected": "unknown_and_incomplete_options_excluded"
+    },
+    {
+      "case_id": "ISP-007",
+      "name": "single_energy_budget_breach",
+      "candidate_count": 2,
+      "required_sources": 2,
+      "expected": "no_feasible_portfolio"
+    },
+    {
+      "case_id": "ISP-008",
+      "name": "single_duration_data_or_exposure_budget_breach",
+      "candidate_count": 2,
+      "required_sources": 2,
+      "expected": "no_feasible_portfolio_for_each_separate_dimension"
+    },
+    {
+      "case_id": "ISP-009",
+      "name": "union_bound_interruption_or_robot_loss_exceeds_budget",
+      "candidate_count": 3,
+      "required_sources": 2,
+      "expected": "portfolio_rejected_without_assuming_independence"
+    },
+    {
+      "case_id": "ISP-010",
+      "name": "shared_bundle_fixed_cost_charged_once",
+      "candidate_count": 2,
+      "required_sources": 2,
+      "expected": "fixed_bundle_cost_added_once_to_total_resources"
+    },
+    {
+      "case_id": "ISP-011",
+      "name": "distinct_bundle_fixed_costs_both_charged",
+      "candidate_count": 2,
+      "required_sources": 2,
+      "expected": "each_unique_bundle_cost_added_once"
+    },
+    {
+      "case_id": "ISP-012",
+      "name": "same_bundle_identity_with_conflicting_digest",
+      "candidate_count": 2,
+      "required_sources": 2,
+      "expected": "fatal_identity_conflict"
+    },
+    {
+      "case_id": "ISP-013",
+      "name": "stale_future_or_expired_bundle_resource_risk_assessment",
+      "candidate_count": 3,
+      "required_sources": 2,
+      "expected": "invalid_options_rejected_with_deterministic_reasons"
+    },
+    {
+      "case_id": "ISP-014",
+      "name": "node_cap_reached",
+      "candidate_count": 8,
+      "required_sources": 4,
+      "expected": "node_limit_reached_never_claims_exact_optimality"
+    },
+    {
+      "case_id": "ISP-015",
+      "name": "input_option_and_bundle_catalogue_order_permutation",
+      "candidate_count": 6,
+      "required_sources": 3,
+      "expected": "identical_frontier_conflicts_and_selected_bundle_references"
+    },
+    {
+      "case_id": "ISP-016",
+      "name": "different_bundle_sets_have_distinct_campaign_composition_value",
+      "candidate_count": 4,
+      "required_sources": 2,
+      "expected": "pareto_pruning_preserves_alternatives_with_different_bundle_identity_sets"
+    },
+    {
+      "case_id": "ISP-017",
+      "name": "risk_values_or_budgets_outside_probability_domain",
+      "candidate_count": 2,
+      "required_sources": 2,
+      "expected": "reject_any_individual_or_budget_ppm_above_1000000_and_cap_union_bound_at_1000000"
+    }
+  ],
+  "comparison_baselines": [
+    "modality_count_greedy",
+    "robot_count_greedy",
+    "variable_resource_greedy_without_fault_domain_constraints",
+    "disjoint_dependency_greedy",
+    "bounded_exact_pareto_frontier"
+  ],
+  "metrics": {
+    "false_independence_plan_rate": "planned_portfolios_with_declared_shared_claim_critical_dependencies / all_planned_portfolios",
+    "feasible_portfolio_recall": "found_feasible_portfolios / all_feasible_portfolios_from_independent_exhaustive_reference",
+    "pareto_frontier_precision": "returned_non_dominated_portfolios / returned_portfolios",
+    "pareto_frontier_recall": "true_reference_frontier_portfolios_returned / all_reference_frontier_portfolios",
+    "resource_budget_violation_rate": "portfolios_exceeding_any_hard_resource_dimension / all_returned_portfolios",
+    "risk_budget_violation_rate": "portfolios_exceeding_either_conservative_risk_bound / all_returned_portfolios",
+    "shared_bundle_cost_error": "reported_fixed_bundle_cost_minus_reference_once_per_unique_bundle_cost",
+    "node_limit_optimality_false_claim_rate": "node_limited_cases_claimed_exact / all_node_limited_cases",
+    "runtime_and_memory": "measured_by_candidate_count_dependency_edges_bundle_count_and_search_nodes"
+  },
+  "proposed_research_targets_not_results": {
+    "false_independence_plan_rate": 0.0,
+    "resource_budget_violation_rate": 0.0,
+    "risk_budget_violation_rate": 0.0,
+    "shared_bundle_cost_error": 0,
+    "pareto_frontier_precision_and_recall": 1.0,
+    "node_limit_optimality_false_claim_rate": 0.0,
+    "independent_exhaustive_reference_required": true
+  },
+  "limitations": [
+    "A complete declared dependency model is not proof all real dependencies were discovered.",
+    "Disjoint dependency sets are independent only within the supplied fault model.",
+    "The planner does not establish physical sensor accuracy or evidence truth.",
+    "The planner does not sum individual EVSI; joint value needs a separate exact source-set factorization assessment.",
+    "The planner's shared bundle charge is per claim-level acquisition portfolio; cross-claim campaign reuse must be reconciled by #12734/#12680.",
+    "A planned independent portfolio must still pass post-acquisition evidence admission #12730.",
+    "All cases and parameter values in this v0.1 manifest are synthetic."
+  ]
+}
