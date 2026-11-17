@@ -390,7 +390,6 @@ pub fn evaluate_adaptive_policy_json(raw:&str)->Result<Value,String>{
  allowed(&bundle,&["candidate_view","oracle"],"bundle")?;
  let candidate=val(&bundle,"candidate_view","bundle")?;let oracle=val(&bundle,"oracle","bundle")?;
  let (bounds,actions,options,worlds,outcomes,actual,budget,max_depth)=parse_candidate_oracle(candidate,oracle)?;
- let option_ids=options.keys().cloned().collect::<BTreeSet<_>>();
  let tree=parse_nodes(val(candidate,"policy_tree","candidate_view")?,&options,&outcomes,&actions)?;
  let submitted=evaluate_policy(candidate,oracle,&tree,&bounds,&actions,&options,&worlds,budget,"release")?;
  let (optimal,optimal_count,optimal_tree)=evaluate_exact(candidate,oracle,&bounds,&actions,&options,&worlds,&outcomes,budget,max_depth)?;
@@ -455,7 +454,14 @@ mod tests{
  #[test]fn adaptive_policy_stops_after_first_gate_failure(){let r=report();let world=&r["submitted_policy"]["world_paths"];let haz=world.as_array().unwrap().iter().find(|x|x["world_id"]=="hazard-b").unwrap();assert_eq!(haz["path_cost_bound_micros"],700);}
  #[test]fn positive_world_requires_both_checks_before_release(){let r=report();let safe=r["submitted_policy"]["world_paths"].as_array().unwrap().iter().find(|x|x["world_id"]=="safe").unwrap();assert_eq!(safe["path_cost_bound_micros"],1500);assert_eq!(r["submitted_policy"]["action_coverage_nominal_bps"],6000);}
  #[test]fn exact_oracle_finds_complete_coverage_with_lower_cost_than_full_revalidation(){let r=report();assert_eq!(r["exact_oracle"]["search_complete"],true);assert_eq!(r["exact_oracle"]["action_coverage_nominal_bps"],6000);assert_eq!(r["exact_oracle"]["nominal_expected_cost_bound_micros"],1300);assert_eq!(r["exact_oracle"]["worst_case_path_cost_bound_micros"],1500);}
- #[test]fn exact_policy_cost_is_below_full_revalidation(){let r=report();assert_eq!(r["exact_oracle"]["worst_case_expected_cost_bound_micros"],1420);assert_eq!(r["exact_oracle"]["nominal_expected_cost_bound_micros"],1300);}
+ #[test]fn exact_policy_cost_is_below_full_revalidation(){
+  let r=report();
+  assert_eq!(r["exact_oracle"]["worst_case_expected_cost_bound_micros"],1420);
+  assert_eq!(r["exact_oracle"]["nominal_expected_cost_bound_micros"],1300);
+  assert_eq!(r["exact_oracle"]["full_revalidation_comparator"]["cost_bound_micros"],1500);
+  assert_eq!(r["exact_oracle"]["full_revalidation_comparator"]["nominal_cost_savings_micros"],200);
+  assert_eq!(r["exact_oracle"]["feasible_policy_count"],13);
+ }
  #[test]fn candidate_cannot_change_budget(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["candidate_view"]["budget_micros"]=json!(99999);assert!(evaluate_adaptive_policy_json(&b.to_string()).unwrap_err().contains("budget differs"));}
  #[test]fn candidate_cannot_change_world_probability_bounds(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["candidate_view"]["hypothesis_bounds"][0]["upper_probability_bps"]=json!(9999);assert!(evaluate_adaptive_policy_json(&b.to_string()).unwrap_err().contains("differ from evaluator-authoritative"));}
  #[test]fn missing_observation_branch_is_rejected(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["candidate_view"]["policy_tree"]["nodes"][0]["branches"].as_object_mut().unwrap().remove("fail");assert!(evaluate_adaptive_policy_json(&b.to_string()).unwrap_err().contains("cover every factor outcome"));}
