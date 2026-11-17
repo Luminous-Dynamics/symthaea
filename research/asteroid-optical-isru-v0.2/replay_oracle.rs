@@ -375,13 +375,13 @@ impl ReplayAgentApi<'_> {
         if !self.measurable_candidates.contains_key(candidate_id) {
             return Err(ReplayError::UnknownCandidate(candidate_id.to_string()));
         }
+        if self.state.observed_candidates.len() as u64 >= self.manifest.max_experiments {
+            return Err(ReplayError::BudgetExhausted);
+        }
         if self.state.observed_candidates.contains(candidate_id) {
             return Err(ReplayError::DuplicateMeasurement(
                 candidate_id.to_string(),
             ));
-        }
-        if self.state.observed_candidates.len() as u64 >= self.manifest.max_experiments {
-            return Err(ReplayError::BudgetExhausted);
         }
 
         let outcome = self
