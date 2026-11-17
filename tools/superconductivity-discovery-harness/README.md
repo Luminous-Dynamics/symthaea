@@ -83,3 +83,27 @@ For a pressure-quenched sample this allows a record to state:
 - the measured Tc criterion and sample identity.
 
 The process history never overwrites or infers the measurement pressure. Planned/commanded steps cannot contain actual values; sensor-verified steps require a resolvable source and locator. Step IDs and sequence numbers must be unique/monotonic. Synthetic negative controls exercise those rules.
+
+## Synthesis protocol and execution contract
+
+Schema: `data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json`.
+
+The schema separates:
+- the target material and precursor lots;
+- planned ordered operations and setpoints;
+- execution runs with commanded, unverified, sensor-verified, failed or aborted states;
+- actual sensor/controller readback and source references;
+- realized phases, phase fractions, characterization-event references and failures.
+
+The Rust executable validates one synthetic protocol fixture:
+
+```bash
+cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_synthesis_protocol_audit
+cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_synthesis_protocol_audit -- \
+  --schema data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json \
+  --fixture tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json
+```
+
+It refuses commanded setpoints represented as actual execution, unresolved sensor evidence, failed runs without failure reasons, execution steps absent from the plan, outcomes without a valid run, duplicate/non-monotonic planned steps and reported phase fractions above 100%.
+
+The synthetic fixture is an abstract pressure-hold/decompression example; it is not an experimental recipe, pressure-vessel instruction or materials result. A validated protocol record is not safety authorization.
