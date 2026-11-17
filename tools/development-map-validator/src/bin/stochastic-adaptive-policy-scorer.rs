@@ -8,9 +8,6 @@
 //! hypotheses. This is a fixed-policy scorer, not a policy-search oracle.
 
 #[allow(dead_code)]
-#[path="noisy-channel-risk.rs"]
-mod noisy_channel;
-#[allow(dead_code)]
 #[path="stochastic-kernel-validator.rs"]
 mod joint_kernel;
 
@@ -663,7 +660,11 @@ mod tests{
   let r=evaluate(COMMON_CAUSE).expect("common cause fixture validates");
   let expected:Value=serde_json::from_str(COMMON_CAUSE_EXPECTED).unwrap();
   assert_eq!(r,expected);
-  assert_eq!(r["submitted_policy"]["nominal_justified_action_coverage_bps"],4500);
+  // The joint pass/pass event is 45% conditional on safe-world; the
+  // nominal prior mass of that world is 90%, so unconditional coverage is 40.5%.
+  assert_eq!(r["submitted_policy"]["nominal_justified_action_coverage_bps"],4050);
+  assert_eq!(r["submitted_policy"]["leaf_reports"].as_array().unwrap().iter()
+   .find(|x|x["leaf_node_id"]=="release-after-b-pass").unwrap()["nominal_path_probability_bps"],4050);
  }
  #[test]fn candidate_cannot_override_joint_kernels(){
   let mut b:Value=serde_json::from_str(DETERMINISTIC).unwrap();
