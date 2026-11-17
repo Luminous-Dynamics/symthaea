@@ -26,7 +26,8 @@
         "runner_class",
         "hardware_class",
         "runner_image_digest_sha256",
-        "region"
+        "region",
+        "billing_currency"
       ],
       "properties": {
         "repository_full_name": {
@@ -84,6 +85,10 @@
         "region": {
           "type": "string",
           "minLength": 1
+        },
+        "billing_currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
         }
       }
     },
@@ -96,6 +101,10 @@
         "type": "string",
         "minLength": 1
       }
+    },
+    "billing_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
     }
   }
 }
