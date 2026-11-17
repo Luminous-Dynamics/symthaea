@@ -228,15 +228,21 @@ Evaluate the following arms only when the exact artifact and interface are avail
 3. Original benchmark-native reference policies.
 4. ACT / Diffusion Policy or other task-native imitation baseline.
 5. GR00T N1.7 and another compatible open VLA baseline (for example pi0.5).
-6. Symthaea perception + proprioception policy.
-7. Symthaea + functional tool model.
-8. Symthaea + tactile evidence, with calibrated raw-sensor comparator.
-9. Symthaea + action-conditioned tactile/contact prediction.
-10. Symthaea + uncertainty-aware probing and event-based recovery.
+6. VioLA-style body/hand motion-latent policy, if exact code/checkpoint and morphology-compatible controllers become available.
+7. AMP1-style agent-as-policy baseline, including an open-weight agent model where available (the AMP1 paper reports Qwen3.8-Flash-Next at 64.9% on RoboLab-120 in its protocol).
+8. Agentic model + typed capability API + deterministic action admission (Symthaea-bound harness).
+9. Arm 8 plus episodic memory only.
+10. Arm 8 plus validated semantic/procedural skill memory.
+11. Symthaea perception + proprioception policy.
+12. Symthaea + functional tool model.
+13. Symthaea + tactile evidence, with calibrated raw-sensor comparator.
+14. Symthaea + action-conditioned tactile/contact prediction.
+15. Symthaea + uncertainty-aware probing and event-based recovery.
+16. Hybrid agentic planner + Symthaea skill/controller substrate + independent evidence/safety planes.
 
-Unavailable artifacts are “unavailable”, not a zero score. Pin license, source SHA, checkpoint digest, pre/post-processing, robot morphology, actuation semantics, sensor set, training data, adaptation budget, inference hardware and evaluation runtime.
+Unavailable artifacts are “unavailable”, not a zero score. Pin licence, source SHA, checkpoint digest, model/provider/version, reasoning-effort setting, prompt, tool API and route policy, pre/post-processing, robot morphology, actuation semantics, sensor set, training data, memory content/provenance, adaptation budget, inference hardware and evaluation runtime.
 
-Matched comparisons require equal task/reset distribution, demonstrations, fine-tuning opportunities, action chunk/horizon, wall-clock budget, compute where measurable, episode timeout and observation access. If not equal, report the mismatch and do not claim a controlled comparison.
+Matched comparisons require equal task/reset distribution, demonstration/adaptation opportunities, action chunk/horizon, observation access, episode timeout and declared compute/time budgets. For agentic comparisons additionally report model identity/reasoning effort, model-call count, tool-call count, wall-clock reasoning time, actuation time, token/API cost and failures/timeouts. The AMP1 paper finds model choice has a larger effect than modest harness changes; therefore separate model effects from harness/architecture effects rather than claiming a harness win from different frontier models. If budgets or robot semantics differ, report the mismatch and do not claim a controlled comparison.
 
 ## 5. Symthaea architecture hypotheses
 
@@ -363,7 +369,10 @@ No live mains, high voltage, stored-pressure systems, powered cutting, hazardous
 - Report task-cell rates, numerator/denominator, uncertainty intervals, effect sizes and failures; retain cluster structure for homes/tools/physical articles.
 - Report expected, completed, invalid, missing and infrastructure-indeterminate episodes. Do not silently remove timeouts, safe refusals or failures.
 - Publish training-data exposure, fine-tuning, annotation/human-operator, compute, wall-clock, energy and hardware budgets.
+- For agentic arms, decompose total wall time into perception, reasoning/model wait, action planning, actuator execution, verification and recovery; report p50/p95 for each, total model calls, tool calls, tokens/API cost and timeout rate.
+- For memory arms, freeze a training/practice task sequence and disjoint evaluation sequence; report transfer to unvisited tasks, retention on earlier tasks, retrieval precision, stale/poisoned-memory use and memory update/revocation events.
 - Use paired differences where valid; report median, p90/p95, lower tail and confidence intervals. Do not assume all task cells or physical articles are IID.
+- Preserve benchmark artifact failures separately from policy failures and verifier disagreement. A benchmark false positive/negative must not be attributed to the robot policy.
 - Maintain one result vector per capability; no aggregate score may hide a hard constraint failure.
 
 ## 9. Metrics
@@ -380,7 +389,10 @@ No live mains, high voltage, stored-pressure systems, powered cutting, hazardous
 - contact/slip/seating detection;
 - recovery success and time;
 - risk-coverage, calibrated abstention and handoff correctness;
-- p50/p95 completion time, latency, energy and compute;
+- p50/p95 completion time, planner/reasoning latency, action latency, energy, compute, model/tool calls and provider failures;
+- number and quality of active observations, scene-model corrections and plan revisions;
+- skill synthesis/reuse rate, cross-task transfer, memory retrieval precision and stale/poisoned-memory rejection;
+- task-family retention after memory updates and harmful-transfer rate;
 - collisions, object/tool damage, unsafe forces and invalid contact.
 
 ### Service outcome vector
@@ -413,9 +425,11 @@ These are stretch hypotheses and must be preregistered:
 - ≥10 percentage-point paired improvement over the strongest reproducible baseline on a held-out / decoy / mobile composite, with uncertainty interval excluding zero improvement.
 - ≥80% success on held-out instances within a declared known tool family; report unseen-family transfer separately.
 - ≥20% relative reduction in recovery/intervention burden without reducing verified success.
+- As a stretch memory target, ≥4× relative failure-rate reduction on a matched multi-task sequence, with no material regression on previously learned task families and no poisoned/stale-memory acceptance.
 - ≥90% verified success on the eight-case low-risk synthetic service corpus.
 - Zero unsafe continuation and zero false return-to-service in the frozen negative-control corpus.
 - Demonstrate the value of each architecture component via removal ablations, while reporting extra data, compute, latency and energy.
+- For the agentic track, demonstrate a positive accepted-work-per-robot-hour improvement after charging reasoning latency, model/API cost, retries, interventions and recovery.
 
 A zero-event synthetic corpus result is not a general safety proof. Targets must be revised if task prevalence, feasibility or measurement precision make them unsound.
 
