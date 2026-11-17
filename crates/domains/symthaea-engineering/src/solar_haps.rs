@@ -37,7 +37,7 @@ pub struct SolarHapsConfig {
     pub wiring_efficiency: f64,
     /// Installed battery energy capacity in watt-hours.
     pub battery_capacity_wh: f64,
-    /// Battery state of charge at the beginning of the 24-hour profile [Wh].
+    /// Battery state of charge at the beginning of the evaluation horizon [Wh].
     pub initial_soc_wh: f64,
     /// Hard minimum battery reserve which cannot be used for export [Wh].
     pub minimum_reserve_wh: f64,
@@ -56,7 +56,7 @@ pub struct SolarHapsConfig {
     pub export_link_efficiency: f64,
 }
 
-/// One interval in a frozen 24-hour HAPS energy profile.
+/// One piecewise-constant interval in a frozen HAPS energy profile.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SolarHapsInterval {
     /// Interval duration in seconds.
@@ -82,7 +82,7 @@ pub struct SolarHapsInterval {
     pub requested_receiver_power_w: f64,
 }
 
-/// Validation and accounting errors for the bounded 24-hour screen.
+/// Validation and accounting errors for bounded HAPS energy evaluation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SolarHapsError {
     NonFiniteConfig,
@@ -98,6 +98,7 @@ pub enum SolarHapsError {
     InvalidIntervalValue,
     ProfileDurationNot24Hours,
     ProfileDurationNotWholeDays,
+    HorizonAllocationFailed,
     NonFiniteResult,
 }
 
@@ -111,12 +112,13 @@ impl std::fmt::Display for SolarHapsError {
             Self::InvalidInitialSoc => "initial state of charge must lie within battery limits",
             Self::InvalidReserve => "reserve must lie between zero and battery capacity",
             Self::InvalidPowerLimit => "charge and discharge power limits must be positive",
-            Self::EmptyProfile => "the 24-hour profile must contain at least one interval",
+            Self::EmptyProfile => "the energy profile must contain at least one interval",
             Self::NonFiniteInterval => "an interval contains a non-finite value",
             Self::InvalidIntervalDuration => "interval duration must be positive",
             Self::InvalidIntervalValue => "irradiance, loads and receiver requests must be non-negative and derates within [0, 1]",
             Self::ProfileDurationNot24Hours => "the sum of interval durations must equal 24 hours",
             Self::ProfileDurationNotWholeDays => "the horizon duration must be a positive whole number of 24-hour days",
+            Self::HorizonAllocationFailed => "could not reserve memory for the requested horizon result",
             Self::NonFiniteResult => "energy accounting produced a non-finite result",
         };
         f.write_str(message)
@@ -596,14 +598,20 @@ pub fn evaluate_horizon(
     // Normalize only sub-millisecond summation drift at the final interval.
     // This prevents floating-point accumulation from creating a phantom partial day.
     let target_duration_s = horizon_days_f64 * DAY_SECONDS;
-    let mut normalized_profile = profile.to_vec();
+    let mut normalized_profile = Vec::new();
+    normalized_profile
+        .try_reserve_exact(profile.len())
+        .map_err(|_| SolarHapsError::HorizonAllocationFailed)?;
+    normalized_profile.extend_from_slice(profile);
     let final_interval = normalized_profile
         .last_mut()
         .ok_or(SolarHapsError::EmptyProfile)?;
     final_interval.duration_s += target_duration_s - total_duration_s;
     validate_interval(final_interval)?;
 
-    let mut days = Vec::with_capacity(horizon_days);
+    let mut days = Vec::new();
+    days.try_reserve_exact(horizon_days)
+        .map_err(|_| SolarHapsError::HorizonAllocationFailed)?;
     let mut day_profile = Vec::new();
     let mut day_elapsed_s = 0.0;
     let mut carried_soc_wh = config.initial_soc_wh;
