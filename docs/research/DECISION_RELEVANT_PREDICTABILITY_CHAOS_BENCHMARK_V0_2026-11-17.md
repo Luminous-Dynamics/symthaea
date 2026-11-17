@@ -218,15 +218,19 @@ This document, source-family split rules, metric definitions, candidate/evaluato
 
 ### W1 — Standard-library Rust reference task
 
-Create a separate package under `research/decision-predictability-benchmark/` with:
-- frozen deterministic latent world generators;
-- paired observationally equivalent worlds;
-- exact Bayesian decision fixtures and action/loss tables;
-- observation permissions, clocks, budget and deadline types;
-- evaluator-only latent records separated from candidate-visible observations;
-- deterministic known-answer tests for positive/zero-value probes, no-observation equivalence, deadline expiry, missingness, stale/duplicate events and budget enforcement.
+The first executable slice now exists under `research/decision-predictability-benchmark/` and is isolated from the root workspace:
 
-The reference generator must not include candidate model code or decide whether a candidate is correct.
+- Qualified Lyapunov-time and forecast-horizon metric contracts.
+- Information-set Bayes risk, policy risk, separately labelled perfect-information lower bound, and decision regret.
+- Expected value-of-information from expected posterior Bayes risk and task-loss-unit acquisition cost.
+- Componentwise resource-vector Pareto dominance.
+- A deterministic paired-world fixture: an actual physical hazard and a sensor-offset-only world yield the same primary-sensor readings, while an independent reference probe distinguishes them.
+- Candidate-visible `CandidateEpisode` / `PrimarySensorObservation` types are distinct from evaluator-only `EvaluatorWorld` / mechanism / loss records.
+- Known-answer tests cover passive observational equivalence, irreducible abstention risk, a decision-changing probe with positive net value, and a one-bit nuisance observation with zero decision value.
+
+The Rust type split is a benchmark API boundary, not a security boundary. Confirmatory evaluation must place evaluator truth in a separate process or permissioned environment. Candidate model code is not included in the reference crate.
+
+Remaining W1 work includes executable deadline/clock/budget admission, missing/stale/duplicate observation controls, a broader family of paired-world generators, and independent review of the fixture/loss protocol. Do not claim these are implemented yet.
 
 ### W2 — Transparent baselines
 
