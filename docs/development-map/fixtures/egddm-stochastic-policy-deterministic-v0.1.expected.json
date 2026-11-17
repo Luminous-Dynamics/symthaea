@@ -1,0 +1,120 @@
+{
+  "scenario_id": "d6-17-2-1-adaptive-exact-two-gate-v0.1",
+  "adjudication_status": "stochastic_joint_kernel_adaptive_policy_scoring",
+  "billing_currency": "USD",
+  "world_count": 4,
+  "joint_row_count": 4,
+  "option_count": 2,
+  "leaf_count": 3,
+  "max_depth": 3,
+  "submitted_policy": {
+    "policy_feasible": true,
+    "nominal_justified_action_coverage_bps": 6000,
+    "nominal_unsafe_action_mass_bps": 0,
+    "unnecessary_abstention_bps": 0,
+    "risk_violation_leaf_count": 0,
+    "over_budget_leaf_count": 0,
+    "actual_hypothesis_unsafe_probability_nominal_bps": 0,
+    "actual_hypothesis_unsafe_probability_upper_bps": 0,
+    "worst_case_path_cost_micros": 1500,
+    "nominal_expected_cost_micros": 1300,
+    "worst_case_expected_cost_micros": 1420,
+    "budget_micros": 1600,
+    "leaf_reports": [
+      {
+        "leaf_node_id": "defer-after-a-fail",
+        "decision_kind": "defer",
+        "action_id": "inspect-readonly",
+        "acquisition_options": [
+          "gate-a"
+        ],
+        "joint_row_count": 2,
+        "nominal_path_probability_bps": 2500,
+        "nominal_posterior_risk_bps": 0,
+        "worst_case_posterior_risk_bps": 0,
+        "evidence_support_lower_bps": 1000,
+        "actual_hypothesis_path_possible": false,
+        "action_justified": true,
+        "path_cost_micros": 700,
+        "within_budget": true,
+        "target_action_counterfactual": {
+          "nominal_risk_bps": 10000,
+          "robust_risk_bps": 10000,
+          "support_lower_bps": 1000
+        }
+      },
+      {
+        "leaf_node_id": "defer-after-b-fail",
+        "decision_kind": "defer",
+        "action_id": "inspect-readonly",
+        "acquisition_options": [
+          "gate-a",
+          "gate-b"
+        ],
+        "joint_row_count": 1,
+        "nominal_path_probability_bps": 1500,
+        "nominal_posterior_risk_bps": 0,
+        "worst_case_posterior_risk_bps": 0,
+        "evidence_support_lower_bps": 500,
+        "actual_hypothesis_path_possible": false,
+        "action_justified": true,
+        "path_cost_micros": 1500,
+        "within_budget": true,
+        "target_action_counterfactual": {
+          "nominal_risk_bps": 10000,
+          "robust_risk_bps": 10000,
+          "support_lower_bps": 500
+        }
+      },
+      {
+        "leaf_node_id": "release-after-b-pass",
+        "decision_kind": "act",
+        "action_id": "release",
+        "acquisition_options": [
+          "gate-a",
+          "gate-b"
+        ],
+        "joint_row_count": 1,
+        "nominal_path_probability_bps": 6000,
+        "nominal_posterior_risk_bps": 0,
+        "worst_case_posterior_risk_bps": 0,
+        "evidence_support_lower_bps": 5000,
+        "actual_hypothesis_path_possible": true,
+        "action_justified": true,
+        "path_cost_micros": 1500,
+        "within_budget": true,
+        "target_action_counterfactual": null
+      }
+    ]
+  },
+  "expected_cost": {
+    "assumption": "Per-hypothesis joint-kernel credal sets are independent across hypotheses; the evaluator then optimizes the outer prior credal set. Cross-hypothesis shared latent ambiguity requires a coupled joint set.",
+    "nominal_expected_cost_micros": 1300,
+    "worst_case_expected_cost_micros": 1420,
+    "full_revalidation_cost_micros": 1500,
+    "nominal_savings_vs_full_revalidation_micros": 200,
+    "conditional_world_cost_bounds": [
+      {
+        "hypothesis_id": "safe",
+        "nominal_conditional_cost_numerator": 15000000,
+        "worst_case_conditional_cost_numerator": 15000000
+      },
+      {
+        "hypothesis_id": "hazard-a",
+        "nominal_conditional_cost_numerator": 15000000,
+        "worst_case_conditional_cost_numerator": 15000000
+      },
+      {
+        "hypothesis_id": "hazard-b",
+        "nominal_conditional_cost_numerator": 7000000,
+        "worst_case_conditional_cost_numerator": 7000000
+      },
+      {
+        "hypothesis_id": "hazard-ab",
+        "nominal_conditional_cost_numerator": 7000000,
+        "worst_case_conditional_cost_numerator": 7000000
+      }
+    ]
+  },
+  "claim_ceiling": "Exact evaluation of a submitted finite adaptive policy over the evaluator-owned finite joint-outcome credal kernels and bounded prior set. Branch event intervals and conditional expected costs are exact for the registered bounded-simplex sets; the outer expected-cost bound assumes kernel ambiguity sets are independent across hypotheses. It does not optimize over all policies, model stochastic execution costs, authenticate joint-kernel calibration, establish model completeness, or authorize production actions."
+}
