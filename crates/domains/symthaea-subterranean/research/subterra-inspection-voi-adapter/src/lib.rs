@@ -16,9 +16,9 @@ use subterra_robust_survival_referee::{
     evaluate_policy_robustly,
 };
 use subterra_survival_reference::{
-    CostPrices, MeasurementAction, MeasurementOutcome, MissionDecision, OutcomeKind,
-    PlannerConfig, PlanningError, PlanningProblem, PlanningReport, ResourceBudget, ResourceCost,
-    RiskLimits, plan_survival_conditioned,
+    CostPrices, MeasurementAction, MeasurementOutcome, MissionDecision, OutcomeKind, PlannerConfig,
+    PlanningError, PlanningProblem, PlanningReport, ResourceBudget, ResourceCost, RiskLimits,
+    plan_survival_conditioned,
 };
 
 const EPSILON: f64 = 1.0e-10;
@@ -273,7 +273,10 @@ fn assess_action(
             continue;
         }
         expected_entropy += probability * entropy(&posterior);
-        if matches!(outcome.kind, OutcomeKind::MissionInterrupted | OutcomeKind::RobotLost) {
+        if matches!(
+            outcome.kind,
+            OutcomeKind::MissionInterrupted | OutcomeKind::RobotLost
+        ) {
             mission_interruption_probability += probability;
         }
         if outcome.kind == OutcomeKind::RobotLost {
@@ -709,9 +712,11 @@ mod tests {
     #[test]
     fn entropy_and_evsi_baselines_respect_robot_loss_limits() {
         let mut case = synthetic_decision_boundary_case(InspectionTask::PipeCable);
-        for model in std::iter::once(&mut case.primary_model)
-            .chain(case.evaluation_models.iter_mut().map(|model| &mut model.problem))
-        {
+        for model in std::iter::once(&mut case.primary_model).chain(
+            case.evaluation_models
+                .iter_mut()
+                .map(|model| &mut model.problem),
+        ) {
             let high = model
                 .actions
                 .iter_mut()
