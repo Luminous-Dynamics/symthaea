@@ -496,32 +496,6 @@
         ]
       }
     ],
-    "factorization_certificates": [
-      {
-        "certificate_id": "gate-pair-mutual-v1",
-        "authority": "independent-assurance-board",
-        "dependence_groups": [
-          "gate-a-system",
-          "gate-b-system"
-        ],
-        "conditioning_scope": [
-          "hypothesis",
-          "deployment_configuration",
-          "same_decision_window"
-        ],
-        "factor_ids": [
-          "gate-a-factor",
-          "gate-b-factor"
-        ],
-        "action_ids": [
-          "release"
-        ],
-        "valid_from": "2026-11-01T00:00:00Z",
-        "valid_until": "2026-12-01T00:00:00Z",
-        "revoked_at": null,
-        "mutual_conditional_independence": true
-      }
-    ],
     "billing_currency": "USD",
     "cost_options": [
       {
