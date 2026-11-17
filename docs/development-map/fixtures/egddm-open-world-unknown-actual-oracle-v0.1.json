@@ -167,6 +167,7 @@
           }
         }
       }
-    ]
+    ],
+    "contamination_nominal_bps": 1000
   }
 }
