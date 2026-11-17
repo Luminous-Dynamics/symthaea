@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 use serde_json::Value;
 
 const FIXTURE_JSON: &str =
-    include_str!("../../../../research/manip-hlb-bio-v0.1/fixtures.json");
+    include_str!("fixtures/hlb_bio_contract_fixtures_v0_1.json");
 
 fn fixture_set() -> Value {
     serde_json::from_str(FIXTURE_JSON).expect("M1 fixture corpus must be valid JSON")
@@ -24,7 +24,7 @@ fn fixture_corpus_has_stable_schema_and_unique_cases() {
         Some("org.luminousdynamics.symthaea.manip_hlb_bio_fixture_set.v0_1")
     );
     assert_eq!(root["version"].as_str(), Some("0.1.0"));
-    assert_eq!(root["status"].as_str(), Some("contract-scaffold-not-yet-consumed-by-rust-test-harness"));
+    assert_eq!(root["status"].as_str(), Some("contract-scaffold-structural-test-source-added-not-run"));
 
     let cases = root["cases"]
         .as_array()
