@@ -41,7 +41,10 @@ impl fmt::Display for CandidateViewError {
         match self {
             Self::EmptyInput => write!(formatter, "candidate packet input is empty"),
             Self::InputTooLarge { actual, maximum } => {
-                write!(formatter, "candidate packet is {actual} bytes; maximum is {maximum}")
+                write!(
+                    formatter,
+                    "candidate packet is {actual} bytes; maximum is {maximum}"
+                )
             }
             Self::InvalidJson => write!(formatter, "candidate packet JSON is invalid"),
             Self::InvalidTicket => write!(
@@ -484,7 +487,8 @@ mod tests {
         let scenario_id = manifest.manifest().scenarios[2].scenario_id.clone();
         let packet = packet(TICKET);
         let mut book = EvaluatorTicketBook::default();
-        book.bind_from_manifest(&packet, &manifest, &scenario_id).unwrap();
+        book.bind_from_manifest(&packet, &manifest, &scenario_id)
+            .unwrap();
         assert_eq!(
             book.bind_from_manifest(&packet, &manifest, &scenario_id),
             Err(CandidateViewError::DuplicateTicket)
