@@ -95,9 +95,10 @@ pub use multiscale::{
 };
 
 pub use fusion_twin::{
-    DisruptionRisk, FusionDigitalTwin, FusionTwinAbstentionReason, FusionTwinEvidenceOutcome,
-    FusionTwinOutput, FusionTwinStepError, PLASMA_HORIZON_LABELS, PLASMA_HORIZONS,
-    PlasmaFepAction, PlasmaFepAgent, PlasmaMultiScalePredictor, PlasmaSensorBinding,
+    AdmittedChannelEvidence, DisruptionRisk, FusionDigitalTwin, FusionTwinAbstentionReason,
+    FusionTwinEvidenceOutcome, FusionTwinOutput, FusionTwinStepError, PLASMA_HORIZON_LABELS,
+    PLASMA_HORIZONS, PlasmaFepAction, PlasmaFepAgent, PlasmaMultiScalePredictor,
+    PlasmaSensorBinding,
 };
 
 pub use grid::{
