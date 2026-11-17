@@ -20,9 +20,11 @@ Rust metric contracts, a paired-world evaluator fixture, a transparent forecasti
 
 ```bash
 cargo fmt --manifest-path research/decision-predictability-benchmark/Cargo.toml -- --check
-cargo clippy --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets -- -D warnings
-cargo test --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets
+cargo clippy --locked --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets -- -D warnings
+cargo test --locked --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets
 ```
+
+The standalone workspace commits `Cargo.lock`; all build/test/CLI examples use `--locked` so dependency resolution cannot drift silently. The lockfile was captured from the pinned Rust 1.96.0 focused workflow and checked into the repository.
 
 The package is an isolated Cargo workspace. Metric and baseline code is standard-library-only; the split-manifest module uses exact-pinned Serde/serde_json and SHA-256 dependencies. Its focused GitHub Actions workflow is pinned to Rust 1.96.0.
 
@@ -31,7 +33,7 @@ The package is an isolated Cargo workspace. Metric and baseline code is standard
 The manifest module is the first executable R0/R1 handoff for [issue #12608](https://github.com/Luminous-Dynamics/symthaea/issues/12608).
 
 ```bash
-cargo run --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin validate-split-manifest -- research/decision-predictability-benchmark/fixtures/split-manifest-v1.json
+cargo run --locked --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin validate-split-manifest -- research/decision-predictability-benchmark/fixtures/split-manifest-v1.json
 ```
 
 The validator rejects unsupported schemas, unknown/duplicate fields, malformed SHA-256 values or commit identifiers, non-opaque IDs, split-group overlap, inconsistent scenario-to-role assignments, missing axis memberships, unreferenced declared groups, and insufficient primary independent units. It enforces a 16 MiB input limit and 100,000 scenario/group ceilings.
@@ -50,13 +52,13 @@ After the chaos-reference-suite package is present in the same checkout:
 
 ```bash
 cargo run --manifest-path research/chaos-reference-suite/Cargo.toml --bin chaos-fixtures -- 2048 20261116 > chaos-fixtures.csv
-cargo run --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin forecast-fixtures -- chaos-fixtures.csv > forecast-report.csv
+cargo run --locked --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin forecast-fixtures -- chaos-fixtures.csv > forecast-report.csv
 ```
 
 The smoke fixture at `fixtures/forecast-smoke.csv` lets CI test the adapter without depending on the separate generator pull request:
 
 ```bash
-cargo run --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin forecast-fixtures -- research/decision-predictability-benchmark/fixtures/forecast-smoke.csv > forecast-report.csv
+cargo run --locked --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin forecast-fixtures -- research/decision-predictability-benchmark/fixtures/forecast-smoke.csv > forecast-report.csv
 ```
 
 ### Evaluation protocol v0
