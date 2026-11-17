@@ -22,6 +22,14 @@ pub enum ProcessTrajectoryKind {
     AcceleratingRelease,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProcessDynamicsProfileV1 {
+    /// Velocity and section intensity scale linearly with normalized prefix
+    /// length; the opening event alone carries PhraseStart emphasis.
+    PrefixLinear,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ProcessPlan {
     pub trajectory_kind: ProcessTrajectoryKind,
@@ -33,6 +41,10 @@ pub struct ProcessPlan {
     /// receive source-cell realization verification.
     #[serde(default)]
     pub process_cell: Option<Motif>,
+    /// Versioned semantics for the note-level expressive envelope. Legacy
+    /// serialized plans may omit this field and are not expressive-audited.
+    #[serde(default)]
+    pub dynamics_profile: Option<ProcessDynamicsProfileV1>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -51,6 +63,7 @@ pub struct ProcessRealizationAuditV1 {
     pub schema_version: u16,
     pub cycle_count: usize,
     pub observed_melody_event_count: usize,
+    pub verified_expressive_event_count: usize,
     pub maximum_prefix_length: usize,
 }
 
@@ -108,6 +121,18 @@ pub enum ProcessRealizationAuditError {
         actual: usize,
     },
     PrefixContentMismatch {
+        cycle_index: usize,
+        event_index: usize,
+    },
+    MissingDynamicsProfile,
+    MelodyDynamicsMismatch {
+        cycle_index: usize,
+        event_index: usize,
+        field: &'static str,
+        expected_bits: u32,
+        actual_bits: u32,
+    },
+    MelodyEmphasisMismatch {
         cycle_index: usize,
         event_index: usize,
     },
@@ -177,6 +202,9 @@ pub fn verify_additive_process_score_v1(
             return Err(ProcessRealizationAuditError::ProcessCellContainsRest { event_index });
         }
     }
+    let dynamics_profile = plan
+        .dynamics_profile
+        .ok_or(ProcessRealizationAuditError::MissingDynamicsProfile)?;
     let expected_contour = independent_prefix_contour(plan.trajectory_kind, maximum_prefix_length);
     for (cycle_index, actual) in plan.prefix_lengths.iter().copied().enumerate() {
         let expected = expected_contour[cycle_index % expected_contour.len()];
@@ -275,6 +303,14 @@ pub fn verify_additive_process_score_v1(
 
     let scale = score.key.scale();
     for (cycle_index, events) in cycle_events.iter().enumerate() {
+        let prefix_length = plan.prefix_lengths[cycle_index];
+        let normalized_prefix = prefix_length as f32 / maximum_prefix_length as f32;
+        let (expected_velocity, expected_intensity) = match dynamics_profile {
+            ProcessDynamicsProfileV1::PrefixLinear => (
+                0.46 + 0.24 * normalized_prefix,
+                0.42 + 0.44 * normalized_prefix,
+            ),
+        };
         for (event_index, (_, observed)) in events.iter().enumerate() {
             let source_event = process_cell.notes[event_index];
             let expected_pitch = scale.degree_pitch(
@@ -283,6 +319,35 @@ pub fn verify_additive_process_score_v1(
             );
             if observed.pitch != expected_pitch || observed.duration != source_event.duration {
                 return Err(ProcessRealizationAuditError::PrefixContentMismatch {
+                    cycle_index,
+                    event_index,
+                });
+            }
+            if observed.velocity.to_bits() != expected_velocity.to_bits() {
+                return Err(ProcessRealizationAuditError::MelodyDynamicsMismatch {
+                    cycle_index,
+                    event_index,
+                    field: "velocity",
+                    expected_bits: expected_velocity.to_bits(),
+                    actual_bits: observed.velocity.to_bits(),
+                });
+            }
+            if observed.section_intensity.to_bits() != expected_intensity.to_bits() {
+                return Err(ProcessRealizationAuditError::MelodyDynamicsMismatch {
+                    cycle_index,
+                    event_index,
+                    field: "section_intensity",
+                    expected_bits: expected_intensity.to_bits(),
+                    actual_bits: observed.section_intensity.to_bits(),
+                });
+            }
+            let expected_emphasis = if cycle_index == 0 && event_index == 0 {
+                Emphasis::PhraseStart
+            } else {
+                Emphasis::Normal
+            };
+            if observed.emphasis != expected_emphasis {
+                return Err(ProcessRealizationAuditError::MelodyEmphasisMismatch {
                     cycle_index,
                     event_index,
                 });
@@ -303,6 +368,7 @@ pub fn verify_additive_process_score_v1(
         schema_version: PROCESS_REALIZATION_AUDIT_SCHEMA_VERSION,
         cycle_count: cycle_events.len(),
         observed_melody_event_count: melody.len(),
+        verified_expressive_event_count: melody.len(),
         maximum_prefix_length,
     })
 }
@@ -473,6 +539,7 @@ pub fn realize_additive_process(
             prefix_lengths,
             cycle_starts,
             process_cell: Some(cell),
+            dynamics_profile: Some(ProcessDynamicsProfileV1::PrefixLinear),
         },
     }
 }
@@ -664,6 +731,94 @@ mod tests {
         let replayed_failure: ProcessRealizationAuditError =
             serde_json::from_value(failure_json).unwrap();
         assert_eq!(replayed_failure, failure);
+    }
+
+
+    #[test]
+    fn frozen_prefix_linear_dynamics_match_reference_values() {
+        let expected_velocity = [0.52_f32, 0.58, 0.64, 0.70];
+        let expected_intensity = [0.53_f32, 0.64, 0.75, 0.86];
+        for (index, prefix_length) in (1..=4).enumerate() {
+            let ratio = prefix_length as f32 / 4.0_f32;
+            let velocity = 0.46_f32 + 0.24_f32 * ratio;
+            let intensity = 0.42_f32 + 0.44_f32 * ratio;
+            assert!((velocity - expected_velocity[index]).abs() < 0.000001);
+            assert!((intensity - expected_intensity[index]).abs() < 0.000001);
+        }
+    }
+
+    #[test]
+    fn score_side_audit_rejects_a_velocity_mutation() {
+        let mut realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        let note = realization.score.notes
+            .iter_mut()
+            .find(|note| note.role == VoiceRole::Melody)
+            .unwrap();
+        note.velocity += 0.05;
+        assert!(matches!(
+            verify_additive_process_score_v1(&realization.plan, &realization.score),
+            Err(ProcessRealizationAuditError::MelodyDynamicsMismatch {
+                field: "velocity",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn score_side_audit_rejects_a_section_intensity_mutation() {
+        let mut realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        let note = realization.score.notes
+            .iter_mut()
+            .find(|note| note.role == VoiceRole::Melody)
+            .unwrap();
+        note.section_intensity += 0.05;
+        assert!(matches!(
+            verify_additive_process_score_v1(&realization.plan, &realization.score),
+            Err(ProcessRealizationAuditError::MelodyDynamicsMismatch {
+                field: "section_intensity",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn score_side_audit_rejects_a_false_phrase_start_emphasis() {
+        let mut realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        let note = realization.score.notes
+            .iter_mut()
+            .find(|note| note.role == VoiceRole::Melody)
+            .unwrap();
+        note.emphasis = Emphasis::Normal;
+        assert!(matches!(
+            verify_additive_process_score_v1(&realization.plan, &realization.score),
+            Err(ProcessRealizationAuditError::MelodyEmphasisMismatch {
+                cycle_index: 0,
+                event_index: 0
+            })
+        ));
+    }
+
+    #[test]
+    fn legacy_plan_without_dynamics_profile_is_not_expressive_verified() {
+        let realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        let mut legacy_plan = realization.plan.clone();
+        legacy_plan.dynamics_profile = None;
+        assert!(matches!(
+            verify_additive_process_score_v1(&legacy_plan, &realization.score),
+            Err(ProcessRealizationAuditError::MissingDynamicsProfile)
+        ));
     }
 
     #[test]
