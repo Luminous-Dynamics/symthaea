@@ -4,6 +4,7 @@
 //! Engineering reasoning facade for Symthaea.
 
 pub mod lightshell_qualification;
+pub mod lightshell_spacer_doe;
 #![deny(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
