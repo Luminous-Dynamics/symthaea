@@ -18151,6 +18151,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-aqua-bench"
+version = "0.1.0"
+
+[[package]]
 name = "symthaea-art-eye"
 version = "0.1.0"
 dependencies = [
