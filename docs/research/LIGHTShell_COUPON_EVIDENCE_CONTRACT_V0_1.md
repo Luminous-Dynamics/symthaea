@@ -14,6 +14,7 @@ Schwager et al. (2022) report that flat-textile methods can be unsuitable for th
 
 Each specimen binds:
 - unique specimen ID and preregistered DoE candidate ID;
+- immutable specimen revision reference and SHA-256 configuration digest;
 - material lot, construction, process/machine program revision and manufactured article;
 - cut orientation (coursewise/walewise/face) and dimensions;
 - measured thickness and conditioning method, environment, temperature, relative humidity and duration;
@@ -23,7 +24,7 @@ A specimen remains `proposed` until its actual lot, process, geometry and condit
 
 ## Test-run record
 
-Every executed run binds a method/protocol revision, fixture identity/revision, support/contact boundary through the referenced protocol, environment, instruments, calibration evidence, operator, acquisition time, raw-data reference and SHA-256 digest, replicate/sample counts and status.
+Every executed run binds a method/protocol revision, fixture identity/revision, support/contact boundary through the referenced protocol, environment, instruments, calibration evidence, operator, acquisition time, raw-data reference and SHA-256 digest, replicate/sample counts and status. It must also repeat the exact specimen revision reference and configuration digest; any mismatch is a stale-configuration admission failure.
 
 Passed runs additionally require a reviewer, acceptance rule, measured observations, method and uncertainty-model references. Failed and inconclusive runs retain the same raw-data and calibration provenance plus a reason. Invalidation retains a reason and does not erase the original record.
 
@@ -61,3 +62,5 @@ The example is synthetic and entirely proposed; all physical values and identiti
 - Yan, Wang & Yu (2026), [Influence of Connective Architectures of Inlaid Weft-Knitted Spacer Fabric](https://doi.org/10.3390/polym18020151).
 - Schwager et al. (2022), [Development and Standardization of Testing Equipment and Methods for Spacer Fabrics](https://doi.org/10.1007/s10443-021-09959-y).
 - Existing engineering owners: Symthaea #4919, #6225, #6226, #6298; Lightshell #12724, #12688 and #12742.
+
+The coupon validator checks the digest format and enforces equality between specimen and run records. Canonical digest production/verification and the underlying manufactured-unit revision remain owned by the existing Mycelix manufacturing/lifecycle and metrology systems; this module does not invent a competing canonical serialization or lifecycle ledger.
