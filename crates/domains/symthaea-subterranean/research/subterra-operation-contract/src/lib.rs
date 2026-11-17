@@ -1343,4 +1343,178 @@ mod tests {
         assert_eq!(registry.attempt(AttemptId(11)).unwrap().state(), AttemptState::ReworkReview);
         assert_eq!(registry.scope_lock_holder(WorkScopeId(7)), Some(AttemptId(11)));
     }
+    #[test]
+    fn idempotency_keys_cannot_be_reused_across_attempts() {
+        let mut registry = OperationRegistry::default();
+        registry.begin_attempt(spec(), 1).unwrap();
+        preflight(&mut registry);
+        registry.append(
+            AttemptId(11),
+            event(2, 3, OperationEvent::CommandIssued {
+                command_digest: digest(10),
+                idempotency_key: digest(11),
+            }),
+        ).unwrap();
+        registry.append(
+            AttemptId(11),
+            event(3, 4, OperationEvent::OutcomeTimedOut),
+        ).unwrap();
+        registry.append(
+            AttemptId(11),
+            event(4, 5, OperationEvent::ReconciledNotExecuted {
+                reconciler_id: 301,
+                evidence_digest: digest(15),
+            }),
+        ).unwrap();
+
+        let mut retry = spec();
+        retry.attempt_id = AttemptId(12);
+        registry.begin_attempt(retry, 6).unwrap();
+        registry.append(
+            AttemptId(12),
+            event(1, 7, OperationEvent::PreflightAccepted {
+                work_package_revision: 4,
+                design_revision: 9,
+                coordinate_frame_revision: 2,
+                calibration_revision: 5,
+                authority_revision: 6,
+                work_package_digest: digest(20),
+                design_digest: digest(21),
+                coordinate_frame_digest: digest(22),
+                calibration_digest: digest(23),
+                authority_evidence_digest: digest(24),
+            }),
+        ).unwrap();
+        assert_eq!(
+            registry.append(
+                AttemptId(12),
+                event(2, 8, OperationEvent::CommandIssued {
+                    command_digest: digest(30),
+                    idempotency_key: digest(11),
+                }),
+            ),
+            Err(ContractError::IdempotencyKeyReused)
+        );
+        assert_eq!(
+            registry.attempt(AttemptId(12)).unwrap().state(),
+            AttemptState::PreflightAccepted
+        );
+    }
+
+    #[test]
+    fn rejected_work_scope_requires_new_authorized_package_before_retry() {
+        let mut registry = OperationRegistry::default();
+        registry.begin_attempt(spec(), 1).unwrap();
+        start_verification(&mut registry);
+        let mut failed = verification();
+        failed.postconditions_passed = false;
+        registry.append(
+            AttemptId(11),
+            event(6, 7, OperationEvent::VerificationSubmitted { receipt: failed }),
+        ).unwrap();
+        registry.append(
+            AttemptId(11),
+            event(7, 8, OperationEvent::RecordReworkReview {
+                authority_revision: 6,
+                disposition_digest: digest(31),
+            }),
+        ).unwrap();
+
+        let mut premature_retry = spec();
+        premature_retry.attempt_id = AttemptId(12);
+        assert!(matches!(
+            registry.begin_attempt(premature_retry, 9),
+            Err(ContractError::ScopeAlreadyLocked { .. })
+        ));
+
+        let authorization = ReworkAuthorization {
+            work_package_id: WorkPackageId(4),
+            work_package_revision: 5,
+            work_package_digest: digest(32),
+            design_revision: 10,
+            design_digest: digest(33),
+            coordinate_frame_revision: 2,
+            coordinate_frame_digest: digest(22),
+            calibration_revision: 5,
+            calibration_digest: digest(23),
+            authority_revision: 7,
+            authority_evidence_digest: digest(34),
+        };
+        assert_eq!(
+            registry.append(
+                AttemptId(11),
+                event(8, 10, OperationEvent::AuthorizeRework {
+                    authorization: authorization.clone(),
+                    approval_digest: digest(35),
+                }),
+            ).unwrap(),
+            AttemptState::ReworkSuperseded
+        );
+        assert_eq!(registry.scope_lock_holder(WorkScopeId(7)), None);
+
+        let mut wrong_retry = spec();
+        wrong_retry.attempt_id = AttemptId(12);
+        wrong_retry.work_package_revision = 5;
+        assert_eq!(
+            registry.begin_attempt(wrong_retry, 11),
+            Err(ContractError::InvalidAuthorityRevision)
+        );
+
+        let mut authorized_retry = spec();
+        authorized_retry.attempt_id = AttemptId(13);
+        authorized_retry.work_package_id = WorkPackageId(4);
+        authorized_retry.work_package_revision = 5;
+        authorized_retry.work_package_digest = digest(32);
+        authorized_retry.design_revision = 10;
+        authorized_retry.design_digest = digest(33);
+        authorized_retry.authority_revision = 7;
+        authorized_retry.authority_evidence_digest = digest(34);
+        registry.begin_attempt(authorized_retry, 11).unwrap();
+        assert_eq!(
+            registry.scope_lock_holder(WorkScopeId(7)),
+            Some(AttemptId(13))
+        );
+    }
+
+    #[test]
+    fn transition_history_retains_the_typed_command_and_evidence_events() {
+        let mut registry = OperationRegistry::default();
+        registry.begin_attempt(spec(), 1).unwrap();
+        preflight(&mut registry);
+        registry.append(
+            AttemptId(11),
+            event(2, 3, OperationEvent::CommandIssued {
+                command_digest: digest(10),
+                idempotency_key: digest(11),
+            }),
+        ).unwrap();
+        let history = registry.attempt(AttemptId(11)).unwrap().history();
+        assert_eq!(history.len(), 2);
+        assert!(matches!(
+            history[1].event,
+            OperationEvent::CommandIssued {
+                command_digest: EvidenceDigest([10; 32]),
+                idempotency_key: EvidenceDigest([11; 32]),
+            }
+        ));
+    }
+
+    #[test]
+    fn verifier_must_bind_its_receipt_to_the_observed_physical_delta() {
+        let mut registry = OperationRegistry::default();
+        registry.begin_attempt(spec(), 1).unwrap();
+        start_verification(&mut registry);
+        let mut receipt = verification();
+        receipt.physical_delta_digest = digest(99);
+        assert_eq!(
+            registry.append(
+                AttemptId(11),
+                event(6, 7, OperationEvent::VerificationSubmitted { receipt }),
+            ).unwrap(),
+            AttemptState::InsufficientEvidence
+        );
+        assert!(registry.attempt(AttemptId(11)).unwrap()
+            .last_verification().unwrap().issues.contains(&VerificationIssue::PhysicalDeltaMismatch));
+    }
+
 }
