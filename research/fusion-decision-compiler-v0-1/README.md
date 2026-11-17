@@ -65,6 +65,18 @@ The initial 15 authored tests cover matched outputs, descriptive-only and covari
 
 The graph helper returns the changed nodes and their full transitive downstream closure. Cycles are tolerated and traversal is deterministic. This is a structural impact calculation, not automatic revocation of an external certificate or authority decision.
 
+
+## Finite model-set decision-stability envelope
+
+The `decision_envelope` module compares two or more source-bound solver outputs against one frozen threshold. It does not average outputs or convert finite model spread into a probability interval. OOD, unknown-applicability, non-converged and stale runs block a complete envelope.
+
+Models are sorted by run ID, solver ID and output digest before validation and pair construction. Each pair uses canonical run order. This makes the entire report, including dependence receipts, invariant to input ordering.
+
+Dependency status preserves both facts when applicable: a discovered common dependency remains a `SharedDependencyFound` result even when an inventory is incomplete, while the per-side completeness flags remain false. When no common dependency is discoverable and an inventory is incomplete, the result is `UnknownDependencyInventory`, never independence.
+
+The synthetic fixture places two illustrative model outputs (92 and 108 MWe) on opposite sides of a 100 MWe threshold, reporting a 16 MWe finite spread and a shared scenario assumption. It is not a PROCESS/SARAS execution or a statistical/physical validation.
+
+
 ## Run locally
 
 From this directory:
@@ -76,6 +88,7 @@ cargo run --manifest-path Cargo.toml --bin verify_fecomp_corpus
 cargo run --manifest-path Cargo.toml --bin verify_validation_domain_corpus
 cargo run --manifest-path Cargo.toml --bin compare_solver_outputs
 cargo run --manifest-path Cargo.toml --bin qualify_plant_service
+cargo run --manifest-path Cargo.toml --bin audit_decision_envelope
 cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
 ```
 
