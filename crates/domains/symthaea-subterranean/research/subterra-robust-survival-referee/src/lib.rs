@@ -10,8 +10,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use subterra_survival_reference::{
-    CostPrices, MeasurementAction, MissionDecision, OutcomeKind, PlanningProblem,
-    PolicyBranch, PolicyNode, ResourceBudget, RiskLimits,
+    CostPrices, MeasurementAction, MissionDecision, OutcomeKind, PlanningProblem, PolicyBranch,
+    PolicyNode, ResourceBudget, RiskLimits,
 };
 
 const PROBABILITY_TOLERANCE: f64 = 1.0e-9;
@@ -48,7 +48,10 @@ impl ResourceUse {
         }
     }
 
-    fn add_cost(self, cost: subterra_survival_reference::ResourceCost) -> Result<Self, RefereeError> {
+    fn add_cost(
+        self,
+        cost: subterra_survival_reference::ResourceCost,
+    ) -> Result<Self, RefereeError> {
         let result = Self {
             energy_j: self.energy_j + cost.energy_j,
             duration_s: self.duration_s + cost.duration_s,
@@ -58,7 +61,9 @@ impl ResourceUse {
         if result.is_finite_nonnegative() {
             Ok(result)
         } else {
-            Err(RefereeError::NumericalOverflow("path resource accumulation"))
+            Err(RefereeError::NumericalOverflow(
+                "path resource accumulation",
+            ))
         }
     }
 
@@ -72,7 +77,9 @@ impl ResourceUse {
         if result.is_finite_nonnegative() {
             Ok(result)
         } else {
-            Err(RefereeError::NumericalOverflow("expected resource accumulation"))
+            Err(RefereeError::NumericalOverflow(
+                "expected resource accumulation",
+            ))
         }
     }
 
@@ -224,7 +231,10 @@ pub enum RefereeError {
     MissingUnknownHypothesis,
     MultipleUnknownHypotheses,
     UnknownHypothesisHasZeroPrior,
-    ProbabilityNotNormalized { context: String, sum_bits: u64 },
+    ProbabilityNotNormalized {
+        context: String,
+        sum_bits: u64,
+    },
     ModelSchemaMismatch(String),
     PolicyNodeLimitExceeded,
     PolicyDepthExceeded,
@@ -232,14 +242,29 @@ pub enum RefereeError {
     PolicyHasNeitherActionNorStop,
     UnknownAction(String),
     UnknownDecision(String),
-    UnknownOutcome { action_id: String, outcome_id: String },
-    DuplicatePolicyOutcome { action_id: String, outcome_id: String },
-    MissingPolicyOutcome { action_id: String, outcome_id: String },
-    PolicyOutcomeKindMismatch { action_id: String, outcome_id: String },
+    UnknownOutcome {
+        action_id: String,
+        outcome_id: String,
+    },
+    DuplicatePolicyOutcome {
+        action_id: String,
+        outcome_id: String,
+    },
+    MissingPolicyOutcome {
+        action_id: String,
+        outcome_id: String,
+    },
+    PolicyOutcomeKindMismatch {
+        action_id: String,
+        outcome_id: String,
+    },
     ObservationMissingContinuation(String),
     TerminalHasContinuation(String),
     StopNodeHasBranches(String),
-    PolicyOutcomeMassMismatch { action_id: String, sum_bits: u64 },
+    PolicyOutcomeMassMismatch {
+        action_id: String,
+        sum_bits: u64,
+    },
     PosteriorUndefined(String),
     NumericalOverflow(&'static str),
 }
@@ -280,21 +305,22 @@ fn validate_config(config: RefereeConfig) -> Result<(), RefereeError> {
     .into_iter()
     .all(|value| value.is_finite() && value >= 0.0)
     {
-        return Err(RefereeError::InvalidConfig("budget and resource prices must be finite and non-negative"));
+        return Err(RefereeError::InvalidConfig(
+            "budget and resource prices must be finite and non-negative",
+        ));
     }
     if !config
         .risk_limits
         .maximum_mission_interruption_probability
         .is_finite()
-        || !(0.0..=1.0).contains(
-            &config
-                .risk_limits
-                .maximum_mission_interruption_probability,
-        )
+        || !(0.0..=1.0).contains(&config.risk_limits.maximum_mission_interruption_probability)
     {
         return Err(RefereeError::InvalidConfig("mission interruption limit"));
     }
-    if !config.risk_limits.maximum_robot_loss_probability.is_finite()
+    if !config
+        .risk_limits
+        .maximum_robot_loss_probability
+        .is_finite()
         || !(0.0..=1.0).contains(&config.risk_limits.maximum_robot_loss_probability)
     {
         return Err(RefereeError::InvalidConfig("robot loss limit"));
@@ -306,17 +332,23 @@ fn validate_config(config: RefereeConfig) -> Result<(), RefereeError> {
         || config.maximum_policy_depth == 0
         || config.maximum_policy_depth > MAX_POLICY_DEPTH
     {
-        return Err(RefereeError::InvalidConfig("limits exceed the bounded v0.1 envelope"));
+        return Err(RefereeError::InvalidConfig(
+            "limits exceed the bounded v0.1 envelope",
+        ));
     }
     Ok(())
 }
 
 fn validate_problem(problem: &PlanningProblem) -> Result<(), RefereeError> {
     if problem.hypotheses.is_empty() || problem.decisions.is_empty() {
-        return Err(RefereeError::InvalidModel("hypotheses and decisions must be non-empty"));
+        return Err(RefereeError::InvalidModel(
+            "hypotheses and decisions must be non-empty",
+        ));
     }
     if problem.actions.len() > MAX_ACTIONS {
-        return Err(RefereeError::InvalidModel("action count exceeds v0.1 bound"));
+        return Err(RefereeError::InvalidModel(
+            "action count exceeds v0.1 bound",
+        ));
     }
 
     let mut hypothesis_ids = BTreeSet::new();
@@ -383,7 +415,10 @@ fn validate_problem(problem: &PlanningProblem) -> Result<(), RefereeError> {
     Ok(())
 }
 
-fn validate_action(action: &MeasurementAction, hypothesis_count: usize) -> Result<(), RefereeError> {
+fn validate_action(
+    action: &MeasurementAction,
+    hypothesis_count: usize,
+) -> Result<(), RefereeError> {
     if action.id.trim().is_empty() || action.modality.trim().is_empty() {
         return Err(RefereeError::InvalidModel("empty action ID or modality"));
     }
@@ -400,7 +435,9 @@ fn validate_action(action: &MeasurementAction, hypothesis_count: usize) -> Resul
         return Err(RefereeError::InvalidModel("invalid action resource cost"));
     }
     if action.outcomes.is_empty() || action.outcomes.len() > MAX_OUTCOMES_PER_ACTION {
-        return Err(RefereeError::InvalidModel("outcome count outside v0.1 bound"));
+        return Err(RefereeError::InvalidModel(
+            "outcome count outside v0.1 bound",
+        ));
     }
 
     let mut outcome_ids = BTreeSet::new();
@@ -414,7 +451,9 @@ fn validate_action(action: &MeasurementAction, hypothesis_count: usize) -> Resul
                 .iter()
                 .any(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
         {
-            return Err(RefereeError::InvalidModel("invalid outcome likelihood vector"));
+            return Err(RefereeError::InvalidModel(
+                "invalid outcome likelihood vector",
+            ));
         }
 
         match (outcome.kind, outcome.terminal_loss_by_hypothesis.as_ref()) {
@@ -423,11 +462,15 @@ fn validate_action(action: &MeasurementAction, hypothesis_count: usize) -> Resul
                 return Err(RefereeError::InvalidModel("observation has terminal loss"));
             }
             (_, None) => {
-                return Err(RefereeError::InvalidModel("terminal outcome has no terminal loss"));
+                return Err(RefereeError::InvalidModel(
+                    "terminal outcome has no terminal loss",
+                ));
             }
             (_, Some(losses))
                 if losses.len() != hypothesis_count
-                    || losses.iter().any(|value| !value.is_finite() || *value < 0.0) =>
+                    || losses
+                        .iter()
+                        .any(|value| !value.is_finite() || *value < 0.0) =>
             {
                 return Err(RefereeError::InvalidModel("invalid terminal loss vector"));
             }
@@ -521,7 +564,8 @@ fn validate_model_schema(models: &[ModelScenario]) -> Result<(), RefereeError> {
             )));
         }
         for action in &problem.actions {
-            let Some((modality, cost, expected_outcomes)) = first_actions.get(action.id.as_str()) else {
+            let Some((modality, cost, expected_outcomes)) = first_actions.get(action.id.as_str())
+            else {
                 return Err(RefereeError::ModelSchemaMismatch(format!(
                     "model {} adds/removes action {}",
                     model.model_id, action.id
@@ -553,8 +597,14 @@ fn validate_model_schema(models: &[ModelScenario]) -> Result<(), RefereeError> {
     Ok(())
 }
 
-fn find_action<'a>(problem: &'a PlanningProblem, action_id: &str) -> Result<&'a MeasurementAction, RefereeError> {
-    problem.actions.iter().find(|action| action.id == action_id)
+fn find_action<'a>(
+    problem: &'a PlanningProblem,
+    action_id: &str,
+) -> Result<&'a MeasurementAction, RefereeError> {
+    problem
+        .actions
+        .iter()
+        .find(|action| action.id == action_id)
         .ok_or_else(|| RefereeError::UnknownAction(action_id.to_owned()))
 }
 
@@ -578,7 +628,12 @@ fn validate_policy(
         (None, None) => return Err(RefereeError::PolicyHasNeitherActionNorStop),
         (None, Some(decision_id)) => {
             if node.branches.is_empty() {
-                if models[0].problem.decisions.iter().any(|decision| decision.id.as_str() == decision_id) {
+                if models[0]
+                    .problem
+                    .decisions
+                    .iter()
+                    .any(|decision| decision.id.as_str() == decision_id)
+                {
                     return Ok(());
                 }
                 return Err(RefereeError::UnknownDecision(decision_id.clone()));
@@ -589,13 +644,20 @@ fn validate_policy(
             let first_action = find_action(&models[0].problem, action_id)?;
             let mut branch_by_id = BTreeMap::new();
             for branch in &node.branches {
-                if branch_by_id.insert(branch.outcome_id.as_str(), branch).is_some() {
+                if branch_by_id
+                    .insert(branch.outcome_id.as_str(), branch)
+                    .is_some()
+                {
                     return Err(RefereeError::DuplicatePolicyOutcome {
                         action_id: action_id.clone(),
                         outcome_id: branch.outcome_id.clone(),
                     });
                 }
-                let Some(outcome) = first_action.outcomes.iter().find(|outcome| outcome.id == branch.outcome_id) else {
+                let Some(outcome) = first_action
+                    .outcomes
+                    .iter()
+                    .find(|outcome| outcome.id == branch.outcome_id)
+                else {
                     return Err(RefereeError::UnknownOutcome {
                         action_id: action_id.clone(),
                         outcome_id: branch.outcome_id.clone(),
@@ -609,12 +671,18 @@ fn validate_policy(
                 }
                 match (outcome.kind, branch.continuation.as_deref()) {
                     (OutcomeKind::Observation, None) => {
-                        return Err(RefereeError::ObservationMissingContinuation(branch.outcome_id.clone()));
+                        return Err(RefereeError::ObservationMissingContinuation(
+                            branch.outcome_id.clone(),
+                        ));
                     }
                     (OutcomeKind::Observation, Some(child)) => {
                         validate_policy(child, models, depth + 1, node_count, config)?;
                     }
-                    (_, Some(_)) => return Err(RefereeError::TerminalHasContinuation(branch.outcome_id.clone())),
+                    (_, Some(_)) => {
+                        return Err(RefereeError::TerminalHasContinuation(
+                            branch.outcome_id.clone(),
+                        ));
+                    }
                     (_, None) => {}
                 }
             }
@@ -623,10 +691,23 @@ fn validate_policy(
             // one supplied model, so model-specific support cannot disappear.
             for outcome in &first_action.outcomes {
                 let possible_in_any_model = models.iter().any(|model| {
-                    model.problem.actions.iter()
+                    model
+                        .problem
+                        .actions
+                        .iter()
                         .find(|candidate| candidate.id.as_str() == action_id)
-                        .and_then(|action| action.outcomes.iter().find(|candidate| candidate.id == outcome.id))
-                        .is_some_and(|candidate| candidate.likelihood_by_hypothesis.iter().any(|value| *value > 0.0))
+                        .and_then(|action| {
+                            action
+                                .outcomes
+                                .iter()
+                                .find(|candidate| candidate.id == outcome.id)
+                        })
+                        .is_some_and(|candidate| {
+                            candidate
+                                .likelihood_by_hypothesis
+                                .iter()
+                                .any(|value| *value > 0.0)
+                        })
                 });
                 if possible_in_any_model && !branch_by_id.contains_key(outcome.id.as_str()) {
                     return Err(RefereeError::MissingPolicyOutcome {
@@ -642,9 +723,15 @@ fn validate_policy(
 
 fn expected_loss(posterior: &[f64], losses: &[f64]) -> Result<f64, RefereeError> {
     if posterior.len() != losses.len() {
-        return Err(RefereeError::InvalidModel("loss/posterior dimension mismatch"));
+        return Err(RefereeError::InvalidModel(
+            "loss/posterior dimension mismatch",
+        ));
     }
-    let value = posterior.iter().zip(losses).map(|(p, loss)| p * loss).sum::<f64>();
+    let value = posterior
+        .iter()
+        .zip(losses)
+        .map(|(p, loss)| p * loss)
+        .sum::<f64>();
     if value.is_finite() && value >= 0.0 {
         Ok(value)
     } else {
@@ -653,7 +740,11 @@ fn expected_loss(posterior: &[f64], losses: &[f64]) -> Result<f64, RefereeError>
 }
 
 fn outcome_probability(posterior: &[f64], likelihood: &[f64]) -> Result<f64, RefereeError> {
-    let value = posterior.iter().zip(likelihood).map(|(p, l)| p * l).sum::<f64>();
+    let value = posterior
+        .iter()
+        .zip(likelihood)
+        .map(|(p, l)| p * l)
+        .sum::<f64>();
     if value.is_finite() && value >= 0.0 && value <= 1.0 + PROBABILITY_TOLERANCE {
         Ok(value.min(1.0))
     } else {
@@ -670,7 +761,8 @@ fn update_posterior(
     if probability <= 0.0 {
         return Err(RefereeError::PosteriorUndefined(outcome_id.to_owned()));
     }
-    let updated = posterior.iter()
+    let updated = posterior
+        .iter()
         .zip(likelihood)
         .map(|(prior, conditional)| prior * conditional / probability)
         .collect::<Vec<_>>();
@@ -691,9 +783,13 @@ fn cache_mismatch(branch: &PolicyBranch, probability: f64, posterior: Option<&[f
         return false;
     };
     branch.posterior.len() != expected.len()
-        || branch.posterior.iter().zip(expected).any(|(actual, expected)| {
-            !actual.is_finite() || (actual - expected).abs() > NUMERICAL_TOLERANCE
-        })
+        || branch
+            .posterior
+            .iter()
+            .zip(expected)
+            .any(|(actual, expected)| {
+                !actual.is_finite() || (actual - expected).abs() > NUMERICAL_TOLERANCE
+            })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -707,7 +803,9 @@ fn evaluate_node(
     prices: CostPrices,
 ) -> Result<PartialMetrics, RefereeError> {
     if let Some(decision_id) = node.stop_decision_id.as_deref() {
-        let decision = problem.decisions.iter()
+        let decision = problem
+            .decisions
+            .iter()
             .find(|candidate| candidate.id == decision_id)
             .ok_or_else(|| RefereeError::UnknownDecision(decision_id.to_owned()))?;
         return Ok(PartialMetrics {
@@ -723,7 +821,9 @@ fn evaluate_node(
         });
     }
 
-    let action_id = node.measurement_action_id.as_deref()
+    let action_id = node
+        .measurement_action_id
+        .as_deref()
         .ok_or(RefereeError::PolicyHasNeitherActionNorStop)?;
     let action = find_action(problem, action_id)?;
     let action_cost_value = ResourceUse::weighted(action.cost, prices)?;
@@ -751,7 +851,9 @@ fn evaluate_node(
     ordered_branches.sort_by(|a, b| a.outcome_id.cmp(&b.outcome_id));
 
     for branch in ordered_branches {
-        let outcome = action.outcomes.iter()
+        let outcome = action
+            .outcomes
+            .iter()
             .find(|candidate| candidate.id == branch.outcome_id)
             .ok_or_else(|| RefereeError::UnknownOutcome {
                 action_id: action_id.to_owned(),
@@ -778,7 +880,9 @@ fn evaluate_node(
         }
 
         if outcome.kind == OutcomeKind::Observation {
-            let child = branch.continuation.as_deref()
+            let child = branch
+                .continuation
+                .as_deref()
                 .ok_or_else(|| RefereeError::ObservationMissingContinuation(outcome.id.clone()))?;
             let future = evaluate_node(
                 problem,
@@ -791,18 +895,25 @@ fn evaluate_node(
             )?;
             expected_decision_loss += probability * future.expected_decision_loss;
             expected_future_cost += probability * future.expected_resource_cost_units;
-            expected_resources = expected_resources.plus_weighted(future.expected_resources, probability)?;
+            expected_resources =
+                expected_resources.plus_weighted(future.expected_resources, probability)?;
             interruption_probability += probability * future.mission_interruption_probability;
             robot_loss_probability += probability * future.robot_loss_probability;
-            maximum_path_resources = maximum_path_resources.component_max(future.maximum_path_resources);
+            maximum_path_resources =
+                maximum_path_resources.component_max(future.maximum_path_resources);
             external_gates_passed &= future.external_gates_passed;
             all_paths_within_budget &= future.all_supported_paths_within_budget;
-            cached_branch_mismatches = cached_branch_mismatches.saturating_add(future.cached_branch_mismatches);
+            cached_branch_mismatches =
+                cached_branch_mismatches.saturating_add(future.cached_branch_mismatches);
         } else {
-            let losses = outcome.terminal_loss_by_hypothesis.as_deref()
-                .ok_or(RefereeError::InvalidModel("terminal outcome missing loss vector"))?;
+            let losses = outcome.terminal_loss_by_hypothesis.as_deref().ok_or(
+                RefereeError::InvalidModel("terminal outcome missing loss vector"),
+            )?;
             expected_decision_loss += probability * expected_loss(&next_posterior, losses)?;
-            if matches!(outcome.kind, OutcomeKind::MissionInterrupted | OutcomeKind::RobotLost) {
+            if matches!(
+                outcome.kind,
+                OutcomeKind::MissionInterrupted | OutcomeKind::RobotLost
+            ) {
                 interruption_probability += probability;
             }
             if outcome.kind == OutcomeKind::RobotLost {
@@ -879,7 +990,10 @@ pub fn evaluate_policy_robustly(
 
     let mut per_model = Vec::with_capacity(models.len());
     for model in ordered_models {
-        let posterior = model.problem.hypotheses.iter()
+        let posterior = model
+            .problem
+            .hypotheses
+            .iter()
             .map(|hypothesis| hypothesis.prior_probability)
             .collect::<Vec<_>>();
         let metrics = evaluate_node(
@@ -899,7 +1013,8 @@ pub fn evaluate_policy_robustly(
             model_id: model.model_id.clone(),
             expected_decision_loss: metrics.expected_decision_loss,
             expected_resource_cost_units: metrics.expected_resource_cost_units,
-            expected_total_value: metrics.expected_decision_loss + metrics.expected_resource_cost_units,
+            expected_total_value: metrics.expected_decision_loss
+                + metrics.expected_resource_cost_units,
             expected_resources: metrics.expected_resources,
             maximum_path_resources: metrics.maximum_path_resources,
             mission_interruption_probability: metrics.mission_interruption_probability,
@@ -911,7 +1026,10 @@ pub fn evaluate_policy_robustly(
         });
     }
 
-    let values = per_model.iter().map(|metric| metric.expected_total_value).collect::<Vec<_>>();
+    let values = per_model
+        .iter()
+        .map(|metric| metric.expected_total_value)
+        .collect::<Vec<_>>();
     let worst_case_expected_total_value = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     let best_case_expected_total_value = values.iter().copied().fold(f64::INFINITY, f64::min);
     let total_value_sum = values.iter().sum::<f64>();
@@ -919,27 +1037,39 @@ pub fn evaluate_policy_robustly(
         return Err(RefereeError::NumericalOverflow("mean model value"));
     }
     let mean_expected_total_value = total_value_sum / values.len() as f64;
-    let maximum_mission_interruption_probability = per_model.iter()
+    let maximum_mission_interruption_probability = per_model
+        .iter()
         .map(|metric| metric.mission_interruption_probability)
         .fold(0.0, f64::max);
-    let maximum_robot_loss_probability = per_model.iter()
+    let maximum_robot_loss_probability = per_model
+        .iter()
         .map(|metric| metric.robot_loss_probability)
         .fold(0.0, f64::max);
     let all_external_gates_passed = per_model.iter().all(|metric| metric.external_gates_passed);
-    let all_supported_paths_within_budget = per_model.iter()
+    let all_supported_paths_within_budget = per_model
+        .iter()
         .all(|metric| metric.all_supported_paths_within_budget);
     let all_models_within_risk_limits = per_model.iter().all(|metric| metric.within_risk_limits);
 
     let mut violations = Vec::new();
     for metric in &per_model {
         if !metric.external_gates_passed {
-            violations.push(format!("{}: at least one selected action failed an external gate", metric.model_id));
+            violations.push(format!(
+                "{}: at least one selected action failed an external gate",
+                metric.model_id
+            ));
         }
         if !metric.all_supported_paths_within_budget {
-            violations.push(format!("{}: at least one supported policy path exceeded a resource budget", metric.model_id));
+            violations.push(format!(
+                "{}: at least one supported policy path exceeded a resource budget",
+                metric.model_id
+            ));
         }
         if !metric.within_risk_limits {
-            violations.push(format!("{}: interruption or robot-loss risk exceeded its hard limit", metric.model_id));
+            violations.push(format!(
+                "{}: interruption or robot-loss risk exceeded its hard limit",
+                metric.model_id
+            ));
         }
     }
 
@@ -977,16 +1107,31 @@ mod tests {
 
     fn hypotheses() -> Vec<Hypothesis> {
         vec![
-            Hypothesis { id: "open".into(), prior_probability: 0.6 },
-            Hypothesis { id: "blocked".into(), prior_probability: 0.3 },
-            Hypothesis { id: "unknown".into(), prior_probability: 0.1 },
+            Hypothesis {
+                id: "open".into(),
+                prior_probability: 0.6,
+            },
+            Hypothesis {
+                id: "blocked".into(),
+                prior_probability: 0.3,
+            },
+            Hypothesis {
+                id: "unknown".into(),
+                prior_probability: 0.1,
+            },
         ]
     }
 
     fn decisions() -> Vec<MissionDecision> {
         vec![
-            MissionDecision { id: "enter".into(), loss_by_hypothesis: vec![0.0, 100.0, 50.0] },
-            MissionDecision { id: "hold".into(), loss_by_hypothesis: vec![40.0, 0.0, 10.0] },
+            MissionDecision {
+                id: "enter".into(),
+                loss_by_hypothesis: vec![0.0, 100.0, 50.0],
+            },
+            MissionDecision {
+                id: "hold".into(),
+                loss_by_hypothesis: vec![40.0, 0.0, 10.0],
+            },
         ]
     }
 
@@ -1080,10 +1225,14 @@ mod tests {
     #[test]
     fn hand_computable_policy_value_and_risk_match() {
         let report = evaluate_policy_robustly(
-            &[ModelScenario { model_id: "nominal".into(), problem: problem(0.02, true) }],
+            &[ModelScenario {
+                model_id: "nominal".into(),
+                problem: problem(0.02, true),
+            }],
             &policy(),
             config(),
-        ).unwrap();
+        )
+        .unwrap();
         let model = &report.per_model[0];
         // Enter loss under the prior is 0.6*0 + 0.3*100 + 0.1*50 = 35.
         // Robot-loss terminal loss is 100; expected loss = 0.98*35 + 0.02*100 = 36.3.
@@ -1098,14 +1247,25 @@ mod tests {
     #[test]
     fn one_shared_policy_is_scored_under_each_model_not_reoptimized() {
         let models = vec![
-            ModelScenario { model_id: "optimistic".into(), problem: problem(0.02, true) },
-            ModelScenario { model_id: "pessimistic".into(), problem: problem(0.15, true) },
+            ModelScenario {
+                model_id: "optimistic".into(),
+                problem: problem(0.02, true),
+            },
+            ModelScenario {
+                model_id: "pessimistic".into(),
+                problem: problem(0.15, true),
+            },
         ];
         let report = evaluate_policy_robustly(&models, &policy(), config()).unwrap();
         assert_eq!(report.model_count, 2);
         assert!((report.maximum_robot_loss_probability - 0.15).abs() < 1.0e-8);
-        assert_eq!(report.disposition, PolicyDisposition::InadmissibleAcrossSuppliedModels);
-        assert!(report.per_model[0].expected_total_value < report.per_model[1].expected_total_value);
+        assert_eq!(
+            report.disposition,
+            PolicyDisposition::InadmissibleAcrossSuppliedModels
+        );
+        assert!(
+            report.per_model[0].expected_total_value < report.per_model[1].expected_total_value
+        );
         assert_eq!(report.per_model[0].model_id, "optimistic");
         assert_eq!(report.per_model[1].model_id, "pessimistic");
     }
@@ -1191,36 +1351,70 @@ mod tests {
         assert_eq!(report.model_count, 2);
         assert_eq!(report.per_model[0].model_id, "model-a");
         assert_eq!(report.per_model[1].model_id, "model-b");
-        assert!(report.per_model[1].expected_decision_loss > report.per_model[0].expected_decision_loss + 30.0);
-        assert!(report.per_model.iter().all(|metric| metric.cached_branch_mismatches > 0));
+        assert!(
+            report.per_model[1].expected_decision_loss
+                > report.per_model[0].expected_decision_loss + 30.0
+        );
+        assert!(
+            report
+                .per_model
+                .iter()
+                .all(|metric| metric.cached_branch_mismatches > 0)
+        );
         assert!(report.all_external_gates_passed);
         assert!(report.all_supported_paths_within_budget);
     }
     #[test]
     fn untrusted_policy_probability_and_posterior_cache_cannot_change_score() {
         let models = vec![
-            ModelScenario { model_id: "a".into(), problem: problem(0.02, true) },
-            ModelScenario { model_id: "b".into(), problem: problem(0.05, true) },
+            ModelScenario {
+                model_id: "a".into(),
+                problem: problem(0.02, true),
+            },
+            ModelScenario {
+                model_id: "b".into(),
+                problem: problem(0.05, true),
+            },
         ];
         let original = evaluate_policy_robustly(&models, &policy(), config()).unwrap();
         let mut tampered = policy();
         tampered.branches[0].probability = f64::NAN;
         tampered.branches[0].posterior = vec![999.0, -10.0];
         let changed = evaluate_policy_robustly(&models, &tampered, config()).unwrap();
-        assert_eq!(original.worst_case_expected_total_value, changed.worst_case_expected_total_value);
-        assert_eq!(original.maximum_robot_loss_probability, changed.maximum_robot_loss_probability);
-        assert!(changed.per_model.iter().all(|metric| metric.cached_branch_mismatches > 0));
+        assert_eq!(
+            original.worst_case_expected_total_value,
+            changed.worst_case_expected_total_value
+        );
+        assert_eq!(
+            original.maximum_robot_loss_probability,
+            changed.maximum_robot_loss_probability
+        );
+        assert!(
+            changed
+                .per_model
+                .iter()
+                .all(|metric| metric.cached_branch_mismatches > 0)
+        );
     }
 
     #[test]
     fn external_gate_denial_in_any_model_blocks_admissibility() {
         let models = vec![
-            ModelScenario { model_id: "admitted".into(), problem: problem(0.02, true) },
-            ModelScenario { model_id: "denied".into(), problem: problem(0.02, false) },
+            ModelScenario {
+                model_id: "admitted".into(),
+                problem: problem(0.02, true),
+            },
+            ModelScenario {
+                model_id: "denied".into(),
+                problem: problem(0.02, false),
+            },
         ];
         let report = evaluate_policy_robustly(&models, &policy(), config()).unwrap();
         assert!(!report.all_external_gates_passed);
-        assert_eq!(report.disposition, PolicyDisposition::InadmissibleAcrossSuppliedModels);
+        assert_eq!(
+            report.disposition,
+            PolicyDisposition::InadmissibleAcrossSuppliedModels
+        );
     }
 
     #[test]
@@ -1228,11 +1422,17 @@ mod tests {
         let mut incomplete = policy();
         incomplete.branches.pop();
         let result = evaluate_policy_robustly(
-            &[ModelScenario { model_id: "only".into(), problem: problem(0.02, true) }],
+            &[ModelScenario {
+                model_id: "only".into(),
+                problem: problem(0.02, true),
+            }],
             &incomplete,
             config(),
         );
-        assert!(matches!(result, Err(RefereeError::MissingPolicyOutcome { .. })));
+        assert!(matches!(
+            result,
+            Err(RefereeError::MissingPolicyOutcome { .. })
+        ));
     }
 
     #[test]
@@ -1241,8 +1441,14 @@ mod tests {
         changed.actions[0].cost.energy_j += 1.0;
         let result = evaluate_policy_robustly(
             &[
-                ModelScenario { model_id: "a".into(), problem: problem(0.02, true) },
-                ModelScenario { model_id: "b".into(), problem: changed },
+                ModelScenario {
+                    model_id: "a".into(),
+                    problem: problem(0.02, true),
+                },
+                ModelScenario {
+                    model_id: "b".into(),
+                    problem: changed,
+                },
             ],
             &policy(),
             config(),
@@ -1305,20 +1511,33 @@ mod tests {
         let mut cfg = config();
         cfg.resource_budget.energy_j = 10.0;
         let report = evaluate_policy_robustly(
-            &[ModelScenario { model_id: "path".into(), problem: p }],
+            &[ModelScenario {
+                model_id: "path".into(),
+                problem: p,
+            }],
             &tree,
             cfg,
-        ).unwrap();
+        )
+        .unwrap();
         assert!(!report.all_supported_paths_within_budget);
         assert!((report.per_model[0].maximum_path_resources.energy_j - 12.0).abs() < 1.0e-8);
-        assert_eq!(report.disposition, PolicyDisposition::InadmissibleAcrossSuppliedModels);
+        assert_eq!(
+            report.disposition,
+            PolicyDisposition::InadmissibleAcrossSuppliedModels
+        );
     }
 
     #[test]
     fn policy_is_deterministic_under_model_and_branch_order_permutation() {
         let mut models = vec![
-            ModelScenario { model_id: "z".into(), problem: problem(0.05, true) },
-            ModelScenario { model_id: "a".into(), problem: problem(0.02, true) },
+            ModelScenario {
+                model_id: "z".into(),
+                problem: problem(0.05, true),
+            },
+            ModelScenario {
+                model_id: "a".into(),
+                problem: problem(0.02, true),
+            },
         ];
         let left = evaluate_policy_robustly(&models, &policy(), config()).unwrap();
         models.reverse();
@@ -1338,12 +1557,19 @@ mod tests {
         // in at least one model. The zero-mass model must skip that branch.
         let report = evaluate_policy_robustly(
             &[
-                ModelScenario { model_id: "zero".into(), problem: zero },
-                ModelScenario { model_id: "positive".into(), problem: positive },
+                ModelScenario {
+                    model_id: "zero".into(),
+                    problem: zero,
+                },
+                ModelScenario {
+                    model_id: "positive".into(),
+                    problem: positive,
+                },
             ],
             &policy(),
             config(),
-        ).unwrap();
+        )
+        .unwrap();
         assert!((report.per_model[0].robot_loss_probability).abs() < 1.0e-12);
         assert!((report.per_model[1].robot_loss_probability - 0.02).abs() < 1.0e-8);
     }
@@ -1351,13 +1577,24 @@ mod tests {
     #[test]
     fn robot_loss_limit_fails_even_when_mean_model_risk_is_lower() {
         let models = vec![
-            ModelScenario { model_id: "low".into(), problem: problem(0.01, true) },
-            ModelScenario { model_id: "high".into(), problem: problem(0.12, true) },
+            ModelScenario {
+                model_id: "low".into(),
+                problem: problem(0.01, true),
+            },
+            ModelScenario {
+                model_id: "high".into(),
+                problem: problem(0.12, true),
+            },
         ];
         let mut cfg = config();
         cfg.risk_limits.maximum_robot_loss_probability = 0.1;
         let report = evaluate_policy_robustly(&models, &policy(), cfg).unwrap();
-        let mean = report.per_model.iter().map(|metric| metric.robot_loss_probability).sum::<f64>() / 2.0;
+        let mean = report
+            .per_model
+            .iter()
+            .map(|metric| metric.robot_loss_probability)
+            .sum::<f64>()
+            / 2.0;
         assert!(mean < 0.1);
         assert!(report.maximum_robot_loss_probability > 0.1);
         assert!(!report.all_models_within_risk_limits);
