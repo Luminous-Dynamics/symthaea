@@ -118,6 +118,7 @@ impl PairedWorldFixture {
         // This helper belongs to the evaluator/fixture side. The candidate
         // receives only the returned sensor observation through the harness,
         // never the world index or the evaluator record.
+        let episode = &self.candidate_episode;
 
         if !episode.reference_probe_available {
             return Err(ProbeDenial::ProbeUnavailable);
