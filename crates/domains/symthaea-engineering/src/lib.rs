@@ -3,6 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Engineering reasoning facade for Symthaea.
 
+pub mod lightshell_qualification;
 #![deny(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
