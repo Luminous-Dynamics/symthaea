@@ -1,65 +1,43 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # Plasma Control Feedback System
+//! # Plasma Stability Heuristic / Simulator Prototype
 //!
-//! Connects integrated information (Phi) monitoring to plasma control actions for
-//! tokamak-style fusion reactor operation. This module provides real-time feedback
-//! control based on consciousness metrics (Phi), enabling proactive disruption avoidance.
+//! This module contains an experimental Phi-driven software feedback loop and a
+//! simplified plasma simulator. Its actions and motor-command mappings are internal
+//! FEP abstractions, not real magnetic-coil, gas-injection, heating or shutdown commands.
 //!
-//! ## Overview
+//! The state contains generic defaults and simplified proxy equations. Phi thresholds
+//! are prototype parameters, not machine-calibrated plasma stability limits. A passing
+//! unit test demonstrates code behavior only; it does not validate a tokamak policy,
+//! predict disruptions, implement an interlock, or authorize physical actuation.
 //!
-//! The plasma control system monitors Phi levels and their dynamics to:
-//! 1. Assess plasma stability in real-time
-//! 2. Recommend control actions based on Phi thresholds
-//! 3. Execute soft landing sequences when disruption is imminent
-//! 4. Learn optimal control policies via temporal difference learning
-//!
-//! ## Architecture
-//!
-//! ```text
-//! ┌────────────────────────────────────────────────────────────────────────────┐
-//! │                     PLASMA CONTROL FEEDBACK LOOP                           │
-//! ├────────────────────────────────────────────────────────────────────────────┤
-//! │                                                                            │
-//! │   ┌─────────────┐      ┌─────────────────┐      ┌──────────────────┐      │
-//! │   │ Φ Monitor   │─────▶│ PlasmaControl   │─────▶│ Control Action   │      │
-//! │   │ (PhiMonitor)│      │ Loop            │      │ Selection        │      │
-//! │   └─────────────┘      └─────────────────┘      └────────┬─────────┘      │
-//! │          │                     │                          │               │
-//! │          │                     ▼                          │               │
-//! │          │            ┌─────────────────┐                 │               │
-//! │          │            │ Stability       │                 │               │
-//! │          └───────────▶│ Assessment      │◀────────────────┘               │
-//! │                       └────────┬────────┘                                 │
-//! │                                │                                          │
-//! │                                ▼                                          │
-//! │                       ┌─────────────────┐      ┌──────────────────┐      │
-//! │                       │ FEP Bridge      │─────▶│ TD Learning      │      │
-//! │                       │ (MotorCommand)  │      │ (Policy Update)  │      │
-//! │                       └─────────────────┘      └──────────────────┘      │
-//! │                                                                            │
-//! └────────────────────────────────────────────────────────────────────────────┘
-//! ```
+//! Use this module for offline algorithm experiments and simulated trajectories only.
+//! Any future plant-specific integration requires measured input qualification,
+//! independently validated state estimation, actuator constraints, and separate
+//! facility authorization.
 //!
 //! ## Phi Thresholds
 //!
+//! The following table documents prototype values only; these are not validated
+//! operating thresholds or regulatory criteria.
+//! 
 //! | Threshold | Value | Meaning |
 //! |-----------|-------|---------|
-//! | Stable    | ≥0.6  | Normal operation, maintain state |
-//! | Warning   | 0.4-0.6 | Elevated risk, consider power reduction |
-//! | Critical  | 0.25-0.4 | Imminent disruption, soft landing |
-//! | Emergency | <0.25 | Emergency shutdown required |
+//! | Stable    | ≥0.6  | Lowest Phi-proxy category |
+//! | Warning   | 0.4-0.6 | Elevated Phi-proxy category |
+//! | Critical  | 0.25-0.4 | Higher Phi-proxy category |
+//! | Emergency | <0.25 | Prototype emergency-category label; not a shutdown command |
 //!
-//! ## Integration with FEP
+//! ## Internal FEP command-category mapping
 //!
-//! The plasma control actions map to FEP `MotorCommandType`:
+//! The simulator's action labels map to FEP `MotorCommandType` categories:
 //! - `MaintainState` -> `NoOp`
-//! - `ReducePower` -> `LearningRateAdjust` (reduce system energy)
-//! - `AdjustMagneticField` -> `AttentionShift` (redirect configuration)
-//! - `InjectGas` -> `ExplorationTrigger` (introduce new dynamics)
-//! - `TriggerSoftLanding` -> `ReflectionInitiate` (controlled wind-down)
-//! - `EmergencyShutdown` -> `ExpectationReset` (immediate state reset)
+//! - `ReducePower` -> `LearningRateAdjust` (internal category mapping only)
+//! - `AdjustMagneticField` -> `AttentionShift` (internal category mapping only)
+//! - `InjectGas` -> `ExplorationTrigger` (internal category mapping only)
+//! - `TriggerSoftLanding` -> `ReflectionInitiate` (internal category mapping only)
+//! These are internal agent command categories only; no hardware API is called.
 
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -198,6 +176,7 @@ pub enum TrendDirection {
 
 /// Control actions for plasma stabilization
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// Abstract simulator action label. Variants are not physical actuator commands.
 pub enum PlasmaControlAction {
     /// Normal operation - maintain current state
     MaintainState,

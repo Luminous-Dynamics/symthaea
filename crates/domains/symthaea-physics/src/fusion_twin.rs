@@ -1,13 +1,23 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Fusion Digital Twin — Genesis Mission Challenge 3
+//! Plasma latent-state and reference-surprise research prototype.
 //!
-//! Ties a ContinuousHV-based plasma encoder + CfC multi-scale predictor + FEP active-inference
-//! agent into a closed-loop digital twin for tokamak disruption avoidance.
+//! This module combines a four-channel ContinuousHV encoder, a CfC/LTC latent-state
+//! evolution primitive, and threshold-based research action labels. It is an offline
+//! prototype, not a validated plasma-state estimator, disruption predictor, safety
+//! interlock, or control system.
 //!
-//! The key innovation is **O(1) temporal prediction**: predicting plasma state 10 seconds
-//! ahead costs the same as predicting 1 ms ahead, thanks to the closed-form CfC solution.
+//! Horizon evolution has constant work with respect to the requested horizon duration
+//! for a fixed latent dimension. The operation still processes the fixed-size vector;
+//! its output is a latent representation, not a unit-bearing physical plasma forecast.
+//!
+//! Important limitations:
+//! - absent sensor channels are currently represented by zero aggregate components;
+//! - the reference vector is a seeded placeholder until a caller installs a baseline;
+//! - the so-called free-energy value is one minus latent-vector similarity, not
+//!   thermodynamic free energy or a calibrated disruption probability;
+//! - action enums are heuristic labels and have no physical actuator binding.
 
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
@@ -16,8 +26,8 @@ use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 use crate::plasma_hdc_encoder::{PlasmaReading, PlasmaSensorType};
 
 // ── FEP Action Thresholds (unified) ────────────────────────────────────────
-/// Free energy thresholds for PlasmaFepAction selection AND DisruptionRisk
-/// classification. Single source of truth — never duplicate these values.
+/// Prototype reference-surprise thresholds for heuristic action labels and risk buckets.
+/// These values are not machine-calibrated operating limits.
 const FE_EMERGENCY: f64 = 0.7;
 const FE_SOFT_LANDING: f64 = 0.5;
 const FE_INJECT_GAS: f64 = 0.3;
@@ -121,10 +131,10 @@ impl FusionHdcEncoder {
 
 // ── Multi-Scale Plasma Predictor ───────────────────────────────────────────
 
-/// Multi-scale predictor tuned for plasma timescales.
+/// Evolves a fixed-size latent representation over configured plasma time horizons.
 ///
-/// Uses a single `HdcLtcUnifiedNeuron` with tau_base appropriate for plasma
-/// dynamics (~1 ms base). Each `predict_at_horizon` call is O(1).
+/// The runtime is independent of the requested horizon duration for a fixed vector
+/// dimension. Returned vectors are not calibrated physical plasma-state forecasts.
 pub struct PlasmaMultiScalePredictor {
     neuron: HdcLtcUnifiedNeuron,
 }
@@ -143,7 +153,7 @@ impl PlasmaMultiScalePredictor {
         }
     }
 
-    /// Predict plasma state at a specific time horizon (seconds). O(1) cost.
+    /// Evolve the latent state over a requested duration; this is not a physical forecast.
     ///
     /// # Panics
     ///
@@ -163,7 +173,7 @@ impl PlasmaMultiScalePredictor {
         neuron_copy.state().clone()
     }
 
-    /// Predict at all plasma horizons (1 ms to 10 s).
+    /// Evolve the latent state at all configured durations (1 ms to 10 s).
     pub fn predict_all_horizons(&self, current_state: &ContinuousHV) -> Vec<(f32, ContinuousHV)> {
         PLASMA_HORIZONS
             .iter()
@@ -219,17 +229,17 @@ impl symthaea_core::temporal::TemporalPredictor for PlasmaMultiScalePredictor {
 /// Discrete actions the plasma FEP agent can take to avoid disruptions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum PlasmaFepAction {
-    /// Everything within tolerance — no intervention.
+    /// Lowest-severity research label; not a facility operating command.
     MaintainState,
-    /// Gradually reduce heating power.
+    /// Research label for a heating-reduction hypothesis; not a command.
     ReduceHeating,
-    /// Adjust magnetic field coils for MHD stability.
+    /// Research label for a magnetic-field adjustment hypothesis; not a command.
     AdjustMagneticField,
-    /// Inject impurity gas for radiative cooling.
+    /// Research label for an impurity-injection hypothesis; not a command.
     InjectGas,
-    /// Controlled ramp-down to avoid runaway electrons.
+    /// Research label for a soft-landing hypothesis; not a command.
     TriggerSoftLanding,
-    /// Immediate shutdown — last resort.
+    /// High-severity research label; it does not initiate a shutdown.
     EmergencyShutdown,
 }
 
@@ -257,19 +267,20 @@ impl PlasmaFepAction {
     pub fn from_index(idx: usize) -> Self {
         match PlasmaFepAction::ALL.get(idx) {
             Some(&action) => action,
-            None => PlasmaFepAction::EmergencyShutdown, // out-of-bounds → safest action
+            None => PlasmaFepAction::EmergencyShutdown, // compatibility fallback label; not a safety determination
         }
     }
 }
 
-/// FEP-based agent for plasma disruption avoidance.
+/// Prototype heuristic that maps latent reference-surprise and a few fixed thresholds
+/// to research action labels. It is not a calibrated predictor or intervention policy.
 ///
-/// Uses HDC-encoded plasma state similarity to compute free energy (surprise),
-/// then selects the safest intervention.
+/// The initial reference is a seeded placeholder. Callers must install a baseline with
+/// `set_reference` before interpreting the resulting similarity score as a comparison.
 pub struct PlasmaFepAgent {
     /// Threshold above which the agent considers the state "surprising".
     pub surprise_threshold: f64,
-    /// Reference "healthy" plasma state HV.
+    /// Seeded latent placeholder until a caller installs a baseline reference.
     reference_state: ContinuousHV,
 }
 
@@ -281,14 +292,15 @@ impl PlasmaFepAgent {
         }
     }
 
-    /// Set the reference (expected) plasma state from a healthy shot.
+    /// Install a caller-provided latent baseline. Its physical validity is not checked.
     pub fn set_reference(&mut self, reference: ContinuousHV) {
         self.reference_state = reference;
     }
 
-    /// Compute free energy (prediction error) between observed and reference state.
+    /// Compute a reference-surprise proxy: one minus latent-vector similarity.
     ///
-    /// Returns 1.0 (maximum surprise) if similarity is NaN.
+    /// This is not thermodynamic free energy, a calibrated probability, or a
+    /// physically validated prediction. Returns 1.0 if similarity is non-finite.
     pub fn compute_free_energy(&self, observed: &ContinuousHV) -> f64 {
         let similarity = observed.similarity(&self.reference_state) as f64;
         if !similarity.is_finite() {
@@ -297,14 +309,15 @@ impl PlasmaFepAgent {
         (1.0 - similarity).max(0.0)
     }
 
-    /// Whether the current plasma state is "surprising" (high free energy).
+    /// Whether the latent reference-surprise proxy exceeds its configured threshold.
     pub fn is_surprised(&self, observed: &ContinuousHV) -> bool {
         self.compute_free_energy(observed) > self.surprise_threshold
     }
 
-    /// Select the best action given the current plasma readings and their encoded HV.
+    /// Return a heuristic research label from the current readings and latent proxy.
     ///
-    /// Decision logic mirrors NRC safety levels:
+    /// These fixed thresholds are not machine-calibrated, not NRC criteria, and do
+    /// not authorize an intervention. The current mapping is:
     /// - Low surprise → MaintainState
     /// - Moderate surprise → ReduceHeating or AdjustMagneticField
     /// - High surprise → InjectGas or TriggerSoftLanding
@@ -351,46 +364,40 @@ impl Default for PlasmaFepAgent {
 
 // ── Fusion Digital Twin ────────────────────────────────────────────────────
 
-/// NRC-style disruption risk level.
+/// Uncalibrated heuristic bucket derived from the reference-surprise proxy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum DisruptionRisk {
-    /// Normal operation.
+    /// Lowest heuristic bucket.
     Green,
-    /// Elevated monitoring — minor deviations detected.
+    /// Elevated heuristic bucket; monitoring semantics are not calibrated.
     Yellow,
-    /// Active intervention required.
+    /// Higher heuristic bucket; does not establish an intervention requirement.
     Orange,
-    /// Imminent disruption — emergency procedures.
+    /// Highest heuristic bucket; not a validated imminent-disruption forecast.
     Red,
 }
 
 /// Output from a single digital-twin prediction cycle.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FusionTwinOutput {
-    /// Multi-scale predictions at plasma horizons.
+    /// Requested horizon durations paired with human-readable labels; not physical forecasts.
     pub predictions: Vec<(f32, String)>,
-    /// Current disruption risk level.
+    /// Prototype heuristic risk bucket; not a calibrated event probability.
     pub disruption_risk: DisruptionRisk,
-    /// Free energy (surprise) of current state.
+    /// Latent reference-surprise proxy; not thermodynamic free energy.
     pub free_energy: f64,
-    /// Recommended FEP action.
+    /// Heuristic research label; not an actuator command or operational recommendation.
     pub recommended_action: PlasmaFepAction,
-    /// Similarity of each predicted state to reference.
+    /// Similarity diagnostics between evolved latent vectors and current latent state.
     pub prediction_similarities: Vec<(f32, f32)>,
 }
 
-/// Fusion Digital Twin: closed-loop plasma control via HDC + CfC + FEP.
+/// Offline latent-analysis prototype combining a plasma encoder, CfC/LTC evolution,
+/// and heuristic reference-surprise labels.
 ///
-/// Combines:
-/// - **FusionHdcEncoder** to encode sensor data into 16,384D ContinuousHV
-/// - **PlasmaMultiScalePredictor** for O(1) temporal prediction (1 ms — 10 s)
-/// - **PlasmaFepAgent** for disruption-avoidance action selection
-///
-/// # Genesis Mission Challenge 3
-///
-/// Addresses the DOE Fusion Energy challenge by demonstrating that a single
-/// consciousness-like architecture can monitor, predict, and control plasma
-/// instabilities across 4 orders of magnitude in timescale.
+/// It does not return physical state forecasts and is not a closed-loop facility
+/// controller. Its action enum is descriptive software output only. In particular,
+/// the default reference is a seeded placeholder until a caller sets a baseline.
 pub struct FusionDigitalTwin {
     encoder: FusionHdcEncoder,
     predictor: PlasmaMultiScalePredictor,
@@ -399,7 +406,7 @@ pub struct FusionDigitalTwin {
 }
 
 impl FusionDigitalTwin {
-    /// Create a new digital twin with default configuration.
+    /// Create the offline latent-analysis prototype with default configuration.
     pub fn new() -> Self {
         Self {
             encoder: FusionHdcEncoder::new(),
@@ -409,16 +416,16 @@ impl FusionDigitalTwin {
         }
     }
 
-    /// Set the reference healthy-plasma state from a known-good shot.
+    /// Set a caller-provided latent reference window; the shot is not independently qualified.
     pub fn set_reference_shot(&mut self, readings: &[PlasmaReading]) {
         let reference_hv = self.encoder.encode_window(readings);
         self.agent.set_reference(reference_hv);
     }
 
-    /// Run one prediction cycle on new sensor readings.
+    /// Run one latent-analysis cycle on the supplied readings.
     ///
-    /// Returns a `FusionTwinOutput` containing predictions at all plasma horizons,
-    /// the current disruption risk level, and a recommended action.
+    /// Output fields are horizon labels, latent similarity and heuristic buckets;
+    /// this method does not produce calibrated physical forecasts or authorize control.
     ///
     /// # Panics
     ///
