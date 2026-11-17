@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'research/asteroid-optical-isru-v0.2/benchmark_contract.rs'
+      - 'research/asteroid-optical-isru-v0.2/replay_oracle.rs'
       - '.github/workflows/isru-benchmark-contract-tests.yml'
   workflow_dispatch:
 
@@ -23,12 +24,18 @@ jobs:
           components: clippy, rustfmt
 
       - name: Check formatting
-        run: rustfmt --edition 2021 --check research/asteroid-optical-isru-v0.2/benchmark_contract.rs
+        run: |
+          rustfmt --edition 2021 --check research/asteroid-optical-isru-v0.2/benchmark_contract.rs
+          rustfmt --edition 2021 --check research/asteroid-optical-isru-v0.2/replay_oracle.rs
 
       - name: Run standalone Clippy
-        run: clippy-driver --edition=2021 --test research/asteroid-optical-isru-v0.2/benchmark_contract.rs -o /tmp/isru-benchmark-contract-clippy -D warnings
+        run: |
+          clippy-driver --edition=2021 --test research/asteroid-optical-isru-v0.2/benchmark_contract.rs -o /tmp/isru-benchmark-contract-clippy -D warnings
+          clippy-driver --edition=2021 --test research/asteroid-optical-isru-v0.2/replay_oracle.rs -o /tmp/isru-replay-oracle-clippy -D warnings
 
       - name: Compile and run exact standalone tests
         run: |
           rustc --edition=2021 --test research/asteroid-optical-isru-v0.2/benchmark_contract.rs -o /tmp/isru-benchmark-contract-tests
           /tmp/isru-benchmark-contract-tests
+          rustc --edition=2021 --test research/asteroid-optical-isru-v0.2/replay_oracle.rs -o /tmp/isru-replay-oracle-tests
+          /tmp/isru-replay-oracle-tests
