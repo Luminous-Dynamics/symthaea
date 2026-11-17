@@ -468,6 +468,35 @@ Add a transfer dimension only after the base study protocol is stable: compare a
 
 Symthaea should be useful before it can physically perform every repair. A reliable advisory system can help people select measurements, reason about unfamiliar faults, find correct tools/parts and verify outcomes. This is a complementary route to the full humanoid—not a substitute for eventual physical competence and not evidence that Symthaea itself executed the repair.
 
+## 7B. Failure-to-skill learning, independent promotion and retention
+
+New child programme: [HUM-FAILURE-TO-SKILL-001 #12706](https://github.com/Luminous-Dynamics/symthaea/issues/12706), complementary to agentic policy/memory #12685 and capability retention #11866.
+
+The core distinction:
+- episodic memory remembers what happened;
+- semantic memory records what was learned about tools/embodiments;
+- procedural memory stores a reusable skill contract;
+- only independently qualified evidence may promote a candidate procedure.
+
+A failed episode must never overwrite a previously qualified skill. It creates an evidence record and a *candidate* correction. The correction must pass exact failure replay, counterfactual control, held-out transfer where claimed, prior-skill retention, exact applicability binding and an independent verifier before promotion.
+
+The synthetic challenge corpus has 30 cases across six skill families (contact approach, grasp retention, tool orientation, force-limited insertion, mobile reposition and perception/calibration drift). Each family includes:
+1. valid causal correction;
+2. irrelevant confounding change;
+3. poisoned memory record;
+4. wrong embodiment / stale applicability;
+5. protected-skill regression.
+
+Artifacts:
+- `failure-to-skill-cases-v0.1.json`
+- `failure-to-skill-cases-v0.1.schema.json`
+
+The evaluator retains hidden causal labels, counterfactual outcomes and expected dispositions; the candidate sees only the episode evidence and budget. These are invented synthetic traces, not measured robot failures.
+
+Primary measurements include repeated-failure rate, recovery after informative observations, candidate correction precision/recall, false promotion/revocation, independent replay, held-out transfer, harmful transfer, protected-skill retention, poisoned/stale memory rejection and time/probe/compute/energy costs.
+
+Prospective research targets (not results): reduce repeated failure by at least 50% under matched replay; ≥80% independent replay success for promoted corrections in their declared envelope; ≥60% held-out same-family transfer for skills claiming reuse; non-inferior protected prior skills; and zero false promotions on frozen poisoned, wrong-embodiment, stale-calibration and verifier-spoofing controls. Finite synthetic zero-event results do not certify physical safety.
+
 ## 8. Statistics and reporting
 
 - Freeze code, model, config, task set, split, seed, environment, robot, tool and evaluator identities before evaluation.
