@@ -999,9 +999,7 @@ pub fn qualify_common_task_preserving_subgroup(
 ) -> Result<CommonTaskPreservingSubgroupV1, QuotientErrorV1> {
     let group_order = ambient_action.group.multiplication.len();
     let candidate_count = problem.candidate_ids.len();
-    preflight(group_order, candidate_count, budget)?;
     validate_multi_environment_problem(problem, budget)?;
-    let validated = validate_action(ambient_action, candidate_count, budget)?;
 
     let environment_checks = problem
         .environments
@@ -1009,9 +1007,16 @@ pub fn qualify_common_task_preserving_subgroup(
         .checked_mul(group_order)
         .and_then(|value| value.checked_mul(candidate_count))
         .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
-    if environment_checks > budget.maximum_work_units {
-        return Err(QuotientErrorV1::WorkBudgetExceeded);
-    }
+    let remaining_work = budget
+        .maximum_work_units
+        .checked_sub(environment_checks)
+        .ok_or(QuotientErrorV1::WorkBudgetExceeded)?;
+    let adjusted_budget = QualificationBudgetV1 {
+        maximum_work_units: remaining_work,
+        ..budget
+    };
+    preflight(group_order, candidate_count, adjusted_budget)?;
+    let validated = validate_action(ambient_action, candidate_count, adjusted_budget)?;
 
     let mut retained = Vec::new();
     let mut exclusion_witnesses = Vec::new();
@@ -1116,13 +1121,38 @@ pub fn qualify_common_task_preserving_subgroup(
 /// Compile a separately replayable quotient for every environment, using the
 /// exact common subgroup. A symmetry that fails in even one environment is
 /// excluded before any quotient receives pruning authority.
+fn multi_environment_stage_budget(
+    problem: &MultiEnvironmentProblemV1,
+    budget: QualificationBudgetV1,
+) -> Result<QualificationBudgetV1, QuotientErrorV1> {
+    let environment_count = problem.environments.len();
+    if environment_count == 0 {
+        return Err(QuotientErrorV1::InvalidEnvironmentCount);
+    }
+    // Reserve a conservative equal share for common-subgroup qualification,
+    // every per-environment compile, and every per-environment verification.
+    let stage_count = environment_count
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(1))
+        .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+    let maximum_work_units = budget.maximum_work_units / stage_count;
+    if maximum_work_units == 0 {
+        return Err(QuotientErrorV1::WorkBudgetExceeded);
+    }
+    Ok(QualificationBudgetV1 {
+        maximum_work_units,
+        ..budget
+    })
+}
+
 pub fn compile_multi_environment_quotient(
     problem: &MultiEnvironmentProblemV1,
     ambient_action: &FiniteActionV1,
     budget: QualificationBudgetV1,
 ) -> Result<MultiEnvironmentQuotientCertificateV1, QuotientErrorV1> {
+    let stage_budget = multi_environment_stage_budget(problem, budget)?;
     let common_subgroup =
-        qualify_common_task_preserving_subgroup(problem, ambient_action, budget)?;
+        qualify_common_task_preserving_subgroup(problem, ambient_action, stage_budget)?;
     let mut environment_quotients = Vec::with_capacity(problem.environments.len());
     for environment in &problem.environments {
         let search_problem = SearchProblemV1 {
@@ -1133,7 +1163,7 @@ pub fn compile_multi_environment_quotient(
         let outcome = compile_quotient(
             &search_problem,
             &common_subgroup.restricted_action,
-            budget,
+            stage_budget,
         )?;
         let CompileOutcomeV1::Authorized(certificate) = outcome else {
             return Err(QuotientErrorV1::TaskSemanticsMismatch);
@@ -1168,6 +1198,7 @@ pub fn verify_multi_environment_quotient(
         return Err(QuotientErrorV1::EnvironmentCertificateMismatch);
     }
 
+    let stage_budget = multi_environment_stage_budget(problem, budget)?;
     let mut per_environment_orbit_counts = Vec::with_capacity(problem.environments.len());
     for (environment, quotient) in problem
         .environments
@@ -1183,7 +1214,7 @@ pub fn verify_multi_environment_quotient(
             &search_problem,
             &certificate.common_subgroup.restricted_action,
             &quotient.certificate,
-            budget,
+            stage_budget,
         )?;
         per_environment_orbit_counts.push((environment.environment_id.clone(), receipt.orbit_count));
     }
@@ -1476,6 +1507,35 @@ mod tests {
         assert_eq!(receipt.common_subgroup_order, 1);
         assert_eq!(receipt.per_environment_orbit_counts.len(), 3);
         assert!(receipt.per_environment_orbit_counts.iter().all(|entry| entry.1 == 16));
+    }
+
+    #[test]
+    fn multi_environment_total_work_budget_is_shared_across_compile_and_replay() {
+        let action = d4_action();
+        let semantics_a = vec![semantics(1, 1, "boundary", "output"); 16];
+        let semantics_b = vec![semantics(1, 1, "boundary", "output"); 16];
+        let problem = MultiEnvironmentProblemV1 {
+            problem_id: "multi-environment-budget-v1".to_owned(),
+            candidate_ids: (0..16).map(|index| format!("p{index:02}")).collect(),
+            environments: vec![
+                TaskEnvironmentV1 {
+                    environment_id: "env-a".to_owned(),
+                    semantics: semantics_a,
+                },
+                TaskEnvironmentV1 {
+                    environment_id: "env-b".to_owned(),
+                    semantics: semantics_b,
+                },
+            ],
+        };
+        let budget = QualificationBudgetV1 {
+            maximum_work_units: 10_000,
+            ..QualificationBudgetV1::default()
+        };
+        assert_eq!(
+            compile_multi_environment_quotient(&problem, &action, budget),
+            Err(QuotientErrorV1::WorkBudgetExceeded)
+        );
     }
 
     #[test]
