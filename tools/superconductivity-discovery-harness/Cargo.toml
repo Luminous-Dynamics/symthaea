@@ -23,3 +23,7 @@ path = "src/main.rs"
 [[bin]]
 name = "sc_discovery_metrics"
 path = "src/bin/discovery_metrics.rs"
+
+[[bin]]
+name = "sc_observation_event_audit"
+path = "src/bin/observation_event_audit.rs"
