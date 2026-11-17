@@ -763,11 +763,6 @@ mod tests {
             r#""schema":"luminous.decision-transfer.split-manifest.v1","#,
             "\n",
         );
-        let revision_line = concat!(
-            "      ",
-            r#""protocol_revision":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","#,
-            "\n",
-        );
         let without_schema = VALID.replacen(schema_line, "", 1);
         let generator_line = concat!("      ", r#""generator":"#, "\n");
         let reordered = without_schema.replacen(
