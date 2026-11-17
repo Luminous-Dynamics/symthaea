@@ -349,24 +349,29 @@ pub fn validate_manifest(manifest: &SplitManifestV1) -> Result<(), ManifestError
                 return Err(ManifestError::DuplicateValue("scenario.groups.axis"));
             }
             validate_opaque_id(&membership.group_id, "scenario.groups.group_id")?;
-            let split_axis = axes.get(&membership.axis).ok_or_else(|| {
-                ManifestError::UnknownAxis(membership.axis.as_str().to_owned())
-            })?;
-            if !split_axis.groups_for(scenario.split_role).iter().any(|id| id == &membership.group_id) {
-                let any_role_has_group = split_axis.all_groups().any(|(id, _)| id == membership.group_id);
-                if any_role_has_group {
-                    return Err(ManifestError::GroupRoleMismatch {
-                        scenario: scenario.scenario_id.clone(),
+            // Only axes listed in split_axes impose a cross-role holdout.
+            // Other declared group labels are contextual metadata and may be
+            // shared across train/validation/test (e.g. parameter transfer
+            // within one equation family).
+            if let Some(split_axis) = axes.get(&membership.axis) {
+                if !split_axis.groups_for(scenario.split_role).iter().any(|id| id == &membership.group_id) {
+                    let any_role_has_group = split_axis.all_groups().any(|(id, _)| id == membership.group_id);
+                    if any_role_has_group {
+                        return Err(ManifestError::GroupRoleMismatch {
+                            scenario: scenario.scenario_id.clone(),
+                            axis: membership.axis.as_str().to_owned(),
+                            role: scenario.split_role.as_str().to_owned(),
+                        });
+                    }
+                    return Err(ManifestError::MissingDeclaredGroup {
                         axis: membership.axis.as_str().to_owned(),
-                        role: scenario.split_role.as_str().to_owned(),
+                        group: membership.group_id.clone(),
                     });
                 }
-                return Err(ManifestError::MissingDeclaredGroup {
-                    axis: membership.axis.as_str().to_owned(),
-                    group: membership.group_id.clone(),
-                });
+                referenced_groups.entry(membership.axis).or_default().insert(membership.group_id.clone());
+            } else if !manifest.sampling.nesting.contains(&membership.axis) {
+                return Err(ManifestError::InvalidField("scenario context axis is absent from sampling.nesting"));
             }
-            referenced_groups.entry(membership.axis).or_default().insert(membership.group_id.clone());
         }
 
         for axis in axes.keys() {
@@ -425,6 +430,22 @@ fn validate_nesting(sampling: &SamplingDesign) -> Result<(), ManifestError> {
 }
 
 fn validate_axis_groups(axis: &SplitAxis) -> Result<(), ManifestError> {
+    let policy_matches = match axis.policy {
+        SplitPolicy::GroupDisjoint => true,
+        SplitPolicy::HeldOutRegion => axis.axis == SplitAxisKind::ParameterCell,
+        SplitPolicy::HeldOutFamily => matches!(
+            axis.axis,
+            SplitAxisKind::InitialConditionFamily
+                | SplitAxisKind::ForcingRegime
+                | SplitAxisKind::CouplingRegime
+                | SplitAxisKind::EquationFamily
+        ),
+        SplitPolicy::HeldOutMechanism => axis.axis == SplitAxisKind::InterventionMechanism,
+        SplitPolicy::HeldOutObservationProcess => axis.axis == SplitAxisKind::ObservationProcess,
+    };
+    if !policy_matches {
+        return Err(ManifestError::InvalidField("split policy is incompatible with its axis"));
+    }
     let lists = [
         (&axis.train_group_ids, SplitRole::Train),
         (&axis.validation_group_ids, SplitRole::Validation),
@@ -514,24 +535,62 @@ fn is_lower_hex(value: u8) -> bool {
 }
 
 fn validate_timestamp(value: &str) -> Result<(), ManifestError> {
+    // Accept the UTC RFC3339 subset YYYY-MM-DDTHH:MM:SS[.fraction]Z.
+    // Validate calendar and clock ranges rather than checking punctuation only.
+    let invalid = || ManifestError::InvalidField("freeze.protocol_frozen_at must be a valid UTC RFC3339 timestamp");
     let bytes = value.as_bytes();
-    let valid_shape = bytes.len() >= 20
-        && bytes.get(4) == Some(&b'-')
-        && bytes.get(7) == Some(&b'-')
-        && bytes.get(10) == Some(&b'T')
-        && bytes.get(13) == Some(&b':')
-        && bytes.get(16) == Some(&b':')
-        && bytes.last() == Some(&b'Z')
-        && bytes.iter().enumerate().all(|(index, byte)| {
-            matches!(index, 4 | 7 | 10 | 13 | 16)
-                || byte.is_ascii_digit()
-                || (*byte == b'.' && index > 18 && index < bytes.len() - 1)
-                || (index == bytes.len() - 1 && *byte == b'Z')
-        });
-    if !valid_shape {
-        return Err(ManifestError::InvalidField("freeze.protocol_frozen_at must be UTC RFC3339 ending in Z"));
+    if bytes.len() < 20
+        || bytes.get(4) != Some(&b'-')
+        || bytes.get(7) != Some(&b'-')
+        || bytes.get(10) != Some(&b'T')
+        || bytes.get(13) != Some(&b':')
+        || bytes.get(16) != Some(&b':')
+        || bytes.last() != Some(&b'Z')
+    {
+        return Err(invalid());
     }
-    Ok(())
+    let parse = |start: usize, end: usize| -> Result<u32, ManifestError> {
+        let slice = bytes.get(start..end).ok_or_else(invalid)?;
+        if slice.is_empty() || !slice.iter().all(u8::is_ascii_digit) {
+            return Err(invalid());
+        }
+        let text = std::str::from_utf8(slice).map_err(|_| invalid())?;
+        text.parse::<u32>().map_err(|_| invalid())
+    };
+
+    let year = parse(0, 4)?;
+    let month = parse(5, 7)?;
+    let day = parse(8, 10)?;
+    let hour = parse(11, 13)?;
+    let minute = parse(14, 16)?;
+    let second = parse(17, 19)?;
+    if year == 0 || !(1..=12).contains(&month) || hour > 23 || minute > 59 || second > 59 {
+        return Err(invalid());
+    }
+
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => return Err(invalid()),
+    };
+    if day == 0 || day > days_in_month {
+        return Err(invalid());
+    }
+
+    match bytes.get(19) {
+        Some(b'Z') if bytes.len() == 20 => Ok(()),
+        Some(b'.') if bytes.len() > 21 && bytes.last() == Some(&b'Z') => {
+            let fraction = &bytes[20..bytes.len() - 1];
+            if fraction.is_empty() || !fraction.iter().all(u8::is_ascii_digit) {
+                return Err(invalid());
+            }
+            Ok(())
+        }
+        _ => Err(invalid()),
+    }
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -699,12 +758,21 @@ mod tests {
 
     #[test]
     fn canonical_digest_ignores_object_key_order() {
-        let schema_line = "      \\"schema\\":\\"luminous.decision-transfer.split-manifest.v1\\",\\n";
-        let revision_line = "      \\"protocol_revision\\":\\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\",\\n";
+        let schema_line = concat!(
+            "      ",
+            r#""schema":"luminous.decision-transfer.split-manifest.v1","#,
+            "\\n",
+        );
+        let revision_line = concat!(
+            "      ",
+            r#""protocol_revision":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","#,
+            "\\n",
+        );
         let without_schema = VALID.replacen(schema_line, "", 1);
+        let generator_line = "      \\"generator\\":";
         let reordered = without_schema.replacen(
-            revision_line,
-            &format!("{revision_line}{schema_line}"),
+            generator_line,
+            &format!("{schema_line}{generator_line}"),
             1,
         );
         let left = parse_and_validate(VALID.as_bytes()).unwrap();
