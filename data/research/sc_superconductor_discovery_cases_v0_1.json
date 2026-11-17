@@ -169,7 +169,7 @@
       "source_type": "peer_reviewed_computational_generation_and_experimental_follow_up",
       "title": "Guided diffusion for the discovery of new superconductors",
       "repository": "https://github.com/paprakash/GuidedMatDiffusion",
-      "repository_revision": "to_be_pinned",
+      "repository_revision": "6583bb73e7f8c496c094feb6ac4b382ee474bf9d",
       "dataset": "https://huggingface.co/datasets/paprakash/GuidedMatDiffusion_data",
       "checkpoint": "https://huggingface.co/paprakash/GuidedMatDiffusion_model",
       "reported_pipeline": {
@@ -228,13 +228,14 @@
       "source_type": "peer_reviewed_experimental_database_and_llm_prediction_workflow",
       "title": "Large language models for superconductor discovery",
       "repository": "https://github.com/sumanitani/LLM_for_Superconductors",
-      "repository_revision": "71ec1b961a6231b21c6745b63dc8f774cd7ecbed",
+      "repository_revision": "8008870e0229bf2001c04a946e306d25617fd4b9",
       "database": "https://www.nemad.org",
       "model_hub": "https://huggingface.co/sumanitani",
       "reported_record_count_abstract": 78203,
       "reported_record_count_methods": 78204,
       "reported_unique_compositions": 19058,
-      "primary_claim_boundary": "Literature-extracted experimental and non-superconductor records with multiple LLM tasks. GNoME Tc>10 K candidates remain predictions. The exact count, row provenance, data license and train/test split require reconciliation."
+      "primary_claim_boundary": "Literature-extracted experimental and non-superconductor records with multiple LLM tasks. GNoME Tc>10 K candidates remain predictions. The exact count, row provenance, data license and train/test split require reconciliation.",
+      "repository_readme_blob_sha": "71ec1b961a6231b21c6745b63dc8f774cd7ecbed"
     }
   ],
   "candidate_records": [
