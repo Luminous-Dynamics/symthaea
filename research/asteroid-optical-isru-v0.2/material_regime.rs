@@ -285,6 +285,7 @@ pub enum RegimeError {
     TimeOverflow,
 }
 
+#[derive(Clone)]
 pub struct MaterialRegimeModel {
     parameters: MaterialParameters,
     state: MaterialState,
