@@ -299,7 +299,15 @@
         "quantity": "joint_position",
         "unit": "rad"
       }
-    ]
+    ],
+    "ordering_evidence": {
+      "expected_order_source": "G1Sonic.WHOLE_BODY_JOINTS / G1Sonic.joint_names",
+      "source_file": "src/humanoidtoolbench/robots/g1_sonic.py",
+      "source_file_sha256": "9865d7ad4fdac29691f3585d77e194c9cedc43c3",
+      "observed_mechanism": "G1Sonic.setup_control creates the joints dict by iterating self.joint_names; get_robot_qpos returns that dict's values.",
+      "raw_joint_qpos_materialization_verified": false,
+      "caveat": "The exact producer that assembles observation['joint_qpos'] from robot observations is not yet pinned end-to-end in the public evaluator source. The 43-name order is the expected profile mapping; mark the adapter incomplete until the materialization path is independently confirmed."
+    }
   },
   "policy_input": {
     "state": {
@@ -901,7 +909,9 @@
     "applied_receipt_created": false,
     "measured_receipt_created": false,
     "actuator_authority": false,
-    "live_hardware_backend": false
+    "live_hardware_backend": false,
+    "raw_qpos_materialization_verified": false,
+    "adapter_conformance_status": "blocked_pending_raw_joint_qpos_materialization_audit_and_UEC_v2_rust_adapter"
   },
   "invariants": [
     "Do not map G1 joint position targets to Symthaea normalized torque or PWM values.",
@@ -947,6 +957,213 @@
     "physical_calibration": false,
     "safety_qualification": false,
     "actuation_authority": false,
-    "benchmark_execution_claimed": false
+    "benchmark_execution_claimed": false,
+    "adapter_conformance_claimed": false
+  },
+  "golden_vectors": {
+    "purpose": "Sentinel vectors for implementing independent observation projection and action decoding tests; values are synthetic test sentinels, not robot measurements.",
+    "raw_joint_qpos": {
+      "source_order": "raw_joint_observation.order",
+      "input_values": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42
+      ],
+      "expected_policy_state_values": [
+        29,
+        30,
+        31,
+        34,
+        35,
+        32,
+        33,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        13,
+        14,
+        12,
+        0.74
+      ]
+    },
+    "flat_decoupled_action": {
+      "schema_id": "decoupled_v1",
+      "input_values": [
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127,
+        128,
+        129,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135
+      ],
+      "expected_named_goal": {
+        "left_hand_natural": [
+          100,
+          101,
+          102,
+          105,
+          106,
+          103,
+          104
+        ],
+        "right_hand_natural": [
+          107,
+          108,
+          109,
+          110,
+          111,
+          112,
+          113
+        ],
+        "left_arm": [
+          114,
+          115,
+          116,
+          117,
+          118,
+          119,
+          120
+        ],
+        "right_arm": [
+          121,
+          122,
+          123,
+          124,
+          125,
+          126,
+          127
+        ],
+        "torso_roll_pitch_yaw": [
+          128,
+          129,
+          130
+        ],
+        "base_height_command_m": 131,
+        "navigation": {
+          "vx_m_s": 132,
+          "vy_m_s": 133,
+          "turn_flag": 134,
+          "target_yaw_rad": 135
+        }
+      }
+    },
+    "hand_permutation": {
+      "flat_left_hand_values": [
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106
+      ],
+      "expected_natural_order_values": [
+        100,
+        101,
+        102,
+        105,
+        106,
+        103,
+        104
+      ],
+      "flat_index_to_natural_source_index": [
+        0,
+        1,
+        2,
+        5,
+        6,
+        3,
+        4
+      ],
+      "inverse_is_same_permutation": true
+    }
   }
 }
