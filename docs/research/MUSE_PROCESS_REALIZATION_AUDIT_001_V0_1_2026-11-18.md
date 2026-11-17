@@ -41,7 +41,7 @@ In particular, event-count growth is a structural fact, not a listener-experienc
 
 ## Adversarial fixtures authored
 
-Nine new tests are present in `process_grammar.rs`:
+Ten new tests are present in `process_grammar.rs`:
 
 - accept unmodified realizations for all four declared trajectory kinds;
 - reject a plan with a false cycle count / contour;
@@ -143,6 +143,6 @@ For deterministic structural invariants, the target should be 100% on frozen pos
 ## Validation status
 
 - Source authored on a branch based on current `main` at `67939c904adcfafd246848b74cd53c52a2cca244`.
-- Nine new Rust unit tests authored, including the 4,096-case deterministic holdout matrix.
+- Ten new Rust unit tests authored, including the 4,096-case deterministic holdout matrix.
 - Cargo/rustc/rustfmt execution unavailable in this environment; compilation, formatting and test results are pending.
 - No workflow pass, audio result, human preference result, or SOTA superiority is claimed.
