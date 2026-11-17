@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luminousdynamics.io/schemas/xstack-adaptive-recovery-trajectory-v0.1.json",
-  "title": "XSTACK Adaptive Recovery Trajectory v0.1",
+  "title": "XSTACK Adaptive Recovery Campaign v0.1",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,7 +10,12 @@
     "corpus_role",
     "classification",
     "execution_boundary",
-    "cases"
+    "cases",
+    "parent_campaign",
+    "parent_issue",
+    "extension_issue",
+    "protocol",
+    "case_index"
   ],
   "properties": {
     "campaign_id": {
@@ -63,6 +68,121 @@
       "maxItems": 10,
       "items": {
         "$ref": "#/$defs/trajectoryCase"
+      }
+    },
+    "parent_campaign": {
+      "const": "XSTACK-AGENT-RESILIENCE-PUBLIC-DEV-0.1"
+    },
+    "parent_issue": {
+      "type": "string",
+      "format": "uri"
+    },
+    "extension_issue": {
+      "type": "string",
+      "format": "uri"
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cases",
+        "adversary_classes",
+        "matched_controls",
+        "independent_effect_oracle",
+        "hidden_holdout",
+        "solver_visible_ground_truth",
+        "note"
+      ],
+      "properties": {
+        "cases": {
+          "const": 10
+        },
+        "adversary_classes": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "enum": [
+              "static",
+              "fixed_multi_step",
+              "adaptive_multi_episode"
+            ]
+          }
+        },
+        "matched_controls": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "enum": [
+              "permissive_positive_control",
+              "protected_condition",
+              "single_safeguard_ablation",
+              "benign_near_neighbor"
+            ]
+          }
+        },
+        "independent_effect_oracle": {
+          "const": true
+        },
+        "hidden_holdout": {
+          "const": false
+        },
+        "solver_visible_ground_truth": {
+          "const": false
+        },
+        "note": {
+          "type": "string",
+          "minLength": 12
+        }
+      }
+    },
+    "case_index": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario_id",
+          "title",
+          "attack_family",
+          "parent_scenarios",
+          "adversary_strategy",
+          "steps"
+        ],
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "pattern": "^XAR-[0-9]{3}$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 8
+          },
+          "attack_family": {
+            "type": "string",
+            "minLength": 4
+          },
+          "parent_scenarios": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "pattern": "^XSR-[0-9]{3}$"
+            }
+          },
+          "adversary_strategy": {
+            "enum": [
+              "static",
+              "fixed_multi_step",
+              "adaptive_multi_episode"
+            ]
+          },
+          "steps": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
       }
     }
   },
