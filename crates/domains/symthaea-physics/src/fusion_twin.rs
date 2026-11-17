@@ -51,26 +51,32 @@ pub const PLASMA_HORIZON_LABELS: &[&str] = &[
 /// Unlike the main `PlasmaHdcEncoder` (which uses BinaryHV), this encoder
 /// produces ContinuousHV for compatibility with the CfC predictor and FEP agent.
 struct FusionHdcEncoder {
-    bases: [ContinuousHV; 4],
+    // First four bases encode normalized physical values; the next four encode
+    // independent channel-presence indicators.
+    bases: [ContinuousHV; 8],
 }
 
 impl FusionHdcEncoder {
     fn new() -> Self {
-        let seeds: [u64; 4] = [
-            0xF05_0001, // electron density
-            0xF05_0002, // electron temperature
-            0xF05_0003, // radiated power
-            0xF05_0004, // safety factor
+        let seeds: [u64; 8] = [
+            0xF05_0001, // electron density value
+            0xF05_0002, // electron temperature value
+            0xF05_0003, // radiated power value
+            0xF05_0004, // safety factor value
+            0xF05_0011, // electron density present
+            0xF05_0012, // electron temperature present
+            0xF05_0013, // radiated power present
+            0xF05_0014, // safety factor present
         ];
-        let bases = seeds.map(|s| ContinuousHV::random(HDC_DIMENSION, s));
+        let bases = seeds.map(|seed| ContinuousHV::random(HDC_DIMENSION, seed));
         Self { bases }
     }
 
-    /// Encode a window of plasma readings into a single ContinuousHV.
+    /// Encode normalized values and explicit per-channel presence into one HV.
+    ///
+    /// A missing channel contributes zero to both its value and presence basis.
+    /// A measured zero contributes zero to the value basis but one to presence.
     fn encode_window(&self, readings: &[PlasmaReading]) -> ContinuousHV {
-        if readings.is_empty() {
-            return ContinuousHV::zero(HDC_DIMENSION);
-        }
 
         // Extract per-sensor averages from the window
         let mut sums = [0.0f64; 4];
@@ -114,7 +120,12 @@ impl FusionHdcEncoder {
             },
         ];
 
-        let weights: Vec<f32> = norms.iter().map(|&v| v as f32).collect();
+        let presence: [f32; 4] = counts.map(|count| if count > 0 { 1.0 } else { 0.0 });
+        let weights: Vec<f32> = norms
+            .iter()
+            .map(|&value| value as f32)
+            .chain(presence)
+            .collect();
         ContinuousHV::encode_weighted(&self.bases, &weights)
     }
 }
@@ -549,6 +560,51 @@ mod tests {
     #[test]
     fn test_plasma_horizons_labels_match() {
         assert_eq!(PLASMA_HORIZONS.len(), PLASMA_HORIZON_LABELS.len());
+    }
+
+    #[test]
+    fn encoder_distinguishes_missing_channel_from_measured_zero() {
+        let encoder = FusionHdcEncoder::new();
+        let missing = encoder.encode_window(&[]);
+        let measured_zero = encoder.encode_window(&[PlasmaReading::new(
+            PlasmaSensorType::ElectronDensity,
+            0.0,
+            0.0,
+        )]);
+        let measured_nonzero = encoder.encode_window(&[PlasmaReading::new(
+            PlasmaSensorType::ElectronDensity,
+            0.8,
+            0.0,
+        )]);
+
+        assert!(
+            missing.similarity(&measured_zero) < 0.999,
+            "a missing density channel must differ from a measured zero"
+        );
+        assert!(
+            measured_zero.similarity(&measured_nonzero) < 0.999,
+            "a measured zero must remain distinguishable from a nonzero measurement"
+        );
+    }
+
+    #[test]
+    fn encoder_marks_presence_independently_for_each_sensor() {
+        let encoder = FusionHdcEncoder::new();
+        let density_only = encoder.encode_window(&[PlasmaReading::new(
+            PlasmaSensorType::ElectronDensity,
+            0.0,
+            0.0,
+        )]);
+        let temperature_only = encoder.encode_window(&[PlasmaReading::new(
+            PlasmaSensorType::ElectronTemperature,
+            0.0,
+            0.0,
+        )]);
+
+        assert!(
+            density_only.similarity(&temperature_only) < 0.999,
+            "different present channels must set different presence bases"
+        );
     }
 
     #[test]
