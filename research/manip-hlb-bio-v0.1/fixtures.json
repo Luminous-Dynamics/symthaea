@@ -1,0 +1,354 @@
+{
+  "schema_id": "org.luminousdynamics.symthaea.manip_hlb_bio_fixture_set.v0_1",
+  "version": "0.1.0",
+  "status": "contract-scaffold-not-yet-consumed-by-rust-test-harness",
+  "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12735",
+  "architecture_dependencies": [
+    "https://github.com/Luminous-Dynamics/symthaea/issues/1274",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/1276",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/1281",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/1284",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/1272",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/1269"
+  ],
+  "semantics": {
+    "plant_clock_authoritative": true,
+    "missing_is_not_zero": true,
+    "requested_is_not_applied": true,
+    "prediction_is_not_measurement": true,
+    "hdc_similarity_is_not_probability": true,
+    "cognitive_readiness_is_not_plant_safety": true,
+    "local_fallback_is_independent_of_hlb": true,
+    "unverified_memory_is_not_executable_procedure": true,
+    "proposal_default": "ABSTAIN"
+  },
+  "required_identity_fields": [
+    "embodiment_profile_id",
+    "embodiment_instance_id",
+    "morphology_digest",
+    "tool_or_gripper_profile_id",
+    "actuator_map_digest",
+    "calibration_profile_id",
+    "model_checkpoint_id",
+    "observation_contract_digest",
+    "frame_realization_digest",
+    "clock_domain_id",
+    "safety_policy_id"
+  ],
+  "disposition_vocabulary": [
+    "ACCEPT_FOR_EVALUATION",
+    "RESTRICTED",
+    "ABSTAIN",
+    "QUARANTINE",
+    "REJECT_STALE",
+    "REJECT_IDENTITY",
+    "VETO_PHYSICAL",
+    "FALLBACK_LOCAL"
+  ],
+  "cases": [
+    {
+      "id": "M1-001-missing-is-not-zero",
+      "purpose": "An unobserved tactile region must not be represented as measured zero force or no contact.",
+      "inputs": {
+        "tactile_region_a": {
+          "status": "MEASURED",
+          "force_n": 0,
+          "sample_id": "t1"
+        },
+        "tactile_region_b": {
+          "status": "MISSING",
+          "missing_reason": "sensor_dropout",
+          "sample_id": null
+        }
+      },
+      "expected": {
+        "region_a": "MEASURED_ZERO",
+        "region_b": "UNAVAILABLE",
+        "aggregate_contact_claim": "ABSTAIN",
+        "disposition": "ABSTAIN"
+      },
+      "invariants": [
+        "missing != measured_zero",
+        "unavailable_region_not_counted_as_no_contact"
+      ]
+    },
+    {
+      "id": "M1-002-stale-contact-observation",
+      "purpose": "A sample older than the declared profile freshness limit cannot support current grasp/contact truth.",
+      "inputs": {
+        "clock_domain_id": "plant-monotonic-1",
+        "source_time_ns": 1000,
+        "evaluation_time_ns": 9000,
+        "max_age_ns": 2000,
+        "contact_detected": true
+      },
+      "expected": {
+        "contact_claim": "STALE",
+        "disposition": "REJECT_STALE",
+        "new_goal_directed_dispatch": false,
+        "local_controller": "UNCHANGED"
+      },
+      "invariants": [
+        "freshness_is_clock_domain_bound",
+        "stale_sample_not_promoted_to_current_state"
+      ]
+    },
+    {
+      "id": "M1-003-frame-realization-mismatch",
+      "purpose": "Equal numeric coordinates expressed in different realized frames are not directly comparable.",
+      "inputs": {
+        "role": "end_effector_position",
+        "unit": "m",
+        "frame_kind": "WORLD",
+        "prediction_frame_realization": "world-map-epoch-4",
+        "observation_frame_realization": "world-map-epoch-5",
+        "predicted_value": [
+          0.4,
+          0.1,
+          0.2
+        ],
+        "observed_value": [
+          0.4,
+          0.1,
+          0.2
+        ],
+        "transform_evidence": null
+      },
+      "expected": {
+        "residual": "NOT_COMPUTABLE",
+        "disposition": "ABSTAIN",
+        "reason": "FRAME_REALIZATION_MISMATCH"
+      },
+      "invariants": [
+        "frame_kind_does_not_identify_frame_instance",
+        "no_implicit_transform"
+      ]
+    },
+    {
+      "id": "M1-004-duplicate-or-out-of-order-sample",
+      "purpose": "A replayed or out-of-order sample must not be admitted as new evidence.",
+      "inputs": {
+        "clock_domain_id": "plant-monotonic-1",
+        "previous_sequence": 42,
+        "incoming_sequence": 42,
+        "previous_sample_digest": "sha256:fixture-a",
+        "incoming_sample_digest": "sha256:fixture-a"
+      },
+      "expected": {
+        "sample_admission": "DUPLICATE",
+        "disposition": "QUARANTINE",
+        "episode_step_increment": false
+      },
+      "invariants": [
+        "sample_identity_is_unique_within_declared_stream",
+        "replay_does_not_create_new_physical_event"
+      ]
+    },
+    {
+      "id": "M1-005-wrong-configuration-memory",
+      "purpose": "An episode learned with a different tool/calibration profile cannot be executed as a directly reusable procedure.",
+      "inputs": {
+        "query_embodiment_profile": "arm-v1",
+        "query_tool_profile": "gripper-soft-v2",
+        "query_calibration_profile": "cal-2026-11-a",
+        "memory_embodiment_profile": "arm-v1",
+        "memory_tool_profile": "gripper-rigid-v1",
+        "memory_calibration_profile": "cal-2026-08-c",
+        "memory_outcome": "verified_success"
+      },
+      "expected": {
+        "memory_use": "DIAGNOSTIC_ONLY",
+        "procedure_precondition": "NOT_SATISFIED",
+        "disposition": "REJECT_IDENTITY"
+      },
+      "invariants": [
+        "semantic_similarity_does_not_override_configuration_identity",
+        "old_memory_is_retained_not_authoritative"
+      ]
+    },
+    {
+      "id": "M1-006-local-slip-reflex-proposal",
+      "purpose": "Fresh measured slip may trigger a bounded local stabilization request without granting mission-level or actuator authority.",
+      "inputs": {
+        "slip_observation": {
+          "status": "MEASURED",
+          "role": "gripper_object_relative_velocity",
+          "unit": "m_per_s",
+          "frame_realization": "tool-frame-7",
+          "value": [
+            0.02,
+            0,
+            0
+          ],
+          "sample_sequence": 88
+        },
+        "local_reflex_profile": "grasp-stabilize-v1",
+        "hlb_available": true
+      },
+      "expected": {
+        "local_response": "BOUNDED_STABILIZE_PROPOSAL",
+        "mission_authority_change": false,
+        "actuator_admission": "REQUIRES_INDEPENDENT_PROJECTION_AND_SUPERVISOR",
+        "disposition": "ACCEPT_FOR_EVALUATION"
+      },
+      "invariants": [
+        "local_reflex_is_profile_bounded",
+        "reflex_proposal_is_not_applied_action"
+      ]
+    },
+    {
+      "id": "M1-007-prediction-mismatch-is-not-safety",
+      "purpose": "A residual mismatch may invalidate a model or request re-observation but cannot itself establish physical safety or calibrated uncertainty.",
+      "inputs": {
+        "prediction_model_id": "manipulator-model-17",
+        "role_contract_digest": "role-contract-abc",
+        "observation_digest": "observation-def",
+        "prediction_source": "LEARNED_MODEL",
+        "observation_source": "MEASURED",
+        "uncertainty_kind": "HEURISTIC_SCORE",
+        "residual_value": 0.7,
+        "persistence_count": 3
+      },
+      "expected": {
+        "model_status": "REQUIRES_REVIEW_OR_REOBSERVATION",
+        "uncertainty_calibration": "UNAVAILABLE",
+        "plant_safety_decision": "NOT_DERIVED_FROM_RESIDUAL",
+        "disposition": "RESTRICTED"
+      },
+      "invariants": [
+        "heuristic_score_is_not_standard_deviation",
+        "prediction_residual_is_not_plant_safety"
+      ]
+    },
+    {
+      "id": "M1-008-hlb-timeout",
+      "purpose": "A late HLB proposal expires without disrupting the independently qualified local control/fallback path.",
+      "inputs": {
+        "proposal_issued_plant_time_ns": 10000,
+        "proposal_expiry_plant_time_ns": 15000,
+        "proposal_arrival_plant_time_ns": 18000,
+        "local_controller_health": "QUALIFIED",
+        "fallback_profile": "manipulator-gravity-hold-v1"
+      },
+      "expected": {
+        "proposal": "REJECTED_EXPIRED",
+        "new_goal_directed_dispatch": false,
+        "local_controller": "CONTINUES_QUALIFIED_OPERATION",
+        "fallback": "AVAILABLE_INDEPENDENTLY",
+        "disposition": "FALLBACK_LOCAL"
+      },
+      "invariants": [
+        "hlb_lateness_does_not_change_plant_dt",
+        "late_cognition_cannot_overwrite_local_fallback"
+      ]
+    },
+    {
+      "id": "M1-009-independent-physical-veto",
+      "purpose": "A physical hard constraint vetoes the proposal even when cognitive readiness is high.",
+      "inputs": {
+        "cognitive_readiness": {
+          "value": 0.99,
+          "status": "FRESH",
+          "source": "COGNITIVE"
+        },
+        "plant_safety": {
+          "status": "VETO",
+          "reason": "WORKSPACE_LIMIT_EXCEEDED",
+          "policy_id": "manipulator-safety-v3"
+        },
+        "requested_action": "REACH"
+      },
+      "expected": {
+        "disposition": "VETO_PHYSICAL",
+        "projected_action": "NO_GOAL_DIRECTED_MOTION",
+        "local_fallback": "PROFILE_DEFINED"
+      },
+      "invariants": [
+        "cognitive_readiness_cannot_override_plant_veto",
+        "plant_safety_requires_independent_policy_and_evidence"
+      ]
+    },
+    {
+      "id": "M1-010-partial-distributed-sensor-loss",
+      "purpose": "Loss of one local sensing node must be explicit and must not be hidden by remaining sensor coverage.",
+      "inputs": {
+        "sensor_nodes": [
+          {
+            "node_id": "contact-1",
+            "status": "MEASURED",
+            "sample_sequence": 12
+          },
+          {
+            "node_id": "contact-2",
+            "status": "UNAVAILABLE",
+            "missing_reason": "network_partition"
+          },
+          {
+            "node_id": "contact-3",
+            "status": "MEASURED",
+            "sample_sequence": 12
+          }
+        ],
+        "required_coverage_profile": "three-region-contact-v1"
+      },
+      "expected": {
+        "coverage": "INCOMPLETE",
+        "aggregate_contact_claim": "QUALIFIED_PARTIAL_ONLY",
+        "disposition": "RESTRICTED",
+        "node_2_recovered_by_inference": false
+      },
+      "invariants": [
+        "distributed_sensor_loss_is_not_imputed_as_no_contact",
+        "coverage_profile_is_explicit"
+      ]
+    },
+    {
+      "id": "M1-011-cognition-cadence-does-not-advance-plant",
+      "purpose": "Changing HLB update cadence changes proposal availability, not physical elapsed time or integration duration.",
+      "inputs": {
+        "plant_interval_ns": 2000000,
+        "cognition_schedules_hz": [
+          5,
+          10,
+          20
+        ],
+        "same_physical_initial_state": true,
+        "same_plant_commands": true
+      },
+      "expected": {
+        "plant_elapsed_ns_each_run": 2000000,
+        "plant_transition_identity": "SAME_WHEN_PHYSICAL_INPUTS_MATCH",
+        "proposal_count_may_differ": true,
+        "disposition": "ACCEPT_FOR_EVALUATION"
+      },
+      "invariants": [
+        "plant_time_is_not_cognitive_tau",
+        "scheduler_cadence_does_not_rewrite_physics"
+      ]
+    },
+    {
+      "id": "M1-012-deterministic-replay",
+      "purpose": "Frozen fixture inputs, clock semantics, identity and event ordering produce a stable canonical result.",
+      "inputs": {
+        "fixture_case": "M1-006-local-slip-reflex-proposal",
+        "event_order": [
+          "observation",
+          "local_reflex",
+          "hlb_proposal",
+          "independent_projection"
+        ],
+        "canonicalization": "declared-v1",
+        "replay_count": 2
+      },
+      "expected": {
+        "disposition_digest_equal": true,
+        "event_order_digest_equal": true,
+        "wall_clock_not_in_canonical_physics_identity": true
+      },
+      "invariants": [
+        "same_frozen_inputs_same_receipt",
+        "wall_clock_is_not_plant_time"
+      ]
+    }
+  ]
+}
