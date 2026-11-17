@@ -24,6 +24,7 @@ A portfolio is admitted only when:
 - all evidence and the external assessment are fresh under a frozen evaluation time;
 - the graph, fault-domain profile, assessment and evidence-set digests match the expected context;
 - every source and verifier has a complete, non-empty transitive dependency closure;
+- every source has a purpose-matched rights receipt and live calibration and rights validity intervals;
 - no claim-critical dependencies overlap across purportedly independent sources;
 - no claim-critical dependency overlaps between acquisition and verifier;
 - Mycelix's portfolio and verifier dispositions explicitly report no shared common cause / independent verification within the complete declared scope;
