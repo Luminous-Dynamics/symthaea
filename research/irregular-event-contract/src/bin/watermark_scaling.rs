@@ -17,6 +17,7 @@ const PROGRESS_RECORDED_AT_US: i64 = 1_000_000;
 const FIRST_ARRIVAL_AT_US: i64 = 2_000_000;
 const ARRIVAL_STEP_US: i64 = 1_000_000;
 const KNOWLEDGE_CUTOFFS: [i64; 2] = [3_000_000, 5_000_000];
+const ARRIVAL_BATCH_COUNT: usize = 4;
 
 fn percentile_micros(samples: &mut [Duration], percentile: f64) -> f64 {
     samples.sort_unstable();
@@ -48,7 +49,7 @@ fn build_ledger(
     event_count: usize,
     source_count: usize,
     late_rate_basis_points: u16,
-) -> Result<(SourceWatermarkLedger, Vec<SourceKey>), String> {
+) -> Result<(SourceWatermarkLedger, Vec<SourceKey>, Duration), String> {
     if event_count == 0 || source_count == 0 || event_count % source_count != 0 {
         return Err("event_count must be nonzero and divisible by source_count".to_owned());
     }
@@ -92,7 +93,8 @@ fn build_ledger(
     // Four arrival transactions are deliberately distinct from event time.
     // Multiplication by 37 permutes each source's event-time keys relative to
     // receipt order for all configured power-of-two source lengths.
-    let mut arrival_batches: [Vec<EventRecord>; 4] = std::array::from_fn(|_| Vec::new());
+    let mut arrival_batches: [Vec<EventRecord>; ARRIVAL_BATCH_COUNT] =
+        std::array::from_fn(|_| Vec::new());
     let mut next_event_id = 1_u64;
     for source in &required_sources {
         for local_index in 0..per_source_count {
@@ -120,6 +122,9 @@ fn build_ledger(
         }
     }
 
+    // Time only the transactional arrival path. Event generation and initial
+    // watermark setup are deliberately outside this measurement boundary.
+    let ingestion_started = Instant::now();
     for (bucket, events) in arrival_batches.into_iter().enumerate() {
         let recorded_at_us = FIRST_ARRIVAL_AT_US + (bucket as i64 * ARRIVAL_STEP_US);
         let expected_late_count = events
@@ -140,7 +145,8 @@ fn build_ledger(
         }
     }
 
-    Ok((ledger, required_sources))
+    let ingestion_elapsed = ingestion_started.elapsed();
+    Ok((ledger, required_sources, ingestion_elapsed))
 }
 
 fn run_case(
@@ -150,7 +156,7 @@ fn run_case(
     late_rate_basis_points: u16,
     known_at_us: i64,
 ) -> Result<(), String> {
-    let (ledger, required_sources) =
+    let (ledger, required_sources, ingestion_elapsed) =
         build_ledger(event_count, source_count, late_rate_basis_points)?;
     let per_source_count = event_count / source_count;
     let interval_start_us = ((per_source_count - interval_width) / 2) as i64;
@@ -253,7 +259,9 @@ fn run_case(
         .unwrap_or_default();
 
     println!(
-        "{event_count},{source_count},{interval_width},{late_rate_basis_points},{known_at_us},{INDEXED_REPETITIONS},{SCAN_REPETITIONS},{VERIFIED_REPETITIONS},{},{},{},{},{scan_p50:.3},{scan_p95:.3},{scan_p99:.3},{indexed_p50:.3},{indexed_p95:.3},{indexed_p99:.3},{verified_p50:.3},{verified_max:.3}",
+        "{event_count},{source_count},{interval_width},{late_rate_basis_points},{known_at_us},{ARRIVAL_BATCH_COUNT},{INDEXED_REPETITIONS},{SCAN_REPETITIONS},{VERIFIED_REPETITIONS},{},{},{},{},{:.3},{:.3},{scan_p50:.3},{scan_p95:.3},{scan_p99:.3},{indexed_p50:.3},{indexed_p95:.3},{indexed_p99:.3},{verified_p50:.3},{verified_max:.3}",
+        ingestion_elapsed.as_secs_f64() * 1_000_000.0,
+        ingestion_elapsed.as_secs_f64() * 1_000_000_000.0 / event_count as f64,
         warm.late_breach_index_buckets_examined,
         warm.late_breach_candidates_examined,
         scanned.late_breach_linear_scan_receipts_examined,
@@ -264,7 +272,7 @@ fn run_case(
 
 fn main() {
     println!(
-        "events,sources,interval_width_us,late_rate_basis_points,known_at_us,indexed_samples,scan_samples,verified_samples,index_buckets,indexed_receipt_candidates,scan_receipts_examined,matching_breaches,scan_p50_us,scan_p95_us,scan_p99_us,indexed_p50_us,indexed_p95_us,indexed_p99_us,verified_p50_us,verified_max_us"
+        "events,sources,interval_width_us,late_rate_basis_points,known_at_us,arrival_batches,ingest_total_us,ingest_ns_per_event,indexed_samples,scan_samples,verified_samples,index_buckets,indexed_receipt_candidates,scan_receipts_examined,matching_breaches,scan_p50_us,scan_p95_us,scan_p99_us,indexed_p50_us,indexed_p95_us,indexed_p99_us,verified_p50_us,verified_max_us"
     );
     for event_count in EVENT_COUNTS {
         for source_count in SOURCE_COUNTS {
