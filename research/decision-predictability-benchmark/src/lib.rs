@@ -702,6 +702,7 @@ mod tests {
             ))
         );
     }
+
     #[test]
     fn normalized_horizon_rejects_overflow() {
         let reference = QualifiedLyapunovReference {
@@ -715,5 +716,4 @@ mod tests {
             ))
         );
     }
-
 }
