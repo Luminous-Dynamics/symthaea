@@ -487,3 +487,16 @@ A live metadata capture found `/version` = site `be9ecdc`, dataset `v2026.09.03`
 - Negative controls: non-detection cannot be encoded as Tc=0; unknown pressure cannot be coerced to ambient; ambient requires explicit 0 GPa; applied pressure requires a positive numeric value; predicted/calculated events cannot claim experimental detection; source references and observation IDs must resolve/be unique.
 
 This observation event layer is deliberately distinct from the material/candidate registry. It models individual condition-bound assertions so conflicting values, criteria, sample/state identities and source revisions can coexist rather than being averaged into a formula-level result. The dedicated CI workflow now covers this schema and its smoke fixture; no pass is claimed until the exact-head run reports success.
+
+
+## 26. SCLib and observation-event interoperability work opened
+
+SCLib is now represented as benchmark catalog #9 in the source register. Its code and data licences are recorded separately (Apache-2.0 / CC BY 4.0 where JZIS has authority; upstream source terms remain binding). The external snapshot stores both the live API /version and /stats identity, including their differing timestamp and data-currentness semantics.
+
+The cross-library audit is tracked in [SCLIB-INTEROP-AUDIT-001 #12669](https://github.com/Luminous-Dynamics/symthaea/issues/12669).
+
+A new schema defines one immutable, condition-bound observation event rather than a material-level summary:
+- data/schemas/superconductivity_observation_event_v0_1.schema.json
+- Four synthetic fixtures cover observed Tc, a bounded non-detection, calculated Tc under applied pressure and ML-predicted Tc.
+- tools/superconductivity-discovery-harness/src/bin/observation_event_audit.rs checks source closure, unique observation IDs, origin semantics, non-detection representation and pressure missingness.
+- The dedicated workflow tests and executes this auditor in addition to the registry and top-K metrics binaries, and retains the observation receipt.
