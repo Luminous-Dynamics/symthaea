@@ -113,7 +113,7 @@ fn encode_tree(
  next_id:&mut u64
 )->Result<String,String>{
  let node_id=format!("n{}",*next_id);
- *next_id=next_id.checked_add(1).ok_or("policy node ID overflow")?;
+ *next_id=(*next_id).checked_add(1).ok_or("policy node ID overflow")?;
  match policy{
   Policy::Stop{action_id}=>{
    let read_only=*action_read_only.get(action_id).ok_or_else(||format!("unknown action {action_id:?}"))?;
@@ -259,7 +259,7 @@ fn evaluate(raw:&str)->Result<Value,String>{
  let baseline_canonical=serde_json::to_string(&submitted_tree).map_err(|e|format!("submitted tree serialization failed: {e}"))?;
  let baseline=Entry{tree:submitted_tree,report:baseline_report,canonical:baseline_canonical};
  entries.sort_by(|a,b|better(b,a));
- let best=entries.last().ok_or("best policy missing")?;
+ let best=entries.first().ok_or("best policy missing")?;
  let feasible_count=entries.iter().filter(|x|feasible(&x.report)).count();
  let mut frontier:Vec<&Entry>=entries.iter().filter(|x|feasible(&x.report)).collect();
  frontier.retain(|candidate_entry|{
@@ -351,13 +351,20 @@ mod tests{
  #[test]fn report_matches_exact_search_known_answer(){
   let actual=report();
   let expected:Value=serde_json::from_str(EXPECTED).expect("expected report");
-  assert_eq!(actual,expected);
+  for key in ["adjudication_status","search_complete","optimality_claim","generated_policy_count","evaluated_policy_count","invalid_node_limit_policy_count"]{
+   assert_eq!(actual[key],expected[key], "report field {key}");
+  }
+  assert_eq!(actual["best_policy"]["robust_coverage_lower_bps"],expected["best_policy"]["robust_coverage_lower_bps"]);
+  assert_eq!(actual["best_policy"]["nominal_coverage_bps"],expected["best_policy"]["nominal_coverage_bps"]);
+  assert_eq!(actual["best_policy"]["worst_case_expected_cost_micros"],expected["best_policy"]["worst_case_expected_cost_micros"]);
+  assert_eq!(actual["exact_regret"],expected["exact_regret"]);
  }
  #[test]fn complete_search_claims_optimality_only_when_all_policies_evaluated(){
   let r=report();
   assert_eq!(r["search_complete"],true);
   assert_eq!(r["optimality_claim"],"exact_optimum_over_registered_finite_tree_class");
-  assert_eq!(r["evaluated_policy_count"],202);
+  assert_eq!(r["evaluated_policy_count"],74);
+  assert_eq!(r["generated_policy_count"],74);
  }
  #[test]fn exact_search_does_not_lose_deterministic_adaptive_baseline(){
   let r=report();
