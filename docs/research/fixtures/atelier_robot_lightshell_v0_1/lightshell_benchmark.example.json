@@ -103,7 +103,9 @@
       "baseline_value": null,
       "hard_gate": false,
       "method_ref": null,
-      "uncertainty_model_ref": null
+      "uncertainty_model_ref": null,
+      "candidate_id": "B0",
+      "observed_value": null
     },
     {
       "metric_id": "rom_delta",
@@ -114,7 +116,9 @@
       "baseline_value": null,
       "hard_gate": true,
       "method_ref": null,
-      "uncertainty_model_ref": null
+      "uncertainty_model_ref": null,
+      "candidate_id": "B0",
+      "observed_value": null
     },
     {
       "metric_id": "joint_energy_delta",
@@ -125,7 +129,9 @@
       "baseline_value": null,
       "hard_gate": true,
       "method_ref": null,
-      "uncertainty_model_ref": null
+      "uncertainty_model_ref": null,
+      "candidate_id": "B0",
+      "observed_value": null
     },
     {
       "metric_id": "peak_temperature_delta",
@@ -136,7 +142,9 @@
       "baseline_value": null,
       "hard_gate": true,
       "method_ref": null,
-      "uncertainty_model_ref": null
+      "uncertainty_model_ref": null,
+      "candidate_id": "B0",
+      "observed_value": null
     },
     {
       "metric_id": "transmitted_force",
@@ -147,7 +155,9 @@
       "baseline_value": null,
       "hard_gate": false,
       "method_ref": null,
-      "uncertainty_model_ref": null
+      "uncertainty_model_ref": null,
+      "candidate_id": "B0",
+      "observed_value": null
     },
     {
       "metric_id": "abrasion_cycles_to_endpoint",
@@ -158,7 +168,9 @@
       "baseline_value": null,
       "hard_gate": false,
       "method_ref": null,
-      "uncertainty_model_ref": null
+      "uncertainty_model_ref": null,
+      "candidate_id": "B0",
+      "observed_value": null
     },
     {
       "metric_id": "repair_time",
@@ -169,7 +181,464 @@
       "baseline_value": null,
       "hard_gate": false,
       "method_ref": null,
-      "uncertainty_model_ref": null
+      "uncertainty_model_ref": null,
+      "candidate_id": "B0",
+      "observed_value": null
+    },
+    {
+      "metric_id": "added_mass",
+      "unit": "g",
+      "measurement_boundary": "installed module, including attachments and fasteners",
+      "comparison_direction": "lower_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "B1",
+      "observed_value": null
+    },
+    {
+      "metric_id": "rom_delta",
+      "unit": "deg or rad (freeze one)",
+      "measurement_boundary": "joint output across the approved motion envelope",
+      "comparison_direction": "within_declared_band",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": true,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "B1",
+      "observed_value": null
+    },
+    {
+      "metric_id": "joint_energy_delta",
+      "unit": "J per matched trajectory",
+      "measurement_boundary": "declared DC input boundary, synchronized voltage/current",
+      "comparison_direction": "within_declared_band",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": true,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "B1",
+      "observed_value": null
+    },
+    {
+      "metric_id": "peak_temperature_delta",
+      "unit": "degC",
+      "measurement_boundary": "named motor/drive/gearbox measurement points at matched duty cycle",
+      "comparison_direction": "within_declared_band",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": true,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "B1",
+      "observed_value": null
+    },
+    {
+      "metric_id": "transmitted_force",
+      "unit": "N",
+      "measurement_boundary": "instrumented fixture at declared support and contact interface",
+      "comparison_direction": "lower_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "B1",
+      "observed_value": null
+    },
+    {
+      "metric_id": "abrasion_cycles_to_endpoint",
+      "unit": "cycles",
+      "measurement_boundary": "declared specimen / seam / finished assembly endpoint",
+      "comparison_direction": "higher_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "B1",
+      "observed_value": null
+    },
+    {
+      "metric_id": "repair_time",
+      "unit": "min",
+      "measurement_boundary": "remove, repair/replace panel, refit and inspect to declared acceptance",
+      "comparison_direction": "lower_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "B1",
+      "observed_value": null
+    },
+    {
+      "metric_id": "added_mass",
+      "unit": "g",
+      "measurement_boundary": "installed module, including attachments and fasteners",
+      "comparison_direction": "lower_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "B2",
+      "observed_value": null
+    },
+    {
+      "metric_id": "rom_delta",
+      "unit": "deg or rad (freeze one)",
+      "measurement_boundary": "joint output across the approved motion envelope",
+      "comparison_direction": "within_declared_band",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": true,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "B2",
+      "observed_value": null
+    },
+    {
+      "metric_id": "joint_energy_delta",
+      "unit": "J per matched trajectory",
+      "measurement_boundary": "declared DC input boundary, synchronized voltage/current",
+      "comparison_direction": "within_declared_band",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": true,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "B2",
+      "observed_value": null
+    },
+    {
+      "metric_id": "peak_temperature_delta",
+      "unit": "degC",
+      "measurement_boundary": "named motor/drive/gearbox measurement points at matched duty cycle",
+      "comparison_direction": "within_declared_band",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": true,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "B2",
+      "observed_value": null
+    },
+    {
+      "metric_id": "transmitted_force",
+      "unit": "N",
+      "measurement_boundary": "instrumented fixture at declared support and contact interface",
+      "comparison_direction": "lower_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "B2",
+      "observed_value": null
+    },
+    {
+      "metric_id": "abrasion_cycles_to_endpoint",
+      "unit": "cycles",
+      "measurement_boundary": "declared specimen / seam / finished assembly endpoint",
+      "comparison_direction": "higher_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "B2",
+      "observed_value": null
+    },
+    {
+      "metric_id": "repair_time",
+      "unit": "min",
+      "measurement_boundary": "remove, repair/replace panel, refit and inspect to declared acceptance",
+      "comparison_direction": "lower_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "B2",
+      "observed_value": null
+    },
+    {
+      "metric_id": "added_mass",
+      "unit": "g",
+      "measurement_boundary": "installed module, including attachments and fasteners",
+      "comparison_direction": "lower_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L1",
+      "observed_value": null
+    },
+    {
+      "metric_id": "rom_delta",
+      "unit": "deg or rad (freeze one)",
+      "measurement_boundary": "joint output across the approved motion envelope",
+      "comparison_direction": "within_declared_band",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": true,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L1",
+      "observed_value": null
+    },
+    {
+      "metric_id": "joint_energy_delta",
+      "unit": "J per matched trajectory",
+      "measurement_boundary": "declared DC input boundary, synchronized voltage/current",
+      "comparison_direction": "within_declared_band",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": true,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L1",
+      "observed_value": null
+    },
+    {
+      "metric_id": "peak_temperature_delta",
+      "unit": "degC",
+      "measurement_boundary": "named motor/drive/gearbox measurement points at matched duty cycle",
+      "comparison_direction": "within_declared_band",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": true,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L1",
+      "observed_value": null
+    },
+    {
+      "metric_id": "transmitted_force",
+      "unit": "N",
+      "measurement_boundary": "instrumented fixture at declared support and contact interface",
+      "comparison_direction": "lower_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L1",
+      "observed_value": null
+    },
+    {
+      "metric_id": "abrasion_cycles_to_endpoint",
+      "unit": "cycles",
+      "measurement_boundary": "declared specimen / seam / finished assembly endpoint",
+      "comparison_direction": "higher_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L1",
+      "observed_value": null
+    },
+    {
+      "metric_id": "repair_time",
+      "unit": "min",
+      "measurement_boundary": "remove, repair/replace panel, refit and inspect to declared acceptance",
+      "comparison_direction": "lower_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L1",
+      "observed_value": null
+    },
+    {
+      "metric_id": "added_mass",
+      "unit": "g",
+      "measurement_boundary": "installed module, including attachments and fasteners",
+      "comparison_direction": "lower_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L2",
+      "observed_value": null
+    },
+    {
+      "metric_id": "rom_delta",
+      "unit": "deg or rad (freeze one)",
+      "measurement_boundary": "joint output across the approved motion envelope",
+      "comparison_direction": "within_declared_band",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": true,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L2",
+      "observed_value": null
+    },
+    {
+      "metric_id": "joint_energy_delta",
+      "unit": "J per matched trajectory",
+      "measurement_boundary": "declared DC input boundary, synchronized voltage/current",
+      "comparison_direction": "within_declared_band",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": true,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L2",
+      "observed_value": null
+    },
+    {
+      "metric_id": "peak_temperature_delta",
+      "unit": "degC",
+      "measurement_boundary": "named motor/drive/gearbox measurement points at matched duty cycle",
+      "comparison_direction": "within_declared_band",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": true,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L2",
+      "observed_value": null
+    },
+    {
+      "metric_id": "transmitted_force",
+      "unit": "N",
+      "measurement_boundary": "instrumented fixture at declared support and contact interface",
+      "comparison_direction": "lower_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L2",
+      "observed_value": null
+    },
+    {
+      "metric_id": "abrasion_cycles_to_endpoint",
+      "unit": "cycles",
+      "measurement_boundary": "declared specimen / seam / finished assembly endpoint",
+      "comparison_direction": "higher_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L2",
+      "observed_value": null
+    },
+    {
+      "metric_id": "repair_time",
+      "unit": "min",
+      "measurement_boundary": "remove, repair/replace panel, refit and inspect to declared acceptance",
+      "comparison_direction": "lower_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L2",
+      "observed_value": null
+    },
+    {
+      "metric_id": "added_mass",
+      "unit": "g",
+      "measurement_boundary": "installed module, including attachments and fasteners",
+      "comparison_direction": "lower_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L3",
+      "observed_value": null
+    },
+    {
+      "metric_id": "rom_delta",
+      "unit": "deg or rad (freeze one)",
+      "measurement_boundary": "joint output across the approved motion envelope",
+      "comparison_direction": "within_declared_band",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": true,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L3",
+      "observed_value": null
+    },
+    {
+      "metric_id": "joint_energy_delta",
+      "unit": "J per matched trajectory",
+      "measurement_boundary": "declared DC input boundary, synchronized voltage/current",
+      "comparison_direction": "within_declared_band",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": true,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L3",
+      "observed_value": null
+    },
+    {
+      "metric_id": "peak_temperature_delta",
+      "unit": "degC",
+      "measurement_boundary": "named motor/drive/gearbox measurement points at matched duty cycle",
+      "comparison_direction": "within_declared_band",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": true,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L3",
+      "observed_value": null
+    },
+    {
+      "metric_id": "transmitted_force",
+      "unit": "N",
+      "measurement_boundary": "instrumented fixture at declared support and contact interface",
+      "comparison_direction": "lower_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L3",
+      "observed_value": null
+    },
+    {
+      "metric_id": "abrasion_cycles_to_endpoint",
+      "unit": "cycles",
+      "measurement_boundary": "declared specimen / seam / finished assembly endpoint",
+      "comparison_direction": "higher_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L3",
+      "observed_value": null
+    },
+    {
+      "metric_id": "repair_time",
+      "unit": "min",
+      "measurement_boundary": "remove, repair/replace panel, refit and inspect to declared acceptance",
+      "comparison_direction": "lower_is_better",
+      "target_value": null,
+      "baseline_value": null,
+      "hard_gate": false,
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "candidate_id": "L3",
+      "observed_value": null
     }
   ],
   "hard_gates": [
@@ -178,63 +647,432 @@
       "condition": "No textile, attachment or local guard may enter a prohibited moving/pinch/shear envelope",
       "state": "unknown",
       "acceptance_rule_ref": null,
-      "reviewer_ref": null
+      "reviewer_ref": null,
+      "candidate_id": "B0"
     },
     {
       "gate_id": "required_rom",
       "condition": "No unapproved loss of required joint range of motion",
       "state": "unknown",
       "acceptance_rule_ref": null,
-      "reviewer_ref": null
+      "reviewer_ref": null,
+      "candidate_id": "B0"
     },
     {
       "gate_id": "cable_hose_bend",
       "condition": "No cable/hose bend-radius, abrasion or connector-access violation",
       "state": "unknown",
       "acceptance_rule_ref": null,
-      "reviewer_ref": null
+      "reviewer_ref": null,
+      "candidate_id": "B0"
     },
     {
       "gate_id": "thermal_cooling",
       "condition": "No obstruction of heat rejection or violation of motor/drive thermal limits",
       "state": "unknown",
       "acceptance_rule_ref": null,
-      "reviewer_ref": null
+      "reviewer_ref": null,
+      "candidate_id": "B0"
     },
     {
       "gate_id": "sensor_fov_calibration",
       "condition": "No unacceptable sensor occlusion, reflection or calibration shift",
       "state": "unknown",
       "acceptance_rule_ref": null,
-      "reviewer_ref": null
+      "reviewer_ref": null,
+      "candidate_id": "B0"
     },
     {
       "gate_id": "retention_detachment_snag",
       "condition": "No uncontained detached component, snag or entanglement hazard",
       "state": "unknown",
       "acceptance_rule_ref": null,
-      "reviewer_ref": null
+      "reviewer_ref": null,
+      "candidate_id": "B0"
     },
     {
       "gate_id": "emergency_service_access",
       "condition": "Emergency stop, isolation, charging and approved service access remain available",
       "state": "unknown",
       "acceptance_rule_ref": null,
-      "reviewer_ref": null
+      "reviewer_ref": null,
+      "candidate_id": "B0"
     },
     {
       "gate_id": "actuation_task_nonregression",
       "condition": "No unacceptable task, torque/current or energy regression against the approved profile",
       "state": "unknown",
       "acceptance_rule_ref": null,
-      "reviewer_ref": null
+      "reviewer_ref": null,
+      "candidate_id": "B0"
     },
     {
       "gate_id": "evidence_integrity",
       "condition": "All compared results bind exact configuration, material lot, protocol, instrument and calibration",
       "state": "unknown",
       "acceptance_rule_ref": null,
-      "reviewer_ref": null
+      "reviewer_ref": null,
+      "candidate_id": "B0"
+    },
+    {
+      "gate_id": "pinch_shear_clearance",
+      "condition": "No textile, attachment or local guard may enter a prohibited moving/pinch/shear envelope",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "B1"
+    },
+    {
+      "gate_id": "required_rom",
+      "condition": "No unapproved loss of required joint range of motion",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "B1"
+    },
+    {
+      "gate_id": "cable_hose_bend",
+      "condition": "No cable/hose bend-radius, abrasion or connector-access violation",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "B1"
+    },
+    {
+      "gate_id": "thermal_cooling",
+      "condition": "No obstruction of heat rejection or violation of motor/drive thermal limits",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "B1"
+    },
+    {
+      "gate_id": "sensor_fov_calibration",
+      "condition": "No unacceptable sensor occlusion, reflection or calibration shift",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "B1"
+    },
+    {
+      "gate_id": "retention_detachment_snag",
+      "condition": "No uncontained detached component, snag or entanglement hazard",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "B1"
+    },
+    {
+      "gate_id": "emergency_service_access",
+      "condition": "Emergency stop, isolation, charging and approved service access remain available",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "B1"
+    },
+    {
+      "gate_id": "actuation_task_nonregression",
+      "condition": "No unacceptable task, torque/current or energy regression against the approved profile",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "B1"
+    },
+    {
+      "gate_id": "evidence_integrity",
+      "condition": "All compared results bind exact configuration, material lot, protocol, instrument and calibration",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "B1"
+    },
+    {
+      "gate_id": "pinch_shear_clearance",
+      "condition": "No textile, attachment or local guard may enter a prohibited moving/pinch/shear envelope",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "B2"
+    },
+    {
+      "gate_id": "required_rom",
+      "condition": "No unapproved loss of required joint range of motion",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "B2"
+    },
+    {
+      "gate_id": "cable_hose_bend",
+      "condition": "No cable/hose bend-radius, abrasion or connector-access violation",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "B2"
+    },
+    {
+      "gate_id": "thermal_cooling",
+      "condition": "No obstruction of heat rejection or violation of motor/drive thermal limits",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "B2"
+    },
+    {
+      "gate_id": "sensor_fov_calibration",
+      "condition": "No unacceptable sensor occlusion, reflection or calibration shift",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "B2"
+    },
+    {
+      "gate_id": "retention_detachment_snag",
+      "condition": "No uncontained detached component, snag or entanglement hazard",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "B2"
+    },
+    {
+      "gate_id": "emergency_service_access",
+      "condition": "Emergency stop, isolation, charging and approved service access remain available",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "B2"
+    },
+    {
+      "gate_id": "actuation_task_nonregression",
+      "condition": "No unacceptable task, torque/current or energy regression against the approved profile",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "B2"
+    },
+    {
+      "gate_id": "evidence_integrity",
+      "condition": "All compared results bind exact configuration, material lot, protocol, instrument and calibration",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "B2"
+    },
+    {
+      "gate_id": "pinch_shear_clearance",
+      "condition": "No textile, attachment or local guard may enter a prohibited moving/pinch/shear envelope",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L1"
+    },
+    {
+      "gate_id": "required_rom",
+      "condition": "No unapproved loss of required joint range of motion",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L1"
+    },
+    {
+      "gate_id": "cable_hose_bend",
+      "condition": "No cable/hose bend-radius, abrasion or connector-access violation",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L1"
+    },
+    {
+      "gate_id": "thermal_cooling",
+      "condition": "No obstruction of heat rejection or violation of motor/drive thermal limits",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L1"
+    },
+    {
+      "gate_id": "sensor_fov_calibration",
+      "condition": "No unacceptable sensor occlusion, reflection or calibration shift",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L1"
+    },
+    {
+      "gate_id": "retention_detachment_snag",
+      "condition": "No uncontained detached component, snag or entanglement hazard",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L1"
+    },
+    {
+      "gate_id": "emergency_service_access",
+      "condition": "Emergency stop, isolation, charging and approved service access remain available",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L1"
+    },
+    {
+      "gate_id": "actuation_task_nonregression",
+      "condition": "No unacceptable task, torque/current or energy regression against the approved profile",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L1"
+    },
+    {
+      "gate_id": "evidence_integrity",
+      "condition": "All compared results bind exact configuration, material lot, protocol, instrument and calibration",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L1"
+    },
+    {
+      "gate_id": "pinch_shear_clearance",
+      "condition": "No textile, attachment or local guard may enter a prohibited moving/pinch/shear envelope",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L2"
+    },
+    {
+      "gate_id": "required_rom",
+      "condition": "No unapproved loss of required joint range of motion",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L2"
+    },
+    {
+      "gate_id": "cable_hose_bend",
+      "condition": "No cable/hose bend-radius, abrasion or connector-access violation",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L2"
+    },
+    {
+      "gate_id": "thermal_cooling",
+      "condition": "No obstruction of heat rejection or violation of motor/drive thermal limits",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L2"
+    },
+    {
+      "gate_id": "sensor_fov_calibration",
+      "condition": "No unacceptable sensor occlusion, reflection or calibration shift",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L2"
+    },
+    {
+      "gate_id": "retention_detachment_snag",
+      "condition": "No uncontained detached component, snag or entanglement hazard",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L2"
+    },
+    {
+      "gate_id": "emergency_service_access",
+      "condition": "Emergency stop, isolation, charging and approved service access remain available",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L2"
+    },
+    {
+      "gate_id": "actuation_task_nonregression",
+      "condition": "No unacceptable task, torque/current or energy regression against the approved profile",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L2"
+    },
+    {
+      "gate_id": "evidence_integrity",
+      "condition": "All compared results bind exact configuration, material lot, protocol, instrument and calibration",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L2"
+    },
+    {
+      "gate_id": "pinch_shear_clearance",
+      "condition": "No textile, attachment or local guard may enter a prohibited moving/pinch/shear envelope",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L3"
+    },
+    {
+      "gate_id": "required_rom",
+      "condition": "No unapproved loss of required joint range of motion",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L3"
+    },
+    {
+      "gate_id": "cable_hose_bend",
+      "condition": "No cable/hose bend-radius, abrasion or connector-access violation",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L3"
+    },
+    {
+      "gate_id": "thermal_cooling",
+      "condition": "No obstruction of heat rejection or violation of motor/drive thermal limits",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L3"
+    },
+    {
+      "gate_id": "sensor_fov_calibration",
+      "condition": "No unacceptable sensor occlusion, reflection or calibration shift",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L3"
+    },
+    {
+      "gate_id": "retention_detachment_snag",
+      "condition": "No uncontained detached component, snag or entanglement hazard",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L3"
+    },
+    {
+      "gate_id": "emergency_service_access",
+      "condition": "Emergency stop, isolation, charging and approved service access remain available",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L3"
+    },
+    {
+      "gate_id": "actuation_task_nonregression",
+      "condition": "No unacceptable task, torque/current or energy regression against the approved profile",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L3"
+    },
+    {
+      "gate_id": "evidence_integrity",
+      "condition": "All compared results bind exact configuration, material lot, protocol, instrument and calibration",
+      "state": "unknown",
+      "acceptance_rule_ref": null,
+      "reviewer_ref": null,
+      "candidate_id": "L3"
     }
   ],
   "test_runs": [],
