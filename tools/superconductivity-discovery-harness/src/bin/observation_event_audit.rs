@@ -104,6 +104,124 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
             ));
         }
 
+        let process_steps = match event.get("process_history") {
+            None => &[][..],
+            Some(Value::Array(steps)) => steps.as_slice(),
+            Some(_) => {
+                return Err(format!(
+                    "{observation_id}: process_history must be an array when present"
+                ));
+            }
+        };
+        let mut process_step_ids = HashSet::with_capacity(process_steps.len());
+        let mut previous_sequence: Option<u64> = None;
+        for step in process_steps {
+            let step_id = step
+                .get("step_id")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| format!("{observation_id}: process step requires step_id"))?;
+            if !process_step_ids.insert(step_id.to_owned()) {
+                return Err(format!("{observation_id}: duplicate process step id {step_id}"));
+            }
+            let sequence = step
+                .get("sequence")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| format!("{observation_id}/{step_id}: sequence must be a non-negative integer"))?;
+            if previous_sequence.is_some_and(|previous| sequence <= previous) {
+                return Err(format!(
+                    "{observation_id}: process step sequence must be strictly increasing"
+                ));
+            }
+            previous_sequence = Some(sequence);
+
+            let state = step
+                .get("execution_state")
+                .and_then(Value::as_str)
+                .ok_or_else(|| format!("{observation_id}/{step_id}: missing execution_state"))?;
+            let actual = step
+                .get("actual")
+                .ok_or_else(|| format!("{observation_id}/{step_id}: missing actual field"))?;
+            let actual_source = step
+                .get("actual_source")
+                .ok_or_else(|| format!("{observation_id}/{step_id}: missing actual_source field"))?;
+
+            match state {
+                "planned" | "commanded" => {
+                    if !actual.is_null() || !actual_source.is_null() {
+                        return Err(format!(
+                            "{observation_id}/{step_id}: planned/commanded step cannot contain actual execution evidence"
+                        ));
+                    }
+                }
+                "executed_unverified" => {
+                    if !actual.is_object() {
+                        return Err(format!(
+                            "{observation_id}/{step_id}: executed_unverified step requires an actual result object"
+                        ));
+                    }
+                }
+                "sensor_verified" => {
+                    if !actual.is_object() {
+                        return Err(format!(
+                            "{observation_id}/{step_id}: sensor_verified step requires actual execution values"
+                        ));
+                    }
+                    let source = actual_source
+                        .as_object()
+                        .ok_or_else(|| format!("{observation_id}/{step_id}: sensor_verified step requires actual_source"))?;
+                    let source_id = source
+                        .get("source_id")
+                        .and_then(Value::as_str)
+                        .ok_or_else(|| format!("{observation_id}/{step_id}: actual_source requires source_id"))?;
+                    if !source_ids.contains(source_id) {
+                        return Err(format!(
+                            "{observation_id}/{step_id}: unresolved process evidence source {source_id}"
+                        ));
+                    }
+                    let measurement_status = source
+                        .get("measurement_status")
+                        .and_then(Value::as_str)
+                        .ok_or_else(|| format!("{observation_id}/{step_id}: actual_source requires measurement_status"))?;
+                    if !matches!(measurement_status, "sensor_measured" | "controller_readback") {
+                        return Err(format!(
+                            "{observation_id}/{step_id}: sensor_verified requires sensor_measured or controller_readback evidence"
+                        ));
+                    }
+                    let locator = source
+                        .get("locator")
+                        .and_then(Value::as_object)
+                        .ok_or_else(|| format!("{observation_id}/{step_id}: actual_source requires locator"))?;
+                    let has_locator = ["page", "section", "table", "figure", "row_or_record_id"]
+                        .iter()
+                        .any(|field| {
+                            locator.get(*field).is_some_and(|value| match value {
+                                Value::String(text) => !text.trim().is_empty(),
+                                Value::Number(number) => number.as_u64().is_some_and(|number| number > 0),
+                                _ => false,
+                            })
+                        });
+                    if !has_locator {
+                        return Err(format!(
+                            "{observation_id}/{step_id}: actual_source locator must identify a source location"
+                        ));
+                    }
+                }
+                "failed" | "aborted" => {
+                    let reason = step
+                        .get("failure_reason")
+                        .and_then(Value::as_str)
+                        .filter(|value| !value.trim().is_empty());
+                    if reason.is_none() {
+                        return Err(format!(
+                            "{observation_id}/{step_id}: failed/aborted process step requires failure_reason"
+                        ));
+                    }
+                }
+                other => return Err(format!("{observation_id}/{step_id}: unsupported execution_state {other}")),
+            }
+        }
+
         let assertion = event
             .get("assertion")
             .ok_or_else(|| format!("{observation_id}: missing assertion"))?;
@@ -276,6 +394,7 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
         "contract": "SC-OBSERVATION-EVENT-0.1",
         "schema_dialect": DIALECT,
         "observation_count": events.len(),
+        "process_step_count": events.iter().map(|event| event.get("process_history").and_then(Value::as_array).map_or(0, Vec::len)).sum::<usize>(),
         "source_count": source_ids.len(),
         "origin_counts": origin_counts,
         "observation_ids": checked,
@@ -286,7 +405,10 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
             "non_detection_is_not_zero": true,
             "calculated_and_predicted_are_not_observations": true,
             "pressure_missingness_preserved": true,
-            "ambient_pressure_is_explicit": true
+            "ambient_pressure_is_explicit": true,
+            "process_steps_ordered_and_unique": true,
+            "planned_commands_not_promoted_to_execution": true,
+            "sensor_verified_steps_have_source_evidence": true
         },
         "claim_ceiling": "Fixture validation only; it does not establish scientific truth, independent replication or a material discovery."
     }))
@@ -389,7 +511,8 @@ mod tests {
         let (schema, fixture) = committed_inputs();
         let bytes = serde_json::to_vec(&fixture).unwrap();
         let receipt = validate_fixture(&schema, &bytes).unwrap();
-        assert_eq!(receipt["observation_count"], 4);
+        assert_eq!(receipt["observation_count"], 5);
+        assert_eq!(receipt["process_step_count"], 2);
         assert_eq!(receipt["origin_counts"]["observed"], 2);
         assert_eq!(receipt["origin_counts"]["calculated"], 1);
         assert_eq!(receipt["origin_counts"]["predicted"], 1);
@@ -451,6 +574,48 @@ mod tests {
         let (_, mut fixture) = committed_inputs();
         fixture["observations"][0]["assertion"]["value"] = json!(-1.0);
         assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn planned_process_step_cannot_contain_actual_execution() {
+        let (_, mut fixture) = committed_inputs();
+        fixture["observations"][4]["process_history"][0]["execution_state"] =
+            json!("planned");
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn sensor_verified_process_step_requires_source_evidence() {
+        let (_, mut fixture) = committed_inputs();
+        fixture["observations"][4]["process_history"][0]["actual_source"]["source_id"] =
+            json!("missing-process-source");
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn process_step_sequences_must_be_unique_and_increasing() {
+        let (_, mut fixture) = committed_inputs();
+        fixture["observations"][4]["process_history"][1]["sequence"] = json!(0);
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn high_pressure_treatment_does_not_change_ambient_measurement_pressure() {
+        let (_, mut fixture) = committed_inputs();
+        let event = &fixture["observations"][4];
+        assert_eq!(event["conditions"]["pressure"]["semantics"], "explicit_ambient");
+        assert_eq!(event["conditions"]["pressure"]["value_gpa"], 0.0);
+        assert_eq!(event["process_history"][0]["actual"]["pressure_gpa"], 18.9);
+        assert_eq!(event["process_history"][1]["actual"]["pressure_gpa"], 0.0);
+        assert!(audit_mutated(fixture).is_ok());
+    }
+
+    #[test]
+    fn process_history_does_not_infer_measurement_pressure_when_unknown() {
+        let (_, mut fixture) = committed_inputs();
+        fixture["observations"][4]["conditions"]["pressure"]["semantics"] = json!("unknown");
+        fixture["observations"][4]["conditions"]["pressure"]["value_gpa"] = Value::Null;
+        assert!(audit_mutated(fixture).is_ok());
     }
 
     #[test]
