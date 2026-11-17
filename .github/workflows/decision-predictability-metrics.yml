@@ -48,3 +48,26 @@ jobs:
           grep -q '^fixture,regime,channel,model,' forecast-report.csv
           grep -q '^# scope=within_trajectory_same_regime_continuation_only' forecast-report.csv
           grep -q ",ok" forecast-report.csv
+
+      - name: Checkout pinned chaos reference generator
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/symthaea
+          ref: d39d1ad9e2c1b72db10ff8859aac379662615a86
+          path: chaos-reference-source
+
+      - name: Run full frozen generator-to-baseline integration
+        run: |
+          cargo run --manifest-path chaos-reference-source/research/chaos-reference-suite/Cargo.toml --bin chaos-fixtures -- 2048 20261116 > chaos-fixtures.csv
+          test -s chaos-fixtures.csv
+          grep -q '^fixture,regime,step,x,y,z chaos-fixtures.csv
+          for fixture in stable_linear logistic_fixed logistic_period2 logistic_chaotic henon quasiperiodic_torus ar1_colored_noise lorenz63; do
+            grep -q "^$fixture," chaos-fixtures.csv
+          done
+          cargo run --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin forecast-fixtures -- chaos-fixtures.csv > forecast-report.csv
+          test -s forecast-report.csv
+          grep -q '^fixture,regime,channel,model,' forecast-report.csv
+          grep -q '^# scope=within_trajectory_same_regime_continuation_only' forecast-report.csv
+          grep -q '^stable_linear,' forecast-report.csv
+          grep -q '^lorenz63,' forecast-report.csv
+          grep -q ",ok" forecast-report.csv
