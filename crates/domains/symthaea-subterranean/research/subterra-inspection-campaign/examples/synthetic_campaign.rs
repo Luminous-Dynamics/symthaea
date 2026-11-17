@@ -35,6 +35,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 decision_id: "cable-support-08".into(),
                 mandatory: false,
             },
+            DecisionRequirement {
+                decision_id: "drawpoint-03".into(),
+                mandatory: false,
+            },
         ],
         deployment_bundles: vec![DeploymentBundle {
             bundle_id: "west_corridor_mobilization".into(),
@@ -46,13 +50,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
         }],
         options: vec![
-            option("pipe-high-value-long-scan", "pipe-segment-14", 9, 9_000),
-            option("pipe-targeted-followup", "pipe-segment-14", 6, 4_000),
-            option("support-metrology", "cable-support-08", 8, 6_000),
+            option("pipe-high-value-long-scan", "pipe-segment-14", 19, 10_000),
+            option("cable-targeted-followup", "cable-support-08", 10, 6_000),
+            option("drawpoint-metrology", "drawpoint-03", 10, 6_000),
         ],
         budget: CampaignBudget {
             resources: ResourceVector {
-                energy_millijoules: 11_000,
+                energy_millijoules: 13_000,
                 duration_milliseconds: 20_000,
                 data_bytes: 20_000,
                 exposure_milliunits: 500,
@@ -65,8 +69,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             fault_domain_profile_digest: "synthetic-only:profile".into(),
             common_cause_assessment_digest: "synthetic-only:assessment".into(),
             portfolio_value_assessment_digest: "synthetic-only:factorization".into(),
-            inventory_disposition: InventoryDisposition::CompleteWithinDeclaredScope,
-            additive_value_factorization_complete: true,
+            inventory_disposition: InventoryDisposition::Unknown,
+            additive_value_factorization_complete: false,
         },
         maximum_search_nodes: 100_000,
     };
