@@ -73,7 +73,7 @@ In particular, event-count growth is a structural fact, not a listener-experienc
 
 ## Adversarial fixtures authored
 
-Twenty-one new tests are present in `process_grammar.rs`:
+Twenty-two new tests are present in `process_grammar.rs`:
 
 1. Accept unmodified realizations for all four declared trajectory kinds.
 2. Match hand-frozen expected contour vectors for all four process kinds.
@@ -88,11 +88,11 @@ Twenty-one new tests are present in `process_grammar.rs`:
 11. Exercise a deterministic 4,096-case holdout: four process kinds × 256 seeds per kind × 2, 4, 8 and 16 bars.
 12. Match frozen prefix-linear velocity and section-intensity reference values.
 13. Reject velocity, section-intensity and phrase-start emphasis mutations.
-14. Refuse expressive verification when a legacy plan lacks the dynamics profile.
-15. Reject mutations to the harmony clock pitch and bass-anchor duration.
-16. Reject assigned identities on accompaniment or melody events.
-17. Reject unplanned voice roles.
-18. Exercise the 4,096-case generated holdout after all melody, expressive and accompaniment checks.
+14. Deserialize a legacy plan without the dynamics profile, then refuse expressive verification.\n15. Reject a source cell containing a zero-duration event.
+16. Reject mutations to the harmony clock pitch and bass-anchor duration.
+17. Reject assigned identities on accompaniment or melody events.
+18. Reject unplanned voice roles.
+19. Exercise the 4,096-case generated holdout after all melody, expressive and accompaniment checks.
 
 Existing process tests remain in place. No test has been compiled or executed in the current environment. Do not describe these tests as passing.
 
