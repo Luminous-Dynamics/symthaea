@@ -52,3 +52,13 @@ The Rust reference also includes an exact fixed-point interval path:
 - `SharedAdditiveBiasProblemV1` models one continuous, campaign-wide additive nuisance value. Each observation induces a feasible interval for that bias; a hypothesis survives only if the intersection across all probes and repeated readings is nonempty. It cannot assign a different bias to each probe.
 
 Tests include interval-overlap discrimination, repeated-reading contradiction, one shared bias across probes, fixed-point overflow rejection, and observationally equivalent hypotheses that must remain ambiguous. The required quantity_unit_id binds the integer endpoint scale into canonical problem bytes (for example, millimetre-integer); changing the unit changes the receipt contract. These intervals are not probabilities or confidence intervals.
+
+
+## Identifiability frontier (stacked v0.1 increment)
+
+Before selecting a policy, the library can now test whether a hypothesis pair is distinguishable at all under the declared probe family.
+
+- **Bounded per-probe model:** a single admissible probe whose allowed outcome sets are disjoint is a constructive separation witness. If every admissible probe overlaps, the pair is observationally indistinguishable under this probe family.
+- **Shared persistent-state model:** for every possible global campaign state, the pair must differ on at least one admissible probe. The report records the cheapest witness probe for each state. If any state gives the same complete signature, it emits that collision and reports unresolved identifiability.
+
+This is an upper-bound diagnostic using the complete available probe family, not a policy claiming that one experiment identifies all candidates. It prevents an optimizer from being blamed for failing an impossible instance, and makes probe-family design a first-class benchmark variable.
