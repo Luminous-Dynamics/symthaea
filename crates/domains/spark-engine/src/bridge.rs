@@ -292,48 +292,74 @@ impl AnomalyFlag {
 /// Provides honest assessment of any reactor design claiming LCF-based operation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HonestReactorAssessment {
-    /// Claimed power output (W)
+    /// Claimed power output (W).
     pub claimed_power_w: f64,
-    /// Physics-predicted power (W)
+    /// Physics-predicted power (W).
     pub physics_power_w: f64,
-    /// Anomaly flag
+    /// Explicit measured/scenario input power, if supplied (W).
+    pub input_power_w: Option<f64>,
+    /// Anomaly flag.
     pub anomaly_flag: AnomalyFlag,
-    /// Q factor assessment
-    pub q_factor: f64,
-    /// Energy gain possible?
-    pub energy_gain_possible: bool,
-    /// Overall verdict
+    /// Primary energy-gain assessment; None if input power is absent.
+    pub q_factor: Option<f64>,
+    /// Energy-gain assessment; None if input power is absent.
+    pub energy_gain_possible: Option<bool>,
+    /// Overall verdict.
     pub verdict: String,
 }
 
 impl HonestReactorAssessment {
-    /// Assess a reactor design.
+    /// Assess a design's physics-predicted fusion output without inventing
+    /// trigger/driver input power. Q and energy gain remain unavailable.
     pub fn assess(
         claimed_power_w: f64,
         conditions: &ExperimentalConditions,
         active_volume_cm3: f64,
     ) -> Self {
-        // Calculate physics-predicted power
+        Self::assess_with_optional_input_power(claimed_power_w, conditions, active_volume_cm3, None)
+    }
+
+    /// Assess a design with an explicitly supplied input-power measurement or
+    /// declared scenario value in watts. This remains a primary energy ratio,
+    /// not a whole-plant electrical balance.
+    pub fn assess_with_input_power(
+        claimed_power_w: f64,
+        conditions: &ExperimentalConditions,
+        active_volume_cm3: f64,
+        input_power_w: f64,
+    ) -> Self {
+        let input_power_w = if input_power_w.is_finite() && input_power_w > 0.0 {
+            Some(input_power_w)
+        } else {
+            None
+        };
+        Self::assess_with_optional_input_power(
+            claimed_power_w,
+            conditions,
+            active_volume_cm3,
+            input_power_w,
+        )
+    }
+
+    fn assess_with_optional_input_power(
+        claimed_power_w: f64,
+        conditions: &ExperimentalConditions,
+        active_volume_cm3: f64,
+        input_power_w: Option<f64>,
+    ) -> Self {
         let screening = conditions.host_material.screening_ev();
         let gamow = GamowIntegration::dd_rate(conditions.temperature_k, screening, 0);
 
         let n_d = conditions.host_material.d_density_full() * conditions.loading_ratio;
         let neutron_rate = gamow.to_neutron_rate(n_d, active_volume_cm3);
 
-        // Power from D-D fusion: each reaction releases 3.65 MeV average
-        // 50% go to neutron channel (3.27 MeV), 50% to proton channel (4.03 MeV)
-        let reactions_per_s = neutron_rate * 2.0; // Neutrons are 50%
-        let physics_power_w = reactions_per_s * 3.65e6 * 1.602e-19; // MeV to J
+        let reactions_per_s = neutron_rate * 2.0;
+        let physics_power_w = reactions_per_s * 3.65e6 * 1.602e-19;
 
-        // Q factor
-        let input_power_w = 1.0; // Assume 1W trigger
-        let q_factor = physics_power_w / input_power_w;
-
-        // Anomaly flag
         let claimed_neutron_rate = claimed_power_w / (3.65e6 * 1.602e-19) / 2.0;
         let anomaly_flag = AnomalyFlag::check(claimed_neutron_rate, conditions);
-
-        let energy_gain_possible = q_factor > 1.0;
+        let q_factor = input_power_w.map(|power| physics_power_w / power);
+        let energy_gain_possible = q_factor.map(|q| q > 1.0);
 
         let verdict = if claimed_power_w > 0.0 && physics_power_w < 1e-100 {
             "IMPOSSIBLE under standard physics - requires unvalidated enhancements".to_string()
@@ -342,15 +368,18 @@ impl HonestReactorAssessment {
                 "Requires {:.0} orders of magnitude enhancement - UNVALIDATED",
                 anomaly_flag.physics_gap_orders
             )
-        } else if energy_gain_possible {
-            "Consistent with physics - energy gain possible".to_string()
         } else {
-            "Consistent with physics - net energy consumer (Q < 1)".to_string()
+            match energy_gain_possible {
+                Some(true) => "Primary energy-gain estimate exceeds unity under the supplied input-power boundary; whole-plant gain is not assessed.".to_string(),
+                Some(false) => "Primary energy-gain estimate is below unity under the supplied input-power boundary.".to_string(),
+                None => "Physics-predicted output calculated; Q is unavailable because measured or declared input power was not supplied.".to_string(),
+            }
         };
 
         Self {
             claimed_power_w,
             physics_power_w,
+            input_power_w,
             anomaly_flag,
             q_factor,
             energy_gain_possible,
@@ -1488,9 +1517,22 @@ mod tests {
 
         assert!(assessment.claimed_power_w > assessment.physics_power_w);
         assert!(assessment.anomaly_flag.assumes_anomaly);
+        assert_eq!(assessment.q_factor, None);
+        assert_eq!(assessment.energy_gain_possible, None);
+        assert!(assessment.input_power_w.is_none());
         assert!(
             assessment.verdict.contains("UNVALIDATED") || assessment.verdict.contains("IMPOSSIBLE")
         );
+    }
+
+    #[test]
+    fn test_honest_assessment_only_reports_q_with_explicit_input_power() {
+        let conditions = ExperimentalConditions::default();
+        let assessment =
+            HonestReactorAssessment::assess_with_input_power(1.0, &conditions, 1.0, 2.0);
+        assert_eq!(assessment.input_power_w, Some(2.0));
+        assert!(assessment.q_factor.is_some());
+        assert_eq!(assessment.energy_gain_possible, Some(false));
     }
 
     #[test]
