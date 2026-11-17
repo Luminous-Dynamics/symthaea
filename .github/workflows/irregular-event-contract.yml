@@ -82,7 +82,7 @@ jobs:
             --locked --all-targets -- --nocapture \
             2>&1 | tee validation-artifacts/cargo-test.log
 
-      - name: Run deterministic indexed-versus-verified scaling benchmark
+      - name: Run deterministic indexed-vs-linear-vs-verified scaling benchmark
         shell: bash
         run: |
           set -euo pipefail
