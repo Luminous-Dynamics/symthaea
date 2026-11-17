@@ -43,14 +43,6 @@ pub enum ContaminantSpecies {
 }
 
 impl ContaminantSpecies {
-    fn index(self) -> usize {
-        match self {
-            Self::OrganicFilm => 0,
-            Self::VolatileSalt => 1,
-            Self::MineralDust => 2,
-        }
-    }
-
     const ALL: [Self; SPECIES_COUNT] = [Self::OrganicFilm, Self::VolatileSalt, Self::MineralDust];
 }
 
@@ -117,7 +109,7 @@ impl DepositionTransfer {
             ("optical_witness_factor", self.optical_witness_factor),
             ("qcm_factor", self.qcm_factor),
         ] {
-            if !value.is_finite() || value < 0.0 || value > 100.0 {
+            if !value.is_finite() || !(0.0..=100.0).contains(&value) {
                 return Err(OpticalHealthError::InvalidTransferFactor(name));
             }
         }
