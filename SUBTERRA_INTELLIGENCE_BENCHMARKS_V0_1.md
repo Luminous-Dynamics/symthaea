@@ -1,0 +1,522 @@
+# Subterra Intelligence Benchmarks v0.1
+
+**Status:** Proposed protocol and targets; no benchmark results claimed  
+**Date:** 2026-11-16  
+**Scope:** Symthaea scientific belief, evidence handling and measurement selection. Robot geometry, SLAM, physical simulation and network performance remain separately benchmarked in Symtropy / external baselines.
+
+## 1. Evaluation principle
+
+A subterranean intelligence system should be evaluated on whether it makes better, more defensible scientific and mission decisions under equal evidence, resource and operating constraints—not on how compelling its map visualization looks.
+
+Every result must preserve separate scores for:
+- hypothesis quality and calibration;
+- evidence lineage and source independence;
+- uncertainty, unknowns and contradiction handling;
+- measurement selection and decision regret;
+- resource cost and communication load;
+- operational and preservation constraints;
+- return, recoverability and evidence delivery.
+
+A composite score may summarize a dashboard but may not conceal a failed hard gate. A zero-false-safe claim applies only to the frozen finite challenge suite and does not prove universal safety.
+
+## 2. Benchmark suite
+
+| Benchmark | Question | Metrics | Proposed initial gate |
+|---|---|---|---|
+| **SiteHypothesisCalibrationBench** | Are morphology/origin/connectivity probabilities calibrated on unseen sites? | Multiclass Brier score, NLL, classwise reliability, expected calibration error, confusion matrix | Publish calibration curves and confidence intervals; no single accuracy headline |
+| **OpenWorldAbstentionBench** | Does the agent recognize unknown or out-of-domain geology? | Risk–coverage curve, selective risk, unknown recall, false promotion rate, OOD detection | Zero unsupported promotions in the frozen semantic adversarial suite; abstention is a valid output |
+| **EvidenceLineageBench** | Can the agent distinguish independent witnesses from correlated derivatives? | Independent physical source count, modality diversity, replay/stale rejection, duplicate inflation | Zero independent-quorum inflation from repeated processing of one physical acquisition in the frozen suite |
+| **ConflictPreservationBench** | Does the belief model preserve rather than average away contradictions? | Conflict recall, time-to-discriminating-measurement, incorrect auto-resolution rate | No conflict is marked resolved without independent verification evidence |
+| **DecisionValueBench** | Does measurement selection reduce decision regret? | EVSI, expected decision loss, realised regret, value per joule/hour/byte | Target at least 20% lower preregistered decision regret than the strongest matched passive/uniform/frontier/information-gain baseline at the same resource budget |
+| **MeasurementCalibrationBench** | Do predicted outcome likelihoods match measured outcomes? | Log score, Brier score per outcome, calibration by modality and site | No EVSI superiority claim until outcome likelihoods are calibrated on held-out sites |
+| **MissionResourceBench** | Does the planner obey the mission envelope? | Energy, duration, data volume, reserve, proposal rejection reasons | Zero hard budget overruns; infeasible proposals are rejected rather than reweighted into eligibility |
+| **DomainTransferBench** | Does the scientific model generalize beyond its training caves? | Leave-site-out and leave-geology-class-out performance; uncertainty inflation; abstention | No cross-body transfer claim from Earth-only data; body-held-out evaluation reported separately |
+| **TemporalModelResidualBench** | Does the agent detect when its predictive model diverges? | Residual calibration, detection delay, false alarm rate, drift recall | Persistent unexplained residuals restrict model assurance; adaptation cannot silently widen authority |
+| **ScienceTaskCompletionBench** | Are the selected measurements returned and usable? | Task completion, evidence packet completeness, calibration metadata, data-return rate | Measurement proposal success requires a valid observation receipt, not a command issued or sensor powered on |
+| **MultiAgentScienceBench** | Do teams divide scientific work under communication/resource limits? | Duplicate effort, unique science coverage, task latency, bytes, agent-loss recovery, evidence-delivery rate | Compare at 250 kbps inter-robot budget and publish all partition/dropout cases; target 99% critical evidence-record delivery in the frozen fault suite or explicit store-and-forward disposition |
+| **ClaimConsistencyBench** | Can incompatible scientific and operational claims be prevented? | Rejection rate for invalid combinations; mutation/serialization negative controls | Reject every contradictory evidence-state combination in the finite adversarial suite |
+| **PreservationBench** | Does the agent obey science-preservation constraints? | Unauthorized sampling/biological action proposals; custody completeness; contamination evidence | Zero unauthorized proposals pass the external policy gate in the finite negative-control suite |
+
+The 20% regret reduction, 99% critical record delivery and zero false promotions are proposed programme targets, not measured results, universal safety standards or current capabilities.
+
+## 3. Strongest relevant baselines
+
+### 3.1 Mapping and localization
+
+**SKiD-SLAM (2026)** is a serious contemporary comparator for distributed LiDAR mapping under resource constraints. Its public report describes a 250 kbps inter-robot bandwidth budget, 320-byte SOLiD descriptor payloads, and field trials with three wheeled rovers in the Majang lava-tube cave. Under the paper's evaluated comparison, it was the only method that completed map merging at the imposed 250 kbps budget. The reported system is based on distributed place recognition, inter-robot pose estimation and trajectory fusion.
+
+Subterra does not need to reimplement this to be useful. It should:
+1. accept map and pose products from strong SLAM systems as observations with provenance and uncertainty;
+2. preserve alignment alternatives and loop-closure conflict;
+3. plan the next scientific measurement based on decision regret;
+4. optimize science tasks and evidence return around the mapping team's resource envelope.
+
+The initial comparison must use SKiD-SLAM's public cave/planetary analogue material where licensing and ground truth allow. Any comparison must bind exact code, configuration, data split and compute/network budget.
+
+Reference: https://arxiv.org/abs/2610.38141  
+Code/data: https://github.com/sparolab/SKiD-SLAM and https://sparolab.github.io/research/skid_slam/
+
+### 3.2 Multi-robot exploration and communications
+
+The 2026 planetary cave robotics review documents breadcrumb nodes, robot mesh, tether/fiber backhaul, store-and-forward and communication-aware droppable nodes in existing teams. These are prior art and baseline capabilities, not a Subterra novelty claim.
+
+Use:
+- single-robot exploration;
+- centralized multi-robot allocation;
+- decentralized allocation;
+- homogeneous team;
+- heterogeneous team;
+- fixed breadcrumb chain;
+- adaptive relay placement;
+- store-and-forward fallback.
+
+The differentiator to measure is whether evidence-aware science task allocation improves useful, independently supported scientific decisions without degrading mapping, return, mission resources or data delivery.
+
+Reference: https://doi.org/10.1002/rob.70233
+
+### 3.3 Site science and sensing
+
+LunarLeaper's 2026 concept combines gravimetry, GPR, imaging, spectroscopy and leg-based geomechanical experiments for a lunar pit. Subterra should compare measurement portfolios such as:
+- morphology-only optical/LiDAR;
+- geometry plus inertial/SLAM;
+- radar/GPR plus topography;
+- gravimetry plus GPR;
+- spectroscopy plus thermal context;
+- multimodal, lineage-aware measurement planning.
+
+The objective is not maximum sensor count. It is the best decision improvement per constrained resource while preserving the actual evidence level of each modality.
+
+Reference: https://doi.org/10.1016/j.actaastro.2025.11.039
+
+### 3.4 Terrestrial cave data
+
+Start with real public datasets:
+- Grotta di Monte Intraleo robotic quadruped/LiDAR and environmental dataset: https://doi.org/10.4121/778253cc-3193-4f66-bc13-03b80380424e
+- Grotta di Monte Intraleo LiDAR/photogrammetry dataset and processing history: https://doi.org/10.4121/0CC49D43-8A5C-453E-9370-8E9088B00B48
+- Ape Cave morphometry and companion data/code: https://doi.org/10.1029/2026JE010115
+
+The Ape Cave study scanned approximately 3.4 km, produced 1,414 sections and includes an unscanned 67 m rockfall-obstructed interval. That gap is useful for testing whether the model can preserve an unknown interval rather than interpolate it into a confirmed corridor.
+
+### 3.5 Orbital evidence
+
+Use:
+- Mare Tranquillitatis Mini-RF analysis and supporting dataset: https://doi.org/10.5281/zenodo.11005458
+- LROC imagery and DTMs: https://wms.lroc.asu.edu/
+- Venus Magellan SAR analysis: https://www.nature.com/articles/s41467-026-68643-6
+- Mars Elysium Mons multi-instrument study: https://www.nature.com/articles/s44453-026-00039-8
+
+Orbital cases test candidate classification, native-resolution preservation, source correlation, alternative hypotheses and confidence ceilings. They do not provide robot traversal ground truth.
+
+## 4. Fair experiment design
+
+1. **Split by site, not random frames.** All scans from one cave section must not leak across training and evaluation. Use leave-site-out evaluation before leave-geology-class-out evaluation.
+2. **Freeze before evaluation.** Commit the observation manifest, coordinate metadata, sensor lineage, ground truth, loss matrix, resource budget, likelihood model, planner configuration and score implementation before exposing Evaluation outcomes.
+3. **Keep roles separate.** Training may fit the likelihood model; Calibration may choose calibration maps and thresholds; Evaluation must not influence either.
+4. **Match resource budgets.** Compare methods under equal sensing time, energy, data volume, robot payload, compute and communication assumptions.
+5. **Preserve uncertainty.** Report confidence intervals, site-level variance, per-modality calibration, missing observations and abstention.
+6. **Test dependence.** Inject correlated sensor outputs, shared calibration error, repeated processing, common-mode dropout and common-source bias.
+7. **Inject mission faults.** Relay loss, partitions, delayed packets, clock skew, stale observations, failed instruments, robot loss, localization drift and partial data exfiltration.
+8. **Separate scientific and operational outcomes.** Correctly identifying a candidate does not prove it can be accessed; a returned map does not prove a safe route; a route does not prove human access.
+9. **Retain negative controls.** Include sensor spoof/replay, contradictory evidence, missing calibration, OOD geology, impossible outcome distributions and unauthorized sample requests.
+10. **Publish reproducibility artefacts.** Release permitted raw/derived observations, dataset manifests, code/configuration digests, exact seed and run identity, environment version, resource trace, score implementation and all failures.
+
+## 5. Required baselines for the value-of-information planner
+
+Use at least these policies on the same finite candidate-action set:
+
+1. **Uniform/random:** choose a permitted measurement uniformly.
+2. **Fixed expert priority:** a frozen modality/task priority list.
+3. **Frontier/coverage greedy:** choose the action expected to reveal the largest unexplored area.
+4. **Entropy greedy:** maximize expected posterior entropy reduction.
+5. **Information-gain per cost:** maximize entropy reduction divided by a declared resource cost.
+6. **Risk-aware frontier:** optimize coverage subject to reviewed risk and return constraints.
+7. **EVSI planner:** minimize expected decision loss after observing the outcome, less declared resource cost.
+8. **Perfect-information oracle:** theoretical lower bound on expected decision loss; never presented as an achievable baseline.
+
+Report both expected and realised regret. The perfect-information oracle is a bound, not a deployable competitor. The decision loss matrix must be preregistered by the study owner and independently reviewed; the planner must not learn the cost of human safety, planetary protection or irreversible contamination from reward tuning.
+
+## 6. Mandatory ablations
+
+- EVSI without the explicit unknown hypothesis vs open-world unknown.
+- Entropy-only vs decision-focused EVSI.
+- One source lineage vs source-lineage-aware evidence.
+- Confidence averaging vs conflict-preserving belief state.
+- No resource prices vs energy/time/data-aware costs.
+- No external gate vs externally pre-admitted measurement set.
+- Single-agent vs centralized and decentralized multi-agent task selection.
+- FEP expected-free-energy policy score vs EVSI score vs both with independently reported outputs.
+- No map uncertainty vs interval/coverage-aware geometry.
+- Earth-only training vs leave-site-out and leave-geology-class-out.
+
+No ablation may disable a safety, retreat, preservation or authorization gate on a physical system. Ablations are simulation / offline analysis only.
+
+## 7. Initial acceptance sequence
+
+### S0 — Mathematical contract
+- Verify prior, likelihood and loss dimensions.
+- Verify finite values, normalized probability distributions and exactly one explicit unknown hypothesis.
+- Verify EVSI calculation against hand-computable reference cases.
+- Verify deterministic tie-breaking and input-order invariance.
+- Verify gate-denied and over-budget actions are never selected.
+
+### S1 — Synthetic evidence
+- Non-uniform synthetic caves and multiple geological origins.
+- Correlated observation sources and common calibration faults.
+- Contradictions, unknown topology, incomplete geometry and out-of-domain environments.
+- Positive and negative controls for claim consistency.
+
+### S2 — Public terrestrial analogues
+- Freeze the Grotta di Monte Intraleo, Ape Cave and Majang data manifests.
+- Independently register calibration/ground truth.
+- Hold out at least one complete site for Evaluation.
+
+### S3 — Robot-in-the-loop
+- Run measurement proposals through the existing subterranean mission executive and Symtropy scenarios.
+- Demonstrate that the planner cannot bypass return-route, logistics, hazard, operator or rescue authority.
+- Include relay partition and lost-robot scenarios.
+
+### S4 — Physical analogue
+- Uncrewed, non-destructive survey with independently registered ground truth.
+- Calibrated metrology, time-synchronized sensors and documented source-lineage.
+- No human-entry or habitation qualification inferred from a robot demo.
+
+### S5+ — Planetary
+- Orbital evidence validation first.
+- Surface/flight and actual subsurface mission evidence only when available.
+- Each body and mission envelope qualified separately.
+
+## 8. What would count as doing better than the state of the art?
+
+A defensible superiority claim requires:
+- strongest relevant baseline reproduced or faithfully integrated;
+- same held-out sites, sensor payload, energy, time, compute and communication limits;
+- preregistered evaluation and loss matrix;
+- independent calibration of outcome likelihoods;
+- confidence intervals and site-level statistical analysis;
+- zero regressions in hard evidence, authority, retreat and preservation invariants.
+
+The near-term target is **not** to beat SKiD-SLAM's map merging or CERBERUS's subterranean mobility. It is to demonstrate that Symthaea uses a strong mapping system's outputs to select more decision-relevant measurements, reduce mission decision regret, preserve evidence uncertainty and produce better scientific return under the same budget.
+
+That is a distinct and testable competitive contribution.
+
+## 9. Status vocabulary
+
+- **PROPOSED:** design or target only.
+- **AUTHORED:** code/test source exists; it may not have compiled or run.
+- **EXECUTED:** exact identified source and fixture completed locally with recorded output.
+- **CI-QUALIFIED:** exact head passed required CI gates.
+- **ANALOGUE-TESTED:** physical terrestrial test with calibrated ground truth.
+- **FLIGHT-TESTED:** demonstrated in the declared flight environment.
+- **PLANETARY-DEPLOYED:** measured at the destination.
+
+Never collapse queued, skipped, not-run, or stale-head evidence into PASS.
+
+
+## 10. Evidence-adapter and claim-separation benchmarks
+
+The typed intake adapter is a prerequisite for connecting the scientific planners to Symtropy's source records. Its own correctness must be measured separately from the planner.
+
+| Benchmark | Required property | Proposed gate |
+|---|---|---|
+| SchemaContractBench | Required fields, enum values, nullability, additional fields and schema versions match the frozen v0.1 contract | 100% schema positive fixtures accepted; every frozen negative fixture rejected |
+| EvidenceRetentionBench | All claim states, original values and evidence references survive JSON-to-typed conversion | Zero dropped or changed evidence references; zero state promotion |
+| ClaimIndependenceBench | Connectivity, access, surveyed extent, origin and engineering suitability remain separate | Directly observed connectivity may coexist with unknown access and unsurveyed interior; no automatic implication |
+| ProfileUnknownPreservationBench | Explicitly unobserved intervals remain unobserved through parsing and summary | Zero zero-filled or interpolated unknown spans |
+| NetworkTopologyBench | Physical observed components use only directly observed connections | Candidate/geophysical edges never alter confirmed components |
+| DemonstratedRouteBench | Traversal queries require directly observed connection AND demonstrated traversal, respecting direction | Zero route through candidate, geophysically supported, contradicted or traversal-unknown edges |
+| PlanetaryAuthorityBoundaryBench | Declared activity permission remains data, not action authority | Zero adapter output is accepted as an external planetary-protection authorization |
+| SchemaDriftBench | Unsupported schema version, unknown enum and unexpected fields fail closed | Zero silent downgrade or lossy forward compatibility |
+
+### Required positive controls
+
+- Directly observed connection with accessibility still unknown.
+- Partial interior survey with no demonstrated traversal of the whole network.
+- Directly observed edge whose traversal remains unknown.
+- Candidate and geophysically supported edges retained in the source record but excluded from confirmed topology.
+- One-way demonstrated edge where outbound traversal is known but retreat is not.
+- Non-Earth permission declaration preserved with a mandatory external review boundary.
+- Partial profile with an explicitly unknown interval.
+
+### Required negative controls
+
+- Directly observed connectivity without its evidence references.
+- Demonstrated access without access/egress descriptions or supporting references.
+- Qualified engineering claim without envelope ID or evidence.
+- Duplicate observation IDs, edge IDs or evidence references.
+- Edge endpoint absent from the node set.
+- Candidate / geophysically supported / contradicted edge marked traversal-demonstrated.
+- Non-finite or negative profile measurements and uncertainty.
+- Missing required nullable fields in profile records.
+- Unknown schema fields or unsupported schema versions.
+
+### Integration boundary
+
+The adapter emits typed site beliefs and network records. It does not fabricate priors from qualitative states, establish sensor independence, authenticate evidence, transform planetary coordinates, calculate cave geomechanics, qualify human access or grant a mission action. A separate calibrated observation model must map evidence into probabilities before an EVSI planner consumes it.
+
+The adapter-level profile summary reports observed-only length-weighted dimensions and coverage. It is not a 3D reconstruction and does not replace Symtropy's morphometry reference.
+
+### Current status
+
+The standalone site/network/profile adapter, science-return lifecycle and pinned upstream schema manifest are AUTHORED. Fixture and manifest JSON syntax has been checked. The 27 site/network/profile adapter cases are AUTHORED but not compiled or executed; the additional 10 science-return lifecycle cases are listed separately in Section 11. No JSON Schema meta-validation, Rust test execution, CI qualification, robot-in-the-loop or analogue result is claimed for this adapter increment.
+
+
+## 11. Science-return lifecycle benchmark
+
+The typed science-return record adds an independently testable operational boundary. The benchmark must distinguish the following event stages:
+
+\`Proposed → Executed → Acquired → IntegrityVerified → Persisted → Delivered → Admitted\`
+
+Failure and cancellation are terminal dispositions. Store-and-forward is a distinct state after persistence and before delivery.
+
+| Benchmark | Required property | Proposed gate |
+|---|---|---|
+| ScienceReturnLifecycleBench | Stages occur in order; no skipping or terminal-state resurrection | Reject every skipped, reordered or post-terminal transition in the finite adversarial suite |
+| AcquisitionTruthBench | A command execution cannot count as an acquired observation | Zero observations credited before an acquisition event |
+| IntegrityAdmissionBench | Acquired evidence is not admitted without a separate integrity/calibration reference | Zero integrity-verified claims without a calibration reference |
+| PersistenceCustodyBench | Acquired data are not labelled persisted without a custody/storage reference | Zero persistence claims without a custody reference |
+| DeliveryReceiptBench | Local persistence or store-and-forward is not labelled delivered | Zero delivery claims without an external delivery receipt and custody reference |
+| ScientificAdmissionBench | Delivered observations are not automatically admitted into scientific belief | Zero admitted observations without a separate admission reference |
+| SiteObservationBindingBench | Return records link to a declared site and observation ID | Zero unknown site/observation associations |
+| EvidenceReturnResilienceBench | Relay loss yields explicit store-and-forward disposition; later delivery requires a new verified receipt | No buffered record counted as delivered until retrieval/delivery evidence exists |
+
+All percentage targets are secondary to the hard state-transition invariants. The record validator checks local ordering and required references only; it does not authenticate signatures, establish durable storage, verify actual transport delivery, or grant custody authority. Those require separate independent verifiers and a versioned cryptographic receipt contract.
+
+
+
+## 12. Empirical likelihood calibration and planner-induced distribution shift
+
+The empirical calibration reference is now authored at research/subterra-likelihood-calibration/. It estimates categorical observation likelihoods from independent Training-site cases and scores a separate Calibration and Evaluation split.
+
+Required benchmarks:
+
+| Benchmark | Property | Proposed gate |
+|---|---|---|
+| SiteSplitLeakageBench | A whole physical site belongs to one split only | Zero cross-split site overlap |
+| AcquisitionLineageBench | One physical acquisition cannot be counted more than once | Zero duplicate acquisition-lineage contribution |
+| SiteActionIndependenceBench | A site/action pair contributes at most one independent sample in v0.1 | Zero duplicate site/action rows |
+| UnknownLikelihoodBench | Explicit unknown hypothesis remains in the contract | Under-supported unknown cells emit no probability vector |
+| ProperScoreBench | Outcome predictions evaluated with proper scoring rules | Report Brier and NLL against uniform and empirical-MLE baselines |
+| HoldoutCoverageBench | Missing likelihood support is visible | Publish scored/total cases and coverage; no hidden denominator change |
+| PlannerInducedShiftBench | Policies change their own observation distribution | Compare open-loop and policy-induced closed-loop predictive scores |
+| MultiStepPredictiveBench | Predictive quality changes with horizon | Report NLL/Brier at horizons 1, 5, 10 and 25 where supported |
+| LikelihoodTableIntegrityBench | A holdout scorer consumes only a table reproducible from Training | Reject modified cells, counts, outcomes, or probabilities |
+| ModelLineageBench | Each table binds dataset ID, estimator, alpha and support threshold | No unversioned likelihood table enters a planner comparison |
+
+### Evaluation design
+
+Keep three site-disjoint partitions:
+- Training: fit the empirical likelihood table.
+- Calibration: assess reliability and, in future versions, select preregistered calibration transforms/thresholds.
+- Evaluation: final frozen holdout; do not tune any parameter after viewing its results.
+
+The v0.1 estimator only scores Calibration and Evaluation. It does not fit temperature scaling, isotonic calibration, conformal prediction, hierarchical Bayesian sensor models or uncertainty sets. The Training split alone determines the Dirichlet-smoothed categorical likelihoods.
+
+The benchmark must also test planner-induced distribution shift. Compare passive/fixed, random, frontier, entropy-greedy, EVSI and survival-conditioned policies while keeping their base likelihood model frozen. Report the score gap between offline observations and the observations each policy actually selects. A model accurate under random sensing may be unreliable under a policy that seeks unusual or low-cost states.
+
+This is particularly important for physical world models: recent 2026 work notes that planner-driven state/action visitation can move away from the offline dataset and recommends multi-step rollout metrics (1/5/10/25), proper scoring rules and uncertainty calibration under OOD states/actions. The benchmark must not confuse in-distribution test performance with policy-time reliability.
+
+### Evidence boundary
+
+The calibration crate's 19 unit tests are AUTHORED, not executed. Five cover guarded EVSI conversion, including under-supported-cell rejection, hypothesis-order consistency and preservation of external gate denial. Its Dirichlet-smoothed empirical frequencies are not a general Bayesian sensor model and are not evidence of planetary transfer. Qualitative Candidate, Supported or DirectlyObserved site claim states must never be converted directly into probability values. Only independently adjudicated site/action observation cases with provenance are eligible for calibration.
+
+
+## 13. Hierarchy-aware dependence and split-leakage benchmarks
+
+The calibration package's one-row-per-site/action rule is safe but intentionally restrictive. Real evidence pipelines produce multiple derived records from one acquisition and contain cross-site common causes such as calibration sessions, environmental episodes, processing runs and adjudication campaigns. The new standalone `subterra-dependence-audit` package computes transitive split-grouping components over these declarations.
+
+| Benchmark | Question | Proposed gate |
+|---|---|---|
+| HierarchyLeakageBench | Do sites, acquisitions or declared common causes cross Training/Calibration/Evaluation? | Zero dependency-component overlap |
+| DerivedArtifactInflationBench | Are raw rows, unique acquisitions and dependency components reported separately? | All denominators published; derived products never counted as independent acquisitions |
+| TransitiveCauseBench | Does A↔B and B↔C common-cause linkage join A/B/C? | One component; zero split crossing |
+| CalibrationEpisodeHoldoutBench | Does performance transfer to an unseen calibration episode? | Leave-one-episode-out result with coverage and uncertainty |
+| EnvironmentEpisodeHoldoutBench | Does performance transfer across lighting, dust, moisture or temperature episodes? | Separate held-out episode report; no row-random headline |
+| DeviceTransferBench | Does performance generalize to a held-out instrument or calibration family? | Leave-device/session-out score, explicitly separate from site transfer |
+| LabelCampaignHoldoutBench | Are shared adjudication campaigns leaking reference-label bias? | No campaign crosses splits; report campaign-held-out sensitivity |
+| GroupedUncertaintyBench | Are uncertainty intervals clustered at the declared dependency level? | Publish independent component count and the interval method; no iid-row interval claim |
+
+The auditor forms connected components using site ID, physical acquisition lineage and caller-declared shared-cause episode IDs. It reports row/site/acquisition/component denominators and refuses a split assignment that separates a declared group. It does **not** prove statistical independence between components or detect undeclared confounders.
+
+A 2026 *Earth and Planetary Science Letters* short communication documents performance inflation from leakage in hierarchically structured geoscience data (DOI 10.1016/j.epsl.2026.120250). A November 2026 review likewise synthesizes evidence that row-wise validation can overstate generalization for measurements nested within specimens, tools and batches (DOI 10.3390/info17111095). These results reinforce why Subterra should lead with site-/episode-disjoint evaluation rather than random-row splits; they are not Subterra benchmark results, and their effect sizes should not be transferred to Subterra.
+
+### Current authored state
+
+- `subterra-dependence-audit/`: 39 authored tests, including 10 paired component-bootstrap tests, 3 multi-acquisition lineage tests and 11 JSON manifest-consumer tests.
+- Six standalone packages are now listed in the verification script.
+- This package is a raw-manifest preflight only. It does not rewrite the current likelihood-calibration dataset or claim integrated hierarchical estimation.
+- Rust formatting, compilation, tests and Clippy remain unexecuted until the six-package script runs on a Rust-equipped environment.
+
+
+## 14. Dependency-component uncertainty intervals
+
+A new paired percentile bootstrap consumes one aggregate baseline/candidate score pair per dependency component emitted by the dependence audit.
+
+| Benchmark | Required property | Proposed gate |
+|---|---|---|
+| PairedClusterBootstrapBench | Resample dependency components, not raw evidence rows | Equal component weight; deterministic fixed seed; no duplicate IDs |
+| BootstrapReproducibilityBench | Same frozen component scores, order and seed produce byte-for-byte same report | Exact repeatability |
+| ClusterCountDisclosureBench | Confidence intervals expose the number of distinct components | Always publish component count; 20 is the minimum and 30+ is preferred; report fewer as descriptive only |
+| PairedEffectBench | Baseline and candidate evaluated on the same components | Report paired mean difference and percentile interval |
+| NumericalIntegrityBench | NaN, infinity, duplicate component IDs and excessive/insufficient replicates fail closed | Zero silently accepted invalid inputs |
+
+This interval routine is not an independence oracle. It assumes the supplied dependency components are appropriate resampling units and does not correct for undeclared dependence, selection bias or temporal/geological nonstationarity. It does not convert a few caves into a large effective sample.
+
+
+## 15. Executable producer/consumer lineage-contract benchmarks
+
+The dependence auditor now consumes the Symtropy observation-lineage JSON with strict typed deserialization and semantic graph checks.
+
+| Benchmark | Property | Proposed gate |
+|---|---|---|
+| LineageManifestParseBench | Exact v0.1 manifest decodes; unknown fields fail closed | 100% frozen positive fixtures accepted; all strict-schema negative fixtures rejected |
+| SourceReferenceBench | Every derived source ID resolves | Zero dangling references |
+| DerivationDAGBench | Processing/source graph is acyclic | Zero cycles |
+| AcquisitionAncestryBench | Derived record's acquisition set equals the union of its parent sets | Zero dropped or invented ancestry |
+| SplitMapCompletenessBench | Evaluator assigns exactly one split per manifest record | Zero missing or unknown split keys |
+| CrossRepoContractBench | Symtropy fixture parses to expected transitive dependency components in Symthaea | Exact group/component counts and frozen fixture IDs |
+
+The typed consumer still does not join observation IDs against their parent site-evidence JSON record, authenticate opaque provenance references, or establish completeness of declared common causes. Those are the next adapter-level gates.
+
+
+## 16. Site-observation lineage integrity
+
+The Symthaea dependence auditor cross-checks the lineage sidecar against the three schema-conforming Symtropy site-evidence fixtures. It requires complete one-to-one mapping between manifest records and site-evidence observations, global observation-ID uniqueness and matching site ownership.
+
+| Benchmark | Property | Proposed gate |
+|---|---|---|
+| ObservationReferenceResolutionBench | Every lineage record resolves to exactly one site observation | Zero dangling references |
+| SiteOwnershipBench | A lineage record's site ID equals the owning site-evidence record | Zero cross-site observation bindings |
+| ObservationUniquenessBench | Site observations and manifest observation IDs are globally unique | Zero duplicate observation identity |
+| ObservationCoverageBench | Every site evidence observation has exactly one lineage record | 100% coverage; zero untracked observations |
+| SchemaVersionBoundaryBench | Unsupported site-evidence schema versions fail closed | Zero silent downgrade |
+
+The consumer only projects schema version/site ID/observation IDs; full site-evidence validation must run against the pinned producer schema. Opaque provenance references remain unauthenticated.
+
+
+## 17. Science-return clock integrity
+
+The science-return state machine now distinguishes sequence order from wall-clock claims. Every event carries a clock identity and absolute time uncertainty. Events from different clocks are not compared; same-clock time regression is rejected only when uncertainty intervals prove the regression.
+
+| Benchmark | Property | Proposed gate |
+|---|---|---|
+| CanonicalEventTimeBench | Invalid dates, offsets and malformed timestamps fail closed | Zero invalid UTC timestamps accepted |
+| ClockIdentityBench | Every event identifies its clock source | Zero missing clock IDs |
+| SameClockRegressionBench | Definite same-clock time regression is rejected | 100% of frozen definite regressions rejected |
+| ClockUncertaintyBench | Overlapping uncertainty intervals are not falsely called regressions | Zero false chronology failures in overlap controls |
+| CrossClockHandoffBench | Robot/relay/ground timestamps from different clocks are not naïvely compared | Sequence order remains authoritative; no cross-clock false rejection |
+
+These checks improve event-log coherence but do not establish clock synchronization, trusted time, actor identity or cryptographic custody.
+
+
+The fixed-width whole-second timestamp representation imposes a minimum declared absolute uncertainty of 1,000 ms, including timestamp quantization. A future sub-second timestamp format must be versioned and tested separately before permitting smaller clock bounds.
+
+
+## 18. Competitive evaluation: robotics performance versus scientific intelligence
+
+The benchmark must compare systems at the layer they actually implement. Subterra is not currently a robot platform, localization system or cave-SLAM implementation.
+
+### DARPA Subterranean Challenge
+
+DARPA's official challenge objective was to search for, detect and report artifacts with spatial references. A report scored when artifact type was correct and the location was within 5 metres; teams were also limited in the number of reports to discourage false positives, and the scoring rewarded finding more artifacts in less time. This is a useful baseline for search, detection, localization and reporting throughput, but it does not score geological-hypothesis calibration, source dependence, experiment value, preservation, custody or scientific admission.
+
+Reference: https://www.darpa.mil/research/programs/darpa-subterranean-challenge
+
+### SKiD-SLAM (2026)
+
+SKiD-SLAM is a current high-quality mapping baseline: its 2026 field report describes distributed multi-robot LiDAR SLAM, including a three-rover Majang lava-tube cave deployment under a 250 kbps inter-robot budget. Its system addresses inter-robot place recognition, relative pose estimation and distributed trajectory fusion. Code and field data are publicly linked by the authors.
+
+References: https://doi.org/10.1109/TFR.2026.3721725 and https://sparolab.github.io/research/skid_slam/
+
+Subterra's first comparison should use SKiD-SLAM maps/poses as a frozen perception backbone wherever licensing and data access permit. The planner must not change SLAM inputs, map quality, localization or robot trajectories between policy baselines. Compare only the evidence-selection, decision and return layer.
+
+### Active-perception evaluation
+
+The October 2026 active-visual-perception review argues that an active sensing result must connect task evidence need, sensing action, predicted observation value, executed acquisition, subsequent state update and downstream task outcome. It explicitly separates improvements in acquired evidence from task utility and from motion, compute, communication, energy, time and safety cost.
+
+Reference: https://doi.org/10.3390/s26206544
+
+### What Subterra must demonstrate
+
+| Evaluation layer | Strong baseline | Subterra's measurable contribution |
+|---|---|---|
+| Search/detection/localization | DARPA SubT scoring and standard detection/localization metrics | Do not claim superiority; consume these outputs with uncertainty and evidence lineage |
+| Mapping/localization | SKiD-SLAM and matched SLAM backbones | Hold map/pose outputs constant; no SLAM superiority claim |
+| Exploration policy | Random, frontier, coverage, entropy, information-gain-per-cost, risk-aware frontier | Lower downstream decision regret at identical eligible action set and mission budget |
+| Measurement selection | Fixed expert priority and one-step entropy/EVSI | More independently supported, decision-relevant evidence acquired and returned |
+| Multi-step mission | Fixed-horizon, survival-unaware active perception and risk-aware exploration | Preserve more future sensing opportunities without exceeding the same hard risk and resource limits |
+| Evidence lineage | Row-random/site-only split and raw evidence counts | Common-cause component isolation, fused-acquisition ancestry and one-to-one observation-return receipts |
+| Scientific outcome | Detection count, map coverage or command success | Verified, delivered and independently admitted science records; command/acquisition is not a completed scientific result |
+
+### Preregistered experiment
+
+1. Freeze one mapping/localization backbone and the same candidate map, ground truth, sensors, action set and site split for every policy.
+2. Run random/fixed-priority/frontier/entropy/information-gain/risk-aware/EVSI/survival-conditioned policies under equal energy, time, data and communication budgets.
+3. Score evidence quality, calibration, downstream decision loss/regret, source independence, return/admission, and all acquisition costs separately.
+4. Use site/acquisition/common-cause dependency components as the evaluation unit; never use random rows as the qualifying result.
+5. Publish coverage and abstention. A method cannot claim a better outcome by dropping unsupported cases or relaxing risk/preservation gates.
+
+Proposed targets remain research targets, not current results: at least 20% lower preregistered decision regret than the strongest matched baseline; at least 15% more independently supported, decision-relevant observations returned at equal expected resource use; zero dependency split leakage; zero unauthorized proposals crossing external gates; zero hard budget/risk-ceiling violations. These targets require independent validation and confidence intervals over enough genuinely distinct sites/components.
+
+A result that improves mapping but not scientific decision quality belongs to the mapping benchmark. A result that improves decision quality but loses the evidence on return does not count as a successful scientific return.
+
+
+## 18. Content-addressed science-return integrity
+
+An acquired science-return record now binds a canonical SHA-256 digest and byte length. The consumer can recompute these values over the returned payload. Structural lifecycle validation alone does not establish that payload bytes have been checked; callers must invoke the byte-verification method and preserve its result before treating byte integrity as established.
+
+| Benchmark | Required property | Proposed gate |
+|---|---|---|
+| AcquiredPayloadBindingBench | An acquired or later-stage record includes one canonical SHA-256 digest and byte length | Zero acquired records without payload metadata |
+| PayloadDigestVerificationBench | Returned bytes recompute to the declared digest | Zero altered payloads accepted |
+| PayloadLengthIntegrityBench | Actual and declared byte lengths match | Zero mismatches accepted |
+| DigestCanonicalizationBench | SHA-256 is exactly 64 lowercase hex characters | All malformed/uppercase/short digests rejected |
+| PayloadStageBoundaryBench | Payload metadata cannot precede acquisition | Zero pre-acquisition payload promotions |
+
+A digest only detects byte changes relative to the digest value. It does not authenticate who declared the digest or prove sensor identity, calibration, durable custody or delivery. Those require separate signed, verifier-bound receipts.
+
+
+## 19. Signed science-return payload attestation
+
+The science-return reference supports detached Ed25519 v1 attestations. The verifier checks acquired byte digest/length, externally expected actor and key IDs, Ed25519 public key, canonical signature encoding and strict signature validity. Its domain-separated message binds site ID, observation ID, acquisition event ID and sequence, acquired actor, source evidence reference, timestamp, clock ID/uncertainty, SHA-256 digest, byte length and key ID.
+
+| Benchmark | Required property | Proposed gate |
+|---|---|---|
+| TrustedKeyBindingBench | Declared key ID equals the evaluator's externally resolved expected key ID | Zero untrusted key-ID substitution |
+| TrustedActorBindingBench | Acquired event actor equals actor identity authorized by the external key registry | Zero actor/key identity mismatch |
+| Ed25519StrictVerificationBench | Valid attestation verifies; altered signature/public key fails strict verification | 100% frozen positive/negative controls |
+| PayloadSignatureBindingBench | Signature binds site, observation, acquired event/sequence, actor, evidence reference, clock metadata, digest and length | Zero cross-site/observation/payload replay |
+| AlgorithmDowngradeBench | Unknown or malformed algorithm is rejected | Zero silent algorithm fallback |
+| PayloadTrustBoundaryBench | Record-supplied key is not treated as trusted absent an external trust registry | Zero self-authorized trust promotion |
+
+This is a signature verifier, not a PKI or custody authority. It does not authenticate the trust registry, key owner, device enrollment, key scope, revocation, expiry, secure element, timestamping authority, durable storage or delivery. A valid signature says that the matching private key signed the bound data; it does not prove that the key was authorized to make the scientific claim.
+
+
+## 20. Standards interoperability: in-toto + SCITT Signed_Statement
+
+| Benchmark | Required property | Proposed gate |
+|---|---|---|
+| InTotoStatementV1Bench | Payload has the exact Statement v1 type URI, exactly one SHA-256 subject and the versioned Subterra predicate URI | All frozen positive fixtures parse; unsupported type/predicate rejected |
+| ScittTag18Bench | Signed statement is CBOR tag 18 wrapping COSE_Sign1 | Zero untagged COSE arrays accepted as SCITT Signed_Statement |
+| ScittProtectedClaimsBench | Protected header contains Ed25519 (-19), kid, JSON content type and CWT iss/sub | Zero missing, unprotected, critical-unknown or substituted security claims |
+| ScittProtectedMutationBench | Mutating protected algorithm/content type changes serialized protected bytes and fails the profile check | 100% tamper-control rejection |
+| Ed25519CoseBench | COSE signature verifies with strict Ed25519 using the evaluator's trusted public key | 100% fixed positive/negative controls |
+| SubjectDigestBench | in-toto subject digest matches the actual acquired bytes | Zero altered payloads accepted |
+| ScienceReturnPredicateBench | Signed predicate event history satisfies the science-return lifecycle validator | Zero invalid lifecycle records admitted |
+| ScittReceiptBench | A future Transparency Service receipt has a verifiable proof of inclusion and service signature | Zero fabricated/invalid receipts accepted; pending service integration |
+
+The SCITT Signed_Statement is not yet a Transparent Statement: no transparency service registration or receipt is claimed. A future receipt verifier must qualify service key trust, receipt signature, VDS inclusion proof, consistency/non-equivocation evidence and registration policy. Log inclusion proves that a statement was recorded under that service's policy; it does not prove the statement's scientific claims are true.
+
+
+The independent Signed_Statement vector is pinned by SHA-256 `464b541e1c0918d67248e05159832ce16e6f5a1592f088f8bb1bb1a6ddca5762`, length 1,622 bytes. It uses a three-event science-return record through acquisition and an external public key. The private seed is intentionally not included.
+
+
+The independent conformance fixture has two additional immutable controls: exact binary SHA-256/length and a final-signature-byte mutation that must fail strict verification. This prevents unnoticed fixture replacement and gives a deterministic negative control independent of the Rust signer.
+
+
+### Subject-to-predicate identity integrity
+
+| Benchmark | Required property | Proposed gate |
+|---|---|---|
+| CanonicalObservationUrnBench | Site and observation identifiers are encoded independently as canonical URI components | One canonical output per input pair |
+| CwtSubjectPredicateBindingBench | CWT sub equals the canonical URN derived from the signed in-toto predicate | Zero validly signed but misbound subject/predicate pairs accepted |
+| SubjectDelimiterInjectionBench | Delimiters, spaces and UTF-8 bytes cannot collide across site/observation boundaries | 100% adversarial identifiers remain unambiguous |
