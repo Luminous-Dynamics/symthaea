@@ -284,6 +284,18 @@ pub fn evaluate_measured_holdout(
         profile,
         &mut diagnostics,
     );
+    let test_ids: BTreeSet<&str> = campaign
+        .test_stand_samples
+        .iter()
+        .map(|sample| sample.sample_id.as_str())
+        .collect();
+    if campaign
+        .holdout_samples
+        .iter()
+        .any(|sample| test_ids.contains(sample.sample_id.as_str()))
+    {
+        diagnostics.push(HoldoutEvaluationDiagnostic::DuplicateSampleIdentity);
+    }
 
     if !diagnostics.is_empty() {
         return HoldoutEvaluationReport {
@@ -580,9 +592,9 @@ fn summarize_samples(
     let predictions: Vec<(&PairedValidationSample, f64)> = ordered_samples
         .iter()
         .filter_map(|sample| {
-            sample.predicted_value.map(|predicted| {
-                (sample, predicted - sample.measured_value)
-            })
+            sample
+                .predicted_value
+                .map(|predicted| (*sample, predicted - sample.measured_value))
         })
         .collect();
     let prediction_count = predictions.len();
