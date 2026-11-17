@@ -1,6 +1,6 @@
 use subterra_independent_sensing_planner::{
-    AcquisitionBudget, AcquisitionPolicy, ExpectedAcquisitionContext, PlannedAcquisitionOption,
-    VerifierDependencyClosure, plan_independent_acquisition_portfolio,
+    AcquisitionBudget, AcquisitionPolicy, DeploymentBundleCost, ExpectedAcquisitionContext,
+    PlannedAcquisitionOption, VerifierDependencyClosure, plan_independent_acquisition_portfolio,
 };
 use subterra_corroboration_assurance::{DependencyIdentity, InventoryDisposition};
 use subterra_inspection_campaign::ResourceVector;
@@ -20,6 +20,8 @@ fn option(id: &str, source: &str, deps: Vec<DependencyIdentity>, energy: u64) ->
         region_scope_digest: "sha256:region".into(),
         deployment_bundle_id: "north-corridor".into(),
         deployment_bundle_digest: "sha256:bundle".into(),
+        deployment_bundle_resource_model_digest: "sha256:bundle-resource-model".into(),
+        deployment_bundle_assessment_digest: "sha256:bundle-assessment".into(),
         dependency_graph_digest: "sha256:graph".into(),
         fault_domain_profile_digest: "sha256:fault-profile".into(),
         dependency_assessment_digest: "sha256:assessment".into(),
@@ -84,8 +86,23 @@ fn main() {
             dep("map", "map-b"),
         ], 7_000),
     ];
+    let deployment_bundles = vec![DeploymentBundleCost {
+        bundle_id: "north-corridor".into(),
+        bundle_digest: "sha256:bundle".into(),
+        resource_model_digest: "sha256:bundle-resource-model".into(),
+        assessment_digest: "sha256:bundle-assessment".into(),
+        assessed_at_unix_ms: 1_799_999_999_900,
+        valid_until_unix_ms: 1_800_000_600_000,
+        fixed_resources: ResourceVector {
+            energy_millijoules: 2_000,
+            duration_milliseconds: 5_000,
+            data_bytes: 512,
+            exposure_milliunits: 2,
+        },
+    }];
     let report = plan_independent_acquisition_portfolio(
         options,
+        &deployment_bundles,
         &expected,
         &verifier,
         AcquisitionPolicy {
@@ -115,6 +132,9 @@ fn main() {
     for (index, plan) in report.pareto_frontier.iter().enumerate() {
         println!("portfolio_{}={:?}", index, plan.selected_option_ids);
         println!("portfolio_{}_energy_millijoules={}", index, plan.resources.energy_millijoules);
+        println!("portfolio_{}_bundle_count={}", index, plan.selected_deployment_bundles.len());
+        println!("portfolio_{}_variable_energy_millijoules={}", index, plan.variable_resources.energy_millijoules);
+        println!("portfolio_{}_shared_fixed_energy_millijoules={}", index, plan.shared_fixed_resources.energy_millijoules);
         println!("portfolio_{}_robot_loss_upper_ppm={}", index, plan.robot_loss_upper_ppm);
     }
     println!("joint_evsi_not_summed=true");
