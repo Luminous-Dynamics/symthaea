@@ -31,6 +31,7 @@ EXCLUDES=(
   "crates/core/symthaea-iit"
   "crates/core/symthaea-observation-attestation"
   "crates/domains/symthaea-architecture-engineering"
+  "crates/domains/symthaea-marine-geometry"
   "crates/domains/symthaea-dishwasher-design"
   "crates/domains/symthaea-rea-compat"
   "crates/domains/symthaea-rea-evidence-verifier"
