@@ -98,7 +98,7 @@ pub enum SolarHapsError {
     InvalidIntervalValue,
     ProfileDurationNot24Hours,
     ProfileDurationNotWholeDays,
-    HorizonAllocationFailed,
+    AllocationFailed,
     NonFiniteResult,
 }
 
@@ -118,7 +118,7 @@ impl std::fmt::Display for SolarHapsError {
             Self::InvalidIntervalValue => "irradiance, loads and receiver requests must be non-negative and derates within [0, 1]",
             Self::ProfileDurationNot24Hours => "the sum of interval durations must equal 24 hours",
             Self::ProfileDurationNotWholeDays => "the horizon duration must be a positive whole number of 24-hour days",
-            Self::HorizonAllocationFailed => "could not reserve memory for the requested horizon result",
+            Self::AllocationFailed => "could not reserve memory for the requested energy-evaluation result",
             Self::NonFiniteResult => "energy accounting produced a non-finite result",
         };
         f.write_str(message)
@@ -349,7 +349,10 @@ pub fn evaluate_day(
 
     let mut soc_wh = config.initial_soc_wh;
     let mut minimum_soc_wh = soc_wh;
-    let mut results = Vec::with_capacity(profile.len());
+    let mut results = Vec::new();
+    results
+        .try_reserve_exact(profile.len())
+        .map_err(|_| SolarHapsError::AllocationFailed)?;
 
     let mut total_solar_generation_wh = 0.0;
     let mut total_own_load_demand_wh = 0.0;
@@ -601,7 +604,7 @@ pub fn evaluate_horizon(
     let mut normalized_profile = Vec::new();
     normalized_profile
         .try_reserve_exact(profile.len())
-        .map_err(|_| SolarHapsError::HorizonAllocationFailed)?;
+        .map_err(|_| SolarHapsError::AllocationFailed)?;
     normalized_profile.extend_from_slice(profile);
     let final_interval = normalized_profile
         .last_mut()
@@ -611,7 +614,7 @@ pub fn evaluate_horizon(
 
     let mut days = Vec::new();
     days.try_reserve_exact(horizon_days)
-        .map_err(|_| SolarHapsError::HorizonAllocationFailed)?;
+        .map_err(|_| SolarHapsError::AllocationFailed)?;
     let mut day_profile = Vec::new();
     let mut day_elapsed_s = 0.0;
     let mut carried_soc_wh = config.initial_soc_wh;
@@ -644,6 +647,9 @@ pub fn evaluate_horizon(
 
             let mut fragment = interval;
             fragment.duration_s = fragment_duration_s;
+            day_profile
+                .try_reserve(1)
+                .map_err(|_| SolarHapsError::AllocationFailed)?;
             day_profile.push(fragment);
             remaining_s -= fragment_duration_s;
             day_elapsed_s += fragment_duration_s;
