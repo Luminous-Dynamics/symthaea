@@ -91,24 +91,25 @@ CL-Bench 1.0 measures LLM agents learning from prior task experience; its curren
 
 Keep model architecture, prompt/context access, memory budget and evaluator information exposure explicit in any adapter comparison.
 
-## 2.8 Current time-series foundation-model scorecard (checked 16 Nov 2026)
+## 2.8 Current time-series foundation-model scorecard (checked 17 Nov 2026)
 
 The standard zero-shot forecasting market has moved quickly. The current comparator set should explicitly include **TimeH2O-v1**, **Timestral-209M**, **ci-proto**, **TimeRSI-1.5**, **TimeRSI**, and **t0-gamma**, alongside Chronos-2, TimesFM-3 and Toto-2.0. Do not use one source or metric as a universal rank.
 
 ### FEV-Bench snapshot and source discrepancy
 
-Two H2O public surfaces currently display different win-rate snapshots:
+H2O's public surfaces now expose three dated win-rate observations, which should remain separate:
 
-| Public surface | TimeH2O-v1 | Timestral-209M | t0-gamma | TimesFM-3 | Chronos-2 | Toto-2.0-2.5B |
+| Public surface / snapshot | TimeH2O-v1 | Timestral-209M | t0-gamma | TimesFM-3 | Chronos-2 | Toto-2.0-2.5B |
 |---|---:|---:|---:|---:|---:|---:|
-| H2O benchmark site (current page) | 91.50% | 89.00% | 87.40% | 82.00% | 75.80% | 72.20% |
-| H2O GitHub benchmark README (current fetched view) | 89.60% | 87.10% | 84.70% | 79.30% | 72.20% | 69.40% |
+| H2O live benchmark page (retrieved 17 Nov; no explicit page snapshot date) | 91.50% | 89.00% | 87.40% | 82.00% | 75.80% | 72.20% |
+| H2O GitHub benchmark README (benchmark data read 13 Nov; fetched 17 Nov) | 89.60% | 87.10% | 84.70% | 79.30% | 72.20% | 69.40% |
+| H2O launch press release (benchmark view dated 24 Oct; release 26 Oct) | 91.90% | 89.60% | 88.10% | not stated here | not stated here | not stated here |
 
 - H2O benchmark page: https://h2oai.github.io/benchmarks/
 - H2O model card / repository: https://huggingface.co/h2oai/timeh2o-v1 and https://github.com/h2oai/benchmarks
 - Mistral Timestral release: https://mistral.ai/news/timestral/
 
-These public surfaces are inconsistent at the time of this check. Preserve both source URL, retrieval date, raw snapshot and aggregation code in any comparison; do not silently choose the more favorable number. The H2O model card separately reports TimeH2O-v1 FEV-Bench SQL skill 50.83 and MASE skill 39.95, as well as GIFT-Eval CRPS 0.441 / MASE 0.654. Its current model card lists a non-commercial licence: https://huggingface.co/h2oai/timeh2o-v1 . Accuracy references do not imply commercial self-hosting rights.
+These public surfaces are inconsistent. Preserve every source URL, retrieval date, benchmark data date, raw snapshot and aggregation code; do not average the observations or select the most favorable number. The current TSFM.ai mirror also reports 170 GIFT-Eval models, with Taichu-TimeSeries-Agent-v2 at average MASE rank 18.02 and Timestral-209M at 32.52. FEV-Bench's MASE-skill view separately lists TimeRSI-1.5 at 41.44, ci-proto at 40.80 and TimeRSI at 40.58. These are metric-specific rankings, not the same target as GIFT-Eval's grouped-slice average rank. The H2O model card separately reports TimeH2O-v1 FEV-Bench SQL skill 50.83 and MASE skill 39.95, as well as GIFT-Eval CRPS 0.441 / MASE 0.654. Its current model card lists a non-commercial licence: https://huggingface.co/h2oai/timeh2o-v1 . Accuracy references do not imply commercial self-hosting rights.
 
 ### Cross-benchmark rankings are different questions
 
