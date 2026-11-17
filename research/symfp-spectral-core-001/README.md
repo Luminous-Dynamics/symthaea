@@ -42,3 +42,11 @@ The paper sets epsilon_norm=epsilon_log=1e-10. The crate records these separatel
 ## Prospective next stage
 
 Reproduce the paper's parameter-free equivariant representation construction with the exact centering, radial basis and spherical-harmonic conventions, then freeze the 32-group synthetic dataset and splits. Only after that should we compare SymFP, LieFlow, LieGAN and exact geometric stabilizer oracles on matched inputs. Paper-reported metrics remain paper results until independently reproduced.
+
+## Robust ambiguity extension (stacked research increment)
+
+The companion robust module adds a conservative uncertainty-aware decision layer beyond the paper's point-estimate formulas. For each degree l, the caller supplies an explicit operator-norm perturbation bound delta_l satisfying ||Delta V_l||_2 <= delta_l. Weyl's singular-value perturbation inequality gives intervals around each singular value. The degree-zero singular value used in the shared rank threshold is itself uncertain, so the module propagates a lower/upper threshold interval to every degree.
+
+From these intervals it derives a minimum/maximum numerical rank per degree and a minimum/maximum L1 distance for each candidate template. It reports a guaranteed nearest template only when one candidate's worst-case distance is strictly smaller than every competitor's best-case distance. Otherwise it returns the candidates not ruled out by interval dominance and abstains on a unique label.
+
+The perturbation bounds are assumptions supplied by the caller; the module does not prove them, derive them from the SVD orthogonality residual, or interpret them as a posterior. This is an ambiguity-control extension, not part of the published SymFP algorithm, and still provides spectral compatibility only.
