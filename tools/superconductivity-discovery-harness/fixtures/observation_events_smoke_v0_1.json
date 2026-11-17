@@ -60,7 +60,8 @@
         "model_id": null,
         "model_revision": null,
         "tested_window": null,
-        "uncertainty": null
+        "uncertainty": null,
+        "measurement_scope": "bulk"
       },
       "conditions": {
         "pressure": {
@@ -152,7 +153,8 @@
           "field_max_t": 0,
           "method": "synthetic test window"
         },
-        "uncertainty": null
+        "uncertainty": null,
+        "measurement_scope": "bulk"
       },
       "conditions": {
         "pressure": {
@@ -245,7 +247,8 @@
           "upper": 9,
           "value": null,
           "coverage": null
-        }
+        },
+        "measurement_scope": "theoretical_model"
       },
       "conditions": {
         "pressure": {
@@ -338,7 +341,8 @@
           "upper": null,
           "value": 2,
           "coverage": null
-        }
+        },
+        "measurement_scope": "theoretical_model"
       },
       "conditions": {
         "pressure": {
@@ -425,7 +429,8 @@
         "model_id": null,
         "model_revision": null,
         "tested_window": null,
-        "uncertainty": null
+        "uncertainty": null,
+        "measurement_scope": "bulk"
       },
       "conditions": {
         "pressure": {
@@ -454,7 +459,7 @@
         "conflict_group_id": null,
         "rights_review": "cleared_for_metadata"
       },
-      "processing_history": [
+      "process_history": [
         {
           "step_id": "pqp-pressure-hold",
           "sequence": 0,
@@ -532,6 +537,184 @@
           "completed_at": null
         }
       ]
+    },
+    {
+      "schema_version": "0.1.0",
+      "fixture_only": true,
+      "material": {
+        "material_id": "fixture-bi2212",
+        "formula_as_reported": "Bi2Sr2CaCu2O8+delta",
+        "formula_normalized": "Bi2Sr2CaCu2O8+delta",
+        "identity_status": "resolved",
+        "state_id": "fixture-bi2212-pseudogap",
+        "phase_id": null,
+        "structure_prototype": null,
+        "space_group": null
+      },
+      "sample": {
+        "identity_status": "matched_specimen",
+        "sample_id": "fixture-bi2212-sample-a",
+        "batch_id": "fixture-bi2212-batch-a",
+        "phase_id": null,
+        "sample_form": "single_crystal",
+        "substrate": null,
+        "phase_fraction_percent": null,
+        "purity_percent": null,
+        "stoichiometry_status": "nominal"
+      },
+      "source": {
+        "source_id": "fixture-source-only",
+        "document_id": {
+          "kind": "other",
+          "identifier": "synthetic-fixture"
+        },
+        "source_revision": "fixture-v0",
+        "source_content_sha256": null,
+        "locator": {
+          "page": 4,
+          "section": "synthetic local pairing/coherence example",
+          "table": null,
+          "figure": null,
+          "figure_panel": null,
+          "supplementary_file": null,
+          "row_or_record_id": null,
+          "source_span_sha256": null
+        },
+        "rights_scope": "metadata_only",
+        "source_snapshot_id": "fixture-only"
+      },
+      "conditions": {
+        "pressure": {
+          "semantics": "explicit_ambient",
+          "value_gpa": 0,
+          "pressure_method": null,
+          "chemical_pressure_description": null
+        },
+        "measurement_temperature_k": 4.2,
+        "magnetic_field_t": 0,
+        "field_orientation": null,
+        "current_density_a_m2": null,
+        "geometry": "synthetic fixture",
+        "doping_state": "synthetic underdoped state",
+        "strain_state": null
+      },
+      "provenance": {
+        "extraction_method": "manual_curated",
+        "extraction_model": null,
+        "extraction_revision": "fixture-v0",
+        "extraction_confidence": 1,
+        "review_status": "human_source_checked",
+        "reviewer_independence": "not_applicable",
+        "independence_group_id": "fixture-pair-coherence",
+        "duplicate_of": null,
+        "conflict_group_id": null,
+        "rights_review": "cleared_for_metadata"
+      },
+      "observation_id": "fixture-local-pairing-energy",
+      "assertion": {
+        "property_code": "pairing_energy",
+        "origin": "observed",
+        "value": 1,
+        "unit": "meV",
+        "detection_status": "detected",
+        "measurement_scope": "local_probe",
+        "measurement_scope_description": "synthetic local shot-noise spectroscopy example",
+        "tc_criterion": null,
+        "measurement_method": "synthetic local shot-noise spectroscopy",
+        "model_id": null,
+        "model_revision": null,
+        "tested_window": null,
+        "uncertainty": null
+      }
+    },
+    {
+      "schema_version": "0.1.0",
+      "fixture_only": true,
+      "material": {
+        "material_id": "fixture-bi2212",
+        "formula_as_reported": "Bi2Sr2CaCu2O8+delta",
+        "formula_normalized": "Bi2Sr2CaCu2O8+delta",
+        "identity_status": "resolved",
+        "state_id": "fixture-bi2212-pseudogap",
+        "phase_id": null,
+        "structure_prototype": null,
+        "space_group": null
+      },
+      "sample": {
+        "identity_status": "matched_specimen",
+        "sample_id": "fixture-bi2212-sample-a",
+        "batch_id": "fixture-bi2212-batch-a",
+        "phase_id": null,
+        "sample_form": "single_crystal",
+        "substrate": null,
+        "phase_fraction_percent": null,
+        "purity_percent": null,
+        "stoichiometry_status": "nominal"
+      },
+      "source": {
+        "source_id": "fixture-source-only",
+        "document_id": {
+          "kind": "other",
+          "identifier": "synthetic-fixture"
+        },
+        "source_revision": "fixture-v0",
+        "source_content_sha256": null,
+        "locator": {
+          "page": 4,
+          "section": "synthetic local pairing/coherence example",
+          "table": null,
+          "figure": null,
+          "figure_panel": null,
+          "supplementary_file": null,
+          "row_or_record_id": null,
+          "source_span_sha256": null
+        },
+        "rights_scope": "metadata_only",
+        "source_snapshot_id": "fixture-only"
+      },
+      "conditions": {
+        "pressure": {
+          "semantics": "explicit_ambient",
+          "value_gpa": 0,
+          "pressure_method": null,
+          "chemical_pressure_description": null
+        },
+        "measurement_temperature_k": 4.2,
+        "magnetic_field_t": 0,
+        "field_orientation": null,
+        "current_density_a_m2": null,
+        "geometry": "synthetic fixture",
+        "doping_state": "synthetic underdoped state",
+        "strain_state": null
+      },
+      "provenance": {
+        "extraction_method": "manual_curated",
+        "extraction_model": null,
+        "extraction_revision": "fixture-v0",
+        "extraction_confidence": 1,
+        "review_status": "human_source_checked",
+        "reviewer_independence": "not_applicable",
+        "independence_group_id": "fixture-pair-coherence",
+        "duplicate_of": null,
+        "conflict_group_id": null,
+        "rights_review": "cleared_for_metadata"
+      },
+      "observation_id": "fixture-bulk-superfluid-stiffness",
+      "assertion": {
+        "property_code": "superfluid_stiffness",
+        "origin": "observed",
+        "value": 1,
+        "unit": "meV",
+        "detection_status": "detected",
+        "measurement_scope": "bulk",
+        "measurement_scope_description": "synthetic bulk stiffness measurement example",
+        "tc_criterion": null,
+        "measurement_method": "synthetic bulk superfluid stiffness probe",
+        "model_id": null,
+        "model_revision": null,
+        "tested_window": null,
+        "uncertainty": null
+      }
     }
   ]
 }
