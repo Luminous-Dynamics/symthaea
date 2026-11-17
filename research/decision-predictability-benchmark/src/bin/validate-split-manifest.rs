@@ -19,7 +19,10 @@ fn run() -> Result<(), String> {
 
     println!("schema={}", validated.manifest().schema);
     println!("scenario_count={}", validated.manifest().scenarios.len());
-    println!("primary_independent_unit={:?}", validated.manifest().sampling.primary_independent_unit);
+    println!(
+        "primary_independent_unit={:?}",
+        validated.manifest().sampling.primary_independent_unit
+    );
     println!("manifest_sha256={}", validated.canonical_sha256());
     Ok(())
 }
