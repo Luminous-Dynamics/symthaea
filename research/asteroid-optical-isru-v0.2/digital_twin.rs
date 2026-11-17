@@ -340,6 +340,7 @@ struct InFlightJob {
     candidate_id: String,
     instrument_id: String,
     stage: StageKind,
+    started_at_seconds: u64,
     finish_at_seconds: u64,
     launch_sequence: u64,
     will_fail: bool,
@@ -673,6 +674,7 @@ impl TwinWorld {
             candidate_id: candidate_id.to_string(),
             instrument_id: instrument_id.to_string(),
             stage,
+            started_at_seconds: self.now_seconds,
             finish_at_seconds: finish_at,
             launch_sequence,
             will_fail,
@@ -730,14 +732,9 @@ impl TwinWorld {
             .fouling_ppm
             .saturating_add(removed_fouling(&job, &self.stages));
 
-        let duration = job.finish_at_seconds.saturating_sub(
-            job.finish_at_seconds.saturating_sub(
-                self.stages
-                    .get(&job.stage)
-                    .expect("stage exists")
-                    .base_duration_seconds,
-            ),
-        );
+        let duration = job
+            .finish_at_seconds
+            .saturating_sub(job.started_at_seconds);
         let mut actual_cost = job.actual_non_time_cost;
         actual_cost.rig_seconds = duration as f64;
         self.reserved = subtract_cost(self.reserved, job.reserved_cost);
@@ -820,6 +817,9 @@ impl TwinWorld {
             .clone();
         if instrument.busy_job_id.is_some() {
             return Err(TwinError::InstrumentBusy(instrument_id.to_string()));
+        }
+        if !self.active_jobs.is_empty() {
+            return Err(TwinError::ActiveJobsRemain);
         }
 
         let (duration, mut cost) = if maintenance {
@@ -1134,7 +1134,7 @@ fn sample_noise(seed: u64, standard_deviation: f64) -> f64 {
     (2.0 * unit - 1.0) * standard_deviation
 }
 
-fn removed_fouling(job: &InFlightJob, stages: &BTreeMap<StageKind, StageSpec>) -> u64 {
+fn fouling_added(job: &InFlightJob, stages: &BTreeMap<StageKind, StageSpec>) -> u64 {
     stages
         .get(&job.stage)
         .map(|stage| stage.fouling_increment_ppm)
@@ -1460,7 +1460,7 @@ mod tests {
     #[test]
     fn resource_reservations_block_overcommit_before_execution() {
         let mut world = world(47, 0, 10, 10_000);
-        world.manifest.resource_budget.source_energy_wh = 2.0;
+        world.manifest.resource_budget.source_energy_wh = 1.0;
         let mut api = world.agent_api();
         assert_eq!(
             api.launch_stage("job-a", "train-a", StageKind::Characterization, "spectrometer-a"),
@@ -1480,7 +1480,11 @@ mod tests {
         let before = api.world.elapsed_seconds();
         api.perform_maintenance("spectrometer-a").unwrap();
         assert!(api.world.elapsed_seconds() >= before + 2);
-        api.recalibrate("spectrometer-a").unwrap_err();
+        api.recalibrate("spectrometer-a").unwrap();
+        assert_eq!(
+            api.instrument_condition("spectrometer-a"),
+            Ok(InstrumentCondition::Available)
+        );
     }
 
     #[test]
