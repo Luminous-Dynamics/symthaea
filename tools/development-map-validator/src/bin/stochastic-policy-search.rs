@@ -242,7 +242,9 @@ fn evaluate(raw:&str)->Result<Value,String>{
  if action_ids.is_empty(){return Err("search requires at least one action".to_owned());}
  action_ids.sort();
  let option_ids:Vec<String>=option_times.keys().cloned().collect();
- let max_acquisitions=max_depth.saturating_sub(1);
+ // The scorer counts root depth as zero; a stop child at depth N
+ // therefore permits N acquisition nodes along its path.
+ let max_acquisitions=max_depth;
  let generation=enumerate_policies(&option_ids,max_acquisitions,&option_outcomes,&action_ids,cap);
  let mut entries=Vec::new();let mut invalid_node_count=0usize;
  for policy in &generation.policies{
