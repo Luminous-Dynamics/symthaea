@@ -479,6 +479,23 @@ impl MaterialRegimeModel {
         })
     }
 
+    /// Advance campaign time during idle/maintenance and relax the material
+    /// surface toward ambient temperature without applying laser energy.
+    pub fn advance_idle(&mut self, duration_seconds: u64) -> Result<(), RegimeError> {
+        let next_elapsed = self
+            .state
+            .elapsed_seconds
+            .checked_add(duration_seconds)
+            .ok_or(RegimeError::TimeOverflow)?;
+        let cooling = (-(duration_seconds as f64)
+            / self.parameters.cooling_time_constant_s)
+            .exp();
+        self.state.surface_temperature_k = self.state.ambient_temperature_k
+            + (self.state.surface_temperature_k - self.state.ambient_temperature_k) * cooling;
+        self.state.elapsed_seconds = next_elapsed;
+        Ok(())
+    }
+
     pub fn state(&self) -> &MaterialState {
         &self.state
     }
@@ -661,6 +678,16 @@ mod tests {
             .unwrap();
         assert!(result.surface_refresh_fraction > 0.0);
         assert!(value.state().surface_depletion_fraction < before + 0.1);
+    }
+
+    #[test]
+    fn idle_time_cools_material_and_advances_campaign_clock() {
+        let mut value = model();
+        let hot = value.apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap()).unwrap();
+        let before = value.state().surface_temperature_k;
+        value.advance_idle(10).unwrap();
+        assert!(value.state().surface_temperature_k < before);
+        assert_eq!(value.state().elapsed_seconds, hot.elapsed_seconds + 10);
     }
 
     #[test]
