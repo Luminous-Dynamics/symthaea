@@ -520,6 +520,30 @@ mod tests{
   reseal_receipt(receipt);
   assert!(evaluate(&bundle.to_string()).unwrap_err().contains("unknown outcomes require reconciliation"));
  }
+ #[test]fn retry_after_definitive_failure_is_counted_in_run_and_option_cost(){
+  let mut bundle:Value=serde_json::from_str(FIXTURE).expect("fixture");
+  let receipt=&mut bundle["candidate_view"]["run_receipts"][0];
+  let first=&mut receipt["attempts"][0];
+  first["status"]=json!("failed");first["result"]=json!("unknown");
+  let retry=json!({
+   "event_id":"run-001-a-retry","sequence":2,"option_id":"gate-a","attempt_no":2,"mode":"retry",
+   "status":"completed","result":"pass","queued_at":"2026-11-17T10:00:16Z",
+   "started_at":"2026-11-17T10:00:17Z","completed_at":"2026-11-17T10:00:18Z","elapsed_ms":1000,
+   "cpu_ms":1000,"gpu_ms":0,"network_bytes":1024,"price_micros":5,"retry_of_event_id":"run-001-a",
+   "evidence_digest_sha256":"a".repeat(64),"billing_record_ref":"billing://synthetic/run-001-a-retry",
+   "billing_record_sha256":"b".repeat(64),"previous_event_sha256":Value::Null,"event_sha256":"0".repeat(64)
+  });
+  receipt["attempts"].as_array_mut().expect("attempts").push(retry);
+  receipt["run_finished_at"]=json!("2026-11-17T10:00:18Z");
+  reseal_receipt(receipt);
+  let r=evaluate(&bundle.to_string()).expect("definitive failure retry validates");
+  assert_eq!(r["retry_count"],1);
+  assert_eq!(r["executed_attempt_count"],5);
+  assert_eq!(r["run_samples"][0]["full_run_cost_micros"],105);
+  let gate_a=r["marginal_option_cost_p95_micros"].as_array().unwrap().iter()
+   .find(|x|x["option_id"]=="gate-a").unwrap();
+  assert_eq!(gate_a["p95_cost_micros"],95);
+ }
  #[test]fn positive_cost_requires_billing_record_reference(){
   let mut bundle:Value=serde_json::from_str(FIXTURE).expect("fixture");
   let receipt=&mut bundle["candidate_view"]["run_receipts"][0];
