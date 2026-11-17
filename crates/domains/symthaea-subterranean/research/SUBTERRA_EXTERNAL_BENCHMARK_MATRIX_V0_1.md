@@ -126,12 +126,26 @@ Tracker: [#12593 — DARPA-SUBT-ARTIFACT-GROUND-TRUTH-001](https://github.com/Lu
 Use the source-pinned round CSVs as a *report evaluator*, not as a mapping or SLAM dataset. The first slice can use the 40-row Prize round and the 80-row combined table; retain the three round-specific files and the 10 source type strings.
 
 - Generate synthetic candidate reports with exact truth, 3-D offsets around and beyond 5 m, wrong class labels, duplicates, omitted detections and false positives.
-- Score correct-class localization using the exact official round rule once its source/round applicability is pinned; until then call any implementation a local 5 m scoring proxy, not official-score parity.
-- Compare unlimited reports with the historical fixed report allowance, then measure precision/recall and abstention as the report budget tightens.
-- Preserve DARPA frame and source-native type names; all transform and alias mappings are separate, versioned artifacts.
-- Ground truth is evaluator-only. Candidate generation cannot see coordinates, class labels or PCD-derived privileged observations.
+**The Systems Final rules and type vocabulary are now pinned**:
+- Final Event Competition Rules, Revision 1, 25 May 2021, §§7.3, 8.3.5, 10.1 and 10.3: https://www.darpa.mil/sites/default/files/SubT_Challenge_Finals_Rules.pdf
+- Final Event Artifacts Specification, 1 April 2021: https://www.darpa.mil/sites/default/files/SubT_Finals_Artifacts_Specification.pdf
+- Final Event ICD: https://www.darpa.mil/sites/default/files/SubT_Challenge_Finals_ICD.pdf
 
-Report per-round denominators, per-class precision/recall, 3-D error distribution, 5 m success fraction under the specified rule, duplicate/false-positive rate, report-budget use, abstention, and exact score replay. This benchmark isolates reporting semantics and decision quality; it does not qualify upstream perception, localization, comms or safety.
+The historical Systems Final scoring contract is:
+- Preliminary: 20 artefacts and at most 25 reports per run.
+- Prize: 40 artefacts and at most 45 reports per run.
+- One point for the correct exact official report string and Euclidean 3-D error less than or equal to 5 m.
+- An invalid report (wrong type or outside tolerance) may be corrected by a later report.
+- Once an artefact has been successfully reported, a later duplicate is invalid but still consumes the report allowance.
+- Reports beyond the round allowance are rejected.
+
+The official report strings are `Survivor`, `Cell Phone`, `Backpack`, `Drill`, `Fire Extinguisher`, `Gas`, `Vent`, `Helmet`, `Rope` and `Cube`. The source CSV uses distinct raw labels such as `cellphone` and `fireextinguisher`; use the versioned explicit crosswalk, never implicit normalization.
+
+Implementation: Symthaea [#12593 — DARPA-SUBT-ARTIFACT-GROUND-TRUTH-001](https://github.com/Luminous-Dynamics/symthaea/issues/12593) and draft [PR #12599 — artifact report referee](https://github.com/Luminous-Dynamics/symthaea/pull/12599). The Rust reference includes both a generic offline one-to-one evaluator and a sequential Systems Final stream scorer. It does not claim full command-post or official event parity: report-time ranking/tiebreaks, transport/API, judge decisions, course-exploration validation and Virtual Competition semantics are out of scope. A deterministic nearest-unreported same-class artefact rule handles ambiguous overlaps, which the cited rule does not specify.
+
+Compare report policies under the fixed round budgets, and also run an uncapped diagnostic to expose the cost of false positives. Report per-round denominators, per-class precision/recall, 3-D error distribution, 5 m success fraction, duplicate and false-positive rates, retry count, report-budget consumption, abstention and exact stream replay. This benchmark isolates reporting semantics and decision quality; it does not qualify upstream perception, localization, comms or safety.
+
+The ground-truth source repository does not expose a clear SPDX dataset licence in the inspected metadata. Keep raw files external and rights-gated; source tree/blob manifest references are pinned, but no data binaries are vendored.
 
 ### B0.6 — decision and report value under bounded evidence
 
