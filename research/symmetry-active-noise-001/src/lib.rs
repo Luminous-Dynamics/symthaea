@@ -99,6 +99,7 @@ pub enum NoiseErrorV1 {
     },
     ReceiptMismatch,
     InvalidDeterministicInput,
+    InvalidHypothesisPair,
     EmptyQuantityUnitId,
     InvalidInterval,
     IntervalArithmeticOverflow,
