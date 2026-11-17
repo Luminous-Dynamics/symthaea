@@ -51,11 +51,7 @@ impl ContaminantSpecies {
         }
     }
 
-    const ALL: [Self; SPECIES_COUNT] = [
-        Self::OrganicFilm,
-        Self::VolatileSalt,
-        Self::MineralDust,
-    ];
+    const ALL: [Self; SPECIES_COUNT] = [Self::OrganicFilm, Self::VolatileSalt, Self::MineralDust];
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -270,9 +266,11 @@ impl OpticalHealthModel {
                 "clean_baseline_transmission",
             ));
         }
-        if extinction_coefficients_cm2_per_ug.iter().flatten().any(|value| {
-            !value.is_finite() || *value < 0.0
-        }) {
+        if extinction_coefficients_cm2_per_ug
+            .iter()
+            .flatten()
+            .any(|value| !value.is_finite() || *value < 0.0)
+        {
             return Err(OpticalHealthError::InvalidOpticalModel(
                 "extinction_coefficients",
             ));
@@ -294,17 +292,12 @@ impl OpticalHealthModel {
         })
     }
 
-    pub fn apply_deposition(
-        &mut self,
-        event: DepositionEvent,
-    ) -> Result<(), OpticalHealthError> {
+    pub fn apply_deposition(&mut self, event: DepositionEvent) -> Result<(), OpticalHealthError> {
         if event.event_id.trim().is_empty() {
             return Err(OpticalHealthError::EmptyIdentity("event_id"));
         }
         if self.seen_deposition_events.contains_key(&event.event_id) {
-            return Err(OpticalHealthError::DuplicateDepositionEvent(
-                event.event_id,
-            ));
+            return Err(OpticalHealthError::DuplicateDepositionEvent(event.event_id));
         }
         if event.recorded_at_seconds < self.last_event_time_seconds
             || event.recorded_at_seconds < self.last_observation_time_seconds
@@ -384,24 +377,15 @@ impl OpticalHealthModel {
         for band in 0..BAND_COUNT {
             let band_seed = seed ^ ((band as u64 + 1) * 0x9e37_79b9);
             source_reference[band] = self.source_power_w
-                * (1.0 + deterministic_noise(
-                    band_seed ^ 0x1111,
-                    self.sensor_noise_stddev,
-                ));
+                * (1.0 + deterministic_noise(band_seed ^ 0x1111, self.sensor_noise_stddev));
             process_channel[band] = self.source_power_w
                 * process_truth[band]
-                * (1.0 + deterministic_noise(
-                    band_seed ^ 0x2222,
-                    self.sensor_noise_stddev,
-                ));
-            normalized_process_transmission[band] =
-                (process_channel[band] / source_reference[band])
-                    / self.clean_baseline_transmission[band];
+                * (1.0 + deterministic_noise(band_seed ^ 0x2222, self.sensor_noise_stddev));
+            normalized_process_transmission[band] = (process_channel[band]
+                / source_reference[band])
+                / self.clean_baseline_transmission[band];
             witness_transmission[band] = witness_truth[band]
-                * (1.0 + deterministic_noise(
-                    band_seed ^ 0x3333,
-                    self.sensor_noise_stddev,
-                ));
+                * (1.0 + deterministic_noise(band_seed ^ 0x3333, self.sensor_noise_stddev));
         }
 
         let qcm_mass = self.qcm.total_loading_ug_cm2()
@@ -441,9 +425,7 @@ impl OpticalHealthModel {
                 .iter()
                 .any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0)
         {
-            return Err(OpticalHealthError::InvalidThreshold(
-                "spectral_thresholds",
-            ));
+            return Err(OpticalHealthError::InvalidThreshold("spectral_thresholds"));
         }
         if !thresholds.maximum_qcm_mass_ug_cm2.is_finite()
             || thresholds.maximum_qcm_mass_ug_cm2 < 0.0
@@ -518,8 +500,7 @@ impl OpticalHealthModel {
             (self.process_optic.roughness_nm + protocol.roughness_delta_nm).max(0.0);
         self.witness.roughness_nm =
             (self.witness.roughness_nm + protocol.roughness_delta_nm).max(0.0);
-        self.qcm.roughness_nm =
-            (self.qcm.roughness_nm + protocol.roughness_delta_nm).max(0.0);
+        self.qcm.roughness_nm = (self.qcm.roughness_nm + protocol.roughness_delta_nm).max(0.0);
         self.last_event_time_seconds = at_seconds;
         self.requalification_required = true;
         self.qualified = false;
@@ -584,10 +565,7 @@ impl OpticalHealthModel {
     }
 
     pub fn witness_transmission(&self) -> [f64; BAND_COUNT] {
-        spectral_transmission(
-            &self.witness,
-            &self.extinction_coefficients_cm2_per_ug,
-        )
+        spectral_transmission(&self.witness, &self.extinction_coefficients_cm2_per_ug)
     }
 
     pub fn qcm_areal_mass_ug_cm2(&self) -> f64 {
@@ -610,14 +588,28 @@ fn validate_reading(reading: &OpticalHealthReading) -> Result<(), OpticalHealthE
     if !reading.simulation_only {
         return Err(OpticalHealthError::InvalidReading("not_simulation_only"));
     }
-    if reading.source_reference_power_w.iter().any(|value| !value.is_finite() || *value <= 0.0)
-        || reading.process_channel_power_w.iter().any(|value| !value.is_finite() || *value < 0.0)
-        || reading.normalized_process_transmission.iter().any(|value| !value.is_finite() || *value < 0.0)
-        || reading.witness_transmission.iter().any(|value| !value.is_finite() || *value < 0.0)
+    if reading
+        .source_reference_power_w
+        .iter()
+        .any(|value| !value.is_finite() || *value <= 0.0)
+        || reading
+            .process_channel_power_w
+            .iter()
+            .any(|value| !value.is_finite() || *value < 0.0)
+        || reading
+            .normalized_process_transmission
+            .iter()
+            .any(|value| !value.is_finite() || *value < 0.0)
+        || reading
+            .witness_transmission
+            .iter()
+            .any(|value| !value.is_finite() || *value < 0.0)
         || !reading.qcm_areal_mass_ug_cm2.is_finite()
         || reading.qcm_areal_mass_ug_cm2 < 0.0
     {
-        return Err(OpticalHealthError::InvalidReading("non_finite_or_negative_value"));
+        return Err(OpticalHealthError::InvalidReading(
+            "non_finite_or_negative_value",
+        ));
     }
     Ok(())
 }
@@ -794,7 +786,10 @@ mod tests {
         let reading = value.inspect("reading-1", 10, 9).unwrap();
         let mut tight = thresholds();
         tight.minimum_process_transmission = [0.95; BAND_COUNT];
-        assert_eq!(value.decide(&reading, &tight), Ok(HealthAction::CleanAndRequalify));
+        assert_eq!(
+            value.decide(&reading, &tight),
+            Ok(HealthAction::CleanAndRequalify)
+        );
     }
 
     #[test]
@@ -840,18 +835,19 @@ mod tests {
     fn successful_post_clean_inspection_is_required_before_requalification() {
         let mut value = model();
         value.apply_deposition(event("dep-1", 10)).unwrap();
-        value.clean(
-            &CleaningProtocol {
-                protocol_id: "clean-v1".to_string(),
-                removal_fraction: [1.0, 1.0, 1.0],
-                roughness_delta_nm: 0.0,
-                duration_seconds: 10,
-                energy_wh: 1.0,
-                consumables_g: 0.1,
-            },
-            20,
-        )
-        .unwrap();
+        value
+            .clean(
+                &CleaningProtocol {
+                    protocol_id: "clean-v1".to_string(),
+                    removal_fraction: [1.0, 1.0, 1.0],
+                    roughness_delta_nm: 0.0,
+                    duration_seconds: 10,
+                    energy_wh: 1.0,
+                    consumables_g: 0.1,
+                },
+                20,
+            )
+            .unwrap();
         let reading = value.inspect("post-clean", 30, 1).unwrap();
         value.requalify(&reading, &thresholds()).unwrap();
         assert!(value.qualified());
@@ -861,18 +857,19 @@ mod tests {
     fn failed_requalification_keeps_campaign_unqualified() {
         let mut value = model();
         value.apply_deposition(event("dep-1", 10)).unwrap();
-        value.clean(
-            &CleaningProtocol {
-                protocol_id: "clean-v1".to_string(),
-                removal_fraction: [0.0, 0.0, 0.0],
-                roughness_delta_nm: 10.0,
-                duration_seconds: 10,
-                energy_wh: 1.0,
-                consumables_g: 0.1,
-            },
-            20,
-        )
-        .unwrap();
+        value
+            .clean(
+                &CleaningProtocol {
+                    protocol_id: "clean-v1".to_string(),
+                    removal_fraction: [0.0, 0.0, 0.0],
+                    roughness_delta_nm: 10.0,
+                    duration_seconds: 10,
+                    energy_wh: 1.0,
+                    consumables_g: 0.1,
+                },
+                20,
+            )
+            .unwrap();
         let reading = value.inspect("post-clean", 30, 1).unwrap();
         assert_eq!(
             value.requalify(&reading, &thresholds()),
