@@ -86,6 +86,25 @@ The evaluator does not verify a real calibration authority, cryptographic signat
 13. Candidate changes to prior, policy, likelihood bounds, dependence group, calibration reference, availability or cutoff are rejected.
 14. Always-act and always-abstain fail paired positive/negative controls.
 
+## Synthetic known-answer fixture results
+
+The 12-trace synthetic fixture uses a 700-basis-point (7%) reversible-probe envelope. The optical primary-channel control produces:
+
+| Evaluation mode | Posterior risk | Decision |
+|---|---:|---|
+| Nominal prior + nominal likelihood | 1.29% | Accept |
+| Ambiguous prior, point likelihood | 4.54% | Accept |
+| Point prior, ambiguous likelihood | 2.91% | Accept |
+| Ambiguous prior + ambiguous likelihood | 9.82% | **Reject** |
+
+The fixture therefore tests an interaction effect: neither uncertainty layer independently crosses the policy threshold, but their joint ambiguity does. The nominal-only action would be a false-safe decision under the registered robust envelope.
+
+A joint optical-pair channel with common-mode uncertainty gives 0.84% nominal and 5.55% worst-case risk, which remains inside the 7% reversible envelope. In contrast, acquiring the two optical devices as separate factors while both share the same dependence group is rejected; their observations do not narrow the hypothesis set. A separate build-pipeline/runtime pair is combined only under an evaluator-held exact-set mutual conditional-independence certificate and yields 0.15% worst-case risk.
+
+The other fixture controls reject expired and revoked calibration, an output impossible under the hidden actual world, zero evidence-support lower bound, future evidence and an incomplete three-group factorization certificate. Always-act fails the irreversible release gate; always-abstain fails the read-only positive control.
+
+These values are synthetic calculations from the checked-in fixture, not empirical incident frequencies, calibrated field probabilities, measured execution costs, Rust execution results or model-agent trials. The complete expected report is committed beside the split candidate and oracle fixtures. The report includes prior-only, likelihood-only and combined robust-risk ablations so later changes cannot hide which uncertainty layer caused a rejection.
+
 ## Baselines and evaluation
 
 Compare against D6.16 prior-only credal posterior; nominal Bayesian point-likelihood update; fixed-prior / fixed-likelihood Bayesian parity control; robust prior with point likelihoods; point prior with robust likelihoods; full robust prior + likelihood interval evaluator; naive independent sensor multiplication; exact joint-channel model; exact-set qualified factorization; source ablation / single-source baselines; always-act, always-abstain and expert/operator adjudication.
