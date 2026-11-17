@@ -471,3 +471,19 @@ Afterward, the registry was expanded with STGI, and the exact-count assertions w
 ### Source identity contract refinement
 
 The first actual Rust test run showed that an arXiv-only source was rejected because the schema required DOI for every source. The schema now requires at least one stable publication identifier: DOI or arXiv ID. Negative controls accept the AutoSuperCon arXiv-only record and reject a source with neither identifier. This supports preprints without weakening provenance requirements.
+
+
+## 25. SCLib cross-library evidence audit and observation-event contract
+
+SCLib is now an explicit external baseline and interoperability target in [#12669](https://github.com/Luminous-Dynamics/symthaea/issues/12669). Its public API and documentation make several evidence requirements concrete: same-extracted-record condition matching, missing pressure ≠ ambient, non-detection ≠ Tc=0, independent source rights, and separate sample/state/property/source lineage.
+
+A live metadata capture found `/version` = site `be9ecdc`, dataset `v2026.09.03`, API `1`. The direct `/stats` endpoint returned 75,202 papers / 19,042 materials with an 8 Nov refresh timestamp, while the public Stats page displayed a 17 Nov refresh timestamp. These surfaces must be pinned independently; a page refresh is not evidence of a new source ingest.
+
+### New event-level contract
+
+- Schema: `data/schemas/superconductivity_observation_event_v0_1.schema.json`
+- Four synthetic-only examples: positive measured transition, bounded non-detection with null value, calculated pressure-dependent Tc and an ML-predicted Tc.
+- Rust executable: `sc_observation_event_audit`
+- Negative controls: non-detection cannot be encoded as Tc=0; unknown pressure cannot be coerced to ambient; ambient requires explicit 0 GPa; applied pressure requires a positive numeric value; predicted/calculated events cannot claim experimental detection; source references and observation IDs must resolve/be unique.
+
+This observation event layer is deliberately distinct from the material/candidate registry. It models individual condition-bound assertions so conflicting values, criteria, sample/state identities and source revisions can coexist rather than being averaged into a formula-level result. The dedicated CI workflow now covers this schema and its smoke fixture; no pass is claimed until the exact-head run reports success.
