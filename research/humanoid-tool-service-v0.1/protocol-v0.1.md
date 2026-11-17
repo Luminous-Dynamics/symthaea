@@ -569,15 +569,17 @@ Physical progression must consume the existing embodiment topology, calibration 
 
 Human-contact capability remains separate and consent-bound under #4680. V0 excludes goal-directed human contact.
 
-## 12. Immediate decision sequence
+## 12. Immediate decision sequence and current status
 
-1. Pin official HumanoidToolBench source, checkpoint, data, assets and license; confirm whether the protocol is executable in our supported environment.
-2. Establish a robot/control/observation compatibility matrix. If no honest mapping exists, use the published benchmark's robot as an external comparator only; do not relabel Symthaea's morphology.
-3. Implement exact 18-cell protocol import and baseline runner only after source/reproducibility audit.
-4. Run no-op/scripted probes before costly model training.
-5. Run matched Symthaea ablations in simulation.
-6. Add eight service-loop cases and an independent postcondition verifier.
-7. Select one physical task only after HIL, topology, calibration, instrumentation and physical qualification prerequisites are met.
+1. **Pin upstream source, assets, checkpoint, license and resources — completed as a source audit.** The exact HumanoidToolBench commit and dataset revisions are recorded in the manifest. AMP1 source, licence and H100/VRAM constraints are also audited. This does not mean the upstream runtime has been installed.
+2. **Establish G1/control/observation compatibility — raw simulation qpos order resolved; UEC v2 runtime adapter pending.** The 43-value chain is traced through `SonicLocoManip._get_obs`, `MujocoEngine.get_robot_qpos` and `G1Sonic.get_robot_qpos`; the mapping manifest records the three producer files/blob IDs. A pure, non-actuating Rust mapping audit crate and nine authored tests are now in the branch. UEC v2 platform integration and runtime conformance remain blocked on its canonical APIs and qualification.
+3. **Freeze the 18-cell HumanoidToolBench protocol and baseline ledger — specification complete.** No local benchmark is run or claimed yet. First runtime work should be a one-episode diagnostic / one-condition 100-episode run after environment and compute qualification.
+4. **Build active tool discovery — protocol/corpus defined.** The 24-case synthetic corpus spans six families with development, held-out instance, transfer and decoy splits. The candidate view must exclude hidden physical parameters and evaluator oracles. No physics episodes have run.
+5. **Run pure mapping audit locally/CI — authored, not yet executed.** The crate is dependency-free and has a focused workflow. The current editing environment has no `rustc` or `cargo`; no test/format/CI pass is claimed.
+6. **Run no-op/scripted probes before costly model work.** Use matched budget and sealed-oracle controls; do not use benchmark success flags as the only postcondition evidence.
+7. **Run matched agentic/VLA/Symthaea simulation ablations.** Separate model/provider, reasoning effort, harness, action interface, reasoning wall time, action-motion time and compute/API costs. Do not copy AMP source without licence review.
+8. **Advance human-augmentation evaluation in parallel.** Compose HUMAN-TOOL-001 #7983 / PR #7997; this is a human + advisory outcome, not humanoid dexterity.
+9. **Progress to physical work only after HIL, topology, calibration, instrumentation and independent physical qualification prerequisites are met.** Select one bounded, low-risk tool task; no physical actuator authority is implied by software mapping or synthetic corpus passes.
 
 ## 13. Claim ceiling
 
