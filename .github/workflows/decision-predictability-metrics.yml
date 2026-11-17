@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - "research/decision-relevant-predictability-v*"
+      - "research/decision-transfer-manifest-validator-v*"
     paths:
       - "research/decision-predictability-benchmark/**"
       - ".github/workflows/decision-predictability-metrics.yml"
@@ -36,14 +37,25 @@ jobs:
         run: cargo fmt --manifest-path research/decision-predictability-benchmark/Cargo.toml -- --check
 
       - name: Run strict Clippy
-        run: cargo clippy --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets -- -D warnings
+        run: cargo clippy --locked --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets -- -D warnings
 
       - name: Run all tests
-        run: cargo test --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets
+        run: cargo test --locked --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets
+
+      - name: Verify locked package metadata
+        run: cargo metadata --locked --manifest-path research/decision-predictability-benchmark/Cargo.toml --format-version 1 > cargo-metadata.json
+
+
+      - name: Validate held-out split manifest fixture
+        run: |
+          cargo run --locked --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin validate-split-manifest -- research/decision-predictability-benchmark/fixtures/split-manifest-v1.json > split-manifest-validation.txt
+          grep -q '^schema=luminous.decision-transfer.split-manifest.v1$' split-manifest-validation.txt
+          grep -q '^manifest_sha256=sha256:' split-manifest-validation.txt
+          cat split-manifest-validation.txt
 
       - name: Run transparent forecast evaluator smoke test
         run: |
-          cargo run --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin forecast-fixtures -- research/decision-predictability-benchmark/fixtures/forecast-smoke.csv > forecast-report.csv
+          cargo run --locked --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin forecast-fixtures -- research/decision-predictability-benchmark/fixtures/forecast-smoke.csv > forecast-report.csv
           test -s forecast-report.csv
           grep -q '^fixture,regime,channel,model,' forecast-report.csv
           grep -q '^# scope=within_trajectory_same_regime_continuation_only' forecast-report.csv
@@ -64,13 +76,16 @@ jobs:
           for fixture in stable_linear logistic_fixed logistic_period2 logistic_chaotic henon quasiperiodic_torus ar1_colored_noise lorenz63; do
             grep -q "^$fixture," chaos-fixtures.csv
           done
-          cargo run --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin forecast-fixtures -- chaos-fixtures.csv > forecast-report.csv
+          cargo run --locked --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin forecast-fixtures -- chaos-fixtures.csv > forecast-report.csv
           test -s forecast-report.csv
           grep -q '^fixture,regime,channel,model,' forecast-report.csv
           grep -q '^# scope=within_trajectory_same_regime_continuation_only' forecast-report.csv
           grep -q '^stable_linear,' forecast-report.csv
           grep -q '^lorenz63,' forecast-report.csv
           grep -q ",ok" forecast-report.csv
+
+      - name: Verify resolved standalone dependency lock
+        run: test -s research/decision-predictability-benchmark/Cargo.lock
 
       - name: Summarize per-fixture forecast metrics
         run: |
@@ -101,5 +116,6 @@ jobs:
           path: |
             chaos-fixtures.csv
             forecast-report.csv
+            research/decision-predictability-benchmark/Cargo.lock
           if-no-files-found: error
           retention-days: 14

@@ -252,7 +252,7 @@ pub fn fit_linear_ar(
     })
 }
 
-fn validate_history(history: &[f64]) -> Result<(), BaselineError> {
+pub(crate) fn validate_history(history: &[f64]) -> Result<(), BaselineError> {
     if history.is_empty() {
         return Err(BaselineError::EmptyHistory);
     }
@@ -267,7 +267,7 @@ fn validate_history(history: &[f64]) -> Result<(), BaselineError> {
 /// This implementation is intentionally dependency-free. It rejects a
 /// numerically rank-deficient design rather than silently returning unstable
 /// coefficients.
-fn solve_least_squares_qr(
+pub(crate) fn solve_least_squares_qr(
     mut matrix: Vec<Vec<f64>>,
     mut target: Vec<f64>,
 ) -> Result<Vec<f64>, BaselineError> {

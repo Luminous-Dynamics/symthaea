@@ -1,5 +1,8 @@
 pub mod baseline;
+pub mod candidate_view;
 pub mod decision_horizon;
+pub mod manifest;
+pub mod ngrc;
 pub mod paired_world;
 pub mod tournament;
 

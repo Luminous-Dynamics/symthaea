@@ -1,6 +1,6 @@
 # Decision-Relevant Predictability Metrics
 
-Dependency-free Rust metric contracts, a paired-world evaluator fixture and a first transparent forecasting tournament adapter for [issue #12546](https://github.com/Luminous-Dynamics/symthaea/issues/12546).
+Rust metric contracts, a paired-world evaluator fixture, a transparent forecasting tournament adapter and a strict split-manifest validator for [issue #12546](https://github.com/Luminous-Dynamics/symthaea/issues/12546).
 
 ## Included
 
@@ -14,17 +14,62 @@ Dependency-free Rust metric contracts, a paired-world evaluator fixture and a fi
 - Probe permission, remaining-budget and decision-deadline admission checks.
 - A **Decision-Relevant Predictability Horizon (DRPH)** contract that consumes independently qualified simultaneous upper bounds on decision regret and critical-event risk. It does not construct or certify those bounds.
 - Transparent univariate forecasting baselines: persistence, training-window mean, and recursive linear AR(p) fitted with Householder QR and optional ridge regularization.
+- A declared uniform-delay quadratic NG-RC reference arm with equally spaced taps and a QR-fitted polynomial readout; not a claim of NGRC-MDS reproduction.
 - A CSV adapter/runner that evaluates those baselines against the output contract of the independent chaos-reference generator.
 
 ## Run the focused crate
 
 ```bash
 cargo fmt --manifest-path research/decision-predictability-benchmark/Cargo.toml -- --check
-cargo clippy --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets -- -D warnings
-cargo test --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets
+cargo clippy --locked --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets -- -D warnings
+cargo test --locked --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets
 ```
 
-The package uses only the Rust standard library and is an isolated Cargo workspace. Its focused GitHub Actions workflow is pinned to Rust 1.96.0.
+The standalone workspace commits `Cargo.lock`; all build/test/CLI examples use `--locked` so dependency resolution cannot drift silently. The lockfile was captured from the pinned Rust 1.96.0 focused workflow and checked into the repository.
+
+The package is an isolated Cargo workspace. Metric and baseline code is standard-library-only; the split-manifest module uses exact-pinned Serde/serde_json and SHA-256 dependencies. Its focused GitHub Actions workflow is pinned to Rust 1.96.0.
+
+The uniform-delay NG-RC implementation is a transparent local reference variant: it fixes the delay count/spacing and includes all linear taps plus pairwise quadratic terms. It is not a faithful reproduction of NGRC-MDS and does not replace the separate paper-parity work in #12624.
+
+The chronological tournament selects the declared NG-RC arm on the validation prefix only:
+- delay count ∈ {1, 2, 3, 4};
+- uniform spacing ∈ {1, 2};
+- ridge penalty ∈ {0, 10⁻⁸, 10⁻⁵}.
+
+It minimizes full validation free-running NRMSE with deterministic tie-breaking (score, delay count, spacing, penalty), then refits the selected feature/readout configuration on the 70% development prefix and forecasts the 30% test suffix recursively from one fixed origin. No test-time observations are assimilated. The CSV reports the selected configuration in the model name and the validation NRMSE; the `ar_order` column remains empty for NG-RC. This is a small reproducible baseline search, not a broad hyperparameter sweep or an assertion that this configuration is optimal for every dynamical system.
+
+## Held-out split-manifest V1
+
+The manifest module is the first executable R0/R1 handoff for [issue #12608](https://github.com/Luminous-Dynamics/symthaea/issues/12608).
+
+```bash
+cargo run --locked --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin validate-split-manifest -- research/decision-predictability-benchmark/fixtures/split-manifest-v1.json
+```
+
+The validator rejects unsupported schemas, unknown/duplicate fields, malformed SHA-256 values or commit identifiers, non-opaque IDs, split-group overlap, inconsistent scenario-to-role assignments, missing axis memberships, unreferenced declared groups, and insufficient primary independent units. It enforces a 16 MiB input limit and 100,000 scenario/group ceilings. It also requires every scenario to carry every axis in the ordered `sampling.nesting` path and ensures each child group maps to exactly one parent group across all scenarios; a parameter-cell ID cannot silently migrate between equation families.
+
+The `sampling.nesting` array is an outer-to-inner path (for example, equation family → parameter cell → trajectory). Every scenario supplies one opaque group ID for every path axis. A child group ID is stable within its parent and cannot be reused under a different parent. Context axes may be shared across split roles; their parent/child hierarchy must still remain coherent.
+
+Canonicalization sorts JSON object keys through the typed Serde representation and preserves array order. The resulting SHA-256 is an integrity identifier, not an authenticity signature or proof that source claims are true. The digest is emitted in a detached receipt: a manifest must never contain its own digest. Seed commitments should use a domain-separated SHA-256 commitment over the seed and a high-entropy secret salt, with seed and salt revealed only after the confirmatory run is sealed. A bare hash of a small integer seed is brute-forceable. Commitments bind a seed choice but do not prove that a generator or solver is correct.
+
+Scenario and group IDs are 32 lowercase hexadecimal characters. The evaluator keeps the mapping from opaque IDs to hidden truth outside the candidate process. Only axes listed in `split_axes` impose cross-role disjointness; other axes in `sampling.nesting` can be attached to each scenario as shared context (for example, the same equation family across train/validation/confirmatory parameter regions). This allows parameter transfer within one known family without accidentally requiring equation-family holdout too. A syntactically valid manifest does not itself establish correct holdout assignment; the manifest must be generated by a trusted evaluator and independently reviewed. The parser validates declared group disjointness and scenario coverage, not the scientific validity of parameter-region boundaries.
+
+The split manifest is deliberately not yet wired to the forecast tournament. That integration follows after the schema and primary independent-unit contract have been independently reviewed.
+
+## Candidate exposure envelope
+
+The candidate-view module provides an explicit, serializable `CandidatePacketV1` and a separate, non-serializable `EvaluatorTicketBook`.
+
+- Candidate packets contain only a per-run opaque ticket, task-contract digest, time unit, as-of time, channel names, allowed action IDs and causal observation frames.
+- The evaluator binds a packet only through a `ValidatedManifest`, requires the packet's task-contract digest to match that manifest exactly, and rejects scenario IDs absent from the validated manifest.
+- The packet schema has no fields for scenario ID, split role, group memberships, seed commitment, reference-data digest, solver qualification digest, latent state, intervention label or hidden truth. Unknown fields are rejected when deserializing.
+- The evaluator ticket book retains the mapping from one-use ticket to the hidden scenario record. Ticket reuse in one book is rejected.
+- Observation timestamps must be monotonic and no later than the declared as-of time. Values must be finite when present; missing channels remain explicit.
+- Tickets must be fresh uniformly random 128-bit values from an OS CSPRNG per scenario per evaluator run. The library validates ticket shape and collisions; it does not generate randomness or prove entropy.
+
+This is a serialization/API boundary and a defense against accidental metadata leakage, **not an operating-system sandbox**. The evaluator must send only the packet bytes to an isolated candidate process; it must never link, expose, or serialize the ticket book into the candidate environment. Process isolation, filesystem/network restrictions, anti-covert-channel controls and independently generated hidden-truth storage remain separate work (coordinate with #12567). The packet schema does not establish statistical validity or causal identifiability.
+
+The module tests check candidate JSON for forbidden evaluator fields, reject unknown fields, reject observations after as-of time, and reject reused tickets. These are structural conformance tests, not an adversarial process-isolation proof.
 
 ## Run the transparent forecasting tournament
 
@@ -34,13 +79,13 @@ After the chaos-reference-suite package is present in the same checkout:
 
 ```bash
 cargo run --manifest-path research/chaos-reference-suite/Cargo.toml --bin chaos-fixtures -- 2048 20261116 > chaos-fixtures.csv
-cargo run --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin forecast-fixtures -- chaos-fixtures.csv > forecast-report.csv
+cargo run --locked --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin forecast-fixtures -- chaos-fixtures.csv > forecast-report.csv
 ```
 
 The smoke fixture at `fixtures/forecast-smoke.csv` lets CI test the adapter without depending on the separate generator pull request:
 
 ```bash
-cargo run --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin forecast-fixtures -- research/decision-predictability-benchmark/fixtures/forecast-smoke.csv > forecast-report.csv
+cargo run --locked --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin forecast-fixtures -- research/decision-predictability-benchmark/fixtures/forecast-smoke.csv > forecast-report.csv
 ```
 
 ### Evaluation protocol v0

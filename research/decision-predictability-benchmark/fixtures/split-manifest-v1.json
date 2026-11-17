@@ -1,0 +1,91 @@
+{
+  "schema": "luminous.decision-transfer.split-manifest.v1",
+  "protocol_revision": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "generator": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "commit": "0123456789abcdef0123456789abcdef01234567",
+    "generator_id": "chaos-reference-suite-v1",
+    "solver_id": "rk4-reference-v1",
+    "solver_configuration_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "task": {
+    "task_id": "lorenz-transfer-decision-v1",
+    "task_contract_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "loss_contract_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "observation_operator_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "sampling": {
+    "primary_independent_unit": "parameter_cell",
+    "nesting": ["equation_family", "parameter_cell", "trajectory"],
+    "minimum_independent_units_per_role": 1
+  },
+  "split_axes": [
+    {
+      "axis": "equation_family",
+      "policy": "held_out_family",
+      "train_group_ids": ["11111111111111111111111111111111"],
+      "validation_group_ids": ["22222222222222222222222222222222"],
+      "confirmatory_test_group_ids": ["33333333333333333333333333333333"]
+    },
+    {
+      "axis": "parameter_cell",
+      "policy": "held_out_region",
+      "train_group_ids": ["44444444444444444444444444444444"],
+      "validation_group_ids": ["55555555555555555555555555555555"],
+      "confirmatory_test_group_ids": ["66666666666666666666666666666666"]
+    },
+    {
+      "axis": "trajectory",
+      "policy": "group_disjoint",
+      "train_group_ids": ["77777777777777777777777777777777"],
+      "validation_group_ids": ["88888888888888888888888888888888"],
+      "confirmatory_test_group_ids": ["99999999999999999999999999999999"]
+    }
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+      "split_role": "train",
+      "groups": [
+        {"axis": "equation_family", "group_id": "11111111111111111111111111111111"},
+        {"axis": "parameter_cell", "group_id": "44444444444444444444444444444444"},
+        {"axis": "trajectory", "group_id": "77777777777777777777777777777777"}
+      ],
+      "seed_commitment": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "reference_data_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "solver_qualification_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "scenario_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2",
+      "split_role": "validation",
+      "groups": [
+        {"axis": "equation_family", "group_id": "22222222222222222222222222222222"},
+        {"axis": "parameter_cell", "group_id": "55555555555555555555555555555555"},
+        {"axis": "trajectory", "group_id": "88888888888888888888888888888888"}
+      ],
+      "seed_commitment": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "reference_data_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "solver_qualification_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "scenario_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa3",
+      "split_role": "confirmatory_test",
+      "groups": [
+        {"axis": "equation_family", "group_id": "33333333333333333333333333333333"},
+        {"axis": "parameter_cell", "group_id": "66666666666666666666666666666666"},
+        {"axis": "trajectory", "group_id": "99999999999999999999999999999999"}
+      ],
+      "seed_commitment": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "reference_data_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "solver_qualification_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  ],
+  "randomization": {
+    "seed_commitment_algorithm": "sha256",
+    "permutation_suite_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+  },
+  "freeze": {
+    "protocol_frozen_at": "2026-11-17T12:00:00Z",
+    "analysis_plan_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+  }
+}
