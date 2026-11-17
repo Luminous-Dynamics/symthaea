@@ -46,7 +46,7 @@ pub struct ProcessRealization {
 pub const PROCESS_REALIZATION_AUDIT_SCHEMA_VERSION: u16 = 1;
 
 /// A successful score-side audit of a planned additive process.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ProcessRealizationAuditV1 {
     pub schema_version: u16,
     pub cycle_count: usize,
@@ -55,7 +55,8 @@ pub struct ProcessRealizationAuditV1 {
 }
 
 /// A fail-closed mismatch between an additive-process plan and its realized score.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ProcessRealizationAuditError {
     EmptyPlan,
     MissingProcessCellBinding,
@@ -621,6 +622,28 @@ mod tests {
     }
 
 
+
+
+    #[test]
+    fn audit_report_and_failure_round_trip_as_machine_readable_evidence() {
+        let realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        let report =
+            verify_additive_process_score_v1(&realization.plan, &realization.score).unwrap();
+        let report_json = serde_json::to_value(&report).unwrap();
+        assert_eq!(report_json["schema_version"], PROCESS_REALIZATION_AUDIT_SCHEMA_VERSION);
+        let replayed_report: ProcessRealizationAuditV1 =
+            serde_json::from_value(report_json).unwrap();
+        assert_eq!(replayed_report, report);
+
+        let failure = ProcessRealizationAuditError::MissingProcessCellBinding;
+        let failure_json = serde_json::to_value(&failure).unwrap();
+        let replayed_failure: ProcessRealizationAuditError =
+            serde_json::from_value(failure_json).unwrap();
+        assert_eq!(replayed_failure, failure);
+    }
 
     #[test]
     fn frozen_generated_holdout_matrix_has_exact_audit_acceptance() {
