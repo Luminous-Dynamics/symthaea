@@ -81,7 +81,7 @@ impl FusionSafetyAdapter {
         safety_gate(level, is_risky)
     }
 
-    /// Whether the recommended action requires an emergency response.
+    /// Whether the heuristic action label is an emergency-category label.
     pub fn is_emergency(output: &FusionTwinOutput) -> bool {
         matches!(
             output.recommended_action,
