@@ -269,7 +269,7 @@
     "benchmark_results_available": false,
     "targets_are_results": false,
     "watermark_test_functions_authored": 25,
-    "crate_test_functions_authored": 81,
+    "crate_test_functions_authored": 98,
     "benchmark_protocol_authored": true,
     "clock_calibration_test_functions_authored": 17,
     "clock_calibration_tests_executed": false
