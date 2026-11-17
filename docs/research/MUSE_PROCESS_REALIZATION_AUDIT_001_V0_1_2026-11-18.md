@@ -22,7 +22,7 @@ This tranche closes that narrow gap without changing the grammar's output format
 4. Assigns every melody event to exactly one planned cycle using rational beat comparisons, not floating-point tolerance.
 5. Rejects melody events outside the trajectory, events crossing a cycle boundary, an incorrect cycle event count, and a cycle whose first event does not begin at its declared start.
 6. Checks that consecutive melody events are contiguous and that the final melody event ends exactly at `Score.total_beats`.
-7. Uses a maximal-prefix cycle as the realized cell template and requires each other cycle's melody to match the corresponding exact pitch-and-duration prefix.
+7. Requires the normalized process cell carried in ProcessPlan and checks every realized pitch and duration against that source cell's scale degree and exact duration.
 
 The return value is a small versioned report: cycle count, observed melody event count, and maximum prefix length. The error enum reports specific rejection causes.
 
@@ -43,12 +43,17 @@ In particular, event-count growth is a structural fact, not a listener-experienc
 
 Eleven new tests are present in `process_grammar.rs`:
 
-- accept unmodified realizations for all four declared trajectory kinds;
-- reject a plan with a false cycle count / contour;
-- reject a mutation to a note's rhythm/content within a cycle;
-- reject a pitch mutation that breaks the repeated cell prefix;
-- reject a shifted cycle boundary;
-- reject a score with a missing melody event.
+1. Accept unmodified realizations for all four declared trajectory kinds.
+2. Match hand-frozen expected contour vectors for all four process kinds.
+3. Reject a plan with a false cycle count / contour.
+4. Reject a duration mutation inside a cycle.
+5. Reject a pitch mutation that breaks a repeated cell prefix.
+6. Reject a coherent whole-cell transposition against the plan-carried process cell.
+7. Deserialize a legacy plan without the optional cell field, then refuse source-cell verification with a typed error.
+8. Round-trip the versioned audit report and typed failure through JSON.
+9. Reject a shifted cycle boundary.
+10. Reject a score with a missing melody event.
+11. Exercise a deterministic 4,096-case holdout: four process kinds × 256 seeds per kind × 2, 4, 8 and 16 bars.
 
 Existing process tests remain in place. No test has been compiled or executed in the current environment. Do not describe these tests as passing.
 
