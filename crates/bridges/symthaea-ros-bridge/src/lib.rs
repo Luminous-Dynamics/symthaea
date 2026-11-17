@@ -7,9 +7,13 @@
 //!
 //! ## Capabilities
 //!
-//! - **Proprioception**: Subscribes to `/joint_states` and transforms them into HDC vectors.
-//! - **Consciousness Telemetry**: Publishes Φ (Phi), neuromodulator levels, and Eight Harmonies activations.
-//! - **Motor Output**: Translates `RobotActuatorCommand` into `trajectory_msgs`.
+//! - **Generic transport**: validates and publishes typed ROS joint trajectories, and consumes sensor data.
+//! - **Consciousness Telemetry**: publishes Φ (Phi), neuromodulator levels, and Eight Harmonies activations.
+//! - **Optional platform adapters**: Humanoid conversion helpers are gated behind `humanoid-adapter`.
+//!
+//! Build without default features for the transport-neutral bridge surface; enable `ros2`
+//! for the ROS middleware bindings. The ROS/DDS network must be isolated and authenticated
+//! externally; successful publication is not evidence of device execution or safe actuation.
 //!
 //! ## ROS2 Setup
 //!
@@ -37,6 +41,8 @@ pub enum RosBridgeError {
     InvalidTrajectory(String),
     #[error("Safety interlock blocked trajectory publication: {0}")]
     SafetyInterlock(String),
+    #[error("Contract violation: {0}")]
+    Contract(String),
 }
 
 /// Normalized consciousness metrics for ROS2 broadcasting.
@@ -109,6 +115,338 @@ pub struct RosBridgeNode {
     scheduler: symthaea_control::ConsciousnessGainScheduler,
     #[cfg(feature = "ros2")]
     spin_thread: Option<std::thread::JoinHandle<()>>,
+}
+
+/// Explicit quantity and unit semantics for one named ROS JointState array field.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RosObservationFieldBindingV2 {
+    pub quantity: String,
+    pub unit: String,
+}
+
+/// Profile-specific semantic mapping for one ROS joint.
+///
+/// ROS JointState arrays do not by themselves carry a portable unit for each joint.
+/// This binding supplies that missing semantic context. If a field binding is present
+/// but the corresponding source array is empty, the output records NotReported.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RosJointObservationBindingV2 {
+    pub profile_id: String,
+    pub joint_name: String,
+    pub position: Option<RosObservationFieldBindingV2>,
+    pub velocity: Option<RosObservationFieldBindingV2>,
+    pub effort: Option<RosObservationFieldBindingV2>,
+}
+
+/// Convert generic named ROS joint arrays into a typed UEC observation frame.
+///
+/// No timestamp is invented: caller supplies the source clock/sequence. Every joint
+/// must have exactly one explicit binding for the requested profile. Non-empty source
+/// arrays require semantic bindings and must contain finite values with a length equal
+/// to the number of joint names. Empty arrays mean the source did not report that field.
+pub fn ros_joint_arrays_to_observation_frame_v2(
+    profile_id: &str,
+    instance_id: &str,
+    source_id: &str,
+    clock: symthaea_core::embodiment_v2::ClockStampV2,
+    frame_graph_id: Option<String>,
+    joint_names: &[String],
+    positions: &[f64],
+    velocities: &[f64],
+    efforts: &[f64],
+    bindings: &[RosJointObservationBindingV2],
+) -> Result<symthaea_core::embodiment_v2::ObservationFrameV2, RosBridgeError> {
+    use symthaea_core::embodiment_v2::{
+        EMBODIMENT_CONTRACT_VERSION_V2, MissingObservationReasonV2, ObservationFrameV2,
+        ObservationValueV2,
+    };
+
+    if profile_id.trim().is_empty() || instance_id.trim().is_empty() || source_id.trim().is_empty() {
+        return Err(RosBridgeError::Contract(
+            "observation profile, instance, and source IDs must be non-empty".into(),
+        ));
+    }
+    clock.validate().map_err(RosBridgeError::Contract)?;
+    if frame_graph_id.as_deref().is_some_and(|frame| frame.trim().is_empty()) {
+        return Err(RosBridgeError::Contract(
+            "frame_graph_id must be absent or non-empty".into(),
+        ));
+    }
+    if joint_names.is_empty() || bindings.is_empty() {
+        return Err(RosBridgeError::Contract(
+            "joint names and profile-specific bindings must not be empty".into(),
+        ));
+    }
+
+    let mut unique_joint_names = std::collections::HashSet::new();
+    for name in joint_names {
+        if name.trim().is_empty() || !unique_joint_names.insert(name.as_str()) {
+            return Err(RosBridgeError::Contract(
+                "joint names must be non-empty and unique".into(),
+            ));
+        }
+    }
+    for (field, values) in [
+        ("positions", positions),
+        ("velocities", velocities),
+        ("efforts", efforts),
+    ] {
+        if !values.is_empty() && values.len() != joint_names.len() {
+            return Err(RosBridgeError::Contract(format!(
+                "{field} length {} must be empty or equal joint count {}",
+                values.len(),
+                joint_names.len()
+            )));
+        }
+        if values.iter().any(|value| !value.is_finite()) {
+            return Err(RosBridgeError::Contract(format!(
+                "{field} contains a non-finite value"
+            )));
+        }
+    }
+
+    let mut binding_by_joint = std::collections::HashMap::new();
+    for binding in bindings {
+        if binding.profile_id.trim().is_empty() || binding.joint_name.trim().is_empty() {
+            return Err(RosBridgeError::Contract(
+                "observation binding profile and joint name must be non-empty".into(),
+            ));
+        }
+        if binding.profile_id != profile_id {
+            return Err(RosBridgeError::Contract(format!(
+                "observation binding profile {:?} does not match requested profile {:?}",
+                binding.profile_id, profile_id
+            )));
+        }
+        if !unique_joint_names.contains(binding.joint_name.as_str()) {
+            return Err(RosBridgeError::Contract(format!(
+                "binding references joint {:?} absent from source arrays",
+                binding.joint_name
+            )));
+        }
+        if binding_by_joint.insert(binding.joint_name.as_str(), binding).is_some() {
+            return Err(RosBridgeError::Contract(format!(
+                "duplicate observation binding for joint {:?}",
+                binding.joint_name
+            )));
+        }
+    }
+    if binding_by_joint.len() != joint_names.len() {
+        return Err(RosBridgeError::Contract(
+            "every source joint must have exactly one explicit observation binding".into(),
+        ));
+    }
+
+    let mut observations = Vec::new();
+    for (index, joint_name) in joint_names.iter().enumerate() {
+        let binding = binding_by_joint.get(joint_name.as_str()).ok_or_else(|| {
+            RosBridgeError::Contract(format!(
+                "no explicit observation binding for joint {joint_name:?}"
+            ))
+        })?;
+        for (field_name, descriptor, values) in [
+            ("position", binding.position.as_ref(), positions),
+            ("velocity", binding.velocity.as_ref(), velocities),
+            ("effort", binding.effort.as_ref(), efforts),
+        ] {
+            match descriptor {
+                Some(descriptor) => {
+                    if descriptor.quantity.trim().is_empty() || descriptor.unit.trim().is_empty() {
+                        return Err(RosBridgeError::Contract(format!(
+                            "{field_name} quantity and unit for joint {joint_name:?} must be non-empty"
+                        )));
+                    }
+                    let (value, missing_reason) = if values.is_empty() {
+                        (None, Some(MissingObservationReasonV2::NotReported))
+                    } else {
+                        (Some(values[index]), None)
+                    };
+                    observations.push(ObservationValueV2 {
+                        address: format!("joint/{joint_name}/{field_name}"),
+                        quantity: descriptor.quantity.clone(),
+                        unit: descriptor.unit.clone(),
+                        value,
+                        missing_reason,
+                        uncertainty: None,
+                    });
+                }
+                None if !values.is_empty() => {
+                    return Err(RosBridgeError::Contract(format!(
+                        "source reports {field_name} for joint {joint_name:?} but profile has no semantic binding"
+                    )));
+                }
+                None => {}
+            }
+        }
+    }
+
+    let frame = ObservationFrameV2 {
+        contract_version: EMBODIMENT_CONTRACT_VERSION_V2,
+        profile_id: profile_id.into(),
+        instance_id: instance_id.into(),
+        clock,
+        frame_graph_id,
+        source_id: source_id.into(),
+        observations,
+    };
+    frame.validate().map_err(RosBridgeError::Contract)?;
+    Ok(frame)
+}
+
+/// Semantic field emitted for one ROS joint. Unit matching is mandatory because
+/// JointTrajectory itself does not carry quantity/unit metadata.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum RosJointQuantityV2 {
+    Position,
+    Velocity,
+    Effort,
+}
+
+impl RosJointQuantityV2 {
+    fn contract_quantity(self) -> &'static str {
+        match self {
+            Self::Position => "position",
+            Self::Velocity => "velocity",
+            Self::Effort => "effort",
+        }
+    }
+}
+
+/// Explicit, profile-specific mapping from a UEC action address to a ROS joint field.
+/// Platform adapters own this mapping; the generic ROS bridge does not infer morphology.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RosJointActionBindingV2 {
+    /// Exact UEC profile this adapter mapping was reviewed for.
+    pub profile_id: String,
+    pub action_address: String,
+    pub joint_name: String,
+    pub quantity: RosJointQuantityV2,
+    pub unit: String,
+}
+
+/// Convert a validated UEC v2 Requested/Projected action frame into a ROS
+/// JointTrajectory value. This function does not publish, authorize, or claim execution.
+/// Applied/Measured/TransportAccepted records cannot be replayed as new command intent.
+pub fn action_frame_to_ros_trajectory_v2(
+    frame: &symthaea_core::embodiment_v2::ActionFrameV2,
+    bindings: &[RosJointActionBindingV2],
+    time_from_start_ns: u64,
+) -> Result<RosTrajectoryCommand, RosBridgeError> {
+    use symthaea_core::embodiment_v2::ActionStageV2;
+
+    frame
+        .validate()
+        .map_err(|error| RosBridgeError::InvalidTrajectory(format!("invalid UEC v2 action frame: {error}")))?;
+    if !matches!(frame.stage, ActionStageV2::Requested | ActionStageV2::Projected) {
+        return Err(RosBridgeError::InvalidTrajectory(
+            "only Requested or Projected action frames may be translated into new ROS commands".into(),
+        ));
+    }
+    if bindings.is_empty() {
+        return Err(RosBridgeError::InvalidTrajectory("joint action bindings must not be empty".into()));
+    }
+
+    let mut names = Vec::<String>::new();
+    let mut addresses = std::collections::HashSet::new();
+    let mut joint_fields = std::collections::HashSet::new();
+    for binding in bindings {
+        if binding.profile_id.trim().is_empty()
+            || binding.action_address.trim().is_empty()
+            || binding.joint_name.trim().is_empty()
+            || binding.unit.trim().is_empty()
+        {
+            return Err(RosBridgeError::InvalidTrajectory(
+                "action binding profile, address, joint name, and unit must be non-empty".into(),
+            ));
+        }
+        if binding.profile_id != frame.profile_id {
+            return Err(RosBridgeError::InvalidTrajectory(format!(
+                "action binding profile {:?} does not match frame profile {:?}",
+                binding.profile_id, frame.profile_id
+            )));
+        }
+        if !addresses.insert(binding.action_address.as_str()) {
+            return Err(RosBridgeError::InvalidTrajectory(format!(
+                "duplicate action binding address {:?}",
+                binding.action_address
+            )));
+        }
+        if !joint_fields.insert((&binding.joint_name, binding.quantity)) {
+            return Err(RosBridgeError::InvalidTrajectory(format!(
+                "duplicate binding for joint {:?} field {:?}",
+                binding.joint_name, binding.quantity
+            )));
+        }
+        if !names.contains(&binding.joint_name) {
+            names.push(binding.joint_name.clone());
+        }
+    }
+
+    let mut positions = std::collections::HashMap::<String, f64>::new();
+    let mut velocities = std::collections::HashMap::<String, f64>::new();
+    let mut efforts = std::collections::HashMap::<String, f64>::new();
+    for action in &frame.actions {
+        let binding = bindings
+            .iter()
+            .find(|binding| binding.action_address == action.address)
+            .ok_or_else(|| RosBridgeError::InvalidTrajectory(format!(
+                "no platform binding for action address {:?}", action.address
+            )))?;
+        if action.quantity != binding.quantity.contract_quantity() {
+            return Err(RosBridgeError::InvalidTrajectory(format!(
+                "action {:?} quantity {:?} does not match binding quantity {:?}",
+                action.address, action.quantity, binding.quantity.contract_quantity()
+            )));
+        }
+        if action.unit != binding.unit {
+            return Err(RosBridgeError::InvalidTrajectory(format!(
+                "action {:?} unit {:?} does not match required unit {:?}",
+                action.address, action.unit, binding.unit
+            )));
+        }
+        let target = match binding.quantity {
+            RosJointQuantityV2::Position => &mut positions,
+            RosJointQuantityV2::Velocity => &mut velocities,
+            RosJointQuantityV2::Effort => &mut efforts,
+        };
+        if target.insert(binding.joint_name.clone(), action.value).is_some() {
+            return Err(RosBridgeError::InvalidTrajectory(format!(
+                "multiple values map to joint {:?} field {:?}",
+                binding.joint_name, binding.quantity
+            )));
+        }
+    }
+
+    fn ordered_values(
+        label: &str,
+        names: &[String],
+        values: &std::collections::HashMap<String, f64>,
+    ) -> Result<Vec<f64>, RosBridgeError> {
+        if values.is_empty() {
+            return Ok(Vec::new());
+        }
+        names
+            .iter()
+            .map(|name| values.get(name).copied().ok_or_else(|| {
+                RosBridgeError::InvalidTrajectory(format!(
+                    "{label} values must cover every declared joint; missing {name:?}"
+                ))
+            }))
+            .collect()
+    }
+
+    let point = RosTrajectoryPoint {
+        positions: ordered_values("position", &names, &positions)?,
+        velocities: ordered_values("velocity", &names, &velocities)?,
+        efforts: ordered_values("effort", &names, &efforts)?,
+        time_from_start_ns,
+    };
+    let command = RosTrajectoryCommand {
+        joint_names: names,
+        points: vec![point],
+    };
+    command.validate()?;
+    Ok(command)
 }
 
 /// Command to control robot joint trajectories via ROS2.
@@ -369,7 +707,7 @@ impl RosBridgeNode {
     }
 
     /// Estimate and return the current `HumanoidState` using sensor fusion over JointState and IMU.
-    #[cfg(feature = "ros2")]
+    #[cfg(all(feature = "ros2", feature = "humanoid-adapter"))]
     pub fn get_current_humanoid_state(
         &self,
     ) -> Result<symthaea_humanoid::types::HumanoidState, RosBridgeError> {
@@ -685,6 +1023,7 @@ impl RosBridgeNode {
     }
 
     /// Converts a Symthaea HumanoidCommand into a ROS2 JointTrajectory format, using torque/effort control.
+    #[cfg(feature = "humanoid-adapter")]
     pub fn command_to_ros_trajectory(
         &self,
         command: &symthaea_humanoid::types::HumanoidCommand,
@@ -706,6 +1045,7 @@ impl RosBridgeNode {
 
     /// Converts ROS2 joint state arrays back into Symthaea's HumanoidState.
     /// Since ROS2 JointState lacks root pose/IMU, those defaults are injected or assumed.
+    #[cfg(feature = "humanoid-adapter")]
     pub fn ros_joint_states_to_humanoid(
         &self,
         positions: &[f64],
@@ -739,6 +1079,181 @@ impl RosBridgeNode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_ros_observation_bindings() -> Vec<RosJointObservationBindingV2> {
+        let position = Some(RosObservationFieldBindingV2 {
+            quantity: "angle".into(),
+            unit: "rad".into(),
+        });
+        let velocity = Some(RosObservationFieldBindingV2 {
+            quantity: "angular_velocity".into(),
+            unit: "rad/s".into(),
+        });
+        let effort = Some(RosObservationFieldBindingV2 {
+            quantity: "moment".into(),
+            unit: "N*m".into(),
+        });
+        vec![
+            RosJointObservationBindingV2 {
+                profile_id: "test.robot-joints.v1".into(),
+                joint_name: "left_joint".into(),
+                position: position.clone(),
+                velocity: velocity.clone(),
+                effort: effort.clone(),
+            },
+            RosJointObservationBindingV2 {
+                profile_id: "test.robot-joints.v1".into(),
+                joint_name: "right_joint".into(),
+                position,
+                velocity,
+                effort,
+            },
+        ]
+    }
+
+    #[test]
+    fn ros_joint_arrays_become_typed_observations_with_explicit_missingness() {
+        use symthaea_core::embodiment_v2::{ClockStampV2, MissingObservationReasonV2};
+        let names = vec!["left_joint".into(), "right_joint".into()];
+        let frame = ros_joint_arrays_to_observation_frame_v2(
+            "test.robot-joints.v1",
+            "robot-1",
+            "ros-joint-state-source",
+            ClockStampV2 {
+                clock_domain_id: "ros-source-clock".into(),
+                sequence: Some(7),
+                timestamp_ns: Some(70_000_000),
+            },
+            Some("world/base".into()),
+            &names,
+            &[0.1, -0.2],
+            &[],
+            &[0.25, -0.25],
+            &test_ros_observation_bindings(),
+        ).unwrap();
+        assert_eq!(frame.observations.len(), 6);
+        assert_eq!(frame.observations[0].value, Some(0.1));
+        assert_eq!(
+            frame.observations[1].missing_reason,
+            Some(MissingObservationReasonV2::NotReported)
+        );
+        assert_eq!(frame.observations[2].unit, "N*m");
+        frame.validate().unwrap();
+    }
+
+    #[test]
+    fn ros_joint_observations_reject_wrong_profile_shape_and_unmapped_fields() {
+        use symthaea_core::embodiment_v2::ClockStampV2;
+        let names = vec!["left_joint".into(), "right_joint".into()];
+        let clock = || ClockStampV2 {
+            clock_domain_id: "ros-source-clock".into(),
+            sequence: Some(7),
+            timestamp_ns: Some(70_000_000),
+        };
+        let mut bindings = test_ros_observation_bindings();
+        bindings[0].profile_id = "wrong.profile.v1".into();
+        assert!(ros_joint_arrays_to_observation_frame_v2(
+            "test.robot-joints.v1", "robot-1", "source", clock(), None,
+            &names, &[0.1, -0.2], &[], &[], &bindings,
+        ).is_err());
+
+        let bindings = test_ros_observation_bindings();
+        assert!(ros_joint_arrays_to_observation_frame_v2(
+            "test.robot-joints.v1", "robot-1", "source", clock(), None,
+            &names, &[0.1], &[], &[], &bindings,
+        ).is_err());
+
+        let mut bindings = test_ros_observation_bindings();
+        bindings[0].effort = None;
+        assert!(ros_joint_arrays_to_observation_frame_v2(
+            "test.robot-joints.v1", "robot-1", "source", clock(), None,
+            &names, &[], &[], &[0.1, -0.2], &bindings,
+        ).is_err());
+    }
+
+    fn test_uec_action_frame(stage: symthaea_core::embodiment_v2::ActionStageV2) -> symthaea_core::embodiment_v2::ActionFrameV2 {
+        use symthaea_core::embodiment_v2::*;
+        ActionFrameV2 {
+            contract_version: EMBODIMENT_CONTRACT_VERSION_V2,
+            profile_id: "test.robot-joints.v1".into(),
+            instance_id: "test-robot-1".into(),
+            clock: ClockStampV2 {
+                clock_domain_id: "test-sim-clock".into(),
+                sequence: Some(7),
+                timestamp_ns: Some(70_000_000),
+            },
+            frame_graph_id: Some("world/base".into()),
+            source_id: "test-controller".into(),
+            stage,
+            actions: vec![
+                ActionValueV2 { address: "joint/left/effort".into(), quantity: "effort".into(), unit: "N*m".into(), value: 0.25 },
+                ActionValueV2 { address: "joint/right/effort".into(), quantity: "effort".into(), unit: "N*m".into(), value: -0.25 },
+            ],
+        }
+    }
+
+    fn test_uec_effort_bindings() -> Vec<RosJointActionBindingV2> {
+        vec![
+            RosJointActionBindingV2 {
+                profile_id: "test.robot-joints.v1".into(),
+                action_address: "joint/left/effort".into(),
+                joint_name: "left_joint".into(),
+                quantity: RosJointQuantityV2::Effort,
+                unit: "N*m".into(),
+            },
+            RosJointActionBindingV2 {
+                profile_id: "test.robot-joints.v1".into(),
+                action_address: "joint/right/effort".into(),
+                joint_name: "right_joint".into(),
+                quantity: RosJointQuantityV2::Effort,
+                unit: "N*m".into(),
+            },
+        ]
+    }
+
+    #[test]
+    fn uec_v2_ros_adapter_maps_actions_only_via_explicit_platform_bindings() {
+        use symthaea_core::embodiment_v2::ActionStageV2;
+        let command = action_frame_to_ros_trajectory_v2(
+            &test_uec_action_frame(ActionStageV2::Projected),
+            &test_uec_effort_bindings(),
+            20_000_000,
+        ).unwrap();
+        assert_eq!(command.joint_names, vec!["left_joint", "right_joint"]);
+        assert!(command.points[0].positions.is_empty());
+        assert!(command.points[0].velocities.is_empty());
+        assert_eq!(command.points[0].efforts, vec![0.25, -0.25]);
+    }
+
+    #[test]
+    fn uec_v2_ros_adapter_rejects_execution_receipts_replayed_as_commands() {
+        use symthaea_core::embodiment_v2::ActionStageV2;
+        for stage in [ActionStageV2::TransportAccepted, ActionStageV2::Applied, ActionStageV2::Measured] {
+            assert!(action_frame_to_ros_trajectory_v2(
+                &test_uec_action_frame(stage),
+                &test_uec_effort_bindings(),
+                20_000_000,
+            ).is_err());
+        }
+    }
+
+    #[test]
+    fn uec_v2_ros_adapter_rejects_missing_bindings_and_unit_mismatch() {
+        use symthaea_core::embodiment_v2::ActionStageV2;
+        let frame = test_uec_action_frame(ActionStageV2::Requested);
+        assert!(action_frame_to_ros_trajectory_v2(&frame, &[], 20_000_000).is_err());
+
+        let mut bindings = test_uec_effort_bindings();
+        bindings[0].unit = "rad".into();
+        assert!(action_frame_to_ros_trajectory_v2(&frame, &bindings, 20_000_000).is_err());
+
+        let incomplete = vec![bindings[1].clone()];
+        assert!(action_frame_to_ros_trajectory_v2(&frame, &incomplete, 20_000_000).is_err());
+
+        let mut wrong_profile = test_uec_effort_bindings();
+        wrong_profile[0].profile_id = "different.robot-profile.v1".into();
+        assert!(action_frame_to_ros_trajectory_v2(&frame, &wrong_profile, 20_000_000).is_err());
+    }
 
     #[test]
     fn test_config_defaults() {
@@ -878,6 +1393,7 @@ mod tests {
         assert!(matches!(result, Err(RosBridgeError::InvalidStatus(_))));
     }
 
+    #[cfg(all(feature = "ros2", feature = "humanoid-adapter"))]
     #[test]
     fn test_hdc_encoding_and_surprise() {
         let node = RosBridgeNode::new(RosBridgeConfig::default());
