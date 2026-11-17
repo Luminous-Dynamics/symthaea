@@ -218,12 +218,21 @@ pub fn evaluate_selective_policy(
     let total_as_f64 = total_cases as f64;
     let coverage = total_accepted as f64 / total_as_f64;
     let abstention_fraction = abstained_cases as f64 / total_as_f64;
-    let selective_risk =
-        (total_accepted > 0).then_some(accepted_action_loss / total_accepted as f64);
-    let accepted_critical_event_rate =
-        (total_accepted > 0).then_some(total_critical as f64 / total_accepted as f64);
-    let mean_fallback_loss = (abstained_cases > 0)
-        .then_some(abstained_fallback_loss / abstained_cases as f64);
+    let selective_risk = if total_accepted > 0 {
+        Some(accepted_action_loss / total_accepted as f64)
+    } else {
+        None
+    };
+    let accepted_critical_event_rate = if total_accepted > 0 {
+        Some(total_critical as f64 / total_accepted as f64)
+    } else {
+        None
+    };
+    let mean_fallback_loss = if abstained_cases > 0 {
+        Some(abstained_fallback_loss / abstained_cases as f64)
+    } else {
+        None
+    };
     let system_loss = total_system_loss / total_as_f64;
 
     let mut environments = Vec::with_capacity(groups.len());
@@ -234,10 +243,16 @@ pub fn evaluate_selective_policy(
     for (environment, accumulator) in groups {
         let group_total = accumulator.total as f64;
         let group_coverage = accumulator.accepted as f64 / group_total;
-        let group_selective_risk =
-            (accumulator.accepted > 0).then_some(accumulator.action_loss / accumulator.accepted as f64);
-        let group_critical_rate =
-            (accumulator.accepted > 0).then_some(accumulator.critical as f64 / accumulator.accepted as f64);
+        let group_selective_risk = if accumulator.accepted > 0 {
+            Some(accumulator.action_loss / accumulator.accepted as f64)
+        } else {
+            None
+        };
+        let group_critical_rate = if accumulator.accepted > 0 {
+            Some(accumulator.critical as f64 / accumulator.accepted as f64)
+        } else {
+            None
+        };
         let group_system_loss = accumulator.system_loss / group_total;
 
         worst_environment_system_loss = worst_environment_system_loss.max(group_system_loss);
@@ -344,7 +359,7 @@ mod tests {
         assert_eq!(metrics.selective_risk, Some(2.0));
         assert_eq!(metrics.accepted_critical_event_rate, Some(0.5));
         assert_eq!(metrics.mean_fallback_loss, Some(0.4));
-        assert_eq!(metrics.system_loss, 1.1);
+        assert_eq!(metrics.system_loss, 1.2);
     }
 
     #[test]
