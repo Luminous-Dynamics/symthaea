@@ -68,6 +68,13 @@ pub struct ProcessRealizationAuditV1 {
 }
 
 /// A fail-closed mismatch between an additive-process plan and its realized score.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProcessDynamicsField {
+    Velocity,
+    SectionIntensity,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProcessRealizationAuditError {
@@ -128,7 +135,7 @@ pub enum ProcessRealizationAuditError {
     MelodyDynamicsMismatch {
         cycle_index: usize,
         event_index: usize,
-        field: &'static str,
+        field: ProcessDynamicsField,
         expected_bits: u32,
         actual_bits: u32,
     },
@@ -327,7 +334,7 @@ pub fn verify_additive_process_score_v1(
                 return Err(ProcessRealizationAuditError::MelodyDynamicsMismatch {
                     cycle_index,
                     event_index,
-                    field: "velocity",
+                    field: ProcessDynamicsField::Velocity,
                     expected_bits: expected_velocity.to_bits(),
                     actual_bits: observed.velocity.to_bits(),
                 });
@@ -336,7 +343,7 @@ pub fn verify_additive_process_score_v1(
                 return Err(ProcessRealizationAuditError::MelodyDynamicsMismatch {
                     cycle_index,
                     event_index,
-                    field: "section_intensity",
+                    field: ProcessDynamicsField::SectionIntensity,
                     expected_bits: expected_intensity.to_bits(),
                     actual_bits: observed.section_intensity.to_bits(),
                 });
@@ -761,7 +768,7 @@ mod tests {
         assert!(matches!(
             verify_additive_process_score_v1(&realization.plan, &realization.score),
             Err(ProcessRealizationAuditError::MelodyDynamicsMismatch {
-                field: "velocity",
+                field: ProcessDynamicsField::Velocity,
                 ..
             })
         ));
@@ -781,7 +788,7 @@ mod tests {
         assert!(matches!(
             verify_additive_process_score_v1(&realization.plan, &realization.score),
             Err(ProcessRealizationAuditError::MelodyDynamicsMismatch {
-                field: "section_intensity",
+                field: ProcessDynamicsField::SectionIntensity,
                 ..
             })
         ));
