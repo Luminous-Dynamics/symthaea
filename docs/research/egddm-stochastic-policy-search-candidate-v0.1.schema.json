@@ -1,0 +1,320 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-stochastic-policy-search-candidate-v0.1.schema.json",
+  "title": "EGDDM D6.17.2.2.4 exact finite policy search candidate view v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "decision_cutoff",
+    "budget_micros",
+    "max_depth",
+    "actions",
+    "hypothesis_bounds",
+    "options",
+    "factors",
+    "submitted_policy_tree"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision_cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "budget_micros": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "max_depth": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action_id",
+          "read_only",
+          "irreversible",
+          "hard_gate",
+          "max_residual_risk_bps"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "read_only": {
+            "type": "boolean"
+          },
+          "irreversible": {
+            "type": "boolean"
+          },
+          "hard_gate": {
+            "type": "boolean"
+          },
+          "max_residual_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        }
+      }
+    },
+    "hypothesis_bounds": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hypothesis_id",
+          "lower_probability_bps",
+          "upper_probability_bps",
+          "nominal_probability_bps"
+        ],
+        "properties": {
+          "hypothesis_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "lower_probability_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "upper_probability_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "nominal_probability_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        }
+      }
+    },
+    "options": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "option_id",
+          "available_at",
+          "factor_id"
+        ],
+        "properties": {
+          "option_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "available_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "factor_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "factors": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "factor_id",
+          "dependence_group",
+          "source_ids",
+          "calibration_ref",
+          "likelihoods"
+        ],
+        "properties": {
+          "factor_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dependence_group": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "calibration_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "likelihoods": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "hypothesis_id",
+                "outcomes"
+              ],
+              "properties": {
+                "hypothesis_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "outcomes": {
+                  "type": "object",
+                  "minProperties": 2,
+                  "maxProperties": 4,
+                  "additionalProperties": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "lower_likelihood_bps",
+                      "upper_likelihood_bps",
+                      "nominal_likelihood_bps"
+                    ],
+                    "properties": {
+                      "lower_likelihood_bps": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      },
+                      "upper_likelihood_bps": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      },
+                      "nominal_likelihood_bps": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "submitted_policy_tree": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root_node_id",
+        "nodes"
+      ],
+      "properties": {
+        "root_node_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "node_id",
+                  "kind",
+                  "option_id",
+                  "at",
+                  "branches"
+                ],
+                "properties": {
+                  "node_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "const": "acquire"
+                  },
+                  "option_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "branches": {
+                    "type": "object",
+                    "minProperties": 2,
+                    "additionalProperties": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "node_id",
+                  "kind",
+                  "decision_kind",
+                  "action_id",
+                  "claimed_residual_risk_bps"
+                ],
+                "properties": {
+                  "node_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "const": "stop"
+                  },
+                  "decision_kind": {
+                    "enum": [
+                      "act",
+                      "defer"
+                    ]
+                  },
+                  "action_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "claimed_residual_risk_bps": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
