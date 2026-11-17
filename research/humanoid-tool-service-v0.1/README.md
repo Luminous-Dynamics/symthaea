@@ -122,6 +122,9 @@ HumanoidToolBench is the direct humanoid tool-use anchor. We will also audit:
 
 These results suggest that Symthaea should be judged on *functional transfer, contact prediction, interaction quality and verified physical outcomes*, not only task completion. All values above are paper-reported and task-specific; they are not directly comparable or Symthaea results. Reproduction requires exact source/checkpoint/data/licence and protocol audit.
 
+
+**Direct humanoid whole-body comparator — ULTRA (IROS 2026):** ULTRA is a unified multimodal Unitree G1 controller that supports both dense reference tracking and sparse goal-conditioned loco-manipulation from egocentric perception, with physics-driven motion retargeting, student distillation and RL fine-tuning. Its project page demonstrates long-horizon goal following and real G1 deployment; it is therefore a closer control/embodiment comparator for Symthaea's humanoid hierarchy than AMP's Franka real-robot trials. It is not a tool-selection benchmark or a persistent cognitive-memory system. The public repository states ULTRA code is Apache-2.0 and the InterMimic-derived stack MIT, while robot assets, motion datasets and third-party dependencies keep their own terms. Its released training stack uses Python / IsaacGym Preview 4 and MuJoCo, so reproduction/runtime cost and data rights need separate qualification. Sources: [ULTRA project and real-robot demonstrations](https://ultrahumanoid.github.io/), [paper](https://arxiv.org/abs/2603.03279), [public code and licence notes](https://github.com/Sirui-Xu/ULTRA).
+
 ## Current SOTA shift: agentic policies and durable skill memory
 
 The benchmark portfolio now includes **agentic manipulation policies**, not only VLA/WAM action-chunk policies.
