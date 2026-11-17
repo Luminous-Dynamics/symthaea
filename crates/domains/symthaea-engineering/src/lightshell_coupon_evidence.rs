@@ -26,6 +26,8 @@ pub struct CouponCampaign {
 #[serde(deny_unknown_fields)]
 pub struct Specimen {
     pub specimen_id: String,
+    pub specimen_revision_ref: Option<String>,
+    pub specimen_configuration_digest: Option<String>,
     pub candidate_id: String,
     pub state: String,
     pub material_lot_ref: Option<String>,
@@ -56,6 +58,8 @@ pub struct Conditioning {
 pub struct TestRun {
     pub run_id: String,
     pub specimen_id: String,
+    pub specimen_revision_ref: Option<String>,
+    pub specimen_configuration_digest: Option<String>,
     pub family: String,
     pub status: String,
     pub protocol_ref: Option<String>,
@@ -289,6 +293,14 @@ impl CouponCampaign {
 
             executed_run_count += 1;
             validate_executed_run(run, &path, &mut findings);
+            if let Some(specimen) = specimen {
+                if run.specimen_revision_ref.as_deref() != specimen.specimen_revision_ref.as_deref()
+                    || run.specimen_configuration_digest.as_deref() != specimen.specimen_configuration_digest.as_deref()
+                {
+                    push(&mut findings, "run_specimen_configuration_mismatch", format!("{path}.specimen_revision_ref/specimen_configuration_digest"),
+                        "Executed measurements must bind to the exact specimen revision and configuration digest currently referenced by the specimen record.");
+                }
+            }
             if run.status == "passed" {
                 passed_run_count += 1;
                 if let Some(specimen) = specimen {
@@ -369,6 +381,8 @@ impl CouponCampaign {
 
 fn validate_available_specimen(specimen: &Specimen, path: &str, findings: &mut Vec<Finding>) {
     for (field, value) in [
+        ("specimen_revision_ref", specimen.specimen_revision_ref.as_deref()),
+        ("specimen_configuration_digest", specimen.specimen_configuration_digest.as_deref()),
         ("material_lot_ref", specimen.material_lot_ref.as_deref()),
         ("construction_ref", specimen.construction_ref.as_deref()),
         ("process_revision_ref", specimen.process_revision_ref.as_deref()),
@@ -395,6 +409,10 @@ fn validate_available_specimen(specimen: &Specimen, path: &str, findings: &mut V
                 "An available specimen requires measured dimensions and conditioning values.");
         }
     }
+    if specimen.specimen_configuration_digest.as_deref().is_some_and(|value| !is_sha256_digest(value)) {
+        push(findings, "invalid_specimen_configuration_digest", format!("{path}.specimen_configuration_digest"),
+            "Specimen configuration digest must use sha256: followed by 64 hexadecimal characters.");
+    }
     if specimen.orientation == "unknown" {
         push(findings, "available_specimen_orientation_unknown", format!("{path}.orientation"),
             "An available specimen must declare its cut/test orientation.");
@@ -407,6 +425,8 @@ fn validate_available_specimen(specimen: &Specimen, path: &str, findings: &mut V
 
 fn validate_executed_run(run: &TestRun, path: &str, findings: &mut Vec<Finding>) {
     for (field, value) in [
+        ("specimen_revision_ref", run.specimen_revision_ref.as_deref()),
+        ("specimen_configuration_digest", run.specimen_configuration_digest.as_deref()),
         ("protocol_ref", run.protocol_ref.as_deref()),
         ("fixture_ref", run.fixture_ref.as_deref()),
         ("fixture_revision", run.fixture_revision.as_deref()),
@@ -420,6 +440,10 @@ fn validate_executed_run(run: &TestRun, path: &str, findings: &mut Vec<Finding>)
             push(findings, "executed_run_missing_provenance", format!("{path}.{field}"),
                 "An executed run must bind protocol, fixture, environment, raw data, operator and acquisition time.");
         }
+    }
+    if run.specimen_configuration_digest.as_deref().is_some_and(|v| !is_sha256_digest(v)) {
+        push(findings, "invalid_specimen_configuration_digest", format!("{path}.specimen_configuration_digest"),
+            "Specimen configuration digest must use sha256: followed by 64 hexadecimal characters.");
     }
     if run.raw_data_digest.as_deref().is_some_and(|v| !is_sha256_digest(v)) {
         push(findings, "invalid_raw_data_digest", format!("{path}.raw_data_digest"),
@@ -679,6 +703,8 @@ mod tests {
             "doe_manifest_ref": "DOe-FIXTURE-12724",
             "specimens": [{
                 "specimen_id": "SPECIMEN-001",
+                "specimen_revision_ref": null,
+                "specimen_configuration_digest": null,
                 "candidate_id": "A0-R",
                 "state": "proposed",
                 "material_lot_ref": null,
@@ -702,6 +728,8 @@ mod tests {
             "test_runs": [{
                 "run_id": "RUN-COMPRESSION-001",
                 "specimen_id": "SPECIMEN-001",
+                "specimen_revision_ref": null,
+                "specimen_configuration_digest": null,
                 "family": "compression",
                 "status": "planned",
                 "protocol_ref": null,
@@ -727,6 +755,8 @@ mod tests {
             },{
                 "run_id": "RUN-VIBRATION-001",
                 "specimen_id": "SPECIMEN-001",
+                "specimen_revision_ref": null,
+                "specimen_configuration_digest": null,
                 "family": "vibration",
                 "status": "planned",
                 "protocol_ref": null,
@@ -764,6 +794,8 @@ mod tests {
     fn available_specimen(manifest: &mut Value) {
         let specimen = &mut manifest["specimens"][0];
         specimen["state"] = json!("available");
+        specimen["specimen_revision_ref"] = json!("SPECIMEN-REV-A");
+        specimen["specimen_configuration_digest"] = json!(format!("sha256:{}", "b".repeat(64)));
         specimen["material_lot_ref"] = json!("LOT-POLYESTER-001");
         specimen["construction_ref"] = json!("KNIT-SPACER-A0-REF");
         specimen["process_revision_ref"] = json!("MACHINE-PROGRAM-REV-01");
@@ -787,6 +819,8 @@ mod tests {
         available_specimen(manifest);
         let run = &mut manifest["test_runs"][1];
         run["status"] = json!("passed");
+        run["specimen_revision_ref"] = json!("SPECIMEN-REV-A");
+        run["specimen_configuration_digest"] = json!(format!("sha256:{}", "b".repeat(64)));
         run["protocol_ref"] = json!("VIBRATION-PROTOCOL-REV-A");
         run["fixture_ref"] = json!("FIXTURE-SHAKER-001");
         run["fixture_revision"] = json!("REV-A");
@@ -898,6 +932,16 @@ mod tests {
         manifest["test_runs"][1]["response_curve"]["points"][2]["x"] = json!(40.0);
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|f| f.code == "response_curve_not_strictly_ordered"));
+    }
+
+    #[test]
+    fn old_measurement_cannot_survive_specimen_revision_change() {
+        let mut manifest = campaign_fixture();
+        passed_vibration_run(&mut manifest);
+        manifest["specimens"][0]["specimen_revision_ref"] = json!("SPECIMEN-REV-B");
+        manifest["specimens"][0]["specimen_configuration_digest"] = json!(format!("sha256:{}", "c".repeat(64)));
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "run_specimen_configuration_mismatch"));
     }
 
     #[test]
