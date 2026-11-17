@@ -702,3 +702,22 @@ A second executable evidence layer now links a local pairing observation to a bu
 The auditor checks that both events are distinct, source-linked, observed, and tied to the same material, state, specimen and batch. It requires consistent pressure semantics/value, field, doping and strain. It rejects unresolved sample identity, predictions/calculations used as measurements, a local pairing event presented as Tc, wrong pairing units, and cross-specimen comparisons.
 
 The report preserves pairing energy and stiffness as separate values with separate units and measurement temperatures. It does not compute a temperature-equivalent from meV and does not derive a Tc from a local gap. The exact-head workflow now formats, tests, runs and Clippy-checks this fifth Rust binary, retaining its synthetic audit receipt.
+
+
+## 38. Current reproducibility snapshot (17 November 2026)
+
+The current v0.1 seed registry on \`research/sc-ambient-pressure-001\` contains:
+- **23 source records**;
+- **13 candidate/material reference records**;
+- **18 benchmark catalogs**.
+
+New screening/coherence sources are:
+1. Jeong et al. 2026 metallic outer-plane screening, with two distinct material references (Cu1245 and F0223).
+2. Luo et al. 2026 single-plane Bi-2201 dimensionality control.
+3. Ye et al. 2023 local-to-global phase-coherence / spatial ordering experiment.
+4. Kapon et al. 2019 field-free stiffness tensor metrology.
+5. Kreidel et al. 2024 resonator kinetic-inductance / stiffness metrology.
+
+The observation-event smoke fixture has seven synthetic events; the synthesis-protocol smoke fixture has one synthetic run and one outcome. The pair/coherence comparison fixture links its synthetic local pairing-energy event and synthetic bulk stiffness event on the same synthetic specimen. All such fixtures are plumbing tests only, not empirical measurements.
+
+The registry auditor's exact count assertions now expect 23 / 13 / 18. All identifiers, source links, JSON parsing and fixture semantics have been checked by retrieving the branch files. Hosted Rust compilation, tests and Clippy remain pending until the exact-head workflow reports success.
