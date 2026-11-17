@@ -41,10 +41,12 @@ impl FusionSafetyAdapter {
 
     /// Convert prototype FusionTwinOutput values into generic software metrics.
     ///
-    /// Mapping:
-    /// - `consciousness_level` ← 1.0 - free_energy (higher FE = less "conscious" of plasma state)
-    /// - `prediction_error` ← free_energy (direct surprise measure)
-    /// - `temporal_coherence` ← mean prediction similarity across horizons
+    /// Compatibility mapping into the generic SafetyMetrics shape.
+    ///
+    /// The consciousness_level slot is reused as a numeric placeholder for
+    /// inverse reference-surprise; it is not a plasma-consciousness quantity.
+    /// prediction_error receives the same uncalibrated reference-surprise proxy,
+    /// and temporal_coherence receives mean latent similarity across horizons.
     pub fn to_safety_metrics(&self, output: &FusionTwinOutput) -> SafetyMetrics {
         let temporal_coherence = if output.prediction_similarities.is_empty() {
             0.0
