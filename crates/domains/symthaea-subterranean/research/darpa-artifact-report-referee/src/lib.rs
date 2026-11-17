@@ -69,8 +69,8 @@ pub struct CandidateReport {
     /// Original report type label; exact string match is required by v0.1.
     pub source_type: String,
     pub position: Vec3,
-    /// Higher values are considered first when a report budget is imposed.
-    pub priority: i32,
+    /// Monotonic submission order; lower values are received first.
+    pub submission_sequence: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -321,9 +321,9 @@ fn select_reports<'a>(
 ) -> (Vec<&'a CandidateReport>, Vec<String>) {
     let mut ordered = reports.iter().collect::<Vec<_>>();
     ordered.sort_by(|left, right| {
-        right
-            .priority
-            .cmp(&left.priority)
+        left
+            .submission_sequence
+            .cmp(&right.submission_sequence)
             .then_with(|| left.id.cmp(&right.id))
     });
 
@@ -525,14 +525,14 @@ mod tests {
         x: f64,
         y: f64,
         z: f64,
-        priority: i32,
+        submission_sequence: u64,
     ) -> CandidateReport {
         CandidateReport {
             id: id.into(),
             coordinate_frame_id: "darpa".into(),
             source_type: class.into(),
             position: Vec3::new(x, y, z),
-            priority,
+            submission_sequence,
         }
     }
 
@@ -631,19 +631,19 @@ mod tests {
     }
 
     #[test]
-    fn report_budget_selects_highest_priority_with_stable_tie_break() {
+    fn report_budget_uses_submission_order_with_stable_tie_break() {
         let gt = vec![
             truth("g1", "vent", 0.0, 0.0, 0.0),
             truth("g2", "gas", 10.0, 0.0, 0.0),
         ];
         let reports = vec![
-            report("r-low", "vent", 0.0, 0.0, 0.0, 1),
-            report("r-b", "gas", 10.0, 0.0, 0.0, 3),
-            report("r-a", "vent", 0.0, 0.0, 0.0, 3),
+            report("r-late", "vent", 0.0, 0.0, 0.0, 3),
+            report("r-b", "gas", 10.0, 0.0, 0.0, 1),
+            report("r-a", "vent", 0.0, 0.0, 0.0, 2),
         ];
         let result = evaluate_reports(&gt, &reports, profile(1.0, Some(2))).unwrap();
         assert_eq!(result.selected_report_count, 2);
-        assert_eq!(result.budget_excluded_report_ids, vec!["r-low"]);
+        assert_eq!(result.budget_excluded_report_ids, vec!["r-late"]);
         assert_eq!(result.true_positive, 2);
     }
 
