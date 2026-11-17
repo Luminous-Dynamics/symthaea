@@ -13,7 +13,7 @@ Rust metric contracts, a paired-world evaluator fixture, a transparent forecasti
 - Separate candidate-visible episode/observation types and evaluator-only mechanism/loss records.
 - Probe permission, remaining-budget and decision-deadline admission checks.
 - A **Decision-Relevant Predictability Horizon (DRPH)** contract that consumes independently qualified simultaneous upper bounds on decision regret and critical-event risk. It does not construct or certify those bounds.
-- Transparent univariate forecasting baselines: persistence, training-window mean, and recursive linear AR(p) fitted with Householder QR and optional ridge regularization.
+- Transparent univariate forecasting baselines: persistence, training-window mean, and recursive linear AR(p) fitted with Householder QR and optional ridge regularization.- A declared uniform-delay quadratic NG-RC reference arm with equally spaced taps and a QR-fitted polynomial readout; not a claim of NGRC-MDS reproduction.
 - A CSV adapter/runner that evaluates those baselines against the output contract of the independent chaos-reference generator.
 
 ## Run the focused crate
@@ -27,6 +27,8 @@ cargo test --locked --manifest-path research/decision-predictability-benchmark/C
 The standalone workspace commits `Cargo.lock`; all build/test/CLI examples use `--locked` so dependency resolution cannot drift silently. The lockfile was captured from the pinned Rust 1.96.0 focused workflow and checked into the repository.
 
 The package is an isolated Cargo workspace. Metric and baseline code is standard-library-only; the split-manifest module uses exact-pinned Serde/serde_json and SHA-256 dependencies. Its focused GitHub Actions workflow is pinned to Rust 1.96.0.
+
+The uniform-delay NG-RC implementation is a transparent local reference variant: it fixes the delay count/spacing and includes all linear taps plus pairwise quadratic terms. It is not a faithful reproduction of NGRC-MDS and does not replace the separate paper-parity work in #12624.
 
 ## Held-out split-manifest V1
 
