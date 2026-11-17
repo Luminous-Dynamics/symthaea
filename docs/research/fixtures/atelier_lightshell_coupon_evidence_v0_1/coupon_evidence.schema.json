@@ -188,7 +188,8 @@
             ]
           }
         }
-      }
+      },
+      "minItems": 1
     },
     "test_runs": {
       "type": "array",
@@ -482,7 +483,8 @@
                           "minimum": 0
                         }
                       }
-                    }
+                    },
+                    "minItems": 3
                   }
                 }
               }
