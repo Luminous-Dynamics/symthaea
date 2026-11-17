@@ -611,4 +611,39 @@ mod tests {
         assert!(!pareto_dominates(fewer_samples, more_samples_less_compute));
         assert!(!pareto_dominates(more_samples_less_compute, fewer_samples));
     }
+    #[test]
+    fn forecast_validates_samples_after_the_first_threshold_crossing() {
+        let samples = [
+            ForecastSample { horizon: 1.0, normalized_error: 0.01 },
+            ForecastSample { horizon: 2.0, normalized_error: 0.2 },
+            ForecastSample { horizon: 1.5, normalized_error: 0.03 },
+        ];
+        assert_eq!(
+            forecast_horizon(&samples, 0.1),
+            Err(MetricError::NonIncreasingForecastTime)
+        );
+    }
+
+    #[test]
+    fn expected_information_value_can_be_negative_after_cost() {
+        let value = expected_value_of_information(1.0, 0.9, 0.2).unwrap();
+        assert!((value.gross_value - 0.1).abs() < 1e-12);
+        assert!((value.net_value + 0.1).abs() < 1e-12);
+    }
+
+    #[test]
+    fn decision_evaluator_rejects_malformed_conditional_probability_mass() {
+        let information_sets = [InformationSet {
+            probability: 1.0,
+            states: vec![state(0.4, &[0.0, 1.0]), state(0.4, &[1.0, 0.0])],
+            candidate_action: Some(0),
+        }];
+        assert_eq!(
+            evaluate_decisions(&information_sets),
+            Err(MetricError::ProbabilityMassNotOne(
+                "conditional state probability mass"
+            ))
+        );
+    }
+
 }
