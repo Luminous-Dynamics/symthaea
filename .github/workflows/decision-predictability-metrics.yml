@@ -40,3 +40,11 @@ jobs:
 
       - name: Run all tests
         run: cargo test --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets
+
+      - name: Run transparent forecast evaluator smoke test
+        run: |
+          cargo run --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin forecast-fixtures -- research/decision-predictability-benchmark/fixtures/forecast-smoke.csv > forecast-report.csv
+          test -s forecast-report.csv
+          grep -q '^fixture,regime,channel,model,' forecast-report.csv
+          grep -q '^# scope=within_trajectory_same_regime_continuation_only' forecast-report.csv
+          grep -q ',ok forecast-report.csv
