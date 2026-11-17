@@ -10,8 +10,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use subterra_survival_reference::{
-    CostPrices, MeasurementAction, OutcomeKind, PlanningProblem, PolicyBranch,
-    PolicyNode, ResourceBudget, RiskLimits,
+    CostPrices, MeasurementAction, OutcomeKind, PlanningProblem, PolicyBranch, PolicyNode,
+    ResourceBudget, RiskLimits,
 };
 
 const PROBABILITY_TOLERANCE: f64 = 1.0e-9;
