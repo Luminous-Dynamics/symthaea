@@ -643,12 +643,12 @@ mod tests {
     fn bayes_risk_can_be_evaluated_without_a_candidate_action() {
         let information_sets = [InformationSet {
             probability: 1.0,
-            states: vec![state(1.0, &[0.0, 1.0])],
+            states: vec![state(0.5, &[0.0, 1.0]), state(0.5, &[1.0, 0.0])],
             candidate_action: None,
         }];
 
         let result = evaluate_bayes_risk(&information_sets).unwrap();
-        assert_eq!(result.bayes_risk, 0.0);
+        assert!((result.bayes_risk - 0.5).abs() < 1e-12);
         assert_eq!(result.perfect_information_risk, 0.0);
     }
 
