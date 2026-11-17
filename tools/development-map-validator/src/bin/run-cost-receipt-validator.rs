@@ -112,7 +112,7 @@ fn validate_attempts(
  approved_options:&BTreeSet<String>,
  run_started:Option<DateTime<FixedOffset>>,
  run_finished:Option<DateTime<FixedOffset>>,
- queued_at:DateTime<FixedOffset>,
+ receipt_queued_at:DateTime<FixedOffset>,
  label:&str
 )->Result<RunMetrics,String>{
  let rows=get(receipt,"attempts",label)?.as_array().ok_or("attempts must be an array")?;
@@ -255,7 +255,7 @@ fn validate_attempts(
   if earliest_started.as_ref().is_some_and(|x|x<start){return Err(format!("{label} run_started_at follows an attempt start"));}
  }else if earliest_started.is_some(){return Err(format!("{label} attempts started but run_started_at is null"));}
  if let Some(finish)=run_finished.as_ref(){
-  if finish<&queued_at{return Err(format!("{label} run_finished_at precedes queued_at"));}
+  if finish<&receipt_queued_at{return Err(format!("{label} run_finished_at precedes queued_at"));}
   if latest_completed.as_ref().is_some_and(|x|x>finish){return Err(format!("{label} run_finished_at precedes an attempt completion"));}
  }else{
   cost_complete=false;wall_complete=false;
@@ -265,7 +265,7 @@ fn validate_attempts(
   (Some(start),Some(finish)) if wall_complete&&finish>=start=>Some((finish-start).num_milliseconds() as u64),
   _=>None
  };
- let queue_delay_ms=run_started.as_ref().map(|start|(start-&queued_at).num_milliseconds().max(0) as u64);
+ let queue_delay_ms=run_started.as_ref().map(|start|(start-&receipt_queued_at).num_milliseconds().max(0) as u64);
  Ok(RunMetrics{
   run_id:String::new(),task_family:String::new(),paired_seed:0,
   cost_micros,wall_ms,queue_delay_ms,
