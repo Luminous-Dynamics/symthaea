@@ -124,6 +124,11 @@ pub enum ProcessRealizationAuditError {
 /// additive-process trajectory.
 ///
 /// This verifier does not trust structural-stage labels in GrammarStructuralTrace.
+/// It requires the generator's exact post-filter/fallback process cell to be
+/// carried in ProcessPlan and compares every realized pitch and duration
+/// against that cell's scale-degree/rhythm definition. The cell is a bound
+/// plan field, not an authenticated provenance claim; callers must pin the
+/// complete plan/score receipt if tamper evidence is required.
 /// It re-derives the canonical prefix contour from the declared trajectory kind
 /// and maximum prefix length, partitions the melody by the exact cycle starts,
 /// checks the note count and exact pitch/rhythm prefix in every cycle, and
@@ -666,13 +671,17 @@ mod tests {
     }
 
     #[test]
-    fn legacy_plan_without_process_cell_is_readable_but_not_source_verified() {
+    fn legacy_plan_without_process_cell_deserializes_but_is_not_source_verified() {
         let realization = realize_additive_process(
             &MusicalIntent { seed: 1, ..MusicalIntent::default() },
             &Style::Minimalism.spec(),
         );
-        let mut legacy_plan = realization.plan.clone();
-        legacy_plan.process_cell = None;
+        let mut legacy_json = serde_json::to_value(&realization.plan).unwrap();
+        legacy_json
+            .as_object_mut()
+            .unwrap()
+            .remove("process_cell");
+        let legacy_plan: ProcessPlan = serde_json::from_value(legacy_json).unwrap();
         assert!(matches!(
             verify_additive_process_score_v1(&legacy_plan, &realization.score),
             Err(ProcessRealizationAuditError::MissingProcessCellBinding)
