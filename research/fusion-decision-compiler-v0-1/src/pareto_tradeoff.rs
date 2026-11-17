@@ -467,9 +467,10 @@ pub fn compare_pair(
         (DominanceRelation::Equivalent, _) => {
             ScalarTradeoffDisposition::ScalarPreferenceBetweenEquivalentVectors
         }
-        (DominanceRelation::NonDominatedTradeoff, ScalarPreference::First | ScalarPreference::Second) => {
-            ScalarTradeoffDisposition::ScalarPreferenceHidesOmittedObjectiveTradeoff
-        }
+        (
+            DominanceRelation::NonDominatedTradeoff,
+            ScalarPreference::First | ScalarPreference::Second,
+        ) => ScalarTradeoffDisposition::ScalarPreferenceHidesOmittedObjectiveTradeoff,
         (_, ScalarPreference::Tie) => ScalarTradeoffDisposition::NoScalarPreference,
     };
 
@@ -603,7 +604,15 @@ mod tests {
     }
 
     fn candidate(id: &str, values: [f64; 7]) -> CandidateObjectiveVector {
-        let [energy, cost, availability, planned, unplanned, ebi, interval_width] = values;
+        let [
+            energy,
+            cost,
+            availability,
+            planned,
+            unplanned,
+            ebi,
+            interval_width,
+        ] = values;
         CandidateObjectiveVector {
             candidate_id: id.to_string(),
             candidate_revision: format!("{id}-r1"),
@@ -639,10 +648,12 @@ mod tests {
 
     #[test]
     fn q_eng_is_monotone_in_each_input() {
-        assert!(calculate_q_eng(0.8, 0.5).unwrap().q_eng
-            > calculate_q_eng(0.7, 0.5).unwrap().q_eng);
-        assert!(calculate_q_eng(0.8, 0.4).unwrap().q_eng
-            > calculate_q_eng(0.8, 0.5).unwrap().q_eng);
+        assert!(
+            calculate_q_eng(0.8, 0.5).unwrap().q_eng > calculate_q_eng(0.7, 0.5).unwrap().q_eng
+        );
+        assert!(
+            calculate_q_eng(0.8, 0.4).unwrap().q_eng > calculate_q_eng(0.8, 0.5).unwrap().q_eng
+        );
     }
 
     #[test]
@@ -664,7 +675,10 @@ mod tests {
     #[test]
     fn q_eng_preference_can_hide_lifetime_energy_and_cost_tradeoff() {
         let profile = profile();
-        let high_qeng = candidate("high-qeng", [8_000.0, 12_000.0, 0.95, 500.0, 300.0, 0.8, 25.0]);
+        let high_qeng = candidate(
+            "high-qeng",
+            [8_000.0, 12_000.0, 0.95, 500.0, 300.0, 0.8, 25.0],
+        );
         let high_service = candidate(
             "high-service",
             12_000.0,
@@ -678,12 +692,16 @@ mod tests {
         let report = compare_pair(&profile, &high_qeng, &high_service);
         assert_eq!(report.scalar_preference, ScalarPreference::First);
         assert_eq!(report.dominance, DominanceRelation::NonDominatedTradeoff);
-        assert!(report
-            .scalar_winner_worse_dimensions
-            .contains(&ObjectiveDimension::LifetimeNetElectricEnergyMwh));
-        assert!(report
-            .scalar_winner_worse_dimensions
-            .contains(&ObjectiveDimension::WholeLifeCost));
+        assert!(
+            report
+                .scalar_winner_worse_dimensions
+                .contains(&ObjectiveDimension::LifetimeNetElectricEnergyMwh)
+        );
+        assert!(
+            report
+                .scalar_winner_worse_dimensions
+                .contains(&ObjectiveDimension::WholeLifeCost)
+        );
         assert_eq!(
             report.scalar_tradeoff,
             ScalarTradeoffDisposition::ScalarPreferenceHidesOmittedObjectiveTradeoff
@@ -716,19 +734,29 @@ mod tests {
         let report = compare_pair(&profile, &lower_availability, &higher_availability);
         assert_eq!(report.scalar_preference, ScalarPreference::First);
         assert_eq!(report.dominance, DominanceRelation::NonDominatedTradeoff);
-        assert!(report
-            .scalar_winner_worse_dimensions
-            .contains(&ObjectiveDimension::OperationalAvailability));
-        assert!(report
-            .scalar_winner_worse_dimensions
-            .contains(&ObjectiveDimension::LifetimeNetElectricEnergyMwh));
+        assert!(
+            report
+                .scalar_winner_worse_dimensions
+                .contains(&ObjectiveDimension::OperationalAvailability)
+        );
+        assert!(
+            report
+                .scalar_winner_worse_dimensions
+                .contains(&ObjectiveDimension::LifetimeNetElectricEnergyMwh)
+        );
     }
 
     #[test]
     fn q_eng_cannot_reverse_true_vector_dominance_when_its_inputs_are_in_vector() {
         let profile = profile();
-        let first = candidate("dominant", [12_000.0, 7_000.0, 0.95, 300.0, 200.0, 0.5, 10.0]);
-        let second = candidate("dominated", [10_000.0, 9_000.0, 0.85, 500.0, 300.0, 0.8, 20.0]);
+        let first = candidate(
+            "dominant",
+            [12_000.0, 7_000.0, 0.95, 300.0, 200.0, 0.5, 10.0],
+        );
+        let second = candidate(
+            "dominated",
+            [10_000.0, 9_000.0, 0.85, 500.0, 300.0, 0.8, 20.0],
+        );
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::FirstDominatesSecond);
         assert_eq!(report.scalar_preference, ScalarPreference::First);
@@ -742,7 +770,10 @@ mod tests {
     fn same_q_eng_ratio_does_not_mean_same_objective_vector() {
         let profile = profile();
         let first = candidate("ratio-a", [8_000.0, 12_000.0, 0.8, 500.0, 400.0, 0.4, 20.0]);
-        let second = candidate("ratio-b", [11_000.0, 7_000.0, 0.9, 300.0, 200.0, 0.45, 10.0]);
+        let second = candidate(
+            "ratio-b",
+            [11_000.0, 7_000.0, 0.9, 300.0, 200.0, 0.45, 10.0],
+        );
         assert_eq!(q_eng(&first).unwrap().q_eng, q_eng(&second).unwrap().q_eng);
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.scalar_preference, ScalarPreference::Tie);
@@ -771,11 +802,13 @@ mod tests {
         let second = candidate("second", [11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0]);
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::NotComparable);
-        assert!(report
-            .first_diagnostics
-            .contains(&ComparisonDiagnostic::MissingObjective(
-                ObjectiveDimension::LifetimeNetElectricEnergyMwh
-            )));
+        assert!(
+            report
+                .first_diagnostics
+                .contains(&ComparisonDiagnostic::MissingObjective(
+                    ObjectiveDimension::LifetimeNetElectricEnergyMwh
+                ))
+        );
         assert_eq!(report.scalar_preference, ScalarPreference::First);
     }
 
@@ -787,7 +820,11 @@ mod tests {
         second.profile_sha256 = sha('c');
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::NotComparable);
-        assert!(report.second_diagnostics.contains(&ComparisonDiagnostic::ProfileDigestMismatch));
+        assert!(
+            report
+                .second_diagnostics
+                .contains(&ComparisonDiagnostic::ProfileDigestMismatch)
+        );
     }
 
     #[test]
@@ -798,7 +835,11 @@ mod tests {
         second.ebi_normalization_ref.clear();
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::NotComparable);
-        assert!(report.second_diagnostics.contains(&ComparisonDiagnostic::EbiNormalizationMismatch));
+        assert!(
+            report
+                .second_diagnostics
+                .contains(&ComparisonDiagnostic::EbiNormalizationMismatch)
+        );
     }
 
     #[test]
@@ -806,7 +847,10 @@ mod tests {
         let profile = profile();
         let mut first = candidate("blocked", [20_000.0, 1_000.0, 1.0, 0.0, 0.0, 0.1, 1.0]);
         first.eligibility = CandidateEligibility::BlockedByHardGate;
-        let second = candidate("eligible", [10_000.0, 10_000.0, 0.8, 500.0, 300.0, 0.5, 20.0]);
+        let second = candidate(
+            "eligible",
+            [10_000.0, 10_000.0, 0.8, 500.0, 300.0, 0.5, 20.0],
+        );
         let report = extract_pareto_front(&profile, &[first, second]);
         assert_eq!(
             report
@@ -825,11 +869,18 @@ mod tests {
         let profile = profile();
         let first = candidate("z", [9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0]);
         let second = candidate("a", [11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0]);
-        let third = candidate("dominated", [7_000.0, 12_000.0, 0.7, 600.0, 450.0, 0.8, 35.0]);
-        let first_report = extract_pareto_front(&profile, &[first.clone(), second.clone(), third.clone()]);
+        let third = candidate(
+            "dominated",
+            [7_000.0, 12_000.0, 0.7, 600.0, 450.0, 0.8, 35.0],
+        );
+        let first_report =
+            extract_pareto_front(&profile, &[first.clone(), second.clone(), third.clone()]);
         let second_report = extract_pareto_front(&profile, &[third, second, first]);
         assert_eq!(first_report, second_report);
-        assert_eq!(first_report.frontier_candidate_ids, vec!["a".to_string(), "z".to_string()]);
+        assert_eq!(
+            first_report.frontier_candidate_ids,
+            vec!["a".to_string(), "z".to_string()]
+        );
     }
 
     #[test]
@@ -862,9 +913,13 @@ mod tests {
         let second = candidate("second", [11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0]);
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::NotComparable);
-        assert!(report.first_diagnostics.contains(&ComparisonDiagnostic::NonFiniteObjective(
-            ObjectiveDimension::WholeLifeCost
-        )));
+        assert!(
+            report
+                .first_diagnostics
+                .contains(&ComparisonDiagnostic::NonFiniteObjective(
+                    ObjectiveDimension::WholeLifeCost
+                ))
+        );
     }
 
     #[test]
@@ -875,12 +930,16 @@ mod tests {
         second.candidate_revision = "same-r2".to_string();
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::NotComparable);
-        assert!(report.first_diagnostics.contains(
-            &ComparisonDiagnostic::DuplicateCandidateIdentity
-        ));
-        assert!(report.second_diagnostics.contains(
-            &ComparisonDiagnostic::DuplicateCandidateIdentity
-        ));
+        assert!(
+            report
+                .first_diagnostics
+                .contains(&ComparisonDiagnostic::DuplicateCandidateIdentity)
+        );
+        assert!(
+            report
+                .second_diagnostics
+                .contains(&ComparisonDiagnostic::DuplicateCandidateIdentity)
+        );
     }
 
     #[test]
