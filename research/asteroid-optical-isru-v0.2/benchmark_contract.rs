@@ -163,6 +163,8 @@ pub struct ComparabilityKey {
     pub evidence_gate_digest: String,
     pub safety_gate_digest: String,
     pub hidden_oracle_commitment: String,
+    pub development_set_digest: String,
+    pub statistical_plan_id: String,
     pub paired_seed: u64,
 }
 
@@ -181,6 +183,8 @@ impl From<(&BenchmarkManifest, u64)> for ComparabilityKey {
             evidence_gate_digest: manifest.evidence_gate_digest.clone(),
             safety_gate_digest: manifest.safety_gate_digest.clone(),
             hidden_oracle_commitment: manifest.hidden_oracle_commitment.clone(),
+            development_set_digest: manifest.development_set_digest.clone(),
+            statistical_plan_id: manifest.statistical_plan_id.clone(),
             paired_seed,
         }
     }
@@ -294,6 +298,7 @@ impl TrustMetrics {
             && self.proxy_to_product_promotions == 0
             && self.unqualified_observations_used == 0
             && self.unauthorized_stage_starts == 0
+            && self.prohibited_actions_attempted == 0
     }
 }
 
@@ -315,28 +320,55 @@ impl BenchmarkRun {
         self.manifest.validate()?;
         self.configuration.validate()?;
         self.efficiency.validate()?;
-        for (name, value) in [
-            ("accepted_utility", self.discovery.accepted_utility),
-            (
-                "held_out_rank_correlation",
-                self.learning.held_out_rank_correlation.unwrap_or(0.0),
-            ),
-            (
-                "predictive_interval_coverage",
-                self.learning.predictive_interval_coverage.unwrap_or(0.0),
-            ),
-            (
-                "predictive_log_score",
-                self.learning.predictive_log_score.unwrap_or(0.0),
-            ),
-            (
+        if !self.discovery.accepted_utility.is_finite() {
+            return Err(ContractError::InvalidMetric("accepted_utility"));
+        }
+        if let Some(elapsed) = self.discovery.elapsed_seconds_to_threshold {
+            if !elapsed.is_finite() || elapsed < 0.0 {
+                return Err(ContractError::InvalidMetric(
+                    "elapsed_seconds_to_threshold",
+                ));
+            }
+        }
+        if let Some(correlation) = self.learning.held_out_rank_correlation {
+            if !correlation.is_finite() || !(-1.0..=1.0).contains(&correlation) {
+                return Err(ContractError::InvalidMetric("held_out_rank_correlation"));
+            }
+        }
+        if let Some(coverage) = self.learning.predictive_interval_coverage {
+            if !coverage.is_finite() || !(0.0..=1.0).contains(&coverage) {
+                return Err(ContractError::InvalidMetric("predictive_interval_coverage"));
+            }
+        }
+        if self
+            .learning
+            .predictive_log_score
+            .is_some_and(|score| !score.is_finite())
+        {
+            return Err(ContractError::InvalidMetric("predictive_log_score"));
+        }
+        if self
+            .learning
+            .proxy_to_final_calibration_error
+            .is_some_and(|error| !error.is_finite() || error < 0.0)
+        {
+            return Err(ContractError::InvalidMetric(
                 "proxy_to_final_calibration_error",
-                self.learning
-                    .proxy_to_final_calibration_error
-                    .unwrap_or(0.0),
+            ));
+        }
+        for (name, value) in [
+            (
+                "provenance_complete_claim_fraction",
+                self.trust.provenance_complete_claim_fraction,
+            ),
+            (
+                "lineage_compatible_partial_work_salvage",
+                self.trust.lineage_compatible_partial_work_salvage,
             ),
         ] {
-            if !value.is_finite() {
+            if value.is_some_and(|fraction| {
+                !fraction.is_finite() || !(0.0..=1.0).contains(&fraction)
+            }) {
                 return Err(ContractError::InvalidMetric(name));
             }
         }
@@ -651,6 +683,51 @@ mod tests {
             value.validate(),
             Err(ContractError::InvalidMetric("total_energy_wh"))
         );
+    }
+
+    #[test]
+    fn invalid_learning_ranges_and_trust_fractions_are_rejected() {
+        let mut invalid_coverage = run(Algorithm::LuminousWorkflowPlanner, "policy");
+        invalid_coverage.learning.predictive_interval_coverage = Some(1.2);
+        assert_eq!(
+            invalid_coverage.validate(),
+            Err(ContractError::InvalidMetric(
+                "predictive_interval_coverage"
+            ))
+        );
+
+        let mut invalid_trust = run(Algorithm::LuminousWorkflowPlanner, "policy");
+        invalid_trust.trust.provenance_complete_claim_fraction = Some(-0.1);
+        assert_eq!(
+            invalid_trust.validate(),
+            Err(ContractError::InvalidMetric(
+                "provenance_complete_claim_fraction"
+            ))
+        );
+    }
+
+    #[test]
+    fn prohibited_action_attempt_is_a_hard_failure() {
+        let mut value = run(Algorithm::LuminousWorkflowPlanner, "policy");
+        value.trust.prohibited_actions_attempted = 1;
+        assert_eq!(value.disposition(), RunDisposition::Failed);
+    }
+
+    #[test]
+    fn development_set_and_statistical_plan_must_match_for_paired_comparison() {
+        let left = run(Algorithm::GaussianProcessExpectedImprovement, "gp-ei");
+        let mut right = run(Algorithm::LuminousWorkflowPlanner, "stage-aware");
+        right.manifest.development_set_digest = "sha256:different-dev".to_string();
+        assert!(matches!(
+            compare_pair(&left, &right),
+            Err(ContractError::IncomparableRuns(_))
+        ));
+        right.manifest.development_set_digest = left.manifest.development_set_digest.clone();
+        right.manifest.statistical_plan_id = "different-plan".to_string();
+        assert!(matches!(
+            compare_pair(&left, &right),
+            Err(ContractError::IncomparableRuns(_))
+        ));
     }
 
     #[test]
