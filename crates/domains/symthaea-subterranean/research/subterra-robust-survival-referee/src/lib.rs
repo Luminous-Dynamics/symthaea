@@ -1573,35 +1573,99 @@ mod tests {
             config(),
         )
         .unwrap();
-        assert!((report.per_model[0].robot_loss_probability).abs() < 1.0e-12);
-        assert!((report.per_model[1].robot_loss_probability - 0.02).abs() < 1.0e-8);
+        let zero_model = report.per_model.iter().find(|metric| metric.model_id == "zero").unwrap();
+        let positive_model = report.per_model.iter().find(|metric| metric.model_id == "positive").unwrap();
+        assert!(zero_model.robot_loss_probability.abs() < 1.0e-12);
+        assert!((positive_model.robot_loss_probability - 0.02).abs() < 1.0e-8);
         assert!(
-            report.per_model[0].cached_branch_mismatches > 0,
+            zero_model.cached_branch_mismatches > 0,
             "a cached posterior cannot be treated as valid when the outcome has zero model mass"
         );
     }
 
     #[test]
     fn same_policy_is_revalued_when_models_disagree_about_sensor_likelihoods() {
-        let mut model_a = problem(0.02, true);
-        model_a.actions[0].outcomes[0].likelihood_by_hypothesis = vec![0.9, 0.1, 0.5];
-        model_a.actions[0].outcomes[1].likelihood_by_hypothesis = vec![0.1, 0.9, 0.5];
+        use subterra_survival_reference::{MeasurementAction, MeasurementOutcome};
 
-        let mut model_b = problem(0.02, true);
-        model_b.actions[0].outcomes[0].likelihood_by_hypothesis = vec![0.1, 0.9, 0.5];
-        model_b.actions[0].outcomes[1].likelihood_by_hypothesis = vec![0.9, 0.1, 0.5];
+        let make_model = |open: [f64; 3]| {
+            let blocked = open.map(|value| 1.0 - value);
+            let outcomes = vec![
+                MeasurementOutcome {
+                    id: "signal_open".into(),
+                    kind: OutcomeKind::Observation,
+                    likelihood_by_hypothesis: open.iter().map(|value| 0.98 * value).collect(),
+                    terminal_loss_by_hypothesis: None,
+                },
+                MeasurementOutcome {
+                    id: "signal_blocked".into(),
+                    kind: OutcomeKind::Observation,
+                    likelihood_by_hypothesis: blocked.iter().map(|value| 0.98 * value).collect(),
+                    terminal_loss_by_hypothesis: None,
+                },
+                MeasurementOutcome {
+                    id: "robot_lost".into(),
+                    kind: OutcomeKind::RobotLost,
+                    likelihood_by_hypothesis: vec![0.02; 3],
+                    terminal_loss_by_hypothesis: Some(vec![100.0; 3]),
+                },
+            ];
+            let mut p = problem(0.02, true);
+            p.actions = vec![MeasurementAction {
+                id: "scan".into(),
+                modality: "geophysical_scan".into(),
+                outcomes,
+                cost: ResourceCost {
+                    energy_j: 10.0,
+                    duration_s: 2.0,
+                    data_bytes: 100.0,
+                    exposure_units: 0.1,
+                },
+                external_gate_passed: true,
+            }];
+            p
+        };
 
-        let shared_policy = policy();
+        let model_a = make_model([0.9, 0.1, 0.5]);
+        let model_b = make_model([0.1, 0.9, 0.5]);
+        let shared_policy = PolicyNode {
+            measurement_action_id: Some("scan".into()),
+            stop_decision_id: None,
+            branches: vec![
+                PolicyBranch {
+                    outcome_id: "signal_open".into(),
+                    kind: OutcomeKind::Observation,
+                    probability: 0.49,
+                    posterior: vec![0.6, 0.3, 0.1],
+                    continuation: Some(Box::new(PolicyNode {
+                        measurement_action_id: None,
+                        stop_decision_id: Some("enter".into()),
+                        branches: vec![],
+                    })),
+                },
+                PolicyBranch {
+                    outcome_id: "signal_blocked".into(),
+                    kind: OutcomeKind::Observation,
+                    probability: 0.49,
+                    posterior: vec![0.6, 0.3, 0.1],
+                    continuation: Some(Box::new(PolicyNode {
+                        measurement_action_id: None,
+                        stop_decision_id: Some("hold".into()),
+                        branches: vec![],
+                    })),
+                },
+                PolicyBranch {
+                    outcome_id: "robot_lost".into(),
+                    kind: OutcomeKind::RobotLost,
+                    probability: 0.02,
+                    posterior: vec![0.6, 0.3, 0.1],
+                    continuation: None,
+                },
+            ],
+        };
         let report = evaluate_policy_robustly(
             &[
-                ModelScenario {
-                    model_id: "model-a".into(),
-                    problem: model_a,
-                },
-                ModelScenario {
-                    model_id: "model-b".into(),
-                    problem: model_b,
-                },
+                ModelScenario { model_id: "model-a".into(), problem: model_a },
+                ModelScenario { model_id: "model-b".into(), problem: model_b },
             ],
             &shared_policy,
             config(),
@@ -1620,8 +1684,12 @@ mod tests {
             report.disposition,
             PolicyDisposition::AdmissibleAcrossSuppliedModels
         );
+        assert!(report.per_model.iter().all(|metric| {
+            (metric.robot_loss_probability - 0.02).abs() < 1.0e-8
+        }));
     }
 
+    #[test]
     #[test]
     fn robot_loss_limit_fails_even_when_mean_model_risk_is_lower() {
         let models = vec![
