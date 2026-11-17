@@ -31,6 +31,17 @@ pub enum CoupledError {
     InvalidPulseIdentity,
 }
 
+pub struct CoupledPulseCommand<'a> {
+    pub pulse_id: &'a str,
+    pub incident_irradiance_w_cm2: f64,
+    pub beam_area_cm2: f64,
+    pub on_duration_seconds: f64,
+    pub cooling_pause_seconds: f64,
+    pub gas: &'a TrapAndGasMeasurement,
+    pub source_temperature_k: f64,
+    pub seed: u64,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct CoupledPulseReceipt {
     pub pulse_id: String,
@@ -77,16 +88,9 @@ impl CoupledCampaign {
     /// response and its deposition both validate and commit, or neither does.
     pub fn apply_pulse(
         &mut self,
-        pulse_id: &str,
-        incident_irradiance_w_cm2: f64,
-        beam_area_cm2: f64,
-        on_duration_seconds: f64,
-        cooling_pause_seconds: f64,
-        gas: &TrapAndGasMeasurement,
-        source_temperature_k: f64,
-        seed: u64,
+        command: CoupledPulseCommand<'_>,
     ) -> Result<CoupledPulseReceipt, CoupledError> {
-        if pulse_id.trim().is_empty() {
+        if command.pulse_id.trim().is_empty() {
             return Err(CoupledError::InvalidPulseIdentity);
         }
 
@@ -94,7 +98,11 @@ impl CoupledCampaign {
         let mut staged_optics = self.optics.clone();
         let observed_at = staged_material.state().elapsed_seconds;
         let reading = staged_optics
-            .inspect(&format!("{pulse_id}-pre"), observed_at, seed)
+            .inspect(
+                &format!("{}-pre", command.pulse_id),
+                observed_at,
+                command.seed,
+            )
             .map_err(CoupledError::Optical)?;
         let action = staged_optics
             .decide(&reading, &self.thresholds)
@@ -105,21 +113,21 @@ impl CoupledCampaign {
 
         let transmission = staged_optics.process_transmission()[self.process_band.index()];
         let pulse = LaserPulse {
-            incident_irradiance_w_cm2,
-            beam_area_cm2,
-            on_duration_seconds,
-            cooling_pause_seconds,
+            incident_irradiance_w_cm2: command.incident_irradiance_w_cm2,
+            beam_area_cm2: command.beam_area_cm2,
+            on_duration_seconds: command.on_duration_seconds,
+            cooling_pause_seconds: command.cooling_pause_seconds,
             process_optic_transmission: transmission,
         };
         let result = staged_material
-            .apply_pulse(&pulse, gas)
+            .apply_pulse(&pulse, command.gas)
             .map_err(CoupledError::Material)?;
 
         let deposition = DepositionEvent {
-            event_id: format!("{pulse_id}-deposition"),
+            event_id: format!("{}-deposition", command.pulse_id),
             deposited_flux_ug_cm2: result.optical_deposition_estimate_ug_cm2,
             transfer: self.transfer.clone(),
-            source_temperature_k,
+            source_temperature_k: command.source_temperature_k,
             recorded_at_seconds: result.elapsed_seconds,
         };
         staged_optics
@@ -127,7 +135,7 @@ impl CoupledCampaign {
             .map_err(CoupledError::Optical)?;
 
         let receipt = CoupledPulseReceipt {
-            pulse_id: pulse_id.to_string(),
+            pulse_id: command.pulse_id.to_string(),
             pre_pulse_health: reading,
             applied_transmission: transmission,
             absorbed_energy_j: result.absorbed_energy_j,
@@ -259,16 +267,32 @@ mod tests {
         }
     }
 
+    fn run_pulse(
+        world: &mut CoupledCampaign,
+        pulse_id: &str,
+        gas: &TrapAndGasMeasurement,
+        source_temperature_k: f64,
+        seed: u64,
+    ) -> Result<CoupledPulseReceipt, CoupledError> {
+        world.apply_pulse(CoupledPulseCommand {
+            pulse_id,
+            incident_irradiance_w_cm2: 100.0,
+            beam_area_cm2: 1.0,
+            on_duration_seconds: 1.0,
+            cooling_pause_seconds: 0.0,
+            gas,
+            source_temperature_k,
+            seed,
+        })
+    }
+
+
     #[test]
     fn deposition_from_one_pulse_attenuates_the_next_pulse() {
         let mut world = campaign();
-        let first = world
-            .apply_pulse("pulse-1", 100.0, 1.0, 1.0, 0.0, &gas(), 500.0, 7)
-            .unwrap();
+        let first = run_pulse(&mut world, "pulse-1", &gas(), 500.0, 7).unwrap();
         let after_first = world.process_transmission()[SpectralBand::Visible.index()];
-        let second = world
-            .apply_pulse("pulse-2", 100.0, 1.0, 1.0, 0.0, &gas(), 500.0, 8)
-            .unwrap();
+        let second = run_pulse(&mut world, "pulse-2", &gas(), 500.0, 8).unwrap();
         assert!(first.deposited_flux_ug_cm2.iter().any(|mass| *mass > 0.0));
         assert!(after_first < 1.0);
         assert!(second.applied_transmission < first.applied_transmission);
@@ -278,9 +302,7 @@ mod tests {
     #[test]
     fn witness_and_qcm_remain_distinct_observations() {
         let mut world = campaign();
-        world
-            .apply_pulse("pulse-1", 100.0, 1.0, 1.0, 0.0, &gas(), 500.0, 7)
-            .unwrap();
+        run_pulse(&mut world, "pulse-1", &gas(), 500.0, 7).unwrap();
         assert!(world.qcm_areal_mass_ug_cm2() > 0.0);
         assert!(world.witness_transmission()[SpectralBand::Visible.index()] < 1.0);
         assert!(world.process_transmission()[SpectralBand::Visible.index()] < 1.0);
@@ -294,7 +316,7 @@ mod tests {
     fn failed_deposition_rolls_back_material_state() {
         let mut world = campaign();
         let before = world.material_state().clone();
-        let result = world.apply_pulse("rollback", 100.0, 1.0, 1.0, 0.0, &gas(), -1.0, 7);
+        let result = run_pulse(&mut world, "rollback", &gas(), -1.0, 7);
         assert!(matches!(result, Err(CoupledError::Optical(_))));
         assert_eq!(*world.material_state(), before);
         assert_eq!(world.process_transmission(), [1.0; 4]);
@@ -304,17 +326,13 @@ mod tests {
     fn wet_purge_changes_signal_not_captured_product() {
         let mut dry = campaign();
         let mut wet = campaign();
-        let dry_receipt = dry
-            .apply_pulse("dry", 100.0, 1.0, 1.0, 0.0, &gas(), 500.0, 7)
-            .unwrap();
+        let dry_receipt = run_pulse(&mut dry, "dry", &gas(), 500.0, 7).unwrap();
         let wet_gas = TrapAndGasMeasurement {
             purge_gas_flow_kg_s: 0.01,
             purge_gas_water_mass_fraction: 0.1,
             ..gas()
         };
-        let wet_receipt = wet
-            .apply_pulse("wet", 100.0, 1.0, 1.0, 0.0, &wet_gas, 500.0, 7)
-            .unwrap();
+        let wet_receipt = run_pulse(&mut wet, "wet", &wet_gas, 500.0, 7).unwrap();
         assert_eq!(dry_receipt.captured_water_kg, wet_receipt.captured_water_kg);
         assert!(
             wet_receipt.gas_analyzer_water_signal_kg > dry_receipt.gas_analyzer_water_signal_kg
@@ -324,9 +342,7 @@ mod tests {
     #[test]
     fn receipt_never_claims_physical_measurement() {
         let mut world = campaign();
-        let receipt = world
-            .apply_pulse("sim-only", 100.0, 1.0, 1.0, 0.0, &gas(), 500.0, 7)
-            .unwrap();
+        let receipt = run_pulse(&mut world, "sim-only", &gas(), 500.0, 7).unwrap();
         assert!(receipt.simulation_only);
         assert!(receipt.pre_pulse_health.simulation_only);
     }
