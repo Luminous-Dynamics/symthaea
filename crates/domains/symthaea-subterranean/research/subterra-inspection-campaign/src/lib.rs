@@ -551,23 +551,38 @@ fn compare_greedy_options(
     a: &InspectionOption,
     b: &InspectionOption,
     metric: GreedyMetric,
-) -> Ordering {
+    bundles: &BTreeMap<String, DeploymentBundle>,
+    used_bundles: &BTreeSet<String>,
+) -> Result<Ordering, CampaignError> {
     let score = match metric {
         GreedyMetric::GrossEvsi => b.gross_evsi_micro_units.cmp(&a.gross_evsi_micro_units),
-        GreedyMetric::EvsiPerEnergy => {
-            let a_cost = u128::from(a.variable_resources.energy_millijoules.max(1));
-            let b_cost = u128::from(b.variable_resources.energy_millijoules.max(1));
-            (u128::from(b.gross_evsi_micro_units) * a_cost)
-                .cmp(&(u128::from(a.gross_evsi_micro_units) * b_cost))
-        }
-        GreedyMetric::EvsiPerDuration => {
-            let a_cost = u128::from(a.variable_resources.duration_milliseconds.max(1));
-            let b_cost = u128::from(b.variable_resources.duration_milliseconds.max(1));
+        GreedyMetric::EvsiPerEnergy | GreedyMetric::EvsiPerDuration => {
+            let marginal_cost = |option: &InspectionOption| {
+                let mut resources = option.variable_resources;
+                if !used_bundles.contains(&option.deployment_bundle_id) {
+                    resources = resources
+                        .checked_add(
+                            bundles
+                                .get(&option.deployment_bundle_id)
+                                .ok_or(CampaignError::MissingDeploymentBundle)?
+                                .fixed_resources,
+                        )
+                        .ok_or(CampaignError::ArithmeticOverflow)?;
+                }
+                let denominator = match metric {
+                    GreedyMetric::EvsiPerEnergy => resources.energy_millijoules,
+                    GreedyMetric::EvsiPerDuration => resources.duration_milliseconds,
+                    GreedyMetric::GrossEvsi => unreachable!(),
+                };
+                Ok::<u64, CampaignError>(denominator.max(1))
+            };
+            let a_cost = u128::from(marginal_cost(a)?);
+            let b_cost = u128::from(marginal_cost(b)?);
             (u128::from(b.gross_evsi_micro_units) * a_cost)
                 .cmp(&(u128::from(a.gross_evsi_micro_units) * b_cost))
         }
     };
-    score.then_with(|| a.option_id.cmp(&b.option_id))
+    Ok(score.then_with(|| a.option_id.cmp(&b.option_id)))
 }
 
 pub fn greedy_baseline(
@@ -575,23 +590,44 @@ pub fn greedy_baseline(
     metric: GreedyMetric,
 ) -> Result<GreedyReport, CampaignError> {
     let prepared = prepare(problem)?;
-    let mut options = prepared
+    let options = prepared
         .groups
         .iter()
         .flat_map(|group| group.options.iter().cloned())
         .collect::<Vec<_>>();
-    options.sort_by(|a, b| compare_greedy_options(a, b, metric));
 
     let mut state = PartialSelection::empty();
     let mut covered = BTreeSet::new();
-    for option in &options {
-        if covered.contains(&option.decision_id) {
-            continue;
+    loop {
+        let mut best: Option<InspectionOption> = None;
+        for option in &options {
+            if covered.contains(&option.decision_id)
+                || apply_option(problem, &prepared.bundles, &state, option)?.is_none()
+            {
+                continue;
+            }
+            let Some(current_best) = &best else {
+                best = Some(option.clone());
+                continue;
+            };
+            if compare_greedy_options(
+                option,
+                current_best,
+                metric,
+                &prepared.bundles,
+                &state.used_bundles,
+            )? == Ordering::Less
+            {
+                best = Some(option.clone());
+            }
         }
-        if let Some(next) = apply_option(problem, &prepared.bundles, &state, option)? {
-            state = next;
-            covered.insert(option.decision_id.clone());
-        }
+
+        let Some(selected) = best else {
+            break;
+        };
+        state = apply_option(problem, &prepared.bundles, &state, &selected)?
+            .ok_or(CampaignError::NoFeasibleCampaign)?;
+        covered.insert(selected.decision_id);
     }
 
     if prepared
@@ -717,6 +753,45 @@ mod tests {
         assert_eq!(
             exact.search_disposition,
             SearchDisposition::OptimalityProven
+        );
+    }
+
+    #[test]
+    fn efficiency_greedy_includes_unselected_shared_bundle_setup_cost() {
+        let expensive_setup = DeploymentBundle {
+            bundle_id: "mobilize_heavy".into(),
+            fixed_resources: ResourceVector {
+                energy_millijoules: 10,
+                ..ResourceVector::default()
+            },
+        };
+        let cheap_setup = empty_bundle("mobilize_light");
+        let p = problem(
+            vec![
+                DecisionRequirement {
+                    decision_id: "asset_a".into(),
+                    mandatory: false,
+                },
+                DecisionRequirement {
+                    decision_id: "asset_b".into(),
+                    mandatory: false,
+                },
+            ],
+            vec![expensive_setup, cheap_setup],
+            vec![
+                option("high_value_heavy_setup", "asset_a", "mobilize_heavy", 10, 1),
+                option("lower_value_light_setup", "asset_b", "mobilize_light", 8, 4),
+            ],
+            11,
+        );
+        let energy_greedy = greedy_baseline(&p, GreedyMetric::EvsiPerEnergy).unwrap();
+        assert_eq!(
+            energy_greedy.selection.selected_option_ids,
+            vec!["lower_value_light_setup"]
+        );
+        assert_eq!(
+            energy_greedy.selection.resources.energy_millijoules,
+            4
         );
     }
 
