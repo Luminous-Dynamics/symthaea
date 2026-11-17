@@ -1,6 +1,6 @@
 # Capability-transition ledger
 
-**Status:** dependency-free Rust evaluator; synthetic tests authored, not yet executed here.  
+**Status:** Rust-based Rust evaluator; synthetic tests authored, not yet executed here.  
 **Parent:** HUM-CAPABILITY-TRANSITION-001 #12741.  
 **Benchmark anchor:** HumanoidToolBench's five recorded events.
 
