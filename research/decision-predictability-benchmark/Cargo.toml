@@ -6,7 +6,7 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 license = "AGPL-3.0-or-later"
-description = "Dependency-free metric contracts for decision-relevant dynamical predictability"
+description = "Decision-relevant dynamical predictability metrics and benchmark contracts"
 
 [lib]
 path = "src/lib.rs"
@@ -14,3 +14,8 @@ path = "src/lib.rs"
 [[bin]]
 name = "forecast-fixtures"
 path = "src/bin/forecast-fixtures.rs"
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
