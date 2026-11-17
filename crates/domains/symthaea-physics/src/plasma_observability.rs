@@ -1155,6 +1155,81 @@ mod tests {
     }
 
     #[test]
+    fn two_channel_status_matrix_never_promotes_non_measured_evidence() {
+        let statuses = vec![
+            measured(0.9, 100),
+            ObservationDisposition::Synthetic {
+                value: 0.9,
+                units: "10^20 m^-3".to_owned(),
+                model_id: "diag-recovery".to_owned(),
+                model_revision: "abc123".to_owned(),
+                input_digest: "8".repeat(64),
+            },
+            ObservationDisposition::Unavailable {
+                reason: "dropout".to_owned(),
+            },
+            ObservationDisposition::Invalid {
+                reason: "integrity check failed".to_owned(),
+            },
+            ObservationDisposition::Delayed {
+                value: 0.9,
+                units: "10^20 m^-3".to_owned(),
+                source_id: "interferometer-01".to_owned(),
+                source_digest: "9".repeat(64),
+                calibration: CalibrationIdentity {
+                    calibration_id: "calibration-density-01".to_owned(),
+                    calibration_revision: "2026-11-01".to_owned(),
+                },
+                observed_at_ns: 90,
+                latency_ns: 10,
+            },
+            ObservationDisposition::Degraded {
+                value: 0.9,
+                units: "10^20 m^-3".to_owned(),
+                source_id: "interferometer-01".to_owned(),
+                source_digest: "a".repeat(64),
+                calibration: CalibrationIdentity {
+                    calibration_id: "calibration-density-01".to_owned(),
+                    calibration_revision: "2026-11-01".to_owned(),
+                },
+                observed_at_ns: 100,
+                reason: "quality below registered threshold".to_owned(),
+            },
+        ];
+
+        let mut available_cases = 0usize;
+        let mut abstained_cases = 0usize;
+        for (density_index, density_status) in statuses.iter().enumerate() {
+            for (temperature_index, temperature_status) in statuses.iter().enumerate() {
+                let frame = base_frame(vec![
+                    channel("density", "interferometer", density_status.clone()),
+                    channel("temperature", "thomson", temperature_status.clone()),
+                ]);
+                let gate = frame
+                    .evaluate_decision_gate(&["density", "temperature"])
+                    .expect("all matrix cases have valid frame syntax");
+
+                if density_index == 0 && temperature_index == 0 {
+                    assert!(
+                        matches!(gate, DecisionInputGate::MeasuredInputsAvailable(_)),
+                        "measured+measured must be available"
+                    );
+                    available_cases += 1;
+                } else {
+                    assert!(
+                        matches!(gate, DecisionInputGate::Abstain { .. }),
+                        "status pair ({density_index}, {temperature_index}) must abstain"
+                    );
+                    abstained_cases += 1;
+                }
+            }
+        }
+
+        assert_eq!(available_cases, 1);
+        assert_eq!(abstained_cases, 35);
+    }
+
+    #[test]
     fn counts_preserve_measured_and_synthetic_as_separate_categories() {
         let frame = base_frame(vec![
             channel("density", "interferometer", measured(0.9, 100)),
