@@ -25,8 +25,17 @@ The crate has no third-party dependencies and includes a committed minimal lockf
 
 This is not a G1 driver, UEC v2 platform implementation, safety projector, trajectory planner, transport, physical calibration, hardware binding, or actuator command path. It does not transform position targets into Symthaea torque/PWM values and must not be routed to the current 21-joint PCA9685 HAL.
 
-## Unresolved upstream source boundary
+## Raw joint ordering traced to the pinned upstream producer
 
-The pinned HumanoidToolBench policy code consumes `observation["joint_qpos"]` with 43 values. G1Sonic exposes a 43-joint declared name profile and a named joint-position view, but the exact producer that materializes that observation field has not yet been traced end-to-end in the public source. The projection function therefore requires caller-supplied joint names paired with every qpos value. Until the raw materialization path is pinned and independently confirmed, the adapter status remains blocked and this crate demonstrates only the declared mapping arithmetic—not end-to-end benchmark conformance.
+The 43-value order is now traced end-to-end at `SNU-PI/HumanoidToolBench@3fec9bd36933a1648ff7f95468c983f3452243a0`:
+
+1. `SonicLocoManip._get_obs` builds `joint_qpos` from `list(self.mujoco.get_robot_qpos().values())`.
+2. `MujocoEngine.get_robot_qpos` delegates to the task robot's `get_robot_qpos`.
+3. `G1Sonic.get_robot_qpos` iterates `self.joints.items()`.
+4. `G1Sonic.setup_control` populates `self.joints` by iterating `self.joint_names`, the exact 43-name `WHOLE_BODY_JOINTS` profile.
+
+Python dictionary insertion order preserves this order. The mapping manifest now records all three producer files and their pinned Git blob IDs. `project_pinned_qpos` is a convenience entry point for exactly this source-pinned order; `project_policy_state` remains available when callers provide explicit name/value pairs and can safely handle reordering.
+
+This resolves the raw-qpos order blocker for the pinned simulation source. It does **not** qualify a UEC v2 platform adapter, simulator episode, real-G1 driver, physical calibration, safety case or actuator authority. UEC v2 integration remains gated on the canonical APIs and runtime conformance.
 
 Upstream reference: `SNU-PI/HumanoidToolBench@3fec9bd36933a1648ff7f95468c983f3452243a0`.
