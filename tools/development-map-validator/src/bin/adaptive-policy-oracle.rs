@@ -338,7 +338,7 @@ fn enumerate_policies(
    outcome_keys.push(outcome.clone());
    if part.is_empty(){
     let id=format!("stop-unreachable-{}",*counter);*counter+=1;
-    child_lists.push(vec![SubPolicy{root:id.clone(),nodes:vec![json!({"node_id":id,"kind":"stop","decision_kind":"defer","action_id":defer_action,"claimed_residual_risk_bps":SCALE})]}]);
+    child_lists.push(vec![SubPolicy{root:id.clone(),nodes:vec![json!({"node_id":id,"kind":"stop","decision_kind":"defer","action_id":defer_action,"claimed_residual_risk_bps":0})]}]);
    }else{
     let mut new_steps=steps.to_vec();new_steps.push(Step{option_id:option_id.clone(),outcome:outcome.clone(),at:at.clone()});
     let subs=enumerate_policies(part,&new_steps,&new_used,depth+1,candidate,oracle,actions,options,worlds,outcomes,counter,total_generated)?;
