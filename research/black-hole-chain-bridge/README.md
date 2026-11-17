@@ -51,9 +51,15 @@ A graph Laplacian is not automatically a curvature tensor. A Lorentz algebra is 
 - Symtropy #2870 classical finite relational-grammar benchmark (structural analogy only).
 - Symtropy #5811 matched GR/Weyl/quantum-information black-hole comparison.
 
+## Finite arithmetic reproduction
+
+A separate Rust reference now enumerates the four slot dimensions [8,3,8,3], the read-exchange orbits, 169 two-slot product assignments, three qubit commutator records, the 79/48/42/3 exchange-weight sectors, the 31104 readout dimension and the exact radical numerator. See [FINITE_ARITHMETIC_REPRODUCTION.md](FINITE_ARITHMETIC_REPRODUCTION.md) and [chain_alpha_count.rs](reference/chain_alpha_count.rs).
+
+This is deliberately a bounded independent combinatorial audit, not a port of the full Lean theorem: it does not reconstruct all operator matrices, matrix commutator expansions, matching-group theorems, or physical interpretation. Its Rust tests are authored but not executed in this environment because rustc/Cargo are unavailable.
+
 ## First experiments
 
-1. Independently reproduce the finite alpha arithmetic and 172-record count, separately from the photon/alpha physical identification.
+1. Execute the Rust finite-count oracle and independently reproduce the full qutrit/qubit matrix basis, trace pairings, commutator records and exact readout result; keep the physical photon/alpha identification separate.
 2. Independently implement the specified finite web, matching, link and read operations.
 3. Check tensor-factor semantics, normalization, positivity, monogamy and no-cloning in small exact Hilbert spaces.
 4. Reproduce the compendium's competing curvature operators and known disagreement.
