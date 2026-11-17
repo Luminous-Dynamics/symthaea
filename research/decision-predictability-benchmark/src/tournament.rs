@@ -993,9 +993,9 @@ mod tests {
 
         let mut second = first.clone();
         let development_end = first.len() * DEVELOPMENT_PERCENT / 100;
-        for index in development_end..second.len() {
+        for (index, value) in second.iter_mut().enumerate().skip(development_end) {
             let phase = (index - development_end) as f64;
-            second[index] = 0.35 + 0.12 * (phase * 0.31).sin();
+            *value = 0.35 + 0.12 * (phase * 0.31).sin();
         }
 
         let first_output = evaluate_fixture_csv(&csv_for(&first)).unwrap();
