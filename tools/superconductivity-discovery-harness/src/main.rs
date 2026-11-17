@@ -1,5 +1,5 @@
 use jsonschema::validator_for;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::env;
@@ -49,7 +49,11 @@ fn required_str<'a>(value: &'a Value, key: &str, context: &str) -> Result<&'a st
         .ok_or_else(|| format!("{context}: missing or empty string field {key}"))
 }
 
-fn required_array<'a>(value: &'a Value, key: &str, context: &str) -> Result<&'a Vec<Value>, String> {
+fn required_array<'a>(
+    value: &'a Value,
+    key: &str,
+    context: &str,
+) -> Result<&'a Vec<Value>, String> {
     value
         .get(key)
         .and_then(Value::as_array)
@@ -64,7 +68,9 @@ fn audit_registry(schema_bytes: &[u8], registry_bytes: &[u8]) -> Result<Value, S
 
     const DIALECT: &str = "https://json-schema.org/draft/2020-12/schema";
     if schema.get("$schema").and_then(Value::as_str) != Some(DIALECT) {
-        return Err(format!("schema must declare Draft 2020-12 exactly ({DIALECT})"));
+        return Err(format!(
+            "schema must declare Draft 2020-12 exactly ({DIALECT})"
+        ));
     }
     reject_schema_references(&schema, "#")?;
 
@@ -124,7 +130,11 @@ fn audit_registry(schema_bytes: &[u8], registry_bytes: &[u8]) -> Result<Value, S
         let predictions = match candidate.get("tc_prediction") {
             None | Some(Value::Null) => &[][..],
             Some(Value::Array(items)) => items.as_slice(),
-            Some(_) => return Err(format!("{candidate_id}: tc_prediction must be array or null")),
+            Some(_) => {
+                return Err(format!(
+                    "{candidate_id}: tc_prediction must be array or null"
+                ));
+            }
         };
 
         match evidence_class {
@@ -291,14 +301,12 @@ mod tests {
 
     fn committed_inputs() -> (Vec<u8>, Vec<u8>) {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let schema = fs::read(
-            root.join("data/schemas/superconductivity_discovery_case_v0_1.schema.json"),
-        )
-        .expect("committed schema should be readable");
-        let registry = fs::read(
-            root.join("data/research/sc_superconductor_discovery_cases_v0_1.json"),
-        )
-        .expect("committed registry should be readable");
+        let schema =
+            fs::read(root.join("data/schemas/superconductivity_discovery_case_v0_1.schema.json"))
+                .expect("committed schema should be readable");
+        let registry =
+            fs::read(root.join("data/research/sc_superconductor_discovery_cases_v0_1.json"))
+                .expect("committed registry should be readable");
         (schema, registry)
     }
 
