@@ -204,6 +204,38 @@
           },
           "safety_review": {
             "type": "string"
+          },
+          "tc_calculations": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object",
+              "required": [
+                "value_k",
+                "pressure_gpa",
+                "method",
+                "status"
+              ],
+              "properties": {
+                "value_k": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "pressure_gpa": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "method": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            }
           }
         },
         "additionalProperties": true
