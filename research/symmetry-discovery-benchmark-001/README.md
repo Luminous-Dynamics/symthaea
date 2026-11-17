@@ -103,7 +103,7 @@ For mechanics, align masses, constraints, constitutive/contact models, integrato
 
 ## Artifacts and reproducibility
 
-- `fixtures/v0.1/cases.json`: first exact finite fixtures.
+- `fixtures/v0.1/cases.json`: five hand-authored exact controls plus 150 deterministic generated point-set instances (30 each for D4, C4, C2 half-turn, C2 reflection, and C1).
 - `schemas/case_manifest.schema.json`: manifest validation.
 - Future accepted run: baseline source/version, input and split digests, hardware/software record, raw predictions, verifier receipts, all failures, and scorecard.
 - Never label a target as achieved from fixture unit tests alone.
@@ -127,4 +127,8 @@ It validates the Draft 2020-12 manifest and then independently checks:
 - polynomial invariance under each group matrix using exact rational coefficient expansion;
 - the expected subgroup label for every frozen case.
 
-The workflow runs this against the exact triggering revision and is guarded against draft PR execution. This is fixture qualification only; no external learner baseline is run by it.
+The deterministic corpus is regenerated from the manifest's D4 matrices using xorshift32 orbit seeds. Reproduce or refresh it with:
+
+    python3 -I research/symmetry-discovery-benchmark-001/tools/generate_d4_pointsets.py --write
+
+The validator checks that the frozen 150 generated cases exactly match the generator output before computing their stabilizers. The workflow runs these checks against the exact triggering revision and is guarded against draft PR execution. This is fixture qualification only; no external learner baseline is run by it.
