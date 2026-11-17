@@ -11,7 +11,7 @@
 #[path = "campaign_resources.rs"]
 mod campaign_resources;
 
-use campaign_resources::{CampaignBudget, ResourceBasis, ResourceVector};
+use campaign_resources::{CampaignBudget, ResourceVector};
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt;
