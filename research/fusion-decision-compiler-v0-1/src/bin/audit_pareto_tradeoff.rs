@@ -27,16 +27,16 @@ fn profile() -> ObjectiveComparisonProfile {
     }
 }
 
-fn candidate(
-    id: &str,
-    energy_mwh: f64,
-    whole_life_cost: f64,
-    availability: f64,
-    planned_downtime: f64,
-    unplanned_downtime: f64,
-    ebi: f64,
-    uncertainty_width_mwe: f64,
-) -> CandidateObjectiveVector {
+fn candidate(id: &str, values: [f64; 7] -> CandidateObjectiveVector {
+    let [
+        energy_mwh,
+        whole_life_cost,
+        availability,
+        planned_downtime,
+        unplanned_downtime,
+        ebi,
+        uncertainty_width_mwe,
+    ] = values;
     let profile = profile();
     CandidateObjectiveVector {
         candidate_id: id.to_string(),
@@ -69,7 +69,7 @@ fn main() {
         300.0,
         0.8,
         25.0,
-    );
+    ;
     let higher_service = candidate(
         "higher-service",
         12_000.0,
@@ -79,7 +79,7 @@ fn main() {
         350.0,
         0.9,
         15.0,
-    );
+    ;
 
     let pair = compare_pair(&profile, &higher_qeng, &higher_service);
     println!("contract_version={}", pair.contract_version);
@@ -102,7 +102,7 @@ fn main() {
         std::process::exit(1);
     }
 
-    let strict_dominator = candidate("dominant", 13_000.0, 7_000.0, 0.97, 250.0, 150.0, 0.6, 10.0);
+    let strict_dominator = candidate("dominant", [13_000.0, 7_000.0, 0.97, 250.0, 150.0, 0.6, 10.0]);
     let frontier = extract_pareto_front(&profile, &[higher_qeng, higher_service, strict_dominator]);
     println!("pareto_front={:?}", frontier.frontier_candidate_ids);
     println!(
