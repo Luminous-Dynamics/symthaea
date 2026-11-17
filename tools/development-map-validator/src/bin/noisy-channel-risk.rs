@@ -655,7 +655,12 @@ mod tests{
     use super::*;
     const CANDIDATE:&str=include_str!("../../../../docs/development-map/fixtures/egddm-noisy-channel-candidate-v0.1.json");
     const ORACLE:&str=include_str!("../../../../docs/development-map/fixtures/egddm-noisy-channel-oracle-v0.1.json");
+    const EXPECTED:&str=include_str!("../../../../docs/development-map/fixtures/egddm-noisy-channel-v0.1.expected.json");
     fn report()->Value{evaluate_noisy_channel_parts_json(CANDIDATE,ORACLE).expect("D6.17 fixture evaluates")}
+    #[test]fn complete_fixture_matches_independent_known_answer_report(){
+        let expected:Value=serde_json::from_str(EXPECTED).expect("expected JSON");
+        assert_eq!(report(),expected);
+    }
     fn trace<'a>(value:&'a Value,id:&str)->&'a Value{
         value["traces"].as_array().unwrap().iter().find(|t|t["trace_id"]==id).expect("known trace")
     }
