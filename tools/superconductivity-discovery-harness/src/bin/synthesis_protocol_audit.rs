@@ -391,6 +391,7 @@ fn validate_protocol(
         .ok_or_else(|| "outcome_records must be an array".to_owned())?;
     let mut outcome_ids = HashSet::with_capacity(outcomes.len());
     let mut phase_count = 0usize;
+    let mut linked_characterization_event_count = 0usize;
 
     for outcome in outcomes {
         let outcome_id = nonempty_text(outcome, "outcome_id")?;
@@ -426,6 +427,7 @@ fn validate_protocol(
             if !linked_events.insert(event_id.to_owned()) {
                 return Err(format!("{outcome_id}: duplicate characterization event id {event_id}"));
             }
+            linked_characterization_event_count += 1;
             let event = observation_events.get(event_id).ok_or_else(|| {
                 format!("{outcome_id}: unresolved characterization event {event_id}")
             })?;
@@ -502,7 +504,8 @@ fn validate_protocol(
         "protocol_id": protocol_id,
         "source_count": source_ids.len(),
         "observation_source_count": observation_source_count,
-        "linked_characterization_event_count": observation_events.len(),
+        "available_observation_event_count": observation_events.len(),
+        "linked_characterization_event_count": linked_characterization_event_count,
         "precursor_count": precursor_ids.len(),
         "planned_step_count": planned.len(),
         "execution_run_count": runs.len(),
@@ -652,63 +655,71 @@ mod tests {
 
     fn audit_mutated(fixture: Value, observations: Value) -> Result<Value, String> {
         let (schema, _, observation_schema, _) = committed_inputs();
-        let bytes = serde_json::to_vec(&fixture).unwrap();
+        let protocol_bytes = serde_json::to_vec(&fixture).unwrap();
         let observation_bytes = serde_json::to_vec(&observations).unwrap();
-        validate_protocol(&schema, &bytes, &observation_schema, &observation_bytes)
+        validate_protocol(
+            &schema,
+            &protocol_bytes,
+            &observation_schema,
+            &observation_bytes,
+        )
     }
 
     #[test]
-    fn committed_protocol_fixture_passes() {
+    fn committed_protocol_and_characterization_link_pass() {
         let (schema, fixture, observation_schema, observations) = committed_inputs();
-        let bytes = serde_json::to_vec(&fixture).unwrap();
+        let protocol_bytes = serde_json::to_vec(&fixture).unwrap();
         let observation_bytes = serde_json::to_vec(&observations).unwrap();
-        let receipt =
-            validate_protocol(&schema, &bytes, &observation_schema, &observation_bytes).unwrap();
+        let receipt = validate_protocol(
+            &schema,
+            &protocol_bytes,
+            &observation_schema,
+            &observation_bytes,
+        )
+        .unwrap();
         assert_eq!(receipt["planned_step_count"], 2);
         assert_eq!(receipt["execution_run_count"], 1);
         assert_eq!(receipt["sensor_verified_step_count"], 2);
         assert_eq!(receipt["outcome_count"], 1);
-        assert_eq!(receipt["linked_characterization_event_count"], 5);
+        assert_eq!(receipt["linked_characterization_event_count"], 1);
     }
 
     #[test]
     fn commanded_step_cannot_claim_actual_execution() {
-        let (_, mut fixture) = committed_inputs();
+        let (_, mut fixture, _, observations) = committed_inputs();
         fixture["execution_runs"][0]["steps"][0]["execution_state"] = json!("commanded");
-        let (_, _, _, observations) = committed_inputs();
         assert!(audit_mutated(fixture, observations).is_err());
     }
 
     #[test]
     fn sensor_verified_requires_a_resolved_source() {
-        let (_, mut fixture) = committed_inputs();
+        let (_, mut fixture, _, observations) = committed_inputs();
         fixture["execution_runs"][0]["steps"][0]["actual_evidence"]["source_id"] =
             json!("missing-source");
-        assert!(audit_mutated(fixture).is_err());
+        assert!(audit_mutated(fixture, observations).is_err());
     }
 
     #[test]
     fn failed_attempts_require_a_failure_reason_and_are_preserved() {
-        let (_, mut fixture) = committed_inputs();
+        let (_, mut fixture, _, observations) = committed_inputs();
         fixture["execution_runs"][0]["steps"][0]["execution_state"] = json!("failed");
         fixture["execution_runs"][0]["steps"][0]["actual_evidence"] = Value::Null;
         fixture["execution_runs"][0]["steps"][0]["failure_reason"] = json!("synthetic failure");
         fixture["execution_runs"][0]["status"] = json!("failed");
-        let (_, _, _, observations) = committed_inputs();
         let receipt = audit_mutated(fixture, observations).unwrap();
         assert_eq!(receipt["failed_or_aborted_step_count"], 1);
     }
 
     #[test]
     fn outcomes_must_reference_an_existing_run() {
-        let (_, mut fixture) = committed_inputs();
+        let (_, mut fixture, _, observations) = committed_inputs();
         fixture["outcome_records"][0]["run_id"] = json!("missing-run");
-        assert!(audit_mutated(fixture).is_err());
+        assert!(audit_mutated(fixture, observations).is_err());
     }
 
     #[test]
     fn phase_fractions_cannot_exceed_one_hundred_percent() {
-        let (_, mut fixture) = committed_inputs();
+        let (_, mut fixture, _, observations) = committed_inputs();
         fixture["outcome_records"][0]["realized_phases"].push(json!({
             "phase_id": "second-phase",
             "identity_status": "identified",
@@ -718,7 +729,7 @@ mod tests {
             "microstructure_notes": null
         }));
         fixture["outcome_records"][0]["realized_phases"][0]["phase_fraction_percent"] = json!(70.0);
-        assert!(audit_mutated(fixture).is_err());
+        assert!(audit_mutated(fixture, observations).is_err());
     }
 
     #[test]
@@ -765,15 +776,15 @@ mod tests {
 
     #[test]
     fn planned_step_sequences_must_be_increasing() {
-        let (_, mut fixture) = committed_inputs();
+        let (_, mut fixture, _, observations) = committed_inputs();
         fixture["planned_steps"][1]["sequence"] = json!(0);
-        assert!(audit_mutated(fixture).is_err());
+        assert!(audit_mutated(fixture, observations).is_err());
     }
 
     #[test]
     fn execution_must_reference_a_planned_step() {
-        let (_, mut fixture) = committed_inputs();
+        let (_, mut fixture, _, observations) = committed_inputs();
         fixture["execution_runs"][0]["steps"][0]["step_id"] = json!("missing-step");
-        assert!(audit_mutated(fixture).is_err());
+        assert!(audit_mutated(fixture, observations).is_err());
     }
 }
