@@ -47,10 +47,15 @@ pub struct OperationSpec {
     pub attempt_id: AttemptId,
     pub work_package_id: WorkPackageId,
     pub work_package_revision: u64,
+    pub work_package_digest: EvidenceDigest,
     pub design_revision: u64,
+    pub design_digest: EvidenceDigest,
     pub coordinate_frame_revision: u64,
+    pub coordinate_frame_digest: EvidenceDigest,
     pub calibration_revision: u64,
+    pub calibration_digest: EvidenceDigest,
     pub authority_revision: u64,
+    pub authority_evidence_digest: EvidenceDigest,
     pub executor_id: u64,
     pub executor_sensor_chain_id: u64,
     /// Declared common-cause domains for the executor's sensing/evidence path.
@@ -66,10 +71,15 @@ impl OperationSpec {
             || self.attempt_id.0 == 0
             || self.work_package_id.0 == 0
             || self.work_package_revision == 0
+            || !self.work_package_digest.is_present()
             || self.design_revision == 0
+            || !self.design_digest.is_present()
             || self.coordinate_frame_revision == 0
+            || !self.coordinate_frame_digest.is_present()
             || self.calibration_revision == 0
+            || !self.calibration_digest.is_present()
             || self.authority_revision == 0
+            || !self.authority_evidence_digest.is_present()
             || self.executor_id == 0
             || self.executor_sensor_chain_id == 0
             || self.required_coverage_per_mille == 0
@@ -130,6 +140,11 @@ pub enum OperationEvent {
         coordinate_frame_revision: u64,
         calibration_revision: u64,
         authority_revision: u64,
+        work_package_digest: EvidenceDigest,
+        design_digest: EvidenceDigest,
+        coordinate_frame_digest: EvidenceDigest,
+        calibration_digest: EvidenceDigest,
+        authority_evidence_digest: EvidenceDigest,
     },
     CommandIssued {
         command_digest: EvidenceDigest,
@@ -142,6 +157,7 @@ pub enum OperationEvent {
         command_digest: EvidenceDigest,
         telemetry_digest: EvidenceDigest,
         calibration_revision: u64,
+        calibration_digest: EvidenceDigest,
     },
     OutcomeTimedOut,
     ReconciledNotExecuted {
@@ -173,7 +189,9 @@ pub struct PhysicalDeltaEvidence {
     pub source_robot_id: u64,
     pub sensor_chain_id: u64,
     pub coordinate_frame_revision: u64,
+    pub coordinate_frame_digest: EvidenceDigest,
     pub calibration_revision: u64,
+    pub calibration_digest: EvidenceDigest,
     pub coverage_per_mille: u16,
     pub unobserved_required_regions: u32,
     pub digest: EvidenceDigest,
@@ -184,7 +202,9 @@ pub struct VerificationReceipt {
     pub verifier_id: u64,
     pub sensor_chain_id: u64,
     pub coordinate_frame_revision: u64,
+    pub coordinate_frame_digest: EvidenceDigest,
     pub calibration_revision: u64,
+    pub calibration_digest: EvidenceDigest,
     pub coverage_per_mille: u16,
     pub unobserved_required_regions: u32,
     pub common_cause_domains: Vec<u64>,
@@ -225,10 +245,13 @@ impl VerificationReceipt {
         if self.sensor_chain_id == 0 || self.sensor_chain_id == spec.executor_sensor_chain_id {
             issues.push(VerificationIssue::SensorChainShared);
         }
-        if self.coordinate_frame_revision != spec.coordinate_frame_revision {
+        if self.coordinate_frame_revision != spec.coordinate_frame_revision
+            || self.coordinate_frame_digest != spec.coordinate_frame_digest
+        {
             issues.push(VerificationIssue::CoordinateFrameMismatch);
         }
-        if self.calibration_revision != spec.calibration_revision {
+        if self.calibration_revision != spec.calibration_revision
+            || self.calibration_digest != spec.calibration_digest {
             issues.push(VerificationIssue::CalibrationMismatch);
         }
         if self.coverage_per_mille < spec.required_coverage_per_mille
@@ -272,7 +295,9 @@ pub struct StampedOperationEvent {
     /// Monotonic mission step; wall-clock timestamps are intentionally not used
     /// as causal proof by this local reference contract.
     pub observed_at_step: u64,
+    pub work_package_id: WorkPackageId,
     pub work_package_revision: u64,
+    pub work_package_digest: EvidenceDigest,
     pub event: OperationEvent,
 }
 
@@ -289,6 +314,8 @@ pub enum ContractError {
     InvalidSpecification,
     InvalidCommonCauseDeclaration,
     EventSequenceGap { expected: u64, received: u64 },
+    EventSequenceExhausted,
+    WorkPackageIdentityMismatch,
     StepRegression,
     WorkPackageRevisionMismatch,
     WorkPackageExpired,
@@ -371,6 +398,11 @@ impl OperationAttempt {
         if stamped.observed_at_step < self.last_observed_at_step {
             return Err(ContractError::StepRegression);
         }
+        if stamped.work_package_id != self.spec.work_package_id
+            || stamped.work_package_digest != self.spec.work_package_digest
+        {
+            return Err(ContractError::WorkPackageIdentityMismatch);
+        }
         if stamped.work_package_revision != self.spec.work_package_revision {
             return Err(ContractError::WorkPackageRevisionMismatch);
         }
@@ -390,11 +422,15 @@ impl OperationAttempt {
             return Err(ContractError::WorkPackageExpired);
         }
 
+        let next_sequence = self
+            .next_sequence
+            .checked_add(1)
+            .ok_or(ContractError::EventSequenceExhausted)?;
         let from = self.state;
         let to = self.transition(&stamped.event)?;
         self.state = to;
         self.last_observed_at_step = stamped.observed_at_step;
-        self.next_sequence = self.next_sequence.saturating_add(1);
+        self.next_sequence = next_sequence;
         self.history.push(TransitionRecord {
             sequence: stamped.sequence,
             observed_at_step: stamped.observed_at_step,
@@ -412,6 +448,11 @@ impl OperationAttempt {
                 coordinate_frame_revision,
                 calibration_revision,
                 authority_revision,
+                work_package_digest,
+                design_digest,
+                coordinate_frame_digest,
+                calibration_digest,
+                authority_evidence_digest,
             } if self.state == AttemptState::Approved => {
                 if *work_package_revision != self.spec.work_package_revision
                     || *design_revision != self.spec.design_revision
@@ -420,8 +461,17 @@ impl OperationAttempt {
                 {
                     return Err(ContractError::WorkPackageRevisionMismatch);
                 }
-                if *authority_revision != self.spec.authority_revision {
+                if *authority_revision != self.spec.authority_revision
+                    || *authority_evidence_digest != self.spec.authority_evidence_digest
+                {
                     return Err(ContractError::InvalidAuthorityRevision);
+                }
+                if *work_package_digest != self.spec.work_package_digest
+                    || *design_digest != self.spec.design_digest
+                    || *coordinate_frame_digest != self.spec.coordinate_frame_digest
+                    || *calibration_digest != self.spec.calibration_digest
+                {
+                    return Err(ContractError::WorkPackageIdentityMismatch);
                 }
                 Ok(AttemptState::PreflightAccepted)
             }
@@ -451,6 +501,7 @@ impl OperationAttempt {
                 command_digest,
                 telemetry_digest,
                 calibration_revision,
+                calibration_digest,
             } if self.state == AttemptState::Acknowledged => {
                 if Some(*command_digest) != self.command_digest {
                     return Err(ContractError::CommandDigestMismatch);
@@ -458,7 +509,9 @@ impl OperationAttempt {
                 if !telemetry_digest.is_present() {
                     return Err(ContractError::MissingDigest);
                 }
-                if *calibration_revision != self.spec.calibration_revision {
+                if *calibration_revision != self.spec.calibration_revision
+                    || *calibration_digest != self.spec.calibration_digest
+                {
                     return Err(ContractError::CalibrationMismatch);
                 }
                 Ok(AttemptState::ActuationObserved)
@@ -499,10 +552,13 @@ impl OperationAttempt {
                 {
                     return Err(ContractError::InvalidEvidenceSource);
                 }
-                if evidence.coordinate_frame_revision != self.spec.coordinate_frame_revision {
+                if evidence.coordinate_frame_revision != self.spec.coordinate_frame_revision
+                    || evidence.coordinate_frame_digest != self.spec.coordinate_frame_digest
+                {
                     return Err(ContractError::CoordinateFrameMismatch);
                 }
-                if evidence.calibration_revision != self.spec.calibration_revision {
+                if evidence.calibration_revision != self.spec.calibration_revision
+                    || evidence.calibration_digest != self.spec.calibration_digest {
                     return Err(ContractError::CalibrationMismatch);
                 }
                 if !evidence.digest.is_present() {
@@ -670,10 +726,15 @@ mod tests {
             attempt_id: AttemptId(11),
             work_package_id: WorkPackageId(3),
             work_package_revision: 4,
+            work_package_digest: digest(20),
             design_revision: 9,
+            design_digest: digest(21),
             coordinate_frame_revision: 2,
+            coordinate_frame_digest: digest(22),
             calibration_revision: 5,
+            calibration_digest: digest(23),
             authority_revision: 6,
+            authority_evidence_digest: digest(24),
             executor_id: 100,
             executor_sensor_chain_id: 200,
             executor_common_cause_domains: vec![1, 2],
@@ -686,7 +747,9 @@ mod tests {
         StampedOperationEvent {
             sequence,
             observed_at_step: step,
+            work_package_id: WorkPackageId(3),
             work_package_revision: 4,
+            work_package_digest: digest(20),
             event,
         }
     }
@@ -704,6 +767,11 @@ mod tests {
                         coordinate_frame_revision: 2,
                         calibration_revision: 5,
                         authority_revision: 6,
+                        work_package_digest: digest(20),
+                        design_digest: digest(21),
+                        coordinate_frame_digest: digest(22),
+                        calibration_digest: digest(23),
+                        authority_evidence_digest: digest(24),
                     },
                 ),
             )
@@ -747,6 +815,7 @@ mod tests {
                         command_digest: digest(10),
                         telemetry_digest: digest(12),
                         calibration_revision: 5,
+                        calibration_digest: digest(23),
                     },
                 ),
             )
@@ -758,7 +827,9 @@ mod tests {
             source_robot_id: 100,
             sensor_chain_id: 200,
             coordinate_frame_revision: 2,
+            coordinate_frame_digest: digest(22),
             calibration_revision: 5,
+            calibration_digest: digest(23),
             coverage_per_mille: 900,
             unobserved_required_regions: 1,
             digest: digest(13),
@@ -770,7 +841,9 @@ mod tests {
             verifier_id: 300,
             sensor_chain_id: 400,
             coordinate_frame_revision: 2,
+            coordinate_frame_digest: digest(22),
             calibration_revision: 5,
+            calibration_digest: digest(23),
             coverage_per_mille: 1000,
             unobserved_required_regions: 0,
             common_cause_domains: vec![3, 4],
@@ -1026,6 +1099,11 @@ mod tests {
                     coordinate_frame_revision: 2,
                     calibration_revision: 5,
                     authority_revision: 6,
+                    work_package_digest: digest(20),
+                    design_digest: digest(21),
+                    coordinate_frame_digest: digest(22),
+                    calibration_digest: digest(23),
+                    authority_evidence_digest: digest(24),
                 }),
             ),
             Err(ContractError::WorkPackageRevisionMismatch)
@@ -1040,6 +1118,11 @@ mod tests {
                     coordinate_frame_revision: 2,
                     calibration_revision: 5,
                     authority_revision: 6,
+                    work_package_digest: digest(20),
+                    design_digest: digest(21),
+                    coordinate_frame_digest: digest(22),
+                    calibration_digest: digest(23),
+                    authority_evidence_digest: digest(24),
                 }),
             ).unwrap(),
             AttemptState::PreflightAccepted
