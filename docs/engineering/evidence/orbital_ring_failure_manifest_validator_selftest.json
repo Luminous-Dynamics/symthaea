@@ -1,0 +1,300 @@
+{
+  "checks": [
+    {
+      "id": "23_required_fields",
+      "status": "passed"
+    },
+    {
+      "id": "empty_template_contract_valid_but_blocked",
+      "status": "passed"
+    },
+    {
+      "id": "empty_template_blocks_all_fields",
+      "status": "passed"
+    },
+    {
+      "id": "not_run_is_not_a_physics_claim",
+      "status": "passed"
+    },
+    {
+      "id": "missing_inertial_frame_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_support_frame_transform_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_ring_radius_m_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_ring_plane_orientation_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_initial_ring_position_m_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_initial_ring_velocity_m_s_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_initial_equilibrium_evidence_ref_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_skyhook_support_locations_rad_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_support_load_before_n_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_support_load_after_n_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_load_change_profile_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_load_step_time_s_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_rider_spacing_m_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_rider_force_law_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_rider_stiffness_n_per_m_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_rider_damping_n_s_per_m_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_rider_max_coupling_force_n_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_actuation_measurement_delay_s_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_force_model_reference_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_energy_boundary_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_momentum_boundary_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_acceptance_limits_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_independent_reference_case_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "complete_fixture_review_ready_not_physics_passed",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_inertial_frame_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_support_frame_transform_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_ring_radius_m_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_ring_plane_orientation_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_initial_ring_position_m_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_initial_ring_velocity_m_s_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_initial_equilibrium_evidence_ref_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_skyhook_support_locations_rad_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_support_load_before_n_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_support_load_after_n_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_load_change_profile_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_load_step_time_s_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_rider_spacing_m_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_rider_force_law_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_rider_stiffness_n_per_m_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_rider_damping_n_s_per_m_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_rider_max_coupling_force_n_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_actuation_measurement_delay_s_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_force_model_reference_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_energy_boundary_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_momentum_boundary_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_acceptance_limits_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_provenance_independent_reference_case_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "wrong_numeric_type_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "tbd_force_law_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "non_unit_plane_normal_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "step_with_nonzero_duration_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "premature_gate_upgrade_rejected",
+      "status": "passed"
+    },
+    {
+      "id": "position_radius_mismatch_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "load_increase_in_reduction_scenario_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "duplicate_support_locations_block",
+      "status": "passed"
+    },
+    {
+      "id": "energy_boundary_frame_mismatch_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "acceptance_limit_above_coupler_capacity_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_transform_direction_metadata_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_energy_term_inventory_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_momentum_term_inventory_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "transform_target_frame_mismatch_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "test_fixture_provenance_blocks_candidate",
+      "status": "passed"
+    },
+    {
+      "id": "rejected_evidence_provenance_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "empty_provenance_references_block",
+      "status": "passed"
+    },
+    {
+      "id": "circular_reference_tangent_state_review_ready",
+      "status": "passed"
+    },
+    {
+      "id": "circular_reference_radial_speed_over_limit_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "circular_reference_missing_radial_tolerance_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_path_constraint_fails_structural_gate",
+      "status": "passed"
+    },
+    {
+      "id": "scenario_version_mismatch_fails_structural_gate",
+      "status": "passed"
+    }
+  ],
+  "checks_failed": 0,
+  "checks_passed": 73,
+  "interpretation": "Contract and provenance checks only; review-ready does not mean physically validated or safe.",
+  "schema": "luminous-dynamics.orbital-ring-manifest-self-test/v1"
+}

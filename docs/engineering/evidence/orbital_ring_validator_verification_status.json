@@ -1,0 +1,57 @@
+{
+  "current_reference_checker": {
+    "expected_check_count": 70,
+    "git_blob_sha": "285f9d1c0423c7fcb88eec541626c05c064abd7a",
+    "path": "scripts/engineering/orbital_ring_reference_check.py",
+    "sha256": "2dab9ac78d49ae2502df48387632ad2b3da821179237c80abae3707aa4f9e69b",
+    "unexecuted_check_ids": [
+      "circular_stream.zero_density_large_finite_speed_is_zero",
+      "circular_stream.nonfinite_result_rejected",
+      "circular_stream.input_guard.nonnumeric_density_rejected",
+      "circular_stream.input_guard.boolean_density_rejected"
+    ]
+  },
+  "current_validator": {
+    "expected_self_test_check_count": 88,
+    "git_blob_sha": "692f88489756e6b045cf2f1b9200a0974ea0860c",
+    "path": "scripts/engineering/validate_orbital_ring_failure_manifest.py",
+    "sha256": "44b3e8500221879be9efeb0faedc95d5873df4c3a063c080bc19338afbaaeb25"
+  },
+  "execution_note": "Validator suite (88 expected checks) and reference-checker suite (70 expected checks) are unexecuted for their current source fingerprints. The draft-safe workflow verifies exact Git blob and SHA-256 identities, repeats outputs byte-for-byte, and compares the blocked template report. Historical pass counts apply only to the exact prior source blobs listed here. Structural errors, malformed populated fields/provenance, declared-state mismatch, nonnumeric inputs, and non-finite stream-force results must fail closed; all reference checks remain T0 arithmetic/contract evidence, not a physical feasibility result.",
+  "last_executed_reference_check": {
+    "checker_git_blob_sha": "7adbaab223517494332711b480bdf37e0b216811",
+    "checker_sha256": "3ab051fc31ba1b4673c07578cfd047a0ce43339a4f8bf37de86992e8588953dc",
+    "checks_failed": 0,
+    "checks_passed": 47,
+    "verification_state": "passed_for_exact_prior_source_only"
+  },
+  "last_executed_self_test": {
+    "checks_failed": 0,
+    "checks_passed": 73,
+    "report_git_blob_sha": "87612c32dfe45c3c0fb8b8588716b35c0457aa67",
+    "report_sha256": "dc7718642fc57f35ca813fb3be857194c9ec74d9bc9413db9810d8a1432367c5",
+    "validator_git_blob_sha": "2d07b86480dea71f3272fbee2a9fde4152727abb",
+    "validator_sha256": "86dece2753b53f44a5f3dffc109a33121ec2b4ff5cef28bca01a41029af74217",
+    "verification_state": "passed_for_exact_prior_source_only"
+  },
+  "physics_claim": "none; these checks cover manifest contract handling only, not orbital-ring equilibrium, stability, or survivability",
+  "schema": "luminous-dynamics.orbital-ring-validator-verification-status/v1",
+  "unexecuted_regressions": [
+    "wrong_numeric_type_fails_contract_validation",
+    "invalid_populated_provenance_fails_contract_validation",
+    "unknown_top_level_key_fails_structural_gate",
+    "non_object_manifest_fails_closed_without_exception",
+    "non_object_required_inputs_fails_structural_gate",
+    "unexpected_input_key_fails_structural_gate",
+    "unexpected_provenance_key_fails_structural_gate",
+    "non_list_required_fields_fails_closed_without_exception",
+    "object_required_fields_fails_closed_without_exception",
+    "support_angles_duplicate_across_zero_wrap_block",
+    "duplicate_json_object_keys_rejected",
+    "nonstandard_nan_token_rejected",
+    "required_fields_subset_fails_closed_and_blocks_promotion",
+    "unexpected_provenance_key_keeps_expected_gate_blocked",
+    "declared_gate_mismatch_keeps_expected_gate_blocked"
+  ],
+  "verification_state": "not_run_after_source_change"
+}

@@ -1,0 +1,177 @@
+name: Orbital-Ring T0 Evidence Gate
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orbital-ring-contract-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+jobs:
+  orbital-ring-manifest-contract:
+    name: Orbital-Ring Manifest + Reference Checks (Python)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Record source identity before validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          reports="${RUNNER_TEMP}/orbital-ring-contract-evidence"
+          mkdir -p "$reports"
+          git rev-parse HEAD > "$reports/commit_sha.txt"
+          git hash-object scripts/engineering/validate_orbital_ring_failure_manifest.py > "$reports/validator_git_blob_sha.txt"
+          sha256sum scripts/engineering/validate_orbital_ring_failure_manifest.py > "$reports/validator_sha256.txt"
+          git hash-object scripts/engineering/orbital_ring_reference_check.py > "$reports/reference_checker_git_blob_sha.txt"
+          sha256sum scripts/engineering/orbital_ring_reference_check.py > "$reports/reference_checker_sha256.txt"
+
+      - name: Match committed verification status to current source
+        shell: bash
+        run: |
+          set -euo pipefail
+          reports="${RUNNER_TEMP}/orbital-ring-contract-evidence"
+          python3 - docs/engineering/evidence/orbital_ring_validator_verification_status.json "$reports/validator_git_blob_sha.txt" "$reports/validator_sha256.txt" "$reports/reference_checker_git_blob_sha.txt" "$reports/reference_checker_sha256.txt" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          def reject_duplicate_keys(pairs):
+              result = {}
+              for key, value in pairs:
+                  if key in result:
+                      raise ValueError(f"duplicate JSON object key: {key}")
+                  result[key] = value
+              return result
+
+          def reject_nonstandard_constant(value):
+              raise ValueError(f"non-standard JSON numeric constant: {value}")
+
+          def strict_json(text):
+              return json.loads(
+                  text,
+                  object_pairs_hook=reject_duplicate_keys,
+                  parse_constant=reject_nonstandard_constant,
+              )
+
+          # Self-check the exact parser used for the committed trust record.
+          for sample in ('{"schema":"first","schema":"second"}',
+                         '{"expected_self_test_check_count":NaN}'):
+              try:
+                  strict_json(sample)
+              except ValueError:
+                  continue
+              raise AssertionError("strict verification-status parser accepted invalid JSON")
+          status = strict_json(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          current = status["current_validator"]
+          blob = Path(sys.argv[2]).read_text(encoding="utf-8").strip()
+          sha256 = Path(sys.argv[3]).read_text(encoding="utf-8").split()[0]
+          assert current["git_blob_sha"] == blob, (current["git_blob_sha"], blob)
+          assert current["sha256"] == sha256, (current["sha256"], sha256)
+          assert current["expected_self_test_check_count"] == 88, current
+          reference = status["current_reference_checker"]
+          reference_blob = Path(sys.argv[4]).read_text(encoding="utf-8").strip()
+          reference_sha256 = Path(sys.argv[5]).read_text(encoding="utf-8").split()[0]
+          assert reference["git_blob_sha"] == reference_blob, (reference["git_blob_sha"], reference_blob)
+          assert reference["sha256"] == reference_sha256, (reference["sha256"], reference_sha256)
+          assert reference["expected_check_count"] == 70, reference
+          print(f"verification status matches validator ({current['expected_self_test_check_count']} checks) and reference checker ({reference['expected_check_count']} checks)")
+          PY
+
+      - name: Compile fail-closed validator
+        run: python3 -m py_compile scripts/engineering/validate_orbital_ring_failure_manifest.py scripts/engineering/orbital_ring_reference_check.py
+
+      - name: Run validator self-tests twice; require deterministic complete pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          reports="${RUNNER_TEMP}/orbital-ring-contract-evidence"
+          mkdir -p "$reports"
+          python3 scripts/engineering/validate_orbital_ring_failure_manifest.py --self-test > "$reports/self-test-a.json"
+          python3 scripts/engineering/validate_orbital_ring_failure_manifest.py --self-test > "$reports/self-test-b.json"
+          cmp "$reports/self-test-a.json" "$reports/self-test-b.json"
+          cp "$reports/self-test-a.json" "$reports/self-test.json"
+          python3 - "$reports/self-test.json" <<'PY'
+          import json
+          import sys
+
+          report = json.load(open(sys.argv[1], encoding="utf-8"))
+          expected = 88
+          assert report.get("checks_passed") == expected, report
+          assert report.get("checks_failed") == 0, report
+          checks = report.get("checks")
+          assert isinstance(checks, list) and len(checks) == expected, report
+          ids = [item.get("id") for item in checks]
+          assert all(isinstance(item, str) and item for item in ids), report
+          assert len(set(ids)) == len(ids), "self-test IDs must be unique"
+          assert all(item.get("status") == "passed" for item in checks), report
+          print(f"manifest validator: {expected}/{expected} deterministic contract tests passed")
+          PY
+
+      - name: Run T0 circular-orbit reference checks twice; require deterministic pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          reports="${RUNNER_TEMP}/orbital-ring-contract-evidence"
+          python3 scripts/engineering/orbital_ring_reference_check.py > "$reports/reference-check-a.json"
+          python3 scripts/engineering/orbital_ring_reference_check.py > "$reports/reference-check-b.json"
+          cmp "$reports/reference-check-a.json" "$reports/reference-check-b.json"
+          cp "$reports/reference-check-a.json" "$reports/reference-check.json"
+          python3 - "$reports/reference-check.json" <<'PY'
+          import json
+          import sys
+
+          report = json.load(open(sys.argv[1], encoding="utf-8"))
+          expected = 70
+          assert report["schema"] == "luminous-dynamics.orbital-ring-reference-check/v3", report
+          assert report["check_count"] == expected, report
+          assert report["evidence_state"] == "passed_at_specified_fidelity", report
+          assert report["failed_check_ids"] == [], report
+          checks = report["checks"]
+          assert len(checks) == expected and all(item["status"] == "passed" for item in checks), report
+          ids = [item["id"] for item in checks]
+          assert len(set(ids)) == expected, "reference-check IDs must be unique"
+          source = report["historical_source_reference"]
+          assert "p. 476" in source["citation"] and "600 km" in source["claim"], source
+          row = next(item for item in report["rows"] if item["altitude_km"] == 600.0)
+          assert abs(row["radius_km"] - 6978.137) < 1e-9, row
+          assert abs(row["speed_km_s"] - 7.5578652065) < 1e-9, row
+          assert abs(row["specific_orbital_energy_mj_kg"] + 28.5606632401) < 1e-9, row
+          print(f"orbit reference checker: {expected}/{expected} deterministic T0 checks passed")
+          PY
+
+      - name: Validate frozen scenario template and match committed report
+        shell: bash
+        run: |
+          set -euo pipefail
+          reports="${RUNNER_TEMP}/orbital-ring-contract-evidence"
+          python3 scripts/engineering/validate_orbital_ring_failure_manifest.py docs/engineering/scenarios/F_SKYHOOK_LOAD_STEP.json > "$reports/manifest-validation.json"
+          cmp "$reports/manifest-validation.json" docs/engineering/evidence/f_skyhook_load_step_manifest_validation.json
+          python3 - "$reports/manifest-validation.json" <<'PY'
+          import json
+          import sys
+
+          report = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert report["validation_state"] == "passed_contract_checks", report
+          assert report["scenario_schema"] == "luminous-dynamics.orbital-ring-failure-scenario/v2", report
+          assert report["scenario_version"] == 2, report
+          assert report["expected_gate_state"] == "Blocked", report
+          assert report["blocking_field_count"] == 23, report
+          assert report["analysis_state"] == "NotRun", report
+          assert report["physics_claim"].startswith("none;"), report
+          print("scenario manifest structurally valid and correctly remains Blocked/NotRun")
+          PY
+
+      - name: Preserve exact validator evidence and source fingerprints
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbital-ring-contract-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/orbital-ring-contract-evidence
+          if-no-files-found: warn
+          retention-days: 90
+

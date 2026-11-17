@@ -53,6 +53,7 @@ engineering = [
     "symthaea-digital-twin",
     "symthaea-formal-safety",
     "symthaea-engineering",
+    "symthaea-orbital-ring",
     "symthaea-mujoco-bridge",
     "symthaea-opensees-bridge",
     "symthaea-ngspice-bridge",
