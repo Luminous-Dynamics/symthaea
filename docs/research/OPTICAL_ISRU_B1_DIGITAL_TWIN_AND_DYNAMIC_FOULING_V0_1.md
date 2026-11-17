@@ -89,7 +89,43 @@ ECSS-Q-ST-70-54C also cautions that simplified witness geometry may overestimate
 
 **Important adaptation boundary:** these standards provide measurement and cleanliness-control practices. Their contaminant limits, thermal conditions, test geometries and qualification criteria must not be copied into an ISRU rig without a separately justified tailoring and validation process.
 
-## 5. Paradigm shifts to prioritize
+## 5. Material-regime and pulse-control model
+
+A third standalone module, `research/asteroid-optical-isru-v0.2/material_regime.rs`, now models a minimal coupled thermal/material response:
+
+- incident beam energy versus absorbed energy after measured process-optic transmission;
+- heat capacity and active thermal depth;
+- spallation onset, volatile-release onset, brittle–ductile transition and melt onset;
+- melt-layer growth and its suppression of spallation/surface renewal;
+- surface volatile depletion and refresh due to spallation;
+- released water/organic/salt vapour versus captured water;
+- organic/salt/dust deposition estimates on the optical path; and
+- separate gas-analyzer water signal, including moisture introduced by purge gas.
+
+It supports a controlled comparison of equal total incident energy delivered continuously or in pulses with cooling intervals. The model is intentionally small and parameterized; it is not a finite-element heat-transfer, DEM spallation, radiative-transfer or volatile-transport solver.
+
+### Why this is a field-relevant physical effect
+
+The October 2025 optical-mining study reports that beam irradiance distribution, mineral morphology and the brittle–ductile transition affect excavation; organic-vapour deposition on sacrificial glass can progressively block light; and surface melt can inhibit surface refresh and lower water production. Its test-bed results report Nectar A excavation up to about 6 kg/h and a water rate around 16 g/h, while Nectar B water estimates were substantially lower (maximum approximately 4.75 g/h in the reported comparisons). These are specific experimental configurations/simulants, not a universal process benchmark or commercial production rate. The study also describes a wet CO₂ purge contaminating the water signal, which is why the model separates captured water from gas-analyzer signal.
+
+Primary study: *Optical mining of carbonaceous chondrite simulants: Testing and lessons learned in asteroid mining research*, Acta Astronautica 235 (October 2025), DOI 10.1016/j.actaastro.2025.04.033: https://doi.org/10.1016/j.actaastro.2025.04.033
+
+### Industry comparisons—different process families
+
+| Reference | Demonstrated capability | Correct comparison boundary |
+|---|---|---|
+| Nectar A/B optical mining (2025) | Test-bed excavation and water-release/capture behavior under focused irradiation; strong morphology, surface refresh and optical deposition effects | Relevant physical behavior for the optical-mining model; not directly comparable to oxygen electrolysis |
+| NASA/Lunar Resources LR-1 MRE (ICES 2026 presentation; late-2024 campaign) | 25 kg simulant; reported 0.07 kg O₂/h average for 9 h under vacuum with real-time VMOMS gas monitoring | Molten-regolith electrolysis throughput benchmark, not optical water mining |
+| NASA CaRD solar-carbothermal prototype (AIAA ASCEND 2026) | Integrated solar concentrator, optical splash plate/shutter, carbothermal reactor, fluid/gas analysis and control; CO detection confirmed carbothermal reaction | Integrated subsystem/interface and energy-accounting benchmark; do not equate this to demonstrated commercial production |
+
+Sources:
+- Optical mining paper: https://doi.org/10.1016/j.actaastro.2025.04.033
+- NASA MRE / ICES 2026 NTRS record: https://ntrs.nasa.gov/citations/20260006167
+- NASA CaRD / AIAA ASCEND 2026 NTRS record: https://ntrs.nasa.gov/citations/20260002864
+
+Luminous's competitive contribution should be judged on fewer experiments to a qualified process envelope, lower false attribution of equipment degradation as material physics, more accepted simulated/physical product per end-to-end resource, and reproducibility across labs—not on claiming higher excavation or oxygen production before running a physical campaign.
+
+## 6. Paradigm shifts to prioritize
 
 ### A. Joint material–apparatus inference
 Fit a causal model with separate latent variables for material state, production-optic state, instrument calibration state, source state and sample state. A falling proxy should not be attributed to material physics until instrument/reference/optic explanations have been tested.
@@ -106,7 +142,7 @@ The objective is independently accepted product per total campaign resource, wit
 ### E. Cross-lab transfer with an apparatus domain model
 Separate material-family transfer from instrument/path transfer. Report which parts of the model transfer, which require a small calibration campaign and which must be relearned.
 
-## 6. B1 benchmark matrix
+## 7. B1 benchmark matrix
 
 Compare on identical scenarios, candidate pools, action spaces, seeds and budgets:
 
@@ -147,7 +183,7 @@ Operations: wall-clock to qualified simulated decision, accepted-simulated-produ
 
 Trust: zero holdout leakage, zero simulator-to-physical evidence promotion, zero stale calibration use, zero stage-order violations, zero budget overrun, deterministic replay equality.
 
-## 7. Initial targets (hypotheses, not achieved results)
+## 8. Initial targets (hypotheses, not achieved results)
 
 - Detect an optical-health threshold crossing before the next exposure action in at least 99% of frozen B1 failure/contamination scenarios.
 - Zero false requalification passes on a sealed suite containing incomplete cleaning, damaged surfaces, stale readings and missing measurement channels.
@@ -158,7 +194,7 @@ Trust: zero holdout leakage, zero simulator-to-physical evidence promotion, zero
 
 These remain pre-registered target hypotheses until the B1 tournament runs. They are not physical qualification or performance claims.
 
-## 8. Reproduction
+## 9. Reproduction
 
 The dedicated workflow compiles and tests standalone Rust references with pinned Rust 1.96, rustfmt, strict Clippy and the Rust test harness:
 
@@ -168,9 +204,9 @@ The dedicated workflow compiles and tests standalone Rust references with pinned
     rustc --edition=2021 --test research/asteroid-optical-isru-v0.2/optical_health.rs -o /tmp/isru-optical-health
     /tmp/isru-optical-health
 
-Current tests exercise out-of-order completion, lock contention, stage prerequisites, holdout access, calibration expiry, instrument maintenance, failures, budgets, deterministic replay, noise moments, QCM/witness/process-optic separation, source-drift normalization, spectral dependence, cleaning residuals and post-clean requalification.
+Current tests exercise out-of-order completion, lock contention, stage prerequisites, holdout access, calibration expiry, instrument maintenance, failures, budgets, deterministic replay, noise moments, QCM/witness/process-optic separation, source-drift normalization, spectral dependence, cleaning residuals, post-clean requalification, spallation/melt regime changes, equal-energy pulsed versus continuous delivery, purge-moisture interference and sample-inventory limits.
 
-## 9. Limitations and next increments
+## 10. Limitations and next increments
 
 - This is a benchmark model, not a validated digital twin of a specific optical ISRU rig.
 - The optical extinction and transfer coefficients are illustrative inputs; they require material-specific and geometry-specific calibration.
