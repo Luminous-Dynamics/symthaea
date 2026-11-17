@@ -1111,6 +1111,92 @@ mod tests {
     }
 
     #[test]
+    fn opposing_model_likelihoods_score_the_same_observable_policy_tree() {
+        use subterra_survival_reference::{MeasurementAction, MeasurementOutcome};
+
+        let make_problem = |open_likelihoods: [f64; 3]| {
+            let blocked_likelihoods = open_likelihoods.map(|value| 1.0 - value);
+            PlanningProblem {
+                hypotheses: hypotheses(),
+                decisions: decisions(),
+                actions: vec![MeasurementAction {
+                    id: "scan".into(),
+                    modality: "geophysical_scan".into(),
+                    outcomes: vec![
+                        MeasurementOutcome {
+                            id: "signal_open".into(),
+                            kind: OutcomeKind::Observation,
+                            likelihood_by_hypothesis: open_likelihoods.to_vec(),
+                            terminal_loss_by_hypothesis: None,
+                        },
+                        MeasurementOutcome {
+                            id: "signal_blocked".into(),
+                            kind: OutcomeKind::Observation,
+                            likelihood_by_hypothesis: blocked_likelihoods.to_vec(),
+                            terminal_loss_by_hypothesis: None,
+                        },
+                    ],
+                    cost: ResourceCost {
+                        energy_j: 10.0,
+                        duration_s: 2.0,
+                        data_bytes: 100.0,
+                        exposure_units: 0.1,
+                    },
+                    external_gate_passed: true,
+                }],
+            }
+        };
+
+        let shared_policy = PolicyNode {
+            measurement_action_id: Some("scan".into()),
+            stop_decision_id: None,
+            branches: vec![
+                PolicyBranch {
+                    outcome_id: "signal_open".into(),
+                    kind: OutcomeKind::Observation,
+                    probability: 0.5,
+                    posterior: vec![0.6, 0.3, 0.1],
+                    continuation: Some(Box::new(PolicyNode {
+                        measurement_action_id: None,
+                        stop_decision_id: Some("enter".into()),
+                        branches: vec![],
+                    })),
+                },
+                PolicyBranch {
+                    outcome_id: "signal_blocked".into(),
+                    kind: OutcomeKind::Observation,
+                    probability: 0.5,
+                    posterior: vec![0.6, 0.3, 0.1],
+                    continuation: Some(Box::new(PolicyNode {
+                        measurement_action_id: None,
+                        stop_decision_id: Some("hold".into()),
+                        branches: vec![],
+                    })),
+                },
+            ],
+        };
+
+        let models = vec![
+            ModelScenario {
+                model_id: "model-a".into(),
+                problem: make_problem([0.9, 0.1, 0.2]),
+            },
+            ModelScenario {
+                model_id: "model-b".into(),
+                problem: make_problem([0.1, 0.9, 0.8]),
+            },
+        ];
+
+        let report = evaluate_policy_robustly(&models, &shared_policy, config()).unwrap();
+        assert_eq!(report.model_count, 2);
+        assert_eq!(report.per_model[0].model_id, "model-a");
+        assert_eq!(report.per_model[1].model_id, "model-b");
+        assert!(report.per_model[1].expected_decision_loss > report.per_model[0].expected_decision_loss + 30.0);
+        assert!(report.per_model.iter().all(|metric| metric.cached_branch_mismatches > 0));
+        assert!(report.all_external_gates_passed);
+        assert!(report.all_supported_paths_within_budget);
+    }
+    #[test]
     fn untrusted_policy_probability_and_posterior_cache_cannot_change_score() {
         let models = vec![
             ModelScenario { model_id: "a".into(), problem: problem(0.02, true) },
