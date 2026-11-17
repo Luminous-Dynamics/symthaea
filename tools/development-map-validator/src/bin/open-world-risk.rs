@@ -77,16 +77,52 @@ fn augment_candidate_and_oracle(
 )->Result<(Value,Value),String>{
     let mut candidate_aug=candidate.clone();
     let mut oracle_aug=oracle.clone();
-    let unknown_prior=json!({
-        "hypothesis_id":unknown_id,
-        "lower_probability_bps":0,
-        "upper_probability_bps":reserve,
-        "nominal_probability_bps":0
-    });
-    candidate_aug["hypothesis_bounds"].as_array_mut()
-        .ok_or("candidate_view.hypothesis_bounds must be an array")?.push(unknown_prior.clone());
-    oracle_aug["hypothesis_bounds"].as_array_mut()
-        .ok_or("oracle.hypothesis_bounds must be an array")?.push(unknown_prior);
+    // Conservative outer relaxation of P_epsilon = (1-epsilon)p + epsilon q,
+    // with epsilon in [0, reserve]. Scale known lower bounds down by
+    // (1-reserve); retain original uppers (epsilon=0 remains possible); and
+    // inject unknown mass in [0,reserve]. The resulting bounded-simplex
+    // superset contains every mixture distribution, so robust risk cannot
+    // become artificially smaller. Nominal known mass is scaled to exactly
+    // 10000-reserve using largest-remainder allocation.
+    for root in [&mut candidate_aug,&mut oracle_aug] {
+        let bounds=root["hypothesis_bounds"].as_array_mut()
+            .ok_or("hypothesis_bounds must be an array")?;
+        let total_known_nominal:u64=bounds.iter()
+            .map(|b|required_u64(b,"nominal_probability_bps","hypothesis bound"))
+            .collect::<Result<Vec<_>,_>>()?.iter().sum();
+        if total_known_nominal!=SCALE {
+            return Err("known nominal prior must sum to 10000 before contamination augmentation".to_owned());
+        }
+        let target=SCALE-reserve;
+        let mut floors=Vec::new();
+        let mut allocated=0u64;
+        for (index,bound) in bounds.iter_mut().enumerate() {
+            let lower=required_u64(bound,"lower_probability_bps","hypothesis bound")?;
+            let nominal=required_u64(bound,"nominal_probability_bps","hypothesis bound")?;
+            bound["lower_probability_bps"]=json!(((lower as u128*target as u128)/SCALE as u128) as u64);
+            let product=nominal as u128*target as u128;
+            let floor=(product/SCALE as u128) as u64;
+            let remainder=(product%SCALE as u128) as u64;
+            bound["nominal_probability_bps"]=json!(floor);
+            floors.push((index,remainder));
+            allocated=allocated.checked_add(floor).ok_or("scaled nominal prior overflow")?;
+        }
+        let mut leftover=target.checked_sub(allocated).ok_or("scaled nominal allocation exceeded target")?;
+        floors.sort_by(|a,b|b.1.cmp(&a.1).then_with(||a.0.cmp(&b.0)));
+        for (index,_) in floors {
+            if leftover==0 {break;}
+            let current=required_u64(&bounds[index],"nominal_probability_bps","scaled hypothesis bound")?;
+            bounds[index]["nominal_probability_bps"]=json!(current+1);
+            leftover-=1;
+        }
+        if leftover!=0 {return Err("could not allocate scaled known nominal probability".to_owned());}
+        bounds.push(json!({
+            "hypothesis_id":unknown_id,
+            "lower_probability_bps":0,
+            "upper_probability_bps":reserve,
+            "nominal_probability_bps":reserve
+        }));
+    }
 
     for (factor_id,unknown_row) in unknown_rows{
         for root in [&mut candidate_aug,&mut oracle_aug]{
@@ -110,7 +146,7 @@ pub fn evaluate_open_world_parts_json(candidate_raw:&str,oracle_raw:&str)->Resul
     allowed_keys(&oracle,&["actual_hypothesis_id","decision_cutoff","actions","hypothesis_bounds","options","factors","hypothesis_safety","calibrations","factorization_certificates","open_world_policy"],"oracle")?;
 
     let policy=required_value(&oracle,"open_world_policy","oracle")?;
-    allowed_keys(policy,&["unknown_hypothesis_id","contamination_reserve_bps","unknown_safe_action_ids","unknown_channel_likelihoods","policy_version"],"oracle.open_world_policy")?;
+    allowed_keys(policy,&["unknown_hypothesis_id","contamination_reserve_bps","read_only_action_ids","unknown_safe_action_ids","unknown_channel_likelihoods","policy_version"],"oracle.open_world_policy")?;
     let unknown_id=required_str(policy,"unknown_hypothesis_id","oracle.open_world_policy")?;
     let reserve=required_u64(policy,"contamination_reserve_bps","oracle.open_world_policy")?;
     if reserve==0||reserve>SCALE{return Err("contamination_reserve_bps must be in 1..=10000".to_owned());}
@@ -127,14 +163,18 @@ pub fn evaluate_open_world_parts_json(candidate_raw:&str,oracle_raw:&str)->Resul
         let id=required_str(a,"action_id","candidate action")?;
         Ok((id,(a["irreversible"].as_bool().unwrap_or(false),a["hard_gate"].as_bool().unwrap_or(false),a["max_residual_risk_bps"].as_u64().unwrap_or(SCALE))))
     }).collect::<Result<_,String>>()?;
-    let unknown_safe_actions=string_set(required_value(policy,"unknown_safe_action_ids","oracle.open_world_policy")?,"unknown_safe_action_ids")?;
-    if unknown_safe_actions.is_empty(){return Err("unknown_safe_action_ids must include at least one read-only action".to_owned());}
-    for id in &unknown_safe_actions{
+    let read_only_actions=string_set(required_value(policy,"read_only_action_ids","oracle.open_world_policy")?,"read_only_action_ids")?;
+    if read_only_actions.is_empty(){return Err("read_only_action_ids must not be empty".to_owned());}
+    for id in &read_only_actions{
         let (irreversible,hard_gate,max_risk)=action_policies.get(id)
-            .ok_or_else(||format!("unknown safe action {id:?} is not registered"))?;
+            .ok_or_else(||format!("read-only action {id:?} is not registered"))?;
         if *irreversible||*hard_gate||*max_risk!=0{
-            return Err(format!("unknown world may only classify non-irreversible zero-risk read-only action {id:?} as safe"));
+            return Err(format!("evaluator read-only classification is inconsistent for action {id:?}"));
         }
+    }
+    let unknown_safe_actions=string_set(required_value(policy,"unknown_safe_action_ids","oracle.open_world_policy")?,"unknown_safe_action_ids")?;
+    if unknown_safe_actions.is_empty()||!unknown_safe_actions.is_subset(&read_only_actions){
+        return Err("unknown_safe_action_ids must be a non-empty subset of evaluator read_only_action_ids".to_owned());
     }
 
     let factor_values=required_value(&candidate,"factors","candidate_view")?.as_array()
