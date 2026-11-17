@@ -594,7 +594,7 @@ fn evaluate_trace(
         "evidence_accepted":evidence_accepted,
         "calibration_valid":calibration_ok,
         "factorization_qualified":factorization_ok,
-        "dependence_mode":if selected.len()<=1 {"single_channel"} else if factorization_ok {"within_group_frechet_and_exact_set_cross_group_product"} else {"unrestricted_frechet_joint_bounds"},
+        "dependence_mode":if selected.is_empty() {"no_evidence"} else if selected.len()==1 {"single_channel"} else if factorization_ok {"within_group_frechet_and_exact_set_cross_group_product"} else {"unrestricted_frechet_joint_bounds"},
         "temporal_valid":temporal_valid,
         "actual_output_possible":actual_output_possible,
         "false_observation_count":false_observation_count,
