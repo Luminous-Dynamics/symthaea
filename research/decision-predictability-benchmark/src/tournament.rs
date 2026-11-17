@@ -509,8 +509,9 @@ fn evaluate_series(fixture: &FixtureTrajectory, channel: Channel, output: &mut S
                     *reference_first == first && *reference_last == last
                 })
                 .map(|(_, _, rmse)| *rmse);
-            let skill = reference_rmse
-                .and_then(|reference| skill_vs_reference_rmse(metrics.rmse, reference, development_scale));
+            let skill = reference_rmse.and_then(|reference| {
+                skill_vs_reference_rmse(metrics.rmse, reference, development_scale)
+            });
 
             write_metric_row(
                 output,
@@ -677,7 +678,11 @@ fn error_metrics(prediction: &[f64], truth: &[f64], scale: f64) -> ErrorMetrics 
 /// Compute skill relative to a reference model only when its error is
 /// material relative to the signal scale. When the reference is already
 /// effectively exact, the ratio is numerically unstable and not informative.
-fn skill_vs_reference_rmse(candidate_rmse: f64, reference_rmse: f64, signal_scale: f64) -> Option<f64> {
+fn skill_vs_reference_rmse(
+    candidate_rmse: f64,
+    reference_rmse: f64,
+    signal_scale: f64,
+) -> Option<f64> {
     if !candidate_rmse.is_finite()
         || candidate_rmse < 0.0
         || !reference_rmse.is_finite()
