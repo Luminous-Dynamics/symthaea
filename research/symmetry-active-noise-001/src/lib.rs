@@ -1159,13 +1159,13 @@ pub fn choose_bounded_noise_minimax_probe(
         }
 
         let mut branch_masks: BTreeMap<u32, u64> = BTreeMap::new();
-        for hypothesis_index in 0..problem.hypothesis_ids.len() {
+        for (hypothesis_index, by_probe) in
+            problem.allowed_outcomes_by_hypothesis.iter().enumerate()
+        {
             if active_hypothesis_mask & (1_u64 << hypothesis_index) == 0 {
                 continue;
             }
-            for outcome in
-                &problem.allowed_outcomes_by_hypothesis[hypothesis_index][probe_index]
-            {
+            for outcome in &by_probe[probe_index] {
                 *branch_masks.entry(*outcome).or_insert(0) |= 1_u64 << hypothesis_index;
             }
         }
@@ -1174,9 +1174,12 @@ pub fn choose_bounded_noise_minimax_probe(
             .iter()
             .map(|(outcome, survivor_mask)| NoiseMinimaxBranchV1 {
                 outcome: *outcome,
-                surviving_hypothesis_ids: (0..problem.hypothesis_ids.len())
-                    .filter(|index| survivor_mask & (1_u64 << index) != 0)
-                    .map(|index| problem.hypothesis_ids[index].clone())
+                surviving_hypothesis_ids: problem
+                    .hypothesis_ids
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, _)| survivor_mask & (1_u64 << index) != 0)
+                    .map(|(_, hypothesis_id)| hypothesis_id.clone())
                     .collect(),
             })
             .collect();
@@ -1256,13 +1259,13 @@ pub fn choose_bounded_interval_minimax_probe(
 
         let mut expanded_by_hypothesis = Vec::new();
         let mut candidate_values = BTreeSet::new();
-        for hypothesis_index in 0..problem.hypothesis_ids.len() {
+        for (hypothesis_index, by_probe) in
+            problem.predicted_intervals_by_hypothesis.iter().enumerate()
+        {
             if active_hypothesis_mask & (1_u64 << hypothesis_index) == 0 {
                 continue;
             }
-            let expanded = problem.predicted_intervals_by_hypothesis[hypothesis_index]
-                [probe_index]
-                .expanded_by(observation_radius)?;
+            let expanded = by_probe[probe_index].expanded_by(observation_radius)?;
             candidate_values.insert(expanded.lower);
             expanded_by_hypothesis.push((hypothesis_index, expanded));
         }
