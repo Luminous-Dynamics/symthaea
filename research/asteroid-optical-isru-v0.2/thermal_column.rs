@@ -119,12 +119,6 @@ impl ThermalColumn {
         let incident_energy_j_m2 = pulse.incident_irradiance_w_m2 * pulse.duration_seconds;
         let energy_delivered_after_optics_j_m2 = incident_energy_j_m2 * pulse.optical_transmission;
         let optical_path_loss_j_m2 = incident_energy_j_m2 - energy_delivered_after_optics_j_m2;
-        let total_depth_m = cell_count as f64 * parameters.cell_thickness_m;
-        let absorbed_fraction = pulse.surface_absorptivity
-            * (1.0 - (-total_depth_m / parameters.optical_absorption_depth_m).exp());
-        let unabsorbed_energy_j_m2 =
-            energy_delivered_after_optics_j_m2 - expected_absorbed_energy_j_m2;
-
         let mut absorbed_energy_j_m2 = 0.0;
         let mut net_radiative_exchange_j_m2 = 0.0;
         let mut latent_heat_removed_j_m2 = 0.0;
@@ -163,7 +157,9 @@ impl ThermalColumn {
             }
 
             let mut next_temperatures = vec![0.0; cell_count];
-            for cell_index in 0..cell_count {
+            for (cell_index, next_temperature_slot) in
+                next_temperatures.iter_mut().enumerate()
+            {
                 let depth_top_m = cell_index as f64 * parameters.cell_thickness_m;
                 let depth_bottom_m = depth_top_m + parameters.cell_thickness_m;
                 let absorption_fraction = (-depth_top_m / parameters.optical_absorption_depth_m)
@@ -197,7 +193,7 @@ impl ThermalColumn {
                 {
                     return Err(ThermalColumnError::NonPhysicalTemperature);
                 }
-                next_temperatures[cell_index] = next_temperature;
+                *next_temperature_slot = next_temperature;
                 absorbed_energy_j_m2 += absorbed_power_w_m2 * step_seconds;
             }
 
@@ -208,6 +204,12 @@ impl ThermalColumn {
             substeps += 1;
         }
 
+        let unabsorbed_energy_j_m2 =
+            energy_delivered_after_optics_j_m2 - absorbed_energy_j_m2;
+        if unabsorbed_energy_j_m2 < -1.0e-8 {
+            return Err(ThermalColumnError::EnergyBalanceFailure);
+        }
+        let unabsorbed_energy_j_m2 = unabsorbed_energy_j_m2.max(0.0);
         let internal_energy_change_j_m2 = areal_heat_capacity
             * temperatures
                 .iter()
