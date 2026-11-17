@@ -56,6 +56,7 @@ pub enum EventEvidence {
     /// Instrumentation was active and the event did not occur.
     InstrumentedAbsent,
     /// The event occurred at this episode-clock timestamp.
+    #[serde(rename = "OCCURRED")]
     OccurredAtNs(u64),
 }
 
