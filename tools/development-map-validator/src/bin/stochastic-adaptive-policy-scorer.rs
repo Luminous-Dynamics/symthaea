@@ -583,7 +583,7 @@ fn evaluate(raw:&str)->Result<Value,String>{
  let mut leaf_reports=Vec::new();let mut risk_violations=0usize;let mut budget_violations=0usize;
  let mut coverage_numerator=0u128;let mut unnecessary_numerator=0u128;
  let mut justified_act_leaves:BTreeSet<String>=BTreeSet::new();
- let mut actual_unsafe_nominal=0u64;let mut actual_unsafe_upper=0u64;
+ 
  for (leaf_id,path) in &leaf_paths{
   let membership=atoms_by_leaf.get(leaf_id).ok_or_else(||format!("leaf {leaf_id:?} has no joint rows"))?;
   let (measured_nominal,measured_robust,support,likelihoods)=leaf_risk(&priors,&safety,&kernels,membership,&path.action_id)?;
@@ -637,8 +637,8 @@ fn evaluate(raw:&str)->Result<Value,String>{
   if path.decision_kind=="act"&&!safety[&actual].contains(&path.action_id){Some(*row_index)}else{None}
  }).collect();
  let actual_unsafe_interval=event_bounds(&actual_kernel.rows,&actual_unsafe_rows)?;
- actual_unsafe_nominal=actual_unsafe_interval.nominal;
- actual_unsafe_upper=actual_unsafe_interval.upper;
+ let actual_unsafe_nominal=actual_unsafe_interval.nominal;
+ let actual_unsafe_upper=actual_unsafe_interval.upper;
  let mut coverage_events=BTreeMap::new();
  let mut unsafe_events=BTreeMap::new();
  for (hypothesis,kernel) in &kernels{
