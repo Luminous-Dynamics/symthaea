@@ -112,7 +112,365 @@
         ]
       }
     ],
-    "multiplication_contract": "matrix multiplication; element table must be independently checked for closure, identity and inverses by the exact oracle"
+    "multiplication_contract": "matrix multiplication; element table must be independently checked for closure, identity and inverses by the exact oracle",
+    "group_order": 8,
+    "identity_element_id": "e",
+    "inverse_table": [
+      {
+        "element_id": "e",
+        "inverse_element_id": "e"
+      },
+      {
+        "element_id": "r90",
+        "inverse_element_id": "r270"
+      },
+      {
+        "element_id": "r180",
+        "inverse_element_id": "r180"
+      },
+      {
+        "element_id": "r270",
+        "inverse_element_id": "r90"
+      },
+      {
+        "element_id": "fx",
+        "inverse_element_id": "fx"
+      },
+      {
+        "element_id": "fy",
+        "inverse_element_id": "fy"
+      },
+      {
+        "element_id": "fdiag",
+        "inverse_element_id": "fdiag"
+      },
+      {
+        "element_id": "fanti",
+        "inverse_element_id": "fanti"
+      }
+    ],
+    "multiplication_table": [
+      {
+        "left_element_id": "e",
+        "right_element_id": "e",
+        "product_element_id": "e"
+      },
+      {
+        "left_element_id": "e",
+        "right_element_id": "r90",
+        "product_element_id": "r90"
+      },
+      {
+        "left_element_id": "e",
+        "right_element_id": "r180",
+        "product_element_id": "r180"
+      },
+      {
+        "left_element_id": "e",
+        "right_element_id": "r270",
+        "product_element_id": "r270"
+      },
+      {
+        "left_element_id": "e",
+        "right_element_id": "fx",
+        "product_element_id": "fx"
+      },
+      {
+        "left_element_id": "e",
+        "right_element_id": "fy",
+        "product_element_id": "fy"
+      },
+      {
+        "left_element_id": "e",
+        "right_element_id": "fdiag",
+        "product_element_id": "fdiag"
+      },
+      {
+        "left_element_id": "e",
+        "right_element_id": "fanti",
+        "product_element_id": "fanti"
+      },
+      {
+        "left_element_id": "r90",
+        "right_element_id": "e",
+        "product_element_id": "r90"
+      },
+      {
+        "left_element_id": "r90",
+        "right_element_id": "r90",
+        "product_element_id": "r180"
+      },
+      {
+        "left_element_id": "r90",
+        "right_element_id": "r180",
+        "product_element_id": "r270"
+      },
+      {
+        "left_element_id": "r90",
+        "right_element_id": "r270",
+        "product_element_id": "e"
+      },
+      {
+        "left_element_id": "r90",
+        "right_element_id": "fx",
+        "product_element_id": "fdiag"
+      },
+      {
+        "left_element_id": "r90",
+        "right_element_id": "fy",
+        "product_element_id": "fanti"
+      },
+      {
+        "left_element_id": "r90",
+        "right_element_id": "fdiag",
+        "product_element_id": "fy"
+      },
+      {
+        "left_element_id": "r90",
+        "right_element_id": "fanti",
+        "product_element_id": "fx"
+      },
+      {
+        "left_element_id": "r180",
+        "right_element_id": "e",
+        "product_element_id": "r180"
+      },
+      {
+        "left_element_id": "r180",
+        "right_element_id": "r90",
+        "product_element_id": "r270"
+      },
+      {
+        "left_element_id": "r180",
+        "right_element_id": "r180",
+        "product_element_id": "e"
+      },
+      {
+        "left_element_id": "r180",
+        "right_element_id": "r270",
+        "product_element_id": "r90"
+      },
+      {
+        "left_element_id": "r180",
+        "right_element_id": "fx",
+        "product_element_id": "fy"
+      },
+      {
+        "left_element_id": "r180",
+        "right_element_id": "fy",
+        "product_element_id": "fx"
+      },
+      {
+        "left_element_id": "r180",
+        "right_element_id": "fdiag",
+        "product_element_id": "fanti"
+      },
+      {
+        "left_element_id": "r180",
+        "right_element_id": "fanti",
+        "product_element_id": "fdiag"
+      },
+      {
+        "left_element_id": "r270",
+        "right_element_id": "e",
+        "product_element_id": "r270"
+      },
+      {
+        "left_element_id": "r270",
+        "right_element_id": "r90",
+        "product_element_id": "e"
+      },
+      {
+        "left_element_id": "r270",
+        "right_element_id": "r180",
+        "product_element_id": "r90"
+      },
+      {
+        "left_element_id": "r270",
+        "right_element_id": "r270",
+        "product_element_id": "r180"
+      },
+      {
+        "left_element_id": "r270",
+        "right_element_id": "fx",
+        "product_element_id": "fanti"
+      },
+      {
+        "left_element_id": "r270",
+        "right_element_id": "fy",
+        "product_element_id": "fdiag"
+      },
+      {
+        "left_element_id": "r270",
+        "right_element_id": "fdiag",
+        "product_element_id": "fx"
+      },
+      {
+        "left_element_id": "r270",
+        "right_element_id": "fanti",
+        "product_element_id": "fy"
+      },
+      {
+        "left_element_id": "fx",
+        "right_element_id": "e",
+        "product_element_id": "fx"
+      },
+      {
+        "left_element_id": "fx",
+        "right_element_id": "r90",
+        "product_element_id": "fanti"
+      },
+      {
+        "left_element_id": "fx",
+        "right_element_id": "r180",
+        "product_element_id": "fy"
+      },
+      {
+        "left_element_id": "fx",
+        "right_element_id": "r270",
+        "product_element_id": "fdiag"
+      },
+      {
+        "left_element_id": "fx",
+        "right_element_id": "fx",
+        "product_element_id": "e"
+      },
+      {
+        "left_element_id": "fx",
+        "right_element_id": "fy",
+        "product_element_id": "r180"
+      },
+      {
+        "left_element_id": "fx",
+        "right_element_id": "fdiag",
+        "product_element_id": "r270"
+      },
+      {
+        "left_element_id": "fx",
+        "right_element_id": "fanti",
+        "product_element_id": "r90"
+      },
+      {
+        "left_element_id": "fy",
+        "right_element_id": "e",
+        "product_element_id": "fy"
+      },
+      {
+        "left_element_id": "fy",
+        "right_element_id": "r90",
+        "product_element_id": "fdiag"
+      },
+      {
+        "left_element_id": "fy",
+        "right_element_id": "r180",
+        "product_element_id": "fx"
+      },
+      {
+        "left_element_id": "fy",
+        "right_element_id": "r270",
+        "product_element_id": "fanti"
+      },
+      {
+        "left_element_id": "fy",
+        "right_element_id": "fx",
+        "product_element_id": "r180"
+      },
+      {
+        "left_element_id": "fy",
+        "right_element_id": "fy",
+        "product_element_id": "e"
+      },
+      {
+        "left_element_id": "fy",
+        "right_element_id": "fdiag",
+        "product_element_id": "r90"
+      },
+      {
+        "left_element_id": "fy",
+        "right_element_id": "fanti",
+        "product_element_id": "r270"
+      },
+      {
+        "left_element_id": "fdiag",
+        "right_element_id": "e",
+        "product_element_id": "fdiag"
+      },
+      {
+        "left_element_id": "fdiag",
+        "right_element_id": "r90",
+        "product_element_id": "fx"
+      },
+      {
+        "left_element_id": "fdiag",
+        "right_element_id": "r180",
+        "product_element_id": "fanti"
+      },
+      {
+        "left_element_id": "fdiag",
+        "right_element_id": "r270",
+        "product_element_id": "fy"
+      },
+      {
+        "left_element_id": "fdiag",
+        "right_element_id": "fx",
+        "product_element_id": "r90"
+      },
+      {
+        "left_element_id": "fdiag",
+        "right_element_id": "fy",
+        "product_element_id": "r270"
+      },
+      {
+        "left_element_id": "fdiag",
+        "right_element_id": "fdiag",
+        "product_element_id": "e"
+      },
+      {
+        "left_element_id": "fdiag",
+        "right_element_id": "fanti",
+        "product_element_id": "r180"
+      },
+      {
+        "left_element_id": "fanti",
+        "right_element_id": "e",
+        "product_element_id": "fanti"
+      },
+      {
+        "left_element_id": "fanti",
+        "right_element_id": "r90",
+        "product_element_id": "fy"
+      },
+      {
+        "left_element_id": "fanti",
+        "right_element_id": "r180",
+        "product_element_id": "fdiag"
+      },
+      {
+        "left_element_id": "fanti",
+        "right_element_id": "r270",
+        "product_element_id": "fx"
+      },
+      {
+        "left_element_id": "fanti",
+        "right_element_id": "fx",
+        "product_element_id": "r270"
+      },
+      {
+        "left_element_id": "fanti",
+        "right_element_id": "fy",
+        "product_element_id": "r90"
+      },
+      {
+        "left_element_id": "fanti",
+        "right_element_id": "fdiag",
+        "product_element_id": "r180"
+      },
+      {
+        "left_element_id": "fanti",
+        "right_element_id": "fanti",
+        "product_element_id": "e"
+      }
+    ]
   },
   "cases": [
     {
