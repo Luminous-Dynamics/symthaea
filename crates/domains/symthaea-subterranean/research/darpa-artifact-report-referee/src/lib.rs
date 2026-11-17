@@ -158,14 +158,52 @@ impl SystemsFinalRound {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtifactTypeAlias {
+    /// Raw type string used in the ground-truth CSV source.
+    pub source_type: String,
+    /// Exact report string in the official DARPA Finals artifacts specification.
+    pub official_report_string: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtifactTypeCrosswalk {
+    /// Version/date of the externally reviewed source-to-official mapping.
+    pub version: String,
+    pub mappings: Vec<ArtifactTypeAlias>,
+}
+
+/// Crosswalk for the DARPA SubT Finals Artifacts Specification dated
+/// 2021-04-01. Keep this mapping explicit; do not lowercase, trim or infer
+/// class aliases during scoring.
+pub fn darpa_final_2021_crosswalk_v0_1() -> ArtifactTypeCrosswalk {
+    ArtifactTypeCrosswalk {
+        version: "darpa-finals-artifact-strings-2021-04-01-v0.1".into(),
+        mappings: vec![
+            ArtifactTypeAlias { source_type: "survivor".into(), official_report_string: "Survivor".into() },
+            ArtifactTypeAlias { source_type: "cellphone".into(), official_report_string: "Cell Phone".into() },
+            ArtifactTypeAlias { source_type: "backpack".into(), official_report_string: "Backpack".into() },
+            ArtifactTypeAlias { source_type: "drill".into(), official_report_string: "Drill".into() },
+            ArtifactTypeAlias { source_type: "fireextinguisher".into(), official_report_string: "Fire Extinguisher".into() },
+            ArtifactTypeAlias { source_type: "gas".into(), official_report_string: "Gas".into() },
+            ArtifactTypeAlias { source_type: "vent".into(), official_report_string: "Vent".into() },
+            ArtifactTypeAlias { source_type: "helmet".into(), official_report_string: "Helmet".into() },
+            ArtifactTypeAlias { source_type: "rope".into(), official_report_string: "Rope".into() },
+            ArtifactTypeAlias { source_type: "cube".into(), official_report_string: "Cube".into() },
+        ],
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SystemsFinalProfile {
     pub round: SystemsFinalRound,
     pub coordinate_frame_id: String,
+    pub type_crosswalk: ArtifactTypeCrosswalk,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SystemsFinalEvaluation {
     pub round: SystemsFinalRound,
+    pub crosswalk_version: String,
     pub expected_artifact_count: usize,
     pub report_limit: usize,
     pub submitted_report_count: usize,
@@ -204,6 +242,11 @@ pub enum RefereeError {
         expected: usize,
         actual: usize,
     },
+    EmptyTypeCrosswalk,
+    DuplicateSourceTypeMapping(String),
+    DuplicateOfficialTypeString(String),
+    UnsupportedOfficialTypeString(String),
+    MissingSourceTypeMapping(String),
 }
 
 impl std::fmt::Display for RefereeError {
@@ -556,6 +599,66 @@ pub fn evaluate_reports(
     })
 }
 
+fn validate_type_crosswalk(
+    crosswalk: &ArtifactTypeCrosswalk,
+    ground_truth: &[GroundTruthArtifact],
+) -> Result<BTreeMap<String, String>, RefereeError> {
+    validate_identifier(&crosswalk.version, "type_crosswalk.version")?;
+    if crosswalk.mappings.is_empty() {
+        return Err(RefereeError::EmptyTypeCrosswalk);
+    }
+
+    const OFFICIAL_TYPES: [&str; 10] = [
+        "Survivor",
+        "Cell Phone",
+        "Backpack",
+        "Drill",
+        "Fire Extinguisher",
+        "Gas",
+        "Vent",
+        "Helmet",
+        "Rope",
+        "Cube",
+    ];
+
+    let mut source_to_official = BTreeMap::new();
+    let mut official_seen = BTreeSet::new();
+    for mapping in &crosswalk.mappings {
+        validate_type_label(&mapping.source_type)?;
+        validate_type_label(&mapping.official_report_string)?;
+        if !OFFICIAL_TYPES.contains(&mapping.official_report_string.as_str()) {
+            return Err(RefereeError::UnsupportedOfficialTypeString(
+                mapping.official_report_string.clone(),
+            ));
+        }
+        if source_to_official
+            .insert(
+                mapping.source_type.clone(),
+                mapping.official_report_string.clone(),
+            )
+            .is_some()
+        {
+            return Err(RefereeError::DuplicateSourceTypeMapping(
+                mapping.source_type.clone(),
+            ));
+        }
+        if !official_seen.insert(mapping.official_report_string.as_str()) {
+            return Err(RefereeError::DuplicateOfficialTypeString(
+                mapping.official_report_string.clone(),
+            ));
+        }
+    }
+
+    for artifact in ground_truth {
+        if !source_to_official.contains_key(&artifact.source_type) {
+            return Err(RefereeError::MissingSourceTypeMapping(
+                artifact.source_type.clone(),
+            ));
+        }
+    }
+    Ok(source_to_official)
+}
+
 /// Replay the historical DARPA Systems Final artifact-report scoring
 /// semantics in submission order.
 ///
@@ -582,6 +685,8 @@ pub fn evaluate_systems_final_stream(
         });
     }
 
+    let source_to_official =
+        validate_type_crosswalk(&profile.type_crosswalk, ground_truth)?;
     let report_limit = profile.round.maximum_reports();
     let scoring_profile = ReportProfile {
         coordinate_frame_id: profile.coordinate_frame_id.clone(),
@@ -604,7 +709,12 @@ pub fn evaluate_systems_final_stream(
     for report in &selected {
         let mut best_match: Option<(usize, f64)> = None;
         for (truth_index, truth) in ordered_truth.iter().enumerate() {
-            if already_reported[truth_index] || report.source_type != truth.source_type {
+            let official_type = source_to_official
+                .get(&truth.source_type)
+                .ok_or_else(|| {
+                    RefereeError::MissingSourceTypeMapping(truth.source_type.clone())
+                })?;
+            if already_reported[truth_index] || report.source_type != *official_type {
                 continue;
             }
             let error = report.position.distance(truth.position)?;
@@ -659,6 +769,7 @@ pub fn evaluate_systems_final_stream(
 
     Ok(SystemsFinalEvaluation {
         round: profile.round,
+        crosswalk_version: profile.type_crosswalk.version,
         expected_artifact_count: expected_artifacts,
         report_limit,
         submitted_report_count: reports.len(),
@@ -742,6 +853,7 @@ mod tests {
             SystemsFinalProfile {
                 round: SystemsFinalRound::Preliminary,
                 coordinate_frame_id: "darpa".into(),
+                type_crosswalk: darpa_final_2021_crosswalk_v0_1(),
             },
         )
         .unwrap();
