@@ -82,5 +82,6 @@
       "decision_kind": "act"
     }
   ],
-  "claim_ceiling": "Synthetic evaluator that injects an evaluator-owned unknown-world hypothesis and contamination reserve into D6.17.1 robust risk evaluation. The reserve is an explicit stress assumption, not an estimated probability of all omitted hazards. It does not prove model completeness, estimate real-world contamination, authenticate unknown-world likelihood bounds, or authorize production actions."
+  "claim_ceiling": "Synthetic evaluator that injects an evaluator-owned unknown-world hypothesis and contamination reserve into D6.17.1 robust risk evaluation. The reserve is an explicit stress assumption, not an estimated probability of all omitted hazards. It does not prove model completeness, estimate real-world contamination, authenticate unknown-world likelihood bounds, or authorize production actions.",
+  "contamination_nominal_bps": 1000
 }
