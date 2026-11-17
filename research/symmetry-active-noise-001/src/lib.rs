@@ -229,6 +229,15 @@ impl BoundedNoiseProblemV1 {
     pub fn from_deterministic(
         problem: &ActiveExperimentProblemV1,
     ) -> Result<Self, NoiseErrorV1> {
+        if problem.hypotheses.is_empty()
+            || problem.probes.is_empty()
+            || problem
+                .probes
+                .iter()
+                .any(|probe| probe.outcomes.len() != problem.hypotheses.len())
+        {
+            return Err(NoiseErrorV1::InvalidDeterministicInput);
+        }
         let adapted = Self {
             problem_id: problem.problem_id.clone(),
             hypothesis_ids: problem.hypotheses.clone(),
@@ -252,11 +261,6 @@ impl BoundedNoiseProblemV1 {
                 .collect(),
         };
         adapted.validate()?;
-        if problem.probes.iter().any(|probe| {
-            probe.outcomes.len() != problem.hypotheses.len()
-        }) {
-            return Err(NoiseErrorV1::InvalidDeterministicInput);
-        }
         Ok(adapted)
     }
 }
