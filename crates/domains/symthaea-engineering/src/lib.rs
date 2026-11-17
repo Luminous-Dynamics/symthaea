@@ -3,9 +3,10 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Engineering reasoning facade for Symthaea.
 
+#![deny(unsafe_code)]
+
 pub mod lightshell_qualification;
 pub mod lightshell_spacer_doe;
-#![deny(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
 use symthaea_broca::{BrocaConfig, BrocaGenerator, ThoughtChannels};
