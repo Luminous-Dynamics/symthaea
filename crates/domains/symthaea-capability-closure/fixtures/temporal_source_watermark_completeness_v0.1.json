@@ -275,7 +275,13 @@
       "indexed_vs_linear_scan_breach_mismatch_count",
       "indexed_vs_linear_scan_speedup",
       "event_arrival_batch_ingest_total_us",
-      "event_arrival_batch_ingest_ns_per_event"
+      "event_arrival_batch_ingest_ns_per_event",
+      "direct_event_arrival_ingest_total_us",
+      "direct_event_arrival_ingest_ns_per_event",
+      "clone_reference_event_arrival_ingest_total_us",
+      "clone_reference_event_arrival_ingest_ns_per_event",
+      "clone_to_direct_event_arrival_ingest_speedup",
+      "direct_vs_clone_final_ledger_digest_mismatch_count"
     ]
   },
   "qualification_targets": {
@@ -326,9 +332,14 @@
       "verified_event_arrival_count",
       "verified_late_breach_count",
       "event_arrival_batch_ingest_total_us",
-      "event_arrival_batch_ingest_ns_per_event"
+      "event_arrival_batch_ingest_ns_per_event",
+      "direct_event_arrival_ingest_total_us",
+      "direct_event_arrival_ingest_ns_per_event",
+      "clone_reference_event_arrival_ingest_total_us",
+      "clone_reference_event_arrival_ingest_ns_per_event",
+      "clone_to_direct_event_arrival_ingest_speedup"
     ],
-    "known_answer": "indexed_semantic_report_equals_linear_scan_reference_semantic_report_equals_verified_receipt.report; verified_receipt.ledger_sha256_equals_current_ledger_state_sha256",
+    "known_answer": "indexed_semantic_report_equals_linear_scan_reference_semantic_report_equals_verified_receipt.report; verified_receipt.ledger_sha256_equals_current_ledger_state_sha256; direct_append_final_ledger_sha256_equals_clone_per_batch_reference_final_ledger_sha256",
     "correctness_gate": "semantic_report_equality_for_all_three_complete_query_paths_and_consistent_instrumentation_counters_and_current_ledger_digest_match_before_timing",
     "measurement_boundary": "in_memory_release_build_cpu_query_and_replay_time_only; event-arrival ingestion separately times four atomic batch commits and excludes event generation and initial progress setup",
     "energy_measurement": "not_measured",
@@ -364,7 +375,15 @@
       10000
     ],
     "scan_query_repetitions": 31,
-    "ingestion_atomicity": "the entire batch is preflighted before mutation; after preflight the direct append path has no typed Result error branch; invalid members preserve ledger state SHA-256 and all counts"
+    "ingestion_atomicity": "the entire batch is preflighted before mutation; after preflight the direct append path has no typed Result error branch; invalid members preserve ledger state SHA-256 and all counts",
+    "ingestion_comparison": {
+      "direct_path": "preflight_full_batch_then_append_without_full_ledger_clone",
+      "reference_path": "clone_complete_current_ledger_for_each_event_batch_then_append_and_commit",
+      "initial_state": "identical_progress_only_snapshot",
+      "inputs": "identical_four_prebuilt_event_batches_and_transaction_timestamps",
+      "timing_boundary": "exclude_event_generation_and_initial_source_progress_setup; report one total sample per path",
+      "acceptance": "final ledger SHA-256 digests must match before reporting time or speedup"
+    }
   },
   "clock_calibration_contract": {
     "module": "research/irregular-event-contract/src/clock.rs",
