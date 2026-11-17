@@ -1,0 +1,33 @@
+name: Capability transition ledger tests
+
+on:
+  push:
+    branches:
+      - research/humanoid-tool-service-v0-1
+    paths:
+      - "research/humanoid-tool-service-v0.1/capability-transition-ledger/**"
+      - ".github/workflows/capability-transition-ledger.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "research/humanoid-tool-service-v0.1/capability-transition-ledger/**"
+      - ".github/workflows/capability-transition-ledger.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: capability-transition-ledger-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+      - name: Run transition evaluator tests
+        run: cargo test --manifest-path research/humanoid-tool-service-v0.1/capability-transition-ledger/Cargo.toml
