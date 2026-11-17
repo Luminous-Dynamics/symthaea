@@ -235,7 +235,7 @@ impl SpacerDoeManifest {
             }
         }
         for required in ["C0", "C1", "C2-T", "C2-M", "C3"] {
-            if !controls.contains(required) {
+            if !controls.iter().any(|control_id| *control_id == required) {
                 push(
                     &mut findings,
                     "missing_required_control",
