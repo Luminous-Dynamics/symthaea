@@ -74,7 +74,11 @@ impl QualifiedLyapunovReference {
         if self.lambda_max <= 0.0 {
             return Err(MetricError::NonPositiveValue("lambda_max"));
         }
-        Ok(1.0 / self.lambda_max)
+        let time = 1.0 / self.lambda_max;
+        if !time.is_finite() {
+            return Err(MetricError::NonFiniteValue("Lyapunov time"));
+        }
+        Ok(time)
     }
 }
 
@@ -106,6 +110,7 @@ pub fn forecast_horizon(
 
     let mut previous_time = 0.0;
     let mut last_passing_time = 0.0;
+    let mut prefix_is_valid = true;
 
     for sample in samples {
         if !sample.horizon.is_finite() {
@@ -121,11 +126,12 @@ pub fn forecast_horizon(
             return Err(MetricError::NegativeValue("normalized forecast error"));
         }
 
-        if sample.normalized_error > threshold {
-            break;
+        if prefix_is_valid && sample.normalized_error > threshold {
+            prefix_is_valid = false;
         }
-
-        last_passing_time = sample.horizon;
+        if prefix_is_valid {
+            last_passing_time = sample.horizon;
+        }
         previous_time = sample.horizon;
     }
 
@@ -282,6 +288,12 @@ pub fn evaluate_decisions(sets: &[InformationSet]) -> Result<DecisionRisk, Metri
             conditional_perfect_risk += state.probability * best_state_loss;
         }
 
+        if expected_losses.iter().any(|loss| !loss.is_finite())
+            || !conditional_perfect_risk.is_finite()
+        {
+            return Err(MetricError::NonFiniteValue("expected decision risk"));
+        }
+
         let best_information_set_loss = expected_losses
             .iter()
             .copied()
@@ -295,7 +307,17 @@ pub fn evaluate_decisions(sets: &[InformationSet]) -> Result<DecisionRisk, Metri
         policy_risk += set.probability * expected_losses[chosen_action];
     }
 
+    if !bayes_risk.is_finite()
+        || !policy_risk.is_finite()
+        || !perfect_information_risk.is_finite()
+    {
+        return Err(MetricError::NonFiniteValue("aggregate decision risk"));
+    }
+
     let raw_regret = policy_risk - bayes_risk;
+    if !raw_regret.is_finite() {
+        return Err(MetricError::NonFiniteValue("decision regret"));
+    }
     if raw_regret < -REGRET_ROUNDOFF_TOLERANCE {
         return Err(MetricError::InformationIncreasedExpectedRisk);
     }
