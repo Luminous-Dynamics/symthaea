@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luminousdynamics.io/schemas/egddm-open-world-oracle-v0.1.schema.json",
-  "title": "EGDDM D6.18 evaluator oracle v0.1",
+  "title": "EGDDM D6.18 evaluator open-world oracle v0.1",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -361,10 +361,11 @@
       "required": [
         "unknown_hypothesis_id",
         "contamination_reserve_bps",
+        "contamination_nominal_bps",
         "read_only_action_ids",
         "unknown_safe_action_ids",
-        "policy_version",
-        "unknown_channel_likelihoods"
+        "unknown_channel_likelihoods",
+        "policy_version"
       ],
       "properties": {
         "unknown_hypothesis_id": {
@@ -374,6 +375,11 @@
         "contamination_reserve_bps": {
           "type": "integer",
           "minimum": 1,
+          "maximum": 10000
+        },
+        "contamination_nominal_bps": {
+          "type": "integer",
+          "minimum": 0,
           "maximum": 10000
         },
         "read_only_action_ids": {
@@ -393,10 +399,6 @@
             "type": "string",
             "minLength": 1
           }
-        },
-        "policy_version": {
-          "type": "string",
-          "minLength": 1
         },
         "unknown_channel_likelihoods": {
           "type": "array",
@@ -446,6 +448,10 @@
               }
             }
           }
+        },
+        "policy_version": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }
