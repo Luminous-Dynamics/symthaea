@@ -266,6 +266,26 @@ The 2026 underground mine infrastructure resilience review identifies dedicated 
 
 Commercial underground automation is advancing on equipment autonomy, 3-D perception and fleet operations. Subterra should not claim novelty for generic autonomous mining or multi-robot routing. Its differentiated hypothesis is **decision-valued inspection connected to independently verified physical work and unresolved-state recovery**.
 
+## 12.1 Real-data readiness and licensing
+
+The companion [#12652 — real-data admission issue](https://github.com/Luminous-Dynamics/symthaea/issues/12652) tracks public sources as separate domains:
+
+| Dataset | Current evidence | Use in this benchmark | Rights/domain caveat |
+|---|---|---|---|
+| [Sewer-ML](https://vap.aau.dk/sewer-ml/) | 1,300,201 images from 75,618 videos, 3 Danish utilities over 9 years, licensed-inspector annotations, 17 official defect classes; published baseline F2-CIW 55.11% and F1-Normal 90.94% | Reproduce sewer-specific classification and assess grouped video/site split transfer | Access form and original dataset terms must be reviewed; sewer labels are not cable-duct/drawpoint labels |
+| [CableInspect-AD](https://mila-iqia.github.io/cableinspect-ad/) | 4,798 expert-annotated high-resolution power-line cable images, 6,023 anomalies, 7 defect types, severity labels, image/pixel/bounding-box annotations | Reproduce power-line cable anomaly detection/segmentation and test calibrated thresholding | CC BY-NC-SA 4.0; non-commercial research only unless separate permission is obtained; not underground duct images |
+| [IPD](https://zenodo-rdm.web.cern.ch/records/17398156) | 357 insulated-pipeline images with binary masks for hole/open-insulation/dent | Potential industrial-pipeline anomaly baseline | Signed licence agreement required; binary masks do not distinguish the three damage classes |
+| VideoPipe QV-Pipe / CCTV-Pipe | Published literature reports 9,601 short clips (>55 h) and 575 long videos (87 h) | Candidate video/temporal-localization benchmark | Access, source release, licence and split provenance remain to be verified before admission |
+
+The dataset sizes/labels above describe the source releases, not admitted or executed Subterra results. A detector trained on these sources cannot be used as a calibrated (P(o\mid h,a)) in EVSI without a separate probability calibration study on the target task and domain. A frame-level score is not an asset-level decision outcome.
+
+For the first campaign:
+1. reproduce each source's official benchmark with its original labels/splits and denominator;
+2. add leave-video/asset/site/utility-out splits only where source identifiers and rights allow;
+3. retain annotation disagreement, class imbalance and unknown labels;
+4. calibrate defect likelihoods on separate site/asset clusters before connecting outputs to the EVSI planner;
+5. keep mine drawpoint volume and mine-specific cable-duct condition as synthetic/NOT_RUN until authorized reference truth and independent metrology are available.
+
 ## 13. Claim ceiling
 
 This benchmark qualifies only the declared synthetic likelihoods, priors, loss functions, sensor/action catalogue, model scenarios and evaluator. It does not prove real sensor accuracy, defect-detection performance, electrical or structural adequacy, geotechnical safety, mine safety, field productivity, or authority to intervene. Physical qualification requires lawful ground-truth data, mine-owner approval, qualified specialist review, instrumented trials and independent measurements.
