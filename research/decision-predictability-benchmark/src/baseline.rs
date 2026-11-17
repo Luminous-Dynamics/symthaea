@@ -284,6 +284,29 @@ fn solve_least_squares_qr(
         return Err(BaselineError::RankDeficientDesign);
     }
 
+    // Scale each design column before QR. This preserves the least-squares
+    // objective while preventing a physically small but identifiable signal
+    // (for example, a decaying stable mode) from being mistaken for a zero
+    // column merely because its absolute magnitude is tiny.
+    let mut column_scales = vec![0.0; column_count];
+    for column in 0..column_count {
+        let scale = matrix
+            .iter()
+            .fold(0.0_f64, |norm, row| norm.hypot(row[column]));
+        if !scale.is_finite() {
+            return Err(BaselineError::NumericalFailure);
+        }
+        if scale <= f64::MIN_POSITIVE {
+            return Err(BaselineError::RankDeficientDesign);
+        }
+        column_scales[column] = scale;
+    }
+    for row in &mut matrix {
+        for (value, scale) in row.iter_mut().zip(column_scales.iter()) {
+            *value /= scale;
+        }
+    }
+
     for pivot in 0..column_count {
         let column_norm = matrix
             .iter()
@@ -366,6 +389,13 @@ fn solve_least_squares_qr(
         }
     }
 
+    for (coefficient, scale) in coefficients.iter_mut().zip(column_scales.iter()) {
+        *coefficient /= scale;
+        if !coefficient.is_finite() {
+            return Err(BaselineError::NumericalFailure);
+        }
+    }
+
     Ok(coefficients)
 }
 
@@ -417,6 +447,23 @@ mod tests {
         for (actual, reference) in forecast.iter().zip(expected.iter()) {
             assert!((actual - reference).abs() < 1e-8);
         }
+    }
+
+    #[test]
+    fn qr_column_scaling_preserves_identifiable_tiny_signal_coefficients() {
+        let mut history = vec![0.7e-180, -0.2e-180];
+        for _ in 0..100 {
+            let time = history.len();
+            let next = 0.25e-180
+                + 1.25 * history[time - 1]
+                - 0.8 * history[time - 2];
+            history.push(next);
+        }
+
+        let model = fit_linear_ar(&history, 2, 0.0).unwrap();
+        assert!((model.coefficients()[0] / 1e-180 - 0.25).abs() < 1e-7);
+        assert!((model.coefficients()[1] - 1.25).abs() < 1e-7);
+        assert!((model.coefficients()[2] + 0.8).abs() < 1e-7);
     }
 
     #[test]
