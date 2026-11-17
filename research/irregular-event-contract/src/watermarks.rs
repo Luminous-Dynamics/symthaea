@@ -377,13 +377,13 @@ impl SourceWatermarkLedger {
 
     /// Append one source-progress revision after preflight, without cloning the log.
     pub fn append(&mut self, revision: SourceProgressRevision) -> Result<(), WatermarkError> {
-        if let Some(previous) = self.last_transaction_time_us {
-            if revision.recorded_at_us <= previous {
-                return Err(WatermarkError::NonIncreasingTransactionTime {
-                    previous,
-                    actual: revision.recorded_at_us,
-                });
-            }
+        if let Some(previous) = self.last_transaction_time_us
+            && revision.recorded_at_us <= previous
+        {
+            return Err(WatermarkError::NonIncreasingTransactionTime {
+                previous,
+                actual: revision.recorded_at_us,
+            });
         }
         self.append_unchecked(revision)?;
         self.last_transaction_time_us = Some(revision.recorded_at_us);
@@ -406,13 +406,13 @@ impl SourceWatermarkLedger {
         {
             return Err(WatermarkError::BatchTimestampMismatch);
         }
-        if let Some(previous) = self.last_transaction_time_us {
-            if transaction_time <= previous {
-                return Err(WatermarkError::NonIncreasingTransactionTime {
-                    previous,
-                    actual: transaction_time,
-                });
-            }
+        if let Some(previous) = self.last_transaction_time_us
+            && transaction_time <= previous
+        {
+            return Err(WatermarkError::NonIncreasingTransactionTime {
+                previous,
+                actual: transaction_time,
+            });
         }
 
         let mut candidate = self.clone();
@@ -777,13 +777,13 @@ impl SourceWatermarkLedger {
         if incoming.is_empty() {
             return Err(WatermarkError::EmptyBatch);
         }
-        if let Some(previous) = self.last_transaction_time_us {
-            if recorded_at_us <= previous {
-                return Err(WatermarkError::NonIncreasingTransactionTime {
-                    previous,
-                    actual: recorded_at_us,
-                });
-            }
+        if let Some(previous) = self.last_transaction_time_us
+            && recorded_at_us <= previous
+        {
+            return Err(WatermarkError::NonIncreasingTransactionTime {
+                previous,
+                actual: recorded_at_us,
+            });
         }
         let mut unique = BTreeSet::new();
         for event in &incoming {
