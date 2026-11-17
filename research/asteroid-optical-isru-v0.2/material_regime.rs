@@ -47,18 +47,36 @@ impl MaterialParameters {
             ("salt_mass_fraction", self.salt_mass_fraction),
             ("spallation_onset_k", self.spallation_onset_k),
             ("volatile_release_onset_k", self.volatile_release_onset_k),
-            ("brittle_ductile_transition_k", self.brittle_ductile_transition_k),
+            (
+                "brittle_ductile_transition_k",
+                self.brittle_ductile_transition_k,
+            ),
             ("melt_onset_k", self.melt_onset_k),
             ("melt_transition_width_k", self.melt_transition_width_k),
-            ("spallation_yield_per_pulse", self.spallation_yield_per_pulse),
-            ("volatile_release_efficiency", self.volatile_release_efficiency),
-            ("melt_growth_time_constant_s", self.melt_growth_time_constant_s),
+            (
+                "spallation_yield_per_pulse",
+                self.spallation_yield_per_pulse,
+            ),
+            (
+                "volatile_release_efficiency",
+                self.volatile_release_efficiency,
+            ),
+            (
+                "melt_growth_time_constant_s",
+                self.melt_growth_time_constant_s,
+            ),
             ("melt_suppression_exponent", self.melt_suppression_exponent),
             ("ductile_spallation_floor", self.ductile_spallation_floor),
             ("cooling_time_constant_s", self.cooling_time_constant_s),
-            ("surface_refresh_efficiency", self.surface_refresh_efficiency),
+            (
+                "surface_refresh_efficiency",
+                self.surface_refresh_efficiency,
+            ),
             ("surface_depletion_rate", self.surface_depletion_rate),
-            ("organic_deposition_fraction", self.organic_deposition_fraction),
+            (
+                "organic_deposition_fraction",
+                self.organic_deposition_fraction,
+            ),
             ("airborne_salt_fraction", self.airborne_salt_fraction),
             ("airborne_dust_fraction", self.airborne_dust_fraction),
         ] {
@@ -75,17 +93,28 @@ impl MaterialParameters {
         {
             return Err(RegimeError::InvalidParameter("zero_physical_scale"));
         }
-        if self.water_mass_fraction + self.organic_mass_fraction + self.salt_mass_fraction >= 1.0
-        {
+        if self.water_mass_fraction + self.organic_mass_fraction + self.salt_mass_fraction >= 1.0 {
             return Err(RegimeError::InvalidParameter("volatile_mass_fractions"));
         }
         for (name, value) in [
-            ("spallation_yield_per_pulse", self.spallation_yield_per_pulse),
-            ("volatile_release_efficiency", self.volatile_release_efficiency),
+            (
+                "spallation_yield_per_pulse",
+                self.spallation_yield_per_pulse,
+            ),
+            (
+                "volatile_release_efficiency",
+                self.volatile_release_efficiency,
+            ),
             ("ductile_spallation_floor", self.ductile_spallation_floor),
-            ("surface_refresh_efficiency", self.surface_refresh_efficiency),
+            (
+                "surface_refresh_efficiency",
+                self.surface_refresh_efficiency,
+            ),
             ("surface_depletion_rate", self.surface_depletion_rate),
-            ("organic_deposition_fraction", self.organic_deposition_fraction),
+            (
+                "organic_deposition_fraction",
+                self.organic_deposition_fraction,
+            ),
             ("airborne_salt_fraction", self.airborne_salt_fraction),
             ("airborne_dust_fraction", self.airborne_dust_fraction),
         ] {
@@ -128,7 +157,10 @@ impl MaterialState {
             ("remaining_water_kg", self.remaining_water_kg),
             ("remaining_organic_kg", self.remaining_organic_kg),
             ("remaining_salt_kg", self.remaining_salt_kg),
-            ("surface_depletion_fraction", self.surface_depletion_fraction),
+            (
+                "surface_depletion_fraction",
+                self.surface_depletion_fraction,
+            ),
             ("melt_layer_fraction", self.melt_layer_fraction),
         ] {
             if !value.is_finite() || value < 0.0 {
@@ -164,7 +196,10 @@ impl LaserPulse {
             ("beam_area_cm2", self.beam_area_cm2),
             ("on_duration_seconds", self.on_duration_seconds),
             ("cooling_pause_seconds", self.cooling_pause_seconds),
-            ("process_optic_transmission", self.process_optic_transmission),
+            (
+                "process_optic_transmission",
+                self.process_optic_transmission,
+            ),
         ] {
             if !value.is_finite() || value < 0.0 {
                 return Err(RegimeError::InvalidPulse(name));
@@ -321,24 +356,20 @@ impl MaterialRegimeModel {
         let melt_excess_fraction = ((peak_temperature - self.parameters.melt_onset_k)
             / self.parameters.melt_transition_width_k)
             .clamp(0.0, 1.0);
-        let melt_kinetics = 1.0
-            - (-pulse.on_duration_seconds / self.parameters.melt_growth_time_constant_s).exp();
+        let melt_kinetics =
+            1.0 - (-pulse.on_duration_seconds / self.parameters.melt_growth_time_constant_s).exp();
         let melt_increment = melt_excess_fraction * melt_kinetics;
-        let melt_layer_fraction = 1.0
-            - (1.0 - self.state.melt_layer_fraction) * (1.0 - melt_increment);
+        let melt_layer_fraction =
+            1.0 - (1.0 - self.state.melt_layer_fraction) * (1.0 - melt_increment);
 
-        let spall_temperature_factor = ((peak_temperature
-            - self.parameters.spallation_onset_k)
-            / (self.parameters.brittle_ductile_transition_k
-                - self.parameters.spallation_onset_k))
+        let spall_temperature_factor = ((peak_temperature - self.parameters.spallation_onset_k)
+            / (self.parameters.brittle_ductile_transition_k - self.parameters.spallation_onset_k))
             .clamp(0.0, 1.0);
-        let ductile_fraction = ((peak_temperature
-            - self.parameters.brittle_ductile_transition_k)
-            / (self.parameters.melt_onset_k
-                - self.parameters.brittle_ductile_transition_k))
+        let ductile_fraction = ((peak_temperature - self.parameters.brittle_ductile_transition_k)
+            / (self.parameters.melt_onset_k - self.parameters.brittle_ductile_transition_k))
             .clamp(0.0, 1.0);
-        let ductile_factor = 1.0
-            - ductile_fraction * (1.0 - self.parameters.ductile_spallation_floor);
+        let ductile_factor =
+            1.0 - ductile_fraction * (1.0 - self.parameters.ductile_spallation_floor);
         let melt_suppression =
             (1.0 - melt_layer_fraction).powf(self.parameters.melt_suppression_exponent);
         let unrefreshed_surface = 1.0 - self.state.surface_depletion_fraction;
@@ -359,8 +390,8 @@ impl MaterialRegimeModel {
             * melt_suppression
             * unrefreshed_surface;
 
-        let available_water = (thermal_mass * self.parameters.water_mass_fraction)
-            .min(self.state.remaining_water_kg);
+        let available_water =
+            (thermal_mass * self.parameters.water_mass_fraction).min(self.state.remaining_water_kg);
         let available_organic = (thermal_mass * self.parameters.organic_mass_fraction)
             .min(self.state.remaining_organic_kg);
         let available_salt =
@@ -370,9 +401,8 @@ impl MaterialRegimeModel {
         let released_organic = available_organic * volatile_release_fraction;
         let released_salt = available_salt * volatile_release_fraction;
         let captured_water = released_water * gas.trap_capture_efficiency;
-        let purge_moisture = gas.purge_gas_flow_kg_s
-            * pulse.on_duration_seconds
-            * gas.purge_gas_water_mass_fraction;
+        let purge_moisture =
+            gas.purge_gas_flow_kg_s * pulse.on_duration_seconds * gas.purge_gas_water_mass_fraction;
         let gas_analyzer_signal = captured_water + purge_moisture;
 
         let refresh_fraction = if thermal_mass > 0.0 {
@@ -383,9 +413,9 @@ impl MaterialRegimeModel {
         };
         let depletion_increment =
             volatile_release_fraction * self.parameters.surface_depletion_rate;
-        let surface_depletion =
-            (self.state.surface_depletion_fraction + depletion_increment - refresh_fraction)
-                .clamp(0.0, 1.0);
+        let surface_depletion = (self.state.surface_depletion_fraction + depletion_increment
+            - refresh_fraction)
+            .clamp(0.0, 1.0);
 
         let deposited_organic = released_organic * self.parameters.organic_deposition_fraction;
         let deposited_salt = released_salt * self.parameters.airborne_salt_fraction;
@@ -399,9 +429,7 @@ impl MaterialRegimeModel {
 
         let end_temperature = self.state.ambient_temperature_k
             + (peak_temperature - self.state.ambient_temperature_k)
-                * (-pulse.cooling_pause_seconds
-                    / self.parameters.cooling_time_constant_s)
-                    .exp();
+                * (-pulse.cooling_pause_seconds / self.parameters.cooling_time_constant_s).exp();
         let elapsed = (pulse.on_duration_seconds + pulse.cooling_pause_seconds).ceil();
         if !elapsed.is_finite() || elapsed > u64::MAX as f64 {
             return Err(RegimeError::TimeOverflow);
@@ -414,8 +442,7 @@ impl MaterialRegimeModel {
             .ok_or(RegimeError::TimeOverflow)?;
 
         self.state.surface_temperature_k = end_temperature;
-        self.state.remaining_solid_kg =
-            (self.state.remaining_solid_kg - spalled_mass).max(0.0);
+        self.state.remaining_solid_kg = (self.state.remaining_solid_kg - spalled_mass).max(0.0);
         self.state.remaining_water_kg = (self.state.remaining_water_kg - released_water).max(0.0);
         self.state.remaining_organic_kg =
             (self.state.remaining_organic_kg - released_organic).max(0.0);
@@ -519,7 +546,9 @@ mod tests {
     #[test]
     fn incident_and_absorbed_energy_are_separate() {
         let mut value = model();
-        let result = value.apply_pulse(&pulse(100.0, 1.0, 0.0, 0.5), &trap()).unwrap();
+        let result = value
+            .apply_pulse(&pulse(100.0, 1.0, 0.0, 0.5), &trap())
+            .unwrap();
         assert_eq!(result.incident_energy_j, 100.0);
         assert_eq!(result.absorbed_energy_j, 50.0);
         assert!(result.simulation_only);
@@ -529,8 +558,12 @@ mod tests {
     fn lower_optical_transmission_reduces_heating_and_spallation() {
         let mut clean = model();
         let mut fouled = model();
-        let clean_result = clean.apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap()).unwrap();
-        let fouled_result = fouled.apply_pulse(&pulse(100.0, 1.0, 0.0, 0.5), &trap()).unwrap();
+        let clean_result = clean
+            .apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap())
+            .unwrap();
+        let fouled_result = fouled
+            .apply_pulse(&pulse(100.0, 1.0, 0.0, 0.5), &trap())
+            .unwrap();
         assert!(clean_result.peak_temperature_k > fouled_result.peak_temperature_k);
         assert!(clean_result.spalled_solid_mass_kg > fouled_result.spalled_solid_mass_kg);
     }
@@ -539,8 +572,12 @@ mod tests {
     fn melt_and_ductile_transition_can_reduce_spallation_at_higher_irradiance() {
         let mut efficient = model();
         let mut overheated = model();
-        let spalling = efficient.apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap()).unwrap();
-        let melt = overheated.apply_pulse(&pulse(300.0, 1.0, 0.0, 1.0), &trap()).unwrap();
+        let spalling = efficient
+            .apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap())
+            .unwrap();
+        let melt = overheated
+            .apply_pulse(&pulse(300.0, 1.0, 0.0, 1.0), &trap())
+            .unwrap();
         assert_eq!(spalling.regime, MaterialRegime::ThermalSpallation);
         assert_eq!(melt.regime, MaterialRegime::Melting);
         assert!(melt.peak_temperature_k > spalling.peak_temperature_k);
@@ -576,8 +613,12 @@ mod tests {
             purge_gas_water_mass_fraction: 0.05,
             ..trap()
         };
-        let dry_result = dry.apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &dry_gas).unwrap();
-        let wet_result = wet.apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &wet_gas).unwrap();
+        let dry_result = dry
+            .apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &dry_gas)
+            .unwrap();
+        let wet_result = wet
+            .apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &wet_gas)
+            .unwrap();
         assert_eq!(dry_result.captured_water_kg, wet_result.captured_water_kg);
         assert!(wet_result.gas_analyzer_water_signal_kg > dry_result.gas_analyzer_water_signal_kg);
     }
@@ -585,7 +626,9 @@ mod tests {
     #[test]
     fn water_release_and_captured_water_are_distinct() {
         let mut value = model();
-        let result = value.apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap()).unwrap();
+        let result = value
+            .apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap())
+            .unwrap();
         assert!(result.released_water_vapor_kg >= result.captured_water_kg);
         assert!(result.released_water_vapor_kg > 0.0);
         assert!(result.captured_water_kg > 0.0);
@@ -594,7 +637,9 @@ mod tests {
     #[test]
     fn organic_and_particle_release_create_optic_deposition_estimates() {
         let mut value = model();
-        let result = value.apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap()).unwrap();
+        let result = value
+            .apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap())
+            .unwrap();
         assert!(result.optical_deposition_estimate_ug_cm2[0] > 0.0);
         assert!(result.optical_deposition_estimate_ug_cm2[2] > 0.0);
     }
@@ -603,7 +648,9 @@ mod tests {
     fn surface_refresh_reduces_exposed_surface_depletion() {
         let mut value = model();
         let before = value.state().surface_depletion_fraction;
-        let result = value.apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap()).unwrap();
+        let result = value
+            .apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap())
+            .unwrap();
         assert!(result.surface_refresh_fraction > 0.0);
         assert!(value.state().surface_depletion_fraction < before + 0.1);
     }
@@ -617,8 +664,12 @@ mod tests {
         let mut state = state();
         state.remaining_solid_kg = 0.000_3;
         let mut value = MaterialRegimeModel::new(params, state, 1.0, 100.0).unwrap();
-        value.apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap()).unwrap();
-        value.apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap()).unwrap();
+        value
+            .apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap())
+            .unwrap();
+        value
+            .apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap())
+            .unwrap();
         assert_eq!(
             value.apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap()),
             Err(RegimeError::SampleExhausted)
@@ -635,7 +686,9 @@ mod tests {
         );
         let mut value = model();
         assert_eq!(
-            value.apply_pulse(&pulse(-1.0, 1.0, 0.0, 1.0), &trap()).err(),
+            value
+                .apply_pulse(&pulse(-1.0, 1.0, 0.0, 1.0), &trap())
+                .err(),
             Some(RegimeError::InvalidPulse("incident_irradiance_w_cm2"))
         );
     }
