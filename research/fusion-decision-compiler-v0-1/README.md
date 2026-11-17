@@ -77,6 +77,39 @@ Dependency status preserves both facts when applicable: a discovered common depe
 The synthetic fixture places two illustrative model outputs (92 and 108 MWe) on opposite sides of a 100 MWe threshold, reporting a 16 MWe finite spread and a shared scenario assumption. It is not a PROCESS/SARAS execution or a statistical/physical validation.
 
 
+
+## Empirical worst-slice holdout stress on finite model decisions
+
+The `empirical_holdout_stress` module composes the frozen finite-model decision envelope with one exact, externally referenced holdout stress receipt per solver run. It does not fit an error distribution, combine solver outputs probabilistically, or turn residual extrema into a confidence interval.
+
+For each solver revision, the evaluator requires a complete predeclared slice set. Each slice must bind facility, operating point and case family, minimum sample count, minimum independent-group count, domain status, residual basis/unit/profile and evidence reference. The stress radius is the largest observed absolute residual across *all* required admissible slices for that exact model revision and observable. Missing/underfilled slices and out-of-domain observations refuse a complete campaign radius; they are never silently omitted or pooled.
+
+The per-model stress interval is:
+```text
+[point_prediction - worst_slice_max_abs_residual,
+ point_prediction + worst_slice_max_abs_residual]
+```
+
+It is an empirical sample stress envelope only. It does not assert that future errors are bounded by the observed maximum, assign coverage to the interval, or quantify a probability of threshold correctness. The threshold result uses the frozen inclusive/exclusive threshold rule and preserves threshold-overlap as ambiguous.
+
+The report separates:
+- the original finite-model decision disposition;
+- per-model empirical stress radii and intervals;
+- the worst validation slice and all slice summaries;
+- numeric stress decision (all-pass, all-fail, split or ambiguous);
+- evidence disposition (SyntheticOnly, AssumptionOnly, EmpiricalHoldoutStressOnly or IncompleteOrNotComparable).
+
+A failed declared holdout metric is not removed: the observed errors and holdout failure status remain visible, usually expanding the stress radius. A model cannot be dropped simply because its validation result is poor.
+
+The synthetic runner uses PROCESS-like 92 MWe and SARAS-like 108 MWe point outputs against a 100 MWe threshold, with synthetic per-model worst-slice radii of 7 and 8 MWe. Numerically, one stress interval remains below threshold and one reaches/passes it, so the synthetic stress decision is StressDecisionSplit. Its evidence disposition remains SyntheticOnly. No actual PROCESS/SARAS runs or measured validation data are involved.
+
+This composes with [model decision stability #12589 / PR #12590](https://github.com/Luminous-Dynamics/symthaea/pull/12590), [measured holdout metrics #12566 / PR #12568](https://github.com/Luminous-Dynamics/symthaea/pull/12568), and the worst-slice validation issue [#12463](https://github.com/Luminous-Dynamics/symthaea/issues/12463). Those producers own the model set, validation split and slice metrics; this module consumes their declared outputs. Evidence digests remain identities until an external verifier authenticates the underlying payload bytes.
+
+The module has 18 authored hostile/metamorphic tests for exact run/model/output/profile binding, missing/unexpected receipts and slices, underfilled/insufficient-group slices, OOD slices, worst-slice selection, holdout failures, pre-reveal and measurement verification, input-order invariance, threshold direction/equality, arithmetic overflow and evidence-class non-promotion.
+
+Claim ceiling: finite observed holdout-error stress on the declared validation slices only. It is not a confidence or credible interval, a future-error guarantee, experimental validation of a fusion model, or plant qualification.
+
+
 ## Run locally
 
 From this directory:
@@ -89,6 +122,7 @@ cargo run --manifest-path Cargo.toml --bin verify_validation_domain_corpus
 cargo run --manifest-path Cargo.toml --bin compare_solver_outputs
 cargo run --manifest-path Cargo.toml --bin qualify_plant_service
 cargo run --manifest-path Cargo.toml --bin audit_decision_envelope
+cargo run --manifest-path Cargo.toml --bin audit_empirical_holdout_stress
 cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
 ```
 
