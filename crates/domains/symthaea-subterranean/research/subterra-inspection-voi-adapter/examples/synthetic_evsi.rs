@@ -31,9 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         println!(
             "  entropy_greedy={} eig_nats={:.4} gross_evsi={:.4}",
-            high.action_id,
-            high.expected_information_gain_nats,
-            high.gross_evsi
+            high.action_id, high.expected_information_gain_nats, high.gross_evsi
         );
         println!(
             "  myopic_evsi={} eig_nats={:.4} gross_evsi={:.4}",
@@ -43,8 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         println!(
             "  planner_selected={:?} planner_gross_evsi={:.4}",
-            report.planner.policy.measurement_action_id,
-            report.planner_gross_evsi
+            report.planner.policy.measurement_action_id, report.planner_gross_evsi
         );
         println!(
             "  robust_models={} worst_case_value={:.4} admissible={}",
