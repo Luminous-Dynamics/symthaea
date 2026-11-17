@@ -133,6 +133,31 @@ The mapping preserves all 43 raw named G1 joint positions, the derived 32-value 
 
 This is a **non-actuating software compatibility specification**. It does not map G1 joint targets onto Symthaea DMC21/Dexterous53 torques, does not connect to the current 21-joint PCA9685 HAL, and creates no UEC Applied/Measured receipt or actuation authority. The typed Rust adapter is deliberately dependent on the canonical UEC v2 APIs and their current qualification state.
 
+## Active tool affordance discovery
+
+A new child programme, [HUM-TOOL-DISCOVERY-001 #12701](https://github.com/Luminous-Dynamics/symthaea/issues/12701), tests whether Symthaea can identify what an unfamiliar tool can physically do—not merely recognize a label or choose among familiar assets.
+
+The first synthetic corpus contains 24 cases across six families: lever, hook, wedge, rotary driver, clamp and mallet. Each family has a development instance, held-out same-family instance, held-out task-transfer instance and a visually similar decoy. The evaluator retains hidden parameters and postconditions; the candidate sees only its declared observations and bounded probe budget.
+
+Artifacts:
+- [Tool discovery cases](tool-discovery-cases-v0.1.json)
+- [Tool discovery schema](tool-discovery-cases-v0.1.schema.json)
+
+This is synthetic protocol data only. It contains no measured physical tools, material-strength claims, safe-load claims or physical task results.
+
+## Executable G1 mapping audit
+
+A small dependency-free Rust crate now implements the G1 policy-state projection and `decoupled_v1` action decode/encode:
+- [Rust crate README](g1-mapping-audit/README.md)
+- [Rust source](g1-mapping-audit/src/lib.rs)
+- [Focused workflow](../../.github/workflows/g1-mapping-audit.yml)
+
+It contains nine authored golden/negative-control tests and a minimal lockfile. The raw 43-value `joint_qpos` order is now traced at the pinned upstream commit through:
+`SonicLocoManip._get_obs → MujocoEngine.get_robot_qpos → G1Sonic.get_robot_qpos`.
+The producer chain and blob IDs are recorded in the mapping manifest. The crate provides both explicit name/value projection and a pinned-order projection helper.
+
+**Important distinction:** this resolves the raw-qpos ordering blocker for the pinned simulation source. It does not yet provide a UEC v2 platform implementation, runtime adapter conformance, real-G1 hardware binding, physical calibration, safety qualification or actuator authority. The Rust tests are authored but have not been executed in this environment.
+
 ## Human-augmented repair is a parallel delivery path
 
 Symthaea should be useful before its humanoid is physically qualified to perform every repair itself.
@@ -150,9 +175,11 @@ Longer term, the two tracks can share validated tool semantics, fault knowledge 
 
 ## Deliverables
 
-- `protocol-v0.1.md`: preregisterable comparison and claim-boundary protocol.
-- `cases-v0.1.json`: exact 18-cell benchmark anchor, eight service-case definitions and negative controls.
-- `schema-v0.1.json`: strict structural contract for the case manifest.
+- `protocol-v0.1.md`: preregisterable comparison and claim-boundary protocol, including agentic SOTA, human assistance and active tool discovery.
+- `cases-v0.1.json` / `schema-v0.1.json`: exact 18-cell benchmark anchor, eight service-case definitions and negative controls.
+- `g1-decoupled-v1-mapping.json` / `g1-decoupled-v1-mapping.schema.json`: exact G1 state/action mapping and source-traced raw-qpos producer chain.
+- `g1-mapping-audit/`: dependency-free Rust mapping primitives, golden/negative-control tests and focused workflow.
+- `tool-discovery-cases-v0.1.json` / `tool-discovery-cases-v0.1.schema.json`: 24 synthetic active-affordance discovery cases across six tool families.
 
 These artifacts define a prospective benchmark. They do not indicate that benchmark episodes were run or that any task has been solved.
 
