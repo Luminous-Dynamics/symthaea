@@ -9,13 +9,13 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::cross_solver_comparison::ApplicabilityState;
 use super::decision_envelope::{
-    DecisionEnvelopeDisposition, DecisionEnvelopePlan, DecisionEnvelopeReport, ThresholdDirection,
-    ThresholdResult, evaluate_decision_envelope,
+    DecisionEnvelopeDisposition, DecisionEnvelopePlan, ThresholdDirection,
+    evaluate_decision_envelope,
 };
 
 pub const EMPIRICAL_STRESS_VERSION: &str = "fusion-empirical-holdout-stress/0.1";
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum StressEvidenceClass {
     SyntheticFixture,
     AssumptionOnly,
@@ -93,6 +93,7 @@ pub enum EmpiricalStressDiagnostic {
     MeasurementPayloadNotVerified,
     ValidationDomainNotAdmissible,
     DecisionProfileMismatch,
+    ValidationProfileDigestMismatch,
     ResidualBasisMismatch,
     InvalidHoldoutDisposition,
     DuplicateSlice,
@@ -110,7 +111,7 @@ pub enum EmpiricalStressDiagnostic {
     BaseDecisionEnvelopeNotAdmissible,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SliceStressEvidence {
     pub slice_id: String,
     pub facility_id: String,
@@ -127,7 +128,7 @@ pub struct SliceStressEvidence {
     pub evidence_ref: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ModelHoldoutStressReceipt {
     pub receipt_id: String,
     pub receipt_sha256: String,
@@ -302,6 +303,7 @@ pub fn evaluate_empirical_holdout_stress(
                     plan.decision_plan.profile.threshold_direction,
                     plan.decision_plan.profile.threshold_inclusive,
                     model.normalized_value,
+                    &plan.stress_profile,
                     receipt,
                     &mut diagnostics,
                 ) {
@@ -542,6 +544,7 @@ fn build_model_report(
     direction: ThresholdDirection,
     inclusive: bool,
     point_estimate: f64,
+    stress_profile: &EmpiricalStressProfile,
     receipt: &ModelHoldoutStressReceipt,
     diagnostics: &mut Vec<EmpiricalStressDiagnostic>,
 ) -> Option<ModelEmpiricalStressReport> {
@@ -568,17 +571,20 @@ fn build_model_report(
         if !slice.in_declared_domain {
             diagnostics.push(EmpiricalStressDiagnostic::SliceOutOfDomain);
         }
-        if slice.sample_count == 0
-            || slice.sample_count < receipt.required_slices.len().saturating_sub(0) * 0
+        if slice.sample_count < stress_profile.minimum_sample_count_per_slice {
+            diagnostics.push(EmpiricalStressDiagnostic::InsufficientSliceSamples);
+        }
+        if slice.independent_group_count
+            < stress_profile.minimum_independent_groups_per_slice
         {
-            diagnostics.push(EmpiricalStressDiagnostic::InvalidSliceValue);
+            diagnostics.push(EmpiricalStressDiagnostic::InsufficientIndependentGroups);
         }
         if !slice.maximum_absolute_residual.is_finite() {
             diagnostics.push(EmpiricalStressDiagnostic::NonFiniteResidual);
         } else if slice.maximum_absolute_residual < 0.0 {
             diagnostics.push(EmpiricalStressDiagnostic::InvalidResidualRange);
         }
-        if slice.residual_basis_ref.trim().is_empty()
+        if slice.residual_basis_ref != stress_profile.residual_basis_ref
             || slice.evidence_ref.trim().is_empty()
             || slice.residual_unit_ref != receipt.unit_ref
         {
@@ -586,6 +592,8 @@ fn build_model_report(
         }
         if !is_sha256(&slice.residual_profile_sha256) {
             diagnostics.push(EmpiricalStressDiagnostic::InvalidValidationArtifactDigest);
+        } else if slice.residual_profile_sha256 != receipt.validation_profile_sha256 {
+            diagnostics.push(EmpiricalStressDiagnostic::ValidationProfileDigestMismatch);
         }
         if !seen_evidence.insert(slice.evidence_ref.as_str()) {
             diagnostics.push(EmpiricalStressDiagnostic::DuplicateSliceEvidence);
@@ -603,6 +611,8 @@ fn build_model_report(
             EmpiricalStressDiagnostic::DuplicateSlice
                 | EmpiricalStressDiagnostic::SliceOutOfDomain
                 | EmpiricalStressDiagnostic::InvalidSliceValue
+                | EmpiricalStressDiagnostic::InsufficientSliceSamples
+                | EmpiricalStressDiagnostic::InsufficientIndependentGroups
                 | EmpiricalStressDiagnostic::NonFiniteResidual
                 | EmpiricalStressDiagnostic::InvalidResidualRange
                 | EmpiricalStressDiagnostic::ResidualBasisMismatch
