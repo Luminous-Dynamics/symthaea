@@ -217,6 +217,21 @@ The decision-conditioned inspection adapter in [#12628](https://github.com/Lumin
 
 The competitive claim should therefore be narrow and testable: Subterra does not lead on generic underground autonomy or small-pipe mobility by assertion. It aims to join task-specific asset observation, decision-valued additional inspection, independently verified physical closeout, and fail-closed recovery into one interoperable evidence loop. Every claimed advantage must be measured against matched baselines using the same hidden truth, sensor/action budget, resource accounting and acceptance rules.
 
+### Public inspection datasets: admitted uses and non-claims
+
+The first external vision/data baselines are tracked separately in [#12652 — SUBTERRA-REAL-DATA-ADMISSION-001](https://github.com/Luminous-Dynamics/symthaea/issues/12652).
+
+| Dataset | Published scope/size | Appropriate benchmark use | Explicit limitation |
+|---|---|---|---|
+| [Sewer-ML](https://vap.aau.dk/sewer-ml/) | 1.3M images from 75,618 videos, 3 Danish utilities, 9 years; licensed-inspector annotations; 17 official defect classes | Reproduce image-level sewer multi-label classification and source-specific metric | Not a cable-duct, drawpoint or mine-support dataset; check terms before any training or redistribution |
+| [CableInspect-AD](https://mila-iqia.github.io/cableinspect-ad/) | 4,798 expert-annotated power-line cable images, 6,023 anomalies, 7 defect types/severity labels, image/pixel/bbox labels | Reproduce anomaly detection, pixel segmentation, thresholding and severity evaluation | CC BY-NC-SA 4.0 (non-commercial); power-line cable imagery is not underground duct condition data |
+| [IPD](https://zenodo-rdm.web.cern.ch/records/17398156) | 357 insulated industrial-pipeline images with binary masks | Industrial pipe-insulation anomaly segmentation baseline | Signed licence required; binary masks do not separate hole/open insulation/dent classes |
+| VideoPipe QV-Pipe / CCTV-Pipe | Published review describes 9,601 short clips (>55 h) and 575 long videos (87 h) | Candidate video classification and temporal defect localization | Access/licence and original split provenance must be verified before admission |
+
+Sewer-ML's published CVPR benchmark reported F2-CIW 55.11% and F1-Normal 90.94% for its selected method; reproduce the original split and metric before adding new methods. These are dataset-specific classification scores, not mission-level accepted-asset performance. [Official benchmark page](https://vap.aau.dk/sewer-ml/).
+
+Do not randomly split neighbouring frames across training and test. Keep video/asset/site/utility/time groups intact, preserve natural class prevalence, publish per-class denominators, and mark source-domain transfer as transfer—not as an equivalent task. The current public set contains no admitted mine drawpoint hang-up volume ground truth. Until authorized mine-specific truth exists, drawpoint volumetric validation remains synthetic/NOT_RUN.
+
 ### Standards boundary
 
 - ISO 17757:2019 is a relevant safety standard for autonomous/semi-autonomous earth-moving and mining machine systems; applicability must be determined for the equipment and operational domain.
