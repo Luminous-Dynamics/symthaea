@@ -19,3 +19,7 @@ jsonschema = { version = "=0.59.0", default-features = false }
 [[bin]]
 name = "sc_discovery_registry_audit"
 path = "src/main.rs"
+
+[[bin]]
+name = "sc_discovery_metrics"
+path = "src/bin/discovery_metrics.rs"
