@@ -12,6 +12,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub const SIMULATION_ONLY: bool = true;
 const STAGE_COUNT: usize = 4;
+type CandidateMap = BTreeMap<String, CandidateDesign>;
+type CandidateTruthMap = BTreeMap<String, CandidateTruth>;
 const PPM_SCALE: u64 = 1_000_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -40,14 +42,6 @@ impl StageKind {
         }
     }
 
-    fn next(self) -> Option<Self> {
-        match self {
-            Self::Characterization => Some(Self::Exposure),
-            Self::Exposure => Some(Self::Capture),
-            Self::Capture => Some(Self::Assay),
-            Self::Assay => None,
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -710,8 +704,7 @@ impl TwinWorld {
         };
         self.now_seconds = job.finish_at_seconds;
 
-        let removed = self
-            .active_jobs
+        self.active_jobs
             .remove(&job.job_id)
             .expect("selected active job exists");
         let instrument = self
@@ -1034,13 +1027,7 @@ fn scaled_duration(seconds: u64, scale_permille: u64) -> u64 {
 
 fn split_seeds(
     seeds: Vec<CandidateSeed>,
-) -> Result<
-    (
-        BTreeMap<String, CandidateDesign>,
-        BTreeMap<String, CandidateTruth>,
-    ),
-    TwinError,
-> {
+) -> Result<(CandidateMap, CandidateTruthMap), TwinError> {
     let mut candidates = BTreeMap::new();
     let mut truths = BTreeMap::new();
     for seed in seeds {
