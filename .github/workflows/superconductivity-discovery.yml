@@ -88,6 +88,8 @@ jobs:
           cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_synthesis_protocol_audit -- \
             --schema data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json \
             --fixture tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json \
+            --observation-schema data/schemas/superconductivity_observation_event_v0_1.schema.json \
+            --observations tools/superconductivity-discovery-harness/fixtures/observation_events_smoke_v0_1.json \
             --out "$RUNNER_TEMP/sc-synthesis-protocol-smoke.json"
           cat "$RUNNER_TEMP/sc-synthesis-protocol-smoke.json"
 
