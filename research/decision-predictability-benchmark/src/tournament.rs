@@ -9,7 +9,7 @@
 //! replicates.
 
 use crate::baseline::{FittedBaseline, fit_linear_ar, fit_mean, fit_persistence};
-use crate::ngrc::{NgrcError, UniformDelayNgrc, fit_uniform_delay_ngrc};
+use crate::ngrc::{UniformDelayNgrc, fit_uniform_delay_ngrc};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -977,6 +977,8 @@ mod tests {
             "# forecast=recursive_free_running_from_one_fixed_as_of_origin;no_test_assimilation"
         ));
         assert!(result.contains("ar_tuned"));
+        assert!(result.contains("ngrc_tuned_d"));
+        assert!(result.contains("ngrc_selection=uniform_delay_taps_1_2_3_4,spacing_1_2,ridge_0_1e-8_1e-5;validation_only"));
         assert!(result.contains("persistence"));
         assert!(result.contains("mean"));
         assert!(result.contains("skill_vs_persistence"));
