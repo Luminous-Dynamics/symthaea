@@ -409,7 +409,7 @@ fn parse_bundle(raw:&str)->Result<(Value,Value),String>{
 fn evaluate(raw:&str)->Result<Value,String>{
  let (candidate,oracle)=parse_bundle(raw)?;
  allowed(&candidate,&["scenario_id","decision_cutoff","budget_micros","max_depth","actions","hypothesis_bounds","options","factors","policy_tree"],"candidate_view")?;
- allowed(&oracle,&["actual_hypothesis_id","decision_cutoff","budget_micros","actions","hypothesis_bounds","options","factors","hypothesis_safety","calibrations","factorization_certificates","world_kernels","cost_options","billing_currency"],"oracle")?;
+ allowed(&oracle,&["actual_hypothesis_id","decision_cutoff","budget_micros","actions","hypothesis_bounds","options","factors","hypothesis_safety","calibrations","world_kernels","cost_options","billing_currency"],"oracle")?;
  let scenario=string(&candidate,"scenario_id","candidate_view")?;
  let cutoff_raw=string(&candidate,"decision_cutoff","candidate_view")?;let cutoff=time(&cutoff_raw,"candidate_view.decision_cutoff")?;
  if cutoff_raw!=string(&oracle,"decision_cutoff","oracle")?{return Err("candidate cutoff differs from evaluator cutoff".to_owned());}
@@ -511,7 +511,13 @@ fn evaluate(raw:&str)->Result<Value,String>{
   let costs=row_costs.get(hypothesis).ok_or("missing per-kernel cost vector")?;
   let (nom,worst)=conditional_cost(&kernel.rows,costs)?;
   conditional_nominal.insert(hypothesis.clone(),nom);conditional_worst.insert(hypothesis.clone(),worst);
-  cost_details.push(json!({"hypothesis_id":hypothesis,"nominal_conditional_cost_numerator":nom,"worst_case_conditional_cost_numerator":worst}));
+  cost_details.push(json!({
+   "hypothesis_id":hypothesis,
+   "nominal_expected_cost_micros":(nom+SCALE as u128-1)/SCALE as u128,
+   "worst_case_expected_cost_micros":(worst+SCALE as u128-1)/SCALE as u128,
+   "nominal_conditional_cost_numerator_bps_micros":nom,
+   "worst_case_conditional_cost_numerator_bps_micros":worst
+  }));
  }
  let nominal_outer=priors.iter().try_fold(0u128,|sum,(id,p)|{
   sum.checked_add(p.nominal as u128*conditional_nominal[id]).ok_or_else(||"nominal total cost overflow".to_owned())
@@ -553,6 +559,8 @@ fn evaluate(raw:&str)->Result<Value,String>{
   let actual_possible=actual_likelihood.upper>0;
   leaf_reports.push(json!({
    "leaf_node_id":leaf_id,"decision_kind":path.decision_kind,"action_id":path.action_id,
+   "claimed_residual_risk_bps":path.claimed,
+   "claimed_risk_understatement":path.decision_kind=="act"&&path.claimed<robust,
    "acquisition_options":path.option_ids,"joint_row_count":path.world_row_count,
    "nominal_path_probability_bps":leaf_nominal_bps,
    "nominal_posterior_risk_bps":nominal,"worst_case_posterior_risk_bps":robust,
@@ -577,6 +585,9 @@ fn evaluate(raw:&str)->Result<Value,String>{
   "scenario_id":scenario,"adjudication_status":"stochastic_joint_kernel_adaptive_policy_scoring",
   "billing_currency":currency,"world_count":kernels.len(),"joint_row_count":kernels.values().map(|x|x.rows.len()).sum::<usize>(),
   "option_count":options.len(),"leaf_count":leaf_paths.len(),"max_depth":max_depth,
+  "kernel_provenance":kernels.iter().map(|(hypothesis,kernel)|json!({
+   "hypothesis_id":hypothesis,"kernel_id":kernel.kernel_id,"authority":kernel.authority
+  })).collect::<Vec<_>>(),
   "submitted_policy":{
    "policy_feasible":policy_feasible,"nominal_justified_action_coverage_bps":coverage,
    "nominal_unsafe_action_mass_bps":unsafe_bps,"unnecessary_abstention_bps":unnecessary,
