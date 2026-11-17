@@ -71,15 +71,19 @@ pub enum ProbeDenial {
 /// addressable so the harness can supply only candidate episodes to a model.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PairedWorldFixture {
-    candidate_episodes: [CandidateEpisode; 2],
+    candidate_episode: CandidateEpisode,
     evaluator_worlds: [EvaluatorWorld; 2],
     prior_physical_hazard_probability: f64,
 }
 
 impl PairedWorldFixture {
-    /// Return candidate-visible episodes only.
-    pub fn candidate_episodes(&self) -> &[CandidateEpisode; 2] {
-        &self.candidate_episodes
+    /// Return the one passive transcript shared by both evaluator worlds.
+    ///
+    /// A paired-world comparison has one candidate-visible history and multiple
+    /// evaluator-only counterfactual worlds. Do not manufacture a per-world
+    /// candidate record or identifier: doing so creates an avoidable side channel.
+    pub fn candidate_episode(&self) -> &CandidateEpisode {
+        &self.candidate_episode
     }
 
     /// Return evaluator-only world records.
@@ -111,10 +115,9 @@ impl PairedWorldFixture {
             .evaluator_worlds
             .get(world_index)
             .ok_or(ProbeDenial::UnknownWorld)?;
-        let episode = self
-            .candidate_episodes
-            .get(world_index)
-            .ok_or(ProbeDenial::UnknownWorld)?;
+        // This helper belongs to the evaluator/fixture side. The candidate
+        // receives only the returned sensor observation through the harness,
+        // never the world index or the evaluator record.
 
         if !episode.reference_probe_available {
             return Err(ProbeDenial::ProbeUnavailable);
@@ -178,9 +181,11 @@ pub fn canonical_paired_world_fixture() -> PairedWorldFixture {
         },
     ];
 
-    let episode = |episode_id| CandidateEpisode {
-        episode_id,
-        primary_observations: observations.clone(),
+    let candidate_episode = CandidateEpisode {
+        // This identifier names the shared passive transcript, not either
+        // hidden world. The paired alternatives do not receive separate IDs.
+        episode_id: "opaque-passive-pair",
+        primary_observations: observations,
         reference_probe_available: true,
         reference_probe_cost: 0.1,
         reference_probe_latency_steps: 1,
@@ -188,7 +193,7 @@ pub fn canonical_paired_world_fixture() -> PairedWorldFixture {
     };
 
     PairedWorldFixture {
-        candidate_episodes: [episode("paired-world-a"), episode("paired-world-b")],
+        candidate_episode,
         evaluator_worlds: [
             EvaluatorWorld {
                 mechanism: WorldMechanism::PhysicalHazard,
@@ -222,28 +227,22 @@ mod tests {
     #[test]
     fn passive_candidate_views_are_exactly_observationally_equivalent() {
         let fixture = canonical_paired_world_fixture();
-        let episodes = fixture.candidate_episodes();
+        let episode = fixture.candidate_episode();
+        let worlds = fixture.evaluator_worlds();
 
-        assert_ne!(episodes[0].episode_id, episodes[1].episode_id);
-        assert_eq!(
-            episodes[0].primary_observations,
-            episodes[1].primary_observations
-        );
-        assert_eq!(
-            episodes[0].reference_probe_available,
-            episodes[1].reference_probe_available
-        );
-        assert_eq!(
-            episodes[0].reference_probe_cost,
-            episodes[1].reference_probe_cost
-        );
-        assert_eq!(
-            episodes[0].decision_deadline_step,
-            episodes[1].decision_deadline_step
-        );
-        assert_eq!(episodes[0].primary_observations.len(), 3);
+        // There is exactly one candidate-visible passive transcript for the
+        // two evaluator-only alternatives; no per-world ID or array position
+        // is available to a candidate.
+        assert_eq!(episode.episode_id, "opaque-passive-pair");
+        assert_eq!(worlds.len(), 2);
+        assert_ne!(worlds[0].mechanism, worlds[1].mechanism);
+        assert_eq!(episode.primary_observations.len(), 3);
+        assert!(episode.reference_probe_available);
+        assert_eq!(episode.reference_probe_cost, 0.1);
+        assert_eq!(episode.reference_probe_latency_steps, 1);
+        assert_eq!(episode.decision_deadline_step, 4);
         assert!(
-            episodes[0]
+            episode
                 .primary_observations
                 .iter()
                 .all(|observation| observation.value == 10.0)
@@ -299,7 +298,7 @@ mod tests {
         let fixture = canonical_paired_world_fixture();
         let worlds = fixture.evaluator_worlds();
         let prior_hazard = fixture.prior_physical_hazard_probability();
-        let probe_cost = fixture.candidate_episodes()[0].reference_probe_cost;
+        let probe_cost = fixture.candidate_episode().reference_probe_cost;
 
         // A perfect reference reading creates a candidate-visible information
         // set for each possible outcome, each with posterior probability one.
@@ -400,7 +399,7 @@ mod tests {
     #[test]
     fn reference_probe_is_denied_when_not_permitted() {
         let mut fixture = canonical_paired_world_fixture();
-        fixture.candidate_episodes[0].reference_probe_available = false;
+        fixture.candidate_episode.reference_probe_available = false;
         assert_eq!(
             fixture.reference_probe_observation(0, 3, 0.1),
             Err(ProbeDenial::ProbeUnavailable)
