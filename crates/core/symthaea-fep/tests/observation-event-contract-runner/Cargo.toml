@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-observation-event-contract-runner"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+
+# This deliberately isolates the source-file contract tests from the root
+# workspace globs until the separately tracked workspace exclusions are fixed.
+[workspace]

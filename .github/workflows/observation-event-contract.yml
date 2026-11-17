@@ -1,0 +1,70 @@
+name: Observation Event Contract
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/observation-event-contract.yml"
+      - "crates/core/symthaea-fep/src/lib.rs"
+      - "crates/core/symthaea-fep/src/observation_event.rs"
+      - "crates/core/symthaea-fep/tests/observation-event-contract-runner/**"
+  push:
+    branches: [research/fep-observation-events-v1-mainline]
+    paths:
+      - ".github/workflows/observation-event-contract.yml"
+      - "crates/core/symthaea-fep/src/lib.rs"
+      - "crates/core/symthaea-fep/src/observation_event.rs"
+      - "crates/core/symthaea-fep/tests/observation-event-contract-runner/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: observation-event-contract-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  event-contract:
+    name: Compile and test authoritative observation-event source
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Check authoritative source formatting
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/observation_event.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/tests/observation-event-contract-runner/src/lib.rs
+
+      - name: Resolve isolated test dependencies
+        run: cargo generate-lockfile --manifest-path crates/core/symthaea-fep/tests/observation-event-contract-runner/Cargo.toml
+
+      - name: Compile and run the authoritative module tests
+        run: cargo test --manifest-path crates/core/symthaea-fep/tests/observation-event-contract-runner/Cargo.toml --locked -- --nocapture
+
+      - name: Record exact source and dependency identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "source_sha=$(git rev-parse HEAD)"
+            echo "event_source_sha256=$(sha256sum crates/core/symthaea-fep/src/observation_event.rs | cut -d ' ' -f 1)"
+            echo "runner_manifest_sha256=$(sha256sum crates/core/symthaea-fep/tests/observation-event-contract-runner/Cargo.toml | cut -d ' ' -f 1)"
+            echo "resolved_lock_sha256=$(sha256sum crates/core/symthaea-fep/tests/observation-event-contract-runner/Cargo.lock | cut -d ' ' -f 1)"
+            cargo tree --manifest-path crates/core/symthaea-fep/tests/observation-event-contract-runner/Cargo.toml --locked
+          } | tee observation-event-contract-receipt.txt
