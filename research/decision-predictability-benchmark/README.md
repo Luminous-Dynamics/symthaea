@@ -46,6 +46,20 @@ Scenario and group IDs are 32 lowercase hexadecimal characters. The evaluator ke
 
 The split manifest is deliberately not yet wired to the forecast tournament. That integration follows after the schema and primary independent-unit contract have been independently reviewed.
 
+## Candidate exposure envelope
+
+The candidate-view module provides an explicit, serializable `CandidatePacketV1` and a separate, non-serializable `EvaluatorTicketBook`.
+
+- Candidate packets contain only a per-run opaque ticket, task-contract digest, time unit, as-of time, channel names, allowed action IDs and causal observation frames.
+- The packet schema has no fields for scenario ID, split role, group memberships, seed commitment, reference-data digest, solver qualification digest, latent state, intervention label or hidden truth. Unknown fields are rejected when deserializing.
+- The evaluator ticket book retains the mapping from one-use ticket to the hidden scenario record. Ticket reuse in one book is rejected.
+- Observation timestamps must be monotonic and no later than the declared as-of time. Values must be finite when present; missing channels remain explicit.
+- Tickets must be fresh uniformly random 128-bit values from an OS CSPRNG per scenario per evaluator run. The library validates ticket shape and collisions; it does not generate randomness or prove entropy.
+
+This is a serialization/API boundary and a defense against accidental metadata leakage, **not an operating-system sandbox**. The evaluator must send only the packet bytes to an isolated candidate process; it must never link, expose, or serialize the ticket book into the candidate environment. Process isolation, filesystem/network restrictions, anti-covert-channel controls and independently generated hidden-truth storage remain separate work (coordinate with #12567). The packet schema does not establish statistical validity or causal identifiability.
+
+The module tests check candidate JSON for forbidden evaluator fields, reject unknown fields, reject observations after as-of time, and reject reused tickets. These are structural conformance tests, not an adversarial process-isolation proof.
+
 ## Run the transparent forecasting tournament
 
 The runner consumes the comment/header/CSV output emitted by `research/chaos-reference-suite`. It does not link against that separate crate: this keeps the fixture generator and candidate evaluator independently buildable while the two pull requests are reviewed.
