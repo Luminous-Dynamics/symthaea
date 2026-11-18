@@ -254,7 +254,7 @@ The independent Rust oracle also ships a JSON CLI:
 
 The submission schema is `schemas/proposal_submission.schema.json`. A method identifies its version, source revision and configuration digest, chooses one exact track/split, and supplies exactly one row per frozen case. A row is either a proposed element set or an explicit abstention with a reason. Missing cases, duplicate IDs, unknown elements and incomplete split coverage are rejected; the denominator cannot be silently reduced.
 
-The audit output carries exact subgroup truth, element-wise proposal classifications, subgroup-axiom violations, and point/coefficient witnesses for each false promotion or missed symmetry. It is a post-hoc audit artifact; it must not be exposed to the model before its proposal submission is frozen.
+The audit output carries exact subgroup truth, element-wise proposal classifications, subgroup-axiom violations, point/coefficient witnesses for each false promotion or missed symmetry, and distribution diagnostics (when supplied) including target mass, outside mass, entropy and W1. It is a post-hoc audit artifact; it must not be exposed to the model before its proposal submission is frozen.
 
 The repository includes `fixtures/v0.1/proposal_oracle_selftest.json`, an explicitly oracle-derived 300-case discovery smoke submission. The exact-head workflow runs the CLI and checks 300/300 exact matches, zero abstentions, zero false promotions, zero missed symmetries and zero invalid groups. **This is pipeline self-test data, not an external learner baseline or benchmark result.** Four Rust binary tests also exercise complete coverage, missing-case rejection, abstention accounting and unknown-element rejection.
 
