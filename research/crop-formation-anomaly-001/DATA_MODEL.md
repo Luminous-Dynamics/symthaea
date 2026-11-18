@@ -67,7 +67,21 @@ A vector reconstruction derived from one or more image assets:
 
 A circle radius from an uncalibrated aerial photograph is image-space geometry, not a field measurement in metres.
 
-### 5. Observation / environmental context
+### 5. Crop-flow orientation samples
+
+A spatially located measurement of how an individual stem or local crop patch is bent/laid:
+- sample ID and parent event/specimen/plot ID;
+- field-local position and coordinate reference system, with scale and uncertainty;
+- measured flow/bend direction and an explicit angular reference frame/sign convention;
+- bend magnitude and unit (for example, radians of stem deflection or a declared ordinal scale);
+- measurement method, instrument, calibration and observer/blinding ID;
+- crop species/cultivar, phenological stage and local sampling role;
+- raw measurement reference and any segmentation/estimation transform;
+- quality weight with a documented rule, not a hidden model confidence.
+
+Direction must be a physical direction in a declared field coordinate frame, not an image-space line angle unless the image has been calibrated. Preserve individual samples; do not replace the field with a single averaged arrow. Opposing or multi-modal directions may have no meaningful circular mean.
+
+### 6. Observation / environmental context
 
 A time-bounded measurement with explicit provenance:
 - observation ID, type, value, unit and uncertainty;
@@ -79,7 +93,7 @@ A time-bounded measurement with explicit provenance:
 
 Never turn absent weather, soil or crop metadata into zero or a guessed value.
 
-### 6. Biological specimen and custody
+### 7. Biological specimen and custody
 
 A specimen record:
 - specimen ID and parent event;
