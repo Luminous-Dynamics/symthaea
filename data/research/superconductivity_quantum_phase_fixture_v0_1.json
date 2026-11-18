@@ -138,8 +138,13 @@
     "temperature": 0.5,
     "temperature_unit": "coupling_energy_units",
     "imaginary_time_slices": 16,
-    "max_abs_charge_state": 3,
-    "random_seed": 17
+    "random_seed": 17,
+    "representation": "phase_path_integral",
+    "imaginary_time_step": 0.125,
+    "charge_basis_cutoff": {
+      "mode": "not_applicable",
+      "max_abs_charge_state": null
+    }
   },
   "bath": {
     "mode": "none",
