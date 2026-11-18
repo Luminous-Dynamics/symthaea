@@ -358,9 +358,9 @@ fn validate_selection_method(
     let Some(specimen) = specimen else { return; };
     match profile.method_id.as_str() {
         "ISO 13935-2" => {
-            if specimen.seam_geometry == "curved" {
-                push(findings, "iso_13935_2_curved_seam_out_of_scope", format!("{path}.specimen_id"),
-                    "ISO 13935-2:2026 is for straight sewn seams; curved-seam use requires a separately validated method.");
+            if specimen.seam_geometry != "straight" {
+                push(findings, "iso_13935_2_seam_geometry_out_of_scope", format!("{path}.specimen_id"),
+                    "ISO 13935-2:2026 is for straight sewn seams; curved or non-seam specimens require a separately validated method.");
             }
             if matches!(specimen.construction_class.as_str(), "nonwoven" | "coated_laminated") {
                 push(findings, "iso_13935_2_construction_out_of_scope", format!("{path}.specimen_id"),
@@ -483,11 +483,21 @@ fn validate_ready_selection(
             }
         }
         if let Some(specimen) = specimen {
-            if specimen.construction_class == "3d_spacer"
-                && selection.fixture_validation_state != "qualified_spacer"
-            {
-                push(findings, "ready_spacer_requires_spacer_fixture", format!("{path}.fixture_validation_state"),
-                    "A ready 3D spacer test requires a qualified spacer-specific fixture.");
+            if specimen.construction_class == "unknown" {
+                push(findings, "ready_selection_unknown_construction", format!("{path}.specimen_id"),
+                    "A ready-for-test method selection requires a known specimen construction class.");
+            }
+            let expected_fixture_state = match profile.map(|value| value.method_id.as_str()) {
+                Some("ISO 5470-2") => Some("qualified_coated"),
+                Some("ISO 6330") => Some("qualified_article"),
+                Some("ISO 9237") if specimen.construction_class == "3d_spacer" => Some("qualified_spacer"),
+                Some("ISO 9237") => Some("qualified_generic"),
+                Some("ISO 13935-2" | "ISO 12947-2") => Some("qualified_generic"),
+                _ => None,
+            };
+            if expected_fixture_state.is_some_and(|expected| selection.fixture_validation_state != expected) {
+                push(findings, "ready_selection_fixture_scope_mismatch", format!("{path}.fixture_validation_state"),
+                    "Fixture validation state must be specific to the selected method and specimen class.");
             }
         }
         if selection.execution_mode == "modified_with_deviation" && is_blank_option(&selection.approved_deviation_ref) {
@@ -616,11 +626,16 @@ mod tests {
     }
 
     #[test]
-    fn iso_13935_2_2026_rejects_curved_seams() {
-        let mut manifest = base_manifest();
-        manifest["specimens"][3]["seam_geometry"] = json!("curved");
-        let report = parse_and_validate(&manifest.to_string()).unwrap();
-        assert!(report.findings.iter().any(|f| f.code == "iso_13935_2_curved_seam_out_of_scope"));
+    fn iso_13935_2_2026_rejects_curved_and_non_seam_geometry() {
+        let mut curved = base_manifest();
+        curved["specimens"][3]["seam_geometry"] = json!("curved");
+        let curved_report = parse_and_validate(&curved.to_string()).unwrap();
+        assert!(curved_report.findings.iter().any(|f| f.code == "iso_13935_2_seam_geometry_out_of_scope"));
+
+        let mut absent = base_manifest();
+        absent["specimens"][3]["seam_geometry"] = json!("not_applicable");
+        let absent_report = parse_and_validate(&absent.to_string()).unwrap();
+        assert!(absent_report.findings.iter().any(|f| f.code == "iso_13935_2_seam_geometry_out_of_scope"));
     }
 
     #[test]
@@ -710,6 +725,22 @@ mod tests {
         manifest["method_profiles"][4]["method_id"] = json!("ISO 6330");
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|f| f.code == "internal_method_namespace_required"));
+    }
+
+    #[test]
+    fn ready_coated_surface_requires_coated_fixture_validation() {
+        let mut manifest = base_manifest();
+        manifest["state"] = json!("ready_for_test");
+        manifest["selections"] = json!([manifest["selections"][2].clone()]);
+        manifest["selections"][0]["state"] = json!("ready_for_test");
+        manifest["selections"][0]["fixture_ref"] = json!("COATED-MARTINDALE-01");
+        manifest["selections"][0]["fixture_revision"] = json!("REV-A");
+        manifest["selections"][0]["fixture_validation_state"] = json!("qualified_generic");
+        manifest["selections"][0]["fixture_validation_ref"] = json!("GENERIC-VALIDATION-01");
+        manifest["selections"][0]["protocol_ref"] = json!("COATED-ABRASION-PROTOCOL");
+        manifest["selections"][0]["acceptance_rule_ref"] = json!("COATED-ACCEPTANCE");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "ready_selection_fixture_scope_mismatch"));
     }
 
     #[test]
