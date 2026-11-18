@@ -123,3 +123,7 @@ The paired pressure-response metric has a useful external comparator: the UK gov
 ## Dynamic supply qualification
 
 The low-pressure protocol defines exact steady-state pressure points. Time-varying pressure, hot/cold supply disturbances, second-fixture demand, pump/regulator cycling and restoration are a separate event-driven qualification programme: see docs/AQUA_DYNAMIC_SUPPLY_TRANSIENT_PROTOCOL_V0_1.md and issue #12801. Event scripts, measurement channels, timebase, uncertainty, recovery and safe-stop outcomes must be frozen separately; no transient performance is claimed until unoccupied tests exist.
+
+## Power-coupled shower / wastewater heat recovery
+
+The 2025/26 UK ETL electric-shower pathway now makes the coupled system boundary especially relevant: the programme retains 4.5 L/min as standard electric-shower maximum, with conditional 9 L/min (power modulation + compliant wastewater heat recovery) and 10.6 L/min (plus UBF) pathways. These are non-domestic UK criteria, not Aqua results or South African requirements. The detailed benchmark is in `docs/AQUA_POWER_COUPLED_SHOWER_DWHR_BENCHMARK_V0_1.md` and issue #12816. It requires whole-system purchased-energy measurement, receiver-side useful heat, fouling and task-level water/energy accounting. No duplicate thermal ledger is implemented here; Symtropy remains the canonical heat/resource authority.
