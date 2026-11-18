@@ -293,3 +293,61 @@ Primary sources:
 ### 8.1 Engineering consequence
 
 Do not replace the current small arithmetic coder. Retain it as a transparent reference backend. Build and compare typed transforms and numeric codecs as separate baselines. A serious competitive result must include Pco and the relevant domain-specialist baselines, not only raw bytes and Zstandard.
+
+
+## 9. Additional 2026 neural lossless baselines: Nacrith and BOA Constrictor
+
+The benchmark matrix should include two more strong architecture-level comparisons.
+
+### 9.1 Nacrith — high-precision transformer/context ensemble
+
+Tacconelli's *Nacrith: Neural Lossless Compression via Ensemble Context Modeling and High-Precision CDF Coding* (February 2026) combines:
+- a 135M-parameter SmolLM2 transformer;
+- an online token-level N-gram predictor;
+- adaptive context mixing and a document-level log-space bias head;
+- a 24-bit CDF precision upgrade;
+- a 32-bit arithmetic coder;
+- a hybrid binary container and optimized inference backend.
+
+The paper reports 0.9389 bits/byte on enwik8 and 0.918 bits/byte on alice29.txt, and 0.723 bits/byte on a post-training-cutoff document. These are author-reported natural-language results, not time-series or causal-transfer results. Its core lesson for CDL-Bench is that the prediction model is only one component: probability precision, context mixing, online adaptation, chunk format and inference/decoder determinism materially affect the end result.
+
+References:
+- https://arxiv.org/abs/2602.19626
+- https://github.com/robtacconelli/Nacrith-GPU
+
+### 9.2 BOA Constrictor — state-space models for scientific compression
+
+Gupta, Doglioni and Elliott's *BOA Constrictor: A Mamba-based lossless compressor for scientific data* (published May 12, 2026) is a particularly relevant comparison for Symthaea's CfC/LTC direction. It uses bytewise autoregressive Mamba prediction with a streaming range coder.
+
+The 2026 paper reports a 2.21 MB model and model-inclusive effective compression ratios of 7.23x on ATLAS Open Data (HDF5) and 9.13x on simulated HepMC v3 particle-collision records, exceeding the next-best traditional algorithms it compared against on those datasets. The authors also discuss data-format dependence and throughput trade-offs.
+
+These results make BOA a direct baseline for any claim that a continuous-time / liquid state predictor offers a useful alternative to modern state-space sequence models on structured scientific streams.
+
+References:
+- https://doi.org/10.1088/2632-2153/ae64a9
+- https://github.com/boa-collaboration/boa-constrictor
+
+### 9.3 Updated architecture comparison
+
+| Architecture | Relevant strength | What Symthaea must demonstrate beyond it |
+|---|---|---|
+| Nacrith / transformer + online context mixer | Strong textual next-symbol modelling, high-precision CDF and online adaptation | Causal mechanism reuse, cross-channel transfer, lower resource cost on the chosen sensor domain |
+| BOA / Mamba + range coder | State-space sequence model for structured scientific bytes | Measurable benefit from HDC/CfC dynamics or factorized causal mechanisms on held-out interventions |
+| SEP / patch semantics + neural backbones + multi-stream execution | Semantic patching and hardware throughput/memory optimization | Equivalent throughput/resource discipline and a stronger causal/typed-stream advantage |
+| WZS / adaptive segmentation + local method selection | Non-stationary stream handling | Reproducible regime detection and decoder-synchronous method switching |
+| Cadence / forecast plus bounded-error residual coding | Strong domain-localized pointwise-error compression | A distinct causal multi-channel or application-budget advantage under the same tolerances |
+
+### 9.4 Revised experimental design
+
+The CDL-Bench model matrix must now add:
+- a compact Mamba/SSM predictor when a reproducible model and decoder are available;
+- a transformer + online context-mixing predictor for text/byte-stream control;
+- a context-only / N-gram / PAQ-like statistical control;
+- matched adaptive CDF precision and entropy-coder ablations;
+- a decoder-determinism test across chunk sizes, thread counts, devices and floating-point configurations.
+
+The comparison must not claim that Symthaea beats Mamba because a hand-built synthetic SCM is easier for its generator, or that it beats a 135M transformer because its checkpoint is not charged. Every model pays for its checkpoint, decoder, context bootstrap, side information and resource footprint in the declared accounting.
+
+A credible near-term target is not universal byte-compression superiority. It is a repeatable Pareto advantage on a tightly specified family of interventional multi-sensor streams: total bits, adaptation observations/bits, memory, latency and exact or bounded-error fidelity all reported separately.
+
+**Evidence boundary:** the figures above are the cited authors' reported results and have not been independently reproduced by CDL-Bench.
