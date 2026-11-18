@@ -2,6 +2,7 @@ use jsonschema::validator_for;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::env;
 use std::f64::consts::{PI, TAU};
@@ -16,6 +17,9 @@ struct Bond {
 }
 
 struct QxyModel {
+    instance_id: String,
+    schema_sha256: String,
+    fixture_sha256: String,
     lattice_linear_size: usize,
     imaginary_time_slices: usize,
     t: f64,
@@ -60,6 +64,15 @@ impl QxyModel {
         if fixture.get("fixture_only").and_then(Value::as_bool) != Some(true) {
             return Err("this initial QXY solver accepts synthetic fixtures only".to_owned());
         }
+
+        let instance_id = fixture
+            .get("instance_id")
+            .and_then(Value::as_str)
+            .filter(|text| !text.trim().is_empty())
+            .ok_or_else(|| "QXY fixture requires instance_id".to_owned())?
+            .to_owned();
+        let schema_sha256 = format!("{:x}", Sha256::digest(schema_bytes));
+        let fixture_sha256 = format!("{:x}", Sha256::digest(fixture_bytes));
 
         let model = fixture
             .get("model")
@@ -390,6 +403,9 @@ impl QxyModel {
         }
 
         Ok(Self {
+            instance_id,
+            schema_sha256,
+            fixture_sha256,
             lattice_linear_size: l,
             imaginary_time_slices: ntau,
             t,
@@ -619,6 +635,9 @@ fn simulate(
         "contract": "SC-QXY-PIMC-SMOKE-0.1",
         "model": "Ponticelli-2026 QXY phase representation",
         "source_model_id": "ponticelli-2026-qxy-2d-square-lattice-phase-representation",
+        "instance_id": model.instance_id,
+        "schema_sha256": model.schema_sha256,
+        "fixture_sha256": model.fixture_sha256,
         "algorithm": "anisotropic_3d_xy_Wolff_plus_Metropolis",
         "energy_reference_t": model.t,
         "interaction_U": model.u,
@@ -815,6 +834,30 @@ mod tests {
         assert!(
             (measured.action_per_spacetime_site - expected_action).abs() < 1.0e-10
         );
+    }
+
+    #[test]
+    fn imaginary_time_slices_must_match_beta() {
+        let (schema, fixture) = inputs();
+        let mut value: Value = serde_json::from_slice(&fixture).unwrap();
+        value["simulation"]["imaginary_time_step"] = json!(0.2);
+        let mutated = serde_json::to_vec(&value).unwrap();
+        assert!(QxyModel::from_bytes(&schema, &mutated).is_err());
+    }
+
+    #[test]
+    fn receipt_is_bound_to_exact_schema_and_fixture_bytes() {
+        let (schema, fixture) = inputs();
+        let model = QxyModel::from_bytes(&schema, &fixture).unwrap();
+        assert_eq!(
+            model.fixture_sha256,
+            format!("{:x}", Sha256::digest(&fixture))
+        );
+        assert_eq!(
+            model.schema_sha256,
+            format!("{:x}", Sha256::digest(&schema))
+        );
+        assert!(!model.instance_id.is_empty());
     }
 
     #[test]
