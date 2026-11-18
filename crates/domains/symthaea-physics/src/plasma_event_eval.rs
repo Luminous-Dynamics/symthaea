@@ -2041,6 +2041,17 @@ mod tests {
             manifest["target_gates"]["all_values_are_research_targets"],
             true
         );
+        assert_eq!(
+            manifest["online_policy_contract"]["alarm_episode_trace_contract"]["episode_start"],
+            "only transition into Raised emits an alarm episode timestamp"
+        );
+        assert!(
+            manifest["evaluation_receipt_contract"]["contains"]
+                .as_array()
+                .expect("receipt fields")
+                .iter()
+                .any(|field| field == "alarm_episode_trace_raised_transition_timestamps")
+        );
     }
 
     #[test]
