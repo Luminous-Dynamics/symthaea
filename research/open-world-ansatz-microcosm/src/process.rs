@@ -9,6 +9,7 @@
 use crate::protocol::{
     AgentAction, AgentView, BlindEpisode, EpisodeStatus, EvaluatorScore, PROTOCOL_VERSION,
 };
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::ffi::OsString;
@@ -89,6 +90,21 @@ pub struct ProcessActionExchange {
     pub agent_view_frame_sha256: String,
     /// SHA-256 of the exact AgentAction bytes received, including its JSONL newline.
     pub agent_action_frame_sha256: String,
+}
+
+/// One generic request/response exchange across the bounded child-process JSONL boundary.
+///
+/// The process layer hashes exact framed bytes but assigns no semantics to the
+/// request or response types. Callers remain responsible for protocol-version,
+/// evidence-prefix, action-legality and evaluator checks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcessFrameExchange<Response> {
+    /// Parsed child response.
+    pub response: Response,
+    /// SHA-256 of the exact request bytes sent, including the JSONL newline.
+    pub request_frame_sha256: String,
+    /// SHA-256 of the exact response bytes received, including the JSONL newline.
+    pub response_frame_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -199,6 +215,58 @@ impl ProcessAgent {
         &self.identity
     }
 
+    /// Exchange any serializable request for a typed response over the
+    /// bounded JSONL child-process channel.
+    ///
+    /// This is transport only: it does not assign research semantics, validate
+    /// an episode, authenticate evidence, or make the child an OS sandbox.
+    pub fn exchange<Request, Response>(
+        &mut self,
+        request: &Request,
+    ) -> Result<ProcessFrameExchange<Response>, ProcessError>
+    where
+        Request: Serialize,
+        Response: DeserializeOwned,
+    {
+        let (input, request_frame_sha256) =
+            encode_jsonl_frame(request, self.max_input_frame_bytes)?;
+
+        let stdin = self
+            .stdin
+            .as_mut()
+            .ok_or_else(|| ProcessError::Protocol("agent stdin was already closed".to_owned()))?;
+        stdin
+            .write_all(&input)
+            .and_then(|()| stdin.flush())
+            .map_err(|error| ProcessError::Io(format!("cannot send JSONL request: {error}")))?;
+
+        let mut output = Vec::new();
+        match read_bounded_line(&mut self.stdout, &mut output, self.max_output_frame_bytes)
+            .map_err(|error| ProcessError::Io(format!("cannot read JSONL response: {error}")))?
+        {
+            BoundedLine::Eof => {
+                let status = self
+                    .child
+                    .as_mut()
+                    .and_then(|child| child.try_wait().ok().flatten());
+                Err(ProcessError::AgentExited(status.map_or_else(
+                    || "stdout closed before a JSONL response frame".to_owned(),
+                    |status| format!("stdout closed before a JSONL response frame: {status}"),
+                )))
+            }
+            BoundedLine::Line => {
+                let (response, response_frame_sha256) =
+                    decode_jsonl_frame::<Response>(&mut output)?;
+                Ok(ProcessFrameExchange {
+                    response,
+                    request_frame_sha256,
+                    response_frame_sha256,
+                })
+            }
+        }
+    }
+
+    /// Typed compatibility wrapper for the existing open-world AgentView/AgentAction protocol.
     pub fn next_action(&mut self, view: &AgentView) -> Result<ProcessActionExchange, ProcessError> {
         if view.task.protocol_version != PROTOCOL_VERSION {
             return Err(ProcessError::Protocol(format!(
@@ -212,63 +280,19 @@ impl ProcessAgent {
             ));
         }
 
-        let mut input = serde_json::to_vec(view)
-            .map_err(|error| ProcessError::Serialization(error.to_string()))?;
-        // The JSONL delimiter is part of the child-side frame limit.
-        if input.len().saturating_add(1) > self.max_input_frame_bytes {
-            return Err(ProcessError::FrameTooLarge {
-                direction: "input",
-                limit: self.max_input_frame_bytes,
-            });
-        }
-        input.push(b'\n');
-        let agent_view_frame_sha256 = sha256_frame(&input);
-
-        let stdin = self
-            .stdin
-            .as_mut()
-            .ok_or_else(|| ProcessError::Protocol("agent stdin was already closed".to_owned()))?;
-        stdin
-            .write_all(&input)
-            .and_then(|()| stdin.flush())
-            .map_err(|error| ProcessError::Io(format!("cannot send AgentView: {error}")))?;
-
-        let mut output = Vec::new();
-        match read_bounded_line(&mut self.stdout, &mut output, self.max_output_frame_bytes)
-            .map_err(|error| ProcessError::Io(format!("cannot read AgentAction: {error}")))?
-        {
-            BoundedLine::Eof => {
-                let status = self
-                    .child
-                    .as_mut()
-                    .and_then(|child| child.try_wait().ok().flatten());
-                Err(ProcessError::AgentExited(status.map_or_else(
-                    || "stdout closed before an AgentAction frame".to_owned(),
-                    |status| format!("stdout closed before an AgentAction frame: {status}"),
-                )))
-            }
-            BoundedLine::Line => {
-                let agent_action_frame_sha256 = sha256_frame(&output);
-                while output
-                    .last()
-                    .is_some_and(|byte| *byte == b'\n' || *byte == b'\r')
-                {
-                    output.pop();
+        let exchange = self
+            .exchange::<AgentView, AgentAction>(view)
+            .map_err(|error| match error {
+                ProcessError::MalformedResponse(message) => {
+                    ProcessError::MalformedAction(message)
                 }
-                if output.is_empty() {
-                    return Err(ProcessError::Protocol(
-                        "agent emitted a blank stdout frame".to_owned(),
-                    ));
-                }
-                let action = serde_json::from_slice(&output)
-                    .map_err(|error| ProcessError::MalformedAction(error.to_string()))?;
-                Ok(ProcessActionExchange {
-                    action,
-                    agent_view_frame_sha256,
-                    agent_action_frame_sha256,
-                })
-            }
-        }
+                other => other,
+            })?;
+        Ok(ProcessActionExchange {
+            action: exchange.response,
+            agent_view_frame_sha256: exchange.request_frame_sha256,
+            agent_action_frame_sha256: exchange.response_frame_sha256,
+        })
     }
 
     /// Close the request stream, require a clean stdout EOF and wait for exit.
@@ -337,6 +361,48 @@ fn validate_frame_limits(input_bytes: usize, output_bytes: usize) -> Result<(), 
 fn sha256_frame(bytes: &[u8]) -> String {
     format!("sha256:{:x}", Sha256::digest(bytes))
 }
+
+/// Serialize one request, append its JSONL delimiter, enforce the frame limit,
+/// and hash the exact bytes that will be transmitted.
+fn encode_jsonl_frame<Request: Serialize>(
+    request: &Request,
+    maximum: usize,
+) -> Result<(Vec<u8>, String), ProcessError> {
+    let mut frame = serde_json::to_vec(request)
+        .map_err(|error| ProcessError::Serialization(error.to_string()))?;
+    if frame.len().saturating_add(1) > maximum {
+        return Err(ProcessError::FrameTooLarge {
+            direction: "input",
+            limit: maximum,
+        });
+    }
+    frame.push(b'\n');
+    let digest = sha256_frame(&frame);
+    Ok((frame, digest))
+}
+
+/// Hash the received response including its delimiter, strip JSONL line endings,
+/// and deserialize the typed response.
+fn decode_jsonl_frame<Response: DeserializeOwned>(
+    frame: &mut Vec<u8>,
+) -> Result<(Response, String), ProcessError> {
+    let digest = sha256_frame(frame);
+    while frame
+        .last()
+        .is_some_and(|byte| *byte == b'\n' || *byte == b'\r')
+    {
+        frame.pop();
+    }
+    if frame.is_empty() {
+        return Err(ProcessError::Protocol(
+            "child emitted a blank JSONL response frame".to_owned(),
+        ));
+    }
+    let response = serde_json::from_slice(frame)
+        .map_err(|error| ProcessError::MalformedResponse(error.to_string()))?;
+    Ok((response, digest))
+}
+
 
 #[derive(Debug)]
 enum BoundedLine {
@@ -486,6 +552,7 @@ pub enum ProcessError {
         limit: usize,
     },
     MalformedAction(String),
+    MalformedResponse(String),
 }
 
 impl fmt::Display for ProcessError {
@@ -500,6 +567,130 @@ impl std::error::Error for ProcessError {}
 mod tests {
     use super::*;
     use std::io::Cursor;
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    struct GenericRequest {
+        protocol: String,
+        action_catalogue: Vec<String>,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    struct GenericResponse {
+        action_id: String,
+        evidence_prefix: String,
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn generic_process_exchange_round_trips_through_a_real_child_and_exits_cleanly() {
+        use std::os::unix::fs::PermissionsExt;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock after Unix epoch")
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "symthaea-generic-jsonl-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&directory).expect("create temporary test directory");
+        let executable = directory.join("echo-agent.sh");
+        let script = concat!(
+            "#!/bin/sh\n",
+            "while IFS= read -r request; do\n",
+            "  printf '%s\\n' '{\"action_id\":\"calibrate\",\"evidence_prefix\":\"sha256:0123456789abcdef\"}'\n",
+            "done\n"
+        );
+        std::fs::write(&executable, script).expect("write child process script");
+        let mut permissions = std::fs::metadata(&executable)
+            .expect("read child process metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(&executable, permissions)
+            .expect("make child process executable");
+
+        let request = GenericRequest {
+            protocol: "symtropy-joint-world-v0".to_owned(),
+            action_catalogue: vec!["measure".to_owned(), "calibrate".to_owned()],
+        };
+        let config = ProcessAgentConfig::new(&executable).with_frame_limits(4096, 4096);
+        let mut agent = ProcessAgent::spawn(config).expect("spawn generic JSONL child");
+        let exchange = agent
+            .exchange::<GenericRequest, GenericResponse>(&request)
+            .expect("exchange typed JSONL request/response");
+
+        assert_eq!(exchange.response.action_id, "calibrate");
+        assert_eq!(
+            exchange.response.evidence_prefix,
+            "sha256:0123456789abcdef"
+        );
+        assert!(exchange.request_frame_sha256.starts_with("sha256:"));
+        assert!(exchange.response_frame_sha256.starts_with("sha256:"));
+        assert_eq!(
+            exchange.request_frame_sha256,
+            sha256_frame(
+                &encode_jsonl_frame(&request, 4096)
+                    .expect("serialize request")
+                    .0
+            )
+        );
+        assert!(agent.finish().is_ok(), "child must exit cleanly after EOF");
+        std::fs::remove_dir_all(directory).expect("remove temporary test directory");
+    }
+
+    #[test]
+    fn generic_jsonl_codec_round_trips_domain_specific_types_and_hashes_delimiters() {
+        let request = GenericRequest {
+            protocol: "symtropy-joint-world-v0".to_owned(),
+            action_catalogue: vec!["measure".to_owned(), "calibrate".to_owned()],
+        };
+        let (request_frame, request_digest) =
+            encode_jsonl_frame(&request, DEFAULT_MAX_FRAME_BYTES).unwrap();
+        assert!(request_frame.ends_with(b"\n"));
+        assert_eq!(request_digest, sha256_frame(&request_frame));
+
+        let response = GenericResponse {
+            action_id: "calibrate".to_owned(),
+            evidence_prefix: "sha256:0123456789abcdef".to_owned(),
+        };
+        let response_payload = serde_json::to_vec(&response).unwrap();
+        let mut response_frame = response_payload.clone();
+        response_frame.push(b'\n');
+        let response_digest = sha256_frame(&response_frame);
+        let (decoded, actual_digest) =
+            decode_jsonl_frame::<GenericResponse>(&mut response_frame).unwrap();
+
+        assert_eq!(decoded, response);
+        assert_eq!(actual_digest, response_digest);
+        assert_ne!(actual_digest, sha256_frame(&response_payload));
+    }
+
+    #[test]
+    fn generic_jsonl_codec_enforces_limits_and_rejects_bad_responses() {
+        let request = GenericRequest {
+            protocol: "v0".to_owned(),
+            action_catalogue: vec!["a".repeat(128)],
+        };
+        assert!(matches!(
+            encode_jsonl_frame(&request, 8),
+            Err(ProcessError::FrameTooLarge {
+                direction: "input",
+                limit: 8
+            })
+        ));
+
+        let mut blank = vec![b'\n'];
+        assert!(matches!(
+            decode_jsonl_frame::<GenericResponse>(&mut blank),
+            Err(ProcessError::Protocol(_))
+        ));
+        let mut malformed = b"{not-json}\n".to_vec();
+        assert!(matches!(
+            decode_jsonl_frame::<GenericResponse>(&mut malformed),
+            Err(ProcessError::MalformedResponse(_))
+        ));
+    }
 
     #[test]
     fn frame_limits_reject_zero_and_unbounded_values() {

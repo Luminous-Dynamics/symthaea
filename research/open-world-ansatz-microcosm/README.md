@@ -130,6 +130,23 @@ The `open_world_agent` binary is a newline-delimited JSON (JSONL) process adapte
 
 Stdout is reserved for action JSONL; errors and diagnostics go to stderr. Input framing is capped at 1 MiB per message, the protocol version is checked, blank lines and submitted episodes are rejected. The adapter has no evaluator constructors or truth arguments. It is a **protocol-facing reference policy**, not yet a bridge to the learned Symthaea research orchestrator. Do not call the process boundary a security sandbox: an external runner must isolate the agent's filesystem, network, environment, process visibility, CPU/memory and wall time.
 
+## Generic typed JSONL process transport
+
+The existing `process::ProcessAgent` now exposes an additive generic `exchange<Request, Response>` method for any request implementing `Serialize` and response implementing `DeserializeOwned`. It reuses the same bounded JSONL framing, exact request/response frame SHA-256 digests (including newlines), environment clearing, executable identity, bounded stdout reader, clean-EOF check and child exit handling as the existing `AgentView -> AgentAction` path.
+
+The existing `next_action(&AgentView)` remains as a compatibility wrapper. It retains the current protocol-version and open-episode checks and returns the same `ProcessActionExchange` type. Eight process tests are authored, including a Unix child-process round trip that exercises the actual pipe exchange, exact request/response frame hashes and clean EOF/exit. These are authored tests, not passing results until the exact-head workflow runs. Generic transport does not validate domain-specific action legality, evidence-prefix semantics, world-model claims, hidden truth, or evaluator results; those remain with the corresponding episode owner.
+
+Example for a future non-microcosm domain protocol:
+
+```rust
+let exchange: ProcessFrameExchange<ExternalAction> =
+    process_agent.exchange::<ExternalEpisodeView, ExternalAction>(&public_view)?;
+```
+
+This is transport reuse, not protocol equivalence. Symtropy's joint stochastic episode still needs an explicit action/observation/claim adapter; its named finite actions and categorical outputs must not be silently reinterpreted as the existing Boolean/Numeric/Interaction intervention types. See [GENERIC-JSONL-TRANSPORT-001 / #12758](https://github.com/Luminous-Dynamics/symthaea/issues/12758) and [Symtropy SIM-REL-015 / #5990](https://github.com/Luminous-Dynamics/symtropy/issues/5990).
+
+The process boundary is not an OS sandbox. Filesystem, network, CPU/memory, environment and process visibility still require a separately qualified isolation boundary for untrusted agents.
+
 ## Open-support / model-misspecification control
 
 The numeric world generator accepts gains in the bounded physical range 1–16, while the agent-facing v0 candidate grammar still enumerates gains {1, 2, 3}. This deliberately separates **world support** from **candidate catalogue support**. The evaluator-only `BlindEpisode::new_numeric_open_support` constructor creates a truth at gain 7, outside the declared catalogue. The child receives the ordinary numeric task contract and does not receive a flag saying that the task is out of catalogue.
