@@ -695,42 +695,6 @@ pub fn validate_meal_proposal(proposal: &MealProposalV1) -> MealProposalValidati
         }
     }
 
-    let mut remaining: BTreeSet<&str> = task_ids.iter().copied().collect();
-    let mut resolved = BTreeSet::new();
-    loop {
-        let ready: Vec<&str> = remaining
-            .iter()
-            .copied()
-            .filter(|task_id| {
-                proposal
-                    .tasks
-                    .iter()
-                    .find(|task| task.task_id == *task_id)
-                    .is_some_and(|task| {
-                        task.depends_on.iter().all(|dependency| {
-                            !task_ids.contains(dependency.as_str())
-                                || resolved.contains(dependency.as_str())
-                        })
-                    })
-            })
-            .collect();
-        if ready.is_empty() {
-            break;
-        }
-        for task_id in ready {
-            remaining.remove(task_id);
-            resolved.insert(task_id);
-        }
-    }
-    if !remaining.is_empty() {
-        violation(
-            &mut violations,
-            MealProposalViolationCodeV1::DependencyCycle,
-            None,
-            "task dependency graph contains a cycle",
-        );
-    }
-
     let mut uncertainty_paths = BTreeSet::new();
     for item in &proposal.uncertainties {
         if !nonempty(&item.field_path)
@@ -1016,6 +980,14 @@ mod tests {
         assert!(report.violations.iter().any(|v| {
             v.code == MealProposalViolationCodeV1::DependencyCycle
         }));
+        assert_eq!(
+            report
+                .violations
+                .iter()
+                .filter(|v| v.code == MealProposalViolationCodeV1::DependencyCycle)
+                .count(),
+            1
+        );
     }
 
     #[test]
