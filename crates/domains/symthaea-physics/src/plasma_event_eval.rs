@@ -730,8 +730,10 @@ pub struct ShotAlarmEvaluation {
 ///
 /// `alarm_times_ns` must contain one timestamp per transition into `Raised`,
 /// not every subsequent `Active` window. Each timestamp therefore represents
-/// the start of a distinct alarm episode; non-disruptive episodes count as
-/// false-alarm events and are normalized by observed negative-shot exposure.
+/// the start of a distinct alarm episode. For a disruptive shot, exactly one
+/// episode within the validation-frozen [minimum, maximum] warning interval may
+/// match the event; all other episodes are false alarms. Non-disruptive episodes
+/// are also false alarms and are normalized by negative-shot exposure.
 pub fn score_shot_alarms(
     shot_id: &str,
     outcome: ShotReferenceOutcome,
@@ -1929,6 +1931,10 @@ mod tests {
 
     #[test]
     fn disruption_warning_must_fall_inside_frozen_minimum_and_maximum_lead_window() {
+        let mut invalid_policy = config();
+        invalid_policy.max_warning_ns = invalid_policy.required_warning_ns - 1;
+        assert!(invalid_policy.validate().is_err());
+
         let valid = score_shot_alarms(
             "valid-window",
             ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
@@ -1998,6 +2004,9 @@ mod tests {
         assert_eq!(summary.validation_receipt_sha256, "a".repeat(64));
         assert_eq!(summary.policy_config_sha256, config().policy_config_sha256());
         assert_eq!(summary.required_warning_ns, 50);
+        assert_eq!(summary.max_warning_ns, 90);
+        assert_eq!(summary.false_alarm_events_on_disruptive_shots, 0);
+        assert_eq!(summary.false_alarm_events_on_non_disruptive_shots, 2);
         let tpr_ci = summary.event_tpr_wilson_95.expect("positive cohort interval");
         assert!(tpr_ci.lower < 1.0 && (tpr_ci.upper - 1.0).abs() < 1e-12);
         let far_ci = summary
