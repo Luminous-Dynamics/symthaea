@@ -35,7 +35,8 @@ fn sha256(bytes: &[u8]) -> String {
 
 fn group_value<'a>(record: &'a Value, key: &str) -> Result<&'a str, String> {
     match key {
-        "family_id" | "prototype_id" | "source_id" => required_text(record, key),
+        "family_id" | "prototype_id" | "source_id" | "field_orientation" | "sample_form"
+        | "tc_criterion" => required_text(record, key),
         _ => Err(format!("unsupported group key {key}")),
     }
 }
@@ -383,7 +384,11 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     }
     let required_keys = strings(&fixture["protocol"], "required_group_keys")?;
     for key in &required_keys {
-        if !matches!(key.as_str(), "family_id" | "prototype_id" | "source_id") {
+        if !matches!(
+            key.as_str(),
+            "family_id" | "prototype_id" | "source_id" | "field_orientation" | "sample_form"
+                | "tc_criterion"
+        ) {
             return Err(format!("unsupported required group key {key}"));
         }
     }
@@ -629,6 +634,13 @@ mod tests {
     fn prediction_property_must_match_split_target() {
         let (schema, mut fixture) = inputs();
         fixture["predictions"][0]["property"] = Value::String("Hc2".to_owned());
+        assert!(audit(&schema, &serde_json::to_vec(&fixture).unwrap()).is_err());
+    }
+
+    #[test]
+    fn condition_axis_overlap_is_rejected() {
+        let (schema, mut fixture) = inputs();
+        fixture["records"][0]["sample_form"] = Value::String("thin_film".to_owned());
         assert!(audit(&schema, &serde_json::to_vec(&fixture).unwrap()).is_err());
     }
 
