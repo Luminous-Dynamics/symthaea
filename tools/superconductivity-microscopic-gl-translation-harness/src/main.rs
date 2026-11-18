@@ -284,6 +284,27 @@ fn validate_coefficient(
     if value.is_null() || value_kind == "null" {
         return Err(format!("coefficient {id}: {status} requires an explicit value"));
     }
+    if matches!(status, "derived" | "constrained" | "phenomenological_fit") {
+        if required_text(coefficient, "unit")? == "not specified" {
+            return Err(format!("coefficient {id}: exportable coefficient requires an explicit unit"));
+        }
+        if status == "derived"
+            && required_text(coefficient, "basis_normalization")? == "not specified"
+        {
+            return Err(format!("derived coefficient {id} requires an explicit basis normalization"));
+        }
+        let uncertainty = coefficient
+            .get("uncertainty_or_covariance")
+            .ok_or_else(|| format!("coefficient {id} missing uncertainty_or_covariance"))?;
+        if !uncertainty_is_present_and_finite(
+            uncertainty,
+            &format!("coefficient {id} uncertainty_or_covariance"),
+        )? {
+            return Err(format!(
+                "coefficient {id}: exportable status {status} requires uncertainty or documented bounds"
+            ));
+        }
+    }
     if value_kind == "scalar" {
         finite_number(value, &format!("coefficient {id} value"))?;
     } else if value_kind == "vector" || value_kind == "matrix" {
