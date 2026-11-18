@@ -82,3 +82,16 @@ It then derives:
 - the L-infinity margin from K to a larger certificate box D.
 
 The recurrence bound is applicable only while the accumulated state error remains within that margin. This is the first derived-bound lane; it is exact only for the integer affine maps and box semantics supplied to it. It does not certify nonlinear systems or infer that the supplied boxes match a real physical domain.
+
+
+### Derived affine-to-task end-to-end path
+
+`qualify_affine_task` now composes the exact affine witness with the finite-horizon envelope:
+1. derive the commutator residual, L-infinity Lipschitz factor, finite action order, invariant reference box and outer-domain margin;
+2. convert those integer bounds into the task's fixed-point scale with checked multiplication;
+3. attach explicit state/objective/constraint units and bound provenance IDs;
+4. propagate the error for the requested horizon;
+5. check task budgets, constraint slack, objective gap and domain margin;
+6. return one receipt containing both the affine witness and envelope; independent replay rederives both.
+
+The end-to-end toy case qualifies a two-step epsilon-lift candidate. At three steps, the same affine residual exceeds the derived domain margin and the compiler abstains. Neither case ever grants hard-prune authority.
