@@ -42,6 +42,12 @@ use crate::style_trajectory_admission::{
 /// Both current style specs resolve this value to 140 BPM.
 pub const M1_SHARED_AROUSAL: f32 = 8.0 / 9.0;
 pub const M1_TRAJECTORY_SCHEMA_VERSION: u16 = 1;
+/// Canonical serialization domain for per-segment evidence hashes.
+pub const M1_SEGMENT_EVIDENCE_DIGEST_SCHEMA_V1: &str =
+    "muse-m1-segment-evidence-serde-json-sha256-v1";
+/// Canonical serialization domain for complete M1 receipt hashes.
+pub const M1_RECEIPT_DIGEST_SCHEMA_V1: &str =
+    "muse-m1-receipt-serde-json-sha256-v1";
 
 const CLASSICAL_SEGMENT_ID: &str = "classical-period-sentence";
 const MINIMALISM_SEGMENT_ID: &str = "minimalism-process-additive";
@@ -72,6 +78,28 @@ pub enum StyleTrajectoryM1Error {
         reason: String,
     },
     ProcessRealizationAudit(ProcessRealizationAuditError),
+    ReceiptSchemaVersionMismatch { expected: u16, actual: u16 },
+    ReceiptDigestMismatch { expected: String, actual: String },
+    ReceiptSerializationFailed { reason: String },
+    ReceiptSegmentCountMismatch { expected: usize, actual: usize },
+    ReceiptIntentMissing,
+    ReceiptIntentBindingMismatch,
+    ReceiptSegmentIdentityMismatch { segment_index: usize },
+    ReceiptSegmentIntervalMismatch { segment_id: String },
+    ReceiptSegmentClockMismatch { segment_id: String },
+    ReceiptSegmentEvidenceDigestMismatch { segment_id: String },
+    ReceiptSegmentScoreDigestMismatch { segment_id: String, expected: String, actual: String },
+    ReceiptTraceVerificationMismatch { segment_id: String },
+    ReceiptSegmentValidationMismatch { segment_id: String },
+    ReceiptComposedScoreDigestMismatch { expected: String, actual: String },
+    ReceiptComposedScoreMismatch,
+    ReceiptBoundaryEvidenceMismatch,
+    ReceiptTransitionMismatch,
+    ReceiptProcessAuditMissing,
+    ReceiptProcessAuditUnexpected,
+    ReceiptProcessAuditMismatch,
+    ReceiptComposedValidationMismatch,
+    ReceiptExpertReviewStatusMismatch,
     UniversalInvariantViolation {
         style: String,
         issues: Vec<ScoreValidationIssue>,
@@ -108,6 +136,11 @@ pub struct StyleTrajectoryM1SegmentV1 {
     #[serde(default)]
     pub process_realization_audit: Option<ProcessRealizationAuditV1>,
     pub validation: TheoryValidationReport,
+    /// SHA-256 binding the complete segment evidence envelope. This is a
+    /// content address, not an author signature; pin it in an outer trusted
+    /// receipt/ledger when tamper evidence across storage boundaries matters.
+    #[serde(default)]
+    pub evidence_sha256: String,
 }
 
 /// Score-domain evidence around an explicit hard boundary. These are
@@ -135,6 +168,11 @@ pub struct StyleTrajectoryM1ResultV1 {
     pub schema_version: u16,
     pub seed: u64,
     pub arousal: f32,
+    /// Full immutable generation input required to replay trace verification.
+    /// Missing intent in legacy receipts remains deserializable but cannot be
+    /// promoted to a verified M1 receipt.
+    #[serde(default)]
+    pub intent: Option<MusicalIntent>,
     pub composed_score: Score,
     pub composed_score_sha256: String,
     pub composed_validation: TheoryValidationReport,
@@ -145,6 +183,23 @@ pub struct StyleTrajectoryM1ResultV1 {
     /// True when catalogue metadata says expert review is required.
     /// It is not evidence that the review has happened.
     pub expert_review_required: bool,
+    /// Content hash over the complete result except this field itself.
+    /// It is not a digital signature or proof of authorship.
+    #[serde(default)]
+    pub receipt_sha256: String,
+}
+
+/// Summary of independently replaying one serialized M1 receipt.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct StyleTrajectoryM1ReceiptVerificationV1 {
+    pub schema_version: u16,
+    pub receipt_sha256: String,
+    pub verified_segment_count: usize,
+    pub trace_integrity_verified_segment_count: usize,
+    pub process_additive_score_verified_segment_count: usize,
+    /// False until the PeriodSentence score-semantic oracle is integrated.
+    pub period_sentence_semantics_verified: bool,
+    pub total_beats: Duration,
 }
 
 /// Compose the first M1 trajectory using Classical then Minimalism.
@@ -268,7 +323,7 @@ pub fn realize_classical_to_minimalism_m1(
     let minimalism_profile_sha = style_profile_sha256_v1(Style::Minimalism)
         .map_err(StyleTrajectoryM1Error::Admission)?;
 
-    let segments = vec![
+    let mut segments = vec![
         StyleTrajectoryM1SegmentV1 {
             segment_id: CLASSICAL_SEGMENT_ID.into(),
             style: Style::Classical,
@@ -281,6 +336,7 @@ pub fn realize_classical_to_minimalism_m1(
             trace_verification: classical_trace_verification,
             process_realization_audit: None,
             validation: classical_validation,
+            evidence_sha256: String::new(),
         },
         StyleTrajectoryM1SegmentV1 {
             segment_id: MINIMALISM_SEGMENT_ID.into(),
@@ -294,8 +350,13 @@ pub fn realize_classical_to_minimalism_m1(
             trace_verification: minimalism_trace_verification,
             process_realization_audit: Some(minimalism_process_realization_audit),
             validation: minimalism_validation,
+            evidence_sha256: String::new(),
         },
     ];
+
+    for segment in &mut segments {
+        segment.evidence_sha256 = segment_evidence_sha256_v1(segment)?;
+    }
 
     let plan = StyleTrajectoryPlanV1 {
         schema_version: symthaea_music_theory::STYLE_TRAJECTORY_SCHEMA_VERSION,
@@ -333,10 +394,11 @@ pub fn realize_classical_to_minimalism_m1(
     let admission = admit_style_trajectory_for_score(&plan, &composed_score)
         .map_err(StyleTrajectoryM1Error::Admission)?;
 
-    Ok(StyleTrajectoryM1ResultV1 {
+    let mut result = StyleTrajectoryM1ResultV1 {
         schema_version: M1_TRAJECTORY_SCHEMA_VERSION,
         seed: intent.seed,
         arousal: intent.arousal,
+        intent: Some(intent),
         composed_score,
         composed_score_sha256,
         composed_validation,
@@ -345,7 +407,276 @@ pub fn realize_classical_to_minimalism_m1(
         boundary_evidence,
         plan,
         expert_review_required: admission.expert_review_required,
+        receipt_sha256: String::new(),
+    };
+    result.receipt_sha256 = m1_receipt_sha256_v1(&result)?;
+    Ok(result)
+}
+
+/// Independently replay and verify a serialized Classical -> Minimalism M1 receipt.
+///
+/// The verifier re-hashes every segment evidence envelope and the complete
+/// receipt, recomputes segment-score digests, reconstructs the composed Score
+/// from the segment-local source Scores, replays universal validation and
+/// Muse Analyst trace verification, reruns the ProcessAdditive score oracle,
+/// validates catalogue/profile admission, and recomputes the hard-boundary
+/// evidence. Legacy receipts without the full intent or digests remain
+/// deserializable but are not upgraded to a verified result.
+///
+/// SHA-256 here establishes content integrity relative to a pinned digest. It
+/// does not establish who authored the receipt: the digest must be anchored in
+/// a separately trusted store or signed by an external authority for that.
+pub fn verify_classical_to_minimalism_m1_receipt_v1(
+    result: &StyleTrajectoryM1ResultV1,
+) -> Result<StyleTrajectoryM1ReceiptVerificationV1, StyleTrajectoryM1Error> {
+    if result.schema_version != M1_TRAJECTORY_SCHEMA_VERSION {
+        return Err(StyleTrajectoryM1Error::ReceiptSchemaVersionMismatch {
+            expected: M1_TRAJECTORY_SCHEMA_VERSION,
+            actual: result.schema_version,
+        });
+    }
+    if result.segments.len() != 2 {
+        return Err(StyleTrajectoryM1Error::ReceiptSegmentCountMismatch {
+            expected: 2,
+            actual: result.segments.len(),
+        });
+    }
+    let intent = result.intent.ok_or(StyleTrajectoryM1Error::ReceiptIntentMissing)?;
+    if intent.seed != result.seed || intent.arousal.to_bits() != result.arousal.to_bits() {
+        return Err(StyleTrajectoryM1Error::ReceiptIntentBindingMismatch);
+    }
+
+    let actual_receipt_sha256 = m1_receipt_sha256_v1(result)?;
+    if actual_receipt_sha256 != result.receipt_sha256 {
+        return Err(StyleTrajectoryM1Error::ReceiptDigestMismatch {
+            expected: result.receipt_sha256.clone(),
+            actual: actual_receipt_sha256,
+        });
+    }
+
+    let expected_styles = [Style::Classical, Style::Minimalism];
+    let expected_ids = [CLASSICAL_SEGMENT_ID, MINIMALISM_SEGMENT_ID];
+    for (index, segment) in result.segments.iter().enumerate() {
+        if segment.style != expected_styles[index] || segment.segment_id != expected_ids[index] {
+            return Err(StyleTrajectoryM1Error::ReceiptSegmentIdentityMismatch {
+                segment_index: index,
+            });
+        }
+
+        let actual_evidence_sha256 = segment_evidence_sha256_v1(segment)?;
+        if actual_evidence_sha256 != segment.evidence_sha256 {
+            return Err(StyleTrajectoryM1Error::ReceiptSegmentEvidenceDigestMismatch {
+                segment_id: segment.segment_id.clone(),
+            });
+        }
+
+        let actual_segment_sha256 = score_sha256(&segment.score)?;
+        if actual_segment_sha256 != segment.segment_score_sha256 {
+            return Err(StyleTrajectoryM1Error::ReceiptSegmentScoreDigestMismatch {
+                segment_id: segment.segment_id.clone(),
+                expected: segment.segment_score_sha256.clone(),
+                actual: actual_segment_sha256,
+            });
+        }
+
+        let replayed_validation = validate_universal_invariants(segment.style, &segment.score)?;
+        if replayed_validation != segment.validation {
+            return Err(StyleTrajectoryM1Error::ReceiptSegmentValidationMismatch {
+                segment_id: segment.segment_id.clone(),
+            });
+        }
+        verify_typed_grammar(
+            segment.style,
+            &segment.grammar_plan,
+            &segment.grammar_trace,
+            &segment.score,
+        )?;
+        let replayed_trace = verify_trace_independently(
+            segment.style,
+            &intent,
+            &segment.score,
+            &segment.grammar_trace,
+        )?;
+        if replayed_trace != segment.trace_verification {
+            return Err(StyleTrajectoryM1Error::ReceiptTraceVerificationMismatch {
+                segment_id: segment.segment_id.clone(),
+            });
+        }
+
+        if segment.score.key != result.composed_score.key
+            || segment.score.tempo_bpm.to_bits() != result.composed_score.tempo_bpm.to_bits()
+            || segment.score.meter != result.composed_score.meter
+        {
+            return Err(StyleTrajectoryM1Error::ReceiptSegmentClockMismatch {
+                segment_id: segment.segment_id.clone(),
+            });
+        }
+    }
+
+    let classical = &result.segments[0];
+    let minimalism = &result.segments[1];
+    let classical_length = classical.score.total_beats;
+    let minimalism_length = minimalism.score.total_beats;
+    let expected_total = classical_length + minimalism_length;
+    if classical.start_beat != Duration::zero()
+        || classical.end_beat != classical_length
+        || minimalism.start_beat != classical.end_beat
+        || minimalism.end_beat != expected_total
+        || minimalism.end_beat != result.composed_score.total_beats
+        || result.plan.total_beats != expected_total
+    {
+        return Err(StyleTrajectoryM1Error::ReceiptSegmentIntervalMismatch {
+            segment_id: "trajectory".into(),
+        });
+    }
+    if result.transition_at_beat != minimalism.start_beat
+        || result.plan.segments.len() != 2
+        || result.plan.segments[0].segment_id != classical.segment_id
+        || result.plan.segments[0].start_beat != classical.start_beat
+        || result.plan.segments[0].end_beat != classical.end_beat
+        || result.plan.segments[1].segment_id != minimalism.segment_id
+        || result.plan.segments[1].start_beat != minimalism.start_beat
+        || result.plan.segments[1].end_beat != minimalism.end_beat
+        || result.plan.transitions.len() != 1
+        || result.plan.transitions[0].from_segment_id != classical.segment_id
+        || result.plan.transitions[0].to_segment_id != minimalism.segment_id
+        || result.plan.transitions[0].mode != StyleTransitionMode::HardBoundary
+    {
+        return Err(StyleTrajectoryM1Error::ReceiptTransitionMismatch);
+    }
+
+    let mut reconstructed = Score::new(
+        classical.score.key,
+        classical.score.tempo_bpm,
+        classical.score.meter,
+    );
+    reconstructed
+        .notes
+        .reserve(classical.score.notes.len() + minimalism.score.notes.len());
+    reconstructed.notes.extend(classical.score.notes.iter().copied());
+    reconstructed.notes.extend(minimalism.score.notes.iter().copied().map(|mut note| {
+        note.onset = note.onset + minimalism.start_beat;
+        note
+    }));
+    reconstructed.total_beats = expected_total;
+    if reconstructed != result.composed_score {
+        return Err(StyleTrajectoryM1Error::ReceiptComposedScoreMismatch);
+    }
+
+    let actual_composed_sha256 = score_sha256(&result.composed_score)?;
+    if actual_composed_sha256 != result.composed_score_sha256
+        || result.plan.source_score_sha256 != result.composed_score_sha256
+    {
+        return Err(StyleTrajectoryM1Error::ReceiptComposedScoreDigestMismatch {
+            expected: result.composed_score_sha256.clone(),
+            actual: actual_composed_sha256,
+        });
+    }
+
+    let admission = admit_style_trajectory_for_score(&result.plan, &result.composed_score)
+        .map_err(StyleTrajectoryM1Error::Admission)?;
+    if admission.expert_review_required != result.expert_review_required {
+        return Err(StyleTrajectoryM1Error::ReceiptExpertReviewStatusMismatch);
+    }
+
+    let replayed_composed_validation =
+        validate_universal_invariants(Style::Classical, &result.composed_score)?;
+    if replayed_composed_validation != result.composed_validation {
+        return Err(StyleTrajectoryM1Error::ReceiptComposedValidationMismatch);
+    }
+
+    if classical.process_realization_audit.is_some() {
+        return Err(StyleTrajectoryM1Error::ReceiptProcessAuditUnexpected);
+    }
+    let process_plan = match &minimalism.grammar_plan {
+        GrammarPlanEvidence::AdditiveProcess(process) => process,
+        _ => {
+            return Err(StyleTrajectoryM1Error::UnexpectedGrammarEvidence {
+                style: "Minimalism".into(),
+                reason: "receipt replay requires typed ProcessAdditive evidence".into(),
+            });
+        }
+    };
+    let replayed_process_audit =
+        verify_additive_process_score_v1(process_plan, &minimalism.score)
+            .map_err(StyleTrajectoryM1Error::ProcessRealizationAudit)?;
+    let stored_process_audit = minimalism
+        .process_realization_audit
+        .as_ref()
+        .ok_or(StyleTrajectoryM1Error::ReceiptProcessAuditMissing)?;
+    if &replayed_process_audit != stored_process_audit {
+        return Err(StyleTrajectoryM1Error::ReceiptProcessAuditMismatch);
+    }
+
+    let replayed_boundary =
+        measure_hard_boundary(&classical.score, &minimalism.score, minimalism.start_beat)?;
+    if replayed_boundary != result.boundary_evidence {
+        return Err(StyleTrajectoryM1Error::ReceiptBoundaryEvidenceMismatch);
+    }
+
+    Ok(StyleTrajectoryM1ReceiptVerificationV1 {
+        schema_version: 1,
+        receipt_sha256: result.receipt_sha256.clone(),
+        verified_segment_count: 2,
+        trace_integrity_verified_segment_count: 2,
+        process_additive_score_verified_segment_count: 1,
+        period_sentence_semantics_verified: false,
+        total_beats: result.composed_score.total_beats,
     })
+}
+
+/// Hash a segment's score, grammar plan/trace, verification and validation
+/// report. The segment hash field itself is excluded from its own material.
+fn segment_evidence_sha256_v1(
+    segment: &StyleTrajectoryM1SegmentV1,
+) -> Result<String, StyleTrajectoryM1Error> {
+    let material = (
+        M1_SEGMENT_EVIDENCE_DIGEST_SCHEMA_V1,
+        &segment.segment_id,
+        &segment.style,
+        segment.start_beat,
+        segment.end_beat,
+        &segment.segment_score_sha256,
+        &segment.score,
+        &segment.grammar_plan,
+        &segment.grammar_trace,
+        &segment.trace_verification,
+        &segment.process_realization_audit,
+        &segment.validation,
+    );
+    let bytes = serde_json::to_vec(&material).map_err(|error| {
+        StyleTrajectoryM1Error::ReceiptSerializationFailed {
+            reason: error.to_string(),
+        }
+    })?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
+/// Hash the complete result while excluding only receipt_sha256 itself.
+fn m1_receipt_sha256_v1(
+    result: &StyleTrajectoryM1ResultV1,
+) -> Result<String, StyleTrajectoryM1Error> {
+    let material = (
+        M1_RECEIPT_DIGEST_SCHEMA_V1,
+        result.schema_version,
+        result.seed,
+        result.arousal,
+        result.intent,
+        &result.composed_score,
+        &result.composed_score_sha256,
+        &result.composed_validation,
+        &result.segments,
+        result.transition_at_beat,
+        &result.boundary_evidence,
+        &result.plan,
+        result.expert_review_required,
+    );
+    let bytes = serde_json::to_vec(&material).map_err(|error| {
+        StyleTrajectoryM1Error::ReceiptSerializationFailed {
+            reason: error.to_string(),
+        }
+    })?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
 }
 
 fn verify_typed_grammar(
@@ -836,5 +1167,82 @@ mod tests {
             *process.prefix_lengths.iter().max().expect("non-empty process")
         );
     }
+
+    #[test]
+    fn m1_receipt_replays_after_json_round_trip() {
+        let generated =
+            realize_classical_to_minimalism_m1(m1_intent(M1_SHARED_AROUSAL)).unwrap();
+        let encoded = serde_json::to_vec(&generated).unwrap();
+        let decoded: StyleTrajectoryM1ResultV1 = serde_json::from_slice(&encoded).unwrap();
+        let verified = verify_classical_to_minimalism_m1_receipt_v1(&decoded).unwrap();
+        assert_eq!(verified.schema_version, 1);
+        assert_eq!(verified.verified_segment_count, 2);
+        assert_eq!(verified.trace_integrity_verified_segment_count, 2);
+        assert_eq!(verified.process_additive_score_verified_segment_count, 1);
+        assert!(!verified.period_sentence_semantics_verified);
+        assert_eq!(verified.total_beats, decoded.composed_score.total_beats);
+        assert_eq!(verified.receipt_sha256, decoded.receipt_sha256);
+    }
+
+    #[test]
+    fn m1_receipt_rejects_mutation_when_the_pinned_receipt_digest_is_unchanged() {
+        let mut result =
+            realize_classical_to_minimalism_m1(m1_intent(M1_SHARED_AROUSAL)).unwrap();
+        result.boundary_evidence.left_events_in_window += 1;
+        let error = verify_classical_to_minimalism_m1_receipt_v1(&result).unwrap_err();
+        assert!(matches!(error, StyleTrajectoryM1Error::ReceiptDigestMismatch { .. }));
+    }
+
+    #[test]
+    fn m1_receipt_rejects_segment_evidence_mutation_even_if_outer_digest_is_recomputed() {
+        let mut result =
+            realize_classical_to_minimalism_m1(m1_intent(M1_SHARED_AROUSAL)).unwrap();
+        result.segments[1].grammar_trace.structures.clear();
+        result.segments[1].evidence_sha256 =
+            segment_evidence_sha256_v1(&result.segments[1]).unwrap();
+        result.receipt_sha256 = m1_receipt_sha256_v1(&result).unwrap();
+        let error = verify_classical_to_minimalism_m1_receipt_v1(&result).unwrap_err();
+        assert!(matches!(
+            error,
+            StyleTrajectoryM1Error::ReceiptTraceVerificationMismatch { .. }
+                | StyleTrajectoryM1Error::UnexpectedGrammarEvidence { .. }
+        ));
+    }
+
+    #[test]
+    fn m1_receipt_rejects_process_audit_report_mutation_after_rehash() {
+        let mut result =
+            realize_classical_to_minimalism_m1(m1_intent(M1_SHARED_AROUSAL)).unwrap();
+        result.segments[1]
+            .process_realization_audit
+            .as_mut()
+            .unwrap()
+            .verified_harmony_event_count += 1;
+        result.segments[1].evidence_sha256 =
+            segment_evidence_sha256_v1(&result.segments[1]).unwrap();
+        result.receipt_sha256 = m1_receipt_sha256_v1(&result).unwrap();
+        let error = verify_classical_to_minimalism_m1_receipt_v1(&result).unwrap_err();
+        assert!(matches!(error, StyleTrajectoryM1Error::ReceiptProcessAuditMismatch));
+    }
+
+    #[test]
+    fn m1_receipt_reconstructs_composed_score_and_rejects_score_mutation() {
+        let mut result =
+            realize_classical_to_minimalism_m1(m1_intent(M1_SHARED_AROUSAL)).unwrap();
+        result.segments[1].score.notes[0].pitch =
+            Pitch::from_midi(result.segments[1].score.notes[0].pitch.midi().wrapping_add(1));
+        result.segments[1].segment_score_sha256 =
+            score_sha256(&result.segments[1].score).unwrap();
+        result.segments[1].evidence_sha256 =
+            segment_evidence_sha256_v1(&result.segments[1]).unwrap();
+        result.receipt_sha256 = m1_receipt_sha256_v1(&result).unwrap();
+        let error = verify_classical_to_minimalism_m1_receipt_v1(&result).unwrap_err();
+        assert!(matches!(
+            error,
+            StyleTrajectoryM1Error::ProcessRealizationAudit(_)
+                | StyleTrajectoryM1Error::ReceiptComposedScoreMismatch
+        ));
+    }
+
 
 }
