@@ -717,14 +717,26 @@ impl HdcLtcBridge {
         // Project target to HDC (reuse same projection)
         let hdc_target = self.project_to_hdc(target);
 
-        // Save live evolution state — training must not perturb it.
+        // Save and validate live evolution state before any speculative mutation.
         let mut live = std::mem::take(&mut self.train_scratch);
         self.network.snapshot_state_into(&mut live);
+        if let Err(error) = self.network.try_restore_state_from(&live) {
+            self.train_scratch = live;
+            return Err(anyhow::anyhow!(
+                "live HDC-LTC evolution snapshot is not restorable: {error:?}"
+            ));
+        }
 
-        // Start the training forward pass from the historical state if given
-        // (otherwise from the live state, without mutating it observably).
+        // Start the training forward pass from the historical state if given.
+        // Incompatible snapshots are rejected atomically; they never become
+        // partially restored training starts.
         if let Some(start) = start {
-            self.network.restore_state_from(start);
+            if let Err(error) = self.network.try_restore_state_from(start) {
+                self.train_scratch = live;
+                return Err(anyhow::anyhow!(
+                    "historical HDC-LTC start snapshot is incompatible: {error:?}"
+                ));
+            }
         }
 
         // Training forward pass (on what is now scratch state)
@@ -758,9 +770,13 @@ impl HdcLtcBridge {
         // run before the live-state restore below)
         self.update_projections(&hdc_input, target, &output, learning_rate);
 
-        // Restore live evolution state; weight updates survive.
-        self.network.restore_state_from(&live);
+        // Restore live evolution state; weight updates survive. The live
+        // snapshot was validated before the training forward pass.
+        let restore_result = self.network.try_restore_state_from(&live);
         self.train_scratch = live;
+        restore_result.map_err(|error| {
+            anyhow::anyhow!("failed to restore validated live HDC-LTC state: {error:?}")
+        })?;
 
         Ok(loss)
     }
@@ -819,12 +835,21 @@ impl HdcLtcBridge {
 
         let mut scratch = std::mem::take(&mut self.predict_scratch);
         self.network.snapshot_state_into(&mut scratch);
+        if let Err(error) = self.network.try_restore_state_from(&scratch) {
+            self.predict_scratch = scratch;
+            return Err(anyhow::anyhow!(
+                "live HDC-LTC prediction snapshot is not restorable: {error:?}"
+            ));
+        }
 
         self.network.evolve_closed_form(horizon, &hdc_input);
         let output = self.project_from_hdc(&self.network.output());
 
-        self.network.restore_state_from(&scratch);
+        let restore_result = self.network.try_restore_state_from(&scratch);
         self.predict_scratch = scratch;
+        restore_result.map_err(|error| {
+            anyhow::anyhow!("failed to restore validated prediction state: {error:?}")
+        })?;
 
         Ok(Array1::from_vec(output))
     }
@@ -1059,6 +1084,58 @@ mod tests {
             expected.approx_eq(&restored, 1e-7),
             "strict bridge restore did not restore recurrent state and clocks"
         );
+    }
+
+    #[test]
+    fn train_step_from_rejects_incompatible_topology_without_mutating_live_state() {
+        let source_config = HdcLtcBridgeConfig {
+            input_dim: 8,
+            output_dim: 8,
+            layer_sizes: vec![2, 3, 1],
+            hdc_dim: 256,
+            seed: 53,
+            ..Default::default()
+        };
+        let target_config = HdcLtcBridgeConfig {
+            layer_sizes: vec![3, 2, 1],
+            seed: 59,
+            ..source_config.clone()
+        };
+        let source = HdcLtcBridge::new(source_config);
+        let mut target = HdcLtcBridge::new(target_config);
+        let input = Array1::from_vec(vec![0.2; 8]);
+        target.step(&input, 0.02).unwrap();
+
+        let incompatible = source.snapshot_evolution_state();
+        let before = target.snapshot_evolution_state();
+        let output_before = target.read_state().unwrap();
+
+        let result = target.train_step_from(
+            &incompatible,
+            &input,
+            &Array1::from_vec(vec![-0.1; 8]),
+            0.02,
+            0.01,
+        );
+        assert!(result.is_err(), "incompatible historical topology must fail closed");
+
+        let after = target.snapshot_evolution_state();
+        assert!(
+            before.approx_eq(&after, 0.0),
+            "rejected historical training snapshot mutated live state"
+        );
+        let output_after = target.read_state().unwrap();
+        assert_eq!(output_before, output_after);
+
+        // The reusable scratch buffer must be returned even on rejection.
+        assert!(target
+            .train_step(
+                &input,
+                &Array1::from_vec(vec![-0.1; 8]),
+                0.02,
+                0.01,
+            )
+            .is_ok());
     }
 
     #[test]
