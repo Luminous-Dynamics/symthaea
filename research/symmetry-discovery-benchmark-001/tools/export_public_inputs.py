@@ -63,7 +63,10 @@ def export(manifest: dict) -> dict[str, dict]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--write", action="store_true")
+    parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
+    if args.write and args.check:
+        parser.error("--write and --check are mutually exclusive")
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     exports = export(manifest)
     if args.write:
@@ -71,15 +74,21 @@ def main() -> int:
         for split, payload in exports.items():
             target = OUTPUT / f"{split}.json"
             target.write_text(
-                json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+                json.dumps(payload, indent=2, ensure_ascii=False) + "\\n",
                 encoding="utf-8",
             )
+    elif args.check:
+        for split, payload in exports.items():
+            target = OUTPUT / f"{split}.json"
+            expected = json.dumps(payload, indent=2, ensure_ascii=False) + "\\n"
+            if not target.exists() or target.read_text(encoding="utf-8") != expected:
+                raise ValueError(f"{split}: checked-in public input export is stale")
+            print(f"{split}: {len(payload['cases'])} label-free cases match exporter")
     else:
         for split, payload in exports.items():
             print(f"{split}: {len(payload['cases'])} label-free cases")
     print("PUBLIC_INPUT_EXPORT_PASS: label-free fields; not a sealed blind set")
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
