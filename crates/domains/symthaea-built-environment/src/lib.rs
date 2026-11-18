@@ -1068,6 +1068,267 @@ pub struct ScenarioEvaluation {
 
 /// Conservative worst-case aggregation over an explicitly supplied scenario set.
 /// Missing, unknown or failing scenarios abstain instead of being pooled away.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EvidenceDependencyNode {
+    pub node_id: String,
+    pub content_digest: String,
+    #[serde(default)]
+    pub depends_on: Vec<String>,
+    #[serde(default)]
+    pub evidence_receipt_digest: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EvidenceDependencyGraph {
+    pub graph_id: String,
+    pub graph_revision: String,
+    pub nodes: Vec<EvidenceDependencyNode>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EvidenceReceiptReference {
+    pub node_id: String,
+    pub receipt_digest: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct InvalidationReceipt {
+    pub graph_id: String,
+    pub prior_revision: String,
+    pub new_revision: String,
+    pub graph_digest: String,
+    pub changed_node_ids: Vec<String>,
+    pub invalidated_node_ids: Vec<String>,
+    pub invalidated_evidence: Vec<EvidenceReceiptReference>,
+    pub preserved_evidence: Vec<EvidenceReceiptReference>,
+    pub receipt_digest: String,
+}
+
+fn is_blake3_digest(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
+fn canonical_dependency_graph(graph: &EvidenceDependencyGraph) -> EvidenceDependencyGraph {
+    let mut canonical = graph.clone();
+    canonical.nodes.sort_by(|left, right| left.node_id.cmp(&right.node_id));
+    for node in &mut canonical.nodes {
+        node.depends_on.sort();
+    }
+    canonical
+}
+
+fn validate_dependency_graph(
+    graph: &EvidenceDependencyGraph,
+) -> Result<(EvidenceDependencyGraph, BTreeMap<String, BTreeSet<String>>), Vec<String>> {
+    let mut errors = Vec::new();
+    if graph.graph_id.trim().is_empty() || graph.graph_revision.trim().is_empty() {
+        errors.push("dependency graph ID and revision are required".to_owned());
+    }
+    if graph.nodes.is_empty() {
+        errors.push("dependency graph must contain at least one node".to_owned());
+    }
+
+    let mut nodes_by_id = BTreeMap::new();
+    for node in &graph.nodes {
+        if node.node_id.trim().is_empty() {
+            errors.push("dependency node ID cannot be empty".to_owned());
+        }
+        if nodes_by_id.insert(node.node_id.clone(), node).is_some() {
+            errors.push(format!("duplicate dependency node ID: {}", node.node_id));
+        }
+        if !is_blake3_digest(&node.content_digest) {
+            errors.push(format!("node {} has an invalid content digest", node.node_id));
+        }
+        if node
+            .evidence_receipt_digest
+            .as_deref()
+            .is_some_and(|digest| !is_blake3_digest(digest))
+        {
+            errors.push(format!("node {} has an invalid evidence receipt digest", node.node_id));
+        }
+        let mut seen_dependencies = BTreeSet::new();
+        for dependency in &node.depends_on {
+            if dependency == &node.node_id {
+                errors.push(format!("node {} cannot depend on itself", node.node_id));
+            }
+            if !seen_dependencies.insert(dependency.clone()) {
+                errors.push(format!("node {} has duplicate dependency {dependency}", node.node_id));
+            }
+        }
+    }
+
+    let mut dependents: BTreeMap<String, BTreeSet<String>> = nodes_by_id
+        .keys()
+        .map(|node_id| (node_id.clone(), BTreeSet::new()))
+        .collect();
+    let mut indegree: BTreeMap<String, usize> = nodes_by_id
+        .keys()
+        .map(|node_id| (node_id.clone(), 0))
+        .collect();
+
+    for node in &graph.nodes {
+        for dependency in &node.depends_on {
+            if !nodes_by_id.contains_key(dependency) {
+                errors.push(format!("node {} references missing dependency {dependency}", node.node_id));
+                continue;
+            }
+            dependents
+                .entry(dependency.clone())
+                .or_default()
+                .insert(node.node_id.clone());
+            *indegree.entry(node.node_id.clone()).or_default() += 1;
+        }
+    }
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+
+    // Kahn's algorithm detects cycles without recursion-depth dependence.
+    let mut ready: BTreeSet<String> = indegree
+        .iter()
+        .filter(|(_, degree)| **degree == 0)
+        .map(|(node_id, _)| node_id.clone())
+        .collect();
+    let mut visited = 0usize;
+    while let Some(node_id) = ready.pop_first() {
+        visited += 1;
+        if let Some(children) = dependents.get(&node_id) {
+            for child in children {
+                if let Some(degree) = indegree.get_mut(child) {
+                    *degree -= 1;
+                    if *degree == 0 {
+                        ready.insert(child.clone());
+                    }
+                }
+            }
+        }
+    }
+    if visited != nodes_by_id.len() {
+        return Err(vec!["dependency graph contains a directed cycle".to_owned()]);
+    }
+
+    Ok((canonical_dependency_graph(graph), dependents))
+}
+
+/// Compute the transitive invalidation closure for an explicit set of changed
+/// source nodes. Every downstream dependent is stale. This declared graph is
+/// not an oracle for hidden causal dependencies.
+pub fn compute_invalidation_receipt(
+    graph: &EvidenceDependencyGraph,
+    prior_revision: &str,
+    new_revision: &str,
+    changed_node_ids: &[String],
+) -> Result<InvalidationReceipt, Vec<String>> {
+    let (canonical, dependents) = validate_dependency_graph(graph)?;
+    let mut errors = Vec::new();
+    if prior_revision.trim().is_empty() || new_revision.trim().is_empty() {
+        errors.push("prior and new revisions are required".to_owned());
+    }
+    if prior_revision == new_revision {
+        errors.push("new revision must differ from prior revision".to_owned());
+    }
+
+    let known_nodes: BTreeSet<String> = canonical
+        .nodes
+        .iter()
+        .map(|node| node.node_id.clone())
+        .collect();
+    let changed: BTreeSet<String> = changed_node_ids.iter().cloned().collect();
+    if changed.is_empty() {
+        errors.push("at least one changed node is required".to_owned());
+    }
+    if changed.len() != changed_node_ids.len() {
+        errors.push("changed node IDs must be unique".to_owned());
+    }
+    for node_id in &changed {
+        if !known_nodes.contains(node_id) {
+            errors.push(format!("changed node does not exist: {node_id}"));
+        }
+    }
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+
+    let mut invalidated = changed.clone();
+    let mut frontier = changed.clone();
+    while let Some(node_id) = frontier.pop_first() {
+        if let Some(children) = dependents.get(&node_id) {
+            for child in children {
+                if invalidated.insert(child.clone()) {
+                    frontier.insert(child.clone());
+                }
+            }
+        }
+    }
+
+    let mut invalidated_evidence = Vec::new();
+    let mut preserved_evidence = Vec::new();
+    for node in &canonical.nodes {
+        if let Some(receipt_digest) = &node.evidence_receipt_digest {
+            let reference = EvidenceReceiptReference {
+                node_id: node.node_id.clone(),
+                receipt_digest: receipt_digest.clone(),
+            };
+            if invalidated.contains(&node.node_id) {
+                invalidated_evidence.push(reference);
+            } else {
+                preserved_evidence.push(reference);
+            }
+        }
+    }
+
+    let graph_bytes = serde_json::to_vec(&canonical)
+        .map_err(|error| vec![format!("cannot serialize dependency graph: {error}")])?;
+    let graph_digest = blake3::hash(&graph_bytes).to_hex().to_string();
+    let mut receipt = InvalidationReceipt {
+        graph_id: canonical.graph_id.clone(),
+        prior_revision: prior_revision.to_owned(),
+        new_revision: new_revision.to_owned(),
+        graph_digest,
+        changed_node_ids: changed.into_iter().collect(),
+        invalidated_node_ids: invalidated.into_iter().collect(),
+        invalidated_evidence,
+        preserved_evidence,
+        receipt_digest: String::new(),
+    };
+    let payload = serde_json::to_vec(&(
+        &receipt.graph_id,
+        &receipt.prior_revision,
+        &receipt.new_revision,
+        &receipt.graph_digest,
+        &receipt.changed_node_ids,
+        &receipt.invalidated_node_ids,
+        &receipt.invalidated_evidence,
+        &receipt.preserved_evidence,
+    ))
+    .map_err(|error| vec![format!("cannot serialize invalidation receipt: {error}")])?;
+    receipt.receipt_digest = blake3::hash(&payload).to_hex().to_string();
+    Ok(receipt)
+}
+
+/// Verify that a receipt still describes the current declared graph and change set.
+pub fn verify_invalidation_receipt(
+    graph: &EvidenceDependencyGraph,
+    expected: &InvalidationReceipt,
+    changed_node_ids: &[String],
+) -> Result<(), Vec<String>> {
+    let actual = compute_invalidation_receipt(
+        graph,
+        &expected.prior_revision,
+        &expected.new_revision,
+        changed_node_ids,
+    )?;
+    if actual != *expected {
+        return Err(vec![
+            "invalidation receipt does not match the current graph/change set".to_owned(),
+        ]);
+    }
+    Ok(())
+}
+
 pub fn worst_case_objectives(
     scenarios: &[ScenarioEvaluation],
 ) -> Result<Vec<OracleObjective>, String> {
@@ -1143,6 +1404,171 @@ mod tests {
 
     fn vocabulary() -> CatalogueVocabulary {
         CatalogueVocabulary::from_catalogue_json(&synthetic_catalogue().to_string()).unwrap()
+    }
+
+    fn sample_dependency_graph() -> EvidenceDependencyGraph {
+        let digest = |value: &str| blake3::hash(value.as_bytes()).to_hex().to_string();
+        EvidenceDependencyGraph {
+            graph_id: "SYNTH-HOME-EVIDENCE-GRAPH-001".to_owned(),
+            graph_revision: "REV-A".to_owned(),
+            nodes: vec![
+                EvidenceDependencyNode {
+                    node_id: "resident-brief".to_owned(),
+                    content_digest: digest("brief-a"),
+                    depends_on: vec![],
+                    evidence_receipt_digest: None,
+                },
+                EvidenceDependencyNode {
+                    node_id: "style-intent".to_owned(),
+                    content_digest: digest("style-a"),
+                    depends_on: vec!["resident-brief".to_owned()],
+                    evidence_receipt_digest: Some(digest("style-receipt-a")),
+                },
+                EvidenceDependencyNode {
+                    node_id: "typology-intent".to_owned(),
+                    content_digest: digest("typology-a"),
+                    depends_on: vec!["resident-brief".to_owned()],
+                    evidence_receipt_digest: Some(digest("typology-receipt-a")),
+                },
+                EvidenceDependencyNode {
+                    node_id: "geometry".to_owned(),
+                    content_digest: digest("geometry-a"),
+                    depends_on: vec!["style-intent".to_owned(), "typology-intent".to_owned()],
+                    evidence_receipt_digest: Some(digest("geometry-receipt-a")),
+                },
+                EvidenceDependencyNode {
+                    node_id: "energy-evaluation".to_owned(),
+                    content_digest: digest("energy-a"),
+                    depends_on: vec!["geometry".to_owned()],
+                    evidence_receipt_digest: Some(digest("energy-receipt-a")),
+                },
+                EvidenceDependencyNode {
+                    node_id: "water-policy".to_owned(),
+                    content_digest: digest("water-policy-a"),
+                    depends_on: vec![],
+                    evidence_receipt_digest: Some(digest("water-policy-receipt-a")),
+                },
+                EvidenceDependencyNode {
+                    node_id: "water-evaluation".to_owned(),
+                    content_digest: digest("water-evaluation-a"),
+                    depends_on: vec!["water-policy".to_owned()],
+                    evidence_receipt_digest: Some(digest("water-evaluation-receipt-a")),
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn invalidation_diamond_only_stales_changed_branch_and_descendants() {
+        let graph = sample_dependency_graph();
+        let receipt = compute_invalidation_receipt(
+            &graph,
+            "REV-A",
+            "REV-B",
+            &["style-intent".to_owned()],
+        )
+        .unwrap();
+        assert_eq!(
+            receipt.invalidated_node_ids,
+            vec![
+                "energy-evaluation".to_owned(),
+                "geometry".to_owned(),
+                "style-intent".to_owned(),
+            ]
+        );
+        let invalidated: BTreeSet<_> = receipt
+            .invalidated_evidence
+            .iter()
+            .map(|item| item.node_id.as_str())
+            .collect();
+        assert_eq!(
+            invalidated,
+            BTreeSet::from(["energy-evaluation", "geometry", "style-intent"])
+        );
+        let preserved: BTreeSet<_> = receipt
+            .preserved_evidence
+            .iter()
+            .map(|item| item.node_id.as_str())
+            .collect();
+        assert_eq!(
+            preserved,
+            BTreeSet::from(["typology-intent", "water-evaluation", "water-policy"])
+        );
+        verify_invalidation_receipt(&graph, &receipt, &["style-intent".to_owned()]).unwrap();
+    }
+
+    #[test]
+    fn common_root_change_invalidates_all_declared_descendants() {
+        let graph = sample_dependency_graph();
+        let receipt = compute_invalidation_receipt(
+            &graph,
+            "REV-A",
+            "REV-B",
+            &["resident-brief".to_owned()],
+        )
+        .unwrap();
+        assert_eq!(
+            receipt.invalidated_node_ids,
+            vec![
+                "energy-evaluation".to_owned(),
+                "geometry".to_owned(),
+                "resident-brief".to_owned(),
+                "style-intent".to_owned(),
+                "typology-intent".to_owned(),
+            ]
+        );
+        assert_eq!(
+            receipt
+                .preserved_evidence
+                .iter()
+                .map(|item| item.node_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["water-evaluation", "water-policy"]
+        );
+    }
+
+    #[test]
+    fn invalidation_rejects_cycles_missing_nodes_and_empty_changes() {
+        let mut cycle = sample_dependency_graph();
+        cycle.nodes[0].depends_on = vec!["energy-evaluation".to_owned()];
+        assert!(validate_dependency_graph(&cycle).is_err());
+
+        let mut missing = sample_dependency_graph();
+        missing.nodes[1].depends_on = vec!["missing-node".to_owned()];
+        assert!(validate_dependency_graph(&missing).is_err());
+
+        let graph = sample_dependency_graph();
+        assert!(compute_invalidation_receipt(&graph, "REV-A", "REV-B", &[]).is_err());
+        assert!(
+            compute_invalidation_receipt(
+                &graph,
+                "REV-A",
+                "REV-B",
+                &["not-present".to_owned()]
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn invalidation_receipt_is_order_independent_and_detects_graph_drift() {
+        let graph = sample_dependency_graph();
+        let changed = vec!["typology-intent".to_owned()];
+        let first =
+            compute_invalidation_receipt(&graph, "REV-A", "REV-B", &changed).unwrap();
+
+        let mut reordered = graph.clone();
+        reordered.nodes.reverse();
+        for node in &mut reordered.nodes {
+            node.depends_on.reverse();
+        }
+        let second =
+            compute_invalidation_receipt(&reordered, "REV-A", "REV-B", &changed).unwrap();
+        assert_eq!(first, second);
+
+        let mut drifted = graph;
+        drifted.nodes[1].content_digest = blake3::hash(b"style-b").to_hex().to_string();
+        assert!(verify_invalidation_receipt(&drifted, &first, &changed).is_err());
     }
 
     #[test]
