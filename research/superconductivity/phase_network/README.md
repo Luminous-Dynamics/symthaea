@@ -143,3 +143,19 @@ The auditor reconstructs the unwrapped displacement as
 \]
 
 and checks its norm against the declared edge length. Nonzero image shifts are admitted only on periodic axes. The per-axis twist vector and this unwrapped bond geometry are prerequisites for a later gauge-consistent helicity-modulus calculation. Abstract graphs may omit physical coordinates, box lengths and image shifts; they are not silently treated as embedded materials.
+
+
+## Monte Carlo pilot boundary
+
+The isolated Rust harness now includes a **small, synthetic-only Wolff embedded-cluster Monte Carlo pilot** for the classical, zero-gauge, unfrustrated XY model. It uses physical periodic bond displacements and zero applied twist, and calculates energy per node, finite-size magnetization, an energy lag-one autocorrelation diagnostic and a helicity-modulus tensor from the fluctuation formula.
+
+The pilot explicitly rejects nonzero link gauge phases and nonzero applied twists. This is intentional: frustrated models require a correct gauge-aware update kernel and must not be silently approximated as a ferromagnet.
+
+The 4×4, few-sweep workflow invocation is only a smoke test for execution, determinism and finite-valued output. It is **not**:
+- a BKT estimate;
+- a finite-size scaling study;
+- a statistically converged Monte Carlo measurement;
+- a validation against tensor-network or high-precision literature values;
+- a claim about a real superconductor.
+
+The next scientific solver gate requires a finite-size sequence, multiple independent seeds, equilibration and autocorrelation analysis, uncertainty estimates, and a comparison against the 2D BKT and 3D XY references above. The Monte Carlo implementation must be independently reviewed and benchmarked before any topology comparison is interpreted scientifically.
