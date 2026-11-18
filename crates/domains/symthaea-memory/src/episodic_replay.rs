@@ -742,10 +742,22 @@ impl EpisodicMemory {
         batch_size: usize,
         current_bath: Option<[f32; 9]>,
     ) -> Vec<Episode> {
+        self.sample_replay_batch_conditioned_with_provenance(batch_size, current_bath)
+            .into_iter()
+            .map(|record| record.episode)
+            .collect()
+    }
+
+    /// Sample bath-conditioned replay entries while retaining their source lineage.
+    pub fn sample_replay_batch_conditioned_with_provenance(
+        &mut self,
+        batch_size: usize,
+        current_bath: Option<[f32; 9]>,
+    ) -> Vec<ProvenancedEpisode> {
         // Fall back to standard sampling if no bath state provided
         let current_bath = match current_bath {
             Some(b) => b,
-            None => return self.sample_replay_batch(batch_size),
+            None => return self.sample_replay_batch_with_provenance(batch_size),
         };
 
         let batch_size = batch_size.min(self.episodes.len());
@@ -801,7 +813,7 @@ impl EpisodicMemory {
 
             if !used_indices.contains(&selected_idx) {
                 used_indices.insert(selected_idx);
-                batch.push(all_episodes[selected_idx].episode.clone());
+                batch.push(all_episodes[selected_idx].as_provenanced_episode());
             }
         }
 
@@ -1050,7 +1062,8 @@ impl EpisodicMemory {
                 // Recalculate priority score with updated consolidation
                 pe.score = pe
                     .episode
-                    .priority_score(self.current_cycle, self.config.recency_weight);
+                    .priority_score(self.current_cycle, self.config.recency_weight)
+                    + pe.consolidation_priority_bonus;
             }
         }
         self.episodes.extend(all);
@@ -1073,7 +1086,8 @@ impl EpisodicMemory {
                 (pe.episode.consolidation_strength + boost).min(5.0);
             pe.score = pe
                 .episode
-                .priority_score(self.current_cycle, self.config.recency_weight);
+                .priority_score(self.current_cycle, self.config.recency_weight)
+                + pe.consolidation_priority_bonus;
         }
         self.episodes.extend(all);
     }
@@ -1115,6 +1129,18 @@ impl EpisodicMemory {
         query: &[f32],
         top_k: usize,
     ) -> Vec<(Episode, f32)> {
+        self.retrieve_by_embedding_similarity_with_provenance(query, top_k)
+            .into_iter()
+            .map(|(record, similarity)| (record.episode, similarity))
+            .collect()
+    }
+
+    /// Embedding retrieval with source lineage and consolidation metadata preserved.
+    pub fn retrieve_by_embedding_similarity_with_provenance(
+        &self,
+        query: &[f32],
+        top_k: usize,
+    ) -> Vec<(ProvenancedEpisode, f32)> {
         if query.is_empty() {
             return Vec::new();
         }
@@ -1123,7 +1149,7 @@ impl EpisodicMemory {
             return Vec::new();
         }
 
-        let mut scored: Vec<(Episode, f32)> = self
+        let mut scored: Vec<(ProvenancedEpisode, f32)> = self
             .episodes
             .iter()
             .filter_map(|pe| {
@@ -1137,7 +1163,7 @@ impl EpisodicMemory {
                     return None;
                 }
                 let sim = dot / (emb_norm * query_norm);
-                Some((pe.episode.clone(), sim))
+                Some((pe.as_provenanced_episode(), sim))
             })
             .collect();
 
@@ -1167,6 +1193,18 @@ impl EpisodicMemory {
     /// information plain state carryover didn't (C1's P1 finding).
     /// Read-only — does not affect consolidation/reconsolidation state.
     pub fn retrieve_by_input_similarity(&self, query: &[f32], top_k: usize) -> Vec<(Episode, f32)> {
+        self.retrieve_by_input_similarity_with_provenance(query, top_k)
+            .into_iter()
+            .map(|(record, similarity)| (record.episode, similarity))
+            .collect()
+    }
+
+    /// Input-vector retrieval with source lineage and consolidation metadata preserved.
+    pub fn retrieve_by_input_similarity_with_provenance(
+        &self,
+        query: &[f32],
+        top_k: usize,
+    ) -> Vec<(ProvenancedEpisode, f32)> {
         if query.is_empty() {
             return Vec::new();
         }
@@ -1174,7 +1212,7 @@ impl EpisodicMemory {
         if query_norm < 1e-12 {
             return Vec::new();
         }
-        let mut scored: Vec<(Episode, f32)> = self
+        let mut scored: Vec<(ProvenancedEpisode, f32)> = self
             .episodes
             .iter()
             .filter_map(|pe| {
@@ -1187,7 +1225,7 @@ impl EpisodicMemory {
                 if input_norm < 1e-12 {
                     return None;
                 }
-                Some((pe.episode.clone(), dot / (input_norm * query_norm)))
+                Some((pe.as_provenanced_episode(), dot / (input_norm * query_norm)))
             })
             .collect();
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
