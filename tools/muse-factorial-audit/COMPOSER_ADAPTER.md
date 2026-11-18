@@ -11,11 +11,11 @@ production API and does not modify the composition engine's behavior.
 
 Generate the exact case manifest:
 
-    cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin emit-cases -- discovery > discovery.csv
+    cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin emit-cases -- discovery > /tmp/muse-discovery-cases.csv
 
 Run the composer adapter from the repository root:
 
-    cargo run --manifest-path crates/domains/symthaea-music-theory/Cargo.toml --example muse_factorial_adapter -- discovery discovery.csv observations.csv "$(git rev-parse HEAD)"
+    cargo run --manifest-path crates/domains/symthaea-music-theory/Cargo.toml --example muse_factorial_adapter -- discovery /tmp/muse-discovery-cases.csv /tmp/muse-observations.csv "$(git rev-parse HEAD)"
 
 The cohort selector is discovery, confirmation, or both. The adapter validates
 the manifest against the exact frozen style, seed, and 3^4 cell set before
@@ -27,7 +27,7 @@ they do not contaminate the next run.
 
 Analyze the resulting observations. The metric registry must be explicit:
 
-    cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin analyze-results -- discovery observations.csv score_note_count,score_total_beats,score_total_seconds,score_tempo_bpm,score_notes_per_beat,score_mean_pitch_midi,score_pitch_span_semitones,score_pitch_stddev_midi,score_mean_velocity,score_velocity_stddev,score_mean_section_intensity,score_mean_note_duration_beats,score_assigned_part_fraction,score_universal_fatal_count,score_style_fatal_count,score_warning_count,score_universal_valid,score_full_validation_valid coverage.csv effects.csv summary.csv
+    cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin analyze-results -- discovery /tmp/muse-observations.csv score_note_count,score_total_beats,score_total_seconds,score_tempo_bpm,score_notes_per_beat,score_mean_pitch_midi,score_pitch_span_semitones,score_pitch_stddev_midi,score_mean_velocity,score_velocity_stddev,score_mean_section_intensity,score_mean_note_duration_beats,score_assigned_part_fraction,score_universal_fatal_count,score_style_fatal_count,score_warning_count,score_universal_valid,score_full_validation_valid coverage.csv effects.csv summary.csv
 
 The root Cargo workspace currently needs the separate unmanifested-member
 exclusion repair before this example can be compiled through Cargo. Do not
