@@ -112,6 +112,13 @@ pub struct VerifiedOutcome {
     pub outcome_digest: String,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SourceLifecycleStatus {
+    Active,
+    Retracted,
+    Superseded { successor_event_id: u32 },
+}
+
 /// Production implementations must verify issuer, signatures, scope,
 /// content digests, valid/transaction time, revocation and calibration range.
 pub trait EvidenceVerifier {
@@ -157,8 +164,12 @@ pub trait EvidenceVerifier {
         known_at_ms: i64,
     ) -> Option<VerifiedOutcome>;
 
-    /// None means retraction state could not be verified and must fail closed.
-    fn is_retracted_as_of(&self, event_id: u32, known_at_ms: i64) -> Option<bool>;
+    /// None means lifecycle state could not be verified and must fail closed.
+    fn lifecycle_status_as_of(
+        &self,
+        event_id: u32,
+        known_at_ms: i64,
+    ) -> Option<SourceLifecycleStatus>;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -199,6 +210,7 @@ pub enum IngestReject {
     RawEventReceiptMismatch,
     AuthorityNotAttested,
     RetractionStatusUnknown,
+    SupersededAsKnown(u32),
     NotValidAtRequestedTime,
     RecordedAfterKnownAt,
     OutcomeNotKnownAtRequestedTime,
@@ -276,11 +288,17 @@ pub fn ingest_as_known(
     if dispatch >= raw.outcome_observed_at_ms {
         return Err(IngestReject::DispatchNotBeforeOutcome);
     }
-    let retracted = verifier
-        .is_retracted_as_of(raw.event_id, query.known_at_ms)
-        .ok_or(IngestReject::RetractionStatusUnknown)?;
-    if retracted {
-        return Err(IngestReject::RetractedAsKnown);
+    match verifier
+        .lifecycle_status_as_of(raw.event_id, query.known_at_ms)
+        .ok_or(IngestReject::RetractionStatusUnknown)?
+    {
+        SourceLifecycleStatus::Active => {}
+        SourceLifecycleStatus::Retracted => {
+            return Err(IngestReject::RetractedAsKnown);
+        }
+        SourceLifecycleStatus::Superseded { successor_event_id } => {
+            return Err(IngestReject::SupersededAsKnown(successor_event_id));
+        }
     }
     if !raw.observed_utility.is_finite() || !(0.0..=1.0).contains(&raw.observed_utility) {
         return Err(IngestReject::InvalidUtility);
@@ -462,6 +480,8 @@ mod tests {
         intervention: bool,
         delayed_complete: bool,
         retracted_at_ms: Option<i64>,
+        superseded_at_ms: Option<i64>,
+        successor_event_id: u32,
         lineage_valid: bool,
         calibration_valid: bool,
         raw_event_valid: bool,
@@ -480,6 +500,8 @@ mod tests {
                 intervention: true,
                 delayed_complete: true,
                 retracted_at_ms: None,
+                superseded_at_ms: None,
+                successor_event_id: 43,
                 lineage_valid: true,
                 calibration_valid: true,
                 raw_event_valid: true,
@@ -588,15 +610,23 @@ mod tests {
             })
         }
 
-        fn is_retracted_as_of(
+        fn lifecycle_status_as_of(
             &self,
             _event_id: u32,
             known_at_ms: i64,
-        ) -> Option<bool> {
-            self.retraction_status_known.then(|| {
-                self.retracted_at_ms
-                    .is_some_and(|at| at <= known_at_ms)
-            })
+        ) -> Option<SourceLifecycleStatus> {
+            if !self.retraction_status_known {
+                return None;
+            }
+            if self.retracted_at_ms.is_some_and(|at| at <= known_at_ms) {
+                return Some(SourceLifecycleStatus::Retracted);
+            }
+            if self.superseded_at_ms.is_some_and(|at| at <= known_at_ms) {
+                return Some(SourceLifecycleStatus::Superseded {
+                    successor_event_id: self.successor_event_id,
+                });
+            }
+            Some(SourceLifecycleStatus::Active)
         }
     }
 
@@ -683,6 +713,20 @@ mod tests {
         assert!(matches!(
             ingest_as_known(&malformed, query(180, 250), &TestVerifier::default()),
             Err(IngestReject::InvalidPayloadDigest)
+        ));
+    }
+
+    #[test]
+    fn later_supersession_preserves_earlier_as_known_state() {
+        let verifier = TestVerifier {
+            superseded_at_ms: Some(260),
+            successor_event_id: 99,
+            ..TestVerifier::default()
+        };
+        assert!(ingest_as_known(&raw(), query(180, 250), &verifier).is_ok());
+        assert!(matches!(
+            ingest_as_known(&raw(), query(180, 270), &verifier),
+            Err(IngestReject::SupersededAsKnown(99))
         ));
     }
 
