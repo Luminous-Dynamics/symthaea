@@ -152,7 +152,7 @@ A different source-family string is not proof of independence. The production ga
 ## 7. Immediate next tranche
 
 1. Implement a production Mycelix verifier for canonical event bytes, signed authority receipt chain, source lineage, calibration, outcome reconciliation and lifecycle receipts (#12771, #9075, #297).
-2. Wire `ConsolidationEvidencePackV1` into the separately governed consolidation policy (#9139 / #12731), retaining source ancestry and reversible state transitions.
+2. Wire `ActionConsolidationEvidenceSummaryV1` into the separately governed consolidation policy (#9139 / #12731), retaining source ancestry and reversible state transitions. Require per-action root/family support rather than pooled global episode counts.
 3. Run one end-to-end raw Session-A → consolidation → Session-B decision → Session-C correction pipeline using unchanged event and receipt identities (#9516).
 4. Move hidden labels and evaluator ownership to independent custody (#11816), and add source-/seed-/mechanism-held-out worlds.
 5. Replace the fixed deterministic interval margin with calibrated uncertainty and preregistered statistical equivalence; retain the deterministic check as an inexpensive negative control.
@@ -187,7 +187,7 @@ For Symthaea, these are useful architectural patterns, not systems to copy whole
 - treat model-generated memory and tool responses as untrusted until verified;
 - rerun behavioral qualification on provider/model/SDK upgrades.
 
-TimlMemBench's raw-native track exposes a remaining gap: the ingress crate now tests receipt-gated single-interaction envelopes, but the MACE evaluator still receives structured `Experience` objects and does not yet ingest full raw multi-turn sessions or execute the consolidation decision. A future adapter must preserve the full ingest → consolidate → act → correct chain.
+TimlMemBench's raw-native track exposes a remaining gap: the ingress crate now tests receipt-gated interaction envelopes and receipt-preserving pack projection, but the governed consolidation policy in #12731 still does not consume the action-scoped summaries. The next seam is a reviewed consumer adapter and a single full raw-session → governed consolidation → Session-B decision → Session-C correction evaluator. A future adapter must preserve the full ingest → consolidate → act → correct chain.
 
 The Agent Memory Challenge Cycle 2 official page, checked on November 18, 2026, says results are **expected November 19, 2026**. The October 31 submission deadline and November 4 evaluation close have passed; Cycle 2 is not open for new submissions. Its Add/Search → platform Answer/Eval contract is a target for a future MACE/Mycelix adapter. Do not claim a Cycle 2 rank before official publication.
 

@@ -508,6 +508,28 @@ pub struct ConsolidationEvidenceRefV1 {
 }
 
 impl ConsolidationEvidenceRefV1 {
+    /// Candidate-visible projection reconstructed from the receipt-preserving
+    /// evidence reference. This does not restore trust by caller assertion:
+    /// every field originates in the previously admitted receipt bundle.
+    pub fn experience(&self) -> Experience {
+        Experience {
+            event_id: self.event_id,
+            source_family: self.source_family,
+            source_root_id: self.source_root_id,
+            scope: self.scope,
+            action: self.action,
+            observed_utility: self.observed_utility,
+            measurement_error_bound: self.measurement_error_bound,
+            intervention: self.intervention,
+            prediction_pre_registered: self.prediction_pre_registered,
+            outcome_reconciled: self.outcome_reconciled,
+            source_trusted: self.source_trust_status == SourceTrustStatus::TrustedForScope,
+            source_retracted: false,
+            confounders_controlled: self.confounders_controlled,
+            delayed_horizon_complete: self.delayed_horizon_complete,
+        }
+    }
+
     pub fn event_id(&self) -> u32 {
         self.event_id
     }
@@ -646,6 +668,90 @@ impl ConsolidationEvidencePackV1 {
         self.as_known
     }
 
+    /// Summarize one candidate action in one exact scope. Independent
+    /// support is calculated only over fully qualified successful events and
+    /// uses distinct verified source families AND upstream roots.
+    pub fn summarize_action_for_scope(
+        &self,
+        target_scope: Scope,
+        action: Action,
+    ) -> ActionConsolidationEvidenceSummaryV1 {
+        let action_events: Vec<&ConsolidationEvidenceRefV1> = self
+            .events
+            .iter()
+            .filter(|event| event.action == action)
+            .collect();
+        let scoped: Vec<&ConsolidationEvidenceRefV1> = action_events
+            .iter()
+            .copied()
+            .filter(|event| event.scope == target_scope)
+            .collect();
+        let trusted: Vec<&ConsolidationEvidenceRefV1> = scoped
+            .iter()
+            .copied()
+            .filter(|event| {
+                event.source_trust_status == SourceTrustStatus::TrustedForScope
+            })
+            .collect();
+        let successful: Vec<&ConsolidationEvidenceRefV1> = trusted
+            .iter()
+            .copied()
+            .filter(|event| {
+                event.outcome_success
+                    && event.intervention
+                    && event.prediction_pre_registered
+                    && event.outcome_reconciled
+                    && event.confounders_controlled
+                    && event.delayed_horizon_complete
+            })
+            .collect();
+
+        let trusted_families: BTreeSet<u16> =
+            trusted.iter().map(|event| event.source_family).collect();
+        let trusted_roots: BTreeSet<u32> =
+            trusted.iter().map(|event| event.source_root_id).collect();
+        let successful_families: BTreeSet<u16> =
+            successful.iter().map(|event| event.source_family).collect();
+        let successful_roots: BTreeSet<u32> =
+            successful.iter().map(|event| event.source_root_id).collect();
+        let max_success_measurement_error_bound = successful
+            .iter()
+            .map(|event| event.measurement_error_bound)
+            .reduce(f64::max);
+        let all_trusted_predictions_pre_registered = !trusted.is_empty()
+            && trusted.iter().all(|event| event.prediction_pre_registered);
+
+        ActionConsolidationEvidenceSummaryV1 {
+            as_known: self.as_known,
+            target_scope,
+            action,
+            action_episode_count: action_events.len(),
+            target_scope_event_count: scoped.len(),
+            trusted_event_count: trusted.len(),
+            trusted_source_family_count: trusted_families.len(),
+            trusted_source_root_count: trusted_roots.len(),
+            qualified_success_event_count: successful.len(),
+            qualified_success_source_family_count: successful_families.len(),
+            qualified_success_source_root_count: successful_roots.len(),
+            untrusted_event_count: scoped
+                .iter()
+                .filter(|event| event.source_trust_status == SourceTrustStatus::Untrusted)
+                .count(),
+            unknown_trust_event_count: scoped
+                .iter()
+                .filter(|event| event.source_trust_status == SourceTrustStatus::Unknown)
+                .count(),
+            qualified_success_event_ids: successful
+                .iter()
+                .map(|event| event.event_id)
+                .collect(),
+            max_qualified_success_measurement_error_bound,
+            scope_matches: !action_events.is_empty()
+                && scoped.len() == action_events.len(),
+            all_trusted_predictions_pre_registered,
+        }
+    }
+
     pub fn events(&self) -> &[ConsolidationEvidenceRefV1] {
         &self.events
     }
@@ -670,6 +776,30 @@ impl ConsolidationEvidencePackV1 {
     pub fn unknown_trust_event_count(&self) -> usize {
         self.unknown_trust_event_count
     }
+}
+
+/// Decision-neutral support for one action in one scope. Counts are
+/// derived from verified ingress records; no retain/promote decision is made.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ActionConsolidationEvidenceSummaryV1 {
+    pub as_known: AsKnownQuery,
+    pub target_scope: Scope,
+    pub action: Action,
+    pub action_episode_count: usize,
+    pub target_scope_event_count: usize,
+    pub trusted_event_count: usize,
+    pub trusted_source_family_count: usize,
+    pub trusted_source_root_count: usize,
+    pub qualified_success_event_count: usize,
+    pub qualified_success_source_family_count: usize,
+    pub qualified_success_source_root_count: usize,
+    pub untrusted_event_count: usize,
+    pub unknown_trust_event_count: usize,
+    pub qualified_success_event_ids: Vec<u32>,
+    /// Worst verified absolute error bound among qualified successful events.
+    pub max_qualified_success_measurement_error_bound: Option<f64>,
+    pub scope_matches: bool,
+    pub all_trusted_predictions_pre_registered: bool,
 }
 
 /// Decision-neutral summary of a verified evidence pack. It carries no
@@ -865,6 +995,7 @@ mod tests {
         authority_status: AuthorityStatus,
         retraction_status_known: bool,
         vary_lineage_by_event: bool,
+        vary_family_by_event: bool,
         trust_status: SourceTrustStatus,
         untrusted_event_id: Option<u32>,
         unknown_trust_event_id: Option<u32>,
@@ -894,6 +1025,7 @@ mod tests {
                 authority_status: AuthorityStatus::ReceiptAttested,
                 retraction_status_known: true,
                 vary_lineage_by_event: false,
+                vary_family_by_event: false,
                 trust_status: SourceTrustStatus::TrustedForScope,
                 untrusted_event_id: None,
                 unknown_trust_event_id: None,
@@ -946,7 +1078,7 @@ mod tests {
             _known_at_ms: i64,
         ) -> Option<VerifiedLineage> {
             self.lineage_valid.then(|| VerifiedLineage {
-                source_family: if self.vary_lineage_by_event {
+                source_family: if self.vary_lineage_by_event || self.vary_family_by_event {
                     u16::try_from(event_id).unwrap_or(self.family_id)
                 } else {
                     self.family_id
@@ -1355,10 +1487,19 @@ mod tests {
         assert_eq!(pack.trusted_event_count(), 4);
         assert_eq!(pack.source_root_count(), 4);
 
-        let memory_b: Vec<Experience> = batch_a
-            .admitted()
+        let action_a_support =
+            pack.summarize_action_for_scope(scope(), Action::A);
+        let action_b_support =
+            pack.summarize_action_for_scope(scope(), Action::B);
+        assert_eq!(action_a_support.qualified_success_source_root_count, 2);
+        assert_eq!(action_b_support.qualified_success_source_root_count, 2);
+        assert_eq!(action_a_support.qualified_success_event_ids, vec![100, 101]);
+        assert_eq!(action_b_support.qualified_success_event_ids, vec![102, 103]);
+
+        let memory_b: Vec<Experience> = pack
+            .events()
             .iter()
-            .map(|item| *item.experience())
+            .map(ConsolidationEvidenceRefV1::experience)
             .collect();
         let query_b = Query { scope: scope() };
         let decision_b = decide(Policy::CausalQualified, &memory_b, query_b);
@@ -1376,10 +1517,15 @@ mod tests {
             &session_c_verifier,
         )
         .expect("non-retracted Session A records remain eligible");
-        let memory_c: Vec<Experience> = batch_c
-            .admitted()
+        let pack_c = build_consolidation_evidence_pack(
+            &batch_c,
+            &[101, 102, 103],
+        )
+        .expect("Session C pack should contain only the still-active events");
+        let memory_c: Vec<Experience> = pack_c
+            .events()
             .iter()
-            .map(|item| *item.experience())
+            .map(ConsolidationEvidenceRefV1::experience)
             .collect();
 
         assert!(!memory_c.iter().any(|item| item.event_id == 100));
@@ -1390,6 +1536,116 @@ mod tests {
         assert!(decide(Policy::ActiveProbe, &memory_c, query_b)
             .probe
             .is_some());
+    }
+
+    #[test]
+    fn action_scoped_summary_never_pools_support_across_actions() {
+        let mut raw_events = Vec::new();
+        for (event_id, action) in [
+            (50, Action::A),
+            (51, Action::A),
+            (52, Action::B),
+        ] {
+            let mut event = raw();
+            event.event_id = event_id;
+            event.session_id = "session-a".into();
+            event.task_id = format!("task-{event_id}");
+            event.payload_sha256 = format!("{event_id:064x}");
+            event.raw_event_receipt_id = format!("raw-{event_id}");
+            event.lineage_receipt_id = format!("lineage-{event_id}");
+            event.calibration_receipt_id = format!("calibration-{event_id}");
+            event.causal_assessment_receipt_id = format!("causal-{event_id}");
+            event.outcome_receipt_id = format!("outcome-{event_id}");
+            event.action = action;
+            raw_events.push(event);
+        }
+        let batch = ingest_batch_as_known(
+            &raw_events,
+            query(180, 250),
+            &varied_lineage_verifier(),
+        )
+        .expect("all raw events have independently attested fixture lineage");
+        let pack = build_consolidation_evidence_pack(&batch, &[50, 51, 52])
+            .expect("evidence pack should preserve all source receipts");
+
+        let a = pack.summarize_action_for_scope(scope(), Action::A);
+        let b = pack.summarize_action_for_scope(scope(), Action::B);
+        assert_eq!(pack.source_root_count(), 3);
+        assert_eq!(a.qualified_success_source_root_count, 2);
+        assert_eq!(a.qualified_success_source_family_count, 2);
+        assert_eq!(a.qualified_success_event_count, 2);
+        assert_eq!(b.qualified_success_source_root_count, 1);
+        assert_eq!(b.qualified_success_event_count, 1);
+        assert_eq!(b.qualified_success_event_ids, vec![52]);
+    }
+
+    #[test]
+    fn multiple_family_labels_from_one_root_count_as_one_success_root() {
+        let mut first = raw();
+        first.event_id = 60;
+        first.payload_sha256 = format!("{:064x}", 60);
+        first.raw_event_receipt_id = "raw-60".into();
+        first.lineage_receipt_id = "lineage-60".into();
+        first.calibration_receipt_id = "calibration-60".into();
+        first.causal_assessment_receipt_id = "causal-60".into();
+        first.outcome_receipt_id = "outcome-60".into();
+
+        let mut second = first.clone();
+        second.event_id = 61;
+        second.payload_sha256 = format!("{:064x}", 61);
+        second.raw_event_receipt_id = "raw-61".into();
+        second.lineage_receipt_id = "lineage-61".into();
+        second.calibration_receipt_id = "calibration-61".into();
+        second.causal_assessment_receipt_id = "causal-61".into();
+        second.outcome_receipt_id = "outcome-61".into();
+
+        let verifier = TestVerifier {
+            vary_family_by_event: true,
+            ..TestVerifier::default()
+        };
+        let batch = ingest_batch_as_known(
+            &[first, second],
+            query(180, 250),
+            &verifier,
+        )
+        .expect("same upstream source root can have multiple publisher labels");
+        let pack = build_consolidation_evidence_pack(&batch, &[60, 61])
+            .expect("pack should retain both independently identified events");
+        let summary = pack.summarize_action_for_scope(scope(), Action::A);
+
+        assert_eq!(summary.qualified_success_event_count, 2);
+        assert_eq!(summary.qualified_success_source_family_count, 2);
+        assert_eq!(summary.qualified_success_source_root_count, 1);
+        assert_eq!(summary.max_qualified_success_measurement_error_bound, Some(0.02));
+    }
+
+    #[test]
+    fn action_summary_isolated_from_other_objectives() {
+        let mut event = raw();
+        event.event_id = 70;
+        event.payload_sha256 = format!("{:064x}", 70);
+        event.raw_event_receipt_id = "raw-70".into();
+        event.lineage_receipt_id = "lineage-70".into();
+        event.calibration_receipt_id = "calibration-70".into();
+        event.causal_assessment_receipt_id = "causal-70".into();
+        event.outcome_receipt_id = "outcome-70".into();
+        event.scope.objective = Objective::Cost;
+
+        let batch = ingest_batch_as_known(
+            &[event],
+            query(180, 250),
+            &TestVerifier::default(),
+        )
+        .expect("valid event may be admitted in its own scope");
+        let pack = build_consolidation_evidence_pack(&batch, &[70])
+            .expect("valid receipt pack should be built");
+        let summary = pack.summarize_action_for_scope(scope(), Action::A);
+
+        assert_eq!(summary.action_episode_count, 1);
+        assert_eq!(summary.target_scope_event_count, 0);
+        assert!(!summary.scope_matches);
+        assert_eq!(summary.qualified_success_event_count, 0);
+        assert_eq!(summary.qualified_success_source_root_count, 0);
     }
 
     #[test]
