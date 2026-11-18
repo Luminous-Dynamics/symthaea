@@ -385,7 +385,7 @@ impl Instance {
             .ok_or_else(|| "empty plan should always be feasible".to_owned())?;
         for mask in 1..subset_count {
             let indices: Vec<usize> = (0..self.actions.len())
-                .filter(|index| (mask & (1_u64 << index)) != 0)
+                .filter(|index| (mask & (1_u64 << *index)) != 0)
                 .collect();
             let Some(candidate) = self.plan_from_indices(&indices)? else {
                 continue;
@@ -660,6 +660,7 @@ mod tests {
     fn exact_oracle_selects_capability_then_measurement_and_amplitude() {
         let (schema, fixture) = inputs();
         let receipt = audit_and_plan(&schema, &fixture).unwrap();
+        assert_eq!(receipt["exact_oracle"]["enumerated_subsets"], 128);
         let oracle = &receipt["exact_oracle"]["plan"];
         assert_eq!(oracle["cost_units"], 5);
         assert!(
