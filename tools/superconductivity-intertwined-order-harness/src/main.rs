@@ -1355,6 +1355,35 @@ mod tests {
     }
 
     #[test]
+    fn wrong_common_gauge_link_sign_fails_negative_control() {
+        let (schema, fixture) = inputs();
+        let model = IntertwinedModel::from_bytes(&schema, &fixture).unwrap();
+        let fields = model.initial_fields();
+        let links = model.initial_link_phases();
+        let angles: Vec<f64> = (0..model.sites.len())
+            .map(|index| 0.2 + 0.29 * index as f64)
+            .collect();
+        let transformed_fields: Vec<Vec<Complex>> = fields
+            .iter()
+            .zip(&angles)
+            .map(|(site_fields, angle)| {
+                site_fields.iter().map(|field| field.rotate(*angle)).collect()
+            })
+            .collect();
+        let wrong_links: Vec<f64> = model
+            .edges
+            .iter()
+            .zip(&links)
+            .map(|(edge, phase)| {
+                phase - angles[edge.source] + angles[edge.target]
+            })
+            .collect();
+        let before = model.energy_for(&fields, &links).unwrap();
+        let after = model.energy_for(&transformed_fields, &wrong_links).unwrap();
+        assert!((before.total - after.total).abs() > 1.0e-5);
+    }
+
+    #[test]
     fn independent_component_phase_rotation_is_not_a_gauge_symmetry() {
         let (schema, fixture) = inputs();
         let model = IntertwinedModel::from_bytes(&schema, &fixture).unwrap();
