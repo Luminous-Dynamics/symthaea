@@ -943,6 +943,175 @@ pub fn summarize_alarm_evaluations(
     })
 }
 
+/// Versioned machine-readable result receipt for one fixed-policy TokaMark
+/// event-evaluation cohort. Content digests are integrity identifiers, not
+/// signatures or proof that the referenced dataset/model/calibration is authentic.
+pub const PLASMA_EVENT_EVALUATION_RECEIPT_SCHEMA: &str =
+    "luminous.plasma-event-evaluation-receipt.v0.1";
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlasmaEventEvaluationReceiptBody {
+    pub schema_version: String,
+    pub benchmark_id: String,
+    pub repository_commit: String,
+    pub dataset_revision: String,
+    pub shot_split_sha256: String,
+    pub preprocessing_sha256: String,
+    pub model_id: String,
+    pub model_revision: String,
+    pub model_artifact_sha256: String,
+    pub seed: u64,
+    pub hardware: String,
+    pub policy: AlarmPolicyConfig,
+    pub shot_evaluations: Vec<ShotAlarmEvaluation>,
+    pub summary: AlarmEvaluationSummary,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlasmaEventEvaluationReceipt {
+    pub body: PlasmaEventEvaluationReceiptBody,
+    pub receipt_sha256: String,
+}
+
+fn valid_git_object_id(value: &str) -> bool {
+    (value.len() == 40 || value.len() == 64)
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+impl PlasmaEventEvaluationReceiptBody {
+    fn validate_metadata(&self) -> Result<(), PlasmaEventEvalError> {
+        if self.schema_version != PLASMA_EVENT_EVALUATION_RECEIPT_SCHEMA
+            || self.benchmark_id != "PLASMA-EVENT-EVAL-001"
+        {
+            return Err(PlasmaEventEvalError::new(
+                "unsupported plasma event evaluation receipt identity",
+            ));
+        }
+        if !valid_git_object_id(&self.repository_commit) {
+            return Err(PlasmaEventEvalError::new(
+                "repository_commit must be a lowercase 40- or 64-character Git object ID",
+            ));
+        }
+        if self.dataset_revision.trim().is_empty()
+            || self.model_id.trim().is_empty()
+            || self.model_revision.trim().is_empty()
+            || self.hardware.trim().is_empty()
+        {
+            return Err(PlasmaEventEvalError::new(
+                "dataset revision, model identity and hardware metadata must be non-empty",
+            ));
+        }
+        for (digest, field) in [
+            (self.shot_split_sha256.as_str(), "shot_split_sha256"),
+            (self.preprocessing_sha256.as_str(), "preprocessing_sha256"),
+            (self.model_artifact_sha256.as_str(), "model_artifact_sha256"),
+        ] {
+            if !valid_sha256(digest) {
+                return Err(PlasmaEventEvalError::new(format!(
+                    "{field} must be 64 lowercase hexadecimal characters",
+                )));
+            }
+        }
+        self.policy.validate()?;
+        Ok(())
+    }
+
+    fn verify_evaluations(&self) -> Result<(), PlasmaEventEvalError> {
+        self.validate_metadata()?;
+        for evaluation in &self.shot_evaluations {
+            let recomputed = score_shot_alarms(
+                &evaluation.shot_id,
+                evaluation.outcome,
+                &evaluation.alarm_times_ns,
+                &self.policy,
+            )?;
+            if recomputed != *evaluation {
+                return Err(PlasmaEventEvalError::new(format!(
+                    "shot evaluation {} does not match its stored outcome and alarm timestamps",
+                    evaluation.shot_id
+                )));
+            }
+        }
+        let recomputed_summary = summarize_alarm_evaluations(&self.shot_evaluations)?;
+        if recomputed_summary != self.summary {
+            return Err(PlasmaEventEvalError::new(
+                "receipt cohort summary does not match its per-shot evaluations",
+            ));
+        }
+        Ok(())
+    }
+
+    fn content_sha256(&self) -> Result<String, PlasmaEventEvalError> {
+        let bytes = serde_json::to_vec(self).map_err(|error| {
+            PlasmaEventEvalError::new(format!(
+                "evaluation receipt serialization failed: {error}"
+            ))
+        })?;
+        Ok(sha256_hex(&bytes))
+    }
+}
+
+impl PlasmaEventEvaluationReceipt {
+    /// Builds a receipt from fixed-policy post-hoc shot evaluations. The
+    /// receipt recomputes all per-shot metrics and the cohort summary before
+    /// it is emitted.
+    #[allow(clippy::too_many_arguments)]
+    pub fn build(
+        repository_commit: String,
+        dataset_revision: String,
+        shot_split_sha256: String,
+        preprocessing_sha256: String,
+        model_id: String,
+        model_revision: String,
+        model_artifact_sha256: String,
+        seed: u64,
+        hardware: String,
+        policy: AlarmPolicyConfig,
+        shot_evaluations: Vec<ShotAlarmEvaluation>,
+    ) -> Result<Self, PlasmaEventEvalError> {
+        let summary = summarize_alarm_evaluations(&shot_evaluations)?;
+        let body = PlasmaEventEvaluationReceiptBody {
+            schema_version: PLASMA_EVENT_EVALUATION_RECEIPT_SCHEMA.to_owned(),
+            benchmark_id: "PLASMA-EVENT-EVAL-001".to_owned(),
+            repository_commit,
+            dataset_revision,
+            shot_split_sha256,
+            preprocessing_sha256,
+            model_id,
+            model_revision,
+            model_artifact_sha256,
+            seed,
+            hardware,
+            policy,
+            shot_evaluations,
+            summary,
+        };
+        body.verify_evaluations()?;
+        let receipt_sha256 = body.content_sha256()?;
+        Ok(Self {
+            body,
+            receipt_sha256,
+        })
+    }
+
+    /// Recomputes all per-shot outcomes, the cohort summary and the outer
+    /// content digest. A successful check does not authenticate external
+    /// dataset/model/validation artifacts.
+    pub fn verify(&self) -> Result<(), PlasmaEventEvalError> {
+        self.body.verify_evaluations()?;
+        if self.receipt_sha256 != self.body.content_sha256()? {
+            return Err(PlasmaEventEvalError::new(
+                "plasma event evaluation receipt digest mismatch",
+            ));
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1135,6 +1304,109 @@ mod tests {
             manifest["target_gates"]["all_values_are_research_targets"],
             true
         );
+    }
+
+    #[test]
+    fn evaluation_receipt_roundtrips_and_recomputes_its_cohort() {
+        let positive = score_shot_alarms(
+            "positive",
+            ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
+            &[20],
+            &config(),
+        )
+        .expect("positive");
+        let negative = score_shot_alarms(
+            "negative",
+            ShotReferenceOutcome::NonDisruptive {
+                observation_end_ns: 3_600_000_000_000,
+            },
+            &[10, 20],
+            &config(),
+        )
+        .expect("negative");
+        let receipt = PlasmaEventEvaluationReceipt::build(
+            "f".repeat(40),
+            "UKAEA-IBM-STFC/tokamark-v1@frozen-revision".to_owned(),
+            "a".repeat(64),
+            "b".repeat(64),
+            "symthaea-plasma-risk".to_owned(),
+            "model-rev-1".to_owned(),
+            "c".repeat(64),
+            42,
+            "cpu-x86_64-rust-1.96".to_owned(),
+            config(),
+            vec![positive, negative],
+        )
+        .expect("receipt should build");
+        receipt.verify().expect("receipt should verify");
+
+        let encoded = serde_json::to_string(&receipt).expect("receipt serialization");
+        let decoded: PlasmaEventEvaluationReceipt =
+            serde_json::from_str(&encoded).expect("receipt deserialization");
+        decoded.verify().expect("round-tripped receipt should verify");
+        assert_eq!(
+            decoded.body.summary.false_alarms_per_non_disruptive_hour,
+            Some(2.0)
+        );
+    }
+
+    #[test]
+    fn evaluation_receipt_detects_tampered_alarm_trace_even_after_digest_reseal() {
+        let negative = score_shot_alarms(
+            "negative",
+            ShotReferenceOutcome::NonDisruptive {
+                observation_end_ns: 100,
+            },
+            &[10],
+            &config(),
+        )
+        .expect("negative");
+        let mut receipt = PlasmaEventEvaluationReceipt::build(
+            "f".repeat(40),
+            "tokamark-v1@frozen-revision".to_owned(),
+            "a".repeat(64),
+            "b".repeat(64),
+            "symthaea-plasma-risk".to_owned(),
+            "model-rev-1".to_owned(),
+            "c".repeat(64),
+            42,
+            "cpu-x86_64-rust-1.96".to_owned(),
+            config(),
+            vec![negative],
+        )
+        .expect("receipt should build");
+        receipt.body.shot_evaluations[0].alarm_times_ns.push(20);
+        receipt.receipt_sha256 = receipt
+            .body
+            .content_sha256()
+            .expect("re-seal tampered content");
+        assert!(receipt.verify().is_err());
+    }
+
+    #[test]
+    fn evaluation_receipt_rejects_invalid_reproducibility_metadata() {
+        let negative = score_shot_alarms(
+            "negative",
+            ShotReferenceOutcome::NonDisruptive {
+                observation_end_ns: 100,
+            },
+            &[],
+            &config(),
+        )
+        .expect("negative");
+        assert!(PlasmaEventEvaluationReceipt::build(
+            "not-a-git-commit".to_owned(),
+            "tokamark-v1@frozen-revision".to_owned(),
+            "a".repeat(64),
+            "b".repeat(64),
+            "symthaea-plasma-risk".to_owned(),
+            "model-rev-1".to_owned(),
+            "c".repeat(64),
+            42,
+            "cpu-x86_64-rust-1.96".to_owned(),
+            config(),
+            vec![negative],
+        ).is_err());
     }
 
     #[test]
