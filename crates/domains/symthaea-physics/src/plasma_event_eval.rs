@@ -1573,6 +1573,28 @@ mod tests {
             true
         );
         assert_eq!(
+            manifest["evaluation_receipt_contract"]["verify_recomputes_warning_window_matches"],
+            true
+        );
+        assert_eq!(
+            manifest["evaluation_receipt_contract"]["verify_recomputes_alarm_episode_partitions"],
+            true
+        );
+        assert!(
+            manifest["evaluation_receipt_contract"]["contains"]
+                .as_array()
+                .expect("receipt fields")
+                .iter()
+                .any(|field| field == "maximum_warning_horizon_ns")
+        );
+        assert!(
+            manifest["evaluation_receipt_contract"]["contains"]
+                .as_array()
+                .expect("receipt fields")
+                .iter()
+                .any(|field| field == "false_alarm_events_on_disruptive_shots")
+        );
+        assert_eq!(
             manifest["evaluation_receipt_contract"]["outer_sha256_is_content_identity_not_authentication"],
             true
         );
