@@ -142,3 +142,12 @@ The dependency-free standard_methods module keeps method-specific channels separ
 - ETL maximum-flow evidence is represented as a distinct faceplate-centre P2 pressure observation plus stabilized flow and its stabilization/calibration receipts.
 
 These validators admit the shape and numerical limits of method evidence only. They do not perform the complete UWL/ETL procedures, validate all spray coverage or flow requirements, or establish product conformity. Formal claims still require the controlled protocol and independent method execution.
+
+
+## Task-selective delivery and UWL boost qualification
+
+The `standard_methods::UwlBoostFunctionObservation` record validates the UWL 2023 Clause 12.1 boost sequence at Type 1 P2: regular flow, boosted flow, flow-control close, reopen without boost, then post-close flow. It preserves separate hot/cold inlet pressure channels and flow calibration provenance. The check requires boost reset after closure, a resolved flow increase, a boosted upper measurement bound below twice the regular lower bound, and post-close flow consistent with regular flow within combined declared measurement uncertainty. This is a method-evidence validator, not UWL product conformity.
+
+The `task_phase` module validates advisory PREPARE / BASE_DELIVERY / OPTIONAL_BOOST / PAUSE / RINSE / RETURN_TO_READY schedules against exact independently qualified capabilities, market variant, hardware and delivery-condition digests. Boost phases require explicit task consent, a direct local user hold with auto-return qualification, and the capability's locally qualified maximum duration. Manufacturer-declared-only or ambiguous boost modes cannot be selected as qualified task-plan capabilities. The summary contains durations only; Symtropy retains water/energy closure and no AI actuator command is emitted.
+
+Full preregistration and exact competitor ambiguity: `docs/AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md`, issue #12798. The Hansgrohe 28036000 public sheet's boosted 6.6 / 9.4 L/min values conflict with its listed 4 L/min maximum/regulator; this remains unresolved pending manufacturer clarification or independent exact-SKU test.
