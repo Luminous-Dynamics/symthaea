@@ -23,7 +23,7 @@
 //!                                                  └───────────────┘
 //! ```
 
-use crate::episodic_replay::{Episode, EpisodicMemory};
+use crate::episodic_replay::{Episode, EpisodicMemory, GraduationProvenance};
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
@@ -231,35 +231,61 @@ impl MemoryCoordinator {
                 continue;
             }
 
-            // Persistence in WM boosts effective phi.
-            // Verified information gets a significant boost to its consolidation strength.
+            // Retain the historical consolidation preference, but do not mix
+            // provenance, persistence, or cross-tier context into the cognitive
+            // state estimate (Psi) or emotional valence.
             let persistence_bonus = (event.steps_survived as f64 / 10.0).min(0.2);
             let sigma_bonus = self.signals.sigma.map_or(0.0, |s| (s * 0.15).min(0.1));
 
             let verification_bonus = if event.is_verified {
                 match event.source {
-                    MemorySource::ActionFeedback => 0.3, // "Proven" by reality
-                    MemorySource::WebResearch => 0.2,    // "Verified" by multiple sources
+                    MemorySource::ActionFeedback => 0.3,
+                    MemorySource::WebResearch => 0.2,
                     _ => 0.1,
                 }
             } else {
                 0.0
             };
 
-            let adjusted_phi =
+            // Preserve the previous replay-score contribution without changing
+            // Psi. The old Phi adjustment contributed half its delta to survival
+            // value; the old synthetic +0.5 valence contributed another 0.075.
+            let old_adjusted_phi =
                 (event.psi_at_graduation + persistence_bonus + sigma_bonus + verification_bonus)
                     .min(1.0);
+            let prior_phi_priority_delta =
+                (old_adjusted_phi - event.psi_at_graduation).max(0.0) * 0.5;
+            let verified_claim_priority_delta = if event.is_verified { 0.075 } else { 0.0 };
+            let consolidation_priority_bonus =
+                prior_phi_priority_delta + verified_claim_priority_delta;
 
-            // Create episode from graduation event
+            // Keep the source classification and producer's verification claim
+            // attached to the episode. A label is useful context, not a unique
+            // source-event ID or an independently verified receipt.
+            let provenance = GraduationProvenance {
+                source: event.source,
+                verification_claimed: event.is_verified,
+                source_label: if event.label.trim().is_empty() {
+                    None
+                } else {
+                    Some(event.label.clone())
+                },
+            };
+
+            // Psi stays exactly as measured at graduation; verification is not
+            // an affective state, so valence remains neutral unless supplied by
+            // a separate emotional observation.
             let episode = Episode::with_metadata(
                 event.content.clone(),
                 event.content, // Self-referential output for graduated items
-                adjusted_phi,
+                event.psi_at_graduation,
                 self.signals.step,
                 1.0 - event.final_activation as f32, // Low activation → high surprise
-                if event.is_verified { 0.5 } else { 0.0 }, // Verified = positive valence
+                0.0,
                 event.coherence_at_graduation as f32,
-            );
+            )
+            .with_graduation_provenance(provenance)
+            .with_consolidation_priority_bonus(consolidation_priority_bonus);
 
             if episodic.store_if_significant(episode) {
                 stored += 1;
@@ -592,13 +618,20 @@ mod tests {
         assert_eq!(coord.stats.graduations_processed, 2);
         assert_eq!(episodic.len(), 2);
 
-        // Verified item should have higher Phi than unverified (due to verification bonus)
+        // Verification/source signals must not alter the cognitive-state estimate.
         let top = episodic.get_top_episodes(2);
+        let low = top.iter().find(|episode| (episode.psi - 0.4).abs() < 1e-9).unwrap();
+        let verified = top.iter().find(|episode| (episode.psi - 0.7).abs() < 1e-9).unwrap();
+        assert_eq!(low.valence, Some(0.0));
+        assert_eq!(verified.valence, Some(0.0));
+        assert_eq!(
+            verified.graduation_provenance.as_ref().unwrap().verification_claimed,
+            true
+        );
+        assert_eq!(low.graduation_provenance.as_ref().unwrap().verification_claimed, false);
         assert!(
-            top[0].psi > top[1].psi,
-            "Verified item should have higher adjusted Phi: {} vs {}",
-            top[0].psi,
-            top[1].psi
+            verified.consolidation_priority_bonus > low.consolidation_priority_bonus,
+            "The producer's verification claim may affect replay priority, not Phi"
         );
     }
 
