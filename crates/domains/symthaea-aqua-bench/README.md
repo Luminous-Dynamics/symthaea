@@ -40,9 +40,9 @@ The Aqua adapter only binds the product comparison to those owner outputs. It ca
 - Matched-run evidence adapter: 18 unit tests.
 - Spray-field summary and matched degradation comparison: 15 unit tests.
 - Service-continuity classifier: 17 unit tests, including exhaustive enumeration of all 57,600 categorical input combinations.
-- Exact-point pressure/flow evidence: 20 unit tests, including one-sided manufacturer pressure-range declarations.
+- Exact-point pressure/flow evidence: 40 unit tests, including one-sided manufacturer pressure-range declarations, uncertainty-aware paired retention and pressure-datum mismatch negative controls.
 
-**70 tests are authored across the four modules.** This is a source inventory only; no exact-head run, rustfmt or Clippy result is claimed until the dedicated Aqua workflow reports it.
+**90 tests are authored across the four modules.** This is a source inventory only; no exact-head run, rustfmt or Clippy result is claimed until the dedicated Aqua workflow reports it.
 
 ## Run
 
