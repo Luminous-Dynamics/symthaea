@@ -796,6 +796,8 @@ mod tests {
         let second = run(&model, temperature, &fixture, overrides).unwrap();
         assert_eq!(first, second);
         assert_eq!(first["chain_receipts"].as_array().unwrap().len(), 2);
+        assert_eq!(first["stiffness_evidence_unresolved_in_any_chain"], true);
+        assert_eq!(first["all_chains_have_block_jackknife_uncertainty"], false);
         for chain in first["chain_receipts"].as_array().unwrap() {
             assert!((0.0..=1.0).contains(&chain["acceptance_rate"].as_f64().unwrap()));
             assert!(chain["observables"]["energy_per_site"]["mean"].as_f64().unwrap().is_finite());
