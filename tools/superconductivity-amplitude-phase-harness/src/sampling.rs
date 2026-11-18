@@ -171,6 +171,7 @@ fn series_summary(values: &[f64]) -> Value {
 fn run_sweep(
     model: &GlModel,
     fields: &mut [Complex],
+    links: &[f64],
     current_energy: &mut f64,
     rng: &mut StdRng,
     proposal_scale: f64,
@@ -186,32 +187,21 @@ fn run_sweep(
             re: original.re + rng.gen_range(-proposal_scale..proposal_scale),
             im: original.im + rng.gen_range(-proposal_scale..proposal_scale),
         };
-        fields[site] = candidate;
-        let proposed_energy = match model.free_energy_for(
-            fields,
-            &model.initial_gauge_phases(),
-        ) {
-            Ok(energy) => energy.total,
-            Err(_) => {
-                fields[site] = original;
-                invalid += 1;
-                continue;
-            }
-        };
-        let delta_energy = proposed_energy - *current_energy;
-        if !delta_energy.is_finite() {
-            fields[site] = original;
-            invalid += 1;
-            continue;
-        }
+        let delta_energy =
+            match model.site_energy_delta(fields, site, candidate, links) {
+                Ok(delta) => delta,
+                Err(_) => {
+                    invalid += 1;
+                    continue;
+                }
+            };
 
         let accept = delta_energy <= 0.0
             || rng.gen_range(0.0..1.0) < (-delta_energy / model.temperature).exp();
         if accept {
-            *current_energy = proposed_energy;
+            fields[site] = candidate;
+            *current_energy += delta_energy;
             accepted += 1;
-        } else {
-            fields[site] = original;
         }
     }
     Ok((accepted, invalid))
@@ -239,6 +229,7 @@ fn run_chain(
         let (sweep_accepted, sweep_invalid) = run_sweep(
             model,
             &mut fields,
+            &links,
             &mut current_energy,
             &mut rng,
             config.proposal_scale,
@@ -263,6 +254,7 @@ fn run_chain(
             let (sweep_accepted, sweep_invalid) = run_sweep(
                 model,
                 &mut fields,
+                &links,
                 &mut current_energy,
                 &mut rng,
                 config.proposal_scale,
@@ -273,6 +265,7 @@ fn run_chain(
         }
 
         let energy = model.free_energy_for(&fields, &links)?;
+        current_energy = energy.total;
         let amplitude_mean = fields
             .iter()
             .map(|field| field.norm_sqr().sqrt())
@@ -452,7 +445,7 @@ pub(super) fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::Value;
+    use serde_json::json;
     use std::fs;
     use std::path::PathBuf;
 
