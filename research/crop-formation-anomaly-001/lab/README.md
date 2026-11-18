@@ -9,6 +9,7 @@ This is the first executable component of CROP-INTEL-001. It is deliberately sma
 - Immutable-in-use decoder manifests with unique IDs and a complete declared search family; persist a canonical manifest digest/timestamp externally before challenge analysis.
 - Predeclared 7-bit ASCII decoder specifications with complete attempt logging.
 - A family-wise maximum-statistic empirical p-value helper. The caller must run the **entire** decoder/transform family on each null replicate and provide that replicate's maximum score.
+- Deterministic 2x2 grid switches preserving row/column margins for a declared null family (not perimeter or connected components).
 - Binary entropy and Wilson intervals for simple benchmark reporting.
 
 ## Explicit non-goals
@@ -28,7 +29,7 @@ cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 ```
 
-The crate has no third-party dependencies. It includes a local `[workspace]` declaration so that it is not silently pulled into the root Symthaea workspace. The current source contains 21 authored unit tests; their execution remains pending because this editing environment has no Rust toolchain.
+The crate has no third-party dependencies. It includes a local `[workspace]` declaration so that it is not silently pulled into the root Symthaea workspace. The current source contains 24 authored unit tests; their execution remains pending because this editing environment has no Rust toolchain.
 
 ## Statistical interpretation
 
