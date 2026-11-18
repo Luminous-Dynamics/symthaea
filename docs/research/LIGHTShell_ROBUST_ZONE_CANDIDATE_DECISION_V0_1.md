@@ -19,7 +19,7 @@ Lan et al. (29 May 2026) examine bootstrap uncertainty bias in small-sample mate
 ## Decision stages
 
 - `exploratory`: proposed requirements or calibrated predictions may create a research shortlist. Outputs remain predictions or insufficient evidence; no module-test eligibility is granted.
-- `downselection`: requires frozen robot/geometry/zone/mission bindings, exact candidate construction/process identity, qualified manufacturing route, physical coupon evidence and applicable methods.
+- `downselection`: requires frozen robot/geometry/zone/mission bindings, exact candidate construction/process identity, manufactured article or coupon-batch identity, transition identity where applicable, and qualified manufacturing route, physical coupon evidence and applicable methods.
 - `confirmatory`: additionally requires a preregistered confirmatory plan. Adaptive exploratory results cannot silently become confirmation.
 
 ## Candidate evidence contract
@@ -29,7 +29,9 @@ Each physical property interval binds:
 - MAT-UQ uncertainty profile;
 - Lightshell coupon evidence and test-run references;
 - method-applicability selection and raw-data digest;
-- exact material lot, process revision and construction identity.
+- exact material lot, process revision and construction identity;
+- manufactured article or coupon-batch identity for physical down-selection;
+- exact transition identity whenever a transition-specific metric is used.
 
 A calibrated model prediction instead binds the exact predictor generation, MAT-UQ calibration receipt, calibration domain and uncertainty profile. The receipt's predictor generation and calibration domain must match the prediction and decision target. MAT-UQ remains responsible for validating those upstream receipts and their statistical calibration; this adapter checks identity and consumes the declared applicability state.
 
@@ -87,3 +89,5 @@ Numeric improvement targets must follow a frozen physical baseline, lot/process 
 ## Claim boundary
 
 `robustly_feasible_for_module_test` is not textile qualification, PPE, robot safety approval, product certification or authorization to manufacture. It only makes a candidate eligible for the next physical engineering test. The engineering owner retains the final material decision.
+
+Physical evidence is rejected when its lot, process revision or construction differs from the candidate record. A candidate using transition-specific metrics must bind the exact transition candidate/interface identity. Down-selection candidates with a qualified process must also bind the exact manufactured article or coupon-batch identity. These checks prevent a good measurement from being silently reused for a different physical article.
