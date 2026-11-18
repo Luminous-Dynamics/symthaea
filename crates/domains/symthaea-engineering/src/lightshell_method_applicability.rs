@@ -124,6 +124,7 @@ impl MethodSelectionManifest {
         let mut findings = Vec::new();
         let mut specimens: HashMap<&str, &SpecimenContext> = HashMap::new();
         let mut profiles: HashMap<&str, &MethodProfile> = HashMap::new();
+        let mut method_profile_keys = HashSet::new();
         let mut selection_ids = HashSet::new();
         let mut ready_for_test_count = 0usize;
 
@@ -181,6 +182,14 @@ impl MethodSelectionManifest {
             if profiles.insert(profile.profile_id.as_str(), profile).is_some() {
                 push(&mut findings, "duplicate_method_profile_id", format!("{path}.profile_id"),
                     "Method profile IDs must be unique.");
+            }
+            if !method_profile_keys.insert((
+                profile.profile_kind.as_str(),
+                profile.method_id.as_str(),
+                profile.edition.as_str(),
+            )) {
+                push(&mut findings, "duplicate_method_identity", format!("{path}.method_id/edition"),
+                    "The same method kind, ID and edition must not be duplicated under different profile IDs.");
             }
             validate_profile(profile, &path, &mut findings);
         }
@@ -658,6 +667,32 @@ mod tests {
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|f| f.code == "spacer_airflow_fixture_not_validated"));
         assert!(report.findings.iter().any(|f| f.code == "ready_spacer_requires_spacer_fixture"));
+    }
+
+    #[test]
+    fn spacer_method_readiness_passes_only_with_spacer_qualified_fixture() {
+        let mut manifest = base_manifest();
+        manifest["state"] = json!("ready_for_test");
+        manifest["selections"] = json!([manifest["selections"][3].clone()]);
+        manifest["selections"][0]["state"] = json!("ready_for_test");
+        manifest["selections"][0]["fixture_ref"] = json!("SPACER-AIR-FIXTURE-01");
+        manifest["selections"][0]["fixture_revision"] = json!("REV-A");
+        manifest["selections"][0]["fixture_validation_state"] = json!("qualified_spacer");
+        manifest["selections"][0]["fixture_validation_ref"] = json!("SPACER-FIXTURE-VALIDATION-01");
+        manifest["selections"][0]["protocol_ref"] = json!("ISO9237-SPACER-ADAPTED-PROTOCOL");
+        manifest["selections"][0]["acceptance_rule_ref"] = json!("AIRFLOW-ACCEPTANCE-REV-A");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.is_valid(), "{:?}", report.findings);
+        assert!(report.can_start_tests());
+    }
+
+    #[test]
+    fn duplicate_method_id_and_edition_are_rejected() {
+        let mut manifest = base_manifest();
+        let duplicate = manifest["method_profiles"][0].clone();
+        manifest["method_profiles"].as_array_mut().unwrap().push(duplicate);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "duplicate_method_identity"));
     }
 
     #[test]
