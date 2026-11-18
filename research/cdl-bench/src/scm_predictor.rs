@@ -348,6 +348,186 @@ impl BytePredictor for ScmHybridPredictor {
     }
 }
 
+const EXPERT_MIXTURE_TOTAL_WEIGHT: u32 = 1 << 24;
+const EXPERT_COUNT: usize = 3;
+
+fn normalize_expert_cdf(cdf: &ByteCdf) -> [u32; BYTE_SYMBOLS] {
+    let total = cdf[BYTE_SYMBOLS] as u64;
+    let distributable = (1u64 << 15) - BYTE_SYMBOLS as u64;
+    let mut frequencies = [1u32; BYTE_SYMBOLS];
+    let mut remainders = [0u64; BYTE_SYMBOLS];
+    let mut assigned = 0u64;
+
+    for symbol in 0..BYTE_SYMBOLS {
+        let raw = (cdf[symbol + 1] - cdf[symbol]) as u64;
+        let scaled = raw * distributable;
+        let extra = scaled / total;
+        remainders[symbol] = scaled % total;
+        frequencies[symbol] += extra as u32;
+        assigned += extra;
+    }
+
+    let leftover = (distributable - assigned) as usize;
+    let mut order: [usize; BYTE_SYMBOLS] = std::array::from_fn(|i| i);
+    order.sort_unstable_by(|left, right| {
+        remainders[*right]
+            .cmp(&remainders[*left])
+            .then_with(|| left.cmp(right))
+    });
+    for &symbol in order.iter().take(leftover) {
+        frequencies[symbol] += 1;
+    }
+    frequencies
+}
+
+fn make_expert_mixture_cdf(
+    weights: &[u32; EXPERT_COUNT],
+    experts: &[[u32; BYTE_SYMBOLS]; EXPERT_COUNT],
+) -> ByteCdf {
+    let weight_total = weights.iter().map(|&w| w as u64).sum::<u64>();
+    let target = 1u64 << 15;
+    let distributable = target - BYTE_SYMBOLS as u64;
+    let denominator = weight_total * target;
+    let mut frequencies = [1u32; BYTE_SYMBOLS];
+    let mut remainders = [0u64; BYTE_SYMBOLS];
+    let mut assigned = 0u64;
+
+    for symbol in 0..BYTE_SYMBOLS {
+        let numerator = (0..EXPERT_COUNT)
+            .map(|expert| weights[expert] as u64 * experts[expert][symbol] as u64)
+            .sum::<u64>();
+        let scaled = numerator * distributable;
+        let extra = scaled / denominator;
+        remainders[symbol] = scaled % denominator;
+        frequencies[symbol] += extra as u32;
+        assigned += extra;
+    }
+
+    let leftover = (distributable - assigned) as usize;
+    let mut order: [usize; BYTE_SYMBOLS] = std::array::from_fn(|i| i);
+    order.sort_unstable_by(|left, right| {
+        remainders[*right]
+            .cmp(&remainders[*left])
+            .then_with(|| left.cmp(right))
+    });
+    for &symbol in order.iter().take(leftover) {
+        frequencies[symbol] += 1;
+    }
+
+    let mut cdf = [0u32; BYTE_SYMBOLS + 1];
+    for symbol in 0..BYTE_SYMBOLS {
+        cdf[symbol + 1] = cdf[symbol] + frequencies[symbol];
+    }
+    cdf
+}
+
+fn update_expert_weights(
+    prior: &[u32; EXPERT_COUNT],
+    likelihoods: &[u32; EXPERT_COUNT],
+) -> [u32; EXPERT_COUNT] {
+    let evidence = (0..EXPERT_COUNT)
+        .map(|i| prior[i] as u128 * likelihoods[i] as u128)
+        .sum::<u128>();
+    let distributable =
+        EXPERT_MIXTURE_TOTAL_WEIGHT as u128 - EXPERT_COUNT as u128;
+    let mut posterior = [1u32; EXPERT_COUNT];
+    let mut remainders = [0u128; EXPERT_COUNT];
+    let mut assigned = 0u128;
+
+    for i in 0..EXPERT_COUNT {
+        let scaled = prior[i] as u128 * likelihoods[i] as u128 * distributable;
+        let extra = scaled / evidence;
+        remainders[i] = scaled % evidence;
+        posterior[i] += extra as u32;
+        assigned += extra;
+    }
+
+    let leftover = (distributable - assigned) as usize;
+    let mut order = [0usize, 1, 2];
+    order.sort_unstable_by(|left, right| {
+        remainders[*right]
+            .cmp(&remainders[*left])
+            .then_with(|| left.cmp(right))
+    });
+    for &i in order.iter().take(leftover) {
+        posterior[i] += 1;
+    }
+    posterior
+}
+
+/// Decoder-synchronous Bayesian mixture of typed-field, temporal-lag and
+/// known-parent SCM byte experts. The posterior weights are updated from the
+/// likelihood of each decoded byte, with a positive integer floor so a weak
+/// expert can recover after a regime change. No expert-selection symbols are
+/// transmitted. The parent expert receives the known SCM topology and is an
+/// oracle control, not a learned causal model. Model ID 7.
+pub struct ScmExpertMixturePredictor {
+    field: StructuredState,
+    lag: StructuredState,
+    parent: StructuredState,
+    weights: [u32; EXPERT_COUNT],
+}
+
+impl ScmExpertMixturePredictor {
+    pub fn new() -> Self {
+        let third = EXPERT_MIXTURE_TOTAL_WEIGHT / 3;
+        Self {
+            field: StructuredState::new(),
+            lag: StructuredState::new(),
+            parent: StructuredState::new(),
+            weights: [third, third, EXPERT_MIXTURE_TOTAL_WEIGHT - 2 * third],
+        }
+    }
+
+    /// Posterior integer weights in expert order: field, lag, parent.
+    pub fn expert_weights(&self) -> [u32; EXPERT_COUNT] {
+        self.weights
+    }
+
+    /// Approximate inline predictor storage, excluding allocator/runtime overhead.
+    pub fn state_bytes() -> usize {
+        std::mem::size_of::<Self>()
+    }
+
+    fn expert_frequencies(&self) -> [[u32; BYTE_SYMBOLS]; EXPERT_COUNT] {
+        [
+            normalize_expert_cdf(&self.field.cdf(0)),
+            normalize_expert_cdf(&self.lag.cdf(2)),
+            normalize_expert_cdf(&self.parent.cdf(1)),
+        ]
+    }
+}
+
+impl Default for ScmExpertMixturePredictor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BytePredictor for ScmExpertMixturePredictor {
+    fn model_id(&self) -> u8 {
+        7
+    }
+
+    fn cumulative_frequency(&self) -> ByteCdf {
+        make_expert_mixture_cdf(&self.weights, &self.expert_frequencies())
+    }
+
+    fn observe(&mut self, symbol: u8) {
+        let experts = self.expert_frequencies();
+        let likelihoods = [
+            experts[0][symbol as usize],
+            experts[1][symbol as usize],
+            experts[2][symbol as usize],
+        ];
+        self.weights = update_expert_weights(&self.weights, &likelihoods);
+
+        self.field.observe(symbol, 0);
+        self.lag.observe(symbol, 2);
+        self.parent.observe(symbol, 1);
+    }
+}
+
 /// Negative-control topology: keeps parent-context arity but deliberately
 /// misassigns downstream parent identities. It is not a valid SCM graph.
 /// Model ID 6. This detects whether any coding gain is caused merely by
@@ -503,16 +683,55 @@ mod tests {
     }
 
     #[test]
+    fn expert_mixture_round_trips_observational_and_interventional_scm() {
+        let observational = generate_scm(4096, 41, None).unwrap();
+        let interventional = generate_scm(
+            4096,
+            41,
+            Some(ScmIntervention {
+                variable: 1,
+                start_step: 1024,
+                end_step: 3072,
+                value: 20_000,
+            }),
+        )
+        .unwrap();
+        round_trip::<ScmExpertMixturePredictor>(&observational.stream, 7);
+        round_trip::<ScmExpertMixturePredictor>(&interventional.stream, 7);
+    }
+
+    #[test]
+    fn expert_mixture_weights_are_positive_normalized_and_deterministic() {
+        let trace = generate_scm(4096, 43, None).unwrap();
+        let mut first = ScmExpertMixturePredictor::default();
+        let mut second = ScmExpertMixturePredictor::default();
+        for &symbol in &trace.stream {
+            first.observe(symbol);
+            second.observe(symbol);
+            let weights = first.expert_weights();
+            assert_eq!(weights, second.expert_weights());
+            assert!(weights.iter().all(|&weight| weight > 0));
+            assert_eq!(
+                weights.iter().map(|&weight| weight as u64).sum::<u64>(),
+                EXPERT_MIXTURE_TOTAL_WEIGHT as u64
+            );
+        }
+        assert_ne!(first.expert_weights(), [EXPERT_MIXTURE_TOTAL_WEIGHT / 3; 3]);
+    }
+
+    #[test]
     fn all_scm_predictors_have_distinct_stable_ids() {
         assert_eq!(ScmFieldPredictor::default().model_id(), 2);
         assert_eq!(ScmParentPredictor::default().model_id(), 3);
         assert_eq!(ScmLagPredictor::default().model_id(), 4);
         assert_eq!(ScmHybridPredictor::default().model_id(), 5);
         assert_eq!(ScmShuffledParentPredictor::default().model_id(), 6);
+        assert_eq!(ScmExpertMixturePredictor::default().model_id(), 7);
         assert!(ScmFieldPredictor::state_bytes() > 0);
         assert!(ScmParentPredictor::state_bytes() > 0);
         assert!(ScmLagPredictor::state_bytes() > 0);
         assert!(ScmHybridPredictor::state_bytes() > 0);
         assert!(ScmShuffledParentPredictor::state_bytes() > 0);
+        assert!(ScmExpertMixturePredictor::state_bytes() > ScmLagPredictor::state_bytes());
     }
 }
