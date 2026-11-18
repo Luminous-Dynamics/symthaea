@@ -51,6 +51,15 @@ pub mod grid;
 pub mod multiscale;
 pub mod nppad_validation;
 pub mod plasma_control;
+pub mod plasma_event_eval;
+pub mod plasma_cluster_bootstrap;
+pub use plasma_cluster_bootstrap::{
+    build_shot_cluster_bootstrap_plan, paired_shot_cluster_bootstrap,
+    shot_cluster_bootstrap_indices, verify_shot_cluster_bootstrap_plan,
+    PairedMetricBootstrapInterval, ShotClusterBootstrapError, ShotClusterBootstrapPlan,
+    ShotClusterBootstrapPlanBody, SHOT_CLUSTER_BOOTSTRAP_RNG_ALGORITHM,
+    SHOT_CLUSTER_BOOTSTRAP_SCHEMA,
+};
 pub mod plasma_hdc_encoder;
 pub mod plasma_observability;
 pub mod threat;
@@ -70,6 +79,16 @@ pub use plasma_hdc_encoder::{
     // Streaming
     PlasmaStateBuffer,
     StabilityAssessment,
+};
+
+pub use plasma_event_eval::{
+    AlarmAbstentionReason, AlarmEpisodeTrace, AlarmEvaluationSummary, AlarmPolicyConfig,
+    AlarmPolicyUpdate, ExposureBootstrapInterval, OnlinePlasmaAlarmPolicy,
+    PlasmaEventEvalError, PlasmaEventEvaluationReceipt, PlasmaEventEvaluationReceiptBody,
+    RateConfidenceInterval, RiskModelBinding, RiskScoreEvidence, ShotAlarmEvaluation,
+    ShotReferenceOutcome, PLASMA_EVENT_EVALUATION_RECEIPT_SCHEMA,
+    PLASMA_RISK_SCORE_EVIDENCE_SCHEMA, bootstrap_false_alarms_per_non_disruptive_hour,
+    observation_frame_sha256, score_shot_alarms, summarize_alarm_evaluations,
 };
 
 pub use plasma_control::{
