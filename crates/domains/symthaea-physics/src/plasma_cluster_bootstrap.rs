@@ -294,6 +294,38 @@ mod tests {
     }
 
     #[test]
+    fn protocol_manifest_pins_shot_cluster_bootstrap_contract() {
+        let manifest: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../benchmarks/plasma/event-eval-v0.json"
+        ))
+        .expect("event evaluation manifest should parse");
+        let contract = &manifest["uncertainty_protocols"]["window_level_metrics"];
+        assert_eq!(
+            contract["resampling_unit"],
+            "shot_id"
+        );
+        assert_eq!(
+            contract["bootstrap_schema"],
+            SHOT_CLUSTER_BOOTSTRAP_SCHEMA
+        );
+        assert_eq!(contract["replicate_count"], 2000);
+        assert_eq!(
+            contract["rng_algorithm"],
+            SHOT_CLUSTER_BOOTSTRAP_RNG_ALGORITHM
+        );
+        assert_eq!(
+            contract["paired_model_comparison"],
+            "use the exact same bootstrap shot-index plan for every model and report paired metric deltas"
+        );
+        assert!(
+            contract["forbidden"]
+                .as_str()
+                .expect("forbidden rule")
+                .contains("resampling individual windows independently")
+        );
+    }
+
+    #[test]
     fn plan_digest_tampering_is_rejected() {
         let ids = shot_ids();
         let mut plan =
