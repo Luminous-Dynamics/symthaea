@@ -597,6 +597,365 @@ pub fn minimum_cost_sufficient_portfolio(
     Ok(best)
 }
 
+/// A caller-declared numeric interval mapped to one categorical signature.
+/// Bounds are [lower_inclusive, upper_exclusive); None means no upper bound.
+/// Gaps between bands intentionally classify as UNKNOWN.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NumericCategoryBand {
+    pub lower_inclusive: f64,
+    pub upper_exclusive: Option<f64>,
+    pub category: String,
+}
+
+/// Explicit mapping from one directly measured observation channel to one
+/// categorical portfolio sensor. The category schema digest identifies the
+/// mapping content; it is not a signature or proof of calibration authenticity.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DiagnosticCategoryRule {
+    pub sensor_id: String,
+    pub channel_id: String,
+    pub category_schema_id: String,
+    pub category_schema_sha256: String,
+    pub requirement: crate::plasma_observability::DecisionChannelRequirement,
+    pub bands: Vec<NumericCategoryBand>,
+}
+
+impl DiagnosticCategoryRule {
+    fn validate(&self) -> Result<(), DiagnosticPortfolioError> {
+        non_empty(&self.sensor_id, "category sensor_id")?;
+        non_empty(&self.channel_id, "category channel_id")?;
+        non_empty(&self.category_schema_id, "category_schema_id")?;
+        if !valid_sha256(&self.category_schema_sha256) {
+            return Err(DiagnosticPortfolioError::new(
+                "category schema digest must be 64 lowercase hexadecimal characters",
+            ));
+        }
+        self.requirement
+            .validate()
+            .map_err(|error| DiagnosticPortfolioError::new(error.message))?;
+        if self.requirement.channel_id != self.channel_id {
+            return Err(DiagnosticPortfolioError::new(
+                "category rule channel_id must match its decision requirement",
+            ));
+        }
+        if self.bands.is_empty() {
+            return Err(DiagnosticPortfolioError::new(
+                "category rule requires at least one numeric band",
+            ));
+        }
+
+        let mut previous_upper: Option<f64> = None;
+        for (index, band) in self.bands.iter().enumerate() {
+            if !band.lower_inclusive.is_finite() {
+                return Err(DiagnosticPortfolioError::new(
+                    "category band lower bound must be finite",
+                ));
+            }
+            non_empty(&band.category, "category label")?;
+            if let Some(upper) = band.upper_exclusive {
+                if !upper.is_finite() || upper <= band.lower_inclusive {
+                    return Err(DiagnosticPortfolioError::new(
+                        "category band upper bound must be finite and greater than lower bound",
+                    ));
+                }
+            }
+            if index > 0 {
+                if let Some(previous) = previous_upper {
+                    if band.lower_inclusive < previous {
+                        return Err(DiagnosticPortfolioError::new(
+                            "category bands must be ordered and non-overlapping",
+                        ));
+                    }
+                } else {
+                    return Err(DiagnosticPortfolioError::new(
+                        "an unbounded category band must be the final band",
+                    ));
+                }
+            }
+            previous_upper = band.upper_exclusive;
+        }
+        Ok(())
+    }
+
+    fn classify(&self, value: f64) -> Option<&str> {
+        self.bands
+            .iter()
+            .find(|band| {
+                value >= band.lower_inclusive
+                    && band.upper_exclusive.is_none_or(|upper| value < upper)
+            })
+            .map(|band| band.category.as_str())
+    }
+}
+
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "reason", rename_all = "snake_case", deny_unknown_fields)]
+pub enum DiagnosticUnknownReason {
+    EvidenceGateBlocked {
+        reason: crate::plasma_observability::AbstentionReason,
+    },
+    OutsideDeclaredCategoryDomain,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DiagnosticFrameSensorEvidence {
+    pub sensor_id: String,
+    pub channel_id: String,
+    pub observation: SensorObservation,
+    pub unknown_reason: Option<DiagnosticUnknownReason>,
+    pub source_id: Option<String>,
+    pub source_digest: Option<String>,
+    pub calibration_id: Option<String>,
+    pub calibration_revision: Option<String>,
+    pub observed_at_ns: Option<u64>,
+    pub category_schema_id: String,
+    pub category_schema_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DiagnosticPortfolioFrameResult {
+    pub shot_id: String,
+    pub frame_id: String,
+    pub frame_time_ns: u64,
+    pub active_sensor_ids: Vec<String>,
+    pub sensor_evidence: Vec<DiagnosticFrameSensorEvidence>,
+    pub diagnosability: DiagnosabilityResult,
+}
+
+/// Evaluate a real observation frame against declared categorical sensor
+/// rules. Only channels that pass the shared measured-input gate and fall in a
+/// declared category band become Known. All other dispositions become
+/// UNKNOWN; synthetic reconstruction is never a new independent sensor.
+pub fn evaluate_observation_frame(
+    model: &DiagnosticPortfolioModel,
+    frame: &crate::plasma_observability::PlasmaObservationFrame,
+    rules: &[DiagnosticCategoryRule],
+    active_sensor_ids: &[String],
+) -> Result<DiagnosticPortfolioFrameResult, DiagnosticPortfolioError> {
+    model.validate()?;
+    frame
+        .validate()
+        .map_err(|error| DiagnosticPortfolioError::new(error.message))?;
+
+    if rules.len() != model.sensors.len() {
+        return Err(DiagnosticPortfolioError::new(
+            "exactly one category rule is required for every candidate sensor",
+        ));
+    }
+
+    let mut rules_by_sensor = BTreeMap::new();
+    let mut channels = BTreeSet::new();
+    for rule in rules {
+        rule.validate()?;
+        if rules_by_sensor.insert(rule.sensor_id.as_str(), rule).is_some() {
+            return Err(DiagnosticPortfolioError::new(format!(
+                "duplicate category rule for sensor {}",
+                rule.sensor_id
+            )));
+        }
+        if !channels.insert(rule.channel_id.as_str()) {
+            return Err(DiagnosticPortfolioError::new(format!(
+                "channel {} is bound to more than one portfolio sensor",
+                rule.channel_id
+            )));
+        }
+        if !model
+            .sensors
+            .iter()
+            .any(|sensor| sensor.sensor_id == rule.sensor_id)
+        {
+            return Err(DiagnosticPortfolioError::new(format!(
+                "category rule references unknown portfolio sensor {}",
+                rule.sensor_id
+            )));
+        }
+    }
+    for sensor in &model.sensors {
+        if !rules_by_sensor.contains_key(sensor.sensor_id.as_str()) {
+            return Err(DiagnosticPortfolioError::new(format!(
+                "missing category rule for portfolio sensor {}",
+                sensor.sensor_id
+            )));
+        }
+    }
+
+    let channels_by_id: BTreeMap<&str, &crate::plasma_observability::DiagnosticChannelObservation> =
+        frame
+            .channels
+            .iter()
+            .map(|channel| (channel.channel_id.as_str(), channel))
+            .collect();
+    let mut sensor_evidence = Vec::with_capacity(model.sensors.len());
+
+    for sensor in &model.sensors {
+        let rule = rules_by_sensor
+            .get(sensor.sensor_id.as_str())
+            .copied()
+            .ok_or_else(|| DiagnosticPortfolioError::new("validated category rule disappeared"))?;
+        let channel = channels_by_id
+            .get(rule.channel_id.as_str())
+            .copied()
+            .ok_or_else(|| {
+                DiagnosticPortfolioError::new(format!(
+                    "frame is missing category channel {}",
+                    rule.channel_id
+                ))
+            })?;
+
+        let gate = frame
+            .evaluate_decision_requirements(std::slice::from_ref(&rule.requirement))
+            .map_err(|error| DiagnosticPortfolioError::new(error.message))?;
+
+        let evidence = match gate {
+            crate::plasma_observability::DecisionInputGate::Abstain {
+                blocked_channels,
+                ..
+            } => {
+                let blocked = blocked_channels.into_iter().next().ok_or_else(|| {
+                    DiagnosticPortfolioError::new(
+                        "measurement gate abstained without a blocked-channel reason",
+                    )
+                })?;
+                DiagnosticFrameSensorEvidence {
+                    sensor_id: sensor.sensor_id.clone(),
+                    channel_id: rule.channel_id.clone(),
+                    observation: SensorObservation::Unknown,
+                    unknown_reason: Some(DiagnosticUnknownReason::EvidenceGateBlocked {
+                        reason: blocked.reason,
+                    }),
+                    source_id: None,
+                    source_digest: None,
+                    calibration_id: None,
+                    calibration_revision: None,
+                    observed_at_ns: None,
+                    category_schema_id: rule.category_schema_id.clone(),
+                    category_schema_sha256: rule.category_schema_sha256.clone(),
+                }
+            }
+            crate::plasma_observability::DecisionInputGate::MeasuredInputsAvailable(inputs) => {
+                let measured = inputs.get(&rule.channel_id).ok_or_else(|| {
+                    DiagnosticPortfolioError::new("measured channel disappeared after gate")
+                })?;
+                if let Some(category) = rule.classify(measured.value()) {
+                    DiagnosticFrameSensorEvidence {
+                        sensor_id: sensor.sensor_id.clone(),
+                        channel_id: rule.channel_id.clone(),
+                        observation: SensorObservation::Known(category.to_owned()),
+                        unknown_reason: None,
+                        source_id: Some(measured.source_id().to_owned()),
+                        source_digest: Some(measured.source_digest().to_owned()),
+                        calibration_id: Some(measured.calibration_id().to_owned()),
+                        calibration_revision: Some(
+                            measured.calibration_revision().to_owned(),
+                        ),
+                        observed_at_ns: Some(measured.observed_at_ns()),
+                        category_schema_id: rule.category_schema_id.clone(),
+                        category_schema_sha256: rule.category_schema_sha256.clone(),
+                    }
+                } else {
+                    DiagnosticFrameSensorEvidence {
+                        sensor_id: sensor.sensor_id.clone(),
+                        channel_id: rule.channel_id.clone(),
+                        observation: SensorObservation::Unknown,
+                        unknown_reason: Some(
+                            DiagnosticUnknownReason::OutsideDeclaredCategoryDomain,
+                        ),
+                        source_id: Some(measured.source_id().to_owned()),
+                        source_digest: Some(measured.source_digest().to_owned()),
+                        calibration_id: Some(measured.calibration_id().to_owned()),
+                        calibration_revision: Some(
+                            measured.calibration_revision().to_owned(),
+                        ),
+                        observed_at_ns: Some(measured.observed_at_ns()),
+                        category_schema_id: rule.category_schema_id.clone(),
+                        category_schema_sha256: rule.category_schema_sha256.clone(),
+                    }
+                }
+            }
+        };
+
+        // A direct-measurement category must never be sourced from a non-measured frame status.
+        if !matches!(
+            channel.disposition,
+            crate::plasma_observability::ObservationDisposition::Measured { .. }
+        ) && !matches!(evidence.observation, SensorObservation::Unknown)
+        {
+            return Err(DiagnosticPortfolioError::new(
+                "non-measured observation was incorrectly promoted to a known category",
+            ));
+        }
+        sensor_evidence.push(evidence);
+    }
+
+    let observed_sensor_ids = model
+        .sensors
+        .iter()
+        .map(|sensor| sensor.sensor_id.as_str())
+        .collect::<BTreeSet<_>>();
+    for sensor_id in active_sensor_ids {
+        if !observed_sensor_ids.contains(sensor_id.as_str()) {
+            return Err(DiagnosticPortfolioError::new(format!(
+                "active sensor {} is not present in the portfolio model",
+                sensor_id
+            )));
+        }
+    }
+
+    let observation_by_sensor: BTreeMap<&str, &SensorObservation> = sensor_evidence
+        .iter()
+        .map(|item| (item.sensor_id.as_str(), &item.observation))
+        .collect();
+    let observed_model = DiagnosticPortfolioModel {
+        schema_version: model.schema_version.clone(),
+        model_id: model.model_id.clone(),
+        decision_catalogue_id: model.decision_catalogue_id.clone(),
+        resource_unit: model.resource_unit.clone(),
+        worlds: model.worlds.clone(),
+        sensors: model
+            .sensors
+            .iter()
+            .map(|sensor| DiagnosticSensor {
+                sensor_id: sensor.sensor_id.clone(),
+                common_mode_groups: sensor.common_mode_groups.clone(),
+                resource_cost: sensor.resource_cost,
+                resource_unit: sensor.resource_unit.clone(),
+                observations: model
+                    .worlds
+                    .iter()
+                    .map(|world| SensorWorldObservation {
+                        world_id: world.world_id.clone(),
+                        observation: observation_by_sensor
+                            .get(sensor.sensor_id.as_str())
+                            .copied()
+                            .cloned()
+                            .unwrap_or(SensorObservation::Unknown),
+                    })
+                    .collect(),
+            })
+            .collect(),
+    };
+    let diagnosability = diagnose(&observed_model, active_sensor_ids)?;
+    Ok(DiagnosticPortfolioFrameResult {
+        shot_id: frame.shot_id.clone(),
+        frame_id: frame.frame_id.clone(),
+        frame_time_ns: frame.frame_time_ns,
+        active_sensor_ids: diagnosability.active_sensor_ids.clone(),
+        sensor_evidence,
+        diagnosability,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
