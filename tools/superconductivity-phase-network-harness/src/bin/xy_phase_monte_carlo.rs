@@ -2,7 +2,7 @@ use jsonschema::validator_for;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use serde_json::{Value, json};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::f64::consts::{PI, TAU};
 use std::fs;
@@ -182,12 +182,18 @@ impl Network {
             return Err("network requires at least one edge".to_owned());
         }
         let mut edges = Vec::with_capacity(edge_values.len());
+        let mut edge_ids = HashSet::with_capacity(edge_values.len());
+        let mut total_coupling = 0.0_f64;
         let mut adjacency = vec![Vec::new(); nodes.len()];
-        for (index, edge) in edge_values.iter().enumerate() {
+        for edge in edge_values {
             let id = edge
                 .get("edge_id")
                 .and_then(Value::as_str)
-                .unwrap_or("unknown-edge");
+                .filter(|text| !text.trim().is_empty())
+                .ok_or_else(|| "edge missing non-empty edge_id".to_owned())?;
+            if !edge_ids.insert(id.to_owned()) {
+                return Err(format!("duplicate edge_id {id}"));
+            }
             let source_id = edge
                 .get("source")
                 .and_then(Value::as_str)
@@ -249,6 +255,7 @@ impl Network {
             }
 
             let edge_index = edges.len();
+            total_coupling += coupling;
             edges.push(Edge {
                 source,
                 target,
@@ -257,9 +264,27 @@ impl Network {
             });
             adjacency[source].push((target, edge_index));
             adjacency[target].push((source, edge_index));
-            if index != edge_index {
-                return Err("edge indexing invariant failed".to_owned());
-            }
+        }
+
+        let budget = fixture
+            .get("coupling_budget")
+            .ok_or_else(|| "missing coupling_budget".to_owned())?;
+        let declared_total = budget
+            .get("total_coupling_energy")
+            .and_then(Value::as_f64)
+            .ok_or_else(|| "coupling_budget.total_coupling_energy must be numeric".to_owned())?;
+        let declared_per_node = budget
+            .get("per_node_coupling_budget")
+            .and_then(Value::as_f64)
+            .ok_or_else(|| "coupling_budget.per_node_coupling_budget must be numeric".to_owned())?;
+        let calculated_per_node = total_coupling / nodes.len() as f64;
+        if !total_coupling.is_finite()
+            || !declared_total.is_finite()
+            || !declared_per_node.is_finite()
+            || (total_coupling - declared_total).abs() > 1.0e-10
+            || (calculated_per_node - declared_per_node).abs() > 1.0e-10
+        {
+            return Err("declared coupling budget does not match the edge sum and node count".to_owned());
         }
 
         Ok(Self {
@@ -357,8 +382,6 @@ fn measure(network: &Network, phases: &[f64]) -> Measurement {
         }
     }
 
-    let volume = network.box_lengths.iter().product::<f64>();
-    let _ = volume;
     Measurement {
         energy_per_node: energy / network.node_count as f64,
         magnetization: magnetization_x.hypot(magnetization_y) / network.node_count as f64,
@@ -574,20 +597,10 @@ fn main() {
     };
     let schema_bytes = read(&schema_path);
     let fixture_bytes = read(&fixture_path);
-    let schema: Value = serde_json::from_slice(&schema_bytes).unwrap_or_else(|error| {
-        eprintln!("schema JSON parse failed: {error}");
-        process::exit(1);
-    });
-    let fixture: Value = serde_json::from_slice(&fixture_bytes).unwrap_or_else(|error| {
-        eprintln!("fixture JSON parse failed: {error}");
-        process::exit(1);
-    });
     let network = Network::from_bytes(&schema_bytes, &fixture_bytes).unwrap_or_else(|error| {
         eprintln!("SC-PHASE-NETWORK-MC-FAIL: {error}");
         process::exit(1);
     });
-    let _ = schema;
-    let _ = fixture;
     let receipt = simulate(
         &network,
         temperature,
@@ -677,5 +690,32 @@ mod tests {
         let network = Network::from_bytes(&schema, &fixture).unwrap();
         assert!(simulate(&network, 0.0, 1, 2, 1).is_err());
         assert!(simulate(&network, -1.0, 1, 2, 1).is_err());
+    }
+
+    #[test]
+    fn duplicate_edge_ids_are_rejected_by_solver() {
+        let (schema, fixture) = inputs();
+        let mut value: Value = serde_json::from_slice(&fixture).unwrap();
+        value["graph"]["edges"][1]["edge_id"] = json!("e00r");
+        let mutated = serde_json::to_vec(&value).unwrap();
+        assert!(Network::from_bytes(&schema, &mutated).is_err());
+    }
+
+    #[test]
+    fn solver_rechecks_coupling_budget() {
+        let (schema, fixture) = inputs();
+        let mut value: Value = serde_json::from_slice(&fixture).unwrap();
+        value["coupling_budget"]["total_coupling_energy"] = json!(99.0);
+        let mutated = serde_json::to_vec(&value).unwrap();
+        assert!(Network::from_bytes(&schema, &mutated).is_err());
+    }
+
+    #[test]
+    fn duplicate_node_ids_are_rejected_by_solver() {
+        let (schema, fixture) = inputs();
+        let mut value: Value = serde_json::from_slice(&fixture).unwrap();
+        value["graph"]["nodes"][1]["node_id"] = json!("n00");
+        let mutated = serde_json::to_vec(&value).unwrap();
+        assert!(Network::from_bytes(&schema, &mutated).is_err());
     }
 }
