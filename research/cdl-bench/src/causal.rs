@@ -10,7 +10,7 @@ use std::fmt;
 const QMAX: i32 = i16::MAX as i32;
 const SCM_MAGIC: &[u8; 4] = b"SCM1";
 const SCM_VERSION: u16 = 1;
-const SCM_HEADER_LEN: usize = 34;
+const SCM_HEADER_LEN: usize = 33;
 
 /// Invalid configuration for a deterministic causal benchmark generator.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,6 +19,7 @@ pub enum GeneratorError {
     AlphabetSizeOutOfRange,
     InterventionVariableOutOfRange,
     InterventionWindowInvalid,
+    LengthOverflow,
 }
 
 impl fmt::Display for GeneratorError {
@@ -32,6 +33,7 @@ impl fmt::Display for GeneratorError {
             Self::InterventionWindowInvalid => {
                 write!(f, "SCM intervention window must satisfy 0 <= start < end <= steps")
             }
+            Self::LengthOverflow => write!(f, "SCM stream length overflows this platform"),
         }
     }
 }
@@ -241,11 +243,12 @@ pub fn generate_scm(
         previous = current;
     }
 
-    let steps_u64 = u64::try_from(steps).map_err(|_| GeneratorError::InterventionWindowInvalid)?;
-    let mut stream = Vec::with_capacity(
-        SCM_HEADER_LEN
-            .saturating_add(steps.saturating_mul(5 * std::mem::size_of::<i16>())),
-    );
+    let steps_u64 = u64::try_from(steps).map_err(|_| GeneratorError::LengthOverflow)?;
+    let stream_capacity = steps
+        .checked_mul(5 * std::mem::size_of::<i16>())
+        .and_then(|payload| SCM_HEADER_LEN.checked_add(payload))
+        .ok_or(GeneratorError::LengthOverflow)?;
+    let mut stream = Vec::with_capacity(stream_capacity);
     stream.extend_from_slice(SCM_MAGIC);
     stream.extend_from_slice(&SCM_VERSION.to_le_bytes());
     match intervention {
@@ -253,12 +256,12 @@ pub fn generate_scm(
             stream.push(do_op.variable);
             stream.extend_from_slice(
                 &u64::try_from(do_op.start_step)
-                    .map_err(|_| GeneratorError::InterventionWindowInvalid)?
+                    .map_err(|_| GeneratorError::LengthOverflow)?
                     .to_le_bytes(),
             );
             stream.extend_from_slice(
                 &u64::try_from(do_op.end_step)
-                    .map_err(|_| GeneratorError::InterventionWindowInvalid)?
+                    .map_err(|_| GeneratorError::LengthOverflow)?
                     .to_le_bytes(),
             );
             stream.extend_from_slice(&do_op.value.to_le_bytes());
