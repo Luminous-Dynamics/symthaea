@@ -483,7 +483,14 @@ impl ActionIR {
         sandbox: &SandboxRoot,
         current_phi: f64,
     ) -> Result<(), PolicyViolation> {
-        // Consciousness Gate: Check global min_phi for any mutation
+        // Authority-adjacent numeric telemetry and policy thresholds are
+        // untrusted inputs. IEEE NaN makes every ordered '<' comparison false,
+        // so validate finiteness and the documented domain before gating.
+        validate_authority_scalar("current_phi", current_phi)?;
+        validate_authority_scalar("capabilities.min_phi", policy.capabilities.min_phi)?;
+
+        // Cognitive caution threshold: this may restrict an otherwise
+        // policy-authorized action, but it is not itself an authority grant.
         if self.risk_tier() > RiskTier::Low && current_phi < policy.capabilities.min_phi {
             return Err(PolicyViolation::PhiTooLow {
                 required: policy.capabilities.min_phi,
@@ -534,7 +541,11 @@ impl ActionIR {
                 working_dir,
                 ..
             } => {
-                // Specific gate for shell execution
+                validate_authority_scalar(
+                    "capabilities.shell.min_phi",
+                    policy.capabilities.shell.min_phi,
+                )?;
+                // Specific cognitive-caution threshold for shell execution.
                 if current_phi < policy.capabilities.shell.min_phi {
                     return Err(PolicyViolation::PhiTooLow {
                         required: policy.capabilities.shell.min_phi,
@@ -726,6 +737,24 @@ pub enum PolicyViolation {
         required: f64,
         actual: f64,
     },
+    /// An authority-adjacent numeric input is non-finite or outside [0, 1].
+    InvalidNumericInput {
+        field: &'static str,
+        value: f64,
+    },
+}
+
+/// Reject malformed cognitive/policy scalars before they enter an ordered
+/// comparison. A NaN comparison can otherwise make a threshold rejection
+/// branch silently fail to execute.
+fn validate_authority_scalar(
+    field: &'static str,
+    value: f64,
+) -> Result<(), PolicyViolation> {
+    if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+        return Err(PolicyViolation::InvalidNumericInput { field, value });
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1989,6 +2018,72 @@ mod tests {
         assert!(matches!(
             err,
             ExecutionError::Policy(PolicyViolation::ShellBudgetExceeded { .. })
+        ));
+    }
+}
+
+
+#[cfg(test)]
+mod authority_numeric_input_tests {
+    use super::*;
+
+    #[test]
+    fn action_validation_rejects_non_finite_and_out_of_range_phi() {
+        let policy = PolicyBundle::restrictive();
+        let sandbox = SandboxRoot::new("test_invalid_authority_phi").unwrap();
+        let action = ActionIR::NoOp;
+
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -0.01, 1.01] {
+            let result = action.validate(&policy, &sandbox, value);
+            assert!(
+                matches!(
+                    result,
+                    Err(PolicyViolation::InvalidNumericInput {
+                        field: "current_phi",
+                        ..
+                    })
+                ),
+                "expected invalid scalar rejection for {value:?}, got {result:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn action_validation_rejects_non_finite_global_policy_threshold() {
+        let mut policy = PolicyBundle::restrictive();
+        policy.capabilities.min_phi = f64::NAN;
+        let sandbox = SandboxRoot::new("test_invalid_global_phi_policy").unwrap();
+
+        let result = ActionIR::NoOp.validate(&policy, &sandbox, 0.8);
+        assert!(matches!(
+            result,
+            Err(PolicyViolation::InvalidNumericInput {
+                field: "capabilities.min_phi",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn shell_validation_rejects_non_finite_shell_threshold() {
+        let mut policy = PolicyBundle::restrictive();
+        policy.capabilities.shell.allowed_programs.insert("echo".into());
+        policy.capabilities.shell.min_phi = f64::INFINITY;
+        let sandbox = SandboxRoot::new("test_invalid_shell_phi_policy").unwrap();
+        let action = ActionIR::RunCommand {
+            program: "echo".into(),
+            args: vec!["safe".into()],
+            env: BTreeMap::new(),
+            working_dir: None,
+        };
+
+        let result = action.validate(&policy, &sandbox, 0.8);
+        assert!(matches!(
+            result,
+            Err(PolicyViolation::InvalidNumericInput {
+                field: "capabilities.shell.min_phi",
+                ..
+            })
         ));
     }
 }

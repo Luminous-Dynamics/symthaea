@@ -46,6 +46,12 @@ pub enum ActionType {
 impl ActionType {
     /// Decode from a floating-point parameter index.
     pub fn from_param(val: f64) -> Option<Self> {
+        // The action selector is an integer protocol field, not a continuous
+        // score. Do not let truncation/saturation turn malformed floats into
+        // a different action ID.
+        if !val.is_finite() || val.fract() != 0.0 || !(0.0..=7.0).contains(&val) {
+            return None;
+        }
         match val as u8 {
             0 => Some(Self::Read),
             1 => Some(Self::Write),
@@ -255,10 +261,28 @@ impl MotorOutputBridge {
         current_phi: f64,
         request: &MotorActionRequest,
     ) -> MotorOutputResult {
-        // 1. Check minimum Phi gate
+        // Malformed numeric state must fail before any ordinary comparison:
+        // NaN < threshold is false and can otherwise bypass these gates.
+        if !current_phi.is_finite() || !(0.0..=1.0).contains(&current_phi) {
+            return MotorOutputResult::skipped(
+                "Invalid current_phi: expected a finite value in [0, 1]",
+            );
+        }
+        if !motor_confidence.is_finite() || !(0.0..=1.0).contains(&motor_confidence) {
+            return MotorOutputResult::skipped(
+                "Invalid motor_confidence: expected a finite value in [0, 1]",
+            );
+        }
+
+        // 1. Check minimum cognitive-caution threshold.
         let min_phi = self
             .min_phi_override
             .unwrap_or(self.policy.capabilities.min_phi);
+        if !min_phi.is_finite() || !(0.0..=1.0).contains(&min_phi) {
+            return MotorOutputResult::skipped(
+                "Invalid configured min_phi: expected a finite value in [0, 1]",
+            );
+        }
         if current_phi < min_phi {
             return MotorOutputResult::skipped(&format!(
                 "Phi {current_phi:.3} below motor output threshold {min_phi:.3}"
@@ -789,5 +813,87 @@ mod tests {
         let cmd = bridge.robot_command(&guardian, &[0.0; 8], &[0.5; 8], 0.9, 0.8, 42);
         assert_eq!(cmd.posture, GuardianPosture::Normal);
         assert_eq!(cmd.cycle, 42);
+    }
+}
+
+#[cfg(test)]
+mod authority_numeric_input_tests {
+    use super::*;
+
+    #[test]
+    fn action_type_selector_requires_exact_finite_integer() {
+        for value in 0..=7u8 {
+            assert_eq!(
+                ActionType::from_param(value as f64),
+                Some(match value {
+                    0 => ActionType::Read,
+                    1 => ActionType::Write,
+                    2 => ActionType::List,
+                    3 => ActionType::Parse,
+                    4 => ActionType::CargoTest,
+                    5 => ActionType::CargoCheck,
+                    6 => ActionType::GitCommit,
+                    7 => ActionType::RunCommand,
+                    _ => unreachable!(),
+                })
+            );
+        }
+
+        for value in [
+            0.9,
+            1.9,
+            -1.0,
+            8.0,
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+        ] {
+            assert!(
+                ActionType::from_param(value).is_none(),
+                "malformed action selector {value:?} must not decode"
+            );
+        }
+    }
+
+    #[test]
+    fn motor_bridge_rejects_invalid_phi_before_dispatch() {
+        for value in [
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            -0.01,
+            1.01,
+        ] {
+            let mut bridge = MotorOutputBridge::with_defaults().unwrap();
+            let result = bridge.execute(&[0.0], 0.8, value, &MotorActionRequest::default());
+            assert!(!result.success);
+            assert!(result.error.unwrap().contains("Invalid current_phi"));
+        }
+    }
+
+    #[test]
+    fn motor_bridge_rejects_invalid_confidence_before_dispatch() {
+        for value in [
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            -0.01,
+            1.01,
+        ] {
+            let mut bridge = MotorOutputBridge::with_defaults().unwrap();
+            let result = bridge.execute(&[0.0], value, 0.8, &MotorActionRequest::default());
+            assert!(!result.success);
+            assert!(result.error.unwrap().contains("Invalid motor_confidence"));
+        }
+    }
+
+    #[test]
+    fn motor_bridge_rejects_invalid_configured_phi_threshold() {
+        let mut bridge = MotorOutputBridge::with_defaults().unwrap();
+        bridge.min_phi_override = Some(f64::NAN);
+
+        let result = bridge.execute(&[0.0], 0.8, 0.8, &MotorActionRequest::default());
+        assert!(!result.success);
+        assert!(result.error.unwrap().contains("Invalid configured min_phi"));
     }
 }
