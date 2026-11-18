@@ -136,6 +136,90 @@ fn validate_observable_value(observation: &Value) -> Result<(), String> {
     Ok(())
 }
 
+fn uncertainty_is_present_and_finite(value: &Value, context: &str) -> Result<bool, String> {
+    if value.is_null() {
+        return Ok(false);
+    }
+    if let Some(number) = value.as_f64() {
+        if !number.is_finite() || number < 0.0 {
+            return Err(format!("{context} must be finite and non-negative"));
+        }
+        return Ok(true);
+    }
+    numeric_array(value, context)?;
+    Ok(true)
+}
+
+fn exportable_coefficients<'a>(coefficients: &'a [Value]) -> Vec<&'a Value> {
+    coefficients
+        .iter()
+        .filter(|coefficient| {
+            matches!(
+                coefficient.get("status").and_then(Value::as_str),
+                Some("derived" | "constrained" | "phenomenological_fit")
+            ) && coefficient.get("value").is_some_and(|value| !value.is_null())
+        })
+        .collect()
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ScalarGlInvariants {
+    xi_squared: f64,
+    inverse_lambda_squared_proxy: f64,
+}
+
+fn scalar_gl_invariants(a: f64, b: f64, k: f64) -> Result<ScalarGlInvariants, String> {
+    if !a.is_finite() || !b.is_finite() || !k.is_finite() || a >= 0.0 || b <= 0.0 || k <= 0.0 {
+        return Err("scalar GL invariants require a<0, b>0 and K>0".to_owned());
+    }
+    let rho0_squared = -a / b;
+    let xi_squared = k / -a;
+    let inverse_lambda_squared_proxy = k * rho0_squared;
+    if !xi_squared.is_finite() || !inverse_lambda_squared_proxy.is_finite() {
+        return Err("scalar GL invariants are non-finite".to_owned());
+    }
+    Ok(ScalarGlInvariants {
+        xi_squared,
+        inverse_lambda_squared_proxy,
+    })
+}
+
+fn scalar_gl_basis_rescaling(a: f64, b: f64, k: f64, scale: f64) -> Result<Value, String> {
+    if !scale.is_finite() || scale <= 0.0 {
+        return Err("order-parameter basis scale must be positive and finite".to_owned());
+    }
+    let original = scalar_gl_invariants(a, b, k)?;
+    let scale_squared = scale * scale;
+    let transformed = (
+        a / scale_squared,
+        b / (scale_squared * scale_squared),
+        k / scale_squared,
+    );
+    let rescaled = scalar_gl_invariants(transformed.0, transformed.1, transformed.2)?;
+    let invariant_residual = (original.xi_squared - rescaled.xi_squared)
+        .abs()
+        .max(
+            (original.inverse_lambda_squared_proxy - rescaled.inverse_lambda_squared_proxy)
+                .abs(),
+        );
+    Ok(json!({
+        "basis_scale": scale,
+        "original_coefficients": {"a": a, "b": b, "K": k},
+        "rescaled_coefficients": {"a": transformed.0, "b": transformed.1, "K": transformed.2},
+        "original_observable_proxies": {
+            "xi_squared": original.xi_squared,
+            "inverse_lambda_squared_proxy": original.inverse_lambda_squared_proxy
+        },
+        "rescaled_observable_proxies": {
+            "xi_squared": rescaled.xi_squared,
+            "inverse_lambda_squared_proxy": rescaled.inverse_lambda_squared_proxy
+        },
+        "maximum_invariant_residual": invariant_residual,
+        "coefficient_tuple_changed": true,
+        "interpretation": "Tc, xi and lambda-like response do not identify absolute GL coefficient magnitudes unless the order-parameter basis normalization is fixed; this scalar GL demonstration is synthetic and convention-specific."
+    }))
+}
+
 fn validate_coefficient(
     coefficient: &Value,
     observables: &HashMap<String, &Value>,
