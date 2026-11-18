@@ -762,22 +762,25 @@ pub fn score_shot_alarms(
                     "disruptive-shot alarm trace extends beyond t_cut_ns",
                 ));
             }
-            let lead_time_ns = alarm_times_ns
-                .first()
-                .copied()
-                .filter(|time| *time < t_cut_ns)
-                .map(|time| t_cut_ns - time)
-                .filter(|lead| *lead >= policy.required_warning_ns);
+            let eligible_alarm = alarm_times_ns.iter().find_map(|time| {
+                let lead = t_cut_ns.saturating_sub(*time);
+                (lead >= policy.required_warning_ns && lead <= policy.max_warning_ns)
+                    .then_some(lead)
+            });
+            let false_alarm_events = alarm_times_ns.len().saturating_sub(usize::from(
+                eligible_alarm.is_some(),
+            ));
             Ok(ShotAlarmEvaluation {
                 shot_id: shot_id.to_owned(),
                 policy_id: policy.policy_id.clone(),
                 validation_receipt_sha256: policy.validation_receipt_sha256.clone(),
                 policy_config_sha256: policy.policy_config_sha256(),
                 required_warning_ns: policy.required_warning_ns,
+                max_warning_ns: policy.max_warning_ns,
                 disruptive: true,
-                event_detected: lead_time_ns.is_some(),
-                false_alarm_events: 0,
-                lead_time_ns,
+                event_detected: eligible_alarm.is_some(),
+                false_alarm_events,
+                lead_time_ns: eligible_alarm,
                 exposure_duration_ns: t_cut_ns,
                 outcome,
                 alarm_times_ns: alarm_times_ns.to_vec(),
@@ -805,6 +808,7 @@ pub fn score_shot_alarms(
                 validation_receipt_sha256: policy.validation_receipt_sha256.clone(),
                 policy_config_sha256: policy.policy_config_sha256(),
                 required_warning_ns: policy.required_warning_ns,
+                max_warning_ns: policy.max_warning_ns,
                 disruptive: false,
                 event_detected: false,
                 false_alarm_events: alarm_times_ns.len(),
@@ -831,6 +835,11 @@ pub struct AlarmEvaluationSummary {
     pub detected_disruptions: usize,
     pub missed_disruptions: usize,
     pub false_alarm_shots: usize,
+    /// False alarm episodes on disruptive shots outside the accepted warning window.
+    pub false_alarm_events_on_disruptive_shots: usize,
+    /// False alarm episodes on non-disruptive shots; this is the numerator for FAR metrics.
+    pub false_alarm_events_on_non_disruptive_shots: usize,
+    /// Total false alarm episodes across both positive and negative shots.
     pub false_alarm_events: usize,
     pub total_non_disruptive_exposure_ns: u128,
     /// None when there are no disruptive shots.
@@ -901,10 +910,13 @@ pub fn summarize_alarm_evaluations(
     let mut validation_receipt_sha256: Option<String> = None;
     let mut policy_config_sha256: Option<String> = None;
     let mut required_warning_ns: Option<u64> = None;
+    let mut max_warning_ns: Option<u64> = None;
     let mut disruptive_shots = 0usize;
     let mut non_disruptive_shots = 0usize;
     let mut detected_disruptions = 0usize;
     let mut false_alarm_shots = 0usize;
+    let mut false_alarm_events_on_disruptive_shots = 0usize;
+    let mut false_alarm_events_on_non_disruptive_shots = 0usize;
     let mut false_alarm_events = 0usize;
     let mut total_non_disruptive_exposure_ns = 0u128;
     let mut warning_times_ns = Vec::new();
@@ -919,6 +931,7 @@ pub fn summarize_alarm_evaluations(
             || !valid_sha256(&evaluation.validation_receipt_sha256)
             || !valid_sha256(&evaluation.policy_config_sha256)
             || evaluation.required_warning_ns == 0
+            || evaluation.max_warning_ns < evaluation.required_warning_ns
             || evaluation.exposure_duration_ns == 0
         {
             return Err(PlasmaEventEvalError::new(
@@ -930,18 +943,21 @@ pub fn summarize_alarm_evaluations(
             &validation_receipt_sha256,
             &policy_config_sha256,
             required_warning_ns,
+            max_warning_ns,
         ) {
-            (None, None, None, None) => {
+            (None, None, None, None, None) => {
                 policy_id = Some(evaluation.policy_id.clone());
                 validation_receipt_sha256 = Some(evaluation.validation_receipt_sha256.clone());
                 policy_config_sha256 = Some(evaluation.policy_config_sha256.clone());
                 required_warning_ns = Some(evaluation.required_warning_ns);
+                max_warning_ns = Some(evaluation.max_warning_ns);
             }
-            (Some(id), Some(receipt), Some(config), Some(warning))
+            (Some(id), Some(receipt), Some(config), Some(warning), Some(max_warning))
                 if id == &evaluation.policy_id
                     && receipt == &evaluation.validation_receipt_sha256
                     && config == &evaluation.policy_config_sha256
-                    && warning == evaluation.required_warning_ns => {}
+                    && warning == evaluation.required_warning_ns
+                    && max_warning == evaluation.max_warning_ns => {}
             _ => {
                 return Err(PlasmaEventEvalError::new(
                     "one summary cannot mix alarm policy identities, config digests or warning requirements",
@@ -951,23 +967,39 @@ pub fn summarize_alarm_evaluations(
 
         if evaluation.disruptive {
             disruptive_shots += 1;
-            if evaluation.event_detected != evaluation.lead_time_ns.is_some()
-                || evaluation.false_alarm_events != 0
-            {
+            if evaluation.event_detected != evaluation.lead_time_ns.is_some() {
                 return Err(PlasmaEventEvalError::new(
                     "disruptive shot evaluation has inconsistent event metrics",
                 ));
             }
             if let Some(lead_time_ns) = evaluation.lead_time_ns {
                 if lead_time_ns < evaluation.required_warning_ns
-                    || lead_time_ns > evaluation.exposure_duration_ns
+                    || lead_time_ns > evaluation.max_warning_ns
                 {
                     return Err(PlasmaEventEvalError::new(
-                        "detected event lead time violates the frozen warning or exposure bound",
+                        "detected event lead time lies outside the frozen warning interval",
                     ));
                 }
                 detected_disruptions += 1;
                 warning_times_ns.push(lead_time_ns);
+            }
+            false_alarm_events_on_disruptive_shots = false_alarm_events_on_disruptive_shots
+                .checked_add(evaluation.false_alarm_events)
+                .ok_or_else(|| PlasmaEventEvalError::new("false alarm event count overflow"))?;
+            false_alarm_events = false_alarm_events
+                .checked_add(evaluation.false_alarm_events)
+                .ok_or_else(|| PlasmaEventEvalError::new("false alarm event count overflow"))?;
+            if evaluation.event_detected {
+                let expected_false_alarms = evaluation.alarm_times_ns.len().saturating_sub(1);
+                if evaluation.false_alarm_events != expected_false_alarms {
+                    return Err(PlasmaEventEvalError::new(
+                        "disruptive shot false-alarm count does not match alarm episodes outside the single matched warning",
+                    ));
+                }
+            } else if evaluation.false_alarm_events != evaluation.alarm_times_ns.len() {
+                return Err(PlasmaEventEvalError::new(
+                    "undetected disruptive shot must count every alarm episode as a false alarm",
+                ));
             }
         } else {
             non_disruptive_shots += 1;
@@ -984,11 +1016,12 @@ pub fn summarize_alarm_evaluations(
             if evaluation.false_alarm_events > 0 {
                 false_alarm_shots += 1;
             }
+            false_alarm_events_on_non_disruptive_shots = false_alarm_events_on_non_disruptive_shots
+                .checked_add(evaluation.false_alarm_events)
+                .ok_or_else(|| PlasmaEventEvalError::new("false-alarm event count overflow"))?;
             false_alarm_events = false_alarm_events
                 .checked_add(evaluation.false_alarm_events)
-                .ok_or_else(|| {
-                    PlasmaEventEvalError::new("false-alarm event count overflow")
-                })?;
+                .ok_or_else(|| PlasmaEventEvalError::new("false-alarm event count overflow"))?;
         }
     }
 
@@ -1006,12 +1039,15 @@ pub fn summarize_alarm_evaluations(
         validation_receipt_sha256: validation_receipt_sha256.unwrap_or_default(),
         policy_config_sha256: policy_config_sha256.unwrap_or_default(),
         required_warning_ns: required_warning_ns.unwrap_or_default(),
+        max_warning_ns: max_warning_ns.unwrap_or_default(),
         shot_count: evaluations.len(),
         disruptive_shots,
         non_disruptive_shots,
         detected_disruptions,
         missed_disruptions,
         false_alarm_shots,
+        false_alarm_events_on_disruptive_shots,
+        false_alarm_events_on_non_disruptive_shots,
         false_alarm_events,
         total_non_disruptive_exposure_ns,
         event_tpr: (disruptive_shots > 0)
@@ -1024,9 +1060,9 @@ pub fn summarize_alarm_evaluations(
             non_disruptive_shots,
         ),
         false_alarms_per_non_disruptive_shot: (non_disruptive_shots > 0)
-            .then_some(false_alarm_events as f64 / non_disruptive_shots as f64),
+            .then_some(false_alarm_events_on_non_disruptive_shots as f64 / non_disruptive_shots as f64),
         false_alarms_per_non_disruptive_hour: (total_non_disruptive_exposure_ns > 0).then_some(
-            false_alarm_events as f64
+            false_alarm_events_on_non_disruptive_shots as f64
                 / (total_non_disruptive_exposure_ns as f64 / 3_600_000_000_000.0),
         ),
         mean_warning_time_ns,
