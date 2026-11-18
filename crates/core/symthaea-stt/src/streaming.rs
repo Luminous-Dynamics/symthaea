@@ -270,6 +270,8 @@ pub struct StreamProcessor {
     segment_index: u64,
     /// Total source samples skipped due to buffer overrun.
     dropped_sample_count: u64,
+    /// Estimated frame starts skipped with source samples that became unavailable.
+    skipped_frame_count: u64,
     /// Most recent discontinuity, consumed with take_discontinuity().
     last_discontinuity: Option<StreamDiscontinuity>,
     /// Recent frames for smoothing
@@ -318,6 +320,7 @@ impl StreamProcessor {
             next_sample: 0,
             segment_index: 0,
             dropped_sample_count: 0,
+            skipped_frame_count: 0,
             last_discontinuity: None,
             recent_frames: VecDeque::with_capacity(10),
             salience_threshold: 0.5,
@@ -354,6 +357,14 @@ impl StreamProcessor {
             self.segment_index = self.segment_index.saturating_add(1);
             self.dropped_sample_count =
                 self.dropped_sample_count.saturating_add(lost_samples);
+            let hop_samples = u64::try_from(self.samples_per_hop)
+                .unwrap_or(u64::MAX)
+                .max(1);
+            let skipped_frames = lost_samples
+                .saturating_add(hop_samples.saturating_sub(1))
+                / hop_samples;
+            self.skipped_frame_count =
+                self.skipped_frame_count.saturating_add(skipped_frames);
             self.last_discontinuity = Some(StreamDiscontinuity {
                 segment_index: self.segment_index,
                 lost_start_sample,
@@ -405,6 +416,11 @@ impl StreamProcessor {
     /// Total number of source samples skipped after the processor fell behind.
     pub fn dropped_sample_count(&self) -> u64 {
         self.dropped_sample_count
+    }
+
+    /// Number of frame starts skipped because their source samples were lost.
+    pub fn skipped_frame_count(&self) -> u64 {
+        self.skipped_frame_count
     }
 
     /// Current temporal segment number.
@@ -569,6 +585,7 @@ impl StreamProcessor {
         self.next_sample = 0;
         self.segment_index = 0;
         self.dropped_sample_count = 0;
+        self.skipped_frame_count = 0;
         self.last_discontinuity = None;
         self.recent_frames.clear();
     }
@@ -689,6 +706,16 @@ impl StreamSession {
         self.active
     }
 
+    /// Take the most recent input discontinuity, if one occurred.
+    pub fn take_discontinuity(&mut self) -> Option<StreamDiscontinuity> {
+        self.processor.take_discontinuity()
+    }
+
+    /// Number of source samples skipped by input overruns.
+    pub fn dropped_sample_count(&self) -> u64 {
+        self.processor.dropped_sample_count()
+    }
+
     /// Get latency in milliseconds
     pub fn latency_ms(&self) -> f32 {
         self.processor.latency_ms()
@@ -800,6 +827,7 @@ mod tests {
         assert!(total_frames > 100, "frame count must keep advancing");
         assert_eq!(processor.frame_count(), total_frames);
         assert_eq!(processor.dropped_sample_count(), 0);
+        assert_eq!(processor.skipped_frame_count(), 0);
         assert_eq!(processor.segment_index(), 0);
     }
 
@@ -829,6 +857,7 @@ mod tests {
         assert_eq!(gap.lost_end_sample, 180);
         assert_eq!(gap.lost_samples(), 150);
         assert_eq!(processor.dropped_sample_count(), 150);
+        assert_eq!(processor.skipped_frame_count(), 15);
         assert_eq!(processor.segment_index(), 1);
 
         assert!(!resumed.is_empty());
@@ -858,6 +887,7 @@ mod tests {
         assert_eq!(processor.frame_count(), 0);
         assert_eq!(processor.segment_index(), 0);
         assert_eq!(processor.dropped_sample_count(), 0);
+        assert_eq!(processor.skipped_frame_count(), 0);
         assert!(processor.take_discontinuity().is_none());
 
         let fresh: Vec<f32> = (0..20).map(|value| value as f32).collect();
