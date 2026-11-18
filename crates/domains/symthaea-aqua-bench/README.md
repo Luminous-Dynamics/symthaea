@@ -41,8 +41,9 @@ The Aqua adapter only binds the product comparison to those owner outputs. It ca
 - Spray-field summary and matched degradation comparison: 15 unit tests.
 - Service-continuity classifier: 17 unit tests, including exhaustive enumeration of all 57,600 categorical input combinations.
 - Exact-point pressure/flow evidence: 40 unit tests, including one-sided manufacturer pressure-range declarations, uncertainty-aware paired retention and pressure-datum mismatch negative controls.
+- Method-specific UWL / ETL pressure records: 12 unit tests for separate hot/cold inlet channels, asymmetric P1/P2/P3 intervals, faceplate-centre P2, calibration receipts and stabilized-flow admission.
 
-**90 tests are authored across the four modules.** This is a source inventory only; no exact-head run, rustfmt or Clippy result is claimed until the dedicated Aqua workflow reports it.
+**102 tests are authored across the five modules.** This is a source inventory only; no exact-head run, rustfmt or Clippy result is claimed until the dedicated Aqua workflow reports it.
 
 ## Run
 
@@ -132,3 +133,12 @@ The 2025/26 UK ETL electric-shower pathway now makes the coupled system boundary
 ## Shower test-method and pressure-datum crosswalk
 
 See docs/AQUA_METHOD_CROSSWALK_V0_1.md and issue #12817. The pressure_curve module records TerminalFittingInlet or PointOfDischarge and rejects cross-datum comparisons. Its single-channel record deliberately does not represent UWL's simultaneous hot/cold inlet pressures or ETL's faceplate-centre P2; those require separate method-specific channel records and apparatus. The generic helper cannot establish EN 18021, UWL, ETL or WaterSense conformity.
+
+
+## Method-specific UWL and ETL pressure records
+
+The dependency-free standard_methods module keeps method-specific channels separate from the generic pressure_curve record:
+- UWL pressure points retain hot and cold inlet channels independently for Type 1 P1 / P2 and Type 2 P3, with the published asymmetric pressure intervals and per-channel instrument / calibration receipts.
+- ETL maximum-flow evidence is represented as a distinct faceplate-centre P2 pressure observation plus stabilized flow and its stabilization/calibration receipts.
+
+These validators admit the shape and numerical limits of method evidence only. They do not perform the complete UWL/ETL procedures, validate all spray coverage or flow requirements, or establish product conformity. Formal claims still require the controlled protocol and independent method execution.
