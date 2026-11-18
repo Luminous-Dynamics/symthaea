@@ -604,7 +604,7 @@ impl AudioProjector {
     /// Uses THERMOMETER encoding: for each mel bin, include all basis vectors
     /// from level 0 up to the current level. This ensures similar mel values
     /// produce similar HVs (smooth similarity gradient).
-    fn direct_mel_hv(mel_features: &[f32], prev_features: Option<&[f32]>) -> HV16 {
+    pub(crate) fn direct_mel_hv(mel_features: &[f32], prev_features: Option<&[f32]>) -> HV16 {
         use crate::hdc::BundleAccumulator;
         let mut acc = BundleAccumulator::new();
 
