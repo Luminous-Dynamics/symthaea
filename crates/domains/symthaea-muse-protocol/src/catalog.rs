@@ -1,6 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! The public Muse 152 taxonomy.
+//! The public Muse 160 taxonomy.
 //!
 //! Catalog entries and callable composer presets are deliberately separate.
 //! `composer_style` is present only when the current engine can route the entry;
@@ -30,10 +30,11 @@ pub enum Constellation {
     ClubBeatMusic,
     PopRock,
     DramaticScreenStage,
+    SouthernAfricanUrbanFolkDance,
 }
 
 impl Constellation {
-    pub const ALL: [Self; 19] = [
+    pub const ALL: [Self; 20] = [
         Self::ClassicalLyricCharacter,
         Self::BaroqueEarlyDance,
         Self::DevelopmentalLargeForms,
@@ -53,6 +54,7 @@ impl Constellation {
         Self::ClubBeatMusic,
         Self::PopRock,
         Self::DramaticScreenStage,
+        Self::SouthernAfricanUrbanFolkDance,
     ];
 
     pub const fn name(self) -> &'static str {
@@ -78,6 +80,7 @@ impl Constellation {
             Self::ClubBeatMusic => "Club and Beat Music",
             Self::PopRock => "Pop and Rock",
             Self::DramaticScreenStage => "Dramatic, Screen and Stage",
+            Self::SouthernAfricanUrbanFolkDance => "Southern African Urban, Folk and Dance Traditions",
         }
     }
 }
@@ -88,6 +91,8 @@ pub enum StyleStatus {
     Foundation,
     Developing,
     Research,
+    /// Unimplemented research entries that must pass specialist review before promotion.
+    ResearchExpertReviewRequired,
     ExpertReviewRequired,
 }
 
@@ -97,6 +102,7 @@ impl StyleStatus {
             Self::Foundation => "Foundation",
             Self::Developing => "Developing",
             Self::Research => "Research",
+            Self::ResearchExpertReviewRequired => "Research; expert review required",
             Self::ExpertReviewRequired => "Expert review required",
         }
     }
@@ -332,7 +338,7 @@ impl CanonicalStyle {
 /// axes inherit a constellation research model until style-specific evidence
 /// replaces them; [`CanonicalStyle::research_gaps`] makes that incompleteness
 /// visible instead of presenting generic fields as finished scholarship.
-const CANONICAL_GRAMMAR_FOCI: [[&str; 8]; 19] = [
+const CANONICAL_GRAMMAR_FOCI: [[&str; 8]; 20] = [
     [
         "balanced period",
         "night-song arc",
@@ -522,6 +528,16 @@ const CANONICAL_GRAMMAR_FOCI: [[&str; 8]; 19] = [
         "horror threat-state cue",
         "science-fiction world-state cue",
         "interactive state-transition score",
+    ],
+    [
+        "kwaito township groove song",
+        "maskandi instrumental introduction and narrative song",
+        "isicathamiya vocal polyphony and refrain",
+        "mbaqanga vocal-instrumental dance song",
+        "kwela whistle-led dance cycle",
+        "marabi repeating piano vamp",
+        "township jazz ensemble and improvisation",
+        "South African bubblegum pop song",
     ],
 ];
 
@@ -718,6 +734,16 @@ const fn anatomy_for(constellation: Constellation) -> StyleAnatomy {
             "narrative timing",
             "cinematic or theatrical space",
         ),
+        SouthernAfricanUrbanFolkDance => anatomy(
+            "multiple style-specific song, dance, and ensemble grammars",
+            "local form hypotheses pending style-level research",
+            "harmony specified per style, not inherited as one system",
+            "style-specific dance cycles, groove, or vocal timing",
+            "locally documented melodic and vocal practices",
+            "style-specific ensemble and voice roles",
+            "practice-specific articulation and timing",
+            "acoustic or produced context, with substitutions disclosed",
+        ),
     }
 }
 
@@ -744,6 +770,20 @@ const fn anatomy(
 }
 
 macro_rules! style {
+    ($id:literal, $name:literal, $constellation:ident, $status:ident) => {
+        CanonicalStyle {
+            id: $id,
+            name: $name,
+            display_name: $name,
+            constellation: Constellation::$constellation,
+            status: StyleStatus::$status,
+            composer_style: None,
+            requires_expert_review: matches!(
+                StyleStatus::$status,
+                StyleStatus::ResearchExpertReviewRequired | StyleStatus::ExpertReviewRequired
+            ),
+        }
+    };
     ($id:literal, $name:literal, $constellation:ident) => {
         CanonicalStyle {
             id: $id,
@@ -765,7 +805,7 @@ macro_rules! style {
             composer_style: Some($composer),
             requires_expert_review: matches!(
                 StyleStatus::$status,
-                StyleStatus::ExpertReviewRequired
+                StyleStatus::ExpertReviewRequired | StyleStatus::ResearchExpertReviewRequired
             ),
         }
     };
@@ -779,14 +819,14 @@ macro_rules! style {
             composer_style: Some($composer),
             requires_expert_review: matches!(
                 StyleStatus::$status,
-                StyleStatus::ExpertReviewRequired
+                StyleStatus::ExpertReviewRequired | StyleStatus::ResearchExpertReviewRequired
             ),
         }
     };
 }
 
-/// The complete, stable Muse 152 registry. IDs are public catalog identities.
-pub const CATALOG: [CanonicalStyle; 152] = [
+/// The complete, stable Muse 160 registry. IDs are public catalog identities.
+pub const CATALOG: [CanonicalStyle; 160] = [
     style!(
         1,
         "Classical",
@@ -1070,6 +1110,15 @@ pub const CATALOG: [CanonicalStyle; 152] = [
     style!(150, "Horror Score", DramaticScreenStage),
     style!(151, "Science-Fiction Score", DramaticScreenStage),
     style!(152, "Adaptive Game Score", DramaticScreenStage),
+    // Research-only entries: catalog identities, not composer routes.
+    style!(153, "Kwaito", SouthernAfricanUrbanFolkDance, ResearchExpertReviewRequired),
+    style!(154, "Maskandi", SouthernAfricanUrbanFolkDance, ResearchExpertReviewRequired),
+    style!(155, "Isicathamiya", SouthernAfricanUrbanFolkDance, ResearchExpertReviewRequired),
+    style!(156, "Mbaqanga", SouthernAfricanUrbanFolkDance, ResearchExpertReviewRequired),
+    style!(157, "Kwela", SouthernAfricanUrbanFolkDance, ResearchExpertReviewRequired),
+    style!(158, "Marabi", SouthernAfricanUrbanFolkDance, ResearchExpertReviewRequired),
+    style!(159, "Township Jazz", SouthernAfricanUrbanFolkDance, ResearchExpertReviewRequired),
+    style!(160, "South African Bubblegum Pop", SouthernAfricanUrbanFolkDance, ResearchExpertReviewRequired),
 ];
 
 pub fn catalog_entry(id: u16) -> Option<&'static CanonicalStyle> {
@@ -1137,8 +1186,8 @@ mod tests {
     use std::collections::HashSet;
 
     #[test]
-    fn catalog_is_exactly_nineteen_by_eight() {
-        assert_eq!(CATALOG.len(), 152);
+    fn catalog_is_exactly_twenty_by_eight() {
+        assert_eq!(CATALOG.len(), 160);
         for constellation in Constellation::ALL {
             assert_eq!(
                 catalog_for_constellation(constellation).count(),
@@ -1147,6 +1196,29 @@ mod tests {
                 constellation.name()
             );
         }
+    }
+
+    #[test]
+    fn southern_african_additions_are_review_gated_and_not_composable() {
+        let expected = [
+            "Kwaito", "Maskandi", "Isicathamiya", "Mbaqanga",
+            "Kwela", "Marabi", "Township Jazz", "South African Bubblegum Pop",
+        ];
+        for (offset, name) in expected.iter().enumerate() {
+            let entry = catalog_entry(153 + offset as u16).unwrap();
+            assert_eq!(entry.name, *name);
+            assert_eq!(entry.status, StyleStatus::ResearchExpertReviewRequired);
+            assert!(entry.requires_expert_review);
+            assert!(entry.composer_style.is_none());
+            assert!(!entry.is_composable());
+            assert_eq!(entry.constellation, Constellation::SouthernAfricanUrbanFolkDance);
+        }
+        let blockers = foundation_promotion_blockers(
+            catalog_entry(153).unwrap(),
+            StylePromotionEvidence::default(),
+        );
+        assert!(blockers.contains(&PromotionBlocker::NotImplemented));
+        assert!(blockers.contains(&PromotionBlocker::ExpertReview));
     }
 
     #[test]

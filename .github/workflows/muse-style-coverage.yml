@@ -1,0 +1,204 @@
+name: Muse Style Coverage
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/domains/symthaea-muse-protocol/src/catalog.rs"
+      - "crates/domains/symthaea-music-theory/src/style.rs"
+      - "crates/domains/symthaea-music-theory/src/grammar.rs"
+      - "crates/domains/symthaea-music-theory/examples/diversity_census.rs"
+      - "crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs"
+      - "crates/domains/symthaea-muse/src/theory_realize.rs"
+      - "scripts/muse_style_capability_inventory.py"
+      - "tests/python/test_muse_style_capability_inventory.py"
+      - "scripts/muse_genre_completion_roadmap.py"
+      - "scripts/muse_choro_synthetic_harness.py"
+      - "tests/python/test_muse_genre_completion_roadmap.py"
+      - "tests/python/test_muse_choro_synthetic_harness.py"
+      - "tests/python/test_muse_choro_source_intake.py"
+      - "crates/domains/symthaea-muse/CHORO_APPROVED_INPUT_MANIFEST_V1.json"
+      - "crates/domains/symthaea-muse/CHORO_PRE_REGISTERED_ANALYSIS_PLAN_V1.json"
+      - "crates/domains/symthaea-muse/CHORO_APPROVED_INPUT_APPROVAL_V1.json"
+      - "scripts/muse_choro_input_manifest.py"
+      - "tests/python/test_muse_choro_input_manifest.py"
+      - "crates/domains/symthaea-muse/genre-completion-roadmap-v1.json"
+      - "crates/domains/symthaea-muse/SOUTHERN_AFRICAN_GENRE_RESEARCH_BRIEF_V1.md"
+      - "crates/domains/symthaea-muse/MUSE_GLOBAL_GENRE_COVERAGE_RESEARCH_V1.md"
+      - "crates/domains/symthaea-muse/CHORO_GRAMMAR_RESEARCH_SPEC_V1.json"
+      - "crates/domains/symthaea-muse/CHORO_SOURCE_INTAKE_V1.json"
+      - "crates/domains/symthaea-muse/CHORO_GRAMMAR_RESEARCH_SPEC_V1.md"
+      - "crates/domains/symthaea-muse/style-genre-coverage-baseline-v1.json"
+      - "scripts/muse_style_coverage.py"
+      - "tests/python/test_muse_style_coverage.py"
+      - ".github/workflows/muse-style-coverage.yml"
+      - ".github/workflows/muse-style-response-curves.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-muse-protocol/src/catalog.rs"
+      - "crates/domains/symthaea-music-theory/src/style.rs"
+      - "crates/domains/symthaea-music-theory/src/grammar.rs"
+      - "crates/domains/symthaea-music-theory/examples/diversity_census.rs"
+      - "crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs"
+      - "crates/domains/symthaea-muse/src/theory_realize.rs"
+      - "scripts/muse_style_capability_inventory.py"
+      - "tests/python/test_muse_style_capability_inventory.py"
+      - "scripts/muse_genre_completion_roadmap.py"
+      - "scripts/muse_choro_synthetic_harness.py"
+      - "tests/python/test_muse_genre_completion_roadmap.py"
+      - "tests/python/test_muse_choro_synthetic_harness.py"
+      - "tests/python/test_muse_choro_source_intake.py"
+      - "crates/domains/symthaea-muse/CHORO_APPROVED_INPUT_MANIFEST_V1.json"
+      - "crates/domains/symthaea-muse/CHORO_PRE_REGISTERED_ANALYSIS_PLAN_V1.json"
+      - "crates/domains/symthaea-muse/CHORO_APPROVED_INPUT_APPROVAL_V1.json"
+      - "scripts/muse_choro_input_manifest.py"
+      - "tests/python/test_muse_choro_input_manifest.py"
+      - "crates/domains/symthaea-muse/genre-completion-roadmap-v1.json"
+      - "crates/domains/symthaea-muse/SOUTHERN_AFRICAN_GENRE_RESEARCH_BRIEF_V1.md"
+      - "crates/domains/symthaea-muse/MUSE_GLOBAL_GENRE_COVERAGE_RESEARCH_V1.md"
+      - "crates/domains/symthaea-muse/CHORO_GRAMMAR_RESEARCH_SPEC_V1.json"
+      - "crates/domains/symthaea-muse/CHORO_SOURCE_INTAKE_V1.json"
+      - "crates/domains/symthaea-muse/CHORO_GRAMMAR_RESEARCH_SPEC_V1.md"
+      - "crates/domains/symthaea-muse/style-genre-coverage-baseline-v1.json"
+      - "scripts/muse_style_coverage.py"
+      - "tests/python/test_muse_style_coverage.py"
+      - ".github/workflows/muse-style-coverage.yml"
+      - ".github/workflows/muse-style-response-curves.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-style-coverage-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  style-coverage:
+    name: Catalog and runtime style capability checks
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Check source-derived coverage against the frozen baseline
+        run: python3 scripts/muse_style_coverage.py --check
+
+      - name: Test parsing, integrity guards, and drift detection
+        run: python3 tests/python/test_muse_style_coverage.py -v
+
+      - name: Audit source-declared executable style controls
+        run: python3 scripts/muse_style_capability_inventory.py > /tmp/muse-style-capability-inventory.json
+
+      - name: Publish style capability source map to the job summary
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/muse-style-capability-inventory.json").read_text())
+          summary = report["summary"]
+          source = report["source"]
+          print("## Muse runtime capability source map")
+          print()
+          print(
+              f"Catalog rows: {summary['catalog_entries']}; "
+              f"rows with runtime profiles: {summary['catalog_entries_with_runtime_profile']}; "
+              f"catalog-only rows: {summary['catalog_entries_without_runtime_profile']}."
+          )
+          print()
+          print(
+              "Grammar dispatch modes: "
+              + ", ".join(
+                  f"{name} = {count}"
+                  for name, count in summary["grammar_dispatch_modes"].items()
+              )
+          )
+          print()
+          print(
+              "Intent-axis declaration counts: "
+              + ", ".join(
+                  f"{count} axes = {styles} styles"
+                  for count, styles in summary["intent_axis_count_distribution"].items()
+              )
+          )
+          print(
+              "Styles declaring no intent axes: "
+              + (", ".join(summary["styles_with_zero_intent_axes"]) or "none")
+          )
+          print()
+          print("| Source | Path | Git blob SHA |")
+          print("|---|---|---|")
+          for label, path_key, hash_key in [
+              ("Catalog", "catalog_path", "catalog_blob_sha"),
+              ("Style declarations", "style_path", "style_blob_sha"),
+              ("Grammar dispatch", "grammar_dispatch_path", "grammar_dispatch_blob_sha"),
+              ("Instrument realization", "realization_path", "realization_blob_sha"),
+              ("Intent-axis census source", "intent_axis_evidence_path", "intent_axis_evidence_blob_sha"),
+          ]:
+              print(f"| {label} | {source[path_key]} | {source[hash_key]} |")
+          print()
+          print("| Style | Grammar family | Dispatch mode | Intent axes | Instrument pool choices |")
+          print("|---|---|---|---:|---:|")
+          for item in report["profiles"]:
+              print(
+                  f"| {item['style']} | {item['grammar_family']} | "
+                  f"{item['grammar_dispatch']['mode']} | "
+                  f"{item['intent_axis_count']} | "
+                  f"{item['instrument_pool']['ensemble_choices']} |"
+              )
+          print()
+          print(
+              "Note: this inventories source-declared capability only. It does not run "
+              "the causal census or validate audio rendering, perceptual distinctness, "
+              "or cultural authenticity."
+          )
+          PY
+
+      - name: Test runtime capability inventory parser and fail-closed guards
+        run: python3 tests/python/test_muse_style_capability_inventory.py -v
+
+      - name: Validate deterministic Choro metrics on synthetic fixtures only
+        run: python3 scripts/muse_choro_synthetic_harness.py --check --output /tmp/muse-choro-synthetic-report.json
+
+      - name: Test Choro synthetic metric harness and fail-closed inputs
+        run: python3 tests/python/test_muse_choro_synthetic_harness.py -v
+
+      - name: Test Choro source-intake accounting and rights boundaries
+        run: python3 tests/python/test_muse_choro_source_intake.py -v
+
+      - name: Validate Choro approved-input manifest stays fail-closed
+        run: python3 scripts/muse_choro_input_manifest.py --check
+
+      - name: Test source-bound Choro input authorization gates
+        run: python3 tests/python/test_muse_choro_input_manifest.py -v
+
+      - name: Publish synthetic harness boundary to job summary
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/muse-choro-synthetic-report.json").read_text())
+          print("## Choro synthetic metric harness")
+          print()
+          print(f"Checks passed: {sum(report['checks'].values())}/{len(report['checks'])}")
+          print()
+          print("| Check | Result |")
+          print("|---|---:|")
+          for name, passed in report["checks"].items():
+              print(f"| {name} | {'PASS' if passed else 'FAIL'} |")
+          print()
+          print("**Evidence boundary:** synthetic fixtures only; no Choro corpus or third-party music data was used. This is not empirical genre validation.")
+          PY
+
+      - name: Verify all-genre completion roadmap against source
+        run: python3 scripts/muse_genre_completion_roadmap.py --check
+
+      - name: Test completion coverage, workstream routing, and expansion intake
+        run: python3 tests/python/test_muse_genre_completion_roadmap.py -v

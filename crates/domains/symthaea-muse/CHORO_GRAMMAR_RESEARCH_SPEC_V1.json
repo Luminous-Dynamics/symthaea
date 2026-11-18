@@ -1,0 +1,376 @@
+{
+  "schema": "muse-genre-specific-research-spec-v1",
+  "spec_id": "CHORO-GRAMMAR-RESEARCH-001",
+  "spec_version": "1.0.0",
+  "status": "research_specification_only_not_runtime_evidence",
+  "identity": {
+    "name": "Choro",
+    "catalog_id": null,
+    "composer_route": null,
+    "expansion_queue_state": "proposal_only_not_in_catalog",
+    "scope": "Brazilian Choro as represented by the cited published corpus and historical studies; not a claim to cover every regional, historical, performance, or contemporary variant."
+  },
+  "decision_boundary": {
+    "implementation_started": false,
+    "runtime_capability_claimed": false,
+    "source_data_copied_into_symthaea": false,
+    "promotion_blockers": [
+      "dataset license/reuse review",
+      "rights-clear analysis plan or separate permission",
+      "independent source audit",
+      "knowledgeable Choro musician/researcher review",
+      "pre-registered hypothesis and null model",
+      "runtime implementation and deterministic behavior evidence",
+      "rendering/instrument limits recorded",
+      "neighboring-style distinctness comparison before any authenticity claim",
+      "substantive preregistered plan with concrete hypotheses/null models and exact plan-to-authorized-source binding"
+    ]
+  },
+  "sources": [
+    {
+      "id": "choro-corpus-study-2020",
+      "kind": "peer_reviewed_corpus_analysis",
+      "citation": "Moss, Fabian C.; Souza, Willian Fernandes; Rohrmeier, Martin. Harmony and form in Brazilian Choro: A corpus-driven approach to musical style analysis. Journal of New Music Research 49(5), 416–437 (2020).",
+      "url": "https://doi.org/10.1080/09298215.2020.1797109",
+      "supports": [
+        "The study transcribed chord symbols and formal structure for 295 representative pieces from the Choro Songbook.",
+        "The study reports differences in harmonic relations/chord transitions and key transitions within pieces.",
+        "The study reports that harmonies in regular 16- and 32-bar phrases conform to their hypermetrical structure.",
+        "The study reports a historical relationship in which older compositions use chords with fewer modifications than younger compositions."
+      ],
+      "does_not_establish": [
+        "That every Choro piece has a 16- or 32-bar phrase.",
+        "A generator architecture, style route, audible fidelity, or community-recognized authenticity.",
+        "A model-ready set of universal numerical thresholds."
+      ],
+      "reported_study_scope": {
+        "pieces": 295,
+        "chord_tokens": 44067,
+        "unique_chord_types": 682,
+        "composers": 180,
+        "subgenres": 19,
+        "most_represented_composer_counts": {
+          "Pixinguinha": 32,
+          "Jacob do Bandolim": 31
+        },
+        "concentration_note": "The paper reports these two composers together account for more than one fifth of the pieces."
+      }
+    },
+    {
+      "id": "dcmlab-choro-corpus",
+      "kind": "research_corpus_repository",
+      "url": "https://github.com/DCMLab/choro/tree/fe409c62deed50fc7f4b0d667863cd13ab230ff6",
+      "pinned_commit": "fe409c62deed50fc7f4b0d667863cd13ab230ff6",
+      "readme_fields": [
+        "global_key",
+        "local_key",
+        "relative_key",
+        "global_mode",
+        "local_mode",
+        "global_meter",
+        "local_meter",
+        "path",
+        "phrase",
+        "part",
+        "bar_no",
+        "duration",
+        "chord",
+        "harte",
+        "rn_chord",
+        "rn_harte",
+        "type",
+        "added",
+        "extensions",
+        "year",
+        "sub_genre",
+        "songbook"
+      ],
+      "license": "CC BY-NC-SA 4.0",
+      "source_limit": "The dataset is based on published songbook material and does not represent the full diversity of the living tradition."
+    },
+    {
+      "id": "choro-phrase-rhythm-2014",
+      "kind": "scholarly_performance_and_rhythm_article",
+      "citation": "Mário Sève, O fraseado do Choro: algumas considerações rítmicas e melódicas (published 2014 proceedings; page dated 2015).",
+      "url": "https://seer.unirio.br/simpom/article/view/4717",
+      "supports": [
+        "A historical discussion of phrase style in Rio de Janeiro from the second half of the nineteenth century to the first half of the twentieth.",
+        "Examples discuss polca-lundu, tango brasileiro, choro-amaxixado and choro-sambado contexts.",
+        "The article discusses Choro ensembles involving cavaquinho, violão and percussion."
+      ],
+      "does_not_establish": [
+        "That any single rhythmic pattern, instrumentation, or subtype is universal to all Choro.",
+        "That the chord/form corpus alone is sufficient to test melody, rhythmic feel, or performance practice."
+      ]
+    },
+    {
+      "id": "choro-songbook-corpus-zenodo-record",
+      "kind": "archived_dataset_metadata_record",
+      "citation": "Choro Songbook Corpus, version 1.1, Zenodo record 10.5281/zenodo.3881347.",
+      "url": "https://zenodo.org/records/3881347",
+      "supports": [
+        "The versioned record identifies the archived Choro Songbook Corpus release and links to the DCMLab repository."
+      ],
+      "does_not_establish": [
+        "The Rights field says 'Other (Open)' without a further description; that metadata is not itself a specific commercial license.",
+        "The paper's data availability statement says non-commercial use, and the related GitHub repository has a separate CC BY-NC-SA 4.0 LICENSE. Resolve the relevant rights before use."
+      ]
+    }
+  ],
+  "license_and_data_handling": {
+    "repository_license": "CC BY-NC-SA 4.0",
+    "repository_license_url": "https://github.com/DCMLab/choro/blob/fe409c62deed50fc7f4b0d667863cd13ab230ff6/LICENSE",
+    "commercial_use_authorized_by_this_spec": false,
+    "data_handling_decision": "Do not copy, commit, bundle, fine-tune on, or use the corpus data in commercial training or a commercial product unless a competent legal review establishes an applicable permission or separately negotiated rights.",
+    "permitted_work_now": [
+      "Cite the publication and repository metadata.",
+      "Use the documented field schema to design an analysis plan.",
+      "Develop synthetic fixtures whose values are authored independently and do not reproduce corpus excerpts."
+    ],
+    "before_empirical_analysis": [
+      "Review license scope and any third-party rights in the transcribed songbook material.",
+      "Obtain written permission or select an independently rights-cleared corpus if the intended use is commercial or licensing is uncertain.",
+      "Record corpus commit, license text version, exact purpose, allowed outputs and retention/deletion policy.",
+      "Do not export substantial derived data or note sequences until permitted use has been reviewed."
+    ],
+    "zenodo_corpus_record_url": "https://zenodo.org/records/3881347",
+    "zenodo_record_rights_display": "Other (Open) — no further description.",
+    "published_paper_data_availability": "The paper states the dataset is available for non-commercial use; the Zenodo label alone does not define broader permission.",
+    "rights_interpretation": "Do not infer a commercial-use license from Zenodo's generic 'Other (Open)' metadata. The associated repository separately states CC BY-NC-SA 4.0. Resolve use-specific rights and underlying Songbook transcription rights before empirical work."
+  },
+  "hypotheses": [
+    {
+      "id": "CHORO-H1-FORM-HYPERMETRE",
+      "state": "proposed_falsifiable_hypothesis_not_tested",
+      "statement": "Within the subset of works annotated as regular 16- or 32-bar phrases, harmonic events exhibit phrase-position structure associated with the reported hypermetrical organization.",
+      "evidence_basis": [
+        "choro-corpus-study-2020"
+      ],
+      "candidate_fields": [
+        "bar_no",
+        "duration",
+        "path",
+        "phrase",
+        "part",
+        "chord",
+        "rn_chord",
+        "global_meter",
+        "local_meter"
+      ],
+      "operationalization": "After rights clearance, define the eligible regular-phrase subset before inspecting outcomes; map chord changes to normalized phrase positions; state the tested hypermetrical boundary positions from a source-backed analysis plan; compare observed boundary concentration/position dependence against a within-piece null that preserves event counts and phrase lengths while disrupting phrase-position alignment.",
+      "null_model": "Pre-registered within-piece circular shift or constrained permutation; document edge handling and the unit of resampling. The exact choice must be fixed before running the candidate dataset.",
+      "falsification_or_no_pass": "No stable effect under the registered null, effect direction reversed, effect confined to a small unreported subgroup, or insufficient annotated regular phrases. Such an outcome blocks a Choro-specific grammar claim for this feature.",
+      "limitations": "The source reports a corpus-level pattern, not a universal rule. Do not hard-code 16/32 bars as required for every piece.",
+      "pass_threshold": "Not set here; pre-register an effect size and uncertainty criterion before licensed evaluation."
+    },
+    {
+      "id": "CHORO-H2-HARMONIC-TRANSITIONS",
+      "state": "proposed_falsifiable_hypothesis_not_tested",
+      "statement": "Chord transitions and within-piece key transitions carry form/context-conditioned structure that cannot be explained by the corpus's aggregate chord-frequency distribution alone.",
+      "evidence_basis": [
+        "choro-corpus-study-2020"
+      ],
+      "candidate_fields": [
+        "global_key",
+        "local_key",
+        "relative_key",
+        "path",
+        "phrase",
+        "part",
+        "bar_no",
+        "rn_chord",
+        "rn_harte",
+        "type",
+        "added",
+        "extensions",
+        "sub_genre"
+      ],
+      "operationalization": "Estimate transition distributions at the piece/part level, report coverage and sparsity, then compare against a pre-registered shuffle that preserves per-piece chord counts and relevant form strata while disrupting adjacent transition order. Evaluate generalization with pieces held out by composition, not rows randomly split from the same piece.",
+      "null_model": "Per-piece constrained permutation of chord order within comparable part/form strata; report sensitivity to sparse strata and missing key annotation.",
+      "falsification_or_no_pass": "The proposed transition features do not outperform the constrained null on held-out pieces, or results vanish under reasonable annotation/stratum choices.",
+      "limitations": "This would establish corpus-relative structure, not by itself distinguish Choro from Samba, Polka, Maxixe, or other neighboring practices.",
+      "pass_threshold": "Set only after a pilot power/coverage audit and pre-registration; no numeric threshold is inferred from the abstract."
+    },
+    {
+      "id": "CHORO-H3-HISTORICAL-ALTERATION",
+      "state": "proposed_falsifiable_hypothesis_not_tested",
+      "statement": "Among compositions with usable year metadata, measured chord-modification frequency differs with composition period in the direction reported by the study: older pieces have fewer chord modifications on average.",
+      "evidence_basis": [
+        "choro-corpus-study-2020"
+      ],
+      "candidate_fields": [
+        "year",
+        "added",
+        "extensions",
+        "type",
+        "songbook",
+        "sub_genre",
+        "rn_chord"
+      ],
+      "operationalization": "Define chord modification from the corpus schema in advance; publish missing-year coverage, year distribution, and songbook/subgenre confounds; compare piece-level modification rates across composition year while clustering uncertainty by piece and performing a sensitivity analysis excluding records with uncertain dates.",
+      "null_model": "Year-label permutation within defensible comparison strata; also report the unadjusted relation and missing-data sensitivity.",
+      "falsification_or_no_pass": "No directional relation after pre-registered sensitivity checks, or too few reliably dated pieces to support the inference.",
+      "limitations": "Publication date, songbook volume, or style-age stereotypes must not be substituted for a composition year. Do not infer a period from sound alone.",
+      "pass_threshold": "Pre-register direction, effect and uncertainty rules once metadata coverage is measured."
+    },
+    {
+      "id": "CHORO-H4-RHYTHMIC-PHRASE-AND-ENSEMBLE",
+      "state": "research_question_not_testable_from_chord_form_corpus_alone",
+      "statement": "Historically situated Choro phrase and rhythmic practices may differ among the polca-lundu, tango brasileiro, choro-amaxixado and choro-sambado contexts described by Sève; typical ensembles include string-led and percussion roles but are not universal.",
+      "evidence_basis": [
+        "choro-phrase-rhythm-2014"
+      ],
+      "required_additional_evidence": [
+        "Rights-cleared score, onset or performance annotations with known provenance.",
+        "Clear mapping between named historical subtype and each analyzed excerpt.",
+        "Review by a knowledgeable Choro practitioner/researcher."
+      ],
+      "operationalization": "Only after source and rights review: measure phrase-level onset/accent patterns and rhythmic asymmetry on a source-defined annotation; compare subtypes and historical periods rather than enforcing one universal template.",
+      "null_model": "Matched beat-grid/phrase-length baselines that preserve event density; the baseline and subtype labels require expert review before execution.",
+      "falsification_or_no_pass": "No stable contrast across the registered examples, subtype labels cannot be reliably established, or evidence is insufficient to separate musical pattern from notation/transcription choices.",
+      "limitations": "The existing chord/form corpus does not alone provide the note-onset and performance-feel evidence required for this test.",
+      "pass_threshold": "Not specified until a licensed and source-defined rhythm corpus is identified."
+    }
+  ],
+  "sampling_and_dependence": {
+    "status": "preanalysis_constraints_not_results",
+    "scope_note": "The counts below are reported by the cited paper, not recomputed by this repository. The branch has not ingested the corpus. They describe that study's songbook-based sampling frame, not Choro as a whole.",
+    "unit_of_observation": "Treat a composition as the minimum indivisible unit for work-level splits; events, bars, chord tokens, parts and phrases from one composition must never be split across train/test partitions.",
+    "source_reported_counts": {
+      "pieces": 295,
+      "chord_tokens": 44067,
+      "unique_chord_types": 682,
+      "composers": 180,
+      "subgenres": 19,
+      "top_composer_piece_counts": {
+        "Pixinguinha": 32,
+        "Jacob do Bandolim": 31
+      }
+    },
+    "primary_split_rule": "Any predictive or selection evaluation must split by complete composition before feature extraction or tuning; never randomly split chord tokens, measures or repeated representations from the same piece.",
+    "generalization_sensitivity": "Where sample size permits, run a group split that keeps every composition by a composer wholly in one partition. Report composer-held-out performance separately from piece-held-out performance; do not call the former optional evidence of universal authenticity.",
+    "dominant_composer_sensitivity": [
+      "Report results with all eligible works.",
+      "Repeat the primary estimate excluding Pixinguinha works.",
+      "Repeat the primary estimate excluding Jacob do Bandolim works.",
+      "Report whether either exclusion changes effect direction, uncertainty, eligible-work count or qualitative conclusion."
+    ],
+    "dependence_and_weighting": [
+      "Report both piece-weighted and composer-aggregated summaries where the question supports both; do not let chord-token volume silently define the sampling weights.",
+      "Estimate uncertainty at the highest defensible independent unit for each hypothesis and state that unit explicitly; composer clustering is required for inference intended to generalize across composers.",
+      "For historical modification, use composition year only when source provenance supports it; report year missingness and overlap by composer, subgenre and songbook. If period and composer are confounded or have inadequate overlap, report the trend as non-identifiable rather than treating adjustment as a cure.",
+      "If too few independent composers or eligible works remain for a planned sensitivity, label it not estimable; do not silently omit the sensitivity."
+    ],
+    "required_report_fields": [
+      "eligible_piece_count",
+      "eligible_composer_count",
+      "eligible_subgenre_count",
+      "piece_and_composer_exclusion_counts",
+      "dominant_composer_sensitivity_results",
+      "piece_weighted_and_composer_aggregated_estimates",
+      "independent_unit_for_uncertainty",
+      "missingness_and_stratum_overlap",
+      "deviations_from_registered_split_or_null"
+    ]
+  },
+  "synthetic_fixture_requirements": [
+    "Use independently authored small examples; no transcription, melody, chord sequence, or other excerpt copied from the restricted corpus.",
+    "Fixture names and annotations describe the tested property, not a claim of authentic Choro.",
+    "Prove that the parser/metric responds to a deliberately inserted phrase-position effect and does not respond to a shuffled counterexample.",
+    "Pin fixture hashes, algorithm version, random seed, and exact input parameters."
+  ],
+  "route_promotion_gates": [
+    "License and source provenance resolved for every evaluation item.",
+    "Three primary corpus hypotheses registered before empirical analysis; separate eligibility/coverage report published.",
+    "Results reproduce under a held-out-by-composition split and constrained nulls.",
+    "Neighboring-style distinctness test uses independent, compatible and rights-cleared reference material.",
+    "A knowledgeable Choro musician/researcher reviews the proposed grammar and limitations.",
+    "An actual executable composer path is added and tested through the same call path used by users.",
+    "Renderer/instrument availability and every substitution are reported separately from symbolic grammar results.",
+    "No cultural authenticity or faithful-generation claim until the applicable review and evidence gates pass."
+  ],
+  "reproducibility": {
+    "spec_is_a_result": false,
+    "current_empirical_results": null,
+    "corpus_data_ingested": false,
+    "thresholds_frozen": false,
+    "future_receipt_required": [
+      "source pins and licenses",
+      "analysis code revision",
+      "corpus authorization or replacement source",
+      "input manifest digest",
+      "eligibility/missingness report",
+      "registered null parameters",
+      "seeded outputs",
+      "metric output digest",
+      "expert review record where applicable",
+      "exact preregistered analysis-plan file SHA-256 and immutable registration URL",
+      "exact plan-to-manifest source binding comparison for source IDs, artifact URLs/paths/digests/bytes and selected work IDs",
+      "registered primary hypotheses, concrete null models, threshold/uncertainty rules, multiplicity policy, missing-data policy, split strategy and mandatory sensitivity analyses"
+    ]
+  },
+  "synthetic_fixture_harness": {
+    "path": "scripts/muse_choro_synthetic_harness.py",
+    "test_path": "tests/python/test_muse_choro_synthetic_harness.py",
+    "schema": "muse-choro-synthetic-harness-report-v1",
+    "status": "synthetic_metric_validation_only_not_empirical_evidence",
+    "source_data_used": false,
+    "corpus_data_ingested": false,
+    "empirical_results": null,
+    "deterministic_seed": 90210,
+    "checks": [
+      "phrase-position metric distinguishes authored aligned fixture from a counterexample and balanced phase rotation null",
+      "conditional transition entropy distinguishes a deterministic authored cycle from a seeded shuffle while preserving symbol counts",
+      "trend metric detects a monotone synthetic series and its reversed counterexample",
+      "invalid or degenerate input fails closed"
+    ],
+    "limits": [
+      "synthetic fixtures do not validate Choro-specific claims",
+      "no third-party corpus data or musical excerpts are used",
+      "commercial corpus use still requires appropriate rights clearance"
+    ]
+  },
+  "alternative_source_intake": {
+    "path": "crates/domains/symthaea-muse/CHORO_SOURCE_INTAKE_V1.json",
+    "schema": "muse-choro-source-intake-v1",
+    "source_records": 6,
+    "records_rights_cleared": 0,
+    "records_pending_rights_review": 6,
+    "files_downloaded": 0,
+    "score_content_transcribed": 0,
+    "empirical_analysis_performed": 0,
+    "status": "metadata_only_candidate_inventory_not_rights_cleared",
+    "note": "Per-work source leads only. No score data is copied or analyzed; commercial or empirical use remains gated on an appropriate rights review."
+  },
+  "evaluation_methodology_references": {
+    "preregistration": {
+      "title": "Welcome to Registrations & Preregistrations",
+      "organization": "Open Science Framework Support",
+      "url": "https://help.osf.io/article/330-welcome-to-registrations",
+      "supports": [
+        "plan timestamped and read-only before collection or analysis",
+        "explicit hypotheses and variables, statistical tests, decision criteria, exclusions, outcomes, contingencies, and planned deviations"
+      ],
+      "limitation": "This repository validates recorded plan fields and a supplied HTTPS URL; it does not independently verify that an external registration exists or that its contents are immutable."
+    },
+    "music_generation_evaluation": {
+      "title": "Recent advances in music generation: methods, evaluation, and challenges",
+      "authors": [
+        "Wei Duan",
+        "Yi Yu",
+        "Jean-Pierre Briot"
+      ],
+      "published": "2026-06-02",
+      "doi": "10.1007/s10462-026-11582-x",
+      "url": "https://doi.org/10.1007/s10462-026-11582-x",
+      "supports": [
+        "no single objective metric covers every relevant aspect of generated music",
+        "symbolic and audio evaluation emphasize different outcome families, including tonality/rhythm/structure versus timbre/transients/perceptual quality"
+      ],
+      "design_implications": [
+        "report multiple registered metrics with distinct interpretations",
+        "separate source-corpus evidence from runtime response, rendered-audio evidence, and expert/listener evaluation"
+      ]
+    }
+  }
+}

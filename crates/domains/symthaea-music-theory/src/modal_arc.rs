@@ -90,7 +90,8 @@ pub fn realize_modal_arc(intent: &MusicalIntent, spec: &CompositionSpec) -> Moda
                     pitch: scale.degree_pitch(degree, 4),
                     onset,
                     duration,
-                    velocity: 0.34 + repetition as f32 * 0.025,
+                    velocity: 0.34
+                        + 0.16 * ((repetition + 1) as f32 / stage_repetitions[0].max(1) as f32),
                     role: VoiceRole::Melody,
                     emphasis: if repetition == 0 && index == 0 {
                         Emphasis::PhraseStart
@@ -115,7 +116,8 @@ pub fn realize_modal_arc(intent: &MusicalIntent, spec: &CompositionSpec) -> Moda
                     pitch: scale.degree_pitch(degree, 4),
                     onset,
                     duration,
-                    velocity: 0.52 + repetition as f32 * 0.025,
+                    velocity: 0.52
+                        + 0.10 * ((repetition + 1) as f32 / stage_repetitions[1].max(1) as f32),
                     role: VoiceRole::Melody,
                     emphasis: if index == 0 {
                         Emphasis::PhraseStart
@@ -218,6 +220,31 @@ mod tests {
             bars: 2,
             seed: 7,
             ..MusicalIntent::default()
+        }
+    }
+
+    #[test]
+    fn long_modal_arcs_keep_stage_dynamics_within_midi_bounds() {
+        let style = Style::HindustaniInspired;
+        for bars in [8_usize, 16, 20, 24, 40] {
+            for seed in 0_u64..4 {
+                let intent = MusicalIntent {
+                    bars,
+                    seed,
+                    ..intent()
+                };
+                let realized = crate::grammar::compose_with_grammar_plan(
+                    style.grammar_profile(),
+                    &intent,
+                    &style.spec(),
+                );
+                assert!(
+                    realized.score.notes.iter().all(|note| {
+                        note.velocity.is_finite() && (0.0..=1.0).contains(&note.velocity)
+                    }),
+                    "invalid velocity for bars={bars}, seed={seed}"
+                );
+            }
         }
     }
 
