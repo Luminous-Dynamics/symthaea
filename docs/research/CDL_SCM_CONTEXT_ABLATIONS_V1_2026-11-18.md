@@ -19,7 +19,7 @@ The first three are implemented as separate predictor arms. The fourth remains f
 
 ## Implemented predictor arms
 
-All custom predictors implement the shared `BytePredictor` interface and use the same arithmetic coder, frame format, checksums, and decoder-synchronous symbol updates. The learner-visible SCM2 header is 16 bytes: magic, version, zero flags, fixed variable count, and sequence length. It contains no intervention target, boundary, forced value or mechanism parameters. Records follow as five signed i16 values in topological order, each little-endian. The intervention manifest and mechanism configuration remain in evaluator-only `ScmTrace` fields.
+All custom predictors implement the shared `BytePredictor` interface and use the same arithmetic coder, frame format, checksums, and decoder-synchronous symbol updates. The learner-visible SCM2 header is 16 bytes: magic, version, zero flags, fixed variable count, and sequence length. It contains no intervention target, boundary, forced value or mechanism parameters. Records follow as five signed i16 values in topological order, each little-endian. The intervention manifest and mechanism configuration remain in crate-private `ScmTrace` fields and are never serialized. The fixed E3 mechanism combinations are public development fixtures visible in source, not a blind test split; confirmatory claims require an externally controlled parameter/seed manifest.
 
 | Frame arm | Model ID | Information used |
 |---|---:|---|
@@ -37,7 +37,7 @@ Each predictor starts from deterministic state for each stream. Predictor state 
 
 ## Preliminary independent diagnostic
 
-An independent Python translation of the deterministic SCM generator and the **revised additive base-plus-context frequency updates** was evaluated on the two E3 held-out mechanism combinations, 10 explicit seeds per combination, and paired observational / `do(x1=20000)` traces using the same seed and exogenous noise: 40 streams total, 4,096 steps each, and 40,976 bytes per SCM2 stream. The intervention target/window/value are not serialized into the stream; paired treatment labels are held only in the evaluator's scoring manifest. The seed set was `0xCA55_A1 + seed_index + 200` for `seed_index = 0..9`.
+An independent Python translation of the deterministic SCM generator and the **revised additive base-plus-context frequency updates** was evaluated on the two E3 held-out mechanism combinations, 10 explicit seeds per combination, and paired observational / `do(x1=20000)` traces using the same seed and exogenous noise: 40 streams total, 4,096 steps each, and 40,976 bytes per SCM2 stream. The intervention target/window/value are not serialized into the stream; paired treatment labels are held only in the evaluator's scoring manifest. The seed set was `0xCA55_A1 + seed_index + 200` for `seed_index = 0..9`. These are explicit public development seeds, not concealed challenge seeds.
 
 The diagnostic is cumulative prequential ideal code length:
 `sum_t log2(total_frequency_t / observed_symbol_frequency_t)`,
