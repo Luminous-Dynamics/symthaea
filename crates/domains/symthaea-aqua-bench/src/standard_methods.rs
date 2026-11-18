@@ -268,6 +268,7 @@ pub struct UwlBoostFunctionObservation {
     pub flow_close_reopen_receipt_sha256: String,
     pub boost_reset_observed_after_close: bool,
     pub regular_flow_labelled_on_scheme: bool,
+    pub scheme_label_receipt_sha256: String,
     pub flow_instrument_id: String,
     pub flow_calibration_receipt_sha256: String,
 }
@@ -311,6 +312,7 @@ impl UwlBoostFunctionObservation {
             ("protocol_sha256", self.protocol_sha256.as_str()),
             ("boost_activated_receipt_sha256", self.boost_activated_receipt_sha256.as_str()),
             ("flow_close_reopen_receipt_sha256", self.flow_close_reopen_receipt_sha256.as_str()),
+            ("scheme_label_receipt_sha256", self.scheme_label_receipt_sha256.as_str()),
             ("flow_calibration_receipt_sha256", self.flow_calibration_receipt_sha256.as_str()),
         ] {
             require_digest(field, digest)?;
@@ -337,10 +339,10 @@ impl UwlBoostFunctionObservation {
             return Err(MethodPressureError::RegularFlowNotListed);
         }
 
-        for (field, flow, uncertainty) in [
-            ("regular_flow_lpm", self.regular_flow_lpm, self.regular_flow_uncertainty_lpm),
-            ("boost_flow_lpm", self.boost_flow_lpm, self.boost_flow_uncertainty_lpm),
-            ("post_close_flow_lpm", self.post_close_flow_lpm, self.post_close_flow_uncertainty_lpm),
+        for (flow, uncertainty) in [
+            (self.regular_flow_lpm, self.regular_flow_uncertainty_lpm),
+            (self.boost_flow_lpm, self.boost_flow_uncertainty_lpm),
+            (self.post_close_flow_lpm, self.post_close_flow_uncertainty_lpm),
         ] {
             if !flow.is_finite() || flow <= 0.0 {
                 return Err(MethodPressureError::InvalidFlow);
@@ -351,12 +353,6 @@ impl UwlBoostFunctionObservation {
             if flow - uncertainty <= 0.0 {
                 return Err(MethodPressureError::InvalidFlowUncertainty);
             }
-            if self.flow_instrument_id.trim().is_empty() {
-                return Err(MethodPressureError::MissingField {
-                    field: "flow_instrument_id",
-                });
-            }
-            let _ = field;
         }
 
         if self.boost_flow_lpm - self.boost_flow_uncertainty_lpm
@@ -664,6 +660,7 @@ mod tests {
             flow_close_reopen_receipt_sha256: digest('e'),
             boost_reset_observed_after_close: true,
             regular_flow_labelled_on_scheme: true,
+            scheme_label_receipt_sha256: digest('9'),
             flow_instrument_id: "flow-boost-01".to_owned(),
             flow_calibration_receipt_sha256: digest('f'),
         }
@@ -759,6 +756,19 @@ mod tests {
         assert_eq!(
             observation.validate(),
             Err(MethodPressureError::RegularFlowNotListed)
+        );
+    }
+
+
+    #[test]
+    fn rejects_missing_scheme_label_receipt_for_regular_flow() {
+        let mut observation = boost_observation();
+        observation.scheme_label_receipt_sha256 = "unknown".to_owned();
+        assert_eq!(
+            observation.validate(),
+            Err(MethodPressureError::InvalidDigest {
+                field: "scheme_label_receipt_sha256"
+            })
         );
     }
 
