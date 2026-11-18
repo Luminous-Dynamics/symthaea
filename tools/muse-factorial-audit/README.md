@@ -74,3 +74,19 @@ The case generator and contrast engine are ready to be connected; no composer ou
 - **Implemented:** standalone factorial case generator, exact coverage validator, contrast kernel and unit-test source.
 - **Source-checked:** factor/style/seed choices and source blob digests in the preregistration.
 - **Not executed:** Rust tests, composer calls, discovery sweep, confirmation sweep, rendering and listening study.
+
+
+## Import and analyze composer results
+
+After an adapter emits one outcome row per expected case and registered metric,
+use the strict importer described in [RESULTS_SCHEMA.md](RESULTS_SCHEMA.md):
+
+```sh
+cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin analyze-results -- \
+  discovery observations.csv note_density,mean_pitch coverage.csv effects.csv summary.csv
+```
+
+The metric list is explicit so wholly absent metrics are visible as 81/81 missing
+within every expected block. Incomplete blocks remain in coverage reports and
+produce no contrast estimates; the command exits non-zero after writing reports.
+Missing, failed, and not-applicable values are never imputed as zero.
