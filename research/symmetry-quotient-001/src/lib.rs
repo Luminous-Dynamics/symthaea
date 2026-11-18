@@ -1428,6 +1428,427 @@ pub fn verify_multi_environment_quotient(
     })
 }
 
+
+/// Optimization sense is explicit because the certified representative search
+/// must be interpreted against the original finite objective.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ObjectiveSenseV1 {
+    Minimize,
+    Maximize,
+}
+
+/// This authority is intentionally disjoint from exact quotient authority.
+/// It permits only an additive-objective-gap claim; it is not exact equivalence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApproximatePruningAuthorityV1 {
+    ExactFeasibilityWithBoundedAdditiveObjectiveDeviation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApproximateSearchContractV1 {
+    /// Unit/scale identifier for objective_cost and the declared tolerance.
+    pub objective_unit_id: String,
+    pub objective_sense: ObjectiveSenseV1,
+    /// User-declared maximum acceptable additive objective gap in objective units.
+    pub maximum_additive_gap: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ApproximateBlockedV1 {
+    HardTaskSemanticMismatch {
+        group_element: usize,
+        source_index: usize,
+        image_index: usize,
+        source_candidate_id: String,
+        image_candidate_id: String,
+        differing_fields: Vec<TaskFieldV1>,
+    },
+    ObjectiveDeviationExceedsTolerance {
+        group_element: usize,
+        source_index: usize,
+        image_index: usize,
+        source_candidate_id: String,
+        image_candidate_id: String,
+        absolute_objective_deviation: u64,
+        maximum_additive_gap: u64,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ApproximateCompileOutcomeV1 {
+    Authorized(ApproximateQuotientCertificateV1),
+    Blocked(ApproximateBlockedV1),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApproximateMemberWitnessV1 {
+    pub candidate_index: usize,
+    pub candidate_id: String,
+    pub group_element: usize,
+    pub inverse_group_element: usize,
+    /// Exact absolute difference from this orbit's canonical representative.
+    pub objective_deviation_from_representative: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApproximateOrbitV1 {
+    pub representative_index: usize,
+    pub representative_id: String,
+    pub members: Vec<ApproximateMemberWitnessV1>,
+    pub stabilizer_group_elements: Vec<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApproximateCertificateEvidenceV1 {
+    pub group_axiom_checks: usize,
+    pub action_law_checks: usize,
+    pub exact_non_objective_semantic_checks: usize,
+    pub representative_objective_checks: usize,
+    pub orbit_member_witnesses: usize,
+    pub complete_domain_cover: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApproximateQuotientCertificateV1 {
+    pub schema_version: u32,
+    pub problem_id: String,
+    pub action_id: String,
+    pub group_id: String,
+    pub group_order: usize,
+    pub candidate_count: usize,
+    pub pruning_authority: ApproximatePruningAuthorityV1,
+    pub objective_unit_id: String,
+    pub objective_sense: ObjectiveSenseV1,
+    pub requested_maximum_additive_gap: u64,
+    /// Verified max |f(candidate) - f(canonical orbit representative)|.
+    pub certified_additive_optimality_gap: u64,
+    pub orbits: Vec<ApproximateOrbitV1>,
+    pub evidence: ApproximateCertificateEvidenceV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ApproximateQuotientErrorV1 {
+    Base(QuotientErrorV1),
+    InvalidObjectiveUnit,
+    Blocked(ApproximateBlockedV1),
+    CertificateMismatch,
+    NoFeasibleRepresentative,
+    SearchResultMismatch,
+}
+
+impl fmt::Display for ApproximateQuotientErrorV1 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl std::error::Error for ApproximateQuotientErrorV1 {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApproximateVerificationReceiptV1 {
+    pub problem_id: String,
+    pub action_id: String,
+    pub objective_unit_id: String,
+    pub objective_sense: ObjectiveSenseV1,
+    pub candidate_count: usize,
+    pub orbit_count: usize,
+    pub witnessed_member_count: usize,
+    pub exact_non_objective_semantic_checks: usize,
+    pub representative_objective_checks: usize,
+    pub certified_additive_optimality_gap: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApproximateSearchResultV1 {
+    pub problem_id: String,
+    pub objective_unit_id: String,
+    pub objective_sense: ObjectiveSenseV1,
+    pub selected_candidate_index: usize,
+    pub selected_candidate_id: String,
+    pub selected_objective_value: i64,
+    pub candidate_count: usize,
+    pub representative_count: usize,
+    pub requested_maximum_additive_gap: u64,
+    pub certified_additive_optimality_gap: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApproximateSearchVerificationReceiptV1 {
+    pub problem_id: String,
+    pub selected_candidate_id: String,
+    pub selected_objective_value: i64,
+    pub full_candidate_count: usize,
+    pub representative_count: usize,
+    pub certified_additive_optimality_gap: u64,
+}
+
+fn non_objective_task_differences(
+    source: &CandidateSemanticsV1,
+    image: &CandidateSemanticsV1,
+) -> Vec<TaskFieldV1> {
+    let mut differences = Vec::new();
+    if source.in_search_domain != image.in_search_domain {
+        differences.push(TaskFieldV1::InSearchDomain);
+    }
+    if source.admissible != image.admissible {
+        differences.push(TaskFieldV1::Admissible);
+    }
+    if source.feasible != image.feasible {
+        differences.push(TaskFieldV1::Feasible);
+    }
+    if source.constraint_signature != image.constraint_signature {
+        differences.push(TaskFieldV1::ConstraintSignature);
+    }
+    if source.boundary_condition_id != image.boundary_condition_id {
+        differences.push(TaskFieldV1::BoundaryConditionId);
+    }
+    if source.output_equivalence_id != image.output_equivalence_id {
+        differences.push(TaskFieldV1::OutputEquivalenceId);
+    }
+    differences
+}
+
+/// Compile a finite quotient when every non-objective task semantic is exact
+/// but the scalar objective may vary within each orbit by a declared additive
+/// tolerance. This is NOT an exact quotient and emits a distinct authority.
+///
+/// The error bound is relative to the deterministic canonical representative
+/// of each orbit. The best representative is therefore epsilon-optimal for
+/// either minimization or maximization over the original finite feasible set.
+pub fn compile_approximate_quotient(
+    problem: &SearchProblemV1,
+    action: &FiniteActionV1,
+    contract: &ApproximateSearchContractV1,
+    budget: QualificationBudgetV1,
+) -> Result<ApproximateCompileOutcomeV1, ApproximateQuotientErrorV1> {
+    if !nonempty(&contract.objective_unit_id) {
+        return Err(ApproximateQuotientErrorV1::InvalidObjectiveUnit);
+    }
+    let group_order = action.group.multiplication.len();
+    let candidate_count = problem.candidate_ids.len();
+    preflight(group_order, candidate_count, budget)
+        .map_err(ApproximateQuotientErrorV1::Base)?;
+    validate_problem(problem, budget).map_err(ApproximateQuotientErrorV1::Base)?;
+    let validated =
+        validate_action(action, candidate_count, budget).map_err(ApproximateQuotientErrorV1::Base)?;
+
+    let mut exact_semantic_checks = 0usize;
+    for (element, permutation) in action.permutations.iter().enumerate() {
+        for (source_index, image_index) in permutation.iter().copied().enumerate() {
+            exact_semantic_checks = exact_semantic_checks
+                .checked_add(1)
+                .ok_or(ApproximateQuotientErrorV1::Base(
+                    QuotientErrorV1::ArithmeticOverflow,
+                ))?;
+            let differing_fields = non_objective_task_differences(
+                &problem.semantics[source_index],
+                &problem.semantics[image_index],
+            );
+            if !differing_fields.is_empty() {
+                return Ok(ApproximateCompileOutcomeV1::Blocked(
+                    ApproximateBlockedV1::HardTaskSemanticMismatch {
+                        group_element: element,
+                        source_index,
+                        image_index,
+                        source_candidate_id: problem.candidate_ids[source_index].clone(),
+                        image_candidate_id: problem.candidate_ids[image_index].clone(),
+                        differing_fields,
+                    },
+                ));
+            }
+        }
+    }
+
+    let exact_orbits = build_orbits(problem, action, &validated.group.inverses);
+    let mut orbits = Vec::with_capacity(exact_orbits.len());
+    let mut representative_objective_checks = 0usize;
+    let mut certified_gap = 0_u64;
+
+    for orbit in exact_orbits {
+        let representative_index = orbit.representative_index;
+        let representative_objective = problem.semantics[representative_index].objective_cost;
+        let mut members = Vec::with_capacity(orbit.members.len());
+
+        for member in orbit.members {
+            representative_objective_checks = representative_objective_checks
+                .checked_add(1)
+                .ok_or(ApproximateQuotientErrorV1::Base(
+                    QuotientErrorV1::ArithmeticOverflow,
+                ))?;
+            let objective_deviation = representative_objective
+                .abs_diff(problem.semantics[member.candidate_index].objective_cost);
+            if objective_deviation > contract.maximum_additive_gap {
+                return Ok(ApproximateCompileOutcomeV1::Blocked(
+                    ApproximateBlockedV1::ObjectiveDeviationExceedsTolerance {
+                        group_element: member.group_element,
+                        source_index: representative_index,
+                        image_index: member.candidate_index,
+                        source_candidate_id: problem.candidate_ids[representative_index].clone(),
+                        image_candidate_id: member.candidate_id,
+                        absolute_objective_deviation: objective_deviation,
+                        maximum_additive_gap: contract.maximum_additive_gap,
+                    },
+                ));
+            }
+            certified_gap = certified_gap.max(objective_deviation);
+            members.push(ApproximateMemberWitnessV1 {
+                candidate_index: member.candidate_index,
+                candidate_id: member.candidate_id,
+                group_element: member.group_element,
+                inverse_group_element: member.inverse_group_element,
+                objective_deviation_from_representative: objective_deviation,
+            });
+        }
+
+        orbits.push(ApproximateOrbitV1 {
+            representative_index,
+            representative_id: orbit.representative_id,
+            members,
+            stabilizer_group_elements: orbit.stabilizer_group_elements,
+        });
+    }
+
+    Ok(ApproximateCompileOutcomeV1::Authorized(
+        ApproximateQuotientCertificateV1 {
+            schema_version: 1,
+            problem_id: problem.problem_id.clone(),
+            action_id: action.action_id.clone(),
+            group_id: action.group.group_id.clone(),
+            group_order,
+            candidate_count,
+            pruning_authority:
+                ApproximatePruningAuthorityV1::ExactFeasibilityWithBoundedAdditiveObjectiveDeviation,
+            objective_unit_id: contract.objective_unit_id.clone(),
+            objective_sense: contract.objective_sense,
+            requested_maximum_additive_gap: contract.maximum_additive_gap,
+            certified_additive_optimality_gap: certified_gap,
+            orbits,
+            evidence: ApproximateCertificateEvidenceV1 {
+                group_axiom_checks: validated.group.checks,
+                action_law_checks: validated.checks,
+                exact_non_objective_semantic_checks: exact_semantic_checks,
+                representative_objective_checks,
+                orbit_member_witnesses: candidate_count,
+                complete_domain_cover: true,
+            },
+        },
+    ))
+}
+
+/// Independently recompute the bounded-error quotient. The caller must supply
+/// the original complete problem/action and the exact unit, sense and tolerance.
+pub fn verify_approximate_certificate(
+    problem: &SearchProblemV1,
+    action: &FiniteActionV1,
+    contract: &ApproximateSearchContractV1,
+    certificate: &ApproximateQuotientCertificateV1,
+    budget: QualificationBudgetV1,
+) -> Result<ApproximateVerificationReceiptV1, ApproximateQuotientErrorV1> {
+    let replayed = compile_approximate_quotient(problem, action, contract, budget)?;
+    let ApproximateCompileOutcomeV1::Authorized(expected) = replayed else {
+        let ApproximateCompileOutcomeV1::Blocked(violation) = replayed else {
+            unreachable!()
+        };
+        return Err(ApproximateQuotientErrorV1::Blocked(violation));
+    };
+    if *certificate != expected {
+        return Err(ApproximateQuotientErrorV1::CertificateMismatch);
+    }
+    Ok(ApproximateVerificationReceiptV1 {
+        problem_id: problem.problem_id.clone(),
+        action_id: action.action_id.clone(),
+        objective_unit_id: contract.objective_unit_id.clone(),
+        objective_sense: contract.objective_sense,
+        candidate_count: certificate.candidate_count,
+        orbit_count: certificate.orbits.len(),
+        witnessed_member_count: certificate.evidence.orbit_member_witnesses,
+        exact_non_objective_semantic_checks: certificate
+            .evidence
+            .exact_non_objective_semantic_checks,
+        representative_objective_checks: certificate.evidence.representative_objective_checks,
+        certified_additive_optimality_gap: certificate.certified_additive_optimality_gap,
+    })
+}
+
+/// Search only the canonical representatives after replaying the approximate
+/// certificate. Ineligible candidates are excluded exactly; feasibility is
+/// never approximated. Ties are resolved by candidate ID.
+pub fn optimize_approximate_representatives(
+    problem: &SearchProblemV1,
+    action: &FiniteActionV1,
+    contract: &ApproximateSearchContractV1,
+    certificate: &ApproximateQuotientCertificateV1,
+    budget: QualificationBudgetV1,
+) -> Result<ApproximateSearchResultV1, ApproximateQuotientErrorV1> {
+    verify_approximate_certificate(problem, action, contract, certificate, budget)?;
+
+    let mut best: Option<(usize, i64)> = None;
+    for orbit in &certificate.orbits {
+        let index = orbit.representative_index;
+        let semantics = &problem.semantics[index];
+        if !(semantics.in_search_domain && semantics.admissible && semantics.feasible) {
+            continue;
+        }
+        let replace = match best {
+            None => true,
+            Some((current_index, current_value)) => {
+                let better_value = match contract.objective_sense {
+                    ObjectiveSenseV1::Minimize => semantics.objective_cost < current_value,
+                    ObjectiveSenseV1::Maximize => semantics.objective_cost > current_value,
+                };
+                better_value
+                    || (semantics.objective_cost == current_value
+                        && problem.candidate_ids[index] < problem.candidate_ids[current_index])
+            }
+        };
+        if replace {
+            best = Some((index, semantics.objective_cost));
+        }
+    }
+    let (selected_index, selected_objective) =
+        best.ok_or(ApproximateQuotientErrorV1::NoFeasibleRepresentative)?;
+    Ok(ApproximateSearchResultV1 {
+        problem_id: problem.problem_id.clone(),
+        objective_unit_id: contract.objective_unit_id.clone(),
+        objective_sense: contract.objective_sense,
+        selected_candidate_index: selected_index,
+        selected_candidate_id: problem.candidate_ids[selected_index].clone(),
+        selected_objective_value: selected_objective,
+        candidate_count: problem.candidate_ids.len(),
+        representative_count: certificate.orbits.len(),
+        requested_maximum_additive_gap: contract.maximum_additive_gap,
+        certified_additive_optimality_gap: certificate.certified_additive_optimality_gap,
+    })
+}
+
+pub fn verify_approximate_search_result(
+    problem: &SearchProblemV1,
+    action: &FiniteActionV1,
+    contract: &ApproximateSearchContractV1,
+    certificate: &ApproximateQuotientCertificateV1,
+    result: &ApproximateSearchResultV1,
+    budget: QualificationBudgetV1,
+) -> Result<ApproximateSearchVerificationReceiptV1, ApproximateQuotientErrorV1> {
+    let expected = optimize_approximate_representatives(
+        problem,
+        action,
+        contract,
+        certificate,
+        budget,
+    )?;
+    if *result != expected {
+        return Err(ApproximateQuotientErrorV1::SearchResultMismatch);
+    }
+    Ok(ApproximateSearchVerificationReceiptV1 {
+        problem_id: result.problem_id.clone(),
+        selected_candidate_id: result.selected_candidate_id.clone(),
+        selected_objective_value: result.selected_objective_value,
+        full_candidate_count: result.candidate_count,
+        representative_count: result.representative_count,
+        certified_additive_optimality_gap: result.certified_additive_optimality_gap,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1557,6 +1978,382 @@ mod tests {
             panic!("expected an exact task-preserving quotient");
         };
         (problem, action, certificate)
+    }
+
+
+    fn approximate_min_problem() -> SearchProblemV1 {
+        let mut problem = c2_problem();
+        problem.semantics[1].objective_cost = 8;
+        problem.semantics[3].objective_cost = 22;
+        problem
+    }
+
+    fn approximate_contract(
+        sense: ObjectiveSenseV1,
+        tolerance: u64,
+    ) -> ApproximateSearchContractV1 {
+        ApproximateSearchContractV1 {
+            objective_unit_id: "microjoule-v1".to_owned(),
+            objective_sense: sense,
+            maximum_additive_gap: tolerance,
+        }
+    }
+
+    #[test]
+    fn bounded_objective_quotient_returns_a_verified_additive_regret_bound() {
+        let problem = approximate_min_problem();
+        let action = c2_action();
+        let contract = approximate_contract(ObjectiveSenseV1::Minimize, 2);
+        let outcome = compile_approximate_quotient(
+            &problem,
+            &action,
+            &contract,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        let ApproximateCompileOutcomeV1::Authorized(certificate) = outcome else {
+            panic!("expected an epsilon-authorized quotient");
+        };
+        assert_eq!(
+            certificate.pruning_authority,
+            ApproximatePruningAuthorityV1::ExactFeasibilityWithBoundedAdditiveObjectiveDeviation
+        );
+        assert_eq!(certificate.certified_additive_optimality_gap, 2);
+        assert_eq!(certificate.requested_maximum_additive_gap, 2);
+        assert_eq!(certificate.orbits.len(), 2);
+        verify_approximate_certificate(
+            &problem,
+            &action,
+            &contract,
+            &certificate,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+
+        let result = optimize_approximate_representatives(
+            &problem,
+            &action,
+            &contract,
+            &certificate,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        assert_eq!(result.selected_candidate_id, "A0");
+        assert_eq!(result.selected_objective_value, 10);
+        let exhaustive_optimum = problem
+            .candidate_ids
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| {
+                let semantics = &problem.semantics[*index];
+                semantics.in_search_domain && semantics.admissible && semantics.feasible
+            })
+            .map(|(index, _)| (index, problem.semantics[index].objective_cost))
+            .min_by_key(|(_, value)| *value)
+            .unwrap()
+            .1;
+        assert_eq!(result.selected_objective_value - exhaustive_optimum, 2);
+        assert_eq!(
+            verify_approximate_search_result(
+                &problem,
+                &action,
+                &contract,
+                &certificate,
+                &result,
+                QualificationBudgetV1::default(),
+            )
+            .unwrap()
+            .certified_additive_optimality_gap,
+            2
+        );
+    }
+
+    #[test]
+    fn approximate_quotient_has_the_same_additive_guarantee_for_maximization() {
+        let mut problem = c2_problem();
+        problem.semantics[1].objective_cost = 12;
+        problem.semantics[3].objective_cost = 22;
+        let action = c2_action();
+        let contract = approximate_contract(ObjectiveSenseV1::Maximize, 2);
+        let ApproximateCompileOutcomeV1::Authorized(certificate) =
+            compile_approximate_quotient(
+                &problem,
+                &action,
+                &contract,
+                QualificationBudgetV1::default(),
+            )
+            .unwrap()
+        else {
+            panic!("expected bounded max quotient");
+        };
+        let result = optimize_approximate_representatives(
+            &problem,
+            &action,
+            &contract,
+            &certificate,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        assert_eq!(result.selected_candidate_id, "B0");
+        assert_eq!(result.selected_objective_value, 20);
+        let exhaustive_max = problem
+            .semantics
+            .iter()
+            .enumerate()
+            .filter(|(_, semantics)| {
+                semantics.in_search_domain && semantics.admissible && semantics.feasible
+            })
+            .map(|(_, semantics)| semantics.objective_cost)
+            .max()
+            .unwrap();
+        assert_eq!(exhaustive_max - result.selected_objective_value, 2);
+        assert_eq!(result.certified_additive_optimality_gap, 2);
+    }
+
+    #[test]
+    fn objective_deviation_one_unit_over_tolerance_blocks_quotient() {
+        let problem = approximate_min_problem();
+        let action = c2_action();
+        let contract = approximate_contract(ObjectiveSenseV1::Minimize, 1);
+        let outcome = compile_approximate_quotient(
+            &problem,
+            &action,
+            &contract,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            outcome,
+            ApproximateCompileOutcomeV1::Blocked(
+                ApproximateBlockedV1::ObjectiveDeviationExceedsTolerance {
+                    absolute_objective_deviation: 2,
+                    maximum_additive_gap: 1,
+                    ..
+                }
+            )
+        ));
+    }
+
+    #[test]
+    fn any_feasibility_or_non_objective_semantic_change_blocks_even_with_large_tolerance() {
+        let mut problem = approximate_min_problem();
+        problem.semantics[1].feasible = false;
+        let outcome = compile_approximate_quotient(
+            &problem,
+            &c2_action(),
+            &approximate_contract(ObjectiveSenseV1::Minimize, u64::MAX),
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            outcome,
+            ApproximateCompileOutcomeV1::Blocked(
+                ApproximateBlockedV1::HardTaskSemanticMismatch {
+                    differing_fields,
+                    ..
+                }
+            ) if differing_fields == vec![TaskFieldV1::Feasible]
+        ));
+
+        let mut problem = approximate_min_problem();
+        problem.semantics[1].boundary_condition_id = "different-boundary".to_owned();
+        let outcome = compile_approximate_quotient(
+            &problem,
+            &c2_action(),
+            &approximate_contract(ObjectiveSenseV1::Minimize, u64::MAX),
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            outcome,
+            ApproximateCompileOutcomeV1::Blocked(
+                ApproximateBlockedV1::HardTaskSemanticMismatch {
+                    differing_fields,
+                    ..
+                }
+            ) if differing_fields == vec![TaskFieldV1::BoundaryConditionId]
+        ));
+    }
+
+    #[test]
+    fn epsilon_zero_matches_the_exact_quotient_and_is_not_promoted() {
+        let problem = c2_problem();
+        let action = c2_action();
+        let exact_outcome =
+            compile_quotient(&problem, &action, QualificationBudgetV1::default()).unwrap();
+        let CompileOutcomeV1::Authorized(exact) = exact_outcome else {
+            panic!("exact fixture should authorize the exact quotient");
+        };
+        let approximate_outcome = compile_approximate_quotient(
+            &problem,
+            &action,
+            &approximate_contract(ObjectiveSenseV1::Minimize, 0),
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        let ApproximateCompileOutcomeV1::Authorized(approximate) = approximate_outcome else {
+            panic!("zero-error quotient should be authorized");
+        };
+        assert_eq!(approximate.certified_additive_optimality_gap, 0);
+        assert_eq!(
+            exact
+                .orbits
+                .iter()
+                .map(|orbit| orbit.representative_id.clone())
+                .collect::<Vec<_>>(),
+            approximate
+                .orbits
+                .iter()
+                .map(|orbit| orbit.representative_id.clone())
+                .collect::<Vec<_>>()
+        );
+        assert_ne!(
+            approximate.pruning_authority,
+            ApproximatePruningAuthorityV1::ExactFeasibilityWithBoundedAdditiveObjectiveDeviation
+        );
+        assert_ne!(
+            exact.pruning_authority,
+            PruningAuthorityV1::ExactFiniteGroupAndExactTaskSemanticPreservation
+        );
+    }
+
+    #[test]
+    fn approximate_certificate_binds_unit_sense_tolerance_and_gap() {
+        let problem = approximate_min_problem();
+        let action = c2_action();
+        let contract = approximate_contract(ObjectiveSenseV1::Minimize, 2);
+        let ApproximateCompileOutcomeV1::Authorized(mut certificate) =
+            compile_approximate_quotient(
+                &problem,
+                &action,
+                &contract,
+                QualificationBudgetV1::default(),
+            )
+            .unwrap()
+        else {
+            panic!("expected bounded quotient");
+        };
+
+        let mut forged = certificate.clone();
+        forged.certified_additive_optimality_gap = 0;
+        assert_eq!(
+            verify_approximate_certificate(
+                &problem,
+                &action,
+                &contract,
+                &forged,
+                QualificationBudgetV1::default(),
+            ),
+            Err(ApproximateQuotientErrorV1::CertificateMismatch)
+        );
+
+        assert!(matches!(
+            verify_approximate_certificate(
+                &problem,
+                &action,
+                &approximate_contract(ObjectiveSenseV1::Minimize, 3),
+                &certificate,
+                QualificationBudgetV1::default(),
+            ),
+            Err(ApproximateQuotientErrorV1::CertificateMismatch)
+        ));
+        assert!(matches!(
+            verify_approximate_certificate(
+                &problem,
+                &action,
+                &approximate_contract(ObjectiveSenseV1::Maximize, 2),
+                &certificate,
+                QualificationBudgetV1::default(),
+            ),
+            Err(ApproximateQuotientErrorV1::CertificateMismatch)
+        ));
+        let mut changed_unit = approximate_contract(ObjectiveSenseV1::Minimize, 2);
+        changed_unit.objective_unit_id = "millijoule-v1".to_owned();
+        assert!(matches!(
+            verify_approximate_certificate(
+                &problem,
+                &action,
+                &changed_unit,
+                &certificate,
+                QualificationBudgetV1::default(),
+            ),
+            Err(ApproximateQuotientErrorV1::CertificateMismatch)
+        ));
+
+        certificate.orbits[0].members[0].objective_deviation_from_representative = 99;
+        assert_eq!(
+            verify_approximate_certificate(
+                &problem,
+                &action,
+                &contract,
+                &certificate,
+                QualificationBudgetV1::default(),
+            ),
+            Err(ApproximateQuotientErrorV1::CertificateMismatch)
+        );
+    }
+
+    #[test]
+    fn approximate_search_excludes_ineligible_candidates_exactly() {
+        let mut problem = approximate_min_problem();
+        problem.semantics[0].feasible = false;
+        problem.semantics[1].feasible = false;
+        problem.semantics[2].objective_cost = 30;
+        problem.semantics[3].objective_cost = 30;
+        let action = c2_action();
+        let contract = approximate_contract(ObjectiveSenseV1::Minimize, 2);
+        let ApproximateCompileOutcomeV1::Authorized(certificate) =
+            compile_approximate_quotient(
+                &problem,
+                &action,
+                &contract,
+                QualificationBudgetV1::default(),
+            )
+            .unwrap()
+        else {
+            panic!("non-objective semantics remain constant within each orbit");
+        };
+        let result = optimize_approximate_representatives(
+            &problem,
+            &action,
+            &contract,
+            &certificate,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        assert_eq!(result.selected_candidate_id, "B0");
+    }
+
+    #[test]
+    fn approximate_work_budget_and_objective_unit_fail_closed() {
+        let problem = approximate_min_problem();
+        let action = c2_action();
+        let mut invalid_unit = approximate_contract(ObjectiveSenseV1::Minimize, 2);
+        invalid_unit.objective_unit_id.clear();
+        assert_eq!(
+            compile_approximate_quotient(
+                &problem,
+                &action,
+                &invalid_unit,
+                QualificationBudgetV1::default(),
+            ),
+            Err(ApproximateQuotientErrorV1::InvalidObjectiveUnit)
+        );
+        let tiny = QualificationBudgetV1 {
+            maximum_work_units: 1,
+            ..QualificationBudgetV1::default()
+        };
+        assert_eq!(
+            compile_approximate_quotient(
+                &problem,
+                &action,
+                &approximate_contract(ObjectiveSenseV1::Minimize, 2),
+                tiny,
+            ),
+            Err(ApproximateQuotientErrorV1::Base(
+                QuotientErrorV1::WorkBudgetExceeded
+            ))
+        );
     }
 
     #[test]
