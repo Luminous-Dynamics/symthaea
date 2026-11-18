@@ -151,7 +151,7 @@ tolerance, entropy coder, context-bootstrap and resource accounting.
 
 ### Structure-aware SCM coding controls
 
-The `causal` command additionally evaluates five custom byte predictors on every
+The `causal` command additionally evaluates six custom byte predictors on every
 SCM2 stream, including observational, interventional, training and held-out E3
 traces. All use the same arithmetic coder and 32-byte CDL frame as the built-in
 order-0/order-1 arms. The learner-visible SCM2 header is 16 bytes and contains
@@ -186,6 +186,7 @@ duplicating identical per-stream statistics. Its state-size output exposes the
 memory cost, while its final expert weights are printed as diagnostics. The
 parent specialist still receives the known SCM topology and remains an oracle
 expert, not a learned mechanism.
+
 For parent, lag, hybrid and shuffled-parent arms, the predictor adds the
 field/lane base frequencies to the selected conditional-context frequencies
 when forming its integer CDF. Both histograms are updated after each decoded
@@ -215,29 +216,6 @@ Interpretation order:
 3. Compare parent-oracle with lag to test whether known graph structure helps.
 4. Compare the fixed-share mixture with each specialist to measure adaptation
    and switching regret across observational/interventional regimes.
-5. Only then test a learned mechanism model against the oracle and the matched
-   noncausal temporal control.
-
-No compression win is implied by source existence. The runner must be compiled
-and executed, and total-size/resource accounting must be complete, before
-reporting an encoded-bit result.
-
-<!-- Replaces the earlier specialist-only state-accounting paragraph. -->
-The predictors include a separate header histogram and reset to a
-deterministic empty state for each stream. Their inline state sizes are printed
-by the runner; their code/executable costs and any shared model distribution
-must be accounted for separately in a cold-start comparison. The per-stream
-frame size alone is not a complete deployed-system size.
-
-Interpretation order:
-1. Compare field/lane with order-0/order-1 to measure the value of typed
-   channel identity.
-2. Compare lag with field/lane to measure ordinary temporal persistence.
-3. Compare parent-oracle with lag to test whether known cross-variable
-   structure adds value beyond same-channel history, especially under
-   intervention.
-4. Compare hybrid with lag and parent-oracle to test whether the two contexts
-   are complementary.
 5. Only then test a learned mechanism model against the oracle and the matched
    noncausal temporal control.
 
