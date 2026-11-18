@@ -14,6 +14,19 @@ struct Matrix2 {
     d: f64,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct CalibrationRow {
+    h: [f64; 2],
+    observed: f64,
+    uncertainty: f64,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct GaussianPosterior {
+    mean: [f64; 2],
+    covariance: Matrix2,
+}
+
 impl Matrix2 {
     fn determinant(self) -> f64 {
         self.a * self.d - self.b * self.b
@@ -105,6 +118,41 @@ fn parse_precision(value: &Value, context: &str) -> Result<Matrix2, String> {
     };
     let _ = matrix.inverse()?;
     Ok(matrix)
+}
+
+fn conjugate_posterior(
+    prior_mean: [f64; 2],
+    prior_precision: Matrix2,
+    observations: &[CalibrationRow],
+) -> Result<GaussianPosterior, String> {
+    let mut posterior_precision = prior_precision;
+    let mut information_vector = [
+        prior_precision.a * prior_mean[0] + prior_precision.b * prior_mean[1],
+        prior_precision.b * prior_mean[0] + prior_precision.d * prior_mean[1],
+    ];
+    for observation in observations {
+        if !observation.uncertainty.is_finite() || observation.uncertainty <= 0.0 {
+            return Err("calibration uncertainty must be positive and finite".to_owned());
+        }
+        if observation.h.iter().any(|value| !value.is_finite())
+            || !observation.observed.is_finite()
+        {
+            return Err("calibration row contains non-finite values".to_owned());
+        }
+        let weight = 1.0 / (observation.uncertainty * observation.uncertainty);
+        posterior_precision = posterior_precision.add_information(observation.h, weight);
+        information_vector[0] += weight * observation.h[0] * observation.observed;
+        information_vector[1] += weight * observation.h[1] * observation.observed;
+    }
+    let covariance = posterior_precision.inverse()?;
+    let mean = [
+        covariance.a * information_vector[0] + covariance.b * information_vector[1],
+        covariance.b * information_vector[0] + covariance.d * information_vector[1],
+    ];
+    if mean.iter().any(|value| !value.is_finite()) {
+        return Err("posterior mean is non-finite".to_owned());
+    }
+    Ok(GaussianPosterior { mean, covariance })
 }
 
 fn observation_operator(observation: &Value) -> Result<[f64; 2], String> {
@@ -275,12 +323,8 @@ fn fit_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Strin
         return Err("calibration and heldout sets must cover every observation exactly once".to_owned());
     }
 
-    let mut posterior_precision = prior_precision;
-    let mut information_vector = [
-        prior_precision.a * prior_mean[0] + prior_precision.b * prior_mean[1],
-        prior_precision.b * prior_mean[0] + prior_precision.d * prior_mean[1],
-    ];
-    let mut calibration_rows = Vec::with_capacity(calibration_set.len());
+    let mut calibration_data_rows = Vec::with_capacity(calibration_set.len());
+    let mut calibration_receipt_rows = Vec::with_capacity(calibration_set.len());
     for id in &calibration_order {
         let observation = observation_by_id[id];
         let value = finite_number(
@@ -300,10 +344,12 @@ fn fit_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Strin
         }
         let h = observation_operator(observation)?;
         let weight = 1.0 / (uncertainty * uncertainty);
-        posterior_precision = posterior_precision.add_information(h, weight);
-        information_vector[0] += weight * h[0] * value;
-        information_vector[1] += weight * h[1] * value;
-        calibration_rows.push(json!({
+        calibration_data_rows.push(CalibrationRow {
+            h,
+            observed: value,
+            uncertainty,
+        });
+        calibration_receipt_rows.push(json!({
             "observation_id": id,
             "modality": required_text(observation, "modality")?,
             "weight_inverse_variance": weight,
@@ -313,16 +359,22 @@ fn fit_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Strin
         }));
     }
 
-    let posterior_covariance = posterior_precision.inverse()?;
-    let posterior_mean = [
-        posterior_covariance.a * information_vector[0]
-            + posterior_covariance.b * information_vector[1],
-        posterior_covariance.b * information_vector[0]
-            + posterior_covariance.d * information_vector[1],
-    ];
-    if posterior_mean.iter().any(|value| !value.is_finite()) {
-        return Err("posterior mean is non-finite".to_owned());
-    }
+    let posterior = conjugate_posterior(
+        prior_mean,
+        prior_precision,
+        &calibration_data_rows,
+    )?;
+    let posterior_mean = posterior.mean;
+    let posterior_covariance = posterior.covariance;
+    let posterior_precision = calibration_data_rows.iter().fold(
+        prior_precision,
+        |precision, row| {
+            precision.add_information(
+                row.h,
+                1.0 / (row.uncertainty * row.uncertainty),
+            )
+        },
+    );
 
     let mut predictive_rows = Vec::with_capacity(heldout_set.len());
     let mut total_log_predictive_density = 0.0;
@@ -409,9 +461,9 @@ fn fit_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Strin
             ]
         },
         "calibration": {
-            "observation_count": calibration_rows.len(),
+            "observation_count": calibration_receipt_rows.len(),
             "modalities": calibration_modalities,
-            "rows": calibration_rows
+            "rows": calibration_receipt_rows
         },
         "posterior": {
             "mean": posterior_mean,
