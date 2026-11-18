@@ -91,7 +91,9 @@ pub enum PressureRunError {
     InvalidDigest { field: &'static str },
     InvalidRange { field: &'static str },
     InvalidSetpoint,
+    InvalidDynamicPressure,
     InvalidSetpointTolerance,
+    InvalidComparisonTolerance,
     PressureOutsideQualifiedEnvelope,
     PressureMissesSetpointTolerance,
     InvalidPressureUncertainty,
@@ -114,8 +116,14 @@ impl Display for PressureRunError {
             Self::InvalidDigest { field } => write!(f, "invalid SHA-256 digest for: {field}"),
             Self::InvalidRange { field } => write!(f, "invalid qualified pressure range: {field}"),
             Self::InvalidSetpoint => write!(f, "pressure setpoint must be finite and positive"),
+            Self::InvalidDynamicPressure => {
+                write!(f, "dynamic fitting-inlet pressure must be finite and positive")
+            }
             Self::InvalidSetpointTolerance => {
                 write!(f, "pressure setpoint tolerance must be finite and positive")
+            }
+            Self::InvalidComparisonTolerance => {
+                write!(f, "maximum matched-pressure separation must be finite and positive")
             }
             Self::PressureOutsideQualifiedEnvelope => {
                 write!(f, "measured pressure uncertainty interval exceeds qualified test envelope")
@@ -224,7 +232,7 @@ impl PressureFlowObservation {
         if !self.dynamic_fitting_inlet_pressure_kpa.is_finite()
             || self.dynamic_fitting_inlet_pressure_kpa <= 0.0
         {
-            return Err(PressureRunError::InvalidSetpoint);
+            return Err(PressureRunError::InvalidDynamicPressure);
         }
 
         let pressure_lower =
@@ -318,7 +326,7 @@ pub fn validate_matched_pressure_comparison(
         return Err(PressureRunError::SameRunCompared);
     }
     if !maximum_pressure_separation_kpa.is_finite() || maximum_pressure_separation_kpa <= 0.0 {
-        return Err(PressureRunError::InvalidSetpointTolerance);
+        return Err(PressureRunError::InvalidComparisonTolerance);
     }
 
     for (field, left, right) in [
@@ -550,5 +558,28 @@ mod tests {
         let mut run = observation("run-01", "aqua-article", 100.0);
         run.flow_lpm = -0.1;
         assert_eq!(run.validate(), Err(PressureRunError::InvalidFlow));
+    }
+}
+
+
+#[cfg(test)]
+mod tolerance_tests {
+    use super::*;
+
+    #[test]
+    fn rejects_invalid_dynamic_pressure_with_specific_error() {
+        let mut run = super::tests::observation("run-01", "aqua-article", 100.0);
+        run.dynamic_fitting_inlet_pressure_kpa = f64::NAN;
+        assert_eq!(run.validate(), Err(PressureRunError::InvalidDynamicPressure));
+    }
+
+    #[test]
+    fn rejects_invalid_matched_pressure_separation_tolerance() {
+        let control = super::tests::observation("control-01", "incumbent", 100.0);
+        let candidate = super::tests::observation("candidate-01", "aqua-article", 100.0);
+        assert_eq!(
+            validate_matched_pressure_comparison(&control, &candidate, 0.0),
+            Err(PressureRunError::InvalidComparisonTolerance)
+        );
     }
 }
