@@ -365,6 +365,11 @@ impl PatternTopologyManifest {
                         "Source-bound topology cannot contain unknown or lossy 2D/3D correspondence.");
                 }
             }
+            if self.state == "topology_preflighted" && panel.correspondence_state != "verified" {
+                semantic_coverage_complete = false;
+                push(&mut findings, "topology_preflight_requires_verified_correspondence", format!("{path}.correspondence_state"),
+                    "Topology preflight requires verified, not merely declared, 2D/3D panel correspondence.");
+            }
             if !matches!(panel.grain_direction.as_str(), "warp" | "weft" | "course" | "wale" | "bias" | "none" | "unknown") {
                 push(&mut findings, "invalid_grain_direction", format!("{path}.grain_direction"),
                     "Unknown grain/material direction vocabulary.");
@@ -621,10 +626,12 @@ impl PatternTopologyManifest {
                     }
                 }
                 "unsupported" | "lossy" | "unknown" => {
-                    semantic_coverage_complete = false;
-                    if self.state != "proposed" && !obligation.declared_out_of_scope {
-                        push(&mut findings, "semantic_preservation_blocked", format!("{path}.preservation_state"),
-                            "Unsupported, lossy or unknown required semantics block source-bound topology.");
+                    if !obligation.declared_out_of_scope {
+                        semantic_coverage_complete = false;
+                        if self.state != "proposed" {
+                            push(&mut findings, "semantic_preservation_blocked", format!("{path}.preservation_state"),
+                                "Unsupported, lossy or unknown required semantics block source-bound topology.");
+                        }
                     }
                 }
                 _ => {}
@@ -941,6 +948,31 @@ mod tests {
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|f| f.code == "source_bound_without_artifacts"));
         assert!(report.findings.iter().any(|f| f.code == "source_bound_topology_empty"));
+    }
+
+    #[test]
+    fn topology_preflight_requires_verified_2d_3d_correspondence() {
+        let mut manifest = base_manifest();
+        manifest["state"] = json!("topology_preflighted");
+        manifest["compiler_binding"]["geometry_state"] = json!("cad_revision_bound");
+        manifest["compiler_binding"]["robot_article_revision"] = json!("ROBOT-REV-A");
+        manifest["compiler_binding"]["geometry_digest"] = json!(format!("sha256:{}", "1".repeat(64)));
+        manifest["panels"][0]["correspondence_state"] = json!("declared");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "topology_preflight_requires_verified_correspondence"));
+        assert!(!report.can_preflight());
+    }
+
+    #[test]
+    fn explicitly_out_of_scope_semantics_need_disposition_but_do_not_fake_lossless_support() {
+        let mut manifest = base_manifest();
+        manifest["state"] = json!("source_bound");
+        manifest["semantic_obligations"][7]["preservation_state"] = json!("unsupported");
+        manifest["semantic_obligations"][7]["declared_out_of_scope"] = json!(true);
+        manifest["semantic_obligations"][7]["scope_disposition_ref"] = json!("NOT-A-KNIT-PRODUCT-SCOPE-01");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.is_valid(), "{:?}", report.findings);
+        assert!(report.semantic_coverage_complete);
     }
 
     #[test]
