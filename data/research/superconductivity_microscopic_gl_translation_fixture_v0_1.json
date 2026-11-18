@@ -97,7 +97,8 @@
       "supporting_observable_ids": [],
       "uncertainty_or_covariance": null,
       "model_family": "conventional_electron_phonon",
-      "non_identifiability_reason": "Metadata-only source reconstruction; full microscopic thermodynamic-potential expansion and basis convention have not been extracted."
+      "non_identifiability_reason": "Metadata-only source reconstruction; full microscopic thermodynamic-potential expansion and basis convention have not been extracted.",
+      "state_id": "method_summary_only"
     },
     {
       "coefficient_id": "scalar_GL_b_quartic",
@@ -113,7 +114,8 @@
       "supporting_observable_ids": [],
       "uncertainty_or_covariance": null,
       "model_family": "conventional_electron_phonon",
-      "non_identifiability_reason": "Tc, xi0 and lambdaL alone do not uniquely determine b."
+      "non_identifiability_reason": "Tc, xi0 and lambdaL alone do not uniquely determine b.",
+      "state_id": "method_summary_only"
     },
     {
       "coefficient_id": "scalar_GL_K_gradient",
@@ -129,7 +131,8 @@
       "supporting_observable_ids": [],
       "uncertainty_or_covariance": null,
       "model_family": "conventional_electron_phonon",
-      "non_identifiability_reason": "Finite-q framework is reported, but no quantitative K tensor or normalization is present in this metadata fixture."
+      "non_identifiability_reason": "Finite-q framework is reported, but no quantitative K tensor or normalization is present in this metadata fixture.",
+      "state_id": "method_summary_only"
     }
   ],
   "claim_ceiling": "Provenance-bound microscopic/effective response record only; no coefficient is promoted beyond its declared evidence status and no material Tc or phase is independently established by this fixture."
