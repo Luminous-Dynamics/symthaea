@@ -28,10 +28,23 @@ Do not merge resistive onset, zero resistance, diamagnetic onset, bulk thermodyn
 
 ## Metrics for a real benchmark run
 
-Report by property, measurement class, label authority, family and split regime: MAE/RMSE in physical units and log-space; median absolute error; paired confidence intervals; prediction-interval coverage and width; calibration; risk-versus-coverage for abstaining models; precision/recall and top-k enrichment at fixed candidate budgets; and cost per independently confirmed candidate. Bootstrap by material/source groups, not individual rows.
+Report by property, measurement class, label authority, family and split regime: MAE/RMSE in physical units and log-space; median absolute error; paired confidence intervals; prediction-interval coverage and width; calibration; risk-versus-coverage for abstaining models; precision/recall and top-k enrichment at fixed candidate budgets; and cost per independently confirmed candidate. Bootstrap by material/source groups, not individual rows. Never pool resistive-onset, zero-resistance, diamagnetic, and bulk-thermodynamic Tc as one metric: score each measurement class separately, and only create a composite endpoint under a preregistered harmonization protocol.
 
 A high global score must never conceal a catastrophic family-specific failure.
 
+## Competitive benchmark plan and prospective targets
+
+Run the same frozen train/test folds and label authority across the following baselines: a composition-only Magpie-descriptor model (including AutoSuperCon-style TabPFN/gradient-boosted baselines); a crystal-structure equivariant graph model; a BEE-NET-style spectral-function model scored against calculated alpha-squared-F/Allen-Dynes labels; and a multi-property, physics-informed model that predicts a distribution and can abstain. Do not compare BEE-NET's DFT-label error with an experimental-label MAE. Keep computational screening precision separate from experimentally confirmed yield.
+
+The following are **prospective programme targets, not achieved results**:
+
+- On source-paper, prototype and family-held-out folds, report paired group-bootstrap intervals and demonstrate calibrated uncertainty. For nominal 90% prediction intervals, target empirical coverage of 85–95% on each adequately represented held-out family; publish a coverage-versus-width curve rather than widening intervals after seeing the test set.
+- At a fixed expensive-compute budget and a fixed top-K candidate count, target at least 1.5× independently validated candidate enrichment over the strongest matched baseline, with the paired 95% confidence interval lower bound above 1.0.
+- Target at least 2× fewer expensive DFT/alpha-squared-F follow-up calculations per independently confirmed material, without reducing recall on the preregistered test candidates.
+- Require explicit abstention on unknown families, missing structural descriptors, unidentifiable GL coefficients, and pressure/temperature conditions outside training support. Report selective risk and coverage; abstention must not be silently counted as a correct negative.
+- For physical discovery, require independent confirmation in more than one characterization channel; distinguish a resistive onset from bulk thermodynamic evidence and record pressure, sample form and orientation.
+
+HTSC-2025 is a useful structure/system-level test of theoretically proposed, ambient-pressure BCS candidates (155 samples); its authors already exclude test materials from training based on structural similarity and report MAE by system. It does not replace experimental family-generalization evaluation: its scope is explicitly theoretical, ambient-pressure and largely conventional BCS systems. Our benchmark should complement it with source-disjoint, state-aware, family-held-out and measured-property tracks.
 ## Current implementation boundary
 
 The version 0.1 auditor validates a seven-row synthetic adversarial fixture. It proves only that the contract and split guardrails behave as coded. The fixture is fabricated, is not an experimental or computational dataset, must not train a model, and has no benchmark score. The Rust auditor deliberately rejects external datasets until a separate importer pins source version, licensing/terms, preprocessing and immutable digests.
