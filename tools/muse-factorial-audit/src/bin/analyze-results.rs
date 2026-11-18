@@ -257,14 +257,18 @@ fn parse_records(input: &str) -> Result<Vec<InputRecord>, String> {
         }
     }
 
-    let field = |row: &[String], name: &str| -> Result<&str, String> {
-        let index = *positions
-            .get(name)
-            .ok_or_else(|| format!("missing required CSV column {name:?}"))?;
-        row.get(index)
-            .map(String::as_str)
-            .ok_or_else(|| format!("row is missing column {name:?}"))
-    };
+fn csv_field<'a>(
+    row: &'a [String],
+    positions: &HashMap<&str, usize>,
+    name: &str,
+) -> Result<&'a str, String> {
+    let index = *positions
+        .get(name)
+        .ok_or_else(|| format!("missing required CSV column {name:?}"))?;
+    row.get(index)
+        .map(String::as_str)
+        .ok_or_else(|| format!("row is missing column {name:?}"))
+}
 
     let mut records = Vec::with_capacity(rows.len());
     for (offset, row) in rows.iter().enumerate() {
@@ -277,11 +281,11 @@ fn parse_records(input: &str) -> Result<Vec<InputRecord>, String> {
             ));
         }
 
-        let case_id = field(row, "case_id")?.trim().to_string();
-        let metric = field(row, "metric")?.trim().to_string();
-        let status = OutcomeStatus::parse(field(row, "status")?.trim())?;
-        let value_text = field(row, "value")?.trim();
-        let artifact_sha256 = field(row, "artifact_sha256")?.trim().to_ascii_lowercase();
+        let case_id = csv_field(row, &positions, "case_id")?.trim().to_string();
+        let metric = csv_field(row, &positions, "metric")?.trim().to_string();
+        let status = OutcomeStatus::parse(csv_field(row, &positions, "status")?.trim())?;
+        let value_text = csv_field(row, &positions, "value")?.trim();
+        let artifact_sha256 = csv_field(row, &positions, "artifact_sha256")?.trim().to_ascii_lowercase();
         let note = positions
             .get("note")
             .and_then(|index| row.get(*index))
@@ -725,7 +729,7 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use muse_factorial_audit::{Cell, DISCOVERY_SEEDS};
+    use muse_factorial_audit::DISCOVERY_SEEDS;
 
     fn one_complete_block() -> (Vec<Case>, Vec<InputRecord>) {
         let cases: Vec<Case> = generate_cases(Cohort::Discovery)
@@ -898,11 +902,5 @@ mod tests {
     fn output_escapes_notes_and_empty_summary_statistics() {
         let field = csv_escape("failure, with \"quotes\"\nand newline");
         assert_eq!(field, "\"failure, with \"\"quotes\"\"\nand newline\"");
-        let _unused = Cell {
-            valence: 0,
-            arousal: 0,
-            energy: 0,
-            bars: 0,
-        };
     }
 }
