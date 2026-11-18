@@ -30,7 +30,28 @@ The exact upstream `data/benchmark.json` is vendored under `external/hiddenbench
 
 The Rust `validate_hiddenbench` binary validates task identities, answer-option membership, non-empty fields, and this pinned group-size distribution. The copied benchmark file's Git blob SHA matches the upstream SHA exactly. The license is preserved in the adjacent `LICENSE`.
 
-The answer key and hidden-fact allocation are evaluator-only. Do not pass the corpus JSON, `correct_answer`, or source manifest to agents. Agent prompts should be constructed from only the assigned task description, shared facts and that agent's assigned private fact.
+The answer key and hidden-fact allocation are evaluator-only. Do not pass the corpus JSON, `correct_answer`, or source manifest to agents.
+
+## Rust validation and scoring commands
+
+```bash
+# Validate the exact upstream corpus and its 65-task / 3- and 4-agent profile
+cargo run --manifest-path research/ig-hidden-info-001/qualifier/Cargo.toml --bin validate_hiddenbench -- \
+  research/ig-hidden-info-001/external/hiddenbench/benchmark.json
+
+# Reproduce the official average-vote and strict-majority score fields
+cargo run --manifest-path research/ig-hidden-info-001/qualifier/Cargo.toml --bin score_hiddenbench -- \
+  research/ig-hidden-info-001/external/hiddenbench/benchmark.json \
+  path/to/hidden-profile-results.json
+
+# Add the full-profile pre-discussion comparison
+cargo run --manifest-path research/ig-hidden-info-001/qualifier/Cargo.toml --bin score_hiddenbench -- \
+  research/ig-hidden-info-001/external/hiddenbench/benchmark.json \
+  path/to/hidden-profile-results.json --full path/to/full-profile-results.json
+```
+
+The scorer supports the upstream result shapes (`metadata -> runs` and legacy `conditions -> runs`). It reports the official per-run average and strict-majority accuracy fields, then adds task-clustered paired bootstrap intervals (10,000 resamples, pinned seed). It distinguishes the official run-weighted Hidden-post minus Full-pre gap from the task-paired gap. A small evaluator-only smoke result is checked in at `fixtures/HIDDENBENCH_SCORE_SMOKE_V0_1.json`; it is not model evidence.
+ Agent prompts should be constructed from only the assigned task description, shared facts and that agent's assigned private fact.
 
 ## Official protocol details to reproduce
 
