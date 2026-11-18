@@ -237,7 +237,10 @@
               "energy_cutoff_unit",
               "phonon_treatment",
               "spin_orbit_included",
-              "provenance_note"
+              "provenance_note",
+              "upstream_code_repository",
+              "inspected_upstream_commit",
+              "upstream_snapshot_relation"
             ],
             "properties": {
               "calculation_family": {
@@ -317,6 +320,17 @@
               "provenance_note": {
                 "type": "string",
                 "minLength": 1
+              },
+              "upstream_code_repository": {
+                "type": "string",
+                "format": "uri"
+              },
+              "inspected_upstream_commit": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "upstream_snapshot_relation": {
+                "const": "inspected_current_upstream_not_asserted_as_paper_revision"
               }
             }
           }
