@@ -1384,20 +1384,19 @@ mod tests {
             )
             .expect("first high-confidence window");
         let (frame_20, requirements) = observation_frame(measured_disposition(20), 20);
+        let evidence = risk_evidence(&frame_20, 0.85, 0.7, 0.9);
+        let expected_evidence_digest = evidence.evidence_sha256().expect("evidence digest");
         let uncertain = policy
-            .update_from_frame(
-                &frame_20,
-                &requirements,
-                Some(risk_evidence(&frame_20, 0.85, 0.7, 0.9)),
-            )
+            .update_from_frame(&frame_20, &requirements, Some(evidence))
             .expect("uncertain interval is a valid evidence record");
         assert!(matches!(
             uncertain,
             AlarmPolicyUpdate::Uncertain {
                 at_ns: 20,
                 alert_remains_active: false,
+                risk_evidence_sha256,
                 ..
-            }
+            } if risk_evidence_sha256 == expected_evidence_digest
         ));
         assert!(!policy.is_active());
 
