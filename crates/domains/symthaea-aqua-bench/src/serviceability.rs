@@ -405,8 +405,16 @@ pub fn validate_matched_service_job(
 
     for (field, left, right) in [
         ("replicate_id", incumbent.replicate_id.as_str(), candidate.replicate_id.as_str()),
-        ("technician_block_id", incumbent.technician_block_id.as_str(), candidate.technician_block_id.as_str()),
-        ("fault_manifest_sha256", incumbent.fault_manifest_sha256.as_str(), candidate.fault_manifest_sha256.as_str()),
+        (
+            "technician_block_id",
+            incumbent.technician_block_id.as_str(),
+            candidate.technician_block_id.as_str(),
+        ),
+        (
+            "fault_manifest_sha256",
+            incumbent.fault_manifest_sha256.as_str(),
+            candidate.fault_manifest_sha256.as_str(),
+        ),
         ("job_profile_id", incumbent.job_profile_id.as_str(), candidate.job_profile_id.as_str()),
         ("protocol_sha256", incumbent.protocol_sha256.as_str(), candidate.protocol_sha256.as_str()),
     ] {
@@ -496,7 +504,10 @@ mod tests {
 
     #[test]
     fn qualified_return_requires_device_authority_and_passed_function_check() {
-        let mut record = observation("run-01", ServiceAccessOutcome::DrySideWithoutDestructiveFinish);
+        let mut record = observation(
+            "run-01",
+            ServiceAccessOutcome::DrySideWithoutDestructiveFinish,
+        );
         record.evidence.clear();
         assert_eq!(record.validate(), Err(ServiceabilityError::MissingDeviceAuthorityEvidence));
         record.evidence.push(evidence(
@@ -510,7 +521,10 @@ mod tests {
 
     #[test]
     fn water_quality_requalification_requires_myclx_receipt() {
-        let mut record = observation("run-01", ServiceAccessOutcome::WetSideWithoutDestructiveFinish);
+        let mut record = observation(
+            "run-01",
+            ServiceAccessOutcome::WetSideWithoutDestructiveFinish,
+        );
         record.water_quality_requalification_required = true;
         assert_eq!(record.validate(), Err(ServiceabilityError::MissingWaterQualityEvidence));
         record.evidence.push(evidence(ServiceEvidenceOwner::MycelixWaterQuality, "quality", 'e'));
@@ -519,7 +533,10 @@ mod tests {
 
     #[test]
     fn metrology_requalification_requires_mycelix_receipt() {
-        let mut record = observation("run-01", ServiceAccessOutcome::WetSideWithoutDestructiveFinish);
+        let mut record = observation(
+            "run-01",
+            ServiceAccessOutcome::WetSideWithoutDestructiveFinish,
+        );
         record.metrology_requalification_required = true;
         assert_eq!(record.validate(), Err(ServiceabilityError::MissingMetrologyEvidence));
         record.evidence.push(evidence(ServiceEvidenceOwner::MycelixMetrology, "metrology", 'f'));
@@ -528,7 +545,10 @@ mod tests {
 
     #[test]
     fn rejects_non_finite_technician_time_and_negative_resource_values() {
-        let mut record = observation("run-01", ServiceAccessOutcome::DrySideWithoutDestructiveFinish);
+        let mut record = observation(
+            "run-01",
+            ServiceAccessOutcome::DrySideWithoutDestructiveFinish,
+        );
         record.technician_minutes = f64::NAN;
         assert_eq!(
             record.validate(),
@@ -544,7 +564,10 @@ mod tests {
 
     #[test]
     fn rejects_duplicate_tools_and_duplicate_evidence_owners() {
-        let mut record = observation("run-01", ServiceAccessOutcome::DrySideWithoutDestructiveFinish);
+        let mut record = observation(
+            "run-01",
+            ServiceAccessOutcome::DrySideWithoutDestructiveFinish,
+        );
         record.tools_used.push("hex-key".to_owned());
         assert_eq!(
             record.validate(),
@@ -566,19 +589,28 @@ mod tests {
 
     #[test]
     fn cohort_keeps_unknown_jobs_in_the_routine_denominator() {
-        let qualified = observation("run-01", ServiceAccessOutcome::DrySideWithoutDestructiveFinish);
+        let qualified = observation(
+            "run-01",
+            ServiceAccessOutcome::DrySideWithoutDestructiveFinish,
+        );
         let unknown = observation("run-02", ServiceAccessOutcome::Unknown);
         let summary = summarize_serviceability_cohort(&[qualified, unknown]).expect("cohort");
         assert_eq!(summary.routine_job_count, 2);
         assert_eq!(summary.routine_non_destructive_qualified_count, 1);
         assert_eq!(summary.routine_unknown_access_count, 1);
-        assert!((summary.routine_non_destructive_qualified_fraction.expect("routine denominator") - 0.5).abs() < 1e-12);
+        let fraction = summary
+            .routine_non_destructive_qualified_fraction
+            .expect("routine denominator");
+        assert!((fraction - 0.5).abs() < 1e-12);
     }
 
     #[test]
     fn cohort_summary_reports_median_times_without_costing() {
         let first = observation("run-01", ServiceAccessOutcome::DrySideWithoutDestructiveFinish);
-        let mut second = observation("run-02", ServiceAccessOutcome::WetSideWithoutDestructiveFinish);
+        let mut second = observation(
+            "run-02",
+            ServiceAccessOutcome::WetSideWithoutDestructiveFinish,
+        );
         second.technician_minutes = 20.0;
         second.downtime_minutes = 40.0;
         let summary = summarize_serviceability_cohort(&[first, second]).expect("cohort");
@@ -589,8 +621,14 @@ mod tests {
 
     #[test]
     fn matched_jobs_require_same_fault_manifest_profile_replicate_and_technician_block() {
-        let incumbent = observation("incumbent-run", ServiceAccessOutcome::DestructiveFinishRemovalRequired);
-        let mut candidate = observation("candidate-run", ServiceAccessOutcome::DrySideWithoutDestructiveFinish);
+        let incumbent = observation(
+            "incumbent-run",
+            ServiceAccessOutcome::DestructiveFinishRemovalRequired,
+        );
+        let mut candidate = observation(
+            "candidate-run",
+            ServiceAccessOutcome::DrySideWithoutDestructiveFinish,
+        );
         candidate.market_variant_id = "INCUMBENT-SKU".to_owned();
         assert_eq!(validate_matched_service_job(&incumbent, &candidate), Ok(()));
         candidate.job_profile_id = "DRAIN_CLEANOUT".to_owned();
@@ -612,7 +650,10 @@ mod tests {
 
     #[test]
     fn rejects_missing_metadata_and_invalid_digests() {
-        let mut record = observation("run-01", ServiceAccessOutcome::DrySideWithoutDestructiveFinish);
+        let mut record = observation(
+            "run-01",
+            ServiceAccessOutcome::DrySideWithoutDestructiveFinish,
+        );
         record.job_profile_id.clear();
         assert_eq!(
             record.validate(),
@@ -647,7 +688,10 @@ mod tests {
 
     #[test]
     fn qualified_return_with_unknown_or_failed_status_is_not_counted() {
-        let mut record = observation("run-01", ServiceAccessOutcome::DrySideWithoutDestructiveFinish);
+        let mut record = observation(
+            "run-01",
+            ServiceAccessOutcome::DrySideWithoutDestructiveFinish,
+        );
         record.return_to_service = ReturnToServiceStatus::Unknown;
         assert!(!record.counts_as_qualified_return());
         record.return_to_service = ReturnToServiceStatus::Failed;
