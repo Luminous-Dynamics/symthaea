@@ -77,6 +77,8 @@ EXPECTED_VALUES = {
     "temperature_operating_limits": ("text", None),
     "uwl_dynamic_pressure_point": ("text", None),
     "test_instrument_calibration_requirement": ("text", None),
+    "boost_function_definition": ("text", None),
+    "boost_function_criteria": ("text", None),
 }
 
 
