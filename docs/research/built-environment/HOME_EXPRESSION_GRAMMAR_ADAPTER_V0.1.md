@@ -18,6 +18,7 @@ NIST's building digitization work identifies semantic interoperability and machi
 Sol-Atlas PR #935 head at authoring time: 73730cbcc2b02e2ef045bd6c068cf59e4b4f41df.
 
 Catalogue HOME-EXPRESSION-CATALOG-0.2.0 blob SHA: 0ba1af38685636c51d19fa399dee315d648585a6.
+Catalogue JSON Schema v0.2 blob SHA: fd995c652c690ecdd54f24b3b5d7b8ed695d7288.
 Grammar schema v0.2 blob SHA: 661c2c5a96e13c7678b80714bdb9e59d787c5a7f.
 30-case conformance corpus (5 positive / 25 negative) blob SHA: 61ff73fca82af4905bb9d5dd2a020bfaf438e94f.
 Corpus schema v0.2 blob SHA: 918ab3b936b45528360a705975f3f50328aea293.
@@ -28,7 +29,7 @@ These references are a draft snapshot, not a stable main-branch dependency. Befo
 
 Resident grammar → identity/provenance validation → semantic compilation → authority separation → versioned mapping rules → candidate set → exact geometry handoff → specialist evaluation → resident comparison.
 
-1. Validate and bind: verify catalogue IDs, grammar schema, reference sources, exact blob identities and all 30 upstream conformance cases.
+1. Validate and bind: verify catalogue IDs, grammar schema, reference sources, exact Git blob SHA-1 identities for both catalogue JSON and catalogue JSON Schema, and all 30 upstream conformance cases.
 2. Preserve the source: keep the original grammar and all five axes. Do not normalize away AVOID, ACCEPTABLE, UNDECIDED, incomparable or conflicting entries.
 3. Classify requirements: keep resident preferences separate from explicit resident non-negotiables, jurisdictional constraints, professional-review requirements and system invariants. Every requirement carries a source class, source reference and verification state.
 4. Map only through explicit rules: each mapping rule identifies source axis/option, target parameter path, mapping version, scope, evidence/source, reviewer and validity range. No default mapping from a style label to geometry, construction property or physical outcome.
