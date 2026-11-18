@@ -79,7 +79,8 @@
         "target_property",
         "target_unit",
         "label_authority",
-        "available_features"
+        "available_features",
+        "measurement_classes"
       ],
       "properties": {
         "task_id": {
@@ -108,6 +109,24 @@
             "minLength": 1
           },
           "uniqueItems": true
+        },
+        "measurement_classes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "resistive_onset",
+              "zero_resistance",
+              "diamagnetic_onset",
+              "bulk_thermodynamic_transition",
+              "spectroscopic_gap",
+              "critical_field",
+              "critical_current",
+              "theoretical_transition",
+              "other"
+            ]
+          }
         }
       }
     },
