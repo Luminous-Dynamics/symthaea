@@ -90,3 +90,17 @@ The metric list is explicit so wholly absent metrics are visible as 81/81 missin
 within every expected block. Incomplete blocks remain in coverage reports and
 produce no contrast estimates; the command exits non-zero after writing reports.
 Missing, failed, and not-applicable values are never imputed as zero.
+
+
+## Composer execution adapter
+
+The next stage is the source-pinned symbolic composer adapter. It validates the
+complete frozen case manifest, invokes each style's canonical grammar-plan
+composition path, hashes each serialized score, and emits 18 symbolic metrics.
+See [COMPOSER_ADAPTER.md](COMPOSER_ADAPTER.md) for the exact run commands,
+metric registry, evidence boundary, and workspace prerequisite.
+
+The adapter source is an example under
+`crates/domains/symthaea-music-theory/examples/`; it cannot be compiled until
+the separate root Cargo workspace member-exclusion repair is applied. No
+composer execution or Rust test result is claimed by this PR.
