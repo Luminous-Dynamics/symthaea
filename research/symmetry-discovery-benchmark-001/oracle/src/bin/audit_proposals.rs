@@ -589,6 +589,15 @@ mod tests {
         assert_eq!(report.summary.false_promotions, 0);
         assert_eq!(report.summary.missed_symmetries, 0);
         assert_eq!(report.summary.invalid_group_proposals, 0);
+        assert_eq!(report.summary.distribution_cases, 300);
+        assert_eq!(
+            report.summary.mean_wasserstein_1_d4_word_metric,
+            Some(0.0)
+        );
+        assert_eq!(
+            report.distribution_metric_id,
+            "d4_word_metric_r90_fx_v1"
+        );
         assert_eq!(report.cases.len(), 300);
     }
 
@@ -615,6 +624,45 @@ mod tests {
         assert_eq!(report.summary.exact_subgroup_matches, 299);
         assert_eq!(report.summary.false_promotions, 0);
         assert_eq!(report.summary.missed_symmetries, 0);
+        assert_eq!(report.summary.distribution_cases, 299);
+        assert_eq!(
+            report.summary.mean_wasserstein_1_d4_word_metric,
+            Some(0.0)
+        );
+    }
+
+    #[test]
+    fn malformed_group_distribution_mass_is_rejected() {
+        let mut submission = smoke_submission();
+        let distribution = submission.predictions[0]
+            .group_distribution
+            .as_mut()
+            .unwrap();
+        *distribution.get_mut("e").unwrap() += 0.25;
+        assert!(validate_submission(&submission)
+            .unwrap_err()
+            .contains("group_distribution must contain eight finite nonnegative masses summing to one"));
+    }
+
+    #[test]
+    fn point_mass_distribution_has_positive_w1_against_nontrivial_subgroup() {
+        let oracle = Manifest::parse().unwrap();
+        let distances = oracle
+            .group_word_distances(&["r90".to_owned(), "fx".to_owned()])
+            .unwrap();
+        let mut point_mass = oracle
+            .element_ids()
+            .into_iter()
+            .map(|id| (id, 0.0))
+            .collect::<BTreeMap<_, _>>();
+        *point_mass.get_mut("e").unwrap() = 1.0;
+        let w1 = wasserstein_1_d4(
+            &point_mass,
+            &["e".to_owned(), "r90".to_owned(), "r180".to_owned(), "r270".to_owned()],
+            &distances,
+        )
+        .unwrap();
+        assert!((w1 - 1.0).abs() <= 1.0e-9);
     }
 
     #[test]
