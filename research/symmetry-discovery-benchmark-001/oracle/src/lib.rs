@@ -339,18 +339,15 @@ impl Manifest {
         let cases = field(&self.root, "cases")?
             .as_array()
             .ok_or_else(|| "cases must be an array".to_owned())?;
-        let mut case_ids = cases
-            .iter()
-            .filter_map(|case| {
-                let case_split = string_field(case, "split").ok()?;
-                let case_track = string_field(case, "track").ok()?;
-                if case_split == split && case_track == track {
-                    string_field(case, "case_id").ok()
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
+        let mut case_ids = Vec::new();
+        for case in cases {
+            let case_split = string_field(case, "split")?;
+            let case_track = string_field(case, "track")?;
+            let case_id = string_field(case, "case_id")?;
+            if case_split == split && case_track == track {
+                case_ids.push(case_id);
+            }
+        }
         case_ids.sort();
         if case_ids.is_empty() {
             return Err(format!("no frozen cases for split {split} and track {track}"));
