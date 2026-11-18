@@ -20,6 +20,25 @@ Related, separate phenomena:
 
 Do not pool these phenomena into a single “social influence” label.
 
+## Official HiddenBench corpus pin and reproduction constraints
+
+The upstream open-source release is pinned at `Yassellee/HiddenBench_ICML` commit `3be6ca16973e4fb751ffc0dfb7eb11f2d28335d1`. The exact `data/benchmark.json` Git blob SHA is `918366d953ecfe7e86a0e8cf7906cf757f574012`; its exact bytes and upstream MIT license are vendored under `external/hiddenbench/`.
+
+The 65-task corpus contains **58 four-agent tasks and 7 three-agent tasks**. This differs from an assumption of a single fixed group size. The reproduction must derive group size from each task's `hidden_information` length and preserve the exact upstream allocation rule.
+
+The upstream reference simulator's relevant method details are:
+- Hidden-profile agents each receive all shared facts plus exactly one shuffled hidden fact; Full-profile agents receive all shared and hidden facts.
+- Fact ordering and private-fact assignment use seeded pseudo-random shuffles.
+- Each agent records an initial private vote before discussion.
+- The default discussion length is 15 rounds.
+- Agents speak sequentially in a rotating order; within a round later agents may see messages already emitted earlier in that round. This is not a simultaneous-round broadcast.
+- Final votes use the last round's discussion transcript by default.
+- Official metrics are individual-vote average accuracy and strict-majority accuracy, each before/after discussion, plus post-minus-pre improvement and the hidden-post minus full-pre gap.
+
+A reproduction must pin the exact upstream simulator, prompt templates, scorer, model endpoint/revision, decoding settings, seed derivation, number of duplications and concurrency settings. Any deviation is a separate treatment arm, not a silent implementation detail.
+
+The task corpus and result metadata contain evaluator-only answer keys and private allocation records. Only agent-specific views may enter prompts, memory or controller state.
+
 ## Experimental unit and information model
 
 The independent experimental unit is a frozen task × model/profile × randomized treatment block. Agents and turns inside the same interaction are nested observations, not independent samples.
