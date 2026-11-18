@@ -152,3 +152,19 @@ The `standard_methods::UwlBoostFunctionObservation` record validates the UWL 202
 The `task_phase` module validates advisory PREPARE / BASE_DELIVERY / OPTIONAL_BOOST / PAUSE / RINSE / RETURN_TO_READY schedules against exact independently qualified capabilities, market variant, hardware and delivery-condition digests. Boost phases require explicit task consent, a direct local user hold with auto-return qualification, and the capability's locally qualified maximum duration. Manufacturer-declared-only or ambiguous boost modes cannot be selected as qualified task-plan capabilities. The summary contains durations only; Symtropy retains water/energy closure and no AI actuator command is emitted.
 
 Full preregistration and exact competitor ambiguity: `docs/AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md`, issue #12798. The Hansgrohe 28036000 public sheet's boosted 6.6 / 9.4 L/min values conflict with its listed 4 L/min maximum/regulator; this remains unresolved pending manufacturer clarification or independent exact-SKU test.
+
+
+## Repairability and serviceability evidence
+
+The dependency-free serviceability module validates exact repair-job observations and summarizes a preregistered cohort. It records access outcome, disassembly depth, tools, spare availability, technician skill/time, downtime, source resource observations, post-repair function and independently authorized return-to-service evidence.
+
+It only counts a routine job as a non-destructive qualified repair when:
+- dry-side or wet-side access was completed without destructive finish removal;
+- the post-repair function check passed;
+- the return-to-service state is explicitly QualifiedReady;
+- an independent device-authority receipt exists; and
+- any required Mycelix water-quality or metrology requalification receipt exists.
+
+Unknown access and pending/failed/unknown requalification remain visible and do not count as successes. A zero routine-job denominator yields an undefined fraction, not 0%. The evaluator reports median technician and downtime minutes and tool count, but does not calculate lifecycle cost or water/energy/environmental totals. Those remain with Symtropy and Mycelix.
+
+Sixteen unit tests are authored; no current-head test or Clippy pass is claimed.
