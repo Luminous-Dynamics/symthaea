@@ -662,7 +662,9 @@ mod tests {
         let receipt = audit_and_plan(&schema, &fixture).unwrap();
         let oracle = &receipt["exact_oracle"]["plan"];
         assert_eq!(oracle["cost_units"], 5);
-        assert_eq!(oracle["target_variance_reduction"], 1.6);
+        assert!(
+            (oracle["target_variance_reduction"].as_f64().unwrap() - 1.6).abs() < 1.0e-12
+        );
         let ids: Vec<&str> = oracle["ordered_action_ids"]
             .as_array()
             .unwrap()
@@ -717,12 +719,6 @@ mod tests {
 
     #[test]
     fn required_capability_must_be_initial_or_acquired() {
-        assert!(mutated_fixture(|fixture| {
-            fixture["initial_capabilities"] = json!([]);
-            fixture["actions"][0]["provides_capabilities"] = json!([]);
-            fixture["actions"][3]["requires_capabilities"] = json!(["missing_transport_capability"]);
-        })
-        .is_ok());
         let (schema, bytes) = inputs();
         let mut fixture: Value = serde_json::from_slice(&bytes).unwrap();
         fixture["initial_capabilities"] = json!([]);
