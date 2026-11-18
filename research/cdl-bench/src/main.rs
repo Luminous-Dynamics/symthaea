@@ -3,7 +3,7 @@ use cdl_bench::{
     decompress, decompress_bounded_i16, decompress_i16, decompress_with_predictor,
     e3_mechanism_splits, generate_e0, generate_fsm, generate_scm, generate_scm_with_config,
     predictor_state_bytes, BoundedPredictor, E0Kind, ModelKind, NumericTransform,
-    ScmFieldPredictor, ScmIntervention, ScmLagPredictor, ScmParentPredictor,
+    ScmFieldPredictor, ScmHybridPredictor, ScmIntervention, ScmLagPredictor, ScmParentPredictor,
 };
 use std::error::Error;
 use std::fs;
@@ -258,7 +258,7 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# benchmark=CDL-Bench-E1-E3-structure-aware-v2");
     println!("# steps={steps}");
     println!("# seed={seed}");
-    println!("source,raw_bytes,cdl_order0_frame,cdl_order1_frame,field_frame,lag_frame,parent_oracle_frame,zstd,round_trip");
+    println!("source,raw_bytes,cdl_order0_frame,cdl_order1_frame,field_frame,lag_frame,parent_oracle_frame,hybrid_frame,zstd,round_trip");
 
     let fsm = generate_fsm(steps, 8, 4, seed)?;
     let scm_observational = generate_scm(steps, seed, None)?;
@@ -314,8 +314,8 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
         // The SCM-specific arms require the declared SCM1 33-byte header and
         // typed x0..x4 little-endian records. The partially observed FSM is
         // deliberately excluded rather than misinterpreted as SCM data.
-        let (field_bytes, lag_bytes, parent_oracle_bytes) = if name == "fsm-observations" {
-            ("NA".to_owned(), "NA".to_owned(), "NA".to_owned())
+        let (field_bytes, lag_bytes, parent_oracle_bytes, hybrid_bytes) = if name == "fsm-observations" {
+            ("NA".to_owned(), "NA".to_owned(), "NA".to_owned(), "NA".to_owned())
         } else {
             let mut field_encoder = ScmFieldPredictor::new();
             let field_frame = compress_with_predictor(source, &mut field_encoder)?;
@@ -341,6 +341,18 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 return Err(format!("lag-predictor round-trip failure for {name}").into());
             }
 
+            let mut hybrid_encoder = ScmHybridPredictor::new();
+            let hybrid_frame = compress_with_predictor(source, &mut hybrid_encoder)?;
+            let mut hybrid_decoder = ScmHybridPredictor::new();
+            if decompress_with_predictor(
+                &hybrid_frame,
+                source.len(),
+                &mut hybrid_decoder,
+            )?.as_slice() != source
+            {
+                return Err(format!("hybrid-predictor round-trip failure for {name}").into());
+            }
+
             let mut parent_encoder = ScmParentPredictor::new();
             let parent_frame = compress_with_predictor(source, &mut parent_encoder)?;
             let mut parent_decoder = ScmParentPredictor::new();
@@ -356,13 +368,14 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 field_frame.len().to_string(),
                 lag_frame.len().to_string(),
                 parent_frame.len().to_string(),
+                hybrid_frame.len().to_string(),
             )
         };
 
         let zstd = external_compressed_len("zstd", &["-q", "-c"], source)
             .map_or_else(|| "NA".to_owned(), |value| value.to_string());
         println!(
-            "{name},{},{},{},{field_bytes},{lag_bytes},{parent_oracle_bytes},{zstd},exact",
+            "{name},{},{},{},{field_bytes},{lag_bytes},{parent_oracle_bytes},{hybrid_bytes},{zstd},exact",
             source.len(),
             frame0.len(),
             frame1.len()
@@ -381,11 +394,13 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# note=E3 held-out tuples reuse mechanism component values but combine them in unseen configurations");
     println!("# scm_field_predictor_state_bytes={}", ScmFieldPredictor::state_bytes());
     println!("# scm_lag_predictor_state_bytes={}", ScmLagPredictor::state_bytes());
+    println!("# scm_hybrid_predictor_state_bytes={}", ScmHybridPredictor::state_bytes());
     println!("# scm_parent_oracle_predictor_state_bytes={}", ScmParentPredictor::state_bytes());
     println!("# note=field_frame conditions on typed variable/byte-lane identity only");
     println!("# note=lag_frame conditions on the previous timestep of the same variable and byte lane, without graph structure");
     println!("# note=parent_oracle_frame additionally receives the known SCM graph and conditions on same-step parent bytes");
     println!("# note=compare parent_oracle_frame against lag_frame to isolate graph-aligned conditioning from same-channel temporal context");
+    println!("# note=hybrid_frame combines known parent topology with previous-sample context using coarser parent buckets");
     println!("# note=parent_oracle is an oracle-topology control, not learned causal discovery or transfer");
     println!("# note=per-stream frame sizes exclude predictor executable/code and inline state; report these separately for end-to-end accounting");
     println!("# note=these are deterministic generator and codec smoke measurements, not predictive transfer results");
