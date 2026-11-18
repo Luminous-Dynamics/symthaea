@@ -11,6 +11,7 @@ This is the first executable component of CROP-INTEL-001. It is deliberately sma
 - Event-grouped benchmark splitting: deterministic approximately balanced grouped K-folds with train/validation complement and event/site/source leakage checks.
 - Seeded measurement-sensitivity audit: explicit uniform centre/radius pixel-error bounds, full-pipeline reruns, sample spread, radius-class agreement and exact-signature stability; stress-test assumptions only, not inferred measurement errors.
 - Crop-flow orientation-field descriptors: circular mean/resultant, direction entropy, bend-magnitude spread and nearest-neighbour alignment.
+- 3D stem-pose orientation statistics: base-to-tip vector concentration, inclination from vertical, horizontal azimuth, 3D nearest-neighbour alignment and optional centre-relative radial/tangential alignment.
 - Binary-grid representation with explicit D4 transforms (four rotations/reflections) and row-major/column-major traversal.
 - Immutable-in-use decoder manifests with unique IDs; a standard 32-way D4 × traversal × ASCII-7 bit-order family; persist a canonical manifest digest/timestamp externally before challenge analysis.
 - Predeclared 7-bit ASCII decoder specifications with complete attempt logging.
@@ -35,7 +36,7 @@ cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 ```
 
-The crate has no third-party dependencies. It includes a local `[workspace]` declaration so that it is not silently pulled into the root Symthaea workspace. The current source contains 63 authored unit tests; their execution remains pending because this editing environment has no Rust toolchain.
+The crate has no third-party dependencies. It includes a local `[workspace]` declaration so that it is not silently pulled into the root Symthaea workspace. The current source contains 69 authored unit tests; their execution remains pending because this editing environment has no Rust toolchain.
 
 ## Statistical interpretation
 
