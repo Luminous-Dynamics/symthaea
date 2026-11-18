@@ -1227,6 +1227,9 @@ pub fn compute_invalidation_receipt(
     if prior_revision.trim().is_empty() || new_revision.trim().is_empty() {
         errors.push("prior and new revisions are required".to_owned());
     }
+    if graph.graph_revision != prior_revision {
+        errors.push("dependency graph revision does not match prior revision".to_owned());
+    }
     if prior_revision == new_revision {
         errors.push("new revision must differ from prior revision".to_owned());
     }
@@ -1548,6 +1551,37 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn invalidation_rejects_duplicate_edges_self_edges_bad_digests_and_stale_revision() {
+        let mut duplicate = sample_dependency_graph();
+        duplicate.nodes[3].depends_on.push("style-intent".to_owned());
+        assert!(validate_dependency_graph(&duplicate).is_err());
+
+        let mut self_edge = sample_dependency_graph();
+        self_edge.nodes[2].depends_on.push("typology-intent".to_owned());
+        assert!(validate_dependency_graph(&self_edge).is_err());
+
+        let mut bad_digest = sample_dependency_graph();
+        bad_digest.nodes[0].content_digest = "not-a-blake3-digest".to_owned();
+        assert!(validate_dependency_graph(&bad_digest).is_err());
+
+        let graph = sample_dependency_graph();
+        assert!(compute_invalidation_receipt(
+            &graph,
+            "STALE-REVISION",
+            "REV-B",
+            &["style-intent".to_owned()]
+        )
+        .is_err());
+        assert!(compute_invalidation_receipt(
+            &graph,
+            "REV-A",
+            "REV-B",
+            &["style-intent".to_owned(), "style-intent".to_owned()]
+        )
+        .is_err());
     }
 
     #[test]
