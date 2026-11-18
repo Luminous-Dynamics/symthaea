@@ -97,7 +97,7 @@ ac-b^2=\ell^2,
 \qquad c\geq0.
 \]
 
-For generic states, these invariants identify the SO(2) orbit; the algebraic relation means the four values contain three independent degrees of freedom. Singular strata (including \(x=0\)) require separate treatment. Retaining signed \(\ell\) matters when the lifted state must distinguish clockwise from counter-clockwise motion; dropping it would silently quotient by reflections as well.
+For every nonzero state pair \((x,v)\neq(0,0)\), these invariants identify the SO(2) orbit; the algebraic relation means the four values contain three independent degrees of freedom. The origin \((x,v)=(0,0)\) is fixed by the whole group and is the non-free singular orbit. The slice \(x=0, v\neq0\) is a boundary/control case but is not itself a nontrivial-stabilizer orbit; the implementation should test it rather than incorrectly classify every \(x=0\) state as singular. Retaining signed \(\ell\) matters when the lifted state must distinguish clockwise from counter-clockwise motion; dropping it would silently quotient by reflections as well.
 
 Differentiate the invariants:
 
@@ -217,9 +217,9 @@ Use two distinct outputs:
 - **Signed angular momentum:** a target depending on \(\ell=x_1v_2-x_2v_1\). A quotient retaining only \(a,b,c\) loses its sign and must fail the sufficiency check; retain \(\ell\) or an equivalent orientation-chirality variable.
 - **Absolute external-frame direction:** a target such as \(h(x)=x_1\) is not SO(2)-invariant. A quotient that removes global rotation is not admissible for this target unless the external reference frame is included in the state/observation contract and a valid lift is supplied. The quotient must not claim it can reconstruct absolute orientation from invariants alone.
 
-### 7.5 Singular orbit
+### 7.5 Singular orbit and quotient boundary
 
-Include \(x=0\) and states where the stabilizer changes. The implementation must return the declared singular-stratum disposition instead of applying a generic smooth quotient chart outside its domain.
+Include the fixed origin \(x=v=0\), where the SO(2) stabilizer is the full group, and the boundary slice \(x=0, v\neq0\), where the action is still free. The implementation must distinguish the non-free orbit from a regular boundary case instead of treating every \(x=0\) state as singular.
 
 ## 8. Independent qualification
 
