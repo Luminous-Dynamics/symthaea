@@ -10,7 +10,8 @@
     "scale",
     "units",
     "example",
-    "claim_boundary"
+    "claim_boundary",
+    "affine_oracle_example"
   ],
   "properties": {
     "schema_version": {
@@ -167,6 +168,144 @@
     "claim_boundary": {
       "type": "string",
       "minLength": 1
+    },
+    "affine_oracle_example": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_id",
+        "step_map",
+        "action",
+        "reference_region",
+        "certificate_domain",
+        "expected",
+        "claim_boundary"
+      ],
+      "properties": {
+        "contract_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "step_map": {
+          "$ref": "#/$defs/affineMap"
+        },
+        "action": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/affineMap"
+            },
+            {
+              "type": "object",
+              "required": [
+                "order"
+              ],
+              "properties": {
+                "order": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 64
+                }
+              }
+            }
+          ]
+        },
+        "reference_region": {
+          "$ref": "#/$defs/box2"
+        },
+        "certificate_domain": {
+          "$ref": "#/$defs/box2"
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "one_step_equivariance_defect_linf",
+            "step_lipschitz_linf",
+            "domain_boundary_margin_linf",
+            "reference_region_invariant",
+            "action_has_declared_finite_order"
+          ],
+          "properties": {
+            "one_step_equivariance_defect_linf": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "step_lipschitz_linf": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "domain_boundary_margin_linf": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "reference_region_invariant": {
+              "const": true
+            },
+            "action_has_declared_finite_order": {
+              "const": true
+            }
+          }
+        },
+        "claim_boundary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "matrix2Integer": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "type": "integer"
+        }
+      }
+    },
+    "vector2Integer": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "integer"
+      }
+    },
+    "affineMap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "matrix",
+        "offset"
+      ],
+      "properties": {
+        "matrix": {
+          "$ref": "#/$defs/matrix2Integer"
+        },
+        "offset": {
+          "$ref": "#/$defs/vector2Integer"
+        }
+      }
+    },
+    "box2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "$ref": "#/$defs/vector2Integer"
+        },
+        "upper": {
+          "$ref": "#/$defs/vector2Integer"
+        }
+      }
     }
   }
 }
