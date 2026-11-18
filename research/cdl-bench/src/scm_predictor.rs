@@ -51,6 +51,7 @@ impl StructuredState {
             1 => self.parent_context(variable, lane),
             2 => Self::value_bucket(&self.previous_record, variable),
             3 => self.hybrid_context(variable, lane),
+            4 => self.shuffled_parent_context(variable),
             _ => 0,
         };
         &self.contexts[variable][lane][context]
@@ -97,6 +98,26 @@ impl StructuredState {
         (parents << 2) | lag
     }
 
+    fn shuffled_parent_context(&self, variable: usize) -> usize {
+        let bucket = |parent: usize| Self::value_bucket(&self.current_record, parent);
+
+        // Deliberately mis-specified but topologically decodable mapping:
+        // x1 <- x0 (only previous field available);
+        // x2 <- x1,x0 (same parents in reversed positions);
+        // x3 <- x1 (wrong: true parent is x2);
+        // x4 <- x0,x2 (wrong: true parents are x1,x3).
+        // This preserves the number of parent slots/context bins while
+        // breaking the correct parent identities on downstream fields.
+        match variable {
+            0 => 0,
+            1 => bucket(0),
+            2 => bucket(1) | (bucket(0) << 2),
+            3 => bucket(1),
+            4 => bucket(0) | (bucket(2) << 2),
+            _ => 0,
+        }
+    }
+
     fn make_cdf(histogram: &[u16; BYTE_SYMBOLS]) -> ByteCdf {
         let mut cdf = [0u32; BYTE_SYMBOLS + 1];
         for (index, frequency) in histogram.iter().enumerate() {
@@ -126,6 +147,7 @@ impl StructuredState {
                 1 => self.parent_context(variable, lane),
                 2 => Self::value_bucket(&self.previous_record, variable),
                 3 => self.hybrid_context(variable, lane),
+                4 => self.shuffled_parent_context(variable),
                 _ => 0,
             };
 
@@ -309,6 +331,47 @@ impl BytePredictor for ScmHybridPredictor {
     }
 }
 
+/// Negative-control topology: keeps parent-context arity but deliberately
+/// misassigns downstream parent identities. It is not a valid SCM graph.
+/// Model ID 6. This detects whether any coding gain is caused merely by
+/// increased context capacity rather than alignment to the true parents.
+pub struct ScmShuffledParentPredictor {
+    state: StructuredState,
+}
+
+impl ScmShuffledParentPredictor {
+    pub fn new() -> Self {
+        Self {
+            state: StructuredState::new(),
+        }
+    }
+
+    /// Approximate inline predictor state, excluding allocator/runtime overhead.
+    pub fn state_bytes() -> usize {
+        std::mem::size_of::<Self>()
+    }
+}
+
+impl Default for ScmShuffledParentPredictor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BytePredictor for ScmShuffledParentPredictor {
+    fn model_id(&self) -> u8 {
+        6
+    }
+
+    fn cumulative_frequency(&self) -> ByteCdf {
+        self.state.cdf(4)
+    }
+
+    fn observe(&mut self, symbol: u8) {
+        self.state.observe(symbol, 4);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -385,6 +448,25 @@ mod tests {
     }
 
     #[test]
+    fn shuffled_parent_predictor_round_trips_observational_and_interventional_scm() {
+        let observational = generate_scm(4096, 37, None).unwrap();
+        let interventional = generate_scm(
+            4096,
+            37,
+            Some(ScmIntervention {
+                variable: 1,
+                start_step: 1024,
+                end_step: 3072,
+                value: 20_000,
+            }),
+        )
+        .unwrap();
+
+        round_trip::<ScmShuffledParentPredictor>(&observational.stream, 6);
+        round_trip::<ScmShuffledParentPredictor>(&interventional.stream, 6);
+    }
+
+    #[test]
     fn hybrid_predictor_round_trips_observational_and_interventional_scm() {
         let observational = generate_scm(4096, 31, None).unwrap();
         let interventional = generate_scm(
@@ -409,9 +491,11 @@ mod tests {
         assert_eq!(ScmParentPredictor::default().model_id(), 3);
         assert_eq!(ScmLagPredictor::default().model_id(), 4);
         assert_eq!(ScmHybridPredictor::default().model_id(), 5);
+        assert_eq!(ScmShuffledParentPredictor::default().model_id(), 6);
         assert!(ScmFieldPredictor::state_bytes() > 0);
         assert!(ScmParentPredictor::state_bytes() > 0);
         assert!(ScmLagPredictor::state_bytes() > 0);
         assert!(ScmHybridPredictor::state_bytes() > 0);
+        assert!(ScmShuffledParentPredictor::state_bytes() > 0);
     }
 }
