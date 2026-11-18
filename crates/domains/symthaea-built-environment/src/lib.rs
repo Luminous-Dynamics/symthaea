@@ -22,6 +22,9 @@ const SYNTHETIC_PROBLEM: &str = include_str!(
 const SYNTHETIC_CANDIDATE_SET: &str = include_str!(
     "../../../../docs/research/built-environment/HOME_EXPRESSION_CANDIDATE_SET_SYNTHETIC_V0.1.json"
 );
+const SYNTHETIC_FLOORPLANBENCH_MANIFEST: &str = include_str!(
+    "../../../../docs/research/built-environment/FLOORPLANBENCH_REPRO_MANIFEST_SYNTHETIC_V0.1.json"
+);
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Copy)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -2577,6 +2580,36 @@ mod tests {
             make("unknown",GateState::Unknown,0.5,0.5),
         ];
         assert_eq!(exact_pareto_front(&evaluations).unwrap(), vec!["a".to_owned(),"b".to_owned(),"c".to_owned()]);
+    }
+
+    #[test]
+    fn pinned_floorplanbench_manifest_drives_the_five_objective_normalizer() {
+        let manifest: Value =
+            serde_json::from_str(SYNTHETIC_FLOORPLANBENCH_MANIFEST).unwrap();
+        assert_eq!(manifest["benchmark"]["pinned_commit"], "7dfcca3dda6b11b4808a259499143e9bd75ed878");
+        assert_eq!(manifest["benchmark"]["task_count"], 28);
+        assert_eq!(manifest["benchmark"]["canonical_run_count"], 1960);
+        assert_eq!(manifest["benchmark"]["evaluation_equivalent_budget_per_run"], 50000);
+        assert_eq!(manifest["metric_contract"]["dominance_objectives"].as_array().unwrap().len(), 5);
+        assert_eq!(manifest["metric_contract"]["raw_objective_inventory"].as_array().unwrap().len(), 9);
+        assert_eq!(manifest["metric_contract"]["hypervolume_reference_point"], serde_json::json!([1.0001,1.0001,1.0001,1.0001,1.0001]));
+
+        let rules: Vec<ObjectiveNormalization> = manifest["synthetic_task_normalization"]["normalization_rules"]
+            .as_array().unwrap().iter().map(|value| {
+                let direction = match value["direction"].as_str().unwrap() {
+                    "MINIMIZE" => ObjectiveDirection::Minimize,
+                    "MAXIMIZE" => ObjectiveDirection::Maximize,
+                    other => panic!("unsupported normalization direction {other}"),
+                };
+                ObjectiveNormalization {
+                    objective_id: value["objective_id"].as_str().unwrap().to_owned(),
+                    direction,
+                    lower_bound: value["lower_bound"].as_f64().unwrap(),
+                    upper_bound: value["upper_bound"].as_f64().unwrap(),
+                }
+            }).collect();
+        assert_eq!(rules.len(), 5);
+        assert!(rules.iter().all(|rule| rule.upper_bound > rule.lower_bound));
     }
 
     #[test]
