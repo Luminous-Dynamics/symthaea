@@ -144,7 +144,9 @@ fn sha256_hex(bytes: &[u8]) -> String {
     encoded
 }
 
-fn observation_frame_sha256(
+/// Compute the deterministic content identity used to bind risk evidence
+/// to one exact observation frame.
+pub fn observation_frame_sha256(
     frame: &PlasmaObservationFrame,
 ) -> Result<String, PlasmaEventEvalError> {
     let canonical = serde_json::to_vec(frame).map_err(|error| {
@@ -269,7 +271,7 @@ pub enum AlarmAbstentionReason {
 
 
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum AlarmPolicyUpdate {
     BelowThreshold {
         at_ns: u64,
@@ -978,6 +980,18 @@ mod tests {
             false
         );
         assert_eq!(
+            manifest["online_policy_contract"]["risk_score_contract"]["uncertainty_straddles_threshold"],
+            "return_uncertain_and_preserve_current_alarm_state"
+        );
+        assert_eq!(
+            manifest["online_policy_contract"]["risk_score_contract"]["model_artifact_sha256_required"],
+            true
+        );
+        assert_eq!(
+            manifest["online_policy_contract"]["risk_score_contract"]["exact_input_frame_sha256_required"],
+            true
+        );
+        assert_eq!(
             manifest["online_policy_contract"]["event_labels_available_online"],
             false
         );
@@ -1066,7 +1080,7 @@ mod tests {
         ));
         assert!(matches!(
             policy.update(&measured("shot-1", 60, 0.1)).expect("update"),
-            AlarmPolicyUpdate::Cleared { at_ns: 60 }
+            AlarmPolicyUpdate::Cleared { at_ns: 60, .. }
         ));
         assert!(!policy.is_active());
     }
