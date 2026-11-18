@@ -1124,6 +1124,62 @@ mod tests {
     }
 
     #[test]
+    fn each_paired_group_must_have_one_baseline_and_one_installed_run() {
+        let mut manifest = base_manifest();
+        make_measured(&mut manifest);
+        let mut duplicate = manifest["runs"][2].clone();
+        duplicate["run_id"] = json!("CURR-BASE-DUPLICATE");
+        manifest["runs"].as_array_mut().unwrap().push(duplicate);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "paired_group_not_one_to_one"));
+    }
+
+    #[test]
+    fn minimum_replicates_apply_to_each_required_pose() {
+        let mut manifest = base_manifest();
+        make_measured(&mut manifest);
+        manifest["gates"][0]["minimum_replicates"] = json!(2);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "required_pose_coverage_missing"));
+        assert_eq!(report.gate_assessments[0].disposition, "insufficient_evidence");
+    }
+
+    #[test]
+    fn gate_coverage_threshold_is_explicit_and_enforced() {
+        let mut manifest = base_manifest();
+        make_measured(&mut manifest);
+        manifest["gates"][0]["minimum_coverage_fraction"] = json!(0.995);
+        manifest["runs"][0]["coverage_fraction"] = json!(0.98);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert_eq!(report.gate_assessments[0].disposition, "insufficient_evidence");
+    }
+
+    #[test]
+    fn non_hard_gate_does_not_override_adjudicated_hard_gate_acceptance() {
+        let mut manifest = base_manifest();
+        make_measured(&mut manifest);
+        manifest["gates"][1]["hard_gate"] = json!(false);
+        manifest["runs"][3]["measured_value"] = json!(8.0);
+        manifest["state"] = json!("adjudicated");
+        manifest["engineering_review"] = json!({
+            "disposition":"accept","reviewer_ref":"ENGINEER-01",
+            "reviewed_at":"2026-11-18T12:00:00+02:00","review_record_ref":"SYSTEM-REVIEW-01"
+        });
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.is_valid(), "{:?}", report.findings);
+        assert_eq!(report.gate_assessments.iter().find(|g| g.gate_id == "GATE-CURRENT").unwrap().disposition, "fail");
+        assert!(report.can_accept_installed_system());
+    }
+
+    #[test]
+    fn gate_pose_set_must_match_article_pose_set_revision() {
+        let mut manifest = base_manifest();
+        manifest["gates"][0]["required_pose_set_ref"] = json!("STALE-POSE-SET-REV");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "gate_pose_set_mismatch"));
+    }
+
+    #[test]
     fn unknown_fields_are_rejected() {
         let mut manifest = base_manifest();
         manifest["invented_robot_safety_approval"] = json!(true);
