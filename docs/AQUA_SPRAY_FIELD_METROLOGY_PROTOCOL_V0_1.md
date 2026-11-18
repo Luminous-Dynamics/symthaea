@@ -90,7 +90,9 @@ Measure inlet, showerhead outlet and bather-plane temperature with synchronized,
 
 ### D. Aerosol / droplet field
 
-Aerosol or droplet-size work is a separate exposure study. Hot and cold shower aerosols can differ in concentration, particle size and temporal dynamics; a visually attractive spray or reduced flow is not evidence of lower inhalation exposure. Use competent aerosol instrumentation and a separately approved protocol. No human exposure trial is authorized by this document.
+Aerosol or droplet-size work is a separate exposure study. A 2025 experimental/modeling study reported different aerosol generation and size distributions under hot versus cold shower conditions; hot-shower particle concentrations peaked early, during approximately the first 1–2 minutes, and the fitted generation/decay values showed substantial variation even among triplicates. Therefore, a session-average aerosol number can hide an important startup transient. Use competent aerosol instrumentation, predeclared size bins and time-resolved sampling that captures startup (including the first 0–2 minutes), steady operation and decay after shutoff; record water temperature, showerhead type, flow, ventilation, room geometry and water source. A visually attractive spray or reduced flow is not evidence of lower inhalation exposure. No human exposure trial is authorized by this document.
+
+Source: Liu et al., “Modelling exposure to aerosols from showers: Implications for microbial risk assessment,” Building and Environment 275 (2025), 112825, https://doi.org/10.1016/j.buildenv.2025.112825. The result motivates better sampling; it does not establish that Aqua's proposed nozzle geometries reduce aerosol exposure.
 
 ## 5. Deterministic map metrics
 
@@ -111,6 +113,14 @@ Report these independently:
 5. **Total mapped mass and target/off-target subtotals:** retain raw totals so derived values can be audited.
 
 Thresholds are inputs to the function, not embedded Aqua constants. Do not choose the threshold after seeing which design wins. Grid cell counts are not independent physical replicates; the independent unit is the complete randomized test run / specimen as defined in the statistical plan.
+
+### Matched degradation and cleaning-recovery comparisons
+
+Aqua now provides a second descriptive helper, `compare_spray_field_to_baseline`, to compare baseline, scale-challenge, partial-blockage and post-clean summaries. Each pair must bind to the same physical specimen, exact geometry digest and one test-context digest. That context must include the same task/target regions, pressure trace, inlet temperature, ambient conditions, installation/mounting, collection interval, grid geometry, measurement protocol and threshold. The helper reports coverage change in percentage points, target deposition change when a relative baseline exists, deposition-CV change and off-target mass-share change. It never decides whether a change is acceptable or clinically meaningful.
+
+This pairing prevents three common comparison errors: mixing specimens, comparing different geometry revisions, and treating a changed pressure or target polygon as if it were cleaning recovery. Baseline-to-scale, baseline-to-partial-blockage and baseline-to-post-clean must be separately reported. Flow, force, temperature and resource outcomes remain separate endpoints and are not inferred from the deposition-map delta.
+
+### Invalid map and comparison conditions
 
 The map summary is invalid when:
 - any cell is missing, duplicated or has non-positive area;
@@ -219,3 +229,10 @@ The Aqua helper may validate grid shape and summarize measured values. It must n
 ## 12. Claim ceiling
 
 This is a preregistration and data-analysis protocol. It does not demonstrate spray-field performance, user comfort, hygiene, aerosol safety, compliance, service life, manufacturing readiness or product superiority. It authorizes no purchase, construction, powered prototype, occupied installation or human-exposure study.
+
+
+## 13. Aerosol and temporal sampling note
+
+The 2025 Building and Environment shower-aerosol study indicates that hot-shower aerosol generation is dynamic, with a prominent early-session peak. For any future exposure study, sample startup, the first 1–2 minutes, steady operation and decay after shutoff separately. Preserve particle-size bins and the exact room/ventilation/water-temperature configuration. Do not extrapolate from the article's test rigs to Aqua devices or claim lower exposure without independently measured, replicated data.
+
+Source: https://doi.org/10.1016/j.buildenv.2025.112825
