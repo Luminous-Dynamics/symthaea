@@ -1464,11 +1464,13 @@ pub enum ApproximateBlockedV1 {
         differing_fields: Vec<TaskFieldV1>,
     },
     ObjectiveDeviationExceedsTolerance {
+        /// Group element mapping source_candidate_id to image_candidate_id.
         group_element: usize,
         source_index: usize,
         image_index: usize,
         source_candidate_id: String,
         image_candidate_id: String,
+        /// Exact max-minus-min objective range within this orbit.
         absolute_objective_deviation: u64,
         maximum_additive_gap: u64,
     },
@@ -1486,6 +1488,8 @@ pub struct ApproximateMemberWitnessV1 {
     pub candidate_id: String,
     pub group_element: usize,
     pub inverse_group_element: usize,
+    /// Original objective value, bound to the complete problem contract.
+    pub objective_value: i64,
     /// Exact absolute difference from this orbit's canonical representative.
     pub objective_deviation_from_representative: u64,
 }
@@ -1504,6 +1508,7 @@ pub struct ApproximateCertificateEvidenceV1 {
     pub action_law_checks: usize,
     pub exact_non_objective_semantic_checks: usize,
     pub representative_objective_checks: usize,
+    pub pairwise_objective_range_checks: usize,
     pub orbit_member_witnesses: usize,
     pub complete_domain_cover: bool,
 }
@@ -1520,6 +1525,11 @@ pub struct ApproximateQuotientCertificateV1 {
     pub objective_unit_id: String,
     pub objective_sense: ObjectiveSenseV1,
     pub requested_maximum_additive_gap: u64,
+    /// Exact, versioned encodings of the complete original inputs.
+    pub problem_contract_bytes: Vec<u8>,
+    pub action_contract_bytes: Vec<u8>,
+    /// Maximum objective range max(f)-min(f) over any one orbit.
+    pub maximum_pairwise_objective_deviation: u64,
     /// Verified max |f(candidate) - f(canonical orbit representative)|.
     pub certified_additive_optimality_gap: u64,
     pub orbits: Vec<ApproximateOrbitV1>,
@@ -1555,6 +1565,7 @@ pub struct ApproximateVerificationReceiptV1 {
     pub witnessed_member_count: usize,
     pub exact_non_objective_semantic_checks: usize,
     pub representative_objective_checks: usize,
+    pub maximum_pairwise_objective_deviation: u64,
     pub certified_additive_optimality_gap: u64,
 }
 
@@ -1580,6 +1591,62 @@ pub struct ApproximateSearchVerificationReceiptV1 {
     pub full_candidate_count: usize,
     pub representative_count: usize,
     pub certified_additive_optimality_gap: u64,
+}
+
+fn append_contract_length(bytes: &mut Vec<u8>, length: usize) {
+    bytes.extend_from_slice(&(length as u64).to_le_bytes());
+}
+
+fn append_contract_string(bytes: &mut Vec<u8>, value: &str) {
+    append_contract_length(bytes, value.len());
+    bytes.extend_from_slice(value.as_bytes());
+}
+
+/// Canonical encoding for exact replay identity. This is not a cryptographic
+/// digest or signature; every original field is retained in versioned bytes.
+fn canonical_problem_contract_bytes(problem: &SearchProblemV1) -> Vec<u8> {
+    let mut bytes = b"luminous.symmetry.error_budgeted.problem.v1\\0".to_vec();
+    append_contract_string(&mut bytes, &problem.problem_id);
+    append_contract_length(&mut bytes, problem.candidate_ids.len());
+    for candidate_id in &problem.candidate_ids {
+        append_contract_string(&mut bytes, candidate_id);
+    }
+    append_contract_length(&mut bytes, problem.semantics.len());
+    for semantics in &problem.semantics {
+        bytes.push(u8::from(semantics.in_search_domain));
+        bytes.push(u8::from(semantics.admissible));
+        bytes.push(u8::from(semantics.feasible));
+        bytes.extend_from_slice(&semantics.objective_cost.to_le_bytes());
+        append_contract_length(&mut bytes, semantics.constraint_signature.len());
+        for value in &semantics.constraint_signature {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        append_contract_string(&mut bytes, &semantics.boundary_condition_id);
+        append_contract_string(&mut bytes, &semantics.output_equivalence_id);
+    }
+    bytes
+}
+
+fn canonical_action_contract_bytes(action: &FiniteActionV1) -> Vec<u8> {
+    let mut bytes = b"luminous.symmetry.error_budgeted.action.v1\\0".to_vec();
+    append_contract_string(&mut bytes, &action.action_id);
+    append_contract_string(&mut bytes, &action.group.group_id);
+    append_contract_length(&mut bytes, action.group.identity);
+    append_contract_length(&mut bytes, action.group.multiplication.len());
+    for row in &action.group.multiplication {
+        append_contract_length(&mut bytes, row.len());
+        for product in row {
+            append_contract_length(&mut bytes, *product);
+        }
+    }
+    append_contract_length(&mut bytes, action.permutations.len());
+    for permutation in &action.permutations {
+        append_contract_length(&mut bytes, permutation.len());
+        for image in permutation {
+            append_contract_length(&mut bytes, *image);
+        }
+    }
+    bytes
 }
 
 fn non_objective_task_differences(
@@ -1659,15 +1726,21 @@ pub fn compile_approximate_quotient(
         }
     }
 
+    let problem_contract_bytes = canonical_problem_contract_bytes(problem);
+    let action_contract_bytes = canonical_action_contract_bytes(action);
     let exact_orbits = build_orbits(problem, action, &validated.group.inverses);
     let mut orbits = Vec::with_capacity(exact_orbits.len());
     let mut representative_objective_checks = 0usize;
+    let mut pairwise_objective_range_checks = 0usize;
     let mut certified_gap = 0_u64;
+    let mut maximum_pairwise_objective_deviation = 0_u64;
 
     for orbit in exact_orbits {
         let representative_index = orbit.representative_index;
         let representative_objective = problem.semantics[representative_index].objective_cost;
         let mut members = Vec::with_capacity(orbit.members.len());
+        let mut minimum_member: Option<(i64, MemberWitnessV1)> = None;
+        let mut maximum_member: Option<(i64, MemberWitnessV1)> = None;
 
         for member in orbit.members {
             representative_objective_checks = representative_objective_checks
@@ -1675,29 +1748,80 @@ pub fn compile_approximate_quotient(
                 .ok_or(ApproximateQuotientErrorV1::Base(
                     QuotientErrorV1::ArithmeticOverflow,
                 ))?;
-            let objective_deviation = representative_objective
-                .abs_diff(problem.semantics[member.candidate_index].objective_cost);
-            if objective_deviation > contract.maximum_additive_gap {
-                return Ok(ApproximateCompileOutcomeV1::Blocked(
-                    ApproximateBlockedV1::ObjectiveDeviationExceedsTolerance {
-                        group_element: member.group_element,
-                        source_index: representative_index,
-                        image_index: member.candidate_index,
-                        source_candidate_id: problem.candidate_ids[representative_index].clone(),
-                        image_candidate_id: member.candidate_id,
-                        absolute_objective_deviation: objective_deviation,
-                        maximum_additive_gap: contract.maximum_additive_gap,
-                    },
-                ));
-            }
+            let objective_value = problem.semantics[member.candidate_index].objective_cost;
+            let objective_deviation = representative_objective.abs_diff(objective_value);
             certified_gap = certified_gap.max(objective_deviation);
+
+            if minimum_member
+                .as_ref()
+                .is_none_or(|(value, witness)| {
+                    objective_value < *value
+                        || (objective_value == *value
+                            && member.candidate_id < witness.candidate_id)
+                })
+            {
+                minimum_member = Some((objective_value, member.clone()));
+            }
+            if maximum_member
+                .as_ref()
+                .is_none_or(|(value, witness)| {
+                    objective_value > *value
+                        || (objective_value == *value
+                            && member.candidate_id < witness.candidate_id)
+                })
+            {
+                maximum_member = Some((objective_value, member.clone()));
+            }
+
             members.push(ApproximateMemberWitnessV1 {
                 candidate_index: member.candidate_index,
                 candidate_id: member.candidate_id,
                 group_element: member.group_element,
                 inverse_group_element: member.inverse_group_element,
+                objective_value,
                 objective_deviation_from_representative: objective_deviation,
             });
+        }
+
+        pairwise_objective_range_checks = pairwise_objective_range_checks
+            .checked_add(1)
+            .ok_or(ApproximateQuotientErrorV1::Base(
+                QuotientErrorV1::ArithmeticOverflow,
+            ))?;
+        let (minimum_value, minimum_witness) =
+            minimum_member.expect("finite quotient orbits are non-empty");
+        let (maximum_value, maximum_witness) =
+            maximum_member.expect("finite quotient orbits are non-empty");
+        let pairwise_deviation = minimum_value.abs_diff(maximum_value);
+        maximum_pairwise_objective_deviation =
+            maximum_pairwise_objective_deviation.max(pairwise_deviation);
+
+        if pairwise_deviation > contract.maximum_additive_gap {
+            // If g_min maps the representative to the minimum member and
+            // g_max maps it to the maximum member, then
+            // g_max * inverse(g_min) maps minimum -> maximum.
+            let inverse_minimum_element =
+                validated.group.inverses[minimum_witness.group_element];
+            let group_element = action.group.multiplication[maximum_witness.group_element]
+                [inverse_minimum_element];
+            if action.permutations[group_element][minimum_witness.candidate_index]
+                != maximum_witness.candidate_index
+            {
+                return Err(ApproximateQuotientErrorV1::Base(
+                    QuotientErrorV1::ActionLawViolation,
+                ));
+            }
+            return Ok(ApproximateCompileOutcomeV1::Blocked(
+                ApproximateBlockedV1::ObjectiveDeviationExceedsTolerance {
+                    group_element,
+                    source_index: minimum_witness.candidate_index,
+                    image_index: maximum_witness.candidate_index,
+                    source_candidate_id: minimum_witness.candidate_id,
+                    image_candidate_id: maximum_witness.candidate_id,
+                    absolute_objective_deviation: pairwise_deviation,
+                    maximum_additive_gap: contract.maximum_additive_gap,
+                },
+            ));
         }
 
         orbits.push(ApproximateOrbitV1 {
@@ -1721,6 +1845,9 @@ pub fn compile_approximate_quotient(
             objective_unit_id: contract.objective_unit_id.clone(),
             objective_sense: contract.objective_sense,
             requested_maximum_additive_gap: contract.maximum_additive_gap,
+            problem_contract_bytes,
+            action_contract_bytes,
+            maximum_pairwise_objective_deviation,
             certified_additive_optimality_gap: certified_gap,
             orbits,
             evidence: ApproximateCertificateEvidenceV1 {
@@ -1728,6 +1855,7 @@ pub fn compile_approximate_quotient(
                 action_law_checks: validated.checks,
                 exact_non_objective_semantic_checks: exact_semantic_checks,
                 representative_objective_checks,
+                pairwise_objective_range_checks,
                 orbit_member_witnesses: candidate_count,
                 complete_domain_cover: true,
             },
@@ -1744,6 +1872,11 @@ pub fn verify_approximate_certificate(
     certificate: &ApproximateQuotientCertificateV1,
     budget: QualificationBudgetV1,
 ) -> Result<ApproximateVerificationReceiptV1, ApproximateQuotientErrorV1> {
+    if certificate.problem_contract_bytes != canonical_problem_contract_bytes(problem)
+        || certificate.action_contract_bytes != canonical_action_contract_bytes(action)
+    {
+        return Err(ApproximateQuotientErrorV1::CertificateMismatch);
+    }
     let expected = match compile_approximate_quotient(problem, action, contract, budget)? {
         ApproximateCompileOutcomeV1::Authorized(expected) => expected,
         ApproximateCompileOutcomeV1::Blocked(violation) => {
@@ -1765,6 +1898,7 @@ pub fn verify_approximate_certificate(
             .evidence
             .exact_non_objective_semantic_checks,
         representative_objective_checks: certificate.evidence.representative_objective_checks,
+        maximum_pairwise_objective_deviation: certificate.maximum_pairwise_objective_deviation,
         certified_additive_optimality_gap: certificate.certified_additive_optimality_gap,
     })
 }
