@@ -36,6 +36,12 @@ pub struct CropFlowDescriptor {
     /// Mean cosine alignment with each sample's nearest distinct-position neighbour.
     /// +1 means locally aligned, -1 means locally opposed.
     pub nearest_neighbor_alignment: Option<f64>,
+    /// Centre-relative radial alignment: +1 outward, -1 inward.
+    /// Available only when a calibrated centre was explicitly supplied.
+    pub radial_alignment: Option<f64>,
+    /// Centre-relative tangential alignment: +1 counter-clockwise, -1 clockwise.
+    /// Available only when a calibrated centre was explicitly supplied.
+    pub tangential_alignment: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,6 +55,7 @@ pub enum CropFlowError {
     NonFiniteWeight { index: usize },
     NegativeWeight { index: usize },
     ZeroTotalWeight,
+    NonFiniteCenter,
 }
 
 impl std::fmt::Display for CropFlowError {
@@ -75,6 +82,7 @@ impl std::fmt::Display for CropFlowError {
                 write!(f, "sample {index} has a negative weight")
             }
             Self::ZeroTotalWeight => write!(f, "crop-flow samples have zero total weight"),
+            Self::NonFiniteCenter => write!(f, "crop-flow reference centre must be finite"),
         }
     }
 }
@@ -88,6 +96,32 @@ impl std::error::Error for CropFlowError {}
 pub fn describe_crop_flow(
     samples: &[CropFlowSample],
     angular_bins: usize,
+) -> Result<CropFlowDescriptor, CropFlowError> {
+    describe_crop_flow_internal(samples, angular_bins, None)
+}
+
+/// Describe a crop-flow field relative to an explicitly calibrated centre.
+///
+/// Coordinates and the centre must be expressed in the same field-local frame.
+/// The radial score is positive for outward flow and negative for inward flow.
+/// The tangential score is positive for counter-clockwise and negative for
+/// clockwise flow. These are geometric alignment descriptors, not force or
+/// mechanism estimates.
+pub fn describe_crop_flow_about_center(
+    samples: &[CropFlowSample],
+    angular_bins: usize,
+    center: Point2,
+) -> Result<CropFlowDescriptor, CropFlowError> {
+    if !center.x.is_finite() || !center.y.is_finite() {
+        return Err(CropFlowError::NonFiniteCenter);
+    }
+    describe_crop_flow_internal(samples, angular_bins, Some(center))
+}
+
+fn describe_crop_flow_internal(
+    samples: &[CropFlowSample],
+    angular_bins: usize,
+    center: Option<Point2>,
 ) -> Result<CropFlowDescriptor, CropFlowError> {
     if samples.is_empty() {
         return Err(CropFlowError::EmptySamples);
@@ -187,6 +221,11 @@ pub fn describe_crop_flow(
     };
 
     let nearest_neighbor_alignment = nearest_neighbor_alignment(samples, &normalized_weights);
+    let (radial_alignment, tangential_alignment) = center
+        .map(|reference_center| {
+            centre_relative_alignment(samples, &normalized_weights, reference_center)
+        })
+        .unwrap_or((None, None));
 
     Ok(CropFlowDescriptor {
         sample_count: samples.len(),
@@ -197,7 +236,45 @@ pub fn describe_crop_flow(
         direction_histogram,
         normalized_direction_entropy,
         nearest_neighbor_alignment,
+        radial_alignment,
+        tangential_alignment,
     })
+}
+
+fn centre_relative_alignment(
+    samples: &[CropFlowSample],
+    normalized_weights: &[f64],
+    center: Point2,
+) -> (Option<f64>, Option<f64>) {
+    let mut radial_sum = 0.0;
+    let mut tangential_sum = 0.0;
+    let mut total_weight = 0.0;
+
+    for (sample, weight) in samples.iter().zip(normalized_weights.iter().copied()) {
+        if weight == 0.0 {
+            continue;
+        }
+        let dx = sample.position.x - center.x;
+        let dy = sample.position.y - center.y;
+        if dx == 0.0 && dy == 0.0 {
+            continue;
+        }
+
+        let radial_direction = dy.atan2(dx);
+        let relative_direction = sample.direction_rad - radial_direction;
+        radial_sum += weight * relative_direction.cos();
+        tangential_sum += weight * relative_direction.sin();
+        total_weight += weight;
+    }
+
+    if total_weight <= 0.0 {
+        (None, None)
+    } else {
+        (
+            Some((radial_sum / total_weight).clamp(-1.0, 1.0)),
+            Some((tangential_sum / total_weight).clamp(-1.0, 1.0)),
+        )
+    }
 }
 
 fn nearest_neighbor_alignment(
@@ -372,6 +449,91 @@ mod tests {
         assert_eq!(
             describe_crop_flow(&[negative_weight], 8),
             Err(CropFlowError::NegativeWeight { index: 0 })
+        );
+    }
+
+    #[test]
+    fn outward_radial_field_is_distinguished_from_tangential_flow() {
+        let center = Point2::new(0.0, 0.0);
+        let samples = [
+            CropFlowSample { position: Point2::new(1.0, 0.0), direction_rad: 0.0, bend_magnitude: 1.0, weight: 1.0 },
+            CropFlowSample { position: Point2::new(0.0, 1.0), direction_rad: std::f64::consts::FRAC_PI_2, bend_magnitude: 1.0, weight: 1.0 },
+            CropFlowSample { position: Point2::new(-1.0, 0.0), direction_rad: std::f64::consts::PI, bend_magnitude: 1.0, weight: 1.0 },
+            CropFlowSample { position: Point2::new(0.0, -1.0), direction_rad: 3.0 * std::f64::consts::FRAC_PI_2, bend_magnitude: 1.0, weight: 1.0 },
+        ];
+        let result = describe_crop_flow_about_center(&samples, 8, center)
+            .expect("radial fixture");
+
+        assert!((result.radial_alignment.expect("centre supplied") - 1.0).abs() < 1.0e-12);
+        assert!(result.tangential_alignment.expect("centre supplied").abs() < 1.0e-12);
+        assert!(result.mean_direction_rad.is_none());
+    }
+
+    #[test]
+    fn counter_clockwise_tangential_field_has_positive_tangential_alignment() {
+        let center = Point2::new(0.0, 0.0);
+        let samples = [
+            CropFlowSample { position: Point2::new(1.0, 0.0), direction_rad: std::f64::consts::FRAC_PI_2, bend_magnitude: 1.0, weight: 1.0 },
+            CropFlowSample { position: Point2::new(0.0, 1.0), direction_rad: std::f64::consts::PI, bend_magnitude: 1.0, weight: 1.0 },
+            CropFlowSample { position: Point2::new(-1.0, 0.0), direction_rad: 3.0 * std::f64::consts::FRAC_PI_2, bend_magnitude: 1.0, weight: 1.0 },
+            CropFlowSample { position: Point2::new(0.0, -1.0), direction_rad: 0.0, bend_magnitude: 1.0, weight: 1.0 },
+        ];
+        let result = describe_crop_flow_about_center(&samples, 8, center)
+            .expect("tangential fixture");
+
+        assert!(result.radial_alignment.expect("centre supplied").abs() < 1.0e-12);
+        assert!((result.tangential_alignment.expect("centre supplied") - 1.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn inward_flow_has_negative_radial_alignment() {
+        let center = Point2::new(0.0, 0.0);
+        let samples = [
+            CropFlowSample { position: Point2::new(1.0, 0.0), direction_rad: std::f64::consts::PI, bend_magnitude: 1.0, weight: 1.0 },
+            CropFlowSample { position: Point2::new(0.0, 1.0), direction_rad: 3.0 * std::f64::consts::FRAC_PI_2, bend_magnitude: 1.0, weight: 1.0 },
+            CropFlowSample { position: Point2::new(-1.0, 0.0), direction_rad: 0.0, bend_magnitude: 1.0, weight: 1.0 },
+            CropFlowSample { position: Point2::new(0.0, -1.0), direction_rad: std::f64::consts::FRAC_PI_2, bend_magnitude: 1.0, weight: 1.0 },
+        ];
+        let result = describe_crop_flow_about_center(&samples, 8, center)
+            .expect("inward fixture");
+
+        assert!((result.radial_alignment.expect("centre supplied") + 1.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn centre_sample_has_no_defined_radial_or_tangential_axis() {
+        let samples = [CropFlowSample {
+            position: Point2::new(0.0, 0.0),
+            direction_rad: 1.0,
+            bend_magnitude: 0.2,
+            weight: 1.0,
+        }];
+        let result = describe_crop_flow_about_center(
+            &samples,
+            8,
+            Point2::new(0.0, 0.0),
+        )
+        .expect("centre sample");
+
+        assert!(result.radial_alignment.is_none());
+        assert!(result.tangential_alignment.is_none());
+    }
+
+    #[test]
+    fn non_finite_reference_center_is_rejected() {
+        let sample = CropFlowSample {
+            position: Point2::new(1.0, 0.0),
+            direction_rad: 0.0,
+            bend_magnitude: 1.0,
+            weight: 1.0,
+        };
+        assert_eq!(
+            describe_crop_flow_about_center(
+                &[sample],
+                8,
+                Point2::new(f64::NAN, 0.0),
+            ),
+            Err(CropFlowError::NonFiniteCenter)
         );
     }
 }
