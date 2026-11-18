@@ -22,7 +22,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-04",
@@ -36,7 +46,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-06",
@@ -50,7 +70,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-09",
@@ -64,7 +94,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-11",
@@ -78,7 +118,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-16",
@@ -92,7 +142,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-21",
@@ -106,7 +166,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-23",
@@ -120,7 +190,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-26",
@@ -134,7 +214,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-28",
@@ -148,7 +238,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-33",
@@ -162,7 +262,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-38",
@@ -176,7 +286,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-40",
@@ -190,7 +310,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-43",
@@ -204,7 +334,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-45",
@@ -218,7 +358,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-48",
@@ -232,7 +382,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-50",
@@ -246,7 +406,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-55",
@@ -260,7 +430,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-57",
@@ -274,7 +454,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-60",
@@ -288,7 +478,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-62",
@@ -302,7 +502,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-65",
@@ -316,7 +526,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-67",
@@ -330,7 +550,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-72",
@@ -344,7 +574,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-74",
@@ -358,7 +598,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-77",
@@ -372,7 +622,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-79",
@@ -386,7 +646,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-82",
@@ -400,7 +670,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-84",
@@ -414,7 +694,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-D4-89",
@@ -428,7 +718,17 @@
         "fy",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
     },
     {
       "case_id": "GENERATED-C4-01",
@@ -438,7 +738,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-04",
@@ -448,7 +758,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-06",
@@ -458,7 +778,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-09",
@@ -468,7 +798,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-11",
@@ -478,7 +818,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-16",
@@ -488,7 +838,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-21",
@@ -498,7 +858,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-23",
@@ -508,7 +878,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-26",
@@ -518,7 +898,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-28",
@@ -528,7 +918,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-33",
@@ -538,7 +938,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-38",
@@ -548,7 +958,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-40",
@@ -558,7 +978,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-43",
@@ -568,7 +998,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-45",
@@ -578,7 +1018,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-48",
@@ -588,7 +1038,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-50",
@@ -598,7 +1058,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-55",
@@ -608,7 +1078,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-57",
@@ -618,7 +1098,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-60",
@@ -628,7 +1118,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-62",
@@ -638,7 +1138,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-65",
@@ -648,7 +1158,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-67",
@@ -658,7 +1178,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-72",
@@ -668,7 +1198,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-74",
@@ -678,7 +1218,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-77",
@@ -688,7 +1238,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-79",
@@ -698,7 +1258,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-82",
@@ -708,7 +1278,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-84",
@@ -718,7 +1298,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C4-89",
@@ -728,7 +1318,17 @@
         "r90",
         "r180",
         "r270"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-01",
@@ -736,7 +1336,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-04",
@@ -744,7 +1354,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-06",
@@ -752,7 +1372,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-09",
@@ -760,7 +1390,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-11",
@@ -768,7 +1408,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-16",
@@ -776,7 +1426,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-21",
@@ -784,7 +1444,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-23",
@@ -792,7 +1462,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-26",
@@ -800,7 +1480,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-28",
@@ -808,7 +1498,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-33",
@@ -816,7 +1516,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-38",
@@ -824,7 +1534,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-40",
@@ -832,7 +1552,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-43",
@@ -840,7 +1570,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-45",
@@ -848,7 +1588,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-48",
@@ -856,7 +1606,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-50",
@@ -864,7 +1624,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-55",
@@ -872,7 +1642,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-57",
@@ -880,7 +1660,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-60",
@@ -888,7 +1678,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-62",
@@ -896,7 +1696,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-65",
@@ -904,7 +1714,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-67",
@@ -912,7 +1732,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-72",
@@ -920,7 +1750,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-74",
@@ -928,7 +1768,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-77",
@@ -936,7 +1786,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-79",
@@ -944,7 +1804,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-82",
@@ -952,7 +1822,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-84",
@@ -960,7 +1840,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_R180-89",
@@ -968,7 +1858,17 @@
       "proposed_elements": [
         "e",
         "r180"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-01",
@@ -976,7 +1876,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-04",
@@ -984,7 +1894,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-06",
@@ -992,7 +1912,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-09",
@@ -1000,7 +1930,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-11",
@@ -1008,7 +1948,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-16",
@@ -1016,7 +1966,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-21",
@@ -1024,7 +1984,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-23",
@@ -1032,7 +2002,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-26",
@@ -1040,7 +2020,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-28",
@@ -1048,7 +2038,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-33",
@@ -1056,7 +2056,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-38",
@@ -1064,7 +2074,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-40",
@@ -1072,7 +2092,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-43",
@@ -1080,7 +2110,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-45",
@@ -1088,7 +2128,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-48",
@@ -1096,7 +2146,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-50",
@@ -1104,7 +2164,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-55",
@@ -1112,7 +2182,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-57",
@@ -1120,7 +2200,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-60",
@@ -1128,7 +2218,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-62",
@@ -1136,7 +2236,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-65",
@@ -1144,7 +2254,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-67",
@@ -1152,7 +2272,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-72",
@@ -1160,7 +2290,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-74",
@@ -1168,7 +2308,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-77",
@@ -1176,7 +2326,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-79",
@@ -1184,7 +2344,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-82",
@@ -1192,7 +2362,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-84",
@@ -1200,7 +2380,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FX-89",
@@ -1208,7 +2398,17 @@
       "proposed_elements": [
         "e",
         "fx"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-01",
@@ -1216,7 +2416,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-04",
@@ -1224,7 +2434,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-06",
@@ -1232,7 +2452,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-09",
@@ -1240,7 +2470,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-11",
@@ -1248,7 +2488,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-16",
@@ -1256,7 +2506,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-21",
@@ -1264,7 +2524,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-23",
@@ -1272,7 +2542,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-26",
@@ -1280,7 +2560,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-28",
@@ -1288,7 +2578,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-33",
@@ -1296,7 +2596,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-38",
@@ -1304,7 +2614,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-40",
@@ -1312,7 +2632,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-43",
@@ -1320,7 +2650,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-45",
@@ -1328,7 +2668,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-48",
@@ -1336,7 +2686,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-50",
@@ -1344,7 +2704,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-55",
@@ -1352,7 +2722,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-57",
@@ -1360,7 +2740,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-60",
@@ -1368,7 +2758,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-62",
@@ -1376,7 +2776,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-65",
@@ -1384,7 +2794,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-67",
@@ -1392,7 +2812,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-72",
@@ -1400,7 +2830,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-74",
@@ -1408,7 +2848,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-77",
@@ -1416,7 +2866,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-79",
@@ -1424,7 +2884,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-82",
@@ -1432,7 +2902,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-84",
@@ -1440,7 +2920,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FY-89",
@@ -1448,7 +2938,17 @@
       "proposed_elements": [
         "e",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-01",
@@ -1456,7 +2956,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-04",
@@ -1464,7 +2974,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-06",
@@ -1472,7 +2992,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-09",
@@ -1480,7 +3010,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-11",
@@ -1488,7 +3028,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-16",
@@ -1496,7 +3046,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-21",
@@ -1504,7 +3064,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-23",
@@ -1512,7 +3082,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-26",
@@ -1520,7 +3100,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-28",
@@ -1528,7 +3118,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-33",
@@ -1536,7 +3136,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-38",
@@ -1544,7 +3154,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-40",
@@ -1552,7 +3172,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-43",
@@ -1560,7 +3190,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-45",
@@ -1568,7 +3208,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-48",
@@ -1576,7 +3226,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-50",
@@ -1584,7 +3244,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-55",
@@ -1592,7 +3262,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-57",
@@ -1600,7 +3280,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-60",
@@ -1608,7 +3298,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-62",
@@ -1616,7 +3316,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-65",
@@ -1624,7 +3334,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-67",
@@ -1632,7 +3352,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-72",
@@ -1640,7 +3370,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-74",
@@ -1648,7 +3388,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-77",
@@ -1656,7 +3406,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-79",
@@ -1664,7 +3424,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-82",
@@ -1672,7 +3442,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-84",
@@ -1680,7 +3460,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FDIAG-89",
@@ -1688,7 +3478,17 @@
       "proposed_elements": [
         "e",
         "fdiag"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-01",
@@ -1696,7 +3496,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-04",
@@ -1704,7 +3514,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-06",
@@ -1712,7 +3532,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-09",
@@ -1720,7 +3550,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-11",
@@ -1728,7 +3568,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-16",
@@ -1736,7 +3586,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-21",
@@ -1744,7 +3604,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-23",
@@ -1752,7 +3622,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-26",
@@ -1760,7 +3640,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-28",
@@ -1768,7 +3658,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-33",
@@ -1776,7 +3676,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-38",
@@ -1784,7 +3694,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-40",
@@ -1792,7 +3712,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-43",
@@ -1800,7 +3730,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-45",
@@ -1808,7 +3748,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-48",
@@ -1816,7 +3766,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-50",
@@ -1824,7 +3784,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-55",
@@ -1832,7 +3802,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-57",
@@ -1840,7 +3820,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-60",
@@ -1848,7 +3838,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-62",
@@ -1856,7 +3856,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-65",
@@ -1864,7 +3874,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-67",
@@ -1872,7 +3892,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-72",
@@ -1880,7 +3910,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-74",
@@ -1888,7 +3928,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-77",
@@ -1896,7 +3946,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-79",
@@ -1904,7 +3964,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-82",
@@ -1912,7 +3982,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-84",
@@ -1920,7 +4000,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-C2_FANTI-89",
@@ -1928,7 +4018,17 @@
       "proposed_elements": [
         "e",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-01",
@@ -1938,7 +4038,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-04",
@@ -1948,7 +4058,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-06",
@@ -1958,7 +4078,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-09",
@@ -1968,7 +4098,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-11",
@@ -1978,7 +4118,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-16",
@@ -1988,7 +4138,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-21",
@@ -1998,7 +4158,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-23",
@@ -2008,7 +4178,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-26",
@@ -2018,7 +4198,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-28",
@@ -2028,7 +4218,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-33",
@@ -2038,7 +4238,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-38",
@@ -2048,7 +4258,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-40",
@@ -2058,7 +4278,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-43",
@@ -2068,7 +4298,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-45",
@@ -2078,7 +4318,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-48",
@@ -2088,7 +4338,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-50",
@@ -2098,7 +4358,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-55",
@@ -2108,7 +4378,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-57",
@@ -2118,7 +4398,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-60",
@@ -2128,7 +4418,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-62",
@@ -2138,7 +4438,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-65",
@@ -2148,7 +4458,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-67",
@@ -2158,7 +4478,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-72",
@@ -2168,7 +4498,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-74",
@@ -2178,7 +4518,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-77",
@@ -2188,7 +4538,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-79",
@@ -2198,7 +4558,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-82",
@@ -2208,7 +4578,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-84",
@@ -2218,7 +4598,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_AXIS-89",
@@ -2228,7 +4618,17 @@
         "r180",
         "fx",
         "fy"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-01",
@@ -2238,7 +4638,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-04",
@@ -2248,7 +4658,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-06",
@@ -2258,7 +4678,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-09",
@@ -2268,7 +4698,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-11",
@@ -2278,7 +4718,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-16",
@@ -2288,7 +4738,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-21",
@@ -2298,7 +4758,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-23",
@@ -2308,7 +4778,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-26",
@@ -2318,7 +4798,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-28",
@@ -2328,7 +4818,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-33",
@@ -2338,7 +4838,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-38",
@@ -2348,7 +4858,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-40",
@@ -2358,7 +4878,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-43",
@@ -2368,7 +4898,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-45",
@@ -2378,7 +4918,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-48",
@@ -2388,7 +4938,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-50",
@@ -2398,7 +4958,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-55",
@@ -2408,7 +4978,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-57",
@@ -2418,7 +4998,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-60",
@@ -2428,7 +5018,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-62",
@@ -2438,7 +5038,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-65",
@@ -2448,7 +5058,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-67",
@@ -2458,7 +5078,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-72",
@@ -2468,7 +5098,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-74",
@@ -2478,7 +5118,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-77",
@@ -2488,7 +5138,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-79",
@@ -2498,7 +5158,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-82",
@@ -2508,7 +5178,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-84",
@@ -2518,7 +5198,17 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-V4_DIAG-89",
@@ -2528,217 +5218,527 @@
         "r180",
         "fdiag",
         "fanti"
-      ]
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
     },
     {
       "case_id": "GENERATED-C1-01",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-04",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-06",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-09",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-11",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-16",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-21",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-23",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-26",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-28",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-33",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-38",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-40",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-43",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-45",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-48",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-50",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-55",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-57",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-60",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-62",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-65",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-67",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-72",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-74",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-77",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-79",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-82",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-84",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     },
     {
       "case_id": "GENERATED-C1-89",
       "disposition": "predicted",
       "proposed_elements": [
         "e"
-      ]
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
     }
   ]
 }
