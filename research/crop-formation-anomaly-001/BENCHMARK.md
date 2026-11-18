@@ -100,7 +100,7 @@ A null must preserve the nuisance structure relevant to the question. Uniform ra
 Use measurements of stem/crop-flow directions at known positions; do not infer stem direction from an uncalibrated overhead outline.
 
 Synthetic controls should include:
-- uniform flow, radial flow, tangential/vortex-like flow, opposing sectors and smoothly varying fields;
+- uniform flow, outward/inward radial flow, clockwise/counter-clockwise tangential flow, opposing sectors and smoothly varying fields;
 - multimodal directions with a zero/undefined circular mean;
 - missing samples, clustered sampling, position duplicates, measurement weights and angle-wrap perturbations;
 - field-coordinate rotation/reflection and known angular measurement noise.
@@ -109,11 +109,12 @@ Measure:
 - circular mean direction error using wrapped angular difference;
 - resultant-length and direction-entropy error;
 - nearest-neighbour directional-alignment error;
+- centre-relative radial and tangential alignment error, with explicit centre-location uncertainty;
 - bend-magnitude mean/variance error;
 - robustness to missingness, uneven sampling, spatial clustering and quality weights;
 - abstention when there is no stable global direction.
 
-The first Rust implementation supplies descriptive summaries only. It is not an interpolated vector-field estimator, does not estimate vorticity/divergence, and does not attribute a flow field to any mechanism.
+The first Rust implementation supplies descriptive summaries only. Its optional centre-relative metrics test radial/inward/outward and tangential/clockwise/counter-clockwise alignment against a supplied calibrated centre. It is not an interpolated vector-field estimator, does not estimate vorticity/divergence, and does not attribute a flow field to any mechanism.
 
 **Synthetic target:** exact recovery within numerical tolerance for noiseless analytic fields; for noisy cases, publish error/coverage curves against the declared noise level. Do not choose a universal real-world degree threshold before instrument and sampling uncertainty are characterized.
 
