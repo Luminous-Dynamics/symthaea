@@ -73,6 +73,7 @@ fn weighted_laplacian_algebraic_connectivity(
     // The returned second eigenvalue is a graph descriptor, not a material observable.
     let max_sweeps = 64_usize;
     let tolerance = 1.0e-12_f64;
+    let mut converged = false;
     for _ in 0..max_sweeps {
         let mut max_off_diagonal = 0.0_f64;
         for p in 0..node_count {
@@ -113,8 +114,14 @@ fn weighted_laplacian_algebraic_connectivity(
             }
         }
         if max_off_diagonal <= tolerance {
+            converged = true;
             break;
         }
+    }
+    if !converged {
+        return Err(format!(
+            "weighted Laplacian Jacobi eigensolver did not converge within {max_sweeps} sweeps"
+        ));
     }
 
     let mut eigenvalues: Vec<f64> = (0..node_count)
@@ -778,5 +785,44 @@ mod tests {
                 "{filename}: expected {expected}, received {gap}"
             );
         }
+    }
+
+    #[test]
+    fn weighted_laplacian_gap_is_invariant_to_node_and_edge_order() {
+        let (_, mut fixture) = inputs();
+        let nodes = fixture["graph"]["nodes"].as_array().unwrap();
+        let edges = fixture["graph"]["edges"].as_array().unwrap();
+        let mut original_ids = HashMap::new();
+        for (index, node) in nodes.iter().enumerate() {
+            original_ids.insert(text_field(node, "node_id").unwrap().to_owned(), index);
+        }
+        let reference =
+            weighted_laplacian_algebraic_connectivity(nodes.len(), edges, &original_ids).unwrap();
+
+        fixture["graph"]["nodes"].as_array_mut().unwrap().reverse();
+        fixture["graph"]["edges"].as_array_mut().unwrap().reverse();
+        let nodes = fixture["graph"]["nodes"].as_array().unwrap();
+        let edges = fixture["graph"]["edges"].as_array().unwrap();
+        let mut reordered_ids = HashMap::new();
+        for (index, node) in nodes.iter().enumerate() {
+            reordered_ids.insert(text_field(node, "node_id").unwrap().to_owned(), index);
+        }
+        let reordered =
+            weighted_laplacian_algebraic_connectivity(nodes.len(), edges, &reordered_ids).unwrap();
+        assert!((reference - reordered).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn disconnected_graph_has_zero_algebraic_connectivity() {
+        let (_, fixture) = inputs();
+        let nodes = fixture["graph"]["nodes"].as_array().unwrap();
+        let edges = fixture["graph"]["edges"].as_array().unwrap();
+        let mut ids = HashMap::new();
+        for (index, node) in nodes.iter().enumerate() {
+            ids.insert(text_field(node, "node_id").unwrap().to_owned(), index);
+        }
+        let disconnected = &edges[..2];
+        let gap = weighted_laplacian_algebraic_connectivity(nodes.len(), disconnected, &ids).unwrap();
+        assert!(gap.abs() < 1.0e-10);
     }
 }
