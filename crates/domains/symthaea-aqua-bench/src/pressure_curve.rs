@@ -566,17 +566,51 @@ mod tests {
 mod tolerance_tests {
     use super::*;
 
+    fn digest(byte: char) -> String {
+        std::iter::repeat_n(byte, 64).collect()
+    }
+
+    fn observation(run_id: &str, product: &str) -> PressureFlowObservation {
+        PressureFlowObservation {
+            run_id: run_id.to_owned(),
+            specimen_id: format!("{product}-specimen-01"),
+            market_variant_id: product.to_owned(),
+            mode_id: "RAIN".to_owned(),
+            geometry_sha256: digest('a'),
+            test_context_sha256: digest('b'),
+            protocol_sha256: digest('c'),
+            pressure_setpoint_kpa: 100.0,
+            setpoint_tolerance_kpa: 5.0,
+            dynamic_fitting_inlet_pressure_kpa: 100.0,
+            dynamic_pressure_uncertainty_kpa: 1.0,
+            static_supply_pressure_kpa: Some(180.0),
+            upstream_residual_pressure_kpa: Some(130.0),
+            flow_lpm: 5.0,
+            flow_uncertainty_lpm: 0.1,
+            pressure_envelope: QualifiedPressureEnvelope {
+                minimum_kpa: 50.0,
+                maximum_kpa: 300.0,
+                evidence_sha256: digest('d'),
+            },
+            product_declared_range: None,
+            task_outcome: TaskOutcome::NotAssessed,
+            standard_method_outcome: StandardMethodOutcome::NotAssessed,
+            pressure_instrument_id: "pressure-channel-01".to_owned(),
+            flow_instrument_id: "flow-channel-01".to_owned(),
+        }
+    }
+
     #[test]
     fn rejects_invalid_dynamic_pressure_with_specific_error() {
-        let mut run = super::tests::observation("run-01", "aqua-article", 100.0);
+        let mut run = observation("run-01", "aqua-article");
         run.dynamic_fitting_inlet_pressure_kpa = f64::NAN;
         assert_eq!(run.validate(), Err(PressureRunError::InvalidDynamicPressure));
     }
 
     #[test]
     fn rejects_invalid_matched_pressure_separation_tolerance() {
-        let control = super::tests::observation("control-01", "incumbent", 100.0);
-        let candidate = super::tests::observation("candidate-01", "aqua-article", 100.0);
+        let control = observation("control-01", "incumbent");
+        let candidate = observation("candidate-01", "aqua-article");
         assert_eq!(
             validate_matched_pressure_comparison(&control, &candidate, 0.0),
             Err(PressureRunError::InvalidComparisonTolerance)
