@@ -50,7 +50,6 @@ The deterministic fixed corpus includes seventeen two-session cases:
 15. Mechanism-break negative control after a regime shift.
 16. Common-cause attack: two source-family labels share one upstream root.
 17. Error-interval negative control: point estimates are close but measurement bounds exceed the equivalence margin.
-17. Error-interval negative control: point estimates are close but measurement bounds exceed the equivalence margin.
 
 ## Compared policies
 
@@ -201,3 +200,22 @@ The advantage should be durable semantics and auditability across providers—no
 Mycelix's [FIN-SYS source profile](https://github.com/Luminous-Dynamics/mycelix/blob/main/docs/finance/FIN_SYS_SOURCE_PROFILE_V1.md) already states the relevant common-cause rule: ten publications reusing one BIS/IMF series remain one upstream provenance family. MACE's `source_root_id` is a synthetic proxy for this lineage, not proof of provenance. In production it must be derived from a verified source-ledger receipt and preserve the acquisition mechanism, original artifact digest, source family, upstream dataset/series, transformation lineage, and supersession links.
 
 Likewise, `measurement_error_bound` is currently a candidate-visible claim. A production error bound must bind its instrument/method, units, calibration revision, operating range, validation evidence and validity interval. An agent must not increase its own trust by asserting a narrower bound.
+
+## Raw-native Session-A ingress boundary (research-only)
+
+The workspace adds a third package, `broca-mace-ingress`. It maps a raw interaction envelope into a candidate-visible `Experience` only after:
+- explicit `valid_at` / `known_at` eligibility checks;
+- prediction-before-dispatch-before-observation ordering;
+- a verifier supplies a nonzero upstream root and source family bound to the event and scope;
+- a calibration verifier supplies a finite measurement-error bound for that scope/time;
+- a causal-assessment verifier classifies intervention, preregistration, confounder control and delayed-horizon status;
+- an outcome verifier confirms externally reconciled state;
+- retraction state is checked as known at the requested transaction time.
+
+The adapter retains receipt digests alongside the compact Experience. Its `EvidenceVerifier` trait is an integration seam, **not cryptographic verification**. A production implementation must consume Mycelix-signed source-ledger, calibration and reconciliation receipts. The test verifier is synthetic and does not establish signature security, production bitemporal storage or live Mycelix conductor integration.
+
+Run:
+
+```bash
+cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-ingress
+```
