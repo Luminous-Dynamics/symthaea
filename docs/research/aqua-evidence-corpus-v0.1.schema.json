@@ -317,6 +317,18 @@
             "string",
             "null"
           ]
+        },
+        "pressure_points_kpa": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "pressure_tolerance_kpa": {
+          "type": "number",
+          "minimum": 0
         }
       }
     },
