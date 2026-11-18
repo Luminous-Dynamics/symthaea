@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::env;
-use std::f64::consts::TAU;
+use std::f64::consts::{PI, TAU};
 use std::fs;
 use std::path::PathBuf;
 use std::process;
@@ -110,6 +110,10 @@ fn finite_number(value: &Value, context: &str) -> Result<f64, String> {
 fn close_enough(left: f64, right: f64) -> bool {
     let scale = left.abs().max(right.abs()).max(1.0);
     (left - right).abs() <= 1.0e-10 * scale
+}
+
+fn wrap_to_pi(angle: f64) -> f64 {
+    (angle + PI).rem_euclid(TAU) - PI
 }
 
 impl GlModel {
@@ -1136,6 +1140,15 @@ mod tests {
         assert_eq!(vortices.negative_charge, 0);
         assert_eq!(vortices.absolute_charge_sum, 0);
         assert_eq!(vortices.valid_plaquettes, 16);
+    }
+
+    #[test]
+    fn phase_wrapping_uses_half_open_minus_pi_to_pi_interval() {
+        assert!((wrap_to_pi(0.0)).abs() < 1.0e-12);
+        assert!((wrap_to_pi(3.0 * PI) + PI).abs() < 1.0e-12);
+        assert!((wrap_to_pi(-3.0 * PI) + PI).abs() < 1.0e-12);
+        assert!(wrap_to_pi(PI).abs() - PI < 1.0e-12);
+        assert!(wrap_to_pi(-PI).abs() - PI < 1.0e-12);
     }
 
     #[test]
