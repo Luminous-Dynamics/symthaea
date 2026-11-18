@@ -159,3 +159,12 @@ The 4×4, few-sweep workflow invocation is only a smoke test for execution, dete
 - a claim about a real superconductor.
 
 The next scientific solver gate requires a finite-size sequence, multiple independent seeds, equilibration and autocorrelation analysis, uncertainty estimates, and a comparison against the 2D BKT and 3D XY references above. The Monte Carlo implementation must be independently reviewed and benchmarked before any topology comparison is interpreted scientifically.
+
+
+## Reference solver and finite-twist cautions
+
+The initial cluster kernel follows the embedded-reflection method introduced by Wolff for O(n) spin models, including the two-dimensional XY model at criticality (U. Wolff, Phys. Rev. Lett. 62, 361 (1989), https://doi.org/10.1103/PhysRevLett.62.361). The implementation's bond activation is limited to positive, unfrustrated couplings and zero gauge-link phase.
+
+The helicity-modulus estimator is the zero-applied-twist linear-response curvature of the free energy. Do not equate it with a finite-angle twisted-boundary measurement: Khairnar & Vojta (Phys. Rev. E 111, 024114 (2025), https://doi.org/10.1103/PhysRevE.111.024114) report non-quadratic finite-twist effects and twist-dependent helicity response associated with opposite-chirality state mixing in the 2D XY model.
+
+The repository includes 4x4, 8x8 and 16x16 synthetic square-lattice input fixtures. This is a *geometry/input ladder*, not a numerical finite-size scaling result. BKT inference still requires substantially larger sizes, multiple independent seeds, warmup/equilibration analysis, autocorrelation-aware uncertainties and comparison to tensor-network level spectroscopy / HOTRG.
