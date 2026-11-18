@@ -61,6 +61,7 @@ The adapter remains deliberately small: it binds paired Aqua test runs to equiva
 - `docs/AQUA_BOUNDED_BATHING_SERVICE_COMPILER_V0_1.md`
 - `docs/AQUA_ESSENTIAL_SERVICE_CONTINUITY_PROTOCOL_V0_1.md`
 - `docs/AQUA_WASHSTATION_BENCHMARK_V0_1.md` — South African SANS Table 3 fixture-specific flow and design-pressure references.
+- `docs/AQUA_LOW_PRESSURE_VALIDATION_PROTOCOL_V0_1.md` — pressure datum, 50–550 kPa test matrix, comparator eligibility and unoccupied validation sequence.
 - `docs/AQUA_COMPETITOR_LEDGER_V0_1.md` — SANS clause/table ambiguity, Johannesburg by-law boundaries and exact commercial shower comparators.
 - `docs/AQUA_AQS1_INTERFACE_AND_FAULT_CONTRACT_V0_1.md`
 - `AQUA-ADAPTIVE-EXPERIENCE-001 #12712` — optional privacy-preserving preference/task assistance.
