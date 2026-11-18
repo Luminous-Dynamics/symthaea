@@ -732,4 +732,51 @@ mod tests {
             .remove("box_lengths");
         assert!(audit_mutated(fixture).is_ok());
     }
+
+    #[test]
+    fn weighted_laplacian_gap_matches_periodic_square_lattice_eigenvalues() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
+        let (_, base_fixture) = inputs();
+        let mut node_ids = HashMap::new();
+        for (index, node) in base_fixture["graph"]["nodes"].as_array().unwrap().iter().enumerate() {
+            let id = text_field(node, "node_id").unwrap();
+            node_ids.insert(id.to_owned(), index);
+        }
+        let base_edges = base_fixture["graph"]["edges"].as_array().unwrap();
+        let gap_4 = weighted_laplacian_algebraic_connectivity(16, base_edges, &node_ids).unwrap();
+        assert!((gap_4 - 2.0).abs() < 1.0e-9);
+
+        for (filename, node_count, edge_count, expected) in [
+            (
+                "superconductivity_phase_network_square_8x8_fixture_v0_1.json",
+                64,
+                128,
+                2.0 - 2.0 * (std::f64::consts::PI / 4.0).cos(),
+            ),
+            (
+                "superconductivity_phase_network_square_16x16_fixture_v0_1.json",
+                256,
+                512,
+                2.0 - 2.0 * (std::f64::consts::PI / 8.0).cos(),
+            ),
+        ] {
+            let fixture: Value = serde_json::from_slice(
+                &fs::read(root.join("data/research").join(filename)).unwrap(),
+            )
+            .unwrap();
+            let nodes = fixture["graph"]["nodes"].as_array().unwrap();
+            let edges = fixture["graph"]["edges"].as_array().unwrap();
+            assert_eq!(nodes.len(), node_count);
+            assert_eq!(edges.len(), edge_count);
+            let mut ids = HashMap::new();
+            for (index, node) in nodes.iter().enumerate() {
+                ids.insert(text_field(node, "node_id").unwrap().to_owned(), index);
+            }
+            let gap = weighted_laplacian_algebraic_connectivity(node_count, edges, &ids).unwrap();
+            assert!(
+                (gap - expected).abs() < 1.0e-8,
+                "{filename}: expected {expected}, received {gap}"
+            );
+        }
+    }
 }
