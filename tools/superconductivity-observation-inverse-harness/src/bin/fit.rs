@@ -210,8 +210,27 @@ fn fit_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Strin
     if calibration_ids.is_empty() || heldout_ids.is_empty() {
         return Err("calibration and heldout partitions must both be non-empty".to_owned());
     }
+    let pre_registered_at = required_text(split, "pre_registered_at")?;
+    if pre_registered_at.len() != 20 || !pre_registered_at.ends_with('Z') {
+        return Err("split pre_registered_at must be UTC RFC3339 seconds".to_owned());
+    }
+    for observation in observations {
+        let conditions = observation
+            .get("conditions")
+            .ok_or_else(|| "observation missing conditions".to_owned())?;
+        let timestamp = required_text(conditions, "measurement_timestamp")?;
+        if timestamp.len() != 20
+            || !timestamp.ends_with('Z')
+            || timestamp < pre_registered_at
+        {
+            return Err("split must be preregistered before every UTC observation timestamp".to_owned());
+        }
+    }
+
     let mut calibration_set = HashSet::new();
     let mut heldout_set = HashSet::new();
+    let mut calibration_order = Vec::with_capacity(calibration_ids.len());
+    let mut heldout_order = Vec::with_capacity(heldout_ids.len());
     let mut calibration_modalities = HashSet::new();
     let mut heldout_modalities = HashSet::new();
     for id_value in calibration_ids {
@@ -222,6 +241,7 @@ fn fit_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Strin
         if !calibration_set.insert(id.to_owned()) {
             return Err(format!("duplicate calibration observation {id}"));
         }
+        calibration_order.push(id.to_owned());
         let observation = observation_by_id
             .get(id)
             .ok_or_else(|| format!("unknown calibration observation {id}"))?;
@@ -235,6 +255,7 @@ fn fit_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Strin
         if !heldout_set.insert(id.to_owned()) {
             return Err(format!("duplicate heldout observation {id}"));
         }
+        heldout_order.push(id.to_owned());
         if calibration_set.contains(id) {
             return Err(format!("observation {id} appears in calibration and holdout"));
         }
@@ -260,7 +281,7 @@ fn fit_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Strin
         prior_precision.b * prior_mean[0] + prior_precision.d * prior_mean[1],
     ];
     let mut calibration_rows = Vec::with_capacity(calibration_set.len());
-    for id in &calibration_set {
+    for id in &calibration_order {
         let observation = observation_by_id[id];
         let value = finite_number(
             observation
@@ -306,7 +327,7 @@ fn fit_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Strin
     let mut predictive_rows = Vec::with_capacity(heldout_set.len());
     let mut total_log_predictive_density = 0.0;
     let mut standardized_residuals = Vec::with_capacity(heldout_set.len());
-    for id in &heldout_set {
+    for id in &heldout_order {
         let observation = observation_by_id[id];
         let observed = finite_number(
             observation
@@ -353,6 +374,10 @@ fn fit_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Strin
     }
 
     let prior_covariance = prior_precision.inverse()?;
+    let mut calibration_modalities: Vec<String> = calibration_modalities.into_iter().collect();
+    calibration_modalities.sort();
+    let mut heldout_modalities: Vec<String> = heldout_modalities.into_iter().collect();
+    heldout_modalities.sort();
     let dataset_id = required_text(&fixture, "dataset_id")?;
     let model_version = required_text(model_target, "model_version")?;
     let prior_id = required_text(model_target, "prior_definition_id")?;
@@ -527,9 +552,9 @@ mod tests {
         let (schema, fixture) = inputs();
         let receipt = fit_dataset(&schema, &serde_json::to_vec(&fixture).unwrap()).unwrap();
         assert_eq!(receipt["calibration"]["observation_count"], 2);
-        assert_eq!(
-            receipt["posterior"]["mean"][0].as_f64().unwrap() - 0.9198125 < 1.0e-4,
-            true
+        assert!(
+            (receipt["posterior"]["mean"][0].as_f64().unwrap() - 0.91981258).abs()
+                < 1.0e-5
         );
         assert_eq!(receipt["heldout_predictive_evaluation"]["heldout_observations_used_in_posterior"], false);
         assert_eq!(receipt["heldout_predictive_evaluation"]["observation_count"], 1);
@@ -572,6 +597,22 @@ mod tests {
     fn asymmetric_prior_precision_is_rejected() {
         let (_, mut fixture) = inputs();
         fixture["model_target"]["parameter_prior_precision"] = json!([[1.0, 0.2], [0.1, 1.0]]);
+        assert!(fit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn inverse_fit_receipt_is_deterministic() {
+        let (schema, fixture) = inputs();
+        let bytes = serde_json::to_vec(&fixture).unwrap();
+        let first = fit_dataset(&schema, &bytes).unwrap();
+        let second = fit_dataset(&schema, &bytes).unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn inverse_fitter_rejects_retrospective_split_registration() {
+        let (_, mut fixture) = inputs();
+        fixture["split"]["pre_registered_at"] = json!("2026-11-18T09:30:00Z");
         assert!(fit_mutated(fixture).is_err());
     }
 }
