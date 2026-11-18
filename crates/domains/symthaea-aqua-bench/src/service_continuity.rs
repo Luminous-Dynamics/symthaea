@@ -509,27 +509,21 @@ mod exhaustive_state_space_tests {
                                             } else {
                                                 match local_capability {
                                                     LocalServiceCapability::FullServiceQualified
-                                                    => {
-                                                        ContinuityMode::QualifiedFull
-                                                    }
+                                                        => ContinuityMode::QualifiedFull,
                                                     LocalServiceCapability::ReducedServiceQualified
-                                                    => {
-                                                        ContinuityMode::QualifiedReduced
-                                                    }
-                                                    LocalServiceCapability::ManualOnlyQualified => {
-                                                        ContinuityMode::ManualOnly
-                                                    }
-                                                    LocalServiceCapability::NoQualifiedService => {
-                                                        ContinuityMode::IsolatedStop
-                                                    }
+                                                        => ContinuityMode::QualifiedReduced,
+                                                    LocalServiceCapability::ManualOnlyQualified
+                                                        => ContinuityMode::ManualOnly,
+                                                    LocalServiceCapability::NoQualifiedService
+                                                        => ContinuityMode::IsolatedStop,
                                                 }
                                             };
 
                                             assert_eq!(
                                                 assessment.mode,
                                                 expected_mode,
-                                                "unexpected mode for state combination \
-                                                {combinations}"
+                                                "unexpected continuity state combination {}",
+                                                combinations
                                             );
                                             assert_eq!(
                                                 assessment.recommendations_available,
