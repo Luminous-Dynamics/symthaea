@@ -190,12 +190,13 @@ impl ScmMechanismConfig {
     }
 }
 
-/// Fixed training and held-out mechanism combinations for E3.
+/// Public development split of training and held-out mechanism combinations for E3.
 ///
-/// Each component value appears in training, but the held-out tuples do not.
-/// This enables tests of compositional mechanism reuse rather than seed-only
-/// generalization. The tuples are protocol fixtures, not an assertion that
-/// any learner has already recovered the mechanisms.
+/// Each component value appears in training, but the complete held-out tuples do
+/// not. These fixtures support reproducible development tests; they are stored
+/// in public source and are therefore NOT a blind/secret evaluation split. Any
+/// confirmatory benchmark must use a separately controlled parameter/seed
+/// manifest unavailable to the learner during development.
 pub fn e3_mechanism_splits() -> (Vec<ScmMechanismConfig>, Vec<ScmMechanismConfig>) {
     let training = vec![
         ScmMechanismConfig {
@@ -253,9 +254,9 @@ pub struct ScmTrace {
     /// It deliberately excludes intervention labels and hidden mechanism parameters.
     pub stream: Vec<u8>,
     /// Evaluator-only intervention supplied to the generator; never serialized in `stream`.
-    pub intervention: Option<ScmIntervention>,
+    pub(crate) intervention: Option<ScmIntervention>,
     /// Hidden generator parameters, reserved for evaluator-side scoring.
-    pub mechanisms: ScmMechanismConfig,
+    pub(crate) mechanisms: ScmMechanismConfig,
 }
 
 fn clip_q15(value: i64) -> i16 {
