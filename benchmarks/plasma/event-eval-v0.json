@@ -56,7 +56,37 @@
       "clear_persistence_windows",
       "required_warning_ns"
     ],
-    "policy_config_sha256": "computed from exact policy ID, validation receipt, threshold bit patterns, persistence counts and required warning interval"
+    "policy_config_sha256": "computed from exact policy ID, validation receipt, threshold bit patterns, persistence counts and required warning interval",
+    "risk_score_contract": {
+      "required_fields": [
+        "shot_id",
+        "frame_id",
+        "frame_time_ns",
+        "exact_input_frame_sha256",
+        "horizon_ns",
+        "target_time_ns",
+        "model_id",
+        "model_revision",
+        "model_artifact_sha256",
+        "training_split_sha256",
+        "calibration_id",
+        "calibration_revision",
+        "calibration_receipt_sha256",
+        "estimate",
+        "lower_bound",
+        "upper_bound"
+      ],
+      "exact_input_frame_sha256_required": true,
+      "model_artifact_sha256_required": true,
+      "train_split_and_calibration_receipts_required": true,
+      "target_time_must_equal_frame_time_plus_horizon": true,
+      "interval_order": "finite_lower_bound <= finite_estimate <= finite_upper_bound",
+      "trigger_condition": "lower_bound >= trigger_threshold",
+      "clear_condition": "upper_bound <= clear_threshold",
+      "uncertainty_straddles_threshold": "return_uncertain_and_preserve_current_alarm_state",
+      "uncertainty_breaks_persistence": true,
+      "digests_are_content_identity_not_authentication": true
+    }
   },
   "offline_scoring_contract": {
     "event_reference_entered_after_trace_generation": true,
