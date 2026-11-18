@@ -18,11 +18,13 @@ const BYTE_LANES: usize = 2;
 const CONTEXTS: usize = 16;
 const MAX_CONTEXT_TOTAL: u32 = 1 << 14;
 
+type BaseHistograms = [[[u16; BYTE_SYMBOLS]; BYTE_LANES]; SCM_VARIABLES];
 type ContextHistograms = [[[[u16; BYTE_SYMBOLS]; CONTEXTS]; BYTE_LANES]; SCM_VARIABLES];
 
 struct StructuredState {
     position: u64,
     header: [u16; BYTE_SYMBOLS],
+    base: BaseHistograms,
     contexts: ContextHistograms,
     current_record: [u8; SCM_VARIABLES * BYTE_LANES],
     previous_record: [u8; SCM_VARIABLES * BYTE_LANES],
@@ -33,28 +35,21 @@ impl StructuredState {
         Self {
             position: 0,
             header: [1; BYTE_SYMBOLS],
+            base: [[[1; BYTE_SYMBOLS]; BYTE_LANES]; SCM_VARIABLES],
             contexts: [[[[1; BYTE_SYMBOLS]; CONTEXTS]; BYTE_LANES]; SCM_VARIABLES],
             current_record: [0; SCM_VARIABLES * BYTE_LANES],
             previous_record: [0; SCM_VARIABLES * BYTE_LANES],
         }
     }
 
-    fn histogram(&self, conditioning: u8) -> &[u16; BYTE_SYMBOLS] {
-        if self.position < SCM_HEADER_BYTES {
-            return &self.header;
-        }
-
-        let offset = self.position - SCM_HEADER_BYTES;
-        let variable = ((offset / BYTE_LANES as u64) % SCM_VARIABLES as u64) as usize;
-        let lane = (offset % BYTE_LANES as u64) as usize;
-        let context = match conditioning {
+    fn context_index(&self, variable: usize, lane: usize, conditioning: u8) -> usize {
+        match conditioning {
             1 => self.parent_context(variable, lane),
             2 => Self::value_bucket(&self.previous_record, variable),
             3 => self.hybrid_context(variable, lane),
             4 => self.shuffled_parent_context(variable),
             _ => 0,
-        };
-        &self.contexts[variable][lane][context]
+        }
     }
 
     fn value_bucket(record: &[u8; SCM_VARIABLES * BYTE_LANES], variable: usize) -> usize {
@@ -143,20 +138,20 @@ impl StructuredState {
             let offset = self.position - SCM_HEADER_BYTES;
             let variable = ((offset / BYTE_LANES as u64) % SCM_VARIABLES as u64) as usize;
             let lane = (offset % BYTE_LANES as u64) as usize;
-            let context = match conditioning {
-                1 => self.parent_context(variable, lane),
-                2 => Self::value_bucket(&self.previous_record, variable),
-                3 => self.hybrid_context(variable, lane),
-                4 => self.shuffled_parent_context(variable),
-                _ => 0,
-            };
+            let context = self.context_index(variable, lane, conditioning);
+
+            // Global field/lane counts are shared across contexts. Conditional
+            // counts add context-specific evidence when a context is enabled.
+            Self::update_histogram(&mut self.base[variable][lane], symbol);
+            if conditioning != 0 {
+                Self::update_histogram(
+                    &mut self.contexts[variable][lane][context],
+                    symbol,
+                );
+            }
 
             // Store the observed byte only after the context is selected.
             self.current_record[variable * BYTE_LANES + lane] = symbol;
-            Self::update_histogram(
-                &mut self.contexts[variable][lane][context],
-                symbol,
-            );
             if variable == SCM_VARIABLES - 1 && lane == BYTE_LANES - 1 {
                 self.previous_record = self.current_record;
             }
@@ -165,7 +160,29 @@ impl StructuredState {
     }
 
     fn cdf(&self, conditioning: u8) -> ByteCdf {
-        Self::make_cdf(self.histogram(conditioning))
+        if self.position < SCM_HEADER_BYTES {
+            return Self::make_cdf(&self.header);
+        }
+
+        let offset = self.position - SCM_HEADER_BYTES;
+        let variable = ((offset / BYTE_LANES as u64) % SCM_VARIABLES as u64) as usize;
+        let lane = (offset % BYTE_LANES as u64) as usize;
+        let base = &self.base[variable][lane];
+        if conditioning == 0 {
+            return Self::make_cdf(base);
+        }
+
+        // Additive interpolation combines the global field/lane evidence with
+        // the selected context's evidence. It is decoder-synchronous and has
+        // a deterministic integer CDF; both histograms are updated per symbol.
+        let context = self.context_index(variable, lane, conditioning);
+        let conditional = &self.contexts[variable][lane][context];
+        let mut cdf = [0u32; BYTE_SYMBOLS + 1];
+        for index in 0..BYTE_SYMBOLS {
+            cdf[index + 1] =
+                cdf[index] + base[index] as u32 + conditional[index] as u32;
+        }
+        cdf
     }
 }
 
