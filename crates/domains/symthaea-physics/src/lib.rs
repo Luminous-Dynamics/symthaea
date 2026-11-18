@@ -73,11 +73,14 @@ pub use plasma_hdc_encoder::{
 };
 
 pub use plasma_diagnostic_portfolio::{
-    CostedSufficientPortfolio, DecisionWorld, DiagnosticPortfolioError, DiagnosticPortfolioModel,
-    DiagnosticSensor, DiagnosabilityResult, SensorObservation, SensorWorldObservation,
-    UnresolvedDecisionPair, diagnose, minimal_common_mode_cut_sets, minimal_sensor_cut_sets,
-    minimal_sufficient_sensor_sets, minimum_cost_sufficient_portfolio,
-    PLASMA_DIAGNOSTIC_PORTFOLIO_BENCHMARK_ID, PLASMA_DIAGNOSTIC_PORTFOLIO_SCHEMA,
+    CostedSufficientPortfolio, DecisionWorld, DiagnosticCategoryRule, DiagnosticFrameSensorEvidence,
+    DiagnosticPortfolioError, DiagnosticPortfolioFrameResult, DiagnosticPortfolioModel,
+    DiagnosticSensor, DiagnosticUnknownReason, DiagnosabilityResult, FrameDecisionDisposition,
+    NumericCategoryBand, PortfolioEvidenceBlockReason, SensorObservation, SensorWorldObservation,
+    UnresolvedDecisionPair, WorldCompatibility, diagnose, evaluate_observation_frame,
+    minimal_common_mode_cut_sets, minimal_sensor_cut_sets, minimal_sufficient_sensor_sets,
+    minimum_cost_sufficient_portfolio, PLASMA_DIAGNOSTIC_PORTFOLIO_BENCHMARK_ID,
+    PLASMA_DIAGNOSTIC_PORTFOLIO_SCHEMA,
 };
 
 pub use plasma_control::{
