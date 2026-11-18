@@ -158,7 +158,7 @@ def main():
     fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))
     generated = generate_cases(fixture)
     authored = [
-        case
+        {**case, "split": case.get("split", "fixture_sanity")}
         for case in fixture["cases"]
         if not case["case_id"].startswith("GENERATED-")
     ]
