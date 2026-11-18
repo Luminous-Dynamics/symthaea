@@ -69,14 +69,14 @@ New module: `lab/src/mechanics.rs`.
 It supplies a small set of transparent SI-unit calculations:
 
 - Concentric hollow elliptical cross-section second moments about both principal axes:
-  - (I_x = \\frac{\\pi}{4}(a_o b_o^3-a_i b_i^3))
-  - (I_y = \\frac{\\pi}{4}(a_o^3 b_o-a_i^3 b_i))
+  - (I_x = \frac{\pi}{4}(a_o b_o^3-a_i b_i^3))
+  - (I_y = \frac{\pi}{4}(a_o^3 b_o-a_i^3 b_i))
 - Principal-axis section moduli: (Z_x=I_x/b_o), (Z_y=I_y/a_o).
 - Three-point bending stiffness estimate: (EI=kL^3/48), where (k) is the linear force/displacement slope and (L) is support span.
 - Three-point bending peak moment: (M_{max}=FL/4).
-- Cantilever tip-load estimate: (EI=FL^3/(3\\delta)); base moment (M=FL).
+- Cantilever tip-load estimate: (EI=FL^3/(3\delta)); base moment (M=FL).
 - Linear local curvature: (κ=M/EI).
-- Single-axis outer-fibre stress: (|\\sigma_{max}|=|M|/Z).
+- Single-axis outer-fibre stress: (|\sigma_{max}|=|M|/Z).
 
 The implementation validates finite positive dimensions and loads, supports solid or concentric hollow elliptical sections, and tests principal-axis anisotropy. The authored unit tests are analytical checks; they do not validate a living-plant constitutive model.
 
