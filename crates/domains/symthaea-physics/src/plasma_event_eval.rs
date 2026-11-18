@@ -531,10 +531,13 @@ mod tests {
 
     fn config() -> AlarmPolicyConfig {
         AlarmPolicyConfig {
+            policy_id: "fixed-test-policy-v1".to_owned(),
+            validation_receipt_sha256: "a".repeat(64),
             trigger_threshold: 0.8,
             clear_threshold: 0.3,
             trigger_persistence_windows: 2,
             clear_persistence_windows: 2,
+            required_warning_ns: 50,
         }
     }
 
@@ -638,6 +641,31 @@ mod tests {
     }
 
     #[test]
+    fn abstention_does_not_clear_an_existing_alarm() {
+        let mut policy = OnlinePlasmaAlarmPolicy::new(config()).expect("valid policy");
+        policy.reset_for_shot("shot-1").expect("valid shot");
+        policy.update(&measured("shot-1", 10, 0.9)).expect("update");
+        policy.update(&measured("shot-1", 20, 0.9)).expect("update");
+        let outcome = policy
+            .update(&AlarmObservation {
+                shot_id: "shot-1".to_owned(),
+                window_end_ns: 30,
+                risk_score: None,
+                evidence_quality: AlarmEvidenceQuality::Unavailable,
+            })
+            .expect("unavailable measurement should abstain");
+        assert_eq!(
+            outcome,
+            AlarmPolicyUpdate::Abstained {
+                at_ns: 30,
+                reason: AlarmAbstentionReason::Unavailable,
+                alert_remains_active: true,
+            }
+        );
+        assert!(policy.is_active());
+    }
+
+    #[test]
     fn non_measured_evidence_cannot_smuggle_a_numeric_score() {
         let mut policy = OnlinePlasmaAlarmPolicy::new(config()).expect("valid policy");
         policy.reset_for_shot("shot-1").expect("valid shot");
@@ -666,7 +694,7 @@ mod tests {
             "shot-disruptive",
             ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
             &[20],
-            50,
+            &config(),
         )
         .expect("valid shot evaluation");
         assert!(detected.event_detected);
@@ -676,7 +704,7 @@ mod tests {
             "shot-late",
             ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
             &[80],
-            50,
+            &config(),
         )
         .expect("valid shot evaluation");
         assert!(!too_late.event_detected);
@@ -689,7 +717,7 @@ mod tests {
             "positive",
             ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
             &[20],
-            50,
+            &config(),
         )
         .expect("positive shot");
         let negative = score_shot_alarms(
@@ -698,7 +726,7 @@ mod tests {
                 observation_end_ns: 100,
             },
             &[20, 70],
-            50,
+            &config(),
         )
         .expect("negative shot");
         let summary = summarize_alarm_evaluations(&[positive, negative]).expect("summary");
@@ -713,12 +741,34 @@ mod tests {
     }
 
     #[test]
+    fn cohort_refuses_to_mix_frozen_policy_identities() {
+        let mut other = config();
+        other.policy_id = "different-frozen-policy-v2".to_owned();
+        other.validation_receipt_sha256 = "b".repeat(64);
+        let first = score_shot_alarms(
+            "shot-a",
+            ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
+            &[20],
+            &config(),
+        )
+        .expect("first policy");
+        let second = score_shot_alarms(
+            "shot-b",
+            ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
+            &[20],
+            &other,
+        )
+        .expect("second policy");
+        assert!(summarize_alarm_evaluations(&[first, second]).is_err());
+    }
+
+    #[test]
     fn no_negative_shots_means_false_alarm_rate_is_not_reported() {
         let positive = score_shot_alarms(
             "positive",
             ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
             &[20],
-            50,
+            &config(),
         )
         .expect("positive shot");
         let summary = summarize_alarm_evaluations(&[positive]).expect("summary");
@@ -732,7 +782,7 @@ mod tests {
             "same",
             ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
             &[20],
-            50,
+            &config(),
         )
         .expect("positive shot");
         assert!(summarize_alarm_evaluations(&[positive.clone(), positive]).is_err());
@@ -742,7 +792,7 @@ mod tests {
                 observation_end_ns: 100,
             },
             &[101],
-            50,
+            &config(),
         )
         .is_err());
     }
