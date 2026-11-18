@@ -86,6 +86,19 @@ impl HammingCandidate {
     }
 }
 
+/// Content identity of the exact ordered candidate grammar used by a search run.
+///
+/// The identity includes every candidate name, so adding/removing/renaming a candidate
+/// changes the generator identity rather than silently reusing an older run namespace.
+pub fn hamming_generator_id() -> ContentId {
+    let mut parts: Vec<&[u8]> = Vec::with_capacity(HammingCandidate::ALL.len() + 1);
+    parts.push(b"hdc-hamming-word-width-and-reduction-grammar-v2");
+    for candidate in HammingCandidate::ALL {
+        parts.push(candidate.name().as_bytes());
+    }
+    ContentId::derive("symthaea.hdc-hamming-generator.v2", parts)
+}
+
 pub fn hamming_problem() -> Result<ProblemSpec, RegistryError> {
     ProblemSpec::new(
         "binary-hdc-hamming-distance-16384",
@@ -477,10 +490,7 @@ pub fn pilot_run(
     Ok(DiscoveryRun::new(
         &problem,
         DiscoveryPolicy::default(),
-        ContentId::derive(
-            "symthaea.generator.v2",
-            [b"hdc-hamming-word-width-and-reduction-grammar-v2".as_slice()],
-        ),
+        hamming_generator_id(),
         baseline_revision,
         SearchBudget::new(
             HammingCandidate::ALL.len() as u64,
@@ -601,6 +611,27 @@ mod tests {
             ),
             BinaryHV::DIM as u32
         );
+    }
+
+    #[test]
+    fn generator_identity_binds_the_complete_ordered_candidate_grammar() {
+        let first = hamming_generator_id();
+        let second = hamming_generator_id();
+        assert_eq!(first, second);
+        assert_eq!(HammingCandidate::ALL.len(), 8);
+
+        let mut shortened: Vec<&[u8]> =
+            vec![b"hdc-hamming-word-width-and-reduction-grammar-v2"];
+        shortened.extend(
+            HammingCandidate::ALL[..HammingCandidate::ALL.len() - 1]
+                .iter()
+                .map(|candidate| candidate.name().as_bytes()),
+        );
+        let shortened_id = ContentId::derive(
+            "symthaea.hdc-hamming-generator.v2",
+            shortened,
+        );
+        assert_ne!(first, shortened_id);
     }
 
     #[test]
