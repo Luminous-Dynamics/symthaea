@@ -46,13 +46,51 @@ pub struct StabilizerCertificateV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SubgroupAxiomViolationV1 {
+    MissingIdentity { identity_element_id: String },
+    MissingInverse {
+        element_id: String,
+        inverse_element_id: String,
+    },
+    MissingProduct {
+        left_element_id: String,
+        right_element_id: String,
+        product_element_id: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProposalElementAuditV1 {
+    pub element_id: String,
+    pub proposed: bool,
+    pub exact: bool,
+    /// For false promotions this is a counterexample to invariance.
+    /// For missed symmetries this is a constructive acceptance witness.
+    pub witness: StabilizerWitnessV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubgroupProposalAuditV1 {
+    pub case_id: String,
+    pub proposed_elements: Vec<String>,
+    pub exact_stabilizer: Vec<String>,
+    pub group_axioms_satisfied: bool,
+    pub axiom_violations: Vec<SubgroupAxiomViolationV1>,
+    pub true_positive_elements: Vec<String>,
+    pub false_promotion_elements: Vec<String>,
+    pub missed_symmetry_elements: Vec<String>,
+    pub true_negative_elements: Vec<String>,
+    pub decisions: Vec<ProposalElementAuditV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Element {
     id: String,
     matrix: Matrix2,
 }
 
 #[derive(Debug)]
-struct Manifest {
+pub struct Manifest {
     root: Value,
     elements: Vec<Element>,
     by_matrix: BTreeMap<String, String>,
@@ -210,7 +248,7 @@ fn multiply(left: Matrix2, right: Matrix2) -> Matrix2 {
 }
 
 impl Manifest {
-    fn parse() -> Result<Self, String> {
+    pub fn parse() -> Result<Self, String> {
         let root: Value = serde_json::from_str(include_str!("../../fixtures/v0.1/cases.json"))
             .map_err(|error| format!("invalid frozen case manifest JSON: {error}"))?;
         if string_field(&root, "benchmark_id")? != "LUMINOUS-SYMM-QUALIFIED-DISCOVERY-001" {
@@ -276,7 +314,7 @@ impl Manifest {
         })
     }
 
-    fn verify_group_axioms(&self) -> Result<(), String> {
+    pub fn verify_group_axioms(&self) -> Result<(), String> {
         let identity_id = string_field(field(&self.root, "ambient_group")?, "identity_element_id")?;
         if self.elements.len() != 8 || self.multiplication.len() != 64 || self.inverses.len() != 8 {
             return Err(
@@ -579,6 +617,120 @@ impl Manifest {
         }
         if certificate.decisions.len() != self.elements.len() {
             return Err(format!("certificate omits a group element for {}", certificate.case_id));
+        }
+        Ok(())
+    }
+
+    /// Compare an arbitrary method-proposed element set with the exact
+    /// stabilizer. Proposal validity as a subgroup is independent of
+    /// element-wise invariance: a proper subgroup may be valid but incomplete,
+    /// while a set of plausible elements may fail identity/inverse/closure.
+    pub fn audit_proposed_subgroup(
+        &self,
+        case: &Value,
+        proposal_ids: &[String],
+    ) -> Result<SubgroupProposalAuditV1, String> {
+        let mut proposed = BTreeSet::new();
+        for element_id in proposal_ids {
+            if !self.elements.iter().any(|element| element.id == *element_id) {
+                return Err(format!("proposal references unknown D4 element {element_id}"));
+            }
+            if !proposed.insert(element_id.clone()) {
+                return Err(format!("proposal contains duplicate element {element_id}"));
+            }
+        }
+
+        let track = string_field(case, "track")?;
+        let exact_certificate = match track.as_str() {
+            "exact_finite_structural_stabilizer" => self.structural_certificate(case)?,
+            "finite_reference_group_regression_discovery" => self.polynomial_certificate(case)?,
+            _ => return Err(format!("unsupported proposal audit track: {track}")),
+        };
+        let exact: BTreeSet<String> = exact_certificate.accepted_subgroup.iter().cloned().collect();
+
+        let ambient = field(&self.root, "ambient_group")?;
+        let identity_id = string_field(ambient, "identity_element_id")?;
+        let mut axiom_violations = Vec::new();
+        if !proposed.contains(&identity_id) {
+            axiom_violations.push(SubgroupAxiomViolationV1::MissingIdentity {
+                identity_element_id: identity_id,
+            });
+        }
+        for left in &proposed {
+            let inverse_id = self
+                .inverses
+                .get(left)
+                .ok_or_else(|| format!("oracle has no inverse entry for {left}"))?;
+            if !proposed.contains(inverse_id) {
+                axiom_violations.push(SubgroupAxiomViolationV1::MissingInverse {
+                    element_id: left.clone(),
+                    inverse_element_id: inverse_id.clone(),
+                });
+            }
+            for right in &proposed {
+                let product_id = self
+                    .multiplication
+                    .get(&(left.clone(), right.clone()))
+                    .ok_or_else(|| format!("oracle has no product entry for {left} * {right}"))?;
+                if !proposed.contains(product_id) {
+                    axiom_violations.push(SubgroupAxiomViolationV1::MissingProduct {
+                        left_element_id: left.clone(),
+                        right_element_id: right.clone(),
+                        product_element_id: product_id.clone(),
+                    });
+                }
+            }
+        }
+
+        let mut true_positive_elements = Vec::new();
+        let mut false_promotion_elements = Vec::new();
+        let mut missed_symmetry_elements = Vec::new();
+        let mut true_negative_elements = Vec::new();
+        let mut decisions = Vec::with_capacity(self.elements.len());
+
+        for exact_decision in &exact_certificate.decisions {
+            let is_proposed = proposed.contains(&exact_decision.element_id);
+            if is_proposed && exact_decision.accepted {
+                true_positive_elements.push(exact_decision.element_id.clone());
+            } else if is_proposed && !exact_decision.accepted {
+                false_promotion_elements.push(exact_decision.element_id.clone());
+            } else if !is_proposed && exact_decision.accepted {
+                missed_symmetry_elements.push(exact_decision.element_id.clone());
+            } else {
+                true_negative_elements.push(exact_decision.element_id.clone());
+            }
+            decisions.push(ProposalElementAuditV1 {
+                element_id: exact_decision.element_id.clone(),
+                proposed: is_proposed,
+                exact: exact_decision.accepted,
+                witness: exact_decision.witness.clone(),
+            });
+        }
+
+        Ok(SubgroupProposalAuditV1 {
+            case_id: exact_certificate.case_id,
+            proposed_elements: proposed.into_iter().collect(),
+            exact_stabilizer: exact_certificate.accepted_subgroup,
+            group_axioms_satisfied: axiom_violations.is_empty(),
+            axiom_violations,
+            true_positive_elements,
+            false_promotion_elements,
+            missed_symmetry_elements,
+            true_negative_elements,
+            decisions,
+        })
+    }
+
+    /// Recompute every proposal classification, subgroup axiom and
+    /// counterexample from the frozen case and reject any edited audit.
+    pub fn verify_proposal_audit(
+        &self,
+        case: &Value,
+        audit: &SubgroupProposalAuditV1,
+    ) -> Result<(), String> {
+        let replayed = self.audit_proposed_subgroup(case, &audit.proposed_elements)?;
+        if replayed != *audit {
+            return Err(format!("proposal audit replay mismatch for {}", audit.case_id));
         }
         Ok(())
     }
@@ -963,6 +1115,119 @@ mod tests {
                 .verify_certificate(polynomial_case, &polynomial_certificate)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn proposal_audit_distinguishes_overpromotion_from_valid_but_incomplete_subgroups() {
+        let oracle = manifest();
+        let cases = field(&oracle.root, "cases").unwrap().as_array().unwrap();
+        let chiral = cases
+            .iter()
+            .find(|case| string_field(case, "case_id").unwrap() == "C4-CHIRAL-ORBIT-001")
+            .unwrap();
+        let d4_proposal = vec![
+            "e", "r90", "r180", "r270", "fx", "fy", "fdiag", "fanti",
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+        let overpromotion = oracle.audit_proposed_subgroup(chiral, &d4_proposal).unwrap();
+        assert!(overpromotion.group_axioms_satisfied);
+        assert_eq!(overpromotion.true_positive_elements.len(), 4);
+        assert_eq!(overpromotion.false_promotion_elements.len(), 4);
+        assert!(overpromotion.missed_symmetry_elements.is_empty());
+        for element_id in ["fx", "fy", "fdiag", "fanti"] {
+            let decision = overpromotion
+                .decisions
+                .iter()
+                .find(|decision| decision.element_id == element_id)
+                .unwrap();
+            assert!(decision.proposed);
+            assert!(!decision.exact);
+            assert!(matches!(
+                decision.witness,
+                StabilizerWitnessV1::MovedPoint { .. }
+            ));
+        }
+        oracle.verify_proposal_audit(chiral, &overpromotion).unwrap();
+
+        let square = cases
+            .iter()
+            .find(|case| string_field(case, "case_id").unwrap() == "D4-SQUARE-POINTSET-001")
+            .unwrap();
+        let c4_proposal = vec!["e", "r90", "r180", "r270"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        let underpromotion = oracle.audit_proposed_subgroup(square, &c4_proposal).unwrap();
+        assert!(underpromotion.group_axioms_satisfied);
+        assert_eq!(underpromotion.true_positive_elements.len(), 4);
+        assert_eq!(underpromotion.missed_symmetry_elements.len(), 4);
+        assert!(underpromotion.false_promotion_elements.is_empty());
+        for element_id in ["fx", "fy", "fdiag", "fanti"] {
+            let decision = underpromotion
+                .decisions
+                .iter()
+                .find(|decision| decision.element_id == element_id)
+                .unwrap();
+            assert!(!decision.proposed);
+            assert!(decision.exact);
+            assert!(matches!(
+                decision.witness,
+                StabilizerWitnessV1::PointPermutation { .. }
+            ));
+        }
+        oracle.verify_proposal_audit(square, &underpromotion).unwrap();
+    }
+
+    #[test]
+    fn proposal_audit_rejects_non_subgroup_support_sets_and_forged_witnesses() {
+        let oracle = manifest();
+        let cases = field(&oracle.root, "cases").unwrap().as_array().unwrap();
+        let square = cases
+            .iter()
+            .find(|case| string_field(case, "case_id").unwrap() == "D4-SQUARE-POINTSET-001")
+            .unwrap();
+
+        let malformed = vec!["e", "r90", "fx"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        let audit = oracle.audit_proposed_subgroup(square, &malformed).unwrap();
+        assert!(!audit.group_axioms_satisfied);
+        assert!(
+            audit
+                .axiom_violations
+                .iter()
+                .any(|violation| matches!(
+                    violation,
+                    SubgroupAxiomViolationV1::MissingProduct { .. }
+                ))
+        );
+
+        let chiral = cases
+            .iter()
+            .find(|case| string_field(case, "case_id").unwrap() == "C4-CHIRAL-ORBIT-001")
+            .unwrap();
+        let d4 = vec!["e", "r90", "r180", "r270", "fx", "fy", "fdiag", "fanti"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        let mut forged = oracle.audit_proposed_subgroup(chiral, &d4).unwrap();
+        let reflection = forged
+            .decisions
+            .iter_mut()
+            .find(|decision| decision.proposed && !decision.exact)
+            .unwrap();
+        if let StabilizerWitnessV1::MovedPoint { transformed, .. } = &mut reflection.witness {
+            transformed.1 += 1;
+        } else {
+            panic!("false promotion must carry a moved-point counterexample");
+        }
+        assert!(oracle.verify_proposal_audit(chiral, &forged).is_err());
+        assert!(oracle.audit_proposed_subgroup(chiral, &d4[..7]).is_ok());
+    }
+
     }
 
     #[test]
