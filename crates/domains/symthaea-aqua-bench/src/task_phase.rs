@@ -45,13 +45,17 @@ pub enum ActivationRequirement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QualifiedModeCapability {
     pub mode_id: String,
+    pub market_variant_id: String,
     pub role: CapabilityRole,
     pub configuration_sha256: String,
+    /// Frozen pressure, inlet-water, temperature, mounting and room applicability.
+    pub delivery_conditions_sha256: String,
+    pub qualification_method_sha256: String,
     pub qualification_receipt_sha256: String,
     pub qualification: CapabilityQualification,
     pub activation: ActivationRequirement,
-    /// Declared flow at the exact evidence-bound pressure point; not a universal curve.
-    pub declared_flow_lpm: String,
+    /// Test-qualified flow at the evidence-bound pressure point; not a universal curve.
+    pub qualified_flow_lpm: String,
     /// Required only for boost modes; local hardware must independently enforce this.
     pub maximum_continuous_seconds: Option<u32>,
 }
@@ -73,7 +77,9 @@ pub struct TaskPhase {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskPhasePlan {
     pub task_profile_id: String,
+    pub market_variant_id: String,
     pub configuration_sha256: String,
+    pub delivery_conditions_sha256: String,
     pub protocol_sha256: String,
     pub phases: Vec<TaskPhase>,
 }
@@ -86,6 +92,7 @@ pub enum TaskPhaseError {
     EmptyPhaseSequence,
     PrepareMustBeFirst,
     ReturnToReadyMustBeLast,
+    InvalidPhaseOrder { phase_index: usize },
     MissingBaseDelivery,
     ZeroDuration { phase_index: usize },
     DurationOverflow,
@@ -120,6 +127,9 @@ impl Display for TaskPhaseError {
             Self::PrepareMustBeFirst => write!(f, "PREPARE must be the first task phase"),
             Self::ReturnToReadyMustBeLast => {
                 write!(f, "RETURN_TO_READY must be the final task phase")
+            }
+            Self::InvalidPhaseOrder { phase_index } => {
+                write!(f, "phase {phase_index} violates the task phase ordering contract")
             }
             Self::MissingBaseDelivery => write!(f, "task plan must include base delivery"),
             Self::ZeroDuration { phase_index } => {
@@ -202,7 +212,7 @@ fn is_sha256(value: &str) -> bool {
 
 fn parse_declared_flow(mode: &QualifiedModeCapability) -> Result<f64, TaskPhaseError> {
     let value = mode
-        .declared_flow_lpm
+        .qualified_flow_lpm
         .parse::<f64>()
         .map_err(|_| TaskPhaseError::InvalidDeclaredFlow {
             mode_id: mode.mode_id.clone(),
@@ -237,7 +247,13 @@ pub fn validate_task_phase_plan(
     if plan.task_profile_id.trim().is_empty() {
         return Err(TaskPhaseError::MissingTaskProfile);
     }
+    if plan.market_variant_id.trim().is_empty() {
+        return Err(TaskPhaseError::MissingTaskProfile);
+    }
     if !is_sha256(&plan.configuration_sha256) {
+        return Err(TaskPhaseError::InvalidConfigurationDigest);
+    }
+    if !is_sha256(&plan.delivery_conditions_sha256) {
         return Err(TaskPhaseError::InvalidConfigurationDigest);
     }
     if !is_sha256(&plan.protocol_sha256) {
@@ -261,6 +277,22 @@ pub fn validate_task_phase_plan(
             return Err(TaskPhaseError::DuplicateCapability {
                 mode_id: capability.mode_id.clone(),
             });
+        }
+    }
+
+    for (phase_index, phase) in plan.phases.iter().enumerate() {
+        if phase_index > 0 && phase_index + 1 < plan.phases.len()
+            && matches!(phase.kind, TaskPhaseKind::Prepare | TaskPhaseKind::ReturnToReady)
+        {
+            return Err(TaskPhaseError::InvalidPhaseOrder { phase_index });
+        }
+        if phase.kind == TaskPhaseKind::OptionalBoost
+            && !matches!(
+                plan.phases.get(phase_index.wrapping_sub(1)).map(|previous| previous.kind),
+                Some(TaskPhaseKind::BaseDelivery | TaskPhaseKind::Rinse)
+            )
+        {
+            return Err(TaskPhaseError::InvalidPhaseOrder { phase_index });
         }
     }
 
@@ -306,8 +338,22 @@ pub fn validate_task_phase_plan(
                         mode_id: mode_id.to_owned(),
                     })?;
 
-                if capability.configuration_sha256 != plan.configuration_sha256 {
+                if capability.market_variant_id != plan.market_variant_id
+                    || capability.configuration_sha256 != plan.configuration_sha256
+                {
                     return Err(TaskPhaseError::ConfigurationMismatch {
+                        mode_id: mode_id.to_owned(),
+                    });
+                }
+                if capability.delivery_conditions_sha256 != plan.delivery_conditions_sha256
+                    || !is_sha256(&capability.delivery_conditions_sha256)
+                {
+                    return Err(TaskPhaseError::ConfigurationMismatch {
+                        mode_id: mode_id.to_owned(),
+                    });
+                }
+                if !is_sha256(&capability.qualification_method_sha256) {
+                    return Err(TaskPhaseError::InvalidQualificationReceipt {
                         mode_id: mode_id.to_owned(),
                     });
                 }
@@ -384,7 +430,12 @@ pub fn validate_task_phase_plan(
                                     .checked_add(phase.duration_seconds)
                                     .ok_or(TaskPhaseError::DurationOverflow)?;
                             }
-                            CapabilityRole::Boost => unreachable!("handled above"),
+                            CapabilityRole::Boost => {
+                                return Err(TaskPhaseError::RoleMismatch {
+                                    phase_index,
+                                    mode_id: mode_id.to_owned(),
+                                });
+                            }
                         }
                     }
                 }
@@ -427,12 +478,15 @@ mod tests {
     ) -> QualifiedModeCapability {
         QualifiedModeCapability {
             mode_id: mode_id.to_owned(),
+            market_variant_id: "AQS1-TEST-ARTICLE".to_owned(),
             role,
             configuration_sha256: digest('a'),
+            delivery_conditions_sha256: digest('d'),
+            qualification_method_sha256: digest('e'),
             qualification_receipt_sha256: digest('b'),
             qualification,
             activation,
-            declared_flow_lpm: match role {
+            qualified_flow_lpm: match role {
                 CapabilityRole::BaseDelivery => "4.5",
                 CapabilityRole::Boost => "7.0",
                 CapabilityRole::Rinse => "5.5",
@@ -445,7 +499,9 @@ mod tests {
     fn plan() -> TaskPhasePlan {
         TaskPhasePlan {
             task_profile_id: "HAIR_WASH_V1".to_owned(),
+            market_variant_id: "AQS1-TEST-ARTICLE".to_owned(),
             configuration_sha256: digest('a'),
+            delivery_conditions_sha256: digest('d'),
             protocol_sha256: digest('c'),
             phases: vec![
                 TaskPhase {
