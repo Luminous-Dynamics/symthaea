@@ -673,6 +673,44 @@ mod tests {
             .any(|specification| specification.id == "anti_transpose-column_major-lsb"));
     }
 
+    #[test]
+    fn full_32_way_tournament_recovers_positive_and_rejects_blank_control() {
+        let manifest = standard_d4_ascii7_manifest("crop-intel-d4-known-answer-v1", 1)
+            .expect("standard decoder manifest");
+
+        let positive_bits = crate::decoder::encode_ascii7(
+            "HELLO",
+            crate::decoder::BitOrder::MostSignificantFirst,
+        )
+        .expect("ASCII positive-control payload");
+        let positive_grid = BinaryGrid::new(5, 7, positive_bits)
+            .expect("positive control grid");
+        let positive_outcomes = manifest.run(&positive_grid);
+        assert_eq!(positive_outcomes.len(), 32);
+
+        let identity_result = positive_outcomes
+            .iter()
+            .find(|outcome| outcome.spec.id == "identity-row_major-msb")
+            .expect("identity/MSB attempt is declared");
+        assert_eq!(
+            identity_result.result.as_ref().expect("positive decode").bytes,
+            b"HELLO"
+        );
+
+        let blank_grid = BinaryGrid::new(5, 7, vec![false; 35])
+            .expect("blank negative-control grid");
+        let blank_outcomes = manifest.run(&blank_grid);
+        assert_eq!(blank_outcomes.len(), 32);
+        assert!(blank_outcomes.iter().all(|outcome| {
+            outcome
+                .result
+                .as_ref()
+                .expect("blank grid decodes to raw symbols")
+                .printable_ascii_fraction
+                == 0.0
+        }));
+    }
+
     fn row_and_column_margins(grid: &BinaryGrid) -> (Vec<usize>, Vec<usize>) {
         let rows = (0..grid.rows())
             .map(|row| {
