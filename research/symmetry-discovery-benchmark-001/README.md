@@ -272,6 +272,16 @@ The implementation therefore has asymmetric decisions:
 - no perfect matching: rule out, with a replayable Hall-deficiency set;
 - never: infer that a compatible action is an exact symmetry.
 
+### Required approximate-noise baseline
+
+Alcázar, Bizzarri, Lávička & Vršek, *Approximate symmetry detection in noisy 3D data*, Computer Aided Geometric Design (April 2026), is a directly relevant comparator. It combines covariance- and tensor-based descriptors with perturbation analysis for isotropic Gaussian-noise point clouds, reports finite-sample high-probability stability bounds for symmetry axes/planes, and targets full symmetry-group recovery rather than isolated transformations: https://doi.org/10.1016/j.cagd.2026.102531
+
+This method's Gaussian-noise / 3D geometry setting is not the same as the current D4 finite-group / deterministic L-infinity envelope. Keep separate matched lanes:
+- a deterministic bounded-error lane with exact Hall certificates (the present fixture);
+- a Gaussian 3D lane that reproduces the paper's data model, descriptors, estimator, thresholds, and confidence guarantees exactly.
+
+Compare exact group recovery, false promotions, false eliminations, axis/plane angular and positional error, group closure, calibration/coverage of confidence sets, sample complexity, and runtime. A Gaussian high-probability guarantee must not be transferred to deterministic bounded-error data or vice versa.
+
 ### Subgroup-lattice upper envelope
 
 Element-wise compatibility does not imply that the compatible set is itself a group. The oracle therefore enumerates the ten D4 subgroups contained in the per-element possible set and marks those maximal under inclusion. These are **not-falsified subgroup candidates**, not certified symmetries: each element may have a different compatible point matching, so joint consistency of one shared noisy realization has not yet been established. The exact latent stabilizer must remain in this upper envelope; otherwise the report is rejected.
