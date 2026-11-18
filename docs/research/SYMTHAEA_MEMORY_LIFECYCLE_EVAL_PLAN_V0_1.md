@@ -75,7 +75,7 @@ Keep base model, prompt, tool access, data split, retrieval budget and total tok
 
 ### Lineage and evidence quality
 - Provenance coverage: fraction of returned memories carrying expected source lineage.
-- Source-label preservation: exact source class and label pass-through.
+- Source-class / verification-claim lineage coverage; arbitrary source labels are excluded from durable replay metadata until a privacy-aware source-event contract exists.
 - Verification-claim calibration: fraction of claimed-verified entries supported by an independent receipt.
 - Source-root independence and correlated-duplicate resistance.
 - Unsupported inference rate: conclusions with no sufficient source support.
@@ -141,14 +141,14 @@ These are targets to preregister and measure, not current results.
 ## 8. Current implementation increment
 
 The accompanying source change is intended to close only the working-memory graduation seam:
-- preserve `MemorySource`, the producer's verification claim and available label in a new versioned `ProvenancedEpisode` replay envelope;
+- preserve `MemorySource` and the producer's verification claim in a versioned `ProvenancedEpisode` replay envelope; arbitrary labels are deliberately not copied;
 - keep the public serialized `Episode` representation unchanged;
-- carry a separate consolidation-priority bonus through replay and reconsolidation;
+- carry a separate persistence/Sigma-derived consolidation-priority bonus through replay and reconsolidation; a producer verification claim alone does not increase replay priority;
 - leave raw Psi and valence untouched;
 - keep the historic replay API while adding provenance-preserving top, sampling and similarity retrieval APIs;
 - reject non-finite/out-of-domain Psi and malformed priority inputs before replay-heap insertion.
 
-This is deliberately **not** a complete source receipt. It contains no immutable source-event/revision ID, payload digest, valid-time/transaction-time coordinates, signature, or independent verifier receipt. Those remain in #9075/#11816/#12846 and their Mycelix/Symtropy owners. No source trust, consent, or action authority is inferred from this envelope.
+This is deliberately **not** a complete source receipt. It deliberately does not persist arbitrary labels and contains no immutable source-event/revision ID, payload digest, valid-time/transaction-time coordinates, signature, or independent verifier receipt. Those remain in #9075/#11816/#12846 and their Mycelix/Symtropy owners. No source trust, consent, or action authority is inferred from this envelope.
 
 ## 9. Exit criteria for a SOTA claim
 
