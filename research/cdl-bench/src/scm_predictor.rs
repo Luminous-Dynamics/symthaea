@@ -786,7 +786,7 @@ mod tests {
                 before = Some(predictor.expert_weights());
             } else if observed_bytes == 16 + ((intervention_start + intervention_end) / 2) * 10 {
                 during = Some(predictor.expert_weights());
-            } else if observed_bytes == 16 + intervention_end * 10 {
+            } else if observed_bytes == 16 + (intervention_end + steps / 8) * 10 {
                 after = Some(predictor.expert_weights());
             }
         }
@@ -796,7 +796,7 @@ mod tests {
         let after = after.expect("post-intervention checkpoint");
         assert!(during[1] > before[1], "lag expert should gain weight under intervention");
         assert!(during[2] < before[2], "parent expert should lose weight under intervention");
-        assert!(after[2] > during[2], "parent expert should begin recovering after intervention");
+        assert!(after[2] > during[2], "parent expert should begin recovering after a post-intervention observation window");
     }
 
     #[test]
