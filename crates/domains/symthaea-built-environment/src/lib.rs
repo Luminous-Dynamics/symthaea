@@ -316,14 +316,22 @@ impl CatalogueVocabulary {
             .ok_or_else(|| "style_catalog is missing or not an array".to_owned())?;
         for style in styles {
             let id = required_string(style, "style_id")?;
-            let sources = style
+            let source_values = style
                 .get("reference_sources")
                 .and_then(Value::as_array)
-                .ok_or_else(|| format!("style {id} has no reference_sources array"))?
-                .iter()
-                .filter_map(Value::as_str)
-                .map(str::to_owned)
-                .collect();
+                .ok_or_else(|| format!("style {id} has no reference_sources array"))?;
+            let mut sources = BTreeSet::new();
+            for source in source_values {
+                let source = source
+                    .as_str()
+                    .ok_or_else(|| format!("style {id} contains a non-string source reference"))?;
+                if !source.starts_with("https://") {
+                    return Err(format!("style {id} contains a non-HTTPS source reference"));
+                }
+                if !sources.insert(source.to_owned()) {
+                    return Err(format!("style {id} contains a duplicate source reference"));
+                }
+            }
             if vocabulary.style_sources.insert(id.clone(), sources).is_some() {
                 return Err(format!("duplicate style ID {id}"));
             }
@@ -2311,6 +2319,24 @@ mod tests {
         wrong_identity.graph_revision = "REV-B".to_owned();
         wrong_identity.graph_id = "DIFFERENT-GRAPH".to_owned();
         assert!(compute_revision_invalidation_receipt(&prior, &wrong_identity).is_err());
+    }
+
+    #[test]
+    fn catalogue_source_references_fail_closed_on_bad_types_urls_and_duplicates() {
+        let mut catalog = synthetic_catalogue();
+        catalog["style_catalog"][1]["reference_sources"] =
+            serde_json::json!(["https://example.org/a", 17]);
+        assert!(CatalogueVocabulary::from_catalogue_json(&catalog.to_string()).is_err());
+
+        let mut non_https = synthetic_catalogue();
+        non_https["style_catalog"][1]["reference_sources"] =
+            serde_json::json!(["http://example.org/a"]);
+        assert!(CatalogueVocabulary::from_catalogue_json(&non_https.to_string()).is_err());
+
+        let mut duplicate = synthetic_catalogue();
+        duplicate["style_catalog"][1]["reference_sources"] =
+            serde_json::json!(["https://example.org/a", "https://example.org/a"]);
+        assert!(CatalogueVocabulary::from_catalogue_json(&duplicate.to_string()).is_err());
     }
 
     #[test]
