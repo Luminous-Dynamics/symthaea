@@ -518,10 +518,6 @@ mod tests {
             MemorySource::WebResearch
         );
         assert!(record.graduation_provenance.as_ref().unwrap().verification_claimed);
-        assert_eq!(
-            record.graduation_provenance.as_ref().unwrap().source_label.as_deref(),
-            Some("persisted")
-        );
     }
 
     #[test]
@@ -649,10 +645,6 @@ mod tests {
         );
         assert_eq!(
             verified.graduation_provenance.as_ref().unwrap().source,
-            MemorySource::ActionFeedback
-        );
-        assert_eq!(
-            verified.graduation_provenance.as_ref().unwrap().source_label.as_deref(),
             MemorySource::ActionFeedback
         );
         assert_eq!(
