@@ -825,6 +825,43 @@ mod tests {
     }
 
     #[test]
+    fn semantic_provenance_envelope_bincode_round_trip_preserves_claim() {
+        let mut mem = SemanticMemory::new(2);
+        let provenance = GraduationProvenance {
+            source: crate::coordinator::MemorySource::ActionFeedback,
+            verification_claimed: true,
+        };
+        assert!(mem
+            .store_with_provenance(
+                vec![0.25, 0.75],
+                0.125,
+                Some("Consolidated Wisdom".to_owned()),
+                Some(provenance),
+            )
+            .is_none());
+
+        let record = mem.get_with_provenance(0).unwrap();
+        assert_eq!(
+            record.schema_version,
+            PROVENANCED_SEMANTIC_ENTRY_SCHEMA_VERSION
+        );
+        let encoded = bincode::serialize(&record).expect("serialize semantic envelope");
+        let decoded: ProvenancedSemanticEntry =
+            bincode::deserialize(&encoded).expect("deserialize semantic envelope");
+
+        assert_eq!(decoded.schema_version, PROVENANCED_SEMANTIC_ENTRY_SCHEMA_VERSION);
+        assert_eq!(decoded.entry.hdc_vector, vec![0.25, 0.75]);
+        assert_eq!(decoded.entry.timestamp, 0);
+        assert_eq!(decoded.entry.category.as_deref(), Some("Consolidated Wisdom"));
+        let claim = decoded.graduation_provenance.unwrap();
+        assert_eq!(
+            claim.source,
+            crate::coordinator::MemorySource::ActionFeedback
+        );
+        assert!(claim.verification_claimed);
+    }
+
+    #[test]
     fn legacy_semantic_store_marks_lineage_absent_and_clear_removes_parallel_slots() {
         let mut mem = SemanticMemory::new(2);
         mem.store(vec![1.0, 0.0], 0.1, None);
