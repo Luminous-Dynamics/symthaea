@@ -41,7 +41,7 @@ For a 3-level factor, the orthogonal contrast bases are linear `[-1, 0, 1]` and 
 
 `sum(y × w) / sum(w²)`
 
-where `w` is the product of the one- or two-factor contrast weights. The kernel reports coefficients and seed dispersion; it deliberately does not fabricate p-values or confidence intervals.
+where `w` is the product of the one- or two-factor contrast weights. The kernel reports coefficients and seed dispersion; it deliberately does not fabricate p-values or confidence intervals. Terms of order three and four are diagnostics, not part of the primary comparison target.
 
 ## Run independently
 
