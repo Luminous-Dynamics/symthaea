@@ -313,8 +313,12 @@ fn validate_coefficient(
         return Err(format!("coefficient {id}: unsupported value_kind {value_kind}"));
     }
 
-    if status == "derived" && supporting.is_empty() {
-        return Err(format!("derived coefficient {id} requires supporting observables"));
+    if matches!(status, "derived" | "constrained" | "phenomenological_fit")
+        && supporting.is_empty()
+    {
+        return Err(format!(
+            "exportable coefficient {id} requires supporting observations from the same material state"
+        ));
     }
     if status == "phenomenological_fit" {
         if model_family != "experimental_effective"
