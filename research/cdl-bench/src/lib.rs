@@ -6,6 +6,7 @@
 
 pub mod bounded_error;
 pub mod causal;
+pub mod scm_predictor;
 
 pub use bounded_error::{compress_bounded_i16, decompress_bounded_i16, BoundedError, BoundedPredictor};
 pub mod numeric;
@@ -13,6 +14,7 @@ pub mod numeric;
 pub use numeric::{compress_i16, decompress_i16, NumericError, NumericTransform};
 
 pub use causal::{e3_mechanism_splits, generate_fsm, generate_scm, generate_scm_with_config, FsmTrace, GeneratorError, ScmIntervention, ScmMechanismConfig, ScmResponse, ScmTrace};
+pub use scm_predictor::{ScmFieldPredictor, ScmParentPredictor};
 
 use std::fmt;
 
