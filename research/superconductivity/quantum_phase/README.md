@@ -240,6 +240,7 @@ Each spatial time-slice has both positive-direction nearest-neighbour bonds; eac
   I=\frac{t\Delta\tau}{\beta}\sum_{\tau,\langle ij\rangle}\sin(\Delta\phi).
   \]
 - Total spatial-plaquette vortex density using the source's wrapped phase-circulation definition.
+- The fixed-origin imaginary-time current-current correlation \(F(\tau)=\langle I(\tau)I(0)\rangle\), with \(I(\tau)=t\sum_{\langle ij\rangle}\sin(\phi_i(\tau)-\phi_j(\tau))\), averaged over independent Monte Carlo configurations. The profile retains each imaginary-time lag and reports per-lag sampling diagnostics.
 
 A deterministic aligned-phase unit test checks the normalization \(\Upsilon=1\), zero vortex density and the expected action per spacetime site. Input tests separately check the source anisotropic couplings and the \(N_\tau\Delta\tau=\beta\) constraint.
 
@@ -250,7 +251,7 @@ A deterministic aligned-phase unit test checks the normalization \(\Upsilon=1\),
 
 The smoke receipt includes exact schema and fixture SHA-256 values, instance identity, model parameters, couplings, actual seed, update counts, Metropolis acceptance and the observable outputs. The workflow's short run is not a statistical measurement.
 
-**Not implemented / not qualified yet:** production-size L=48 and larger runs, error bars, integrated autocorrelation / effective-sample-size analysis, warmup and convergence criteria, Δτ extrapolation, BKT finite-size scaling, zero-temperature 3D-XY scaling, quantum-critical finite-size collapse, current-current imaginary-time correlators, conductivity sum rules, analytic continuation and the dissipative bath extension.
+**Not implemented / not qualified yet:** production-size L=48 and larger runs, convergence-qualified errors, robust integrated autocorrelation / effective-sample-size analysis at production length, automatic warmup criteria, Δτ extrapolation, BKT finite-size scaling, zero-temperature 3D-XY scaling, quantum-critical finite-size collapse, Matsubara-frequency current response, Drude-weight / conductivity sum-rule validation, analytic continuation and the dissipative bath extension. The current-current correlator is implemented only as an unvalidated source-form estimator; no conductivity is computed.
 
 The reported \(U_c/t=5.72(1)\), \(z=1\), and \(\nu=0.671\) remain paper-reported targets. We have not reproduced them. The source's \(N_\tau=1000\) at L=48 and \(N_\tau=5000\) at T/t=0.05 illustrate the computational burden; do not promote the L=4 smoke to source parity.
 
@@ -265,3 +266,10 @@ These statistics are not a replacement for integrated autocorrelation time, effe
 The QXY runner also supports independent-seed ensembles via `--replicates N`. Each chain gets a distinct deterministic seed and its own receipt. For multiple chains it reports between-seed sample standard deviation and standard error for action, stiffness and vortex density. These are **between-chain** diagnostics only: they do not remove within-chain autocorrelation or prove each chain equilibrated. Per-chain lag-one autocorrelation, an initial-positive-sequence integrated-autocorrelation estimate and effective-sample-size diagnostic are included, with an explicit warning that short chains are not publication-quality uncertainties.
 
 The hosted smoke command uses two chains with one warmup and two measurement sweeps each. That is a test of repeatability and receipt plumbing—not a physics-quality sample size.
+
+
+### Dynamic-response estimator boundary
+
+The source defines \(I(\tau)=t\sum_{\langle ij\rangle}\sin(\phi_i(\tau)-\phi_j(\tau))\) and \(F(\tau)=\langle I(\tau)I(0)\rangle\). The prototype evaluates this with a fixed imaginary-time origin for each sampled configuration and preserves all \(N_\tau\) lags. It does not average the origin over imaginary time. The output is a raw Euclidean correlator with per-lag sample diagnostics; it is not a real-frequency spectrum or a dc transport coefficient.
+
+The next dynamic-response gate is to reproduce the source's Matsubara transform and Drude-weight decomposition, check current conservation and response identities, then compare the source's constrained analytic-continuation ansatz against independent regularized methods and synthetic known-spectrum controls. The source reports that current-current sampling required at least an \(N_\tau\)-fold increase in computational time to obtain smooth and stable data relative to more heavily time-averaged observables. We therefore keep conductivity continuation out of the short CI smoke.
