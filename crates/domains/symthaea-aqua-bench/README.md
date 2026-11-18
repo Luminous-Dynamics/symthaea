@@ -108,13 +108,13 @@ This is a product-level classification function only. It does not actuate isolat
 ## Exact-point pressure / flow evidence
 
 The dependency-free `pressure_curve` module validates exact-point pressure / flow observations. It:
-- requires dynamic pressure at the terminal fitting inlet and does not substitute static or upstream residual pressure;
+- requires dynamic pressure at an explicit datum (terminal fitting inlet or point of discharge) and does not substitute static or upstream residual pressure;
 - checks the measured pressure plus its uncertainty against a preregistered setpoint tolerance and the complete test-article pressure-rating envelope;
 - reports manufacturer-declared operating-range status separately from test-rig admission, so an out-of-declared-range comparator point remains visibly exploratory;
 - validates exact-point matched comparisons using a shared context/protocol digest and a preregistered maximum pressure separation;
 - does not interpolate an untested pressure or infer a task/comfort result.
 
-Thirty-five pressure-curve / pressure-retention contract tests are authored. Manufacturer pressure evidence may specify a minimum only, a maximum only, or a complete range; the validator preserves that distinction and never invents an unpublished bound. The paired low/high-pressure comparison requires the same specimen, exact variant, mode, geometry, pressure-invariant context, protocol, rating evidence and instrument IDs; it reports central flow retention plus conservative measurement-uncertainty bounds. This is not a confidence interval across specimens, does not interpolate and does not determine task success. The module validates measurement context only; Mycelix retains metrology admission and Symtropy retains hydraulic/resource authority.
+Forty pressure-curve / pressure-retention contract tests are authored. Manufacturer pressure evidence may specify a minimum only, a maximum only, or a complete range; the validator preserves that distinction and never invents an unpublished bound. If the source pressure datum is missing or differs from the observed datum, it returns DeclaredDatumNotSpecified or DeclaredDatumMismatch instead of claiming a pressure-range match. The paired low/high-pressure comparison requires the same specimen, exact variant, mode, geometry, pressure-invariant context, protocol, rating evidence and instrument IDs; it reports central flow retention plus conservative measurement-uncertainty bounds. This is not a confidence interval across specimens, does not interpolate and does not determine task success. The module validates measurement context only; Mycelix retains metrology admission and Symtropy retains hydraulic/resource authority.
 
 
 The paired pressure-response metric has a useful external comparator: the UK government's non-domestic Energy Technology List requires at least 60% low-pressure flow relative to maximum flow at 3 bar, tested at 1.5 bar, when the 3-bar flow is no more than 8 L/min. Aqua's proposed 70% initial and 80% stretch values are internal research targets, not certification criteria. See docs/AQUA_LOW_PRESSURE_VALIDATION_PROTOCOL_V0_1.md.
@@ -127,3 +127,8 @@ The low-pressure protocol defines exact steady-state pressure points. Time-varyi
 ## Power-coupled shower / wastewater heat recovery
 
 The 2025/26 UK ETL electric-shower pathway now makes the coupled system boundary especially relevant: the programme retains 4.5 L/min as standard electric-shower maximum, with conditional 9 L/min (power modulation + compliant wastewater heat recovery) and 10.6 L/min (plus UBF) pathways. These are non-domestic UK criteria, not Aqua results or South African requirements. The detailed benchmark is in `docs/AQUA_POWER_COUPLED_SHOWER_DWHR_BENCHMARK_V0_1.md` and issue #12816. It requires whole-system purchased-energy measurement, receiver-side useful heat, fouling and task-level water/energy accounting. No duplicate thermal ledger is implemented here; Symtropy remains the canonical heat/resource authority.
+
+
+## Shower test-method and pressure-datum crosswalk
+
+See docs/AQUA_METHOD_CROSSWALK_V0_1.md and issue #12817. The pressure_curve module records TerminalFittingInlet or PointOfDischarge and rejects cross-datum comparisons. Its single-channel record deliberately does not represent UWL's simultaneous hot/cold inlet pressures or ETL's faceplate-centre P2; those require separate method-specific channel records and apparatus. The generic helper cannot establish EN 18021, UWL, ETL or WaterSense conformity.
