@@ -1,0 +1,71 @@
+# CDL-Bench standalone codec laboratory
+
+This is a dependency-free Rust crate under `research/cdl-bench`. It is intentionally
+outside the root Symthaea Cargo workspace and has no production cognitive-loop
+dependencies.
+
+## Implemented in v0.1
+
+- Deterministic adaptive order-0 and order-1 byte-frequency predictors.
+- A 32-bit arithmetic entropy coder / decoder.
+- A versioned frame with uncompressed length, payload length, source CRC-32 and
+  payload CRC-32.
+- Output-size limits, strict frame-length checks, and checksum failure handling.
+- Deterministic E0 sources: IID uniform, IID skewed, first-order Markov, periodic,
+  bursty, long runs and pseudo-random incompressible bytes.
+- CLI file encode/decode and an E0 length comparison against installed
+  Zstandard, Brotli, XZ and gzip commands.
+
+## Run
+
+```sh
+cd research/cdl-bench
+cargo test
+cargo run --release -- e0 --bytes 65536 --seed 42
+cargo run --release -- encode --model order1 input.bin output.cdl
+cargo run --release -- decode output.cdl reconstructed.bin
+cmp input.bin reconstructed.bin
+```
+
+## Frame format v1
+
+All integer fields are little-endian.
+
+| Offset | Length | Field |
+|---:|---:|---|
+| 0 | 4 | Magic `CDL1` |
+| 4 | 2 | Version (1) |
+| 6 | 1 | Model id (0 = order-0, 1 = order-1) |
+| 7 | 1 | Reserved flags (must be zero) |
+| 8 | 8 | Original byte length |
+| 16 | 8 | Payload length |
+| 24 | 4 | CRC-32 of reconstructed source |
+| 28 | 4 | CRC-32 of arithmetic-coded payload |
+| 32 | variable | Arithmetic-coded payload |
+
+The decoder reconstructs the same adaptive model from previously decoded bytes.
+No probability table or training corpus is read from an undeclared external source.
+
+## Accounting and limitations
+
+- The E0 table compares complete CDL frames (including the 32-byte header) with
+  native command outputs from installed general-purpose codecs.
+- The predictor state byte count is reported separately. The runner executable
+  size is printed by the file encoder, but excludes shared libraries and OS
+  runtime dependencies. These values are **not** silently added to the per-stream
+  frame ratio.
+- The codec model itself is a very small adaptive byte model, not a claim of
+  SOTA compression. Order-0 and order-1 are correctness and baseline arms.
+- The pseudo-random generator is deterministic test data, not cryptographic
+  randomness and not a substitute for an external incompressible corpus.
+- The CLI E0 runner caps each generated stream at 64 MiB.
+- CRC-32 detects accidental corruption; it is not authentication or tamper-proof
+  provenance.
+- The arithmetic coder and frame format are a research prototype. Do not use
+  them for production archival, security, or untrusted data interchange.
+- No compression result, external benchmark win, causal-transfer result, or
+  SOTA claim is implied by source existence. Run the tests and record the exact
+  toolchain and machine before interpreting performance.
+
+The first milestone is decoder correctness and transparent accounting, not a
+headline compression ratio.
