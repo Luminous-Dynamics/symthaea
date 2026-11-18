@@ -133,7 +133,7 @@ A separate `--monte-carlo` path now runs finite-size single-component-site Metro
 The sampler supports deterministic multi-chain seeds and records per-chain:
 - acceptance / invalid proposal counts, initial/final energy and raw measured configurations;
 - component-resolved mean \(|\psi_a|\) and \(|\psi_a|^2\);
-- relative-phase-lock cosine statistics;
+- relative-phase-lock cosine and sine statistics (both invariant under the common electromagnetic U(1));
 - quadratic, quartic, gradient and total energy;
 - heat-capacity fluctuation point estimate;
 - twist-current means, diamagnetic tensor, current covariance and the thermal helicity-modulus point-estimate tensor;
@@ -231,3 +231,24 @@ The thermal twist estimator is
 \operatorname{Cov}(J_\mu,J_\nu)/T.
 \]
 It is reported as a finite-chain point estimate. The pilot does not yet report blocked jackknife/bootstrap uncertainty for the tensor/eigenvalues. Autocorrelation and multi-size scaling therefore remain required before a negative or positive point estimate can be used as a material-stability statement.
+
+
+### Relative-phase chirality signal (not a symmetry classification)
+
+For each declared phase-lock pair \((a,b)\), the sampler now reports both
+
+\[
+C_{ab}=\left\langle
+\frac{\operatorname{Re}(\psi_a^*\psi_b)}
+{|\psi_a||\psi_b|}
+\right\rangle,
+\qquad
+S_{ab}=\left\langle
+\frac{\operatorname{Im}(\psi_a^*\psi_b)}
+{|\psi_a||\psi_b|}
+\right\rangle.
+\]
+
+Both are invariant under the one common electromagnetic U(1). Under simple time reversal (complex conjugation), \(C_{ab}\) is even and \(S_{ab}\) is odd. The receipt deliberately labels time-reversal classification as `not_inferred_from_relative_phase_sine_without_full_crystal_symmetry_action`: a nonzero relative-phase sine by itself does not establish a time-reversal-breaking phase without checking all crystal/gauge symmetry operations and possible component transformations.
+
+A unit test checks common-gauge invariance and sign reversal of the relative-phase sine under complex conjugation. This is an observable-level control, not a phase classification.
