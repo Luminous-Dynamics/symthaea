@@ -70,6 +70,7 @@
         "source_type": {
           "enum": [
             "manufacturer_datasheet",
+            "manufacturer_product_page",
             "official_standard_or_programme",
             "public_authority_by_law",
             "peer_reviewed_article",
