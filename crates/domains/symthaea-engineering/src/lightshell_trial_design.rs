@@ -798,8 +798,8 @@ mod tests {
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.is_valid(), "{:?}", report.findings);
         assert_eq!(report.executed_period_count, 18);
-        manifest["blocks"][1]["periods"][0]["linked_system_run_ref"] =
-            manifest["blocks"][0]["periods"][0]["linked_system_run_ref"].clone();
+        let first_run_ref = manifest["blocks"][0]["periods"][0]["linked_system_run_ref"].clone();
+        manifest["blocks"][1]["periods"][0]["linked_system_run_ref"] = first_run_ref;
         let duplicate = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(duplicate.findings.iter().any(|finding| finding.code == "duplicate_system_run_reference"));
     }
@@ -897,16 +897,17 @@ mod tests {
     fn unknown_strata_and_unknown_fields_are_rejected() {
         let mut manifest = base_manifest();
         manifest["blocks"][0]["stratum_id"] = json!("UNDECLARED-STRATUM");
-        manifest["invented_robot_authority"] = json!(true);
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|finding| finding.code == "unknown_block_stratum"));
+        manifest["invented_robot_authority"] = json!(true);
         assert!(parse_and_validate(&manifest.to_string()).is_err());
     }
 
     #[test]
     fn block_allocation_receipts_must_be_unique() {
         let mut manifest = base_manifest();
-        manifest["blocks"][1]["allocation_receipt_ref"] = manifest["blocks"][0]["allocation_receipt_ref"].clone();
+        let first_receipt = manifest["blocks"][0]["allocation_receipt_ref"].clone();
+        manifest["blocks"][1]["allocation_receipt_ref"] = first_receipt;
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|finding| finding.code == "missing_or_duplicate_allocation_receipt"));
     }
