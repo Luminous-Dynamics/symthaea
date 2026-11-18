@@ -193,4 +193,6 @@ Reuse the existing Symthaea falsification/power reference and open-world work ra
 - [Active experiment selection](EXPERIMENT_SELECTION.md) — expected information gain, statistical power, cost, feasibility and model-misspecification safeguards.
 - [Standalone Rust reference lab](lab/README.md) — dependency-free geometry and crop-flow descriptors, explicit binary-grid/7-bit decoding, complete decoder-attempt logging, row/column-margin-preserving grid null generation, maximum-statistic calibration helper, entropy and Wilson intervals.
 
+The current reference crate includes crop-flow circular statistics as well as geometry and grid decoding. It preserves per-sample direction and does not force a single mean direction when the resultant is near zero.
+
 The Rust lab is an initial reference implementation, not a production image pipeline. It currently accepts calibrated 2D point sets, preconstructed binary grids, and bit sequences; it does not read aerial images, infer crop masks from photographs, classify formation origin, or infer semantic meaning. Its unit tests have been authored but **not executed** in this environment because no Rust toolchain is installed. Do not treat the crate as compiled or qualified until `cargo fmt`, `cargo test` and `cargo clippy` run on the exact head.
