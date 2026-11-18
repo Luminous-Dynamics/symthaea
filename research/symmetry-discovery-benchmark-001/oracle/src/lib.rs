@@ -1006,16 +1006,23 @@ fn augment_bounded_matching(
         }
         visited_targets[*target] = true;
         let current_owner = target_to_source[*target];
-        if current_owner.is_none()
-            || augment_bounded_matching(
-                current_owner.expect("checked as present"),
-                adjacency,
-                target_to_source,
-                visited_targets,
-            )
-        {
-            target_to_source[*target] = Some(source);
-            return true;
+        match current_owner {
+            None => {
+                target_to_source[*target] = Some(source);
+                return true;
+            }
+            Some(owner)
+                if augment_bounded_matching(
+                    owner,
+                    adjacency,
+                    target_to_source,
+                    visited_targets,
+                ) =>
+            {
+                target_to_source[*target] = Some(source);
+                return true;
+            }
+            Some(_) => {}
         }
     }
     false
@@ -1069,9 +1076,9 @@ fn bounded_noise_matching_witness(
     let mut reachable_sources = vec![false; count];
     let mut reachable_targets = vec![false; count];
     let mut queue = std::collections::VecDeque::new();
-    for source in 0..count {
-        if !target_to_source.iter().any(|owner| *owner == Some(source)) {
-            reachable_sources[source] = true;
+    for (source, reachable) in reachable_sources.iter_mut().enumerate() {
+        if !target_to_source.contains(&Some(source)) {
+            *reachable = true;
             queue.push_back(source);
         }
     }
@@ -1182,6 +1189,12 @@ impl Manifest {
             .checked_mul(2)
             .ok_or_else(|| "twice-coordinate-error bound overflow".to_owned())?;
         let exact_stabilizer = self.declared_subgroup(base_case)?;
+        let computed_stabilizer = self.structural_stabilizer(base_case)?;
+        if computed_stabilizer != exact_stabilizer {
+            return Err(format!(
+                "bounded-noise base fixture {base_case_id} does not match its exact stabilizer label"
+            ));
+        }
         let mut possible_elements = Vec::new();
         let mut ruled_out_elements = Vec::new();
         let mut decisions = Vec::with_capacity(self.elements.len());
@@ -1760,7 +1773,7 @@ mod bounded_noise_tests {
             .verify_bounded_noise_report(base_case_id, observed, epsilon, &report)
             .is_err());
 
-        let mut invalid_observed = observed.clone();
+        let mut invalid_observed = (*observed).clone();
         invalid_observed[0][0] = Value::from(1000.0);
         assert!(manifest
             .bounded_noise_stabilizer_report(base_case_id, &invalid_observed, epsilon)
