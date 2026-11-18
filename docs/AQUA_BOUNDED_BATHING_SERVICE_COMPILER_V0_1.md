@@ -54,9 +54,11 @@ Do not infer age, disability, diagnosis, body dimensions, gender, skin condition
 
 ### 3.2 Qualified capability
 
-A capability record is bound to exact hardware and installation identity:
+A capability record is bound to exact hardware, installation and **fixture/product-method category** identity:
 
 - capability and schema version;
+- fixture category (tap, shower outlet, shower system or other sanitary fixture);
+- qualification method scope and clause (for example UWL 2023 boost clause 12.1, EN 18021 tap boost 7.3.3, shower-outlet boost 8.3.2, or shower-system boost 10.3.8);
 - device model, SKU, hardware revision and installed configuration digest;
 - task/mode supported;
 - qualified pressure, flow, inlet temperature and room-condition envelope;
@@ -66,7 +68,7 @@ A capability record is bound to exact hardware and installation identity:
 - evidence references, owner, validity interval and status;
 - unsupported modes and known exclusions.
 
-A product-family web page, nominal flow claim, simulation or synthetic fixture is not a qualification receipt. Evidence must identify whether it is measured, independently tested, supplier-declared, simulated or unknown.
+A product-family web page, nominal flow claim, simulation or synthetic fixture is not a qualification receipt. Evidence must identify whether it is measured, independently tested, supplier-declared, simulated or unknown. Method scope must match the exact product category: a tap test clause cannot qualify a shower outlet or shower system. UWL 2023 and EN 18021 are separate method routes; do not transfer their criteria between schemes. The current EN 18021 public excerpt exposes tap-specific numerical criteria but not the full shower-specific clauses; no shower acceptance values are inferred until the controlled text is reviewed.
 
 ### 3.3 Candidate service plan
 
@@ -195,3 +197,10 @@ Do not claim 100% safety from software tests. These targets apply only to the de
 ## 10. Claim ceiling
 
 This document authorizes software-contract and offline/synthetic research only. It is not a control-system design, safety case, product certification, clinical or wellness protocol, hygiene qualification, plumbing/electrical design, procurement approval or authorization for human exposure. The compiler must never become the safety authority.
+
+
+## 11. Typed qualification scope in the Rust task-phase contract
+
+The Rust `task_phase` module now carries a fixture category on the plan and each qualified mode, plus an explicit qualification-method scope. It rejects category mismatch and rejects an EN 18021 tap boost clause attached to a shower-outlet mode. It keeps EN 18021 shower-outlet (8.3.2), shower-system (10.3.8) and UWL 2023 boost (12.1) as distinct routes.
+
+This is a metadata/scope-integrity check. It does not implement the full EN 18021 shower clauses, run UWL/EN tests, or certify a mode. The standard-specific method SHA and independent qualification receipt remain required; the controlled full method must be available to the assessor.
