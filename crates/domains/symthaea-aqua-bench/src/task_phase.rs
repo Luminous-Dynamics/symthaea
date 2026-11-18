@@ -42,12 +42,58 @@ pub enum ActivationRequirement {
     DirectUserHoldWithAutoReturn,
 }
 
+/// Product category against which this exact mode qualification was performed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FixtureProductCategory {
+    Tap,
+    ShowerOutlet,
+    ShowerSystem,
+    OtherSanitaryFixture,
+}
+
+/// Method clause / product category represented by the mode's qualification receipt.
+///
+/// This is a scope label only; it does not execute the standard's test procedure or
+/// establish conformity. The method SHA and qualification receipt still bind the
+/// controlled protocol and independently assessed result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QualificationMethodScope {
+    Uwl2023BoostClause12_1,
+    En18021TapBoostClause7_3_3,
+    En18021ShowerOutletBoostClause8_3_2,
+    En18021ShowerSystemBoostClause10_3_8,
+    OtherIndependentlyQualifiedMethod,
+}
+
+impl QualificationMethodScope {
+    fn is_compatible_with(self, category: FixtureProductCategory) -> bool {
+        match self {
+            Self::Uwl2023BoostClause12_1 => matches!(
+                category,
+                FixtureProductCategory::Tap
+                    | FixtureProductCategory::ShowerOutlet
+                    | FixtureProductCategory::ShowerSystem
+            ),
+            Self::En18021TapBoostClause7_3_3 => category == FixtureProductCategory::Tap,
+            Self::En18021ShowerOutletBoostClause8_3_2 => {
+                category == FixtureProductCategory::ShowerOutlet
+            }
+            Self::En18021ShowerSystemBoostClause10_3_8 => {
+                category == FixtureProductCategory::ShowerSystem
+            }
+            Self::OtherIndependentlyQualifiedMethod => true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QualifiedModeCapability {
     pub mode_id: String,
     pub market_variant_id: String,
+    pub fixture_category: FixtureProductCategory,
     pub role: CapabilityRole,
     pub configuration_sha256: String,
+    pub qualification_method_scope: QualificationMethodScope,
     /// Frozen pressure, inlet-water, temperature, mounting and room applicability.
     pub delivery_conditions_sha256: String,
     pub qualification_method_sha256: String,
@@ -78,6 +124,7 @@ pub struct TaskPhase {
 pub struct TaskPhasePlan {
     pub task_profile_id: String,
     pub market_variant_id: String,
+    pub fixture_category: FixtureProductCategory,
     pub configuration_sha256: String,
     pub delivery_conditions_sha256: String,
     pub protocol_sha256: String,
@@ -105,6 +152,8 @@ pub enum TaskPhaseError {
     MissingCapability { mode_id: String },
     DuplicateCapability { mode_id: String },
     ConfigurationMismatch { mode_id: String },
+    ProductCategoryMismatch { mode_id: String },
+    QualificationMethodCategoryMismatch { mode_id: String },
     InvalidQualificationReceipt { mode_id: String },
     CapabilityNotIndependentlyQualified { mode_id: String },
     RoleMismatch { phase_index: usize, mode_id: String },
@@ -171,6 +220,15 @@ impl Display for TaskPhaseError {
             }
             Self::ConfigurationMismatch { mode_id } => {
                 write!(f, "mode belongs to a different hardware configuration: {mode_id}")
+            }
+            Self::ProductCategoryMismatch { mode_id } => {
+                write!(f, "mode qualification belongs to a different fixture category: {mode_id}")
+            }
+            Self::QualificationMethodCategoryMismatch { mode_id } => {
+                write!(
+                    f,
+                    "boost qualification method clause does not match fixture category: {mode_id}"
+                )
             }
             Self::InvalidQualificationReceipt { mode_id } => {
                 write!(f, "mode qualification receipt is invalid: {mode_id}")
@@ -373,6 +431,11 @@ pub fn validate_task_phase_plan(
                         mode_id: mode_id.to_owned(),
                     });
                 }
+                if capability.fixture_category != plan.fixture_category {
+                    return Err(TaskPhaseError::ProductCategoryMismatch {
+                        mode_id: mode_id.to_owned(),
+                    });
+                }
                 if !is_sha256(&capability.delivery_conditions_sha256) {
                     return Err(TaskPhaseError::InvalidDeliveryConditionsDigest);
                 }
@@ -402,6 +465,14 @@ pub fn validate_task_phase_plan(
 
                 match expected_role {
                     CapabilityRole::Boost => {
+                        if !capability
+                            .qualification_method_scope
+                            .is_compatible_with(plan.fixture_category)
+                        {
+                            return Err(TaskPhaseError::QualificationMethodCategoryMismatch {
+                                mode_id: mode_id.to_owned(),
+                            });
+                        }
                         if capability.activation
                             != ActivationRequirement::DirectUserHoldWithAutoReturn
                         {
@@ -510,8 +581,14 @@ mod tests {
         QualifiedModeCapability {
             mode_id: mode_id.to_owned(),
             market_variant_id: "AQS1-TEST-ARTICLE".to_owned(),
+            fixture_category: FixtureProductCategory::ShowerOutlet,
             role,
             configuration_sha256: digest('a'),
+            qualification_method_scope: if role == CapabilityRole::Boost {
+                QualificationMethodScope::En18021ShowerOutletBoostClause8_3_2
+            } else {
+                QualificationMethodScope::OtherIndependentlyQualifiedMethod
+            },
             delivery_conditions_sha256: digest('d'),
             qualification_method_sha256: digest('e'),
             qualification_receipt_sha256: digest('b'),
@@ -531,6 +608,7 @@ mod tests {
         TaskPhasePlan {
             task_profile_id: "HAIR_WASH_V1".to_owned(),
             market_variant_id: "AQS1-TEST-ARTICLE".to_owned(),
+            fixture_category: FixtureProductCategory::ShowerOutlet,
             configuration_sha256: digest('a'),
             delivery_conditions_sha256: digest('d'),
             protocol_sha256: digest('c'),
@@ -888,6 +966,49 @@ mod tests {
         assert_eq!(
             validate_task_phase_plan(&candidate, &capabilities()),
             Err(TaskPhaseError::InvalidPhaseOrder { phase_index: 2 })
+        );
+    }
+
+
+    #[test]
+    fn rejects_tap_boost_clause_for_shower_outlet_capability() {
+        let mut caps = capabilities();
+        caps[1].qualification_method_scope =
+            QualificationMethodScope::En18021TapBoostClause7_3_3;
+
+        assert_eq!(
+            validate_task_phase_plan(&plan(), &caps),
+            Err(TaskPhaseError::QualificationMethodCategoryMismatch {
+                mode_id: "boost".to_owned()
+            })
+        );
+    }
+
+    #[test]
+    fn admits_shower_system_boost_only_with_shower_system_scope() {
+        let mut task = plan();
+        task.fixture_category = FixtureProductCategory::ShowerSystem;
+        let mut caps = capabilities();
+        for capability in &mut caps {
+            capability.fixture_category = FixtureProductCategory::ShowerSystem;
+        }
+        caps[1].qualification_method_scope =
+            QualificationMethodScope::En18021ShowerSystemBoostClause10_3_8;
+
+        assert!(validate_task_phase_plan(&task, &caps).is_ok());
+    }
+
+    #[test]
+    fn rejects_capability_category_mismatch_before_method_selection() {
+        let task = plan();
+        let mut caps = capabilities();
+        caps[1].fixture_category = FixtureProductCategory::ShowerSystem;
+
+        assert_eq!(
+            validate_task_phase_plan(&task, &caps),
+            Err(TaskPhaseError::ProductCategoryMismatch {
+                mode_id: "boost".to_owned()
+            })
         );
     }
 
