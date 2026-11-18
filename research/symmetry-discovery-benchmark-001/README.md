@@ -302,3 +302,16 @@ The bounded-noise fixture has its own Draft 2020-12 schema and is included in th
 - forged reports and observations outside the declared per-coordinate error bound are rejected.
 
 This is a deterministic bounded-error model, not a probabilistic noise model, sensor calibration, or physical measurement guarantee.
+
+
+## Scorecard extension for bounded-noise runs
+
+The shared run-scorecard schema now supports a typed `uncertainty_result` per case:
+- model identifier (`bounded_coordinate_linf`);
+- coordinate scale and `epsilon_scaled`;
+- possible and ruled-out group elements;
+- not-falsified subgroup candidates;
+- count of Hall-deficiency witnesses;
+- an invariant that the exact latent subgroup remained possible.
+
+This allows matched noise-robustness runs to report uncertainty coverage and false-elimination risk alongside the common denominator, abstention, runtime, memory, and verification metrics. It does not change the scorecard requirements for non-noisy tracks.
