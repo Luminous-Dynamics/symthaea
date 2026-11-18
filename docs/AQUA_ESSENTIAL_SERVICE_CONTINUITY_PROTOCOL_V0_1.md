@@ -175,3 +175,18 @@ Stages:
 ## 11. Claim ceiling
 
 This protocol establishes requirements and test cases only. It does not demonstrate outage resilience, safe state transitions, water quality, a safe buffer tank, regulatory compliance or human suitability. It authorizes no construction, water-source connection, procurement or occupied/human-exposure operation.
+
+
+## 12. Deterministic software evaluator
+
+The crate now contains a pure Rust product-level classifier in `crates/domains/symthaea-aqua-bench/src/service_continuity.rs`. It accepts explicit owner-reported water-use qualification, local protection state, critical-evidence freshness, pressure-envelope state, drain/leak status, local capability mode, digital-experience availability and a requalification-required flag.
+
+It can return QUALIFIED_FULL, QUALIFIED_REDUCED, MANUAL_ONLY, ISOLATED_STOP or RECOVERY_PENDING. It does not create a reduced/manual mode: only an explicitly supplied locally qualified capability can be admitted. Unknown / stale / revoked / wrong-use-class water, uncertain protections, non-current critical evidence, pressure outside/unknown relative to the qualified envelope, blocked/unknown drain and detected/unknown leak all classify as ISOLATED_STOP. Loss of optional digital recommendations does not downgrade a qualified local service. A cleared fault remains RECOVERY_PENDING while requalification is required.
+
+The module currently has 16 authored unit tests. They are not claimed as executed or passing until the dedicated exact-head Aqua workflow reports them. The evaluator does not actuate hardware, close valves, choose temperature limits, approve water, or supersede a local safety controller.
+
+## 13. Low-pressure continuity interface
+
+The SANS 10252-1:2018 Edition 3.2 Table 3 lists 50–100 kPa as the design flow-pressure range for a water-saving showerhead at a 10 L/min design flow. This is a local installation-design reference, not proof of useful shower performance across the range. Aqua adds 50 / 75 / 100 kPa test points in [AQUA-LOW-PRESSURE-001 #12784](https://github.com/Luminous-Dynamics/symthaea/issues/12784), while keeping 140 / 150 / 300 / 310 kPa as separate method and comparator points. Static pressure, upstream residual pressure and dynamic fitting-inlet pressure must never be conflated.
+
+The same SANS edition's amended clause 5.3.3.2 states a 10 L/min maximum shower discharge, while Table 3 lists 12 L/min as the likely maximum for its water-saving showerhead row. Treat this as an apparent internal inconsistency requiring controlled SABS interpretation; do not infer permission to exceed the clause-level maximum.
