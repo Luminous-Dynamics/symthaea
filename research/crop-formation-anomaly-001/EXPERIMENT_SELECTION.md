@@ -1,6 +1,6 @@
 # CROP-INTEL-001 — Active experiment selection
 
-**Status:** research design; no experiment policy implemented.
+**Status:** research design with a finite-hypothesis expected-information-gain reference in Rust; not compiled or executed.
 
 ## Motivation
 
@@ -75,6 +75,16 @@ A staged fidelity ladder is preferable to jumping directly to an expensive simul
 Every fidelity upgrade must demonstrate better held-out predictive accuracy or uncertainty calibration at a matched data and compute budget. More parameters alone are not progress.
 
 This is consistent with recent work on goal-oriented Bayesian design for nonlinear models, which targets information about predictive quantities of interest rather than parameters alone ([Zhong et al., SIAM/ASA JUQ, 2026](https://doi.org/10.1137/24M1649344)), and new work on experimental designs for practical parameter identifiability and model discrimination ([Mathematical Biosciences, 2026](https://doi.org/10.1016/j.mbs.2026.109710)).
+
+## 3B. Rust reference implementation
+
+The dependency-free lab exposes `expected_information_gain_bits(priors, conditional_outcome_probabilities)`. It calculates the mutual information between the discrete mechanism hypothesis and the outcome of one proposed action:
+
+`I(H;Y|a) = H(H) - Σ_y P(y|a) H(H|y,a)`
+
+The function validates that the prior and every conditional row are finite, nonnegative probability distributions that sum to one, that there is one row per hypothesis, and that each row uses the same outcome ordering. It rejects malformed matrices rather than silently normalizing them. Nine known-answer / invalid-input tests are authored.
+
+The utility assumes that the supplied predictive distributions are already defensible. It does not estimate them, include cost, model measurement error, or enforce safety/permission gates. Compute information gain for eligible actions only after hard gates; retain cost, expected power, missingness, and model-discrepancy sensitivity as separate outputs. A model-unknown hypothesis should be included only with a defensible predictive distribution. EIG must be stress-tested against plausible priors and alternative predictive models before it guides real experiment selection.
 
 ## 4. Cost and feasibility
 
@@ -174,7 +184,7 @@ Measure:
 - harm/permission/rights constraint violations (must be zero);
 - abstention when no affordable, adequately powered action exists.
 
-Keep the oracle upper bound separate from deployable policies. The policy must not be given the generating model or hidden ground truth.
+Keep the oracle upper bound separate from deployable policies. The policy must not be given the generating model or hidden ground truth. Include model-discrepancy scenarios where all candidate models are imperfect; the safe policy should preserve an unknown-model disposition instead of confidently selecting the least-wrong hypothesis.
 
 ## 8. Integration path
 
