@@ -1504,9 +1504,6 @@ mod tests {
                 .iter()
                 .any(|metric| metric == "false_alarm_events_on_disruptive_shots")
         );
-        /*
-        .any(|metric| metric == "false_alarms_per_non_disruptive_hour")
-        );
         assert_eq!(
             manifest["offline_scoring_contract"]["false_alarm_rate_denominators"]["per_hour"],
             "sum of non-disruptive shot exposure durations in hours"
