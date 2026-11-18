@@ -1636,6 +1636,14 @@ mod tests {
             true
         );
         assert_eq!(
+            manifest["online_policy_contract"]["policy_config_fields"]
+                .as_array()
+                .expect("policy field list")
+                .iter()
+                .any(|field| field == "score_min" || field == "score_max"),
+            true
+        );
+        assert_eq!(
             manifest["offline_scoring_contract"]["warning_interval"]["event_detected_when"],
             "at least one alarm episode has t_cut - alarm_time in [minimum_ns, maximum_ns]"
         );
@@ -1737,8 +1745,8 @@ mod tests {
             "a".repeat(64),
             "b".repeat(64),
             "symthaea-plasma-risk".to_owned(),
-            "model-rev-1".to_owned(),
-            "c".repeat(64),
+            "test-model-v1".to_owned(),
+            "1".repeat(64),
             42,
             "cpu-x86_64-rust-1.96".to_owned(),
             config(),
@@ -1774,8 +1782,8 @@ mod tests {
             "a".repeat(64),
             "b".repeat(64),
             "symthaea-plasma-risk".to_owned(),
-            "model-rev-1".to_owned(),
-            "c".repeat(64),
+            "test-model-v1".to_owned(),
+            "1".repeat(64),
             42,
             "cpu-x86_64-rust-1.96".to_owned(),
             config(),
@@ -1807,8 +1815,8 @@ mod tests {
             "a".repeat(64),
             "b".repeat(64),
             "symthaea-plasma-risk".to_owned(),
-            "model-rev-1".to_owned(),
-            "c".repeat(64),
+            "test-model-v1".to_owned(),
+            "1".repeat(64),
             42,
             "cpu-x86_64-rust-1.96".to_owned(),
             config(),
@@ -1856,8 +1864,8 @@ mod tests {
             "a".repeat(64),
             "b".repeat(64),
             "symthaea-plasma-risk".to_owned(),
-            "model-rev-1".to_owned(),
-            "c".repeat(64),
+            "test-model-v1".to_owned(),
+            "1".repeat(64),
             42,
             "cpu-x86_64-rust-1.96".to_owned(),
             config(),
