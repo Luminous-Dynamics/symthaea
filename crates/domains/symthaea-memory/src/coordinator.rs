@@ -283,11 +283,13 @@ impl MemoryCoordinator {
                 1.0 - event.final_activation as f32, // Low activation → high surprise
                 0.0,
                 event.coherence_at_graduation as f32,
-            )
-            .with_graduation_provenance(provenance)
-            .with_consolidation_priority_bonus(consolidation_priority_bonus);
+            );
 
-            if episodic.store_if_significant(episode) {
+            if episodic.store_if_significant_with_provenance(
+                episode,
+                Some(provenance),
+                consolidation_priority_bonus,
+            ) {
                 stored += 1;
             }
             self.stats.graduations_processed += 1;
@@ -609,7 +611,10 @@ mod tests {
 
         // Simulate multiple WM items graduating at different times
         coord.queue_graduation(make_graduation(1, 5, 0.4, false));
-        coord.queue_graduation(make_graduation(2, 8, 0.7, true)); // Verified = higher adjusted Phi
+        let mut verified_event = make_graduation(2, 8, 0.7, true);
+        verified_event.source = MemorySource::ActionFeedback;
+        verified_event.label = "action-result:fixture-42".to_owned();
+        coord.queue_graduation(verified_event);
         coord.queue_graduation(make_graduation(3, 2, 0.6, false)); // Below min steps
 
         let stored = coord.process_graduations(&mut episodic);
@@ -619,20 +624,50 @@ mod tests {
         assert_eq!(episodic.len(), 2);
 
         // Verification/source signals must not alter the cognitive-state estimate.
-        let top = episodic.get_top_episodes(2);
-        let low = top.iter().find(|episode| (episode.psi - 0.4).abs() < 1e-9).unwrap();
-        let verified = top.iter().find(|episode| (episode.psi - 0.7).abs() < 1e-9).unwrap();
-        assert_eq!(low.valence, Some(0.0));
-        assert_eq!(verified.valence, Some(0.0));
+        let top = episodic.get_top_episodes_with_provenance(2);
+        let low = top
+            .iter()
+            .find(|record| (record.episode.psi - 0.4).abs() < 1e-9)
+            .unwrap();
+        let verified = top
+            .iter()
+            .find(|record| (record.episode.psi - 0.7).abs() < 1e-9)
+            .unwrap();
+        assert_eq!(low.episode.valence, Some(0.0));
+        assert_eq!(verified.episode.valence, Some(0.0));
         assert_eq!(
             verified.graduation_provenance.as_ref().unwrap().verification_claimed,
             true
         );
-        assert_eq!(low.graduation_provenance.as_ref().unwrap().verification_claimed, false);
+        assert_eq!(
+            low.graduation_provenance.as_ref().unwrap().verification_claimed,
+            false
+        );
         assert!(
             verified.consolidation_priority_bonus > low.consolidation_priority_bonus,
             "The producer's verification claim may affect replay priority, not Phi"
         );
+    }
+
+    #[test]
+    fn verified_claim_cannot_bypass_raw_psi_admission_threshold() {
+        let mut coord = MemoryCoordinator::default();
+        coord.update_signals(0.9, 0.9);
+
+        let config = crate::episodic_replay::EpisodicReplayConfig {
+            psi_threshold: 0.5,
+            ..Default::default()
+        };
+        let mut episodic = EpisodicMemory::new(config);
+
+        let mut event = make_graduation(77, 8, 0.45, true);
+        event.source = MemorySource::ActionFeedback;
+        event.label = "claimed-verified-low-psi".to_owned();
+        coord.queue_graduation(event);
+
+        let stored = coord.process_graduations(&mut episodic);
+        assert_eq!(stored, 0);
+        assert_eq!(episodic.len(), 0);
     }
 
     #[test]
