@@ -362,3 +362,70 @@ Sources:
 UWL 2023 applies P1/P2/P3 as dynamic pressures **to each inlet**: 150 kPa +10/-0 and 300 kPa +20/-0 for Type 1; 10 kPa +2/-0 for Type 2. ETL also requires P2 at the centre of the faceplate for its maximum-flow procedure. These method datums cannot be collapsed into one upstream or terminal-inlet gauge point. The complete crosswalk is in [AQUA_METHOD_CROSSWALK_V0_1.md](AQUA_METHOD_CROSSWALK_V0_1.md), tracked by [#12817](https://github.com/Luminous-Dynamics/symthaea/issues/12817).
 
 Aqua's generic pressure retention helper is now explicit about pressure datum and rejects cross-datum comparisons. It supports general terminal-fitting-inlet or point-of-discharge engineering channels only. It does not model the UWL simultaneous inlet channels or ETL faceplate-centre P2 and therefore cannot produce an ETL/UWL compliance claim.
+
+
+## 17. Task-selective delivery and temporary boost — UWL 2023 Clause 12.1
+
+Temporary boost is not a new category by itself. Commercial hold-to-boost controls already exist, so Aqua must compete on the complete task result and reset behavior rather than a button or a peak-flow claim.
+
+### Exact commercial case: Hansgrohe Activera Select S WaterBoost, SKU 28036000
+
+The South African manufacturer page / datasheet states, at 3 bar:
+- Regular Rain: 2.9 L/min.
+- Regular ImpactRain: 2.9 L/min.
+- ImpactRain + Booster: 6.6 L/min.
+- Rain + Booster: 9.4 L/min.
+- Flow regulator: 4 L/min (possible tolerance −20%).
+- Maximum flow: 4 L/min.
+- Minimum flow pressure: 0.8 bar.
+- WaterBoost is a press-and-hold side control.
+
+This contains an unresolved manufacturer documentation-scope contradiction: the boosted flows exceed the same page's declared 4 L/min regulator / maximum. Aqua does not assume that boost bypasses the restrictor, that the maximum applies only to regular modes, or that the boosted values are erroneous. Obtain manufacturer clarification and independently measure the exact SKU, mode, supply conditions, regulator and delivered flow before using these values as a verified boost baseline.
+
+Source:
+- https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000
+- https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28036000
+
+### Formal UWL boost-function benchmark
+
+The Unified Water Label Taps & Showers Technical Criteria (January 2023), definition 3.12 and clause 12.1, is a stronger reference than product marketing. It defines a boost function as temporary flow increase that automatically cancels on closure of the flow control.
+
+Under Type 1 P2 (dynamic 300 kPa +20/-0 applied to each inlet separately), the method records:
+1. Regular flow Qreg.
+2. Boosted flow Qboost.
+3. Flow-control closure.
+4. Reopening without boost and post-close flow Qmax.
+
+The criteria require automatic return to regular flow (Qmax = Qreg), Qboost < 2 × Qreg, and Qreg listed on the scheme label. These are method requirements; manufacturer specifications are not a pass result. Aqua's Rust validator additionally records declared flow-measurement uncertainty and a scheme-label evidence receipt. Equality within combined measurement uncertainty is an Aqua screening rule for its software record, not a replacement for formal UWL method interpretation.
+
+Source: https://uwla.eu/wp-content/uploads/2023/05/TAPS-Showers-Technical-2023.pdf
+
+### Nominal WaterBoost ratios — screening signal only
+
+If the listed regular and boosted manufacturer flows are directly comparable at the same method conditions:
+- ImpactRain: 6.6 / 2.9 ≈ **2.28×** regular.
+- Rain: 9.4 / 2.9 ≈ **3.24×** regular.
+
+Those nominal ratios exceed UWL's Qboost < 2 × Qreg criterion. This is not a finding of non-conformity: the product-page regulator/maximum conflict remains unresolved, and the exact SKU has not been reproduced under the complete UWL P2 test. The proper next step is manufacturer clarification plus an independent exact-SKU test, not an assumption about bypass or a marketing allegation.
+
+### Aqua research target
+
+Aqua should aim for:
+- a very low-flow base mode that is task-qualified;
+- a task-specific boost only where the task benefits from it;
+- exact user hold / automatic reset and a qualified duration ceiling;
+- measured Qreg, Qboost and Qmax at the UWL method datum;
+- Qboost below the UWL 2× regular-flow criterion where claiming method compatibility;
+- at least **20% lower fresh water per completed task** versus a matched always-high-flow control, with independent task-quality endpoints non-inferior, including startup, pause, rinse, failed attempts, cleaning and purge.
+
+The 20% is a research hypothesis, not a result or certification claim. A hold-to-boost button alone is not an ETL user-behaviour feature (UBF); ETL UBF status depends on whether the built-in feature demonstrably reduces total shower duration / volume under the ETL method.
+
+### Evidence / implementation references
+
+- Machine-readable UWL boost criteria are in [AQUA_EVIDENCE_CORPUS_V0_1.md](research/AQUA_EVIDENCE_CORPUS_V0_1.md), 15 entries / 77 claims.
+- Exact method channel and flow-sequence validator: `standard_methods::UwlBoostFunctionObservation`.
+- Exact-SKU, configuration-, delivery-condition- and qualification-bound task-phase plan: `task_phase::validate_task_phase_plan`.
+- Full test and research protocol: [AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md](AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md).
+- Workstream: [#12798](https://github.com/Luminous-Dynamics/symthaea/issues/12798).
+
+No Aqua boost product, task-quality benefit, water saving, energy saving or UWL conformity result is claimed.
