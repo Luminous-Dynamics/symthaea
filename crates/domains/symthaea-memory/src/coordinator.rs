@@ -526,6 +526,16 @@ mod tests {
         assert_eq!(coord.stats.graduations_rejected, 1);
         assert_eq!(coord.stats.graduations_processed, 1);
         assert_eq!(stored, 1);
+        let record = episodic.get_top_episodes_with_provenance(1).pop().unwrap();
+        assert_eq!(
+            record.graduation_provenance.as_ref().unwrap().source,
+            MemorySource::WebResearch
+        );
+        assert!(record.graduation_provenance.as_ref().unwrap().verification_claimed);
+        assert_eq!(
+            record.graduation_provenance.as_ref().unwrap().source_label.as_deref(),
+            Some("persisted")
+        );
     }
 
     #[test]
@@ -582,7 +592,10 @@ mod tests {
         assert_eq!(episodic.len(), 1);
         let top = episodic.get_top_episodes(1);
         assert!(!top.is_empty());
-        assert!(top[0].psi > 0.5, "Episode should have adjusted Phi");
+        assert!(
+            (top[0].psi - 0.6).abs() < 1e-9,
+            "Graduated episode must retain the raw Psi measured at graduation"
+        );
 
         // Record retrieval and check enrichment
         let hash = content_hash(&top[0].input);
@@ -643,10 +656,27 @@ mod tests {
             low.graduation_provenance.as_ref().unwrap().verification_claimed,
             false
         );
+        assert_eq!(
+            verified.graduation_provenance.as_ref().unwrap().source,
+            MemorySource::ActionFeedback
+        );
+        assert_eq!(
+            verified.graduation_provenance.as_ref().unwrap().source_label.as_deref(),
+            Some("action-result:fixture-42")
+        );
         assert!(
             verified.consolidation_priority_bonus > low.consolidation_priority_bonus,
             "The producer's verification claim may affect replay priority, not Phi"
         );
+
+        let sampled = episodic.sample_replay_batch_with_provenance(2);
+        assert_eq!(sampled.len(), 2);
+        assert!(sampled.iter().any(|record| {
+            record
+                .graduation_provenance
+                .as_ref()
+                .is_some_and(|p| p.source == MemorySource::ActionFeedback)
+        }));
     }
 
     #[test]
