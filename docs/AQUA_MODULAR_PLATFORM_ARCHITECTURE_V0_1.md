@@ -211,3 +211,10 @@ The detailed pressure-run matrix, pressure datum definitions, comparator admissi
 ## Task-selective delivery research
 
 Aqua will benchmark low-flow base service with explicitly user-authorized, locally qualified task-specific bursts rather than assume a boost button is novel. Hansgrohe WaterBoost SKU 28036000 is an existing commercial precedent; its public page contains an unresolved 4 L/min regulator / maximum versus 6.6 / 9.4 L/min boost-flow scope ambiguity. The evidence corpus preserves the ambiguity, and the task-phase protocol requires independent reproduction before using the boosted figures as matched performance points. See [AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md](AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md) and [#12798](https://github.com/Luminous-Dynamics/symthaea/issues/12798).
+
+
+## Pressure independence and transient supply response
+
+AQS-1 now distinguishes steady-state pressure independence from dynamic supply response. The UK non-domestic ETL reference uses a 3 bar / 1.5 bar flow-retention comparison with a 60% minimum under stated conditions; Aqua's proposed 70% initial / 80% stretch are internal research targets using conservative measurement-uncertainty bounds, not certification claims. Exact-point same-specimen comparison is implemented in pressure_curve. See the updated low-pressure protocol and competitor ledger.
+
+Dynamic events—startup, pressure steps, concurrent basin/bath draw, pump/regulator cycling, hot/cold interruptions and restoration—are covered separately by [AQUA_DYNAMIC_SUPPLY_TRANSIENT_PROTOCOL_V0_1.md](AQUA_DYNAMIC_SUPPLY_TRANSIENT_PROTOCOL_V0_1.md) and [#12801](https://github.com/Luminous-Dynamics/symthaea/issues/12801). No steady-state flow ratio is used to infer transient performance.
