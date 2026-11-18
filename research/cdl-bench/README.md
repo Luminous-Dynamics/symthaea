@@ -13,6 +13,8 @@ dependencies.
 - Output-size limits, strict frame-length checks, and checksum failure handling.
 - Deterministic E0 sources: IID uniform, IID skewed, first-order Markov, periodic,
   bursty, long runs and pseudo-random incompressible bytes.
+- E1 finite-state generator with evaluator-only latent state and noisy/aliased emissions.
+- E2 five-variable fixed-point structural causal generator with serialized do-intervention manifests.
 - CLI file encode/decode and an E0 length comparison against installed
   Zstandard, Brotli, XZ and gzip commands.
 
@@ -22,6 +24,7 @@ dependencies.
 cd research/cdl-bench
 cargo test
 cargo run --release -- e0 --bytes 65536 --seed 42
+cargo run --release -- causal --steps 10000 --seed 42
 cargo run --release -- encode --model order1 input.bin output.cdl
 cargo run --release -- decode output.cdl reconstructed.bin
 cmp input.bin reconstructed.bin
@@ -69,3 +72,16 @@ No probability table or training corpus is read from an undeclared external sour
 
 The first milestone is decoder correctness and transparent accounting, not a
 headline compression ratio.
+
+## E1 and E2 generators
+
+`cdl-bench causal --steps 10000 --seed 42` creates:
+- A partially observed finite-state process (8 latent states, 4 emission symbols).
+- An observational five-variable structural causal trace.
+- A paired trace with `do(x1=20000)` active on the middle half of the stream.
+
+The command checks exact codec round-trips and reports framed lengths for the
+order-0/order-1 models, plus Zstandard when installed. It is **not** yet a
+causal predictor comparison: it tests generator reproducibility and coding
+plumbing only. The finite-state latent labels remain evaluator-side; the
+serialized SCM stream includes the intervention manifest and observed i16 values.
