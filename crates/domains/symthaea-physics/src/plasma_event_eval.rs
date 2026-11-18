@@ -1301,6 +1301,18 @@ mod tests {
             "sum of non-disruptive shot exposure durations in hours"
         );
         assert_eq!(
+            manifest["evaluation_receipt_contract"]["schema_version"],
+            PLASMA_EVENT_EVALUATION_RECEIPT_SCHEMA
+        );
+        assert_eq!(
+            manifest["evaluation_receipt_contract"]["verify_recomputes_per_shot_scores"],
+            true
+        );
+        assert_eq!(
+            manifest["evaluation_receipt_contract"]["outer_sha256_is_content_identity_not_authentication"],
+            true
+        );
+        assert_eq!(
             manifest["target_gates"]["all_values_are_research_targets"],
             true
         );
