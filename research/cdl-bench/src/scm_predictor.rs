@@ -705,6 +705,7 @@ mod tests {
         let trace = generate_scm(4096, 43, None).unwrap();
         let mut first = ScmExpertMixturePredictor::default();
         let mut second = ScmExpertMixturePredictor::default();
+        let initial_weights = first.expert_weights();
         for &symbol in &trace.stream {
             first.observe(symbol);
             second.observe(symbol);
@@ -716,7 +717,7 @@ mod tests {
                 EXPERT_MIXTURE_TOTAL_WEIGHT as u64
             );
         }
-        assert_ne!(first.expert_weights(), [EXPERT_MIXTURE_TOTAL_WEIGHT / 3; 3]);
+        assert_ne!(first.expert_weights(), initial_weights);
     }
 
     #[test]
