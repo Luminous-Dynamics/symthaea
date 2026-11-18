@@ -154,6 +154,9 @@ fn load_multiple_run_records(paths: &[String]) -> Result<(Value, Vec<Value>), St
         let (metadata, runs) = load_run_records(path)?;
         let model = metadata_string(&metadata, "model");
         let profile = metadata_string(&metadata, "profile");
+        if profile.as_deref().is_some_and(|value| value != "hidden") {
+            return Err(format!("hidden result input has non-hidden profile metadata ({path})"));
+        }
 
         if let (Some(expected), Some(actual)) = (&expected_model, &model) {
             if expected != actual {
@@ -175,7 +178,13 @@ fn load_multiple_run_records(paths: &[String]) -> Result<(Value, Vec<Value>), St
         if expected_profile.is_none() {
             expected_profile = profile;
         }
-        if combined_metadata.is_none() || metadata_string(&combined_metadata.clone().unwrap_or(Value::Null), "model").is_none() {
+        let replace_metadata = match combined_metadata.as_ref() {
+            None => true,
+            Some(existing) => {
+                metadata_string(existing, "model").is_none() && model.is_some()
+            }
+        };
+        if replace_metadata {
             combined_metadata = Some(metadata);
         }
         combined_runs.extend(runs);
@@ -429,6 +438,22 @@ fn score(
     let mut task_clustered_hidden_post_minus_full_pre_gap = None;
     if let Some(full_path) = full_results_path {
         let (full_json, full_runs) = load_run_records(full_path)?;
+        if metadata_string(&full_json, "profile")
+            .as_deref()
+            .is_some_and(|value| value != "full")
+        {
+            return Err("full-profile result input has non-full profile metadata".to_string());
+        }
+        if let (Some(hidden_model), Some(full_model)) = (
+            metadata_string(&results_json, "model"),
+            metadata_string(&full_json, "model"),
+        ) {
+            if hidden_model != full_model {
+                return Err(format!(
+                    "hidden and full-profile inputs use different models: {hidden_model} vs {full_model}"
+                ));
+            }
+        }
         let mut full_by_task = BTreeMap::<String, Vec<f64>>::new();
         for (run_index, run) in full_runs.iter().enumerate() {
             let id_match = run.get("task_id").and_then(id_string)
@@ -465,7 +490,6 @@ fn score(
         if !paired_gaps.is_empty() {
             task_clustered_hidden_post_minus_full_pre_gap = Some(mean(&paired_gaps));
         }
-        let _ = full_json;
     }
 
     Ok(ScoreReport {
