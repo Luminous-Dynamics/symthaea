@@ -185,7 +185,7 @@ impl Display for TaskPhaseError {
                 write!(f, "mode activation requirement is inconsistent: {mode_id}")
             }
             Self::InvalidQualifiedFlow { mode_id } => {
-                write!(f, "declared mode flow is invalid: {mode_id}")
+                write!(f, "qualified mode flow is invalid: {mode_id}")
             }
             Self::MissingBoostDurationLimit { mode_id } => {
                 write!(f, "boost mode has no local maximum continuous duration: {mode_id}")
@@ -436,9 +436,13 @@ pub fn validate_task_phase_plan(
                     CapabilityRole::BaseDelivery | CapabilityRole::Rinse => {
                         if capability.activation
                             != ActivationRequirement::LocalQualifiedControl
-                            || capability.maximum_continuous_seconds.is_some()
                         {
                             return Err(TaskPhaseError::ActivationMismatch {
+                                mode_id: mode_id.to_owned(),
+                            });
+                        }
+                        if capability.maximum_continuous_seconds.is_some() {
+                            return Err(TaskPhaseError::UnexpectedBoostDurationLimit {
                                 mode_id: mode_id.to_owned(),
                             });
                         }
@@ -820,7 +824,7 @@ mod tests {
         caps[0].maximum_continuous_seconds = Some(30);
         assert_eq!(
             validate_task_phase_plan(&plan(), &caps),
-            Err(TaskPhaseError::ActivationMismatch {
+            Err(TaskPhaseError::UnexpectedBoostDurationLimit {
                 mode_id: "base".to_owned()
             })
         );
