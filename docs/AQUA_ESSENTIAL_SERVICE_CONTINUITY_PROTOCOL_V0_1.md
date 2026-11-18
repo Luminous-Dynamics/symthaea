@@ -183,7 +183,7 @@ The crate now contains a pure Rust product-level classifier in `crates/domains/s
 
 It can return QUALIFIED_FULL, QUALIFIED_REDUCED, MANUAL_ONLY, ISOLATED_STOP or RECOVERY_PENDING. It does not create a reduced/manual mode: only an explicitly supplied locally qualified capability can be admitted. Unknown / stale / revoked / wrong-use-class water, uncertain protections, non-current critical evidence, pressure outside/unknown relative to the qualified envelope, blocked/unknown drain and detected/unknown leak all classify as ISOLATED_STOP. Loss of optional digital recommendations does not downgrade a qualified local service. A cleared fault remains RECOVERY_PENDING while requalification is required.
 
-The module currently has 16 authored unit tests. They are not claimed as executed or passing until the dedicated exact-head Aqua workflow reports them. The evaluator does not actuate hardware, close valves, choose temperature limits, approve water, or supersede a local safety controller.
+The module currently has 17 authored unit tests, including an exhaustive finite-state enumeration across all 57,600 combinations of water-use status, local protection, evidence freshness, pressure state, drain state, leak state, qualified local capability, digital availability and requalification flag. The test asserts hard-stop precedence, recovery-pending behavior, explicit capability admission and digital-independence invariants. These tests are not claimed as executed or passing until the dedicated exact-head Aqua workflow reports them. The evaluator does not actuate hardware, close valves, choose temperature limits, approve water, or supersede a local safety controller.
 
 ## 13. Low-pressure continuity interface
 
