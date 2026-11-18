@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/built-environment/HOME_EXPRESSION_CANDIDATE_SET_V0.1.schema.json",
+  "title": "Symthaea Home Expression candidate set v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "candidate_set_id",
+    "maturity",
+    "source_problem_id",
+    "source_problem_revision",
+    "source_catalogue_revision",
+    "generation_status",
+    "generator",
+    "candidate_count",
+    "candidates",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "candidate_set_id": {
+      "type": "string"
+    },
+    "maturity": {
+      "enum": [
+        "ILLUSTRATIVE_NOT_EXECUTED",
+        "SYNTHETIC_NOT_EVALUATED",
+        "OWNER_REVIEW_REQUIRED"
+      ]
+    },
+    "source_problem_id": {
+      "type": "string"
+    },
+    "source_problem_revision": {
+      "type": "string"
+    },
+    "source_catalogue_revision": {
+      "const": "HOME-EXPRESSION-CATALOG-0.2.0"
+    },
+    "generation_status": {
+      "enum": [
+        "EXAMPLE_ONLY_NOT_EXECUTED",
+        "EXECUTED_SYNTHETIC",
+        "EXECUTED_OWNER_REVIEW_REQUIRED"
+      ]
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "build_digest",
+        "method",
+        "seed",
+        "replay_status"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "build_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "method": {
+          "type": "string"
+        },
+        "seed": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "replay_status": {
+          "enum": [
+            "NOT_RUN",
+            "REPLAYABLE",
+            "REPLAY_MISMATCH"
+          ]
+        }
+      }
+    },
+    "candidate_count": {
+      "const": 3
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_id",
+          "candidate_state",
+          "interpretation",
+          "source_intents",
+          "parameter_deltas",
+          "geometry_ref",
+          "hard_gate_state",
+          "physical_evaluation_state",
+          "pareto_state",
+          "resident_choice_state"
+        ],
+        "properties": {
+          "candidate_id": {
+            "type": "string"
+          },
+          "candidate_state": {
+            "const": "ILLUSTRATIVE_NOT_GENERATED"
+          },
+          "interpretation": {
+            "type": "string"
+          },
+          "source_intents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "axis",
+                "option_id",
+                "preference"
+              ],
+              "properties": {
+                "axis": {
+                  "enum": [
+                    "spatial_typology",
+                    "architectural_expression",
+                    "material_tectonic_intent",
+                    "environmental_strategy_intent",
+                    "experience_programme"
+                  ]
+                },
+                "option_id": {
+                  "type": "string"
+                },
+                "preference": {
+                  "enum": [
+                    "PRIMARY",
+                    "SECONDARY",
+                    "ACCENT",
+                    "REFERENCE_ONLY",
+                    "AVOID",
+                    "ACCEPTABLE",
+                    "UNDECIDED",
+                    "PREFERRED",
+                    "CONSIDERED",
+                    "AVOIDED"
+                  ]
+                }
+              }
+            }
+          },
+          "parameter_deltas": {
+            "type": "array",
+            "maxItems": 0
+          },
+          "geometry_ref": {
+            "type": "null"
+          },
+          "hard_gate_state": {
+            "const": "UNKNOWN_NOT_EVALUATED"
+          },
+          "physical_evaluation_state": {
+            "const": "NOT_EVALUATED"
+          },
+          "pareto_state": {
+            "const": "NOT_EVALUATED"
+          },
+          "resident_choice_state": {
+            "const": "NOT_RECORDED"
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "CONCEPTUAL_INTENT_DERIVATIVES_ONLY_NO_GEOMETRY_COST_PERFORMANCE_OR_FEASIBILITY"
+    }
+  }
+}
