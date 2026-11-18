@@ -95,7 +95,21 @@ A spatially located 3D base-to-tip stem-axis measurement:
 
 Preserve the original measured vector and its coordinate frame. Do not collapse a 3D vector into one horizontal angle before retaining the vertical inclination. A stem near vertical has an undefined/unstable horizontal azimuth, and a multimodal 3D field may have no meaningful global mean axis.
 
-### 7. Observation / environmental context
+### 7. Stem mechanical test sample
+
+A controlled mechanical test on a plant specimen, with raw observations kept distinct from model-derived quantities:
+- sample/test ID, parent specimen ID, test type and frozen protocol ID;
+- fixture geometry (support span for three-point bending, cantilever length for a cantilever test) in metres;
+- loading rate in m/s, loading orientation and specimen axis convention;
+- full force-displacement curve, with force in newtons, displacement in metres, and optional time in seconds;
+- specimen state: sheath present/removed/not applicable/unknown, moisture mass fraction and method, temperature and collection-to-test interval where known;
+- failure mode (none, stem bend, stem break, root failure, local buckle, other or unknown);
+- derived flexural rigidity and peak moment, explicitly marked as derived values with the formula/protocol version;
+- instrument/load-cell calibration, method, observed timestamp, blind ID and raw-data reference.
+
+Do not store a derived (EI) value as if it were directly measured. Preserve the raw curve and the protocol parameters needed to recompute it. Never compare different fixture spans, loading orientations, moisture states or displacement rates as if they were interchangeable. Destructive failure tests and nondestructive stiffness tests are separate endpoints.
+
+### 8. Observation / environmental context
 
 A time-bounded measurement with explicit provenance:
 - observation ID, type, value, unit and uncertainty;
@@ -107,7 +121,7 @@ A time-bounded measurement with explicit provenance:
 
 Never turn absent weather, soil or crop metadata into zero or a guessed value.
 
-### 8. Biological specimen and custody
+### 9. Biological specimen and custody
 
 A specimen record:
 - specimen ID and parent event;
