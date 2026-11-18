@@ -1487,7 +1487,18 @@
           "limitations": [
             "Not a universal 20% efficiency guarantee.",
             "Do not apply directly to Aqua without matched test, calibrated thermal boundary and independent task/comfort assessment."
-          ]
+          ],
+          "derivation": {
+            "formula": "Study-reported comparison of shower-pattern thermal-transfer performance; approximately 20% potential energy reduction at similar thermal sensation in the studied configurations.",
+            "inputs": [
+              "Measured heat-transfer coefficients for five showerheads and 18 spray patterns",
+              "The study's two-pattern energy comparison"
+            ],
+            "assumptions": [
+              "Only the paper's test conditions and evaluated patterns are represented.",
+              "No extrapolation to Aqua geometry, whole-service boundary or other user population."
+            ]
+          }
         },
         {
           "claim_id": "thermal-pattern.parameters",
