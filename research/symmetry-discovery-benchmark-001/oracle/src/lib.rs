@@ -1823,12 +1823,53 @@ mod bounded_noise_tests {
             .unwrap();
         assert_eq!(tight_report.possible_elements, vec!["e"]);
         assert_eq!(wide_report.possible_elements, vec!["e", "fx"]);
-        assert!(wide_report.exact_stabilizer_elements == vec!["e"]);
+        assert_eq!(wide_report.exact_stabilizer_elements, vec!["e".to_owned()]);
         assert!(!wide_report.exact_stabilizer_elements.contains(&"fx".to_owned()));
         assert!(wide_report
             .possible_elements
             .iter()
             .all(|element| tight_report.possible_elements.contains(element)));
+    }
+
+    #[test]
+    fn widening_valid_error_envelopes_never_removes_possible_elements_or_subgroups() {
+        let manifest = manifest();
+        let fixture = noise_cases();
+        for case in fixture["cases"].as_array().unwrap() {
+            let base_case_id = case["base_case_id"].as_str().unwrap();
+            let observed = &case["observed_points"];
+            let initial_epsilon = i128::from(case["epsilon_scaled"].as_i64().unwrap());
+            let mut previous_elements = BTreeSet::new();
+            let mut previous_subgroups = BTreeSet::new();
+
+            for epsilon in initial_epsilon..=initial_epsilon + 6 {
+                let report = manifest
+                    .bounded_noise_stabilizer_report(base_case_id, observed, epsilon)
+                    .unwrap();
+                let current_elements: BTreeSet<String> =
+                    report.possible_elements.iter().cloned().collect();
+                let current_subgroups: BTreeSet<Vec<String>> = report
+                    .not_falsified_subgroup_candidates
+                    .iter()
+                    .map(|candidate| candidate.element_ids.clone())
+                    .collect();
+                assert!(
+                    previous_elements.is_subset(&current_elements),
+                    "widening epsilon removed a possible element in {} at epsilon {}",
+                    case["noise_case_id"],
+                    epsilon
+                );
+                assert!(
+                    previous_subgroups.is_subset(&current_subgroups),
+                    "widening epsilon removed a subgroup candidate in {} at epsilon {}",
+                    case["noise_case_id"],
+                    epsilon
+                );
+                assert!(report.exact_latent_subgroup_remains_candidate);
+                previous_elements = current_elements;
+                previous_subgroups = current_subgroups;
+            }
+        }
     }
 
     #[test]
