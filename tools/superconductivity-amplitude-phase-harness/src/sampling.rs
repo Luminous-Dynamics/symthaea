@@ -145,6 +145,16 @@ fn integrated_autocorrelation_time(values: &[f64]) -> Option<f64> {
     Some((0.5 + sum_pairs).max(0.5))
 }
 
+fn population_variance(values: &[f64]) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    let mean = values.iter().sum::<f64>() / values.len() as f64;
+    (values.iter().map(|value| value * value).sum::<f64>() / values.len() as f64
+        - mean * mean)
+        .max(0.0)
+}
+
 fn series_summary(values: &[f64]) -> Value {
     let mean = values.iter().sum::<f64>() / values.len() as f64;
     let standard_deviation = sample_standard_deviation(values);
@@ -248,6 +258,7 @@ fn run_chain(
     let mut positive_vortex_series = Vec::with_capacity(config.measurement_sweeps);
     let mut negative_vortex_series = Vec::with_capacity(config.measurement_sweeps);
     let mut skipped_core_plaquette_series = Vec::with_capacity(config.measurement_sweeps);
+    let mut raw_measurements = Vec::with_capacity(config.measurement_sweeps);
     let mut twist_current_series: Vec<Vec<f64>> = (0..model.dimension)
         .map(|_| Vec::with_capacity(config.measurement_sweeps))
         .collect();
@@ -301,7 +312,7 @@ fn run_chain(
             }
         }
 
-        if let Some(vortices) = model.vortex_diagnostics(&fields, &links)? {
+        let vortex_record = if let Some(vortices) = model.vortex_diagnostics(&fields, &links)? {
             let density = if vortices.valid_plaquettes > 0 {
                 vortices.absolute_charge_sum as f64 / vortices.valid_plaquettes as f64
             } else {
@@ -312,7 +323,29 @@ fn run_chain(
             negative_vortex_series.push(vortices.negative_charge as f64);
             skipped_core_plaquette_series
                 .push(vortices.skipped_low_amplitude_plaquettes as f64);
-        }
+            json!({
+                "positive_charge": vortices.positive_charge,
+                "negative_charge": vortices.negative_charge,
+                "absolute_charge_sum": vortices.absolute_charge_sum,
+                "valid_plaquettes": vortices.valid_plaquettes,
+                "skipped_low_amplitude_plaquettes": vortices.skipped_low_amplitude_plaquettes,
+                "absolute_charge_density": density
+            })
+        } else {
+            Value::Null
+        };
+
+        raw_measurements.push(json!({
+            "measurement_index": raw_measurements.len(),
+            "energy_per_node": energy.total / fields.len() as f64,
+            "local_potential_energy_per_node": energy.local / fields.len() as f64,
+            "gradient_energy_per_node": energy.gradient / fields.len() as f64,
+            "mean_amplitude": amplitude_mean,
+            "mean_squared_amplitude": squared_amplitude_mean,
+            "twist_current": twist.current,
+            "twist_diamagnetic": twist.diamagnetic,
+            "vortex_diagnostics": vortex_record
+        }));
     }
 
     if energy_series.iter().any(|value| !value.is_finite())
@@ -357,6 +390,13 @@ fn run_chain(
     } else {
         0.0
     };
+    let energy_variance_per_node = population_variance(&energy_series);
+    let heat_capacity_per_node = fields.len() as f64
+        * energy_variance_per_node
+        / (model.temperature * model.temperature);
+    if !heat_capacity_per_node.is_finite() || heat_capacity_per_node < 0.0 {
+        return Err("GL heat-capacity fluctuation estimator is invalid".to_owned());
+    }
 
     Ok(json!({
         "status": "executed",
@@ -371,6 +411,8 @@ fn run_chain(
         "proposals_accepted": accepted,
         "invalid_proposals": invalid,
         "acceptance_rate": acceptance_rate,
+        "heat_capacity_per_node_fluctuation_estimate": heat_capacity_per_node,
+        "energy_variance_per_node_squared": energy_variance_per_node,
         "twist_response": {
             "twist_convention": "A_ij(theta)=A_ij+sum_mu theta_mu*edge_displacement_mu/box_length_mu",
             "first_derivative_current_mean": current_means,
@@ -382,6 +424,11 @@ fn run_chain(
         },
         "observables": {
             "energy_per_node": series_summary(&energy_series),
+            "heat_capacity_per_node_fluctuation_estimate": {
+                "value": heat_capacity_per_node,
+                "definition": "N * Var(E_per_node) / T^2",
+                "warning": "Finite-chain fluctuation estimate only; autocorrelation-aware uncertainty and thermodynamic-limit scaling are not yet implemented."
+            },
             "local_potential_energy_per_node": series_summary(&local_energy_series),
             "gradient_energy_per_node": series_summary(&gradient_energy_series),
             "mean_amplitude": series_summary(&amplitude_series),
@@ -407,6 +454,7 @@ fn run_chain(
                 series_summary(&skipped_core_plaquette_series)
             }
         },
+        "raw_measurements": raw_measurements,
         "claim_ceiling": "Finite synthetic lattice Metropolis pilot only; no equilibration guarantee, phase transition, thermodynamic-limit observable, material Tc, or experiment is established."
     }))
 }
@@ -460,6 +508,15 @@ pub(super) fn run(
     let energy = collect_means("energy_per_node")?;
     let amplitude = collect_means("mean_amplitude")?;
     let squared_amplitude = collect_means("mean_squared_amplitude")?;
+    let heat_capacity = chains
+        .iter()
+        .map(|chain| {
+            chain
+                .get("heat_capacity_per_node_fluctuation_estimate")
+                .and_then(Value::as_f64)
+                .ok_or_else(|| "chain receipt missing heat capacity estimate".to_owned())
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let vortex_density = chains
         .iter()
         .filter_map(|chain| {
@@ -511,6 +568,7 @@ pub(super) fn run(
             "energy_per_node": ensemble_summary(&energy),
             "mean_amplitude": ensemble_summary(&amplitude),
             "mean_squared_amplitude": ensemble_summary(&squared_amplitude),
+            "heat_capacity_per_node_fluctuation_estimate": ensemble_summary(&heat_capacity),
             "vortex_charge_density": if vortex_density.is_empty() {
                 Value::Null
             } else {
