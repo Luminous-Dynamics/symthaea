@@ -776,18 +776,14 @@ impl SwarmManager {
         &self.active_coalitions
     }
 
-    /// Effective Phi for this agent, incorporating swarm delegation.
+    /// Read the typed collective cognitive contribution for planning/learning.
     ///
-    /// Returns max(individual_phi, swarm-delegated Phi) when in a conscious collective.
-    pub fn effective_phi(&self, individual_phi: f64) -> f64 {
-        if self.swarm_consciousness.delegation.in_conscious_collective {
-            let alpha = 0.3;
-            let blended =
-                alpha * self.swarm_consciousness.phi_swarm + (1.0 - alpha) * individual_phi;
-            blended.max(individual_phi)
-        } else {
-            individual_phi
-        }
+    /// This value is cognition-only. It is not a capability, permit, control
+    /// lease, safety admission, or actuator authority.
+    pub fn collective_cognitive_influence(
+        &self,
+    ) -> &super::swarm_consciousness::CollectiveCognitiveInfluence {
+        &self.swarm_consciousness.cognitive_influence
     }
 
     pub fn conscious_collective_count(&self) -> usize {
