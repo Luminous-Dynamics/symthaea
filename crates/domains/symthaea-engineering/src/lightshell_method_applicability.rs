@@ -785,6 +785,55 @@ mod tests {
     }
 
     #[test]
+    fn iso_25086_1_ready_selection_requires_method_specific_mace_fixture() {
+        let mut manifest = base_manifest();
+        manifest["state"] = json!("ready_for_test");
+        manifest["method_profiles"].push(json!({
+            "profile_id":"M-ISO-25086-1-2026","profile_kind":"international_standard",
+            "method_id":"ISO 25086-1","edition":"2026","test_family":"snagging",
+            "metadata_source_ref":"https://www.iso.org/standard/88922.html",
+            "metadata_state":"verified_current_metadata"
+        }));
+        manifest["selections"] = json!([{
+            "selection_id":"SEL-SNAG-READY","specimen_id":"SP-UNCOATED","profile_id":"M-ISO-25086-1-2026",
+            "test_family":"snagging","selected_surface":"fabric_surface","fixture_class":"mace_snagging",
+            "fixture_ref":"MACE-SNAG-01","fixture_revision":"REV-A","fixture_validation_state":"qualified_generic",
+            "fixture_validation_ref":"MACE-VALIDATION-01","state":"ready_for_test","execution_mode":"normative_unmodified",
+            "approved_deviation_ref":null,"internal_method_validation_ref":null,
+            "protocol_ref":"ISO25086-PROTOCOL-REF","acceptance_rule_ref":"SNAGGING-ACCEPTANCE-01","cleaning_profile":null
+        }]);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.is_valid(), "{:?}", report.findings);
+        assert!(report.can_start_tests());
+    }
+
+    #[test]
+    fn iso_25086_spacer_requires_spacer_qualified_mace_fixture() {
+        let mut manifest = base_manifest();
+        manifest["specimens"].push(json!({
+            "specimen_id":"SP-SPACER-SNAG","candidate_id":"A2-R",
+            "construction_class":"3d_spacer","seam_geometry":"not_applicable","thickness_mm":8.0
+        }));
+        manifest["method_profiles"].push(json!({
+            "profile_id":"M-ISO-25086-1-2026","profile_kind":"international_standard",
+            "method_id":"ISO 25086-1","edition":"2026","test_family":"snagging",
+            "metadata_source_ref":"https://www.iso.org/standard/88922.html",
+            "metadata_state":"verified_current_metadata"
+        }));
+        manifest["state"] = json!("ready_for_test");
+        manifest["selections"] = json!([{
+            "selection_id":"SEL-SPACER-SNAG","specimen_id":"SP-SPACER-SNAG","profile_id":"M-ISO-25086-1-2026",
+            "test_family":"snagging","selected_surface":"fabric_surface","fixture_class":"mace_snagging",
+            "fixture_ref":"MACE-SNAG-01","fixture_revision":"REV-A","fixture_validation_state":"qualified_generic",
+            "fixture_validation_ref":"GENERIC-MACE-VALIDATION","state":"ready_for_test","execution_mode":"normative_unmodified",
+            "approved_deviation_ref":null,"internal_method_validation_ref":null,
+            "protocol_ref":"ISO25086-PROTOCOL-REF","acceptance_rule_ref":"SNAGGING-ACCEPTANCE-01","cleaning_profile":null
+        }]);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "ready_selection_fixture_scope_mismatch"));
+    }
+
+    #[test]
     fn iso_25086_1_2026_rejects_nonwoven_nonknit_construction() {
         let mut manifest = base_manifest();
         manifest["specimens"].push(json!({
