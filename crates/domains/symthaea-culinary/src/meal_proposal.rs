@@ -343,6 +343,22 @@ pub fn validate_meal_proposal(proposal: &MealProposalV1) -> MealProposalValidati
             );
         }
     }
+    if proposal.ingredients.is_empty() {
+        violation(
+            &mut violations,
+            MealProposalViolationCodeV1::MissingRequiredValue,
+            Some("ingredients"),
+            "a meal proposal must contain at least one ingredient",
+        );
+    }
+    if proposal.tasks.is_empty() {
+        violation(
+            &mut violations,
+            MealProposalViolationCodeV1::MissingRequiredValue,
+            Some("tasks"),
+            "a meal proposal must contain at least one culinary task",
+        );
+    }
     if proposal.constraints.servings == 0 {
         violation(
             &mut violations,
@@ -854,6 +870,23 @@ mod tests {
             assert!(!id.trim().is_empty());
             assert!(ids.insert(id));
         }
+    }
+
+    #[test]
+    fn empty_ingredient_and_task_lists_are_rejected() {
+        let mut proposal = valid_proposal();
+        proposal.ingredients.clear();
+        proposal.tasks.clear();
+
+        let report = validate_meal_proposal(&proposal);
+        assert!(report.violations.iter().any(|v| {
+            v.code == MealProposalViolationCodeV1::MissingRequiredValue
+                && v.reference.as_deref() == Some("ingredients")
+        }));
+        assert!(report.violations.iter().any(|v| {
+            v.code == MealProposalViolationCodeV1::MissingRequiredValue
+                && v.reference.as_deref() == Some("tasks")
+        }));
     }
 
     #[test]
