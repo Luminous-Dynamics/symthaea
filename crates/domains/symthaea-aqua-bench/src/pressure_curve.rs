@@ -734,7 +734,9 @@ pub enum RetentionThresholdStatus {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PressureRetentionError {
     InvalidRequiredRetentionFraction,
+    SameRunCompared,
     PressurePointsNotStrictlyOrdered,
+    PressureIntervalsNotSeparated,
     SpecimenMismatch,
     ProductVariantMismatch,
     ModeMismatch,
@@ -756,8 +758,17 @@ impl Display for PressureRetentionError {
             Self::InvalidRequiredRetentionFraction => {
                 write!(f, "required flow-retention fraction must be finite and in (0, 1]")
             }
+            Self::SameRunCompared => {
+                write!(f, "a pressure-response run cannot be compared with itself")
+            }
             Self::PressurePointsNotStrictlyOrdered => {
                 write!(f, "low-pressure setpoint must be lower than high-pressure setpoint")
+            }
+            Self::PressureIntervalsNotSeparated => {
+                write!(
+                    f,
+                    "measured pressure uncertainty intervals must not overlap"
+                )
             }
             Self::SpecimenMismatch => {
                 write!(f, "pressure-response observations must use the same specimen")
@@ -866,6 +877,9 @@ pub fn compare_flow_retention(
     {
         return Err(PressureRetentionError::InvalidRequiredRetentionFraction);
     }
+    if low_pressure.run_id == high_pressure.run_id {
+        return Err(PressureRetentionError::SameRunCompared);
+    }
     if low_pressure.pressure_setpoint_kpa >= high_pressure.pressure_setpoint_kpa {
         return Err(PressureRetentionError::PressurePointsNotStrictlyOrdered);
     }
@@ -903,6 +917,13 @@ pub fn compare_flow_retention(
         || low_pressure.flow_instrument_id != high_pressure.flow_instrument_id
     {
         return Err(PressureRetentionError::InstrumentMismatch);
+    }
+    let low_pressure_upper_kpa = low_pressure.dynamic_fitting_inlet_pressure_kpa
+        + low_pressure.dynamic_pressure_uncertainty_kpa;
+    let high_pressure_lower_kpa = high_pressure.dynamic_fitting_inlet_pressure_kpa
+        - high_pressure.dynamic_pressure_uncertainty_kpa;
+    if low_pressure_upper_kpa >= high_pressure_lower_kpa {
+        return Err(PressureRetentionError::PressureIntervalsNotSeparated);
     }
     if high_pressure.flow_lpm <= 0.0 {
         return Err(PressureRetentionError::ReferenceFlowMustBePositive);
@@ -1176,6 +1197,31 @@ mod retention_tests {
         assert_eq!(
             compare_flow_retention(&low, &high, 0.60),
             Err(PressureRetentionError::InvalidObservation { side: "low" })
+        );
+    }
+
+
+    #[test]
+    fn rejects_reused_run_id() {
+        let low = observation("same-run", 150.0, 4.0);
+        let high = observation("same-run", 300.0, 5.0);
+        assert_eq!(
+            compare_flow_retention(&low, &high, 0.60),
+            Err(PressureRetentionError::SameRunCompared)
+        );
+    }
+
+    #[test]
+    fn rejects_overlapping_measured_pressure_uncertainty_intervals() {
+        let mut low = observation("run-low", 150.0, 4.0);
+        let mut high = observation("run-high", 160.0, 4.2);
+        low.setpoint_tolerance_kpa = 10.0;
+        high.setpoint_tolerance_kpa = 10.0;
+        low.dynamic_fitting_inlet_pressure_kpa = 155.0;
+        high.dynamic_fitting_inlet_pressure_kpa = 156.0;
+        assert_eq!(
+            compare_flow_retention(&low, &high, 0.60),
+            Err(PressureRetentionError::PressureIntervalsNotSeparated)
         );
     }
 
