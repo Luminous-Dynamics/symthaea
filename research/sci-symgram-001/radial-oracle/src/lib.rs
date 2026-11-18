@@ -4,6 +4,8 @@
 //! development reference, not a physical simulator or a scientific discovery
 //! policy. Integer coefficients keep all checks exact and dependency-free.
 
+#![forbid(unsafe_code)]
+
 use std::collections::BTreeMap;
 use std::fmt;
 
