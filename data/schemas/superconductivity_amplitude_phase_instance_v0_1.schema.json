@@ -14,7 +14,8 @@
     "electromagnetism",
     "thermal",
     "source_references",
-    "claim_ceiling"
+    "claim_ceiling",
+    "sampling"
   ],
   "properties": {
     "contract": {
@@ -249,6 +250,49 @@
     },
     "claim_ceiling": {
       "const": "Synthetic static GL input only; no Monte Carlo, Tc, material property, or experimental result is established."
+    },
+    "sampling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "random_seed",
+        "warmup_sweeps",
+        "measurement_sweeps",
+        "thinning",
+        "proposal_scale",
+        "independent_chains"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "single_site_complex_field_metropolis"
+        },
+        "random_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warmup_sweeps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "measurement_sweeps": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "thinning": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "proposal_scale": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "independent_chains": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        }
+      }
     }
   }
 }
