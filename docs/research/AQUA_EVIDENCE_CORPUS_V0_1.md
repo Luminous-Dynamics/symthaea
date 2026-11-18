@@ -187,7 +187,7 @@
 |---|---|---|---|---|---|---|---|
 | `clasp.sa.sample.size` | sample_size | 19 products | independent_market_sample | measured | method=CLASP South African Shower Heads Testing Report; sample n=19 | context_only: Dated local product sample; product identities were removed from public report imagery. | [CLASP](https://www.clasp.ngo/research/all/south-african-shower-heads-testing-report/); independent_market_study; date not stated |
 | `clasp.sa.pressure-compensating.mean-flow` | mean_flow_rate | 6.6 L/min | independent_market_sample | measured | pressure=300 kPa; method=CLASP report; WRC 2025 summary of 19-product sample; sample n=19 | context_only: Aggregate mean for the pressure-compensating subset. | [Water Research Commission summarizing CLASP South African testing](https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf); independent_market_study; date not stated |
-| `clasp.sa.fixed-orifice.mean-flow` | mean_flow_rate | 24 L/min | independent_market_sample | measured | pressure=300 kPa; method=CLASP report; WRC 2025 summary of 19-product sample; sample n=19 | context_only: Aggregate mean for the fixed-orifice subset. | [Water Research Commission summarizing CLASP South African testing](https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf); independent_market_study; date not stated |
+| `clasp.sa.fixed-orifice.mean-flow` | observed_flow_rate_range | 24–27 L/min | independent_market_sample | measured | pressure=300 kPa; method=CLASP report; WRC 2025 summary of 19-product sample; sample n=19 | context_only: Dated aggregate range for fixed-orifice products in the sample; not an exact-SKU mean or named product result. | [Water Research Commission summarizing CLASP South African testing](https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf); independent_market_study; date not stated |
 
 **Limitations — `clasp.sa.sample.size`:**
 - Not a 2026 exhaustive market census.
@@ -199,6 +199,7 @@
 
 **Limitations — `clasp.sa.fixed-orifice.mean-flow`:**
 - Not a named product result.
+- Do not interpret the lower and upper values as an uncertainty interval or confidence interval.
 - Sample composition and market availability may have changed.
 
 ## Consequences of the Integration of a Hyperbolic Funnel into a Showerhead for Droplets, Jet Break-Up Lengths, and Physical-Chemical Parameters
