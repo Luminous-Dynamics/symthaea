@@ -83,6 +83,14 @@ This is a useful falsification result, not a causal-compression win. It suggests
 
 The independent Python calculation mirrors the deterministic generator, SCM2 record layout and histogram updates but is not compiler-backed execution of the Rust implementation. Rust compilation, unit tests, rustfmt, actual arithmetic-coded frame lengths, throughput, memory, energy and external-codec comparisons remain unverified. No SOTA result or deployed-size reduction is claimed. The earlier unsmoothed-context percentages are superseded and must not be combined with this table.
 
+## Follow-on: fixed-share online expert mixture
+
+A subsequent increment adds `ScmExpertMixturePredictor` (model ID 7), which combines the typed-field, temporal-lag and known-parent expert probabilities with an exact-rational integer mixture and a 1/256 fixed-share update per byte. It shares field/header histograms to reduce redundant state and does not receive intervention labels. The separate report
+[`CDL_EXPERT_MIXTURE_FIXED_SHARE_V1_2026-11-18.md`](CDL_EXPERT_MIXTURE_FIXED_SHARE_V1_2026-11-18.md)
+records its 40-stream public-development reference simulation, expert-weight switching and limits.
+
+The result is modest: about 0.0294% lower mean ideal code cost than lag across paired observational/interventional traces, but about 0.0274% worse on intervention streams. Expert weights do move toward lag during intervention. This establishes a useful adaptation baseline; it does not demonstrate causal compression, actual arithmetic-coded size savings, or a Rust run.
+
 ## Hypotheses and falsification
 
 - **H1 — typed fields help:** field/lane coding should beat flattened order-0/order-1 controls on held-out SCM streams and then be compared with tuned multichannel codecs.
