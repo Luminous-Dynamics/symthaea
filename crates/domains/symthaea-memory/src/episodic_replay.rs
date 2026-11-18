@@ -152,15 +152,6 @@ pub struct Episode {
     #[serde(default)]
     pub semantic_embedding: Option<Vec<f32>>,
 
-    /// Source-class / verification-claim metadata from working-memory graduation.
-    /// This is descriptive lineage, not an independently verified source receipt.
-    #[serde(default)]
-    pub graduation_provenance: Option<GraduationProvenance>,
-
-    /// Additive replay-retention score, kept separate from Psi and emotional valence.
-    /// Does not affect admission thresholds, authority, or action permissions.
-    #[serde(default)]
-    pub consolidation_priority_bonus: f64,
 }
 
 impl Episode {
@@ -180,8 +171,6 @@ impl Episode {
             dopamine_at_encoding: None,
             bath_state_at_encoding: None,
             semantic_embedding: None,
-            graduation_provenance: None,
-            consolidation_priority_bonus: 0.0,
         }
     }
 
@@ -217,30 +206,6 @@ impl Episode {
     /// Set semantic embedding for embedding-based retrieval.
     pub fn with_semantic_embedding(mut self, embedding: Vec<f32>) -> Self {
         self.semantic_embedding = Some(embedding);
-        self
-    }
-
-    /// Attach source-class and verification-claim lineage from a graduation event.
-    ///
-    /// This does not assert that the source claim was independently authenticated.
-    /// Production source-event IDs, digests and verifier receipts belong to the
-    /// bitemporal/MACE receipt contract.
-    pub fn with_graduation_provenance(
-        mut self,
-        provenance: GraduationProvenance,
-    ) -> Self {
-        self.graduation_provenance = Some(provenance);
-        self
-    }
-
-    /// Add a finite, non-negative bonus to replay retention priority.
-    ///
-    /// This is deliberately independent of Psi, valence and episode admission.
-    /// Invalid bonuses are ignored rather than contaminating heap ordering.
-    pub fn with_consolidation_priority_bonus(mut self, bonus: f64) -> Self {
-        if bonus.is_finite() && bonus >= 0.0 {
-            self.consolidation_priority_bonus = bonus;
-        }
         self
     }
 
@@ -300,7 +265,6 @@ impl Episode {
             + recency_bonus
             + consolidation_bonus
             + da_bonus
-            + self.consolidation_priority_bonus
             + replay_penalty * 0.05
     }
 
@@ -339,6 +303,27 @@ impl Episode {
 struct PrioritizedEpisode {
     episode: Episode,
     score: f64,
+    graduation_provenance: Option<GraduationProvenance>,
+    consolidation_priority_bonus: f64,
+}
+
+/// Public retrieval envelope that preserves the source and policy-derived replay
+/// metadata without changing the long-standing serialized Episode representation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProvenancedEpisode {
+    pub episode: Episode,
+    pub graduation_provenance: Option<GraduationProvenance>,
+    pub consolidation_priority_bonus: f64,
+}
+
+impl PrioritizedEpisode {
+    fn as_provenanced_episode(&self) -> ProvenancedEpisode {
+        ProvenancedEpisode {
+            episode: self.episode.clone(),
+            graduation_provenance: self.graduation_provenance.clone(),
+            consolidation_priority_bonus: self.consolidation_priority_bonus,
+        }
+    }
 }
 
 impl PartialEq for PrioritizedEpisode {
@@ -553,6 +538,18 @@ impl EpisodicMemory {
     ///
     /// Returns true if the episode was stored, false if it was below threshold.
     pub fn store_if_significant(&mut self, episode: Episode) -> bool {
+        self.store_if_significant_with_provenance(episode, None, 0.0)
+    }
+
+    /// Store an episode with optional graduation lineage and an independent
+    /// retention-priority adjustment. Provenance and the bonus cannot bypass
+    /// the raw-Psi admission threshold.
+    pub fn store_if_significant_with_provenance(
+        &mut self,
+        episode: Episode,
+        graduation_provenance: Option<GraduationProvenance>,
+        consolidation_priority_bonus: f64,
+    ) -> bool {
         self.current_cycle = episode.timestamp;
         self.cycles_since_replay += 1;
 
@@ -562,37 +559,41 @@ impl EpisodicMemory {
             || !(0.0..=1.0).contains(&episode.psi)
             || !self.config.psi_threshold.is_finite()
             || !(0.0..=1.0).contains(&self.config.psi_threshold)
-            || !episode.consolidation_priority_bonus.is_finite()
-            || episode.consolidation_priority_bonus < 0.0
+            || !consolidation_priority_bonus.is_finite()
+            || consolidation_priority_bonus < 0.0
         {
             return false;
         }
 
-        // Check the raw Psi threshold; provenance and retention bonuses cannot admit
-        // an episode whose cognitive-state estimate is below the configured floor.
+        // The raw Psi threshold is authoritative for admission. Neither a
+        // verification claim nor a consolidation-priority bonus can raise Psi.
         if episode.psi < self.config.psi_threshold {
             return false;
         }
 
-        // Calculate priority score
-        let score = episode.priority_score(self.current_cycle, self.config.recency_weight);
+        let base_score = episode.priority_score(self.current_cycle, self.config.recency_weight);
+        let score = base_score + consolidation_priority_bonus;
+        if !score.is_finite() {
+            return false;
+        }
 
-        // Update statistics
+        // Update statistics from the raw cognitive-state estimate.
         let n = self.episodes.len() as f64;
         self.average_psi = (self.average_psi * n + episode.psi) / (n + 1.0);
         if episode.psi < self.min_psi_in_buffer {
             self.min_psi_in_buffer = episode.psi;
         }
 
-        // Store the episode
-        self.episodes.push(PrioritizedEpisode { episode, score });
+        self.episodes.push(PrioritizedEpisode {
+            episode,
+            score,
+            graduation_provenance,
+            consolidation_priority_bonus,
+        });
         self.total_stored += 1;
 
-        // Evict if over capacity
         if self.episodes.len() > self.config.capacity {
-            // Remove lowest priority (we need to rebuild to get min)
-            // For efficiency, we'll let it grow slightly over capacity
-            // Real eviction happens during sampling
+            // Real eviction happens during sampling.
             self.total_evicted += 1;
         }
 
@@ -645,6 +646,17 @@ impl EpisodicMemory {
     ///
     /// Uses either Phi-weighted sampling or uniform sampling based on config.
     pub fn sample_replay_batch(&mut self, batch_size: usize) -> Vec<Episode> {
+        self.sample_replay_batch_with_provenance(batch_size)
+            .into_iter()
+            .map(|record| record.episode)
+            .collect()
+    }
+
+    /// Sample replay entries while retaining their graduation provenance.
+    pub fn sample_replay_batch_with_provenance(
+        &mut self,
+        batch_size: usize,
+    ) -> Vec<ProvenancedEpisode> {
         let batch_size = batch_size.min(self.episodes.len());
         if batch_size == 0 {
             return Vec::new();
@@ -693,7 +705,7 @@ impl EpisodicMemory {
 
                 if !used_indices.contains(&selected_idx) {
                     used_indices.insert(selected_idx);
-                    batch.push(all_episodes[selected_idx].episode.clone());
+                    batch.push(all_episodes[selected_idx].as_provenanced_episode());
                 }
             }
         } else {
@@ -711,7 +723,7 @@ impl EpisodicMemory {
             }
 
             for idx in indices.into_iter().take(batch_size) {
-                batch.push(all_episodes[idx].episode.clone());
+                batch.push(all_episodes[idx].as_provenanced_episode());
             }
         }
 
@@ -1068,6 +1080,16 @@ impl EpisodicMemory {
 
     /// Get all episodes sorted by Phi (highest first)
     pub fn get_top_episodes(&self, n: usize) -> Vec<Episode> {
+        self.get_top_episodes_with_provenance(n)
+            .into_iter()
+            .map(|record| record.episode)
+            .collect()
+    }
+
+    /// Retrieve top episodes together with the source-class and verification-claim
+    /// metadata preserved at graduation. This is descriptive lineage, not a
+    /// signed source receipt or permission grant.
+    pub fn get_top_episodes_with_provenance(&self, n: usize) -> Vec<ProvenancedEpisode> {
         let mut sorted: Vec<_> = self.episodes.iter().collect();
         sorted.sort_by(|a, b| {
             b.episode
@@ -1078,7 +1100,7 @@ impl EpisodicMemory {
         sorted
             .into_iter()
             .take(n)
-            .map(|pe| pe.episode.clone())
+            .map(PrioritizedEpisode::as_provenanced_episode)
             .collect()
     }
 
