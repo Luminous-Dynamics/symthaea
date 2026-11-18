@@ -35,6 +35,7 @@ A feature-mode percentage is not a whole-service resource result. A sensor estim
 | Hansgrohe Activera Select S shower set, SKU 28048000 | Official SA product page: Rain 7.2 L/min and ImpactRain 6.5 L/min at 3 bar; 7.2 L/min maximum; 0.5–6 bar operating range; function from 3 L/min | Exact local-market handheld shower-set comparator without the ShowerTablet system configuration | Manufacturer declaration; do not transfer SKU 28087000 thermostat / 10 bar system attributes to this set |
 | Hansgrohe Raindance Select E 120 3jet PowderRain EcoSmart+, SKU 28729000 | Official SA datasheet: PowderRain 5.2 L/min, Rain 5.4 L/min and massage 5.2 L/min at 3 bar; maximum 6 L/min; minimum flow pressure 1.5 bar | Strong exact-SKU premium low-flow local comparator | Manufacturer datasheet, not independent matched test; reproduce each mode at matched pressures |
 | Brondell Nebia Corre, N400RO model family | Manufacturer sheet: 1.5 gpm (5.7 L/min) in Angel Hair, Hard and Soft; 1.2 gpm (4.5 L/min) in Super Saver; stated inlet range 20–80 psi (1.4–5.5 bar) | Exact lower-flow commercial mode comparator with a broad stated inlet-pressure range | Manufacturer specification; the sheet does not provide a matched pressure/flow/coverage/force curve or prove equal performance at every pressure |
+| Hansgrohe Activera Select S Hand Shower 95 2jet EcoSmart+ with WaterBoost, SKU 28036000 | Official SA page: base Rain/ImpactRain 2.9 L/min at 3 bar; ImpactRain + Booster 6.6 L/min; Rain + Booster 9.4 L/min; user presses/holds side button. Same page lists 4 L/min flow regulator / maximum and 0.8 bar minimum. | Commercial precedent for manual hold-to-boost / task-selective flow | Manufacturer page has unresolved scope ambiguity between 4 L/min regulator/maximum and 6.6 / 9.4 L/min boost claims. Boost flow figures are not eligible as validated comparison points until clarified or independently reproduced |
 | Consumer Reports 2026 test population | Publicly listed top-performing examples include 1.5–1.6 gpm (5.68–6.06 L/min) heads; tests include coverage, force, water use and temperature drop | Global independent consumer-lab comparator | Exact model/market variant and test protocol must be reproduced before head-to-head claims |
 
 ### Sources and evidence class
@@ -297,3 +298,14 @@ The current frozen source snapshot is available as:
 - [JSON Schema (Draft 2020-12)](research/aqua-evidence-corpus-v0.1.schema.json)
 
 Snapshot 2026-11-18 contains nine entries and 41 claims, including separate Activera 28087000 shower-system and 28048000 shower-set identities. The GitHub Aqua workflow validates schema, source-class compatibility, units, pressure/mode disclosures, derivation requirements and negative controls, and checks the Markdown rendering against the JSON source. The corpus is not an Aqua performance claim; it is a source-classified baseline.
+
+
+## Task-selective delivery — existing commercial precedent
+
+Hansgrohe's Activera Select S WaterBoost, South African SKU 28036000, already provides a user-held temporary flow increase. The official product page lists base Rain / ImpactRain at 2.9 L/min, boosted ImpactRain at 6.6 L/min and boosted Rain at 9.4 L/min at 3 bar, while also listing a 4 L/min flow regulator / maximum and 0.8 bar minimum. The relationship between the 4 L/min values and the boosted figures is not explained; Aqua records this as an unresolved manufacturer specification-scope ambiguity rather than choosing a convenient interpretation. The page says the boost is initiated by pressing and holding the side button.
+
+This makes a temporary boost button a commercial precedent, not an Aqua novelty. Aqua's differentiation must be a complete task-phase plan, measured resource accounting, independent task outcome, pressure/temperature robustness, explicit user authority and verified return-to-base behavior—not merely an extra flow mode.
+
+See [AQUA-TASK-SELECTIVE-DELIVERY-001 #12798](https://github.com/Luminous-Dynamics/symthaea/issues/12798) and [AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md](AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md).
+
+Source: https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000
