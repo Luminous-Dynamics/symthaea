@@ -385,6 +385,13 @@ impl IntertwinedModel {
                 dimension,
                 &format!("component {id} momentum"),
             )?;
+            if (role == "pdw_plus_q" || role == "pdw_minus_q")
+                && momentum.iter().all(|value| value.abs() <= 1.0e-12)
+            {
+                return Err(format!(
+                    "PDW component {id} must declare a nonzero pair momentum"
+                ));
+            }
             if momentum.iter().any(|value| value.abs() > 1.0e-12) {
                 return Err(format!(
                     "component {id} has nonzero momentum; finite-Q PDW evaluation is not implemented in this version"
@@ -1409,6 +1416,14 @@ mod tests {
     fn finite_momentum_pdw_component_is_rejected_by_zero_q_evaluator() {
         assert!(mutate_and_parse(|fixture| {
             fixture["components"][0]["momentum_vector"] = json!([0.25, 0.0]);
+        })
+        .is_err());
+    }
+
+    #[test]
+    fn pdw_role_cannot_be_declared_with_zero_momentum() {
+        assert!(mutate_and_parse(|fixture| {
+            fixture["components"][0]["component_role"] = json!("pdw_plus_q");
         })
         .is_err());
     }
