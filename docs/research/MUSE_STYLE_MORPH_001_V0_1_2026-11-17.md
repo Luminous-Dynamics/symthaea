@@ -363,7 +363,7 @@ Six M1 unit tests have been authored (shared-clock typed pair, clock mismatch re
 
 ## 2026-11-18 M1 receipt integration — independent ProcessAdditive audit
 
-The follow-on M1 implementation is designed to carry the music-theory layer's ProcessRealizationAuditV1 in the Minimalism segment receipt. It calls verify_additive_process_score_v1 on the exact segment-local score and typed GrammarPlanEvidence::AdditiveProcess plan before composing the final trajectory result.
+The M1 implementation now carries the music-theory layer's ProcessRealizationAuditV1 in the Minimalism segment receipt. It calls verify_additive_process_score_v1 on the exact segment-local score and typed GrammarPlanEvidence::AdditiveProcess plan before composing the final trajectory result.
 
 - The Minimalism segment serializes the versioned process audit report alongside its exact segment score, grammar plan, trace verification and validation report.
 - Classical carries None; no unsupported Classical semantic audit is implied.
