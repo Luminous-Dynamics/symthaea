@@ -4,6 +4,16 @@
 **Owner:** [#12762](https://github.com/Luminous-Dynamics/symthaea/issues/12762)  
 **Pinned benchmark:** [HiddenBench source manifest](external/hiddenbench/SOURCE_MANIFEST.json)
 
+## 0. Published result payloads
+
+The original MIT-licensed [HiddenBench-results dataset](https://huggingface.co/datasets/YuxuanLi1225/HiddenBench-results) publishes the model-run JSON payloads and a file manifest. The file manifest says the result contents are copied without modification and identifies three GPT-4.1 files needed to score the full 65-task HiddenBench comparison:
+
+- 80 hidden runs across eight manual/adapted tasks;
+- 570 hidden runs across 57 generated tasks;
+- 650 full-profile runs across all 65 tasks.
+
+The exact source paths, run counts, byte sizes, dataset revision and intended CLI arrangement are pinned in [PUBLIC_RESULT_SOURCE_MANIFEST_V0_1.json](external/hiddenbench/PUBLIC_RESULT_SOURCE_MANIFEST_V0_1.json). The result payloads have not yet been downloaded or independently re-scored in this branch. A publication-reproduction stage should fetch and hash these exact files, score them with the official Python scorer and the new Rust scorer, then explain any discrepancy. Only after that should model API re-runs begin.
+
 ## 1. Direct scientific comparator
 
 | Work | What it establishes in its own setup | Required use in this programme |
