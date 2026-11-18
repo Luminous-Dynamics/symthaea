@@ -157,6 +157,15 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     let target_property = required_text(task, "target_property")?;
     let target_unit = required_text(task, "target_unit")?;
     let task_authority = required_text(task, "label_authority")?;
+    let allowed_measurement_classes: HashSet<&str> = task["measurement_classes"]
+        .as_array()
+        .ok_or_else(|| "measurement_classes must be an array".to_owned())?
+        .iter()
+        .map(|value| value.as_str().ok_or_else(|| "measurement class must be text".to_owned()))
+        .collect::<Result<_, _>>()?;
+    if allowed_measurement_classes.is_empty() {
+        return Err("measurement_classes cannot be empty".to_owned());
+    }
 
     for feature in task["available_features"]
         .as_array()
@@ -170,6 +179,10 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
             || normalized == format!("measured_{target_property}")
             || normalized == format!("observed_{target_property}")
             || normalized == "target_value"
+            || normalized == "source_id"
+            || normalized == "source_paper_id"
+            || normalized == "source_date"
+            || normalized == "material_state_id"
         {
             return Err(format!(
                 "target leakage: target property {target_property} appears in available features"
@@ -225,6 +238,7 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     let mut source_dates: HashMap<String, String> = HashMap::new();
     let mut group_partitions: HashMap<(String, String, String), String> = HashMap::new();
     let mut counts: BTreeMap<String, BTreeMap<String, u64>> = BTreeMap::new();
+    let mut measurement_class_counts: BTreeMap<String, u64> = BTreeMap::new();
 
     for observation in observations {
         let id = required_text(observation, "observation_id")?.to_owned();
@@ -268,6 +282,15 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         required_text(observation, "normalized_formula")?;
         required_text(observation, "family_id")?;
         required_text(observation, "source_locator")?;
+        let measurement_class = required_text(observation, "measurement_class")?;
+        if !allowed_measurement_classes.contains(measurement_class) {
+            return Err(format!(
+                "measurement class {measurement_class} is outside the preregistered task definition"
+            ));
+        }
+        *measurement_class_counts
+            .entry(measurement_class.to_owned())
+            .or_insert(0) += 1;
         if task_authority == "measured_experiment"
             && required_text(observation, "measurement_method")? == "first_principles"
         {
@@ -356,6 +379,7 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         "unique_observation_count": observation_ids.len(),
         "task": task,
         "split_results": split_results,
+        "measurement_class_counts": measurement_class_counts,
         "model_metrics_status": "not_run_no_predictions_supplied",
         "schema_sha256": sha256_hex(schema_bytes),
         "fixture_sha256": sha256_hex(fixture_bytes),
@@ -552,6 +576,23 @@ mod tests {
     }
 
     #[test]
+    fn measurement_class_must_be_preregistered_for_the_task() {
+        rejects_mutation(|fixture| {
+            fixture["observations"][0]["measurement_class"] = json!("spectroscopic_gap");
+        });
+    }
+
+    #[test]
+    fn source_identifier_cannot_be_a_prediction_feature() {
+        rejects_mutation(|fixture| {
+            fixture["task"]["available_features"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!("source_id"));
+        });
+    }
+
+    #[test]
     fn malformed_source_dates_are_rejected() {
         rejects_mutation(|fixture| {
             fixture["observations"][6]["source_date"] = json!("2026/02/03");
@@ -561,8 +602,7 @@ mod tests {
     #[test]
     fn group_leakage_is_rejected_even_when_declared_partitions_match() {
         rejects_mutation(|fixture| {
-            fixture["observations"][4]["family_id"] = json!("conventional");
-            fixture["observations"][5]["family_id"] = json!("conventional");
+            fixture["observations"][4]["normalized_formula"] = json!("Pb");
         });
     }
 }
