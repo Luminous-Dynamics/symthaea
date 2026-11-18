@@ -769,9 +769,8 @@ pub fn score_shot_alarms(
                 (lead >= policy.required_warning_ns && lead <= policy.max_warning_ns)
                     .then_some(lead)
             });
-            let false_alarm_events = alarm_times_ns.len().saturating_sub(usize::from(
-                eligible_alarm.is_some(),
-            ));
+            let matched_alarms = if eligible_alarm.is_some() { 1 } else { 0 };
+            let false_alarm_events = alarm_times_ns.len().saturating_sub(matched_alarms);
             Ok(ShotAlarmEvaluation {
                 shot_id: shot_id.to_owned(),
                 policy_id: policy.policy_id.clone(),
@@ -1105,7 +1104,7 @@ pub fn summarize_alarm_evaluations(
 /// event-evaluation cohort. Content digests are integrity identifiers, not
 /// signatures or proof that the referenced dataset/model/calibration is authentic.
 pub const PLASMA_EVENT_EVALUATION_RECEIPT_SCHEMA: &str =
-    "luminous.plasma-event-evaluation-receipt.v0.1";
+    "luminous.plasma-event-evaluation-receipt.v0.2";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
