@@ -928,7 +928,11 @@ impl Manifest {
             let declared = self.declared_subgroup(case)?;
             let label = string_field(case, "expected_subgroup_label")?;
             *structural_families.entry(label.clone()).or_insert(0) += 1;
-            if case_id.starts_with("GENERATED-") {
+            let is_generated = field(case, "controls")?
+                .get("generated")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            if is_generated {
                 if split == "fixture_sanity" {
                     return Err(format!("generated case {case_id} cannot use fixture_sanity"));
                 }
