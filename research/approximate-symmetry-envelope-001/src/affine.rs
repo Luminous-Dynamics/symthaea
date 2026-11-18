@@ -578,7 +578,7 @@ mod tests {
     #[test]
     fn affine_error_bound_exceeding_derived_domain_margin_abstains() {
         let contract = contract();
-        let mut task = AffineTaskBoundsV1 {
+        let task = AffineTaskBoundsV1 {
             task_contract_id: "projection-task-three-steps-v1".to_owned(),
             state_unit_id: "metre".to_owned(),
             objective_unit_id: "joule".to_owned(),
@@ -596,7 +596,6 @@ mod tests {
             max_constraint_error: 3_000,
             objective_gap: Some(10_000),
         };
-        task.max_state_error = 3_000;
         let receipt = qualify_affine_task(
             &contract,
             &task,
