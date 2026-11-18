@@ -64,6 +64,7 @@
     "active_alarm_cleared_by_missing_data": false,
     "policy_config_fields": [
       "policy_id",
+      "score_scale_id",
       "validation_receipt_sha256",
       "trigger_threshold",
       "clear_threshold",
@@ -71,7 +72,7 @@
       "clear_persistence_windows",
       "required_warning_ns"
     ],
-    "policy_config_sha256": "computed from exact policy ID, validation receipt, threshold bit patterns, persistence counts and required warning interval",
+    "policy_config_sha256": "computed from exact policy ID, score scale ID, validation receipt, threshold bit patterns, persistence counts and required warning interval",
     "risk_score_contract": {
       "required_fields": [
         "shot_id",
@@ -82,6 +83,7 @@
         "target_time_ns",
         "model_id",
         "model_revision",
+        "score_scale_id",
         "model_artifact_sha256",
         "training_split_sha256",
         "calibration_id",
@@ -112,7 +114,9 @@
         "otherwise": "uncertain; preserve current alert state and reset persistence counters"
       },
       "interval_coverage_claim": "nominal method metadata only; empirical coverage must be reported on held-out data",
-      "evidence_digest": "SHA-256 content identity only; not source/model/calibration authenticity proof"
+      "evidence_digest": "SHA-256 content identity only; not source/model/calibration authenticity proof",
+      "threshold_scale_identity": "risk evidence score_scale_id must exactly match frozen policy score_scale_id",
+      "policy_config_digest_schema": "luminous.plasma-alarm-policy.v0.2"
     }
   },
   "offline_scoring_contract": {
