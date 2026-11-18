@@ -116,7 +116,7 @@ Where possible, acquire stem orientation from calibrated ground-level images or 
 
 A critical extension is to pair direction fields with mechanical ground truth: stem flexural rigidity, breaking force/moment, bend angle, root anchorage, moisture and crop stage. A spatial orientation field alone cannot infer the force or mechanism that produced it.
 
-## 4. What "better than SOTA" should mean here
+## 5. What "better than SOTA" should mean here
 
 There is no single SOTA number. The goal is **Pareto superiority on matched tasks**, not a composite score that hides weaknesses.
 
@@ -129,7 +129,7 @@ There is no single SOTA number. The goal is **Pareto superiority on matched task
 | Causal explanation | Explicit physical models, crop mechanics, weather/terrain analysis and controlled experiments | Multiple competing predictions plus active experiment selection | Held-out spatial predictions and physical/biological replication |
 | Scientific assistant | Search/LLM tools and conventional Bayesian/statistical workflows | Evidence graph, model uncertainty, falsification, cost-aware information gain and abstention | Matched prospective benchmark with blinded hypotheses and independent graders |
 
-## 5. Proposed performance goals
+## 6. Proposed performance goals
 
 These are internal research targets, not published SOTA results.
 
@@ -142,7 +142,7 @@ These are internal research targets, not published SOTA results.
 7. **Efficiency:** report end-to-end cost, memory, human review time and latency; do not let cheap incorrect matches count as wins.
 8. **Reproducibility:** every headline number tied to a frozen dataset version, source hashes, software commit, configuration, seed, exclusions and independent review.
 
-## 6. Strategic advantage
+## 7. Strategic advantage
 
 Do not compete on the whole pipeline with every archive and geolocator. Form an interoperability strategy:
 
