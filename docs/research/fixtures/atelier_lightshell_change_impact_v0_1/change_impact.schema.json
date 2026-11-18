@@ -1,0 +1,524 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:lightshell-change-impact:0.1.0",
+  "title": "Atelier Lightshell Claim-Scoped Change Impact and Requalification Plan",
+  "description": "Maps serialized repair/service/change events to Lightshell qualification claim dispositions. Not a service ledger, test executor, return-to-service authority or product passport.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "decision_id",
+    "state",
+    "predecessor",
+    "successor",
+    "change_event",
+    "unaffected_claim_policy",
+    "claims",
+    "impact_rules",
+    "evidence_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "decision_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "proposed",
+        "impact_assessed"
+      ]
+    },
+    "predecessor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation_ref",
+        "article_ref",
+        "robot_article_revision",
+        "geometry_digest",
+        "topology_digest",
+        "route_digest"
+      ],
+      "properties": {
+        "generation_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "article_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robot_article_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "geometry_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        },
+        "topology_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        },
+        "route_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        }
+      }
+    },
+    "successor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation_ref",
+        "article_ref",
+        "robot_article_revision",
+        "geometry_digest",
+        "topology_digest",
+        "route_digest"
+      ],
+      "properties": {
+        "generation_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "article_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robot_article_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "geometry_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        },
+        "topology_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        },
+        "route_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        }
+      }
+    },
+    "change_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "event_ref",
+        "event_kind",
+        "event_origin",
+        "authority_ref",
+        "event_evidence_ref",
+        "predecessor_generation_ref",
+        "successor_generation_ref",
+        "treatment_state",
+        "changed_entities"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event_kind": {
+          "enum": [
+            "cleaning",
+            "flex_exposure",
+            "mission_replay",
+            "abrasion_exposure",
+            "impact_event",
+            "repair",
+            "panel_replacement",
+            "seam_replacement",
+            "attachment_replacement",
+            "sensor_replacement",
+            "sensor_recalibration",
+            "material_lot_change",
+            "process_revision_change",
+            "robot_geometry_change",
+            "joint_revision_change"
+          ]
+        },
+        "event_origin": {
+          "enum": [
+            "physical_event",
+            "synthetic_fixture",
+            "supplier_declaration",
+            "model_inferred"
+          ]
+        },
+        "authority_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "event_evidence_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "predecessor_generation_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "successor_generation_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "treatment_state": {
+          "enum": [
+            "as_manufactured",
+            "after_cleaning",
+            "after_flex",
+            "after_mission_replay",
+            "after_repair",
+            "after_replacement"
+          ]
+        },
+        "changed_entities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "entity_kind",
+              "predecessor_entity_ref",
+              "successor_entity_ref"
+            ],
+            "properties": {
+              "entity_kind": {
+                "enum": [
+                  "garment_article",
+                  "component",
+                  "panel",
+                  "connection",
+                  "articulation_feature",
+                  "service_feature",
+                  "material_lot",
+                  "process_revision",
+                  "sensor_tile",
+                  "sensor_interconnect",
+                  "robot_geometry",
+                  "robot_joint",
+                  "pose_set",
+                  "zone"
+                ]
+              },
+              "predecessor_entity_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "successor_entity_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "unaffected_claim_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "owner_ref",
+        "policy_ref"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "preserved",
+            "not_evaluated"
+          ]
+        },
+        "owner_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claim_id",
+          "claim_family",
+          "evidence_generation_ref",
+          "evidence_origin",
+          "evidence_ref",
+          "dependencies"
+        ],
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "claim_family": {
+            "enum": [
+              "geometry_fit",
+              "joint_clearance",
+              "seam_integrity",
+              "impact_protection",
+              "vibration_isolation",
+              "airflow",
+              "thermal",
+              "dimensional_stability",
+              "cleanability",
+              "sensor_calibration",
+              "sensor_continuity",
+              "attachment_retention",
+              "material_property",
+              "process_capability",
+              "mission_profile",
+              "serviceability"
+            ]
+          },
+          "evidence_generation_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_origin": {
+            "enum": [
+              "physical_measurement",
+              "calibrated_model",
+              "supplier_declaration",
+              "simulation",
+              "synthetic_fixture"
+            ]
+          },
+          "evidence_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dependencies": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "entity_kind",
+                "entity_ref"
+              ],
+              "properties": {
+                "entity_kind": {
+                  "enum": [
+                    "garment_article",
+                    "component",
+                    "panel",
+                    "connection",
+                    "articulation_feature",
+                    "service_feature",
+                    "material_lot",
+                    "process_revision",
+                    "sensor_tile",
+                    "sensor_interconnect",
+                    "robot_geometry",
+                    "robot_joint",
+                    "pose_set",
+                    "zone"
+                  ]
+                },
+                "entity_ref": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "impact_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rule_id",
+          "event_kind",
+          "claim_family",
+          "affected_entity_kinds",
+          "disposition",
+          "owner_ref",
+          "policy_ref",
+          "review_record_ref",
+          "test_plan_ref",
+          "method_selection_ref",
+          "fixture_revision_ref",
+          "acceptance_rule_ref"
+        ],
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "event_kind": {
+            "enum": [
+              "cleaning",
+              "flex_exposure",
+              "mission_replay",
+              "abrasion_exposure",
+              "impact_event",
+              "repair",
+              "panel_replacement",
+              "seam_replacement",
+              "attachment_replacement",
+              "sensor_replacement",
+              "sensor_recalibration",
+              "material_lot_change",
+              "process_revision_change",
+              "robot_geometry_change",
+              "joint_revision_change"
+            ]
+          },
+          "claim_family": {
+            "enum": [
+              "geometry_fit",
+              "joint_clearance",
+              "seam_integrity",
+              "impact_protection",
+              "vibration_isolation",
+              "airflow",
+              "thermal",
+              "dimensional_stability",
+              "cleanability",
+              "sensor_calibration",
+              "sensor_continuity",
+              "attachment_retention",
+              "material_property",
+              "process_capability",
+              "mission_profile",
+              "serviceability"
+            ]
+          },
+          "affected_entity_kinds": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "enum": [
+                "garment_article",
+                "component",
+                "panel",
+                "connection",
+                "articulation_feature",
+                "service_feature",
+                "material_lot",
+                "process_revision",
+                "sensor_tile",
+                "sensor_interconnect",
+                "robot_geometry",
+                "robot_joint",
+                "pose_set",
+                "zone"
+              ]
+            }
+          },
+          "disposition": {
+            "enum": [
+              "review_required",
+              "retest_required",
+              "superseded"
+            ]
+          },
+          "owner_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "policy_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "review_record_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "test_plan_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "method_selection_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fixture_revision_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "acceptance_rule_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "evidence_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonical_event_authority_is_external",
+        "historical_evidence_is_immutable",
+        "unaffected_claims_need_explicit_policy",
+        "missing_dependency_mapping_is_not_evaluated",
+        "retest_targets_successor_generation",
+        "no_return_to_service_authority"
+      ],
+      "properties": {
+        "canonical_event_authority_is_external": {
+          "const": true
+        },
+        "historical_evidence_is_immutable": {
+          "const": true
+        },
+        "unaffected_claims_need_explicit_policy": {
+          "const": true
+        },
+        "missing_dependency_mapping_is_not_evaluated": {
+          "const": true
+        },
+        "retest_targets_successor_generation": {
+          "const": true
+        },
+        "no_return_to_service_authority": {
+          "const": true
+        }
+      }
+    }
+  }
+}
