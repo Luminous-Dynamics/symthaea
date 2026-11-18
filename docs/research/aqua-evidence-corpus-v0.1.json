@@ -1291,11 +1291,12 @@
         },
         {
           "claim_id": "clasp.sa.fixed-orifice.mean-flow",
-          "parameter": "mean_flow_rate",
-          "original_value": "Fixed-orifice showerheads averaged about 24 L/min at 300 kPa",
+          "parameter": "observed_flow_rate_range",
+          "original_value": "Approximately 24–27 L/min at 300 kPa in the fixed-orifice product sample",
           "canonical_value": {
-            "kind": "scalar",
-            "value": 24,
+            "kind": "range",
+            "minimum": 24,
+            "maximum": 27,
             "unit": "L/min"
           },
           "evidence_class": "independent_market_sample",
@@ -1322,10 +1323,11 @@
           },
           "comparison": {
             "status": "context_only",
-            "reason": "Aggregate mean for the fixed-orifice subset."
+            "reason": "Dated aggregate range for fixed-orifice products in the sample; not an exact-SKU mean or named product result."
           },
           "limitations": [
             "Not a named product result.",
+            "Do not interpret the lower and upper values as an uncertainty interval or confidence interval.",
             "Sample composition and market availability may have changed."
           ]
         }
