@@ -33,9 +33,10 @@ The six confirmation styles were selected for route diversity: Classical / Perio
 - Deterministic case generation and stable case IDs.
 - Exact materialized-case validation (missing, duplicated, unexpected or mutated cases reject).
 - A strict 81-cell style/seed/metric block contract.
-- Eight orthogonal main-effect contrasts and 24 pairwise interaction contrasts.
+- 32 primary contrasts: eight orthogonal main effects and 24 pairwise interactions.
 - Across-seed mean, sample standard deviation, minimum and maximum.
-- Adversarial tests for case coverage, duplicates, non-finite responses and known synthetic effects.
+- 48 three-/four-factor higher-order diagnostic contrasts, kept separate from the primary terms.
+- Adversarial tests for case coverage, duplicates, non-finite responses, row-order determinism and known synthetic main, pairwise and higher-order effects.
 
 For a 3-level factor, the orthogonal contrast bases are linear `[-1, 0, 1]` and quadratic `[1, -2, 1]`. The pairwise contrast coefficient is:
 
