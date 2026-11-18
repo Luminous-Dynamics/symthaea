@@ -318,6 +318,64 @@ fn cases() -> Vec<Scenario> {
     ]
 }
 
+const PROBE_COST: f64 = 0.12;
+
+fn apply_environment_probe(case: &Scenario) -> Option<Vec<Experience>> {
+    let max_event = case
+        .session_a
+        .iter()
+        .map(|item| item.event_id)
+        .max()
+        .unwrap_or(0);
+    let max_family = case
+        .session_a
+        .iter()
+        .map(|item| item.source_family)
+        .max()
+        .unwrap_or(0);
+    let first_event = max_event.checked_add(1)?;
+    let first_family = max_family.checked_add(1)?;
+    first_event.checked_add(3)?;
+    first_family.checked_add(3)?;
+
+    let mut memory = case.session_a.clone();
+    for (action_index, action) in [Action::A, Action::B].into_iter().enumerate() {
+        for replicate in 0..2_u32 {
+            let offset = (action_index as u32) * 2 + replicate;
+            let noise = if replicate == 0 { -0.01 } else { 0.01 };
+            let observed = (case.oracle.utility(action) + noise).clamp(0.0, 1.0);
+            memory.push(experience(
+                first_event + offset,
+                first_family + offset as u16,
+                case.session_b.scope,
+                action,
+                observed,
+            ));
+        }
+    }
+    Some(memory)
+}
+
+// Simulate a candidate-requested experiment as environment interaction. The
+// candidate sees only the returned observations on its second decision; oracle
+// utilities remain evaluator-only.
+fn simulate(
+    policy: Policy,
+    case: &Scenario,
+) -> (Decision, Vec<Experience>, f64, bool, bool) {
+    let initial = decide(policy, &case.session_a, case.session_b);
+    if !initial.requires_probe {
+        return (initial, case.session_a.clone(), 0.0, false, false);
+    }
+
+    let Some(memory) = apply_environment_probe(case) else {
+        return (Decision::abstain(), case.session_a.clone(), 0.0, true, false);
+    };
+    let final_decision = decide(Policy::CausalQualified, &memory, case.session_b);
+    let resolved = final_decision.action.is_some();
+    (final_decision, memory, PROBE_COST, true, resolved)
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct Metrics {
     decisions: u32,
@@ -329,14 +387,21 @@ struct Metrics {
     unsupported_a_reuse: u32,
     evidence_bound_decisions: u32,
     total_evidence_refs: u32,
+    probe_requests: u32,
+    probe_resolved: u32,
+    probe_cost_micros: u32,
 }
 
 fn evaluate(policy: Policy, scenarios: &[Scenario]) -> Metrics {
     let mut metrics = Metrics::default();
 
     for case in scenarios {
-        let decision = decide(policy, &case.session_a, case.session_b);
+        let (decision, memory, probe_cost, probe_requested, probe_resolved) =
+            simulate(policy, case);
         metrics.decisions += 1;
+        metrics.probe_requests += u32::from(probe_requested);
+        metrics.probe_resolved += u32::from(probe_resolved);
+        metrics.probe_cost_micros += (probe_cost * 1_000_000.0).round() as u32;
 
         let action = match decision.action {
             Some(action) => action,
@@ -355,8 +420,7 @@ fn evaluate(policy: Policy, scenarios: &[Scenario]) -> Metrics {
         }
         metrics.total_evidence_refs += decision.evidence_ids.len() as u32;
 
-        let by_id: BTreeMap<u32, &Experience> = case
-            .session_a
+        let by_id: BTreeMap<u32, &Experience> = memory
             .iter()
             .map(|item| (item.event_id, item))
             .collect();
@@ -400,7 +464,8 @@ fn report(scenarios: &[Scenario]) {
         concat!(
             "policy,accuracy_pct,mean_utility,mean_regret,abstentions,",
             "causal_claims,causal_overclaims,invalid_evidence_reuse,",
-            "unsupported_A_reuse,evidence_bound_decisions,total_evidence_refs"
+            "unsupported_A_reuse,evidence_bound_decisions,total_evidence_refs,",
+            "probe_requests,probe_resolved,probe_cost_usd_micros"
         )
     );
 
@@ -410,21 +475,22 @@ fn report(scenarios: &[Scenario]) {
         let total_utility: f64 = scenarios
             .iter()
             .map(|case| {
-                let decision = decide(policy, &case.session_a, case.session_b);
-                case.oracle.utility(decision.action.unwrap_or(Action::B))
+                let (decision, _, probe_cost, _, _) = simulate(policy, case);
+                case.oracle.utility(decision.action.unwrap_or(Action::B)) - probe_cost
             })
             .sum();
         let total_regret: f64 = scenarios
             .iter()
             .map(|case| {
-                let decision = decide(policy, &case.session_a, case.session_b);
+                let (decision, _, probe_cost, _, _) = simulate(policy, case);
                 let action = decision.action.unwrap_or(Action::B);
-                case.oracle.optimal_utility() - case.oracle.utility(action)
+                case.oracle.optimal_utility()
+                    - (case.oracle.utility(action) - probe_cost)
             })
             .sum();
 
         println!(
-            "{},{:.1},{:.3},{:.3},{},{},{},{},{},{},{}",
+            "{},{:.1},{:.3},{:.3},{},{},{},{},{},{},{},{},{},{}",
             policy.name(),
             100.0 * f64::from(metrics.correct_actions) / count,
             total_utility / count,
@@ -435,7 +501,10 @@ fn report(scenarios: &[Scenario]) {
             metrics.invalid_evidence_reuse,
             metrics.unsupported_a_reuse,
             metrics.evidence_bound_decisions,
-            metrics.total_evidence_refs
+            metrics.total_evidence_refs,
+            metrics.probe_requests,
+            metrics.probe_resolved,
+            metrics.probe_cost_micros
         );
     }
 
@@ -564,6 +633,38 @@ mod tests {
         assert_eq!(metrics.causal_overclaims, 0);
         assert_eq!(metrics.invalid_evidence_reuse, 0);
         assert_eq!(metrics.unsupported_a_reuse, 0);
+    }
+
+    #[test]
+    fn active_probe_learns_target_regime_effect_after_transport_is_rejected() {
+        let case = cases()
+            .into_iter()
+            .find(|item| item.name == "mechanism_break_after_regime_shift")
+            .expect("mechanism-break scenario exists");
+        let (decision, memory, cost, requested, resolved) =
+            simulate(Policy::ActiveProbe, &case);
+
+        assert!(requested);
+        assert!(resolved);
+        assert_eq!(decision.action, Some(Action::B));
+        assert_eq!(memory.len(), case.session_a.len() + 4);
+        assert!((cost - PROBE_COST).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn active_probe_is_not_used_when_exact_or_invariant_memory_is_sufficient() {
+        let cases = cases();
+        let exact = cases
+            .iter()
+            .find(|item| item.name == "identified_effect_transfer")
+            .expect("exact case exists");
+        let invariant = cases
+            .iter()
+            .find(|item| item.name == "invariant_transport_few_shot")
+            .expect("invariant case exists");
+
+        assert!(!simulate(Policy::ActiveProbe, exact).3);
+        assert!(!simulate(Policy::ActiveProbe, invariant).3);
     }
 
     #[test]
