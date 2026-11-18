@@ -39,6 +39,25 @@ Run the performance comparison with:
 cargo bench -p symthaea-algorithm-lab --bench hdc_hamming_candidates
 ```
 
+## Typed source-generation preview
+
+A first source-generation increment now exists in `src/kernel_ir.rs`.
+
+`KernelPlan` describes:
+- word width: u8 / u32 / u64 / u128;
+- static unroll factor: 1 / 2 / 4 / 8;
+- independent accumulator count: 1 / 2 / 4 / 8.
+
+The finite v1 grammar contains 64 validated plans. Every plan has a deterministic content identity bound to the full grammar/renderer identity. `render_rust_source()` emits portable Rust using exact XOR, `count_ones()` and integer accumulation; the emitted source has its own content identity.
+
+This is a source-generation prototype only:
+- it does not invoke Cargo/rustc;
+- it does not compile or execute generated artifacts;
+- it does not have filesystem, process, Git or promotion authority;
+- it does not establish that any generated plan is faster or even compiler-valid.
+
+The next increment in [AR-6B #12787](https://github.com/Luminous-Dynamics/symthaea/issues/12787) adds isolated compilation/execution and connects each generated artifact to the independent Hamming oracle and the candidate-independent evaluation context in #1352. Do not count the 64 plans as 64 tested algorithms until generated artifacts have actually compiled and passed the exact oracle.
+
 ## Measurement boundary
 
 Criterion output is a measurement, not a promotion decision. Do not copy a timing into the algorithm registry without also binding the exact source revision, toolchain, target/hardware profile, evaluator/oracle identities, and correctness evidence through `EvaluationReceipt`.

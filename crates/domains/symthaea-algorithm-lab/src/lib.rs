@@ -6,6 +6,8 @@
 //! It deliberately discovers/evaluates no cryptographic primitive and has no repository or
 //! production authority.
 
+pub mod kernel_ir;
+
 use symthaea_algorithms::discovery::{
     CandidateArtifact, CandidateArtifactKind, CandidateProposal, DiscoveryError, DiscoveryPolicy,
     DiscoveryRun, SearchBudget,
