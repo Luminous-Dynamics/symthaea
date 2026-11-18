@@ -6,7 +6,7 @@
 //! unknown or unqualified candidates entering a physical Pareto set.
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Value};
+use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const DESIGN_PROBLEM_SCHEMA_VERSION: &str = "0.1.0";
@@ -286,8 +286,20 @@ fn collect_ids(value: &Value, catalogue_key: &str, id_key: &str) -> Result<BTree
     Ok(ids)
 }
 
-fn is_sha1(value: &str) -> bool {
-    value.len() == 40 && value.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+fn is_lower_hex(value: &str, expected_len: usize) -> bool {
+    value.len() == expected_len
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
+fn is_git_sha1(value: &str) -> bool {
+    is_lower_hex(value, 40)
+}
+
+fn is_evidence_digest(value: &str) -> bool {
+    // Symtropy and specialist receipts may use SHA-256 or BLAKE3 digests.
+    is_lower_hex(value, 64)
 }
 
 fn validate_intent_axis(name: &str, axis: &IntentAxis, allowed: &BTreeSet<String>, errors: &mut Vec<String>) {
@@ -383,7 +395,7 @@ fn validate_requirements(requirements: &[Requirement], seen: &mut BTreeSet<Strin
         {
             errors.push(format!("requirement has an empty or duplicate ID/statement: {}", requirement.requirement_id));
         }
-        if matches!(requirement.source_class, RequirementSourceClass::JurisdictionalRule | RequirementSourceClass::ProfessionalReviewRequirement)
+        if matches!(&requirement.source_class, RequirementSourceClass::JurisdictionalRule | RequirementSourceClass::ProfessionalReviewRequirement)
             && requirement.source_ref.as_deref().is_none_or(str::is_empty)
         {
             errors.push(format!("authority requirement {} has no source reference", requirement.requirement_id));
@@ -429,7 +441,7 @@ fn validate_compilation(compilation: &Compilation, input: &ResidentIntent, vocab
     if detailed_ids != declared_ids {
         errors.push("mapping_rule_ids does not match detailed mapping_rules".to_owned());
     }
-    match compilation.mapping_state {
+    match &compilation.mapping_state {
         MappingState::NoOwnerReviewedMapping if compilation.mapping_rules.iter().any(|r| r.review_state == MappingReviewState::Approved) => {
             errors.push("NO_OWNER_REVIEWED_MAPPING cannot contain approved mapping rules".to_owned());
         }
@@ -475,7 +487,7 @@ pub fn validate_design_problem(problem: &DesignProblem, vocabulary: &CatalogueVo
         ("conformance_corpus_blob_sha", problem.source_bindings.conformance_corpus_blob_sha.as_str()),
         ("conformance_corpus_schema_blob_sha", problem.source_bindings.conformance_corpus_schema_blob_sha.as_str()),
     ] {
-        if !is_sha1(digest) { errors.push(format!("{name} is not a lowercase 40-character Git object SHA")); }
+        if !is_git_sha1(digest) { errors.push(format!("{name} is not a lowercase 40-character Git object SHA")); }
     }
     let input = &problem.input;
     if input.grammar_id.trim().is_empty() || input.design_revision_ref.trim().is_empty() || input.source_fixture_ref.trim().is_empty() {
@@ -536,7 +548,7 @@ pub fn geometry_handoff_eligible(problem: &DesignProblem, provider: &GeometryPro
     symbolic_candidate_generation_allowed(problem)
         && problem.generation_permissions.geometry_generation == GeometryGenerationPermission::AllowedWithQualifiedGeometryProvider
         && provider.qualified && !provider.provider_id.is_empty() && !provider.provider_revision.is_empty()
-        && provider.exact_geometry_digest.as_deref().is_some_and(is_sha1)
+        && provider.exact_geometry_digest.as_deref().is_some_and(is_evidence_digest)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -566,9 +578,9 @@ pub fn candidate_eligible_for_physical_pareto(candidate: &Candidate) -> bool {
     candidate.hard_gate_state == GateState::Pass
         && candidate.geometry_ref.as_deref().is_some_and(|r| !r.is_empty())
         && !candidate.physical_evaluations.is_empty()
-        && candidate.physical_evaluations.iter().all(|r| r.qualified && !r.owner_system.is_empty() && !r.solver_version.is_empty() && is_sha1(&r.exact_input_digest))
+        && candidate.physical_evaluations.iter().all(|r| r.qualified && !r.owner_system.is_empty() && !r.solver_version.is_empty() && is_evidence_digest(&r.exact_input_digest))
         && !candidate.objectives.is_empty()
-        && candidate.objectives.iter().all(|o| o.value.is_finite() && !o.objective_id.is_empty() && !o.unit.is_empty() && is_sha1(&o.source_receipt_digest))
+        && candidate.objectives.iter().all(|o| o.value.is_finite() && !o.objective_id.is_empty() && !o.unit.is_empty() && is_evidence_digest(&o.source_receipt_digest))
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -686,8 +698,8 @@ mod tests {
             candidate_id:"cand-1".to_owned(), parent_candidate_ids:vec![], source_intent_refs:vec![],
             parameter_deltas:BTreeMap::new(), unresolved_requirements:vec![],
             hard_gate_state:GateState::Unknown, geometry_ref:Some("geometry://exact".to_owned()),
-            physical_evaluations:vec![PhysicalEvaluationReceipt {owner_system:"symtropy".to_owned(),solver_version:"v1".to_owned(),exact_input_digest:"a".repeat(40),qualified:true}],
-            objectives:vec![ObjectiveValue {objective_id:"energy".to_owned(),value:10.0,unit:"kWh".to_owned(),source_receipt_digest:"b".repeat(40)}]
+            physical_evaluations:vec![PhysicalEvaluationReceipt {owner_system:"symtropy".to_owned(),solver_version:"v1".to_owned(),exact_input_digest:"a".repeat(64),qualified:true}],
+            objectives:vec![ObjectiveValue {objective_id:"energy".to_owned(),value:10.0,unit:"kWh".to_owned(),source_receipt_digest:"b".repeat(64)}]
         };
         assert!(!candidate_eligible_for_physical_pareto(&candidate));
         candidate.hard_gate_state = GateState::Pass;
