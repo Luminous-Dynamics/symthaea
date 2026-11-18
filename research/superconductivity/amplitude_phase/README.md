@@ -198,3 +198,29 @@ Not implemented or qualified:
 - dynamics, noise, fluctuation-dissipation and conductivity.
 
 The current vortex output is a phase-winding count with an explicit amplitude threshold. It does not yet estimate vortex-core free energy, distinguish bound from unbound pairs, or classify the transition.
+
+
+## Complex-field Metropolis pilot
+
+The same executable now has an optional `--monte-carlo` path. It uses a single-site symmetric proposal in the complex plane:
+
+\[
+\psi_i' = \psi_i + \delta_x + i\delta_y,
+\qquad
+\delta_x,\delta_y\sim\mathrm{Uniform}[-s,s],
+\]
+
+and accepts with \(\min(1,e^{-\Delta F/T})\), where \(F\) is the exact lattice functional above and the declared dimensionless temperature is positive.
+
+The update computes \(\Delta F\) from the changed site's local quartic potential and incident gauge-covariant links. A unit test compares this local delta to a full-lattice recomputation at every site for nonuniform complex fields and nonzero link phases. The full energy is recomputed at each measurement point to bound accumulated floating-point drift.
+
+Sampling protocol is part of the fixture: RNG seed, warmup sweeps, measurement sweeps, thinning, proposal scale and independent-chain count. CLI overrides are included in the receipt. Each chain reports:
+- initial/final energy and proposal acceptance / invalid counts;
+- per-node total, local and gradient energy;
+- mean \(|\psi|\) and \(|\psi|^2\);
+- amplitude-aware vortex charge density and skipped core plaquettes when the graph supports the 2D grid diagnostic;
+- sample standard deviations, initial-positive-sequence integrated autocorrelation estimates, effective sample sizes and autocorrelation-corrected standard errors when the series is long enough.
+
+The multi-chain receipt preserves every chain/seed and reports between-chain dispersion. This does not replace within-chain autocorrelation checks or prove equilibration. The current CI pilot uses two short chains only to test determinism, update plumbing and receipt structure. It is not a thermodynamic measurement.
+
+The sampler uses a fixed proposal scale and is intentionally simple. It is a baseline, not a claim of state-of-the-art mixing. The next algorithmic comparison should include adaptive-but-frozen-after-warmup Metropolis, overrelaxation or hybrid Monte Carlo where mathematically appropriate, and replica exchange near suspected first-order regimes. Compare effective independent samples per CPU-second at matched acceptance, observable error and system size. Do not judge samplers by acceptance rate alone.
