@@ -13,6 +13,7 @@ resolver = "2"
 serde_json = "=1.0.150"
 sha2 = "=0.10.9"
 jsonschema = { version = "=0.59.0", default-features = false }
+rand = "=0.8.5"
 
 [[bin]]
 name = "sc_amplitude_phase_audit"
