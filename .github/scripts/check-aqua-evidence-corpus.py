@@ -63,6 +63,14 @@ EXPECTED_VALUES = {
     "water_chemistry_observation": ("text", None),
     "potential_energy_reduction": ("scalar", "%"),
     "influential_design_parameters": ("text", None),
+    "field_study_duration": ("scalar", "months"),
+    "overall_heat_exchanger_efficiency": ("scalar", "%"),
+    "fouling_nominal_efficiency_reduction": ("scalar", "%"),
+    "overall_dhwr_system_efficiency": ("scalar", "%"),
+    "global_dhw_cop": ("scalar", "COP"),
+    "heat_pump_cop_reduction": ("scalar", "%"),
+    "preferred_dhwr_coupling_topology": ("text", None),
+    "model_validation_cv_rmse": ("scalar", "%"),
 }
 
 
