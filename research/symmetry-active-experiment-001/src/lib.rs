@@ -808,6 +808,45 @@ mod tests {
         QualificationBudgetV1::default()
     }
 
+    fn context_lookahead_fixture() -> ActiveExperimentProblemV1 {
+        ActiveExperimentProblemV1 {
+            problem_id: "eight-hypothesis-context-lookahead-v0.1".to_owned(),
+            hypotheses: (0..8).map(|index| format!("H-{index}")).collect(),
+            probes: vec![
+                ExperimentProbeV1 {
+                    probe_id: "p-context".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                    outcomes: vec![0, 0, 1, 1, 2, 2, 3, 3],
+                },
+                ExperimentProbeV1 {
+                    probe_id: "p-follow-A".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                    outcomes: vec![0, 1, 0, 0, 0, 0, 0, 0],
+                },
+                ExperimentProbeV1 {
+                    probe_id: "p-follow-B".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                    outcomes: vec![0, 0, 0, 1, 0, 0, 0, 0],
+                },
+                ExperimentProbeV1 {
+                    probe_id: "p-follow-C".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                    outcomes: vec![0, 0, 0, 0, 0, 1, 0, 0],
+                },
+                ExperimentProbeV1 {
+                    probe_id: "p-follow-D".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                    outcomes: vec![0, 0, 0, 0, 0, 0, 0, 1],
+                },
+            ],
+        }
+    }
+
     fn cost_sensitive_fixture() -> ActiveExperimentProblemV1 {
         ActiveExperimentProblemV1 {
             problem_id: "cost-sensitive-four-hypotheses-v0.1".to_owned(),
@@ -1061,6 +1100,76 @@ mod tests {
             compile_active_experiment(&fixture(), tiny),
             Err(ExperimentErrorV1::WorkBudgetExceeded)
         );
+    }
+
+
+    #[test]
+    fn context_probe_produces_a_2_5x_adaptive_saving_over_the_exact_static_basis() {
+        let problem = context_lookahead_fixture();
+        let adaptive = compile_active_experiment(&problem, budget()).unwrap();
+        let static_design = solve_exact_static_probe_design(
+            &problem,
+            budget(),
+            StaticProbeBudgetV1::default(),
+        )
+        .unwrap();
+
+        assert_eq!(adaptive.root_worst_case_cost, 2);
+        assert_eq!(static_design.selected_probe_ids.len(), 5);
+        assert_eq!(static_design.selected_cost, 5);
+        assert_eq!(static_design.subsets_examined, 32);
+        assert_eq!(
+            static_design.selected_probe_ids,
+            vec![
+                "p-context".to_owned(),
+                "p-follow-A".to_owned(),
+                "p-follow-B".to_owned(),
+                "p-follow-C".to_owned(),
+                "p-follow-D".to_owned(),
+            ]
+        );
+        assert_eq!(
+            static_design.selected_cost / adaptive.root_worst_case_cost,
+            2
+        );
+        assert!(static_design.selected_cost as f64 / adaptive.root_worst_case_cost as f64 >= 2.5);
+        verify_exact_static_probe_design(
+            &problem,
+            &static_design,
+            budget(),
+            StaticProbeBudgetV1::default(),
+        )
+        .unwrap();
+
+        // Replay every candidate: the context outcome selects exactly one
+        // specialized follow-up, and the second observation identifies it.
+        for hypothesis_index in 0..problem.hypotheses.len() {
+            let context_outcome = (hypothesis_index / 2) as u32;
+            let follow_up = (hypothesis_index / 2) + 1;
+            let follow_up_outcome = (hypothesis_index % 2) as u32;
+            let replayed = replay_observations(
+                &problem,
+                &adaptive,
+                &[context_outcome, follow_up_outcome],
+                budget(),
+            )
+            .unwrap();
+            assert_eq!(
+                replayed,
+                vec![problem.hypotheses[hypothesis_index].clone()]
+            );
+            let PlanDispositionV1::Probe { branches, .. } = &adaptive.root.disposition else {
+                panic!("root must be the context probe");
+            };
+            let branch = branches
+                .iter()
+                .find(|branch| branch.outcome == context_outcome)
+                .unwrap();
+            let PlanDispositionV1::Probe { probe_id, .. } = &branch.child.disposition else {
+                panic!("context branch must select one specialized follow-up");
+            };
+            assert_eq!(probe_id, &problem.probes[follow_up].probe_id);
+        }
     }
 
     #[test]
