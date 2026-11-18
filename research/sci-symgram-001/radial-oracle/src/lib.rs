@@ -161,6 +161,7 @@ impl Polynomial {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QualificationError {
     NonPositiveCoupling,
+    CouplingOutsideBound { coupling: i128, maximum: i128 },
     ExponentOutsideBound { exponent: u32, maximum: u32 },
 }
 
@@ -168,6 +169,9 @@ impl fmt::Display for QualificationError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NonPositiveCoupling => write!(formatter, "coupling must be positive"),
+            Self::CouplingOutsideBound { coupling, maximum } => {
+                write!(formatter, "coupling {coupling} exceeds the supported maximum {maximum}")
+            }
             Self::ExponentOutsideBound { exponent, maximum } => {
                 write!(formatter, "exponent {exponent} exceeds the supported maximum {maximum}")
             }
@@ -272,15 +276,22 @@ fn invariant_polynomials() -> (Polynomial, Polynomial, Polynomial, Polynomial) {
 ///
 ///     x_dot = v,  v_dot = -k (x . x)^m x.
 ///
-/// The bounded reference accepts integer m <= 8 and positive integer k.
+/// The bounded reference accepts integer m <= 8 and integer 0 < k <= 1,000,000.
 /// All returned checks are exact polynomial identities over the integers.
 pub fn qualify_radial_case(
     exponent: u32,
     coupling: i128,
 ) -> Result<QualificationReport, QualificationError> {
     const MAX_EXPONENT: u32 = 8;
+    const MAX_COUPLING: i128 = 1_000_000;
     if coupling <= 0 {
         return Err(QualificationError::NonPositiveCoupling);
+    }
+    if coupling > MAX_COUPLING {
+        return Err(QualificationError::CouplingOutsideBound {
+            coupling,
+            maximum: MAX_COUPLING,
+        });
     }
     if exponent > MAX_EXPONENT {
         return Err(QualificationError::ExponentOutsideBound {
@@ -371,7 +382,7 @@ mod tests {
 
     #[test]
     fn radial_family_is_exactly_equivariant_for_multiple_exponents_and_scales() {
-        for exponent in 0..=5 {
+        for exponent in 0..=8 {
             for coupling in [1, 2, 7] {
                 let report = qualify_radial_case(exponent, coupling).unwrap();
                 assert!(report.vector_field_equivariant, "{report:?}");
@@ -448,6 +459,17 @@ mod tests {
         assert_eq!(
             qualify_radial_case(0, -1),
             Err(QualificationError::NonPositiveCoupling)
+        );
+    }
+
+    #[test]
+    fn coupling_above_bounded_exact_arithmetic_limit_is_rejected() {
+        assert_eq!(
+            qualify_radial_case(0, i128::MAX),
+            Err(QualificationError::CouplingOutsideBound {
+                coupling: i128::MAX,
+                maximum: 1_000_000
+            })
         );
     }
 
