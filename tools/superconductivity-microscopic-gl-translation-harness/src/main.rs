@@ -647,7 +647,8 @@ mod tests {
     #[test]
     fn coefficient_cannot_join_observations_from_another_material_state() {
         let (_, mut fixture) = inputs();
-        fixture["material_states"].push(fixture["material_states"][0].clone());
+        let second_state = fixture["material_states"][0].clone();
+        fixture["material_states"].as_array_mut().unwrap().push(second_state);
         fixture["material_states"][1]["state_id"] = json!("second-pressure-state");
         fixture["derived_observables"] = json!([{
             "observable_id":"xi-at-state-2",
