@@ -376,6 +376,13 @@ fn validate_coefficient(
             "coefficient {id} cannot promote a conventional SCDFT result as a correlated-unconventional GL coefficient"
         ));
     }
+    if mechanism_scope == "correlated_unconventional"
+        && model_family == "conventional_electron_phonon"
+    {
+        return Err(format!(
+            "coefficient {id} cannot promote a correlated-unconventional result as a conventional electron-phonon GL coefficient"
+        ));
+    }
     Ok(())
 }
 
