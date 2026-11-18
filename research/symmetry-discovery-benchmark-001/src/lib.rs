@@ -273,9 +273,25 @@ pub fn exhaustive_orbits(action: &FiniteActionV1, candidate_count: usize) -> Vec
     result
 }
 
+fn fixture_fnv1a64(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf29ce484222325_u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn frozen_json_manifest_matches_noncryptographic_byte_fingerprint() {
+        let manifest = include_bytes!("../fixtures/v0.1/cases.json");
+        assert_eq!(manifest.len(), 136_742);
+        assert_eq!(fixture_fnv1a64(manifest), 0x9022_19de_12ff_50d1);
+    }
 
     #[test]
     fn d4_matrices_form_an_exact_group_and_square_action() {
