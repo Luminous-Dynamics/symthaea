@@ -1033,6 +1033,12 @@ impl IntertwinedModel {
                 })).collect::<Vec<_>>()
             },
             "components": component_metadata,
+            "secondary_order_fields": self.secondary_orders.iter().map(|field| json!({
+                "field_id": field.id,
+                "field_kind": field.kind,
+                "site_values": field.site_values,
+                "component_coupling_count": field.component_coefficients.len()
+            })).collect::<Vec<_>>(),
             "model_scope": {
                 "evaluated_component_momenta": "zero_only",
                 "finite_q_pdw_evaluated": false,
