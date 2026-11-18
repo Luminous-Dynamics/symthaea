@@ -37,7 +37,10 @@
     "tool_payload_digest": "TOOL-PAYLOAD-DIGEST-01",
     "mission_profile_ref": "MISSION-PROFILE-REV-A",
     "environment_stratum_ref": "ENV-STRATUM-01",
-    "matched_conditions_ref": "MATCHED-CONTEXT-01"
+    "matched_conditions_ref": "MATCHED-CONTEXT-01",
+    "incumbent_cover_ref": "INDUSTRY-COMPARATOR-COVER-01",
+    "incumbent_session_ref": "INCUMBENT-SESSION-01",
+    "incumbent_cover_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
   },
   "gates": [
     {
@@ -60,7 +63,8 @@
         "POSE-EXTREME-B"
       ],
       "method_selection_ref": "METHOD-GATE-CLEARANCE",
-      "acceptance_rule_ref": "RULE-GATE-CLEARANCE"
+      "acceptance_rule_ref": "RULE-GATE-CLEARANCE",
+      "comparison_control": null
     },
     {
       "gate_id": "GATE-CURRENT",
@@ -79,7 +83,8 @@
       "required_pose_set_ref": null,
       "required_pose_refs": [],
       "method_selection_ref": "METHOD-GATE-CURRENT",
-      "acceptance_rule_ref": "RULE-GATE-CURRENT"
+      "acceptance_rule_ref": "RULE-GATE-CURRENT",
+      "comparison_control": "baseline_uncovered"
     },
     {
       "gate_id": "GATE-AIRFLOW",
@@ -98,7 +103,8 @@
       "required_pose_set_ref": null,
       "required_pose_refs": [],
       "method_selection_ref": "METHOD-GATE-AIRFLOW",
-      "acceptance_rule_ref": "RULE-GATE-AIRFLOW"
+      "acceptance_rule_ref": "RULE-GATE-AIRFLOW",
+      "comparison_control": "baseline_uncovered"
     }
   ],
   "runs": [],
