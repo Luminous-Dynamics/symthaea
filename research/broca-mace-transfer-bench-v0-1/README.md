@@ -203,7 +203,7 @@ Likewise, `measurement_error_bound` is currently a candidate-visible claim. A pr
 
 ## Raw-native Session-A ingress boundary (research-only)
 
-The workspace adds a third package, `broca-mace-ingress`. Its 28 deterministic mock-verifier tests exercise receipt-gated single-event admission, bitemporal replay, authority status, lifecycle/retraction, calibration, lineage, outcome reconciliation, batch idempotency and the consolidation evidence-pack projection.
+The workspace adds broca-mace-ingress as its third package and broca-mace-consolidation as its fourth. The ingress crate has 32 deterministic mock-verifier tests exercise receipt-gated single-event admission, bitemporal replay, authority status, lifecycle/retraction, calibration, lineage, outcome reconciliation, batch idempotency and the consolidation evidence-pack projection.
 
 The adapter maps a raw interaction envelope into candidate-visible `Experience` only after:
 
@@ -221,7 +221,7 @@ Duplicate batch deliveries are re-verified. The same event ID is idempotent only
 
 The ingress-issued `IngestedExperience` and `IngestBatch` types expose read-only accessors, so callers cannot construct an admitted result by setting their own trust booleans. Receipt authenticity and source trust are separate: `TrustedForScope`, `Untrusted` and `Unknown` come from a versioned trust-policy receipt. Validly signed but untrusted/unknown sources remain preserved as non-qualified evidence; they cannot count toward causal support. `build_consolidation_evidence_pack` creates a deterministic, sorted `ConsolidationEvidencePackV1` from selected admitted IDs. It preserves event/session/task identity, scope/action, outcomes, measurement bounds and full receipt bundles, while deriving distinct source-family and upstream-root counts from verifier-returned lineage **only for sources trusted under the identified policy**. The pack separately counts trusted, untrusted and unknown-trust events so a downstream consolidation policy can quarantine rather than silently inflate support. `summarize_for_scope` emits a global decision-neutral `ConsolidationEvidenceSummaryV1`. The new `summarize_action_for_scope` emits action-specific event, family, root and qualified-success counts, exact scope status, successful event IDs and worst measurement-error bound. It cannot pool successes from Action A into Action B. It emits no retain/compress/promote action or oracle score. A success requires trusted lineage, an externally verified successful outcome, intervention, pre-registration, confounder control, reconciliation and a completed delayed horizon.
 
-This is an **input contract**, not a consolidation decision. The pack contains no proposed promotion action, oracle label or authorization grant. The raw-ingress tests now exercise Session-A interactions → receipt-preserving evidence pack → action-scoped support summaries → Session-B causal decision reconstructed only from the pack's immutable evidence references → Session-C bitemporal retraction → rebuilt pack → next decision. The separate governed consolidation policy in #12731 still does not consume this pack; its promotion/retention consumer adapter remains pending. Action-specific summaries now provide the missing non-oracular support interface, but they are not themselves promotion decisions.
+This is an **input contract**, not a consolidation decision. The pack contains no proposed promotion action, oracle label or authorization grant. The raw-ingress tests now exercise Session-A interactions → receipt-preserving evidence pack → action-scoped support summaries → Session-B causal decision reconstructed only from the pack's immutable evidence references → Session-C bitemporal retraction → rebuilt pack → next decision. The MACE-specific proposal consumer now consumes action-specific summaries. The broader governed lifecycle policy in #12731 still does not consume this pack; privacy erasure, reversible storage transitions and retention/forgetting remain separately governed.
 
 ### Trust boundary
 
@@ -237,3 +237,13 @@ cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p
 ## Additional evaluation targets
 
 The external portfolio also tracks StateMemBench (current-vs-superseded state), Memora/FAMA (obsolete-memory penalties), ConsolidationBench (retain/compress/promote/forget decisions and governance), and AgentMemoryBench (joint procedural/system and personal/factual memory). Their protocols and scores are distinct. In particular, ConsolidationBench reports that its internal consolidation-quality score did not predict external transfer in a later small study; MACE therefore scores consolidation governance and downstream transfer independently.
+
+## Proposal-only consolidation consumer
+
+The workspace now includes broca-mace-consolidation, a narrow consumer of receipt-derived ActionConsolidationEvidenceSummaryV1. It is separate from ingress: ingress validates evidence and reports support; consolidation evaluates whether the evidence is sufficient to propose a reusable procedure. It does not mutate persistent memory, erase source data, grant authority, or replace Mycelix lifecycle/privacy controls.
+
+The default prototype gate mirrors the governed benchmark's three-support threshold: at least three qualified success events, three distinct source families, and three distinct upstream roots for the same action and exact scope; all trusted predictions must be pre-registered; every success must be receipt-reconciled, interventional, confounder-controlled and past its delayed horizon; the maximum attested measurement-error bound must be at most 0.05 normalized utility units. Untrusted or unknown-trust evidence is quarantined. Insufficient evidence remains provisional.
+
+The proposal contains the exact action/scope, as-known coordinates, evidence event IDs, family/root counts, measurement bound and policy revision. It is a candidate recommendation, not an authorization or storage transaction.
+
+A cross-crate regression in consolidation/tests/raw_session_pipeline.rs now exercises raw Session-A ingestion → receipt pack → action-specific consolidation proposals → Session-B causal decision → Session-C source retraction → rebuilt pack → abstention/active-probe request. The test verifier is synthetic; no production Mycelix verifier is claimed.

@@ -8,3 +8,4 @@ description = "Proposal-only consolidation consumer for verified MACE evidence s
 
 [dependencies]
 broca-mace-ingress = { path = "../ingress" }
+broca-mace-policy = { path = "../policy" }
