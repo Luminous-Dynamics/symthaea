@@ -606,14 +606,14 @@ mod tests {
         let rows = (0..grid.rows())
             .map(|row| {
                 (0..grid.columns())
-                    .filter(|column| grid.cells[row * grid.columns() + column])
+                    .filter(|column| grid.cells[row * grid.columns() + *column])
                     .count()
             })
             .collect();
         let columns = (0..grid.columns())
             .map(|column| {
                 (0..grid.rows())
-                    .filter(|row| grid.cells[row * grid.columns() + column])
+                    .filter(|row| grid.cells[*row * grid.columns() + column])
                     .count()
             })
             .collect();
