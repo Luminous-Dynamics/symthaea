@@ -52,6 +52,7 @@ pub mod multiscale;
 pub mod nppad_validation;
 pub mod plasma_control;
 pub mod plasma_event_eval;
+pub mod plasma_cluster_bootstrap;
 pub mod plasma_hdc_encoder;
 pub mod threat;
 
