@@ -39,8 +39,8 @@ jobs:
           components: rustfmt, clippy
       - name: Check formatting
         run: cargo fmt --manifest-path research/symmetry-benchmark-exact-oracle-001/Cargo.toml --all -- --check
-      - name: Generate deterministic dependency lock
-        run: cargo generate-lockfile --manifest-path research/symmetry-benchmark-exact-oracle-001/Cargo.toml
+      - name: Verify committed dependency lock
+        run: cargo metadata --locked --format-version 1 --manifest-path research/symmetry-benchmark-exact-oracle-001/Cargo.toml > /dev/null
       - name: Run exact fixture oracle tests
         run: cargo test --locked --manifest-path research/symmetry-benchmark-exact-oracle-001/Cargo.toml
       - name: Strict Clippy
