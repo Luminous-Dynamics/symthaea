@@ -15,7 +15,7 @@ dependencies.
 - Deterministic E0 sources: IID uniform, IID skewed, first-order Markov, periodic,
   bursty, long runs and pseudo-random incompressible bytes.
 - E1 finite-state generator with evaluator-only latent state and noisy/aliased emissions.
-- E2 five-variable fixed-point structural causal generator with serialized do-intervention manifests.
+- E2 five-variable fixed-point structural causal generator with evaluator-only intervention manifests kept outside learner-visible observations.
 - E3 factorized SCM mechanism configurations with held-out combinations assembled from individually seen mechanism components; hidden configs remain evaluator-side.
 - CLI file encode/decode and an E0 length comparison against installed
   Zstandard, Brotli, XZ and gzip commands.
@@ -92,9 +92,11 @@ the order-0/order-1, typed-field, temporal-lag, parent-oracle, hybrid and
 shuffled-parent models, plus Zstandard when installed. The parent and hybrid
 models receive the correct SCM graph by construction; they are topology-aware
 coding controls, not learned causal predictors. The shuffled-parent model is a
-topology negative control. The finite-state latent labels remain evaluator-side;
-the serialized SCM stream includes the intervention manifest and observed i16
-values. No causal-transfer result is implied.
+topology negative control. The finite-state latent labels, intervention
+manifests and mechanism parameters remain evaluator-side. The learner-visible
+SCM2 stream contains schema/length metadata and observed i16 values only; it
+does not expose intervention targets, windows or forced values. No
+causal-transfer result is implied.
 
 ## Typed numerical i16 pipeline
 
@@ -148,10 +150,12 @@ tolerance, entropy coder, context-bootstrap and resource accounting.
 
 ### Structure-aware SCM coding controls
 
-The `causal` command additionally evaluates two custom byte predictors on every
-SCM1 stream, including observational, interventional, training and held-out E3
-traces. Both use the same arithmetic coder and 32-byte CDL frame as the built-in
-order-0/order-1 arms:
+The `causal` command additionally evaluates five custom byte predictors on every
+SCM2 stream, including observational, interventional, training and held-out E3
+traces. All use the same arithmetic coder and 32-byte CDL frame as the built-in
+order-0/order-1 arms. The learner-visible SCM2 header is 16 bytes and contains
+only magic, version, flags, variable count and sequence length. Intervention
+metadata is retained in the evaluator-side `ScmTrace` and never serialized:
 
 - `field_frame`: separate adaptive base histograms for each variable and
   byte lane. This tests typed channel identity against one flattened byte
@@ -184,7 +188,7 @@ conditioning structure is known in advance. The lag arm is deliberately a
 strong noncausal comparator. The shuffled-parent arm tests whether a result is
 specific to the correct variable identities.
 
-The two predictors include a separate header histogram and reset to a
+The predictors include a separate header histogram and reset to a
 deterministic empty state for each stream. Their inline state sizes are printed
 by the runner; their code/executable costs and any shared model distribution
 must be accounted for separately in a cold-start comparison. The per-stream
@@ -211,9 +215,9 @@ reporting an encoded-bit result.
 The same causal command also emits:
 - Three training SCM configurations.
 - Two held-out configurations that recombine mechanism component values seen in the training configurations, while keeping the full configuration tuple unseen.
-- For each held-out configuration, a paired observational and `do(x1=20000)` trace with the same seed, so the intervention comparison is counterfactual.
+- For each held-out configuration, a paired observational and `do(x1=20000)` trace with the same seed, so the intervention comparison is counterfactual while target/window/value remain evaluator-side.
 
-The hidden mechanism configuration is retained in the evaluator-side ScmTrace metadata and is not serialized into the learner-visible observation stream. The CLI labels the paired held-out streams and verifies codec round trips; it does not yet train a mechanism learner or measure transfer. A generator unit test also checks that the upstream x0 remains invariant while descendants x2 and x4 respond to the x1 intervention in each held-out world. This is a dataset-generation fixture only.
+The hidden mechanism configuration and intervention manifest are retained in evaluator-side ScmTrace metadata and are not serialized into the learner-visible SCM2 observation stream. The CLI labels the paired held-out streams and verifies codec round trips; it does not yet train a mechanism learner or measure transfer. A generator unit test also checks that the upstream x0 remains invariant while descendants x2 and x4 respond to the x1 intervention in each held-out world. This is a dataset-generation fixture only.
 
 ## Plugging in a custom predictor
 
