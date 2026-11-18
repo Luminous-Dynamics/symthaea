@@ -1,0 +1,91 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "LIGHTSHELL-MISSION-SYNTHETIC-001",
+  "state": "proposed",
+  "platform": {
+    "platform_id": "SYNTHETIC-ROBOT-001",
+    "article_revision": null,
+    "geometry_digest": null
+  },
+  "operating_domain": {
+    "odd_profile_ref": null,
+    "approval_ref": null,
+    "mission_mix_ref": null,
+    "service_horizon_ref": null
+  },
+  "zones": [
+    {
+      "zone_id": "elbow_gaiter",
+      "function_refs": [
+        "REQ-ARTICULATION-01",
+        "REQ-FLEX-FATIGUE-01"
+      ]
+    }
+  ],
+  "source_runs": [
+    {
+      "source_run_id": "SYNTHETIC-SOURCE-001",
+      "source_kind": "synthetic_fixture",
+      "article_revision": null,
+      "run_ref": null,
+      "start_time": null,
+      "end_time": null,
+      "clock_sync_ref": null,
+      "raw_data_digest": null,
+      "instrument_refs": [],
+      "calibration_refs": [],
+      "data_quality_state": "synthetic_fixture",
+      "missing_data_fraction": null,
+      "saturation_observed": false,
+      "gap_disposition_ref": null
+    }
+  ],
+  "observations": [
+    {
+      "observation_id": "OBS-JOINT-FLEX-001",
+      "zone_id": "elbow_gaiter",
+      "source_run_ref": "SYNTHETIC-SOURCE-001",
+      "exposure_kind": "joint_flex",
+      "evidence_origin": "synthetic",
+      "metric_id": "joint_rom_deg",
+      "unit": "deg",
+      "sample_count": 100,
+      "minimum": 0,
+      "p50": 45,
+      "p95": 80,
+      "p99": 88,
+      "maximum": 90,
+      "frequency_bins": [],
+      "method_ref": null,
+      "uncertainty_model_ref": null,
+      "derivation_ref": null
+    }
+  ],
+  "test_blocks": [
+    {
+      "block_id": "BLOCK-FLEX-001",
+      "sequence_index": 0,
+      "sequence_group": null,
+      "zone_id": "elbow_gaiter",
+      "exposure_kind": "joint_flex",
+      "observation_refs": [
+        "OBS-JOINT-FLEX-001"
+      ],
+      "method_selection_ref": null,
+      "protocol_ref": null,
+      "block_intent": "screening",
+      "acceleration_mode": "none",
+      "acceleration_model_ref": null,
+      "correlation_evidence_ref": null,
+      "lifetime_equivalence_claim": false,
+      "state": "proposed"
+    }
+  ],
+  "evidence_policy": {
+    "missing_data_never_becomes_zero": true,
+    "simulated_or_estimated_exposure_is_non_qualifying": true,
+    "frequency_distribution_preserved": true,
+    "unvalidated_acceleration_blocks_lifetime_claims": true,
+    "coupon_plan_is_not_robot_lifetime_qualification": true
+  }
+}
