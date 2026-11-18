@@ -32,7 +32,7 @@ impl std::fmt::Display for PlasmaEventEvalError {
 impl std::error::Error for PlasmaEventEvalError {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AlarmEvidenceQuality {
+enum AlarmEvidenceQuality {
     DirectMeasured,
     Synthetic,
     Unavailable,
@@ -42,7 +42,7 @@ pub enum AlarmEvidenceQuality {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct AlarmObservation {
+struct AlarmObservation {
     pub shot_id: String,
     pub window_end_ns: u64,
     /// A predeclared risk score, not assumed to be a calibrated probability.
@@ -584,6 +584,72 @@ mod tests {
         }
     }
 
+    use crate::plasma_observability::{
+        CalibrationIdentity, DecisionChannelRequirement, DiagnosticChannelObservation,
+        ObservationDisposition, PlasmaObservationFrame, PLASMA_OBSERVATION_SCHEMA,
+    };
+
+    fn observation_frame(
+        disposition: ObservationDisposition,
+        frame_time_ns: u64,
+    ) -> (PlasmaObservationFrame, Vec<DecisionChannelRequirement>) {
+        let calibration = CalibrationIdentity {
+            calibration_id: "density-calibration".to_owned(),
+            calibration_revision: "rev-1".to_owned(),
+        };
+        let frame = PlasmaObservationFrame {
+            schema_version: PLASMA_OBSERVATION_SCHEMA.to_owned(),
+            shot_id: "shot-1".to_owned(),
+            frame_id: format!("frame-{frame_time_ns}"),
+            clock_domain: "shot-relative-ns".to_owned(),
+            frame_time_ns,
+            expected_channel_ids: vec!["density".to_owned()],
+            channels: vec![DiagnosticChannelObservation {
+                channel_id: "density".to_owned(),
+                diagnostic_system_id: "interferometer".to_owned(),
+                disposition,
+            }],
+        };
+        let requirements = vec![DecisionChannelRequirement {
+            channel_id: "density".to_owned(),
+            expected_units: "10^20 m^-3".to_owned(),
+            max_age_ns: 1_000_000,
+            allowed_source_ids: vec!["source-density".to_owned()],
+            calibration,
+        }];
+        (frame, requirements)
+    }
+
+    fn measured_disposition(frame_time_ns: u64) -> ObservationDisposition {
+        ObservationDisposition::Measured {
+            value: 0.8,
+            units: "10^20 m^-3".to_owned(),
+            source_id: "source-density".to_owned(),
+            source_digest: "a".repeat(64),
+            calibration: CalibrationIdentity {
+                calibration_id: "density-calibration".to_owned(),
+                calibration_revision: "rev-1".to_owned(),
+            },
+            observed_at_ns: frame_time_ns,
+        }
+    }
+
+    fn synthetic_disposition() -> ObservationDisposition {
+        ObservationDisposition::Synthetic {
+            value: 0.8,
+            units: "10^20 m^-3".to_owned(),
+            model_id: "reconstructor".to_owned(),
+            model_revision: "v1".to_owned(),
+            input_digest: "b".repeat(64),
+        }
+    }
+
+    fn unavailable_disposition() -> ObservationDisposition {
+        ObservationDisposition::Unavailable {
+            reason: "diagnostic acquisition missing".to_owned(),
+        }
+    }
+
     fn measured(shot_id: &str, time_ns: u64, score: f64) -> AlarmObservation {
         AlarmObservation {
             shot_id: shot_id.to_owned(),
@@ -687,25 +753,31 @@ mod tests {
     fn unqualified_evidence_abstains_and_breaks_persistence() {
         let mut policy = OnlinePlasmaAlarmPolicy::new(config()).expect("valid policy");
         policy.reset_for_shot("shot-1").expect("valid shot");
-        policy.update(&measured("shot-1", 10, 0.9)).expect("update");
+        let (measured_frame, requirements) =
+            observation_frame(measured_disposition(10), 10);
+        policy
+            .update_from_frame(&measured_frame, &requirements, Some(0.9))
+            .expect("direct measurement should be admitted");
+
+        let (synthetic_frame, requirements) = observation_frame(synthetic_disposition(), 20);
         let outcome = policy
-            .update(&AlarmObservation {
-                shot_id: "shot-1".to_owned(),
-                window_end_ns: 20,
-                risk_score: None,
-                evidence_quality: AlarmEvidenceQuality::Synthetic,
-            })
+            .update_from_frame(&synthetic_frame, &requirements, None)
             .expect("synthetic evidence should abstain");
-        assert_eq!(
+        assert!(matches!(
             outcome,
             AlarmPolicyUpdate::Abstained {
                 at_ns: 20,
-                reason: AlarmAbstentionReason::Synthetic,
+                reason: AlarmAbstentionReason::EvidenceGateBlocked(ref blocked),
                 alert_remains_active: false,
-            }
-        );
+            } if blocked.len() == 1 && blocked[0].channel_id == "density"
+        ));
+
+        let (measured_frame, requirements) =
+            observation_frame(measured_disposition(30), 30);
         assert!(matches!(
-            policy.update(&measured("shot-1", 30, 0.9)).expect("update"),
+            policy
+                .update_from_frame(&measured_frame, &requirements, Some(0.9))
+                .expect("direct measurement should be admitted"),
             AlarmPolicyUpdate::PendingTrigger {
                 consecutive_windows: 1,
                 ..
@@ -717,38 +789,35 @@ mod tests {
     fn abstention_does_not_clear_an_existing_alarm() {
         let mut policy = OnlinePlasmaAlarmPolicy::new(config()).expect("valid policy");
         policy.reset_for_shot("shot-1").expect("valid shot");
-        policy.update(&measured("shot-1", 10, 0.9)).expect("update");
-        policy.update(&measured("shot-1", 20, 0.9)).expect("update");
+        let (frame_10, requirements) = observation_frame(measured_disposition(10), 10);
+        policy.update_from_frame(&frame_10, &requirements, Some(0.9)).expect("update");
+        let (frame_20, requirements) = observation_frame(measured_disposition(20), 20);
+        policy.update_from_frame(&frame_20, &requirements, Some(0.9)).expect("update");
+        assert!(policy.is_active());
+
+        let (frame_30, requirements) = observation_frame(unavailable_disposition(), 30);
         let outcome = policy
-            .update(&AlarmObservation {
-                shot_id: "shot-1".to_owned(),
-                window_end_ns: 30,
-                risk_score: None,
-                evidence_quality: AlarmEvidenceQuality::Unavailable,
-            })
+            .update_from_frame(&frame_30, &requirements, None)
             .expect("unavailable measurement should abstain");
-        assert_eq!(
+        assert!(matches!(
             outcome,
             AlarmPolicyUpdate::Abstained {
                 at_ns: 30,
-                reason: AlarmAbstentionReason::Unavailable,
+                reason: AlarmAbstentionReason::EvidenceGateBlocked(ref blocked),
                 alert_remains_active: true,
-            }
-        );
+            } if blocked.len() == 1 && blocked[0].channel_id == "density"
+        ));
         assert!(policy.is_active());
     }
 
     #[test]
-    fn non_measured_evidence_cannot_smuggle_a_numeric_score() {
+    fn blocked_evidence_cannot_smuggle_a_numeric_score() {
         let mut policy = OnlinePlasmaAlarmPolicy::new(config()).expect("valid policy");
         policy.reset_for_shot("shot-1").expect("valid shot");
-        let observation = AlarmObservation {
-            shot_id: "shot-1".to_owned(),
-            window_end_ns: 10,
-            risk_score: Some(0.99),
-            evidence_quality: AlarmEvidenceQuality::Synthetic,
-        };
-        assert!(policy.update(&observation).is_err());
+        let (frame, requirements) = observation_frame(synthetic_disposition(), 10);
+        assert!(policy
+            .update_from_frame(&frame, &requirements, Some(0.99))
+            .is_err());
         assert_eq!(policy.last_window_end_ns, None);
     }
 
