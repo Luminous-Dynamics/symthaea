@@ -503,6 +503,8 @@ fn validate_ready_selection(
             }
             let expected_fixture_state = match profile.map(|value| value.method_id.as_str()) {
                 Some("ISO 5470-2") => Some("qualified_coated"),
+                Some("ISO 25086-1") if specimen.construction_class == "3d_spacer" => Some("qualified_spacer"),
+                Some("ISO 25086-1") => Some("qualified_generic"),
                 Some("ISO 6330") => Some("qualified_article"),
                 Some("ISO 9237") if specimen.construction_class == "3d_spacer" => Some("qualified_spacer"),
                 Some("ISO 9237") => Some("qualified_generic"),
