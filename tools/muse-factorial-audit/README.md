@@ -47,9 +47,13 @@ where `w` is the product of the one- or two-factor contrast weights. The kernel 
 
 ```sh
 cargo test --manifest-path tools/muse-factorial-audit/Cargo.toml
+
+# Materialize the frozen case identities in deterministic CSV form.
+cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin emit-cases -- discovery > /tmp/muse-discovery-cases.csv
+cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin emit-cases -- confirmation > /tmp/muse-confirmation-cases.csv
 ```
 
-The harness has no third-party crates. It can also be tested directly with `rustc --test tools/muse-factorial-audit/src/lib.rs` in a Rust environment.
+The harness has no third-party crates. It can also be tested directly with `rustc --test tools/muse-factorial-audit/src/lib.rs` in a Rust environment. The case exporter emits stable IDs plus the four factor-level codes; it does not call the composer.
 
 ## Integration boundary
 
