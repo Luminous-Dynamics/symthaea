@@ -194,7 +194,7 @@ Primary source: [City of Johannesburg Water Services By-laws 2023, Local Authori
 
 Aqua no longer treats 150 kPa as its lowest research pressure. SANS 10252-1:2018 Edition 3.2 Table 3 lists a 50–100 kPa design flow-pressure range for a water-saving showerhead at 10 L/min design flow, and other fixture-specific flow-pressure references for basins, baths and bidets. This motivates additional low-head research at 50 / 75 / 100 kPa; it does not establish that any given fixture is qualified at those pressures. Exact pressure datum and dynamic pressure at the fitting inlet must be recorded.
 
-The same edition's amended clause 5.3.3.2 states a 10 L/min maximum discharge, while Table 3 lists a 12 L/min likely maximum for the water-saving showerhead row. This apparent internal inconsistency is recorded in the competitor ledger and requires interpretation against the controlled SABS edition; Aqua will not treat the Table 3 value as permission to exceed the clause-level maximum.
+The same edition's amended clause 5.3.3.2 states a 10 L/min maximum discharge. Table 3's 12 L/min likely-maximum value is a separate user-demand planning quantity (footnote a), not necessarily an attainable product flow and not permission to exceed the clause-level limit. The Table 3 50–100 kPa design pressure is used where manufacturer flow-pressure curves are unavailable (footnote b); it motivates low-head research but is not a universal product pressure rating.
 
 Track the dedicated low-pressure programme in [AQUA-LOW-PRESSURE-001 #12784](https://github.com/Luminous-Dynamics/symthaea/issues/12784).
 
