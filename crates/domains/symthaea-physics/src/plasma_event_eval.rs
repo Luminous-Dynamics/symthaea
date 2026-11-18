@@ -467,8 +467,7 @@ pub enum AlarmPolicyUpdate {
 /// A checked per-shot adapter from online policy state transitions to
 /// alarm-episode start timestamps. Only Raised transitions create episodes;
 /// repeated Active/PendingClear windows never create extra alarm timestamps.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AlarmEpisodeTrace {
     pub shot_id: String,
     pub policy_id: String,
@@ -563,15 +562,16 @@ impl AlarmEpisodeTrace {
                 "alarm policy update timestamps must be strictly increasing",
             ));
         }
+        let next_update_count = self
+            .update_count
+            .checked_add(1)
+            .ok_or_else(|| PlasmaEventEvalError::new("trace update_count overflow"))?;
         if raised {
             self.alarm_times_ns.push(at_ns);
         }
         self.final_alarm_active = next_active;
         self.last_update_ns = Some(at_ns);
-        self.update_count = self
-            .update_count
-            .checked_add(1)
-            .ok_or_else(|| PlasmaEventEvalError::new("trace update_count overflow"))?;
+        self.update_count = next_update_count;
         Ok(())
     }
 
