@@ -1349,6 +1349,98 @@ mod tests {
     }
 
     #[test]
+    fn m1_receipt_rejects_unresolved_period_sentence_return_after_rehash() {
+        let mut result =
+            realize_classical_to_minimalism_m1(m1_intent(M1_SHARED_AROUSAL)).unwrap();
+        let transition = result.segments[0]
+            .grammar_trace
+            .obligation_transitions
+            .iter_mut()
+            .find(|item| {
+                item.obligation_id == "thematic-return-and-closure"
+                    && item.to == AssertedObligationState::Fulfilled
+            })
+            .expect("Classical segment must retain its Period/Sentence return fulfillment");
+        transition.to = AssertedObligationState::Unresolved;
+        result.segments[0].evidence_sha256 =
+            segment_evidence_sha256_v1(&result.segments[0]).unwrap();
+        result.receipt_sha256 = m1_receipt_sha256_v1(&result).unwrap();
+
+        let error = verify_classical_to_minimalism_m1_receipt_v1(&result).unwrap_err();
+        assert!(matches!(
+            error,
+            StyleTrajectoryM1Error::IndependentTraceVerificationFailed { .. }
+                | StyleTrajectoryM1Error::UnexpectedGrammarEvidence { .. }
+        ));
+    }
+
+    #[test]
+    fn m1_receipt_rejects_unresolvable_return_source_identity_after_rehash() {
+        let mut result =
+            realize_classical_to_minimalism_m1(m1_intent(M1_SHARED_AROUSAL)).unwrap();
+        for transition in &mut result.segments[0].grammar_trace.obligation_transitions {
+            if transition.obligation_id == "thematic-return-and-closure"
+                && (transition.to == AssertedObligationState::Created
+                    || transition.to == AssertedObligationState::Fulfilled)
+            {
+                let source = transition
+                    .source_evidence
+                    .first_mut()
+                    .expect("typed return transition must retain source evidence");
+                source.role_index = usize::MAX;
+            }
+        }
+        result.segments[0].evidence_sha256 =
+            segment_evidence_sha256_v1(&result.segments[0]).unwrap();
+        result.receipt_sha256 = m1_receipt_sha256_v1(&result).unwrap();
+
+        let error = verify_classical_to_minimalism_m1_receipt_v1(&result).unwrap_err();
+        assert!(matches!(
+            error,
+            StyleTrajectoryM1Error::IndependentTraceVerificationFailed { .. }
+                | StyleTrajectoryM1Error::UnexpectedGrammarEvidence { .. }
+        ));
+    }
+
+    #[test]
+    fn m1_receipt_rejects_period_sentence_source_target_identity_overlap_after_rehash() {
+        let mut result =
+            realize_classical_to_minimalism_m1(m1_intent(M1_SHARED_AROUSAL)).unwrap();
+        let source = result.segments[0]
+            .grammar_trace
+            .obligation_transitions
+            .iter()
+            .find(|item| {
+                item.obligation_id == "thematic-return-and-closure"
+                    && item.to == AssertedObligationState::Created
+            })
+            .expect("Classical segment must retain the created return source")
+            .source_evidence
+            .clone();
+        let fulfilled = result.segments[0]
+            .grammar_trace
+            .obligation_transitions
+            .iter_mut()
+            .find(|item| {
+                item.obligation_id == "thematic-return-and-closure"
+                    && item.to == AssertedObligationState::Fulfilled
+            })
+            .expect("Classical segment must retain the fulfilled return target");
+        fulfilled.evidence = source;
+        fulfilled.source_evidence = fulfilled.evidence.clone();
+        result.segments[0].evidence_sha256 =
+            segment_evidence_sha256_v1(&result.segments[0]).unwrap();
+        result.receipt_sha256 = m1_receipt_sha256_v1(&result).unwrap();
+
+        let error = verify_classical_to_minimalism_m1_receipt_v1(&result).unwrap_err();
+        assert!(matches!(
+            error,
+            StyleTrajectoryM1Error::IndependentTraceVerificationFailed { .. }
+                | StyleTrajectoryM1Error::UnexpectedGrammarEvidence { .. }
+        ));
+    }
+
+    #[test]
     fn m1_receipt_rejects_mutation_when_the_pinned_receipt_digest_is_unchanged() {
         let mut result =
             realize_classical_to_minimalism_m1(m1_intent(M1_SHARED_AROUSAL)).unwrap();
