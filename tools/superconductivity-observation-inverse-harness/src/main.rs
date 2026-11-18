@@ -480,8 +480,7 @@ mod tests {
     #[test]
     fn leave_one_modality_out_requires_one_unseen_modality() {
         let (_, mut fixture) = inputs();
-        fixture["observations"][2]["modality"] =
-            json!("amplitude_sensitive_spectroscopy");
+        fixture["observations"][2]["modality"] = json!("amplitude_sensitive_spectroscopy");
         assert!(audit_mutated(fixture).is_err());
     }
 
