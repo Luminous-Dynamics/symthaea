@@ -584,8 +584,13 @@ impl SemanticMemory {
             return None;
         }
 
-        let total_error: f32 = entries.iter().map(|e| e.prediction_error).sum();
-        let avg_error = total_error / entries.len() as f32;
+        // Accumulate in f64: each stored error is finite f32, but summing
+        // several large finite values in f32 can overflow before averaging.
+        let total_error: f64 = entries
+            .iter()
+            .map(|entry| entry.prediction_error as f64)
+            .sum();
+        let avg_error = (total_error / entries.len() as f64) as f32;
 
         // Update stats
         let n = self.stats.semantic_hits as f32;
@@ -1073,6 +1078,24 @@ mod tests {
         assert_eq!(mem.stats.total_stored, 0);
     }
 
+
+
+    #[test]
+    fn compute_similar_error_averages_large_finite_errors_without_overflow() {
+        let mut mem = SemanticMemory::new(4);
+        let vector = make_hdc_vector(456, 8);
+        mem.store(vector.clone(), f32::MAX, None);
+        mem.store(vector.clone(), f32::MAX, None);
+
+        let (average, count) = mem
+            .compute_similar_error(&vector, 2)
+            .expect("both finite-error entries should be retrievable");
+        assert_eq!(count, 2);
+        assert!(average.is_finite());
+        assert_eq!(average, f32::MAX);
+        assert_eq!(mem.compute_lr_factor(&vector, 2), 1.5);
+        assert!(mem.stats.avg_retrieved_error.is_finite());
+    }
 
     #[test]
     fn semantic_store_rejects_malformed_vectors_and_errors_before_mutation() {
