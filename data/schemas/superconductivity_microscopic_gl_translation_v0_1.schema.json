@@ -461,7 +461,11 @@
               "pairing_gap",
               "other",
               "quadratic_pair_susceptibility",
-              "quartic_free_energy_response"
+              "quartic_free_energy_response",
+              "J_dp_intrinsic",
+              "electron_phonon_mass_enhancement",
+              "fermi_surface_average_gap",
+              "fermi_surface_average_velocity"
             ]
           },
           "value_kind": {
@@ -495,7 +499,8 @@
               "isotropic_declared",
               "anisotropic_tensor",
               "not_applicable",
-              "not_specified"
+              "not_specified",
+              "scalar_paper_reported_directionality_unspecified"
             ]
           },
           "uncertainty": {
