@@ -93,6 +93,29 @@ Use accepted statistical controls as baselines, not proprietary AI novelty:
 - negative controls and independent replication;
 - explicit out-of-domain abstention.
 
+## 4. Adjacent crop-lodging measurement science
+
+Crop lodging is the closest mature measurement domain for the biological and mechanical observables we need, even though its task is not crop-circle origin inference.
+
+Recent work already measures lodging by affected area, location, severity and stem angle:
+- Azizi et al. (2024), *Comprehensive wheat lodging detection after initial lodging using UAV RGB images*, reports a multi-task approach for ratio, location and angle and over 91% classification accuracy on its two declared states. These are the paper's own dataset/task results, not a crop-circle score.
+- Long et al. (2025), *Comprehensive wheat lodging detection under different UAV heights using machine/deep learning models*, explicitly evaluates how UAV height affects detection and proposes a MobileNetV3-M model.
+- A 2026 review, *Multi-scale lodging in rice and wheat*, connects field biomechanics with UAV spectral/photogrammetric products and LiDAR-derived stem inclination. It stresses that canopy posture and remote-sensing products are phenotypic proxies, not direct measurements of intrinsic properties such as flexural rigidity or breaking moment; mechanical ground-truth calibration is required.
+- A 2026 review of UAV sensing in gramineous crops covers lodging area identification, severity and angle, with supervised classification and semantic segmentation as major established approaches.
+- Ground-based LiDAR/UAV phenotyping has also been used to estimate plant height and lodging angle in field research, offering a stronger 3D comparator than overhead photographs alone.
+
+### Implication for CROP-INTEL
+
+The new crop-flow descriptor should be treated as a low-cost measurement/statistics layer, not an SOTA perception model. Compare it against:
+1. blinded human stem-angle and lodging-direction measurements;
+2. RGB texture/spectral direction estimators (e.g. Gabor/Fourier orientation);
+3. UAV/photogrammetry/LiDAR point-cloud stem inclination;
+4. standard crop-lodging segmentation and area/severity baselines.
+
+Where possible, acquire stem orientation from calibrated ground-level images or 3D point clouds, and record the raw individual measurements. Aggregate statistics are not a substitute for preserving the per-stem data.
+
+A critical extension is to pair direction fields with mechanical ground truth: stem flexural rigidity, breaking force/moment, bend angle, root anchorage, moisture and crop stage. A spatial orientation field alone cannot infer the force or mechanism that produced it.
+
 ## 4. What "better than SOTA" should mean here
 
 There is no single SOTA number. The goal is **Pareto superiority on matched tasks**, not a composite score that hides weaknesses.
