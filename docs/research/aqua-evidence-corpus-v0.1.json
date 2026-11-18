@@ -1542,6 +1542,377 @@
           ]
         }
       ]
+    },
+    {
+      "entry_id": "hansgrohe-activera-system-28087000",
+      "subject": {
+        "type": "product",
+        "id": "hansgrohe.activera-select-s.system.28087000",
+        "name": "Activera Select S Shower System 95 2jet EcoSmart with ShowerTablet Select 360 and 65 cm shower bar",
+        "manufacturer": "Hansgrohe",
+        "sku": "28087000",
+        "market": "South Africa",
+        "revision": null
+      },
+      "claims": [
+        {
+          "claim_id": "hansgrohe.28087000.rain.flow",
+          "parameter": "flow_rate",
+          "original_value": "7.2 L/min Rain at 3 bar",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 7.2,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "Rain",
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": "manufacturer nominal 3 bar",
+            "unknown_conditions": [
+              "independent laboratory replication",
+              "temperature profile",
+              "sample count"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28087000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Exact SA system SKU and mode can anchor a physical matched test; declaration is not a measured Aqua comparator result."
+          },
+          "limitations": [
+            "Keep the Rain mode distinct from ImpactRain and total-system maximum."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28087000.impactrain.flow",
+          "parameter": "flow_rate",
+          "original_value": "6.5 L/min ImpactRain at 3 bar",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 6.5,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "ImpactRain",
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": "manufacturer nominal 3 bar",
+            "unknown_conditions": [
+              "independent laboratory replication",
+              "temperature profile",
+              "sample count"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28087000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Exact SA system SKU and mode can anchor a physical matched test; declaration is not a measured Aqua comparator result."
+          },
+          "limitations": [
+            "Keep the ImpactRain mode distinct from Rain."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28087000.system.maximum-flow",
+          "parameter": "maximum_flow_rate",
+          "original_value": "8 L/min maximum system flow at 3 bar",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 8,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": "manufacturer nominal 3 bar",
+            "unknown_conditions": [
+              "independent laboratory replication",
+              "outlet / mixed operating state"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28087000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Manufacturer-declared maximum system flow for the exact shower system."
+          },
+          "limitations": [
+            "The hand-shower mode maximum is separately specified as 7.2 L/min; do not conflate the two."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28087000.minimum-pressure",
+          "parameter": "minimum_operating_pressure",
+          "original_value": "Minimum flow pressure 0.5 bar",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 50,
+            "unit": "kPa"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "derived",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "flow and spray performance at exactly 0.5 bar",
+              "pressure datum",
+              "complete operating range"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28087000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Manufacturer-declared minimum flow pressure converted to kPa."
+          },
+          "limitations": [
+            "This does not establish useful bathing task performance at 50 kPa or a complete pressure/flow curve."
+          ],
+          "derivation": {
+            "formula": "bar × 100 = kPa",
+            "inputs": [
+              "0.5 bar"
+            ],
+            "assumptions": [
+              "Exact unit conversion."
+            ]
+          }
+        },
+        {
+          "claim_id": "hansgrohe.28087000.maximum-operating-pressure",
+          "parameter": "maximum_operating_pressure",
+          "original_value": "Maximum operating pressure 10 bar",
+          "canonical_value": {
+            "kind": "range",
+            "maximum": 1000,
+            "unit": "kPa"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "derived",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "complete product pressure range statement in this claim",
+              "performance across full operating range"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28087000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Manufacturer's published maximum operating pressure converted to kPa; minimum is declared in a separate claim."
+          },
+          "limitations": [
+            "This is a system operating-pressure limit, not evidence of spray/task performance at every lower pressure."
+          ],
+          "derivation": {
+            "formula": "bar × 100 = kPa",
+            "inputs": [
+              "10 bar"
+            ],
+            "assumptions": [
+              "Exact unit conversion."
+            ]
+          }
+        },
+        {
+          "claim_id": "hansgrohe.28087000.thermostat",
+          "parameter": "thermostat_configuration",
+          "original_value": "ShowerTablet Select 360 thermostatic control",
+          "canonical_value": {
+            "kind": "text",
+            "text": "Integrated ShowerTablet Select 360 thermostat"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "independent laboratory replication",
+              "complete task performance",
+              "flow curve across operating range"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.com/articledetail-activera-select-s-shower-system-for-exposed-installation-95-2jet-ecosmart-with-showertablet-select-360-and-shower-bar-65-cm-28087000",
+            "publisher": "Hansgrohe",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Exact system component configuration."
+          },
+          "limitations": [
+            "Compare full installed system burden separately from a bare handheld shower set."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28087000.safety-stop",
+          "parameter": "temperature_safety_feature",
+          "original_value": "SafetyStop at 40°C",
+          "canonical_value": {
+            "kind": "text",
+            "text": "SafetyStop at 40°C"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "independent laboratory replication",
+              "complete task performance",
+              "flow curve across operating range"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28087000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Manufacturer feature declaration for the named system."
+          },
+          "limitations": [
+            "This is not an independent scald-safety certification or measured outlet-temperature result."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28087000.coolcontact",
+          "parameter": "temperature_safety_feature",
+          "original_value": "CoolContact thermostat housing",
+          "canonical_value": {
+            "kind": "text",
+            "text": "CoolContact thermostat housing intended to prevent the housing from heating up"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "independent laboratory replication",
+              "complete task performance",
+              "flow curve across operating range"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.com/articledetail-activera-select-s-shower-system-for-exposed-installation-95-2jet-ecosmart-with-showertablet-select-360-and-shower-bar-65-cm-28087000",
+            "publisher": "Hansgrohe",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Manufacturer feature description."
+          },
+          "limitations": [
+            "Not an independent surface-temperature test."
+          ]
+        }
+      ]
     }
   ]
 }
