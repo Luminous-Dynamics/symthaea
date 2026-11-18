@@ -151,16 +151,20 @@ Among eligible geometries:
 
 ## 8. Research targets
 
-The 6.0 L/min primary and 4.5 L/min stretch points remain investigation targets, not novelty or superiority claims. Commercial products already publish 4.5–5.7 L/min modes. The differentiator must be a statistically supported matched improvement in the robust response vector and completed service—not the minimum nominal flow alone.
+The 6.0 L/min primary and 4.5 L/min stretch points remain investigation targets, not novelty or superiority claims. Commercial products already publish 4.5–5.7 L/min modes. A more ambitious research hypothesis is **at least 20% less fresh water per completed task than the strongest exact low-flow comparator**, with all preregistered standard-method, spray-field, temperature and independent task-quality endpoints non-inferior, including the cleaning / purge boundary. This is intentionally harder than the 14.4 ± 5.6% lower-flow result reported in the 2019 hyperbolic-vortex paper, which matched mean jet velocity rather than independently demonstrating user-equivalent service. It is a research target, not a promised result.
 
 The first study should compare:
 - A0: exact local premium comparator modes;
 - A1: passive zoned manifold;
 - A2: replaceable nozzle cassette;
-- A3: passive fluidic / flow-shaping geometry only if it is manufacturable and measurable;
-- A4: fixed plus handheld delivery as separate task modes.
+- A3: passive feedback-channel fluidic oscillator, only if manufacturable and stable at the low-pressure points;
+- A4: hyperbolic-vortex / air-entraining internal distributor, reproducing the published concept as prior art rather than claiming invention;
+- A5: fixed plus handheld delivery as separate task modes;
+- A6: deterministic selectable zones.
 
-Do not begin with powered variable zones until passive designs demonstrate a robust, maintainable advantage. A fluidic oscillator is a research hypothesis, not a shower-proven technology: a March 2026 review of wall-attachment oscillating jets reports double-feedback oscillation at Reynolds numbers around 220 in certain studied configurations, but those configurations are not showerheads and the threshold cannot be transferred directly. The study motivates a bounded test arm only. Source: Jaafarian et al., International Communications in Heat and Mass Transfer (2026), DOI 10.1016/j.icheatmasstransfer.2025.110243, https://www.sciencedirect.com/science/article/pii/S0735193325016690.
+The 2019 prior-art result is a useful quantitative research baseline: van de Griend et al. reported 14.4 ± 5.6% less water at similar mean jet velocity, p < 0.01, in their test configuration. The authors did not conduct a new human comfort trial; they inferred comfort from earlier literature and explicitly noted that the altered central/outer nozzle distribution might or might not be desirable. They also observed changes in dissolved-gas / water-chemistry indicators in a separate recirculating characterization rig. Aqua must compare the full spatial field, task outcome, low-pressure envelope, aerosol time series, water-quality owner endpoints and cleanability before making any similar service claim. Source: van de Griend et al., Water (2019), 11(12), 2446, https://doi.org/10.3390/w11122446.
+
+Do not begin with powered variable zones until passive designs demonstrate a robust, maintainable advantage. A fluidic oscillator is a separate research hypothesis, not a shower-proven technology: a March 2026 review of wall-attachment oscillating jets reports double-feedback oscillation at Reynolds numbers around 220 in certain studied configurations, but those configurations are not showerheads and the threshold cannot be transferred directly. Source: Jaafarian et al., International Communications in Heat and Mass Transfer (2026), DOI 10.1016/j.icheatmasstransfer.2025.110243, https://www.sciencedirect.com/science/article/pii/S0735193325016690.
 
 ## 9. Evidence ownership
 
