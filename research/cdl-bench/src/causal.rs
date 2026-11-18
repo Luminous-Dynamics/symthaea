@@ -195,6 +195,12 @@ pub fn generate_scm(
         }
     }
 
+    let steps_u64 = u64::try_from(steps).map_err(|_| GeneratorError::LengthOverflow)?;
+    let stream_capacity = steps
+        .checked_mul(5 * std::mem::size_of::<i16>())
+        .and_then(|payload| SCM_HEADER_LEN.checked_add(payload))
+        .ok_or(GeneratorError::LengthOverflow)?;
+
     let mut rng = SplitMix64::new(seed);
     let mut previous = [0i16; 5];
     let mut observations = Vec::with_capacity(steps);
@@ -243,11 +249,6 @@ pub fn generate_scm(
         previous = current;
     }
 
-    let steps_u64 = u64::try_from(steps).map_err(|_| GeneratorError::LengthOverflow)?;
-    let stream_capacity = steps
-        .checked_mul(5 * std::mem::size_of::<i16>())
-        .and_then(|payload| SCM_HEADER_LEN.checked_add(payload))
-        .ok_or(GeneratorError::LengthOverflow)?;
     let mut stream = Vec::with_capacity(stream_capacity);
     stream.extend_from_slice(SCM_MAGIC);
     stream.extend_from_slice(&SCM_VERSION.to_le_bytes());
