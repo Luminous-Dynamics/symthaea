@@ -21,6 +21,7 @@ pub struct RobustDecisionManifest {
     pub zone_requirement_revision: Option<String>,
     pub requirements_state: String,
     pub mission_profile_ref: Option<String>,
+    pub decision_domain_ref: Option<String>,
     pub confirmatory_plan_ref: Option<String>,
     pub requirements: Vec<DecisionRequirement>,
     pub candidates: Vec<Candidate>,
@@ -71,6 +72,8 @@ pub struct PropertyEvidence {
     pub uncertainty_profile_ref: Option<String>,
     pub calibration_receipt_ref: Option<String>,
     pub predictor_generation_ref: Option<String>,
+    pub calibration_receipt_predictor_generation_ref: Option<String>,
+    pub calibration_domain_ref: Option<String>,
     pub coupon_evidence_ref: Option<String>,
     pub coupon_run_ref: Option<String>,
     pub method_selection_ref: Option<String>,
@@ -192,6 +195,10 @@ impl RobustDecisionManifest {
         {
             push(&mut findings, "decision_missing_robot_or_requirement_binding", "article_revision/geometry_digest/zone_requirement_ref/zone_requirement_revision/mission_profile_ref",
                 "A down-selection or confirmatory decision must bind the exact robot article, geometry, frozen zone requirement revision and mission profile.");
+        }
+        if self.stage != "exploratory" && is_blank_option(&self.decision_domain_ref) {
+            push(&mut findings, "decision_domain_binding_missing", "decision_domain_ref",
+                "Down-selection and confirmatory decisions must bind the target applicability domain.");
         }
         if self.stage == "confirmatory" && is_blank_option(&self.confirmatory_plan_ref) {
             push(&mut findings, "confirmatory_plan_missing", "confirmatory_plan_ref",
@@ -385,11 +392,21 @@ impl RobustDecisionManifest {
                             ("uncertainty_profile_ref", evidence.uncertainty_profile_ref.as_deref()),
                             ("calibration_receipt_ref", evidence.calibration_receipt_ref.as_deref()),
                             ("predictor_generation_ref", evidence.predictor_generation_ref.as_deref()),
+                            ("calibration_receipt_predictor_generation_ref", evidence.calibration_receipt_predictor_generation_ref.as_deref()),
+                            ("calibration_domain_ref", evidence.calibration_domain_ref.as_deref()),
                         ] {
                             if value.is_none_or(is_blank) {
                                 push(&mut findings, "prediction_missing_calibration_provenance", format!("{epath}.{field}"),
-                                    "A calibrated prediction must bind the exact MAT-UQ profile, calibration receipt and predictor generation.");
+                                    "A calibrated prediction must bind the exact MAT-UQ profile, calibration receipt, predictor generation and calibration domain.");
                             }
+                        }
+                        if evidence.predictor_generation_ref != evidence.calibration_receipt_predictor_generation_ref {
+                            push(&mut findings, "calibration_predictor_generation_mismatch", format!("{epath}.predictor_generation_ref/calibration_receipt_predictor_generation_ref"),
+                                "The calibration receipt must be bound to the exact predictor generation used for this prediction.");
+                        }
+                        if self.decision_domain_ref.as_deref().is_some_and(|domain| evidence.calibration_domain_ref.as_deref() != Some(domain)) {
+                            push(&mut findings, "prediction_calibration_domain_mismatch", format!("{epath}.calibration_domain_ref"),
+                                "The calibration receipt domain must match the target decision domain.");
                         }
                     }
                     _ => {}
@@ -727,6 +744,8 @@ mod tests {
                 "uncertainty_profile_ref":"MAT-UQ-PROFILE-01",
                 "calibration_receipt_ref":null,
                 "predictor_generation_ref":null,
+                "calibration_receipt_predictor_generation_ref":null,
+                "calibration_domain_ref":null,
                 "coupon_evidence_ref":"COUPON-EVIDENCE-12751",
                 "coupon_run_ref":format!("RUN-{id}-{metric_id}"),
                 "method_selection_ref":"METHOD-SELECTION-12759",
@@ -751,6 +770,7 @@ mod tests {
             "zone_requirement_revision":"REV-A",
             "requirements_state":"frozen",
             "mission_profile_ref":"MISSION-PROFILE-12761",
+            "decision_domain_ref":"LIGHTSHELL-DOMAIN-REV-A",
             "confirmatory_plan_ref":null,
             "requirements":[
                 {
@@ -786,18 +806,6 @@ mod tests {
         })
     }
 
-    fn calibrated_prediction(candidate_id: &str, metric_id: &str, unit: &str, low: f64, high: f64) -> Value {
-        json!({
-            "metric_id":metric_id,"unit":unit,"lower_bound":low,"upper_bound":high,
-            "interval_semantics":"prediction_interval","coverage_fraction":0.95,
-            "evidence_origin":"calibrated_prediction","applicability_state":"in_declared_domain",
-            "uncertainty_profile_ref":"MAT-UQ-PROFILE-PRED-01",
-            "calibration_receipt_ref":"CALIBRATION-RECEIPT-01",
-            "predictor_generation_ref":"PREDICTOR-GEN-01",
-            "coupon_evidence_ref":null,"coupon_run_ref":null,"method_selection_ref":null,"raw_data_digest":null,
-            "evidence_material_lot_ref":null,"evidence_process_revision_ref":null,"evidence_construction_ref":null
-        })
-    }
 
     #[test]
     fn physical_candidates_are_assessed_without_weighted_score() {
@@ -865,6 +873,8 @@ mod tests {
             property["interval_semantics"] = json!("prediction_interval");
             property["calibration_receipt_ref"] = json!("CALIBRATION-01");
             property["predictor_generation_ref"] = json!("PREDICTOR-01");
+            property["calibration_receipt_predictor_generation_ref"] = json!("PREDICTOR-01");
+            property["calibration_domain_ref"] = json!("LIGHTSHELL-DOMAIN-REV-A");
             property["uncertainty_profile_ref"] = json!("MAT-UQ-01");
             property["applicability_state"] = json!("ood_detected");
             property["coupon_evidence_ref"] = json!(null);
@@ -908,6 +918,56 @@ mod tests {
     }
 
     #[test]
+    fn calibration_receipt_for_another_predictor_generation_is_rejected() {
+        let mut manifest = base_manifest();
+        manifest["stage"] = json!("exploratory");
+        manifest["candidates"] = json!([candidate("P",[60.0,70.0],[120.0,130.0],"preflight_passed")]);
+        for property in manifest["candidates"][0]["properties"].as_array_mut().unwrap() {
+            property["evidence_origin"] = json!("calibrated_prediction");
+            property["interval_semantics"] = json!("prediction_interval");
+            property["calibration_receipt_ref"] = json!("CALIBRATION-01");
+            property["predictor_generation_ref"] = json!("PREDICTOR-NEW");
+            property["calibration_receipt_predictor_generation_ref"] = json!("PREDICTOR-OLD");
+            property["calibration_domain_ref"] = json!("LIGHTSHELL-DOMAIN-REV-A");
+            property["applicability_state"] = json!("in_declared_domain");
+            property["coupon_evidence_ref"] = json!(null);
+            property["coupon_run_ref"] = json!(null);
+            property["method_selection_ref"] = json!(null);
+            property["raw_data_digest"] = json!(null);
+            property["evidence_material_lot_ref"] = json!(null);
+            property["evidence_process_revision_ref"] = json!(null);
+            property["evidence_construction_ref"] = json!(null);
+        }
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "calibration_predictor_generation_mismatch"));
+    }
+
+    #[test]
+    fn calibration_receipt_for_another_domain_is_rejected() {
+        let mut manifest = base_manifest();
+        manifest["stage"] = json!("exploratory");
+        manifest["candidates"] = json!([candidate("P",[60.0,70.0],[120.0,130.0],"preflight_passed")]);
+        for property in manifest["candidates"][0]["properties"].as_array_mut().unwrap() {
+            property["evidence_origin"] = json!("calibrated_prediction");
+            property["interval_semantics"] = json!("prediction_interval");
+            property["calibration_receipt_ref"] = json!("CALIBRATION-01");
+            property["predictor_generation_ref"] = json!("PREDICTOR-01");
+            property["calibration_receipt_predictor_generation_ref"] = json!("PREDICTOR-01");
+            property["calibration_domain_ref"] = json!("OTHER-DOMAIN");
+            property["applicability_state"] = json!("in_declared_domain");
+            property["coupon_evidence_ref"] = json!(null);
+            property["coupon_run_ref"] = json!(null);
+            property["method_selection_ref"] = json!(null);
+            property["raw_data_digest"] = json!(null);
+            property["evidence_material_lot_ref"] = json!(null);
+            property["evidence_process_revision_ref"] = json!(null);
+            property["evidence_construction_ref"] = json!(null);
+        }
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "prediction_calibration_domain_mismatch"));
+    }
+
+    #[test]
     fn supplier_claims_and_simulation_never_become_physical_front_members() {
         let mut manifest = base_manifest();
         manifest["candidates"][0]["properties"][0]["evidence_origin"] = json!("supplier_claim");
@@ -948,12 +1008,14 @@ mod tests {
         let mut manifest = base_manifest();
         manifest["candidates"][1]["properties"][1]["lower_bound"] = json!(100.0);
         manifest["candidates"][1]["properties"][1]["upper_bound"] = json!(105.0);
-        manifest["candidates"][1]["properties"][2]["lower_bound"] = json!(35.0);
-        manifest["candidates"][1]["properties"][2]["upper_bound"] = json!(39.0);
+        manifest["candidates"][1]["properties"][2]["lower_bound"] = json!(46.0);
+        manifest["candidates"][1]["properties"][2]["upper_bound"] = json!(49.0);
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.is_valid(), "{:?}", report.findings);
-        assert!(report.physical_pareto_candidates().contains(&"B"));
-        assert!(!report.physical_pareto_candidates().contains(&"A"));
+        assert!(report.physical_pareto_candidates().contains(&"A"));
+        assert!(!report.physical_pareto_candidates().contains(&"B"));
+        let b = report.candidate_assessments.iter().find(|item| item.candidate_id == "B").unwrap();
+        assert_eq!(b.dominated_by, vec!["A"]);
     }
 
     #[test]
