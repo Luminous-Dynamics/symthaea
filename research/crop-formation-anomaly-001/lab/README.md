@@ -13,7 +13,7 @@ This is the first executable component of CROP-INTEL-001. It is deliberately sma
 - Crop-flow orientation-field descriptors: circular mean/resultant, direction entropy, bend-magnitude spread and nearest-neighbour alignment.
 - 3D stem-pose orientation statistics: base-to-tip vector concentration, inclination from vertical, horizontal azimuth, 3D nearest-neighbour alignment and optional centre-relative radial/tangential alignment.
 - First-order SI-unit mechanics: hollow elliptical section properties, section moduli, three-point and cantilever beam-test estimates, local curvature and outer-fibre stress.
-- Piecewise-EI Euler–Bernoulli cantilever profiles under tip force or uniform transverse load, with separate linear translational and rotational root springs. Includes exact segment-wise integrals and ten new analytical tests.
+- Piecewise-EI Euler–Bernoulli cantilever profiles under tip force or uniform transverse load, with separate linear translational and rotational root springs. Includes exact segment-wise integrals and ten new analytical tests. The event schema also records root-anchorage force/translation and moment/rotation curves to support independent root-spring calibration.
 - Binary-grid representation with explicit D4 transforms (four rotations/reflections) and row-major/column-major traversal.
 - Immutable-in-use decoder manifests with unique IDs; a standard 32-way D4 × traversal × ASCII-7 bit-order family; persist a canonical manifest digest/timestamp externally before challenge analysis.
 - Predeclared 7-bit ASCII decoder specifications with complete attempt logging.
