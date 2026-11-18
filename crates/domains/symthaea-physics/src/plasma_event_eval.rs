@@ -55,6 +55,59 @@ struct AlarmObservation {
     pub evidence_quality: AlarmEvidenceQuality,
 }
 
+/// Exact model/split/calibration/uncertainty tuple authorized by one frozen
+/// alarm policy. The policy digest commits to every field; score evidence
+/// carrying a different but syntactically valid identity is rejected.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RiskModelBinding {
+    pub model_id: String,
+    pub model_revision: String,
+    pub model_artifact_sha256: String,
+    pub training_split_sha256: String,
+    pub calibration_id: String,
+    pub calibration_revision: String,
+    pub calibration_receipt_sha256: String,
+    pub uncertainty_method_id: String,
+    pub nominal_coverage: f64,
+}
+
+impl RiskModelBinding {
+    fn validate(&self) -> Result<(), PlasmaEventEvalError> {
+        for (value, field) in [
+            (self.model_id.as_str(), "risk model_id"),
+            (self.model_revision.as_str(), "risk model_revision"),
+            (self.calibration_id.as_str(), "risk calibration_id"),
+            (self.calibration_revision.as_str(), "risk calibration_revision"),
+            (self.uncertainty_method_id.as_str(), "risk uncertainty_method_id"),
+        ] {
+            if value.trim().is_empty() {
+                return Err(PlasmaEventEvalError::new(format!("{field} must be non-empty")));
+            }
+        }
+        for (digest, field) in [
+            (self.model_artifact_sha256.as_str(), "risk model_artifact_sha256"),
+            (self.training_split_sha256.as_str(), "risk training_split_sha256"),
+            (self.calibration_receipt_sha256.as_str(), "risk calibration_receipt_sha256"),
+        ] {
+            if !valid_sha256(digest) {
+                return Err(PlasmaEventEvalError::new(format!(
+                    "{field} must be 64 lowercase hexadecimal characters"
+                )));
+            }
+        }
+        if !self.nominal_coverage.is_finite()
+            || self.nominal_coverage <= 0.0
+            || self.nominal_coverage >= 1.0
+        {
+            return Err(PlasmaEventEvalError::new(
+                "risk model nominal_coverage must be finite and strictly between zero and one",
+            ));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AlarmPolicyConfig {
@@ -63,6 +116,9 @@ pub struct AlarmPolicyConfig {
     pub score_scale_id: String,
     /// SHA-256 content identity for the frozen validation/calibration receipt.
     pub validation_receipt_sha256: String,
+    /// Exact model artifact, training split, calibration and uncertainty method
+    /// that the validation receipt authorized for this policy.
+    pub risk_model: RiskModelBinding,
     pub trigger_threshold: f64,
     pub clear_threshold: f64,
     pub trigger_persistence_windows: usize,
@@ -87,6 +143,7 @@ impl AlarmPolicyConfig {
                 "validation receipt must be 64 lowercase hexadecimal characters",
             ));
         }
+        self.risk_model.validate()?;
         if self.required_warning_ns == 0 {
             return Err(PlasmaEventEvalError::new("required_warning_ns must be positive"));
         }
@@ -118,10 +175,19 @@ impl AlarmPolicyConfig {
             canonical.extend_from_slice(&(field.len() as u64).to_be_bytes());
             canonical.extend_from_slice(field);
         };
-        append(b"luminous.plasma-alarm-policy.v0.3");
+        append(b"luminous.plasma-alarm-policy.v0.4");
         append(self.policy_id.as_bytes());
         append(self.score_scale_id.as_bytes());
         append(self.validation_receipt_sha256.as_bytes());
+        append(self.risk_model.model_id.as_bytes());
+        append(self.risk_model.model_revision.as_bytes());
+        append(self.risk_model.model_artifact_sha256.as_bytes());
+        append(self.risk_model.training_split_sha256.as_bytes());
+        append(self.risk_model.calibration_id.as_bytes());
+        append(self.risk_model.calibration_revision.as_bytes());
+        append(self.risk_model.calibration_receipt_sha256.as_bytes());
+        append(self.risk_model.uncertainty_method_id.as_bytes());
+        append(format!("{:016x}", self.risk_model.nominal_coverage.to_bits()).as_bytes());
         append(format!("{:016x}", self.trigger_threshold.to_bits()).as_bytes());
         append(format!("{:016x}", self.clear_threshold.to_bits()).as_bytes());
         append(self.trigger_persistence_windows.to_string().as_bytes());
@@ -201,7 +267,7 @@ impl RiskScoreEvidence {
     pub fn validate_for_frame(
         &self,
         frame: &PlasmaObservationFrame,
-        expected_score_scale_id: &str,
+        policy: &AlarmPolicyConfig,
     ) -> Result<(), PlasmaEventEvalError> {
         if self.schema_version != PLASMA_RISK_SCORE_EVIDENCE_SCHEMA {
             return Err(PlasmaEventEvalError::new(
@@ -259,9 +325,24 @@ impl RiskScoreEvidence {
                 "risk estimate and interval bounds must be finite and ordered",
             ));
         }
-        if self.score_scale_id != expected_score_scale_id {
+        if self.score_scale_id != policy.score_scale_id {
             return Err(PlasmaEventEvalError::new(
                 "risk evidence score_scale_id does not match the frozen alarm policy",
+            ));
+        }
+        let binding = &policy.risk_model;
+        if self.model_id != binding.model_id
+            || self.model_revision != binding.model_revision
+            || self.model_artifact_sha256 != binding.model_artifact_sha256
+            || self.training_split_sha256 != binding.training_split_sha256
+            || self.calibration_id != binding.calibration_id
+            || self.calibration_revision != binding.calibration_revision
+            || self.calibration_receipt_sha256 != binding.calibration_receipt_sha256
+            || self.uncertainty_method_id != binding.uncertainty_method_id
+            || self.nominal_coverage.to_bits() != binding.nominal_coverage.to_bits()
+        {
+            return Err(PlasmaEventEvalError::new(
+                "risk evidence model, training split, calibration or uncertainty binding does not match the frozen alarm policy",
             ));
         }
         if self.horizon_ns == 0 {
@@ -423,7 +504,7 @@ impl OnlinePlasmaAlarmPolicy {
                         "a qualified measured frame requires model-bound risk evidence",
                     )
                 })?;
-                evidence.validate_for_frame(frame, &self.config.score_scale_id)?;
+                evidence.validate_for_frame(frame, &self.config)?;
                 let risk_evidence_sha256 = evidence.evidence_sha256()?;
                 let observation = AlarmObservation {
                     shot_id: inputs.shot_id().to_owned(),
@@ -1121,6 +1202,17 @@ mod tests {
             policy_id: "fixed-test-policy-v1".to_owned(),
             score_scale_id: "normalized-risk-0-1-v1".to_owned(),
             validation_receipt_sha256: "a".repeat(64),
+            risk_model: RiskModelBinding {
+                model_id: "symthaea-plasma-risk".to_owned(),
+                model_revision: "test-model-v1".to_owned(),
+                model_artifact_sha256: "1".repeat(64),
+                training_split_sha256: "2".repeat(64),
+                calibration_id: "plasma-risk-calibration".to_owned(),
+                calibration_revision: "cal-v1".to_owned(),
+                calibration_receipt_sha256: "3".repeat(64),
+                uncertainty_method_id: "heldout-conformal-v1".to_owned(),
+                nominal_coverage: 0.9,
+            },
             trigger_threshold: 0.8,
             clear_threshold: 0.3,
             trigger_persistence_windows: 2,
@@ -1771,9 +1863,51 @@ mod tests {
         assert_eq!(policy.last_window_end_ns, None);
 
         let mut wrong_artifact = risk_evidence(&frame, 0.9, 0.9, 0.9);
-        wrong_artifact.model_artifact_sha256 = "not-a-digest".to_owned();
+        wrong_artifact.model_artifact_sha256 = "f".repeat(64);
         assert!(policy
             .update_from_frame(&frame, &requirements, Some(wrong_artifact))
+            .is_err());
+        assert_eq!(policy.last_window_end_ns, None);
+
+        let mut wrong_model = risk_evidence(&frame, 0.9, 0.9, 0.9);
+        wrong_model.model_id = "different-model".to_owned();
+        assert!(policy
+            .update_from_frame(&frame, &requirements, Some(wrong_model))
+            .is_err());
+        assert_eq!(policy.last_window_end_ns, None);
+
+        let mut wrong_split = risk_evidence(&frame, 0.9, 0.9, 0.9);
+        wrong_split.training_split_sha256 = "e".repeat(64);
+        assert!(policy
+            .update_from_frame(&frame, &requirements, Some(wrong_split))
+            .is_err());
+        assert_eq!(policy.last_window_end_ns, None);
+
+        let mut wrong_calibration = risk_evidence(&frame, 0.9, 0.9, 0.9);
+        wrong_calibration.calibration_id = "different-calibration".to_owned();
+        assert!(policy
+            .update_from_frame(&frame, &requirements, Some(wrong_calibration))
+            .is_err());
+        assert_eq!(policy.last_window_end_ns, None);
+
+        let mut wrong_calibration_revision = risk_evidence(&frame, 0.9, 0.9, 0.9);
+        wrong_calibration_revision.calibration_revision = "rev-2".to_owned();
+        assert!(policy
+            .update_from_frame(&frame, &requirements, Some(wrong_calibration_revision))
+            .is_err());
+        assert_eq!(policy.last_window_end_ns, None);
+
+        let mut wrong_uncertainty_method = risk_evidence(&frame, 0.9, 0.9, 0.9);
+        wrong_uncertainty_method.uncertainty_method_id = "unvalidated-method".to_owned();
+        assert!(policy
+            .update_from_frame(&frame, &requirements, Some(wrong_uncertainty_method))
+            .is_err());
+        assert_eq!(policy.last_window_end_ns, None);
+
+        let mut wrong_nominal_coverage = risk_evidence(&frame, 0.9, 0.9, 0.9);
+        wrong_nominal_coverage.nominal_coverage = 0.95;
+        assert!(policy
+            .update_from_frame(&frame, &requirements, Some(wrong_nominal_coverage))
             .is_err());
         assert_eq!(policy.last_window_end_ns, None);
 
