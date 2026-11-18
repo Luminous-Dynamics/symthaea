@@ -43,12 +43,37 @@ jobs:
           schema = json.loads((root / "schemas/case_manifest.schema.json").read_text())
           scorecard_schema = json.loads((root / "schemas/run_scorecard.schema.json").read_text())
           manifest = json.loads((root / "fixtures/v0.1/cases.json").read_text())
+          noise_schema = json.loads((root / "schemas/bounded_noise_manifest.schema.json").read_text())
+          noise_manifest = json.loads((root / "fixtures/noisy-v0.1/cases.json").read_text())
           Draft202012Validator.check_schema(schema)
           Draft202012Validator(schema).validate(manifest)
           Draft202012Validator.check_schema(scorecard_schema)
+          Draft202012Validator.check_schema(noise_schema)
+          Draft202012Validator(noise_schema).validate(noise_manifest)
+          assert len(noise_manifest["cases"]) == 12
+          assert all(case["epsilon_scaled"] > 0 for case in noise_manifest["cases"])
           PY
       - name: Validate exact group axioms, point stabilizers and polynomial invariance
         run: python3 -I research/symmetry-discovery-benchmark-001/tools/validate_fixtures.py
+      - name: Validate bounded-noise symmetry fixtures
+        run: python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("research/symmetry-discovery-benchmark-001")
+          manifest = json.loads((root / "fixtures/noisy-v0.1/cases.json").read_text())
+          ids = [case["noise_case_id"] for case in manifest["cases"]]
+          assert len(ids) == len(set(ids)) == 12
+          for case in manifest["cases"]:
+              possible = set(case["expected_possible_elements"])
+              ruled_out = set(case["expected_ruled_out_elements"])
+              exact = set(case["exact_stabilizer_elements"])
+              assert not (possible & ruled_out)
+              assert possible | ruled_out == {"e", "r90", "r180", "r270", "fx", "fy", "fdiag", "fanti"}
+              assert exact <= possible
+              assert "not proof" in case["interpretation"] or "not promoted" in case["interpretation"] or "leaves a reflection possible" in case["interpretation"] or "excludes" in case["interpretation"]
+          print("bounded_noise_fixture_contract=PASS")
+          PY
       - name: Self-test auditable benchmark scorecard validator
         run: python3 -I research/symmetry-discovery-benchmark-001/tools/validate_scorecard.py --self-test
       - name: Install pinned Rust toolchain
