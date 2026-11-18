@@ -421,7 +421,9 @@ fn validate_instance(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
                 .get("max_abs_charge_state")
                 .and_then(Value::as_u64)
                 .filter(|value| *value > 0)
-                .ok_or_else(|| "integer charge basis requires a positive max_abs_charge_state".to_owned())?;
+                .ok_or_else(|| {
+                    "integer charge basis requires a positive max_abs_charge_state".to_owned()
+                })?;
             Some(value)
         }
         other => return Err(format!("unsupported quantum representation {other}")),
@@ -456,12 +458,18 @@ fn validate_instance(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
                 || !bath.get("low_frequency_exponent").is_some_and(Value::is_null)
                 || !bath.get("cutoff_energy").is_some_and(Value::is_null)
             {
-                return Err("bath mode none requires zero coupling, null exponents/cutoff and an empty spectrum".to_owned());
+                return Err(
+                    "bath mode none requires zero coupling, null exponents/cutoff and an empty spectrum"
+                        .to_owned(),
+                );
             }
         }
         "analytic_power_law" => {
             if bath_operator == "none" || bath_strength <= 0.0 || !spectral_density.is_empty() {
-                return Err("analytic_power_law bath requires an operator, positive coupling and no tabulated spectrum".to_owned());
+                return Err(
+                    "analytic_power_law bath requires an operator, positive coupling and no tabulated spectrum"
+                        .to_owned(),
+                );
             }
             let exponent = finite_number(
                 bath.get("low_frequency_exponent")
@@ -479,7 +487,10 @@ fn validate_instance(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
         }
         "tabulated" => {
             if bath_operator == "none" || bath_strength <= 0.0 || spectral_density.len() < 2 {
-                return Err("tabulated bath requires an operator, positive coupling and at least two spectral points".to_owned());
+                return Err(
+                    "tabulated bath requires an operator, positive coupling and at least two spectral points"
+                        .to_owned(),
+                );
             }
             let mut previous_omega = 0.0_f64;
             for point in spectral_density {
@@ -488,11 +499,16 @@ fn validate_instance(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
                     "bath omega",
                 )?;
                 let density = finite_number(
-                    point.get("density").ok_or_else(|| "spectral point missing density".to_owned())?,
+                    point
+                        .get("density")
+                        .ok_or_else(|| "spectral point missing density".to_owned())?,
                     "bath density",
                 )?;
                 if omega <= previous_omega || density < 0.0 {
-                    return Err("tabulated bath frequencies must be strictly increasing and densities non-negative".to_owned());
+                    return Err(
+                        "tabulated bath frequencies must be strictly increasing and densities non-negative"
+                            .to_owned(),
+                    );
                 }
                 previous_omega = omega;
             }
@@ -517,7 +533,9 @@ fn validate_instance(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
     )?;
     if flux_mode == "zero" {
         if !close_enough(total_flux, 0.0) || any_nonzero_gauge_link {
-            return Err("zero-flux declaration conflicts with nonzero gauge-link phase or flux".to_owned());
+            return Err(
+                "zero-flux declaration conflicts with nonzero gauge-link phase or flux".to_owned(),
+            );
         }
     } else if flux_mode != "link_phases_declared" {
         return Err(format!("unsupported external flux mode {flux_mode}"));
