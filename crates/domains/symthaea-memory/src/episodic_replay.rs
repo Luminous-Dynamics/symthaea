@@ -74,11 +74,26 @@ use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
 use crate::TrainableNetwork;
+use crate::coordinator::MemorySource;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // EPISODE: A Single High-Phi Moment
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/// Metadata preserved when a working-memory item graduates into episodic storage.
+///
+/// verification_claimed records the producer's claim at graduation. It is not
+/// an independent verifier receipt, cryptographic attestation, or permission.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraduationProvenance {
+    /// Broad origin class assigned by the producing memory pipeline.
+    pub source: MemorySource,
+    /// Whether the producer marked the item verified at graduation.
+    pub verification_claimed: bool,
+    /// Producer-supplied label; not a globally unique event identifier.
+    pub source_label: Option<String>,
+}
 
 /// An episode representing a single high-consciousness moment in the cognitive loop.
 ///
@@ -136,6 +151,16 @@ pub struct Episode {
     /// Semantic embedding from neural encoder (for embedding-based retrieval).
     #[serde(default)]
     pub semantic_embedding: Option<Vec<f32>>,
+
+    /// Source-class / verification-claim metadata from working-memory graduation.
+    /// This is descriptive lineage, not an independently verified source receipt.
+    #[serde(default)]
+    pub graduation_provenance: Option<GraduationProvenance>,
+
+    /// Additive replay-retention score, kept separate from Psi and emotional valence.
+    /// Does not affect admission thresholds, authority, or action permissions.
+    #[serde(default)]
+    pub consolidation_priority_bonus: f64,
 }
 
 impl Episode {
@@ -155,6 +180,8 @@ impl Episode {
             dopamine_at_encoding: None,
             bath_state_at_encoding: None,
             semantic_embedding: None,
+            graduation_provenance: None,
+            consolidation_priority_bonus: 0.0,
         }
     }
 
@@ -182,12 +209,38 @@ impl Episode {
             dopamine_at_encoding: None,
             bath_state_at_encoding: None,
             semantic_embedding: None,
+            graduation_provenance: None,
+            consolidation_priority_bonus: 0.0,
         }
     }
 
     /// Set semantic embedding for embedding-based retrieval.
     pub fn with_semantic_embedding(mut self, embedding: Vec<f32>) -> Self {
         self.semantic_embedding = Some(embedding);
+        self
+    }
+
+    /// Attach source-class and verification-claim lineage from a graduation event.
+    ///
+    /// This does not assert that the source claim was independently authenticated.
+    /// Production source-event IDs, digests and verifier receipts belong to the
+    /// bitemporal/MACE receipt contract.
+    pub fn with_graduation_provenance(
+        mut self,
+        provenance: GraduationProvenance,
+    ) -> Self {
+        self.graduation_provenance = Some(provenance);
+        self
+    }
+
+    /// Add a finite, non-negative bonus to replay retention priority.
+    ///
+    /// This is deliberately independent of Psi, valence and episode admission.
+    /// Invalid bonuses are ignored rather than contaminating heap ordering.
+    pub fn with_consolidation_priority_bonus(mut self, bonus: f64) -> Self {
+        if bonus.is_finite() && bonus >= 0.0 {
+            self.consolidation_priority_bonus = bonus;
+        }
         self
     }
 
@@ -247,6 +300,7 @@ impl Episode {
             + recency_bonus
             + consolidation_bonus
             + da_bonus
+            + self.consolidation_priority_bonus
             + replay_penalty * 0.05
     }
 
@@ -502,7 +556,20 @@ impl EpisodicMemory {
         self.current_cycle = episode.timestamp;
         self.cycles_since_replay += 1;
 
-        // Check Phi threshold
+        // Reject malformed cognitive state before ordered comparisons or heap insertion.
+        // NaN < threshold is false and can otherwise silently bypass a rejection gate.
+        if !episode.psi.is_finite()
+            || !(0.0..=1.0).contains(&episode.psi)
+            || !self.config.psi_threshold.is_finite()
+            || !(0.0..=1.0).contains(&self.config.psi_threshold)
+            || !episode.consolidation_priority_bonus.is_finite()
+            || episode.consolidation_priority_bonus < 0.0
+        {
+            return false;
+        }
+
+        // Check the raw Psi threshold; provenance and retention bonuses cannot admit
+        // an episode whose cognitive-state estimate is below the configured floor.
         if episode.psi < self.config.psi_threshold {
             return false;
         }
