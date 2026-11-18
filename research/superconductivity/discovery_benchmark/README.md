@@ -10,6 +10,12 @@ That is the central benchmark gap: excellent interpolation inside known families
 
 BEE-NET is a different and complementary baseline. Its reported 0.87 K MAE is against DFT-derived Allen-Dynes Tc labels, not measured experimental Tc. It predicts the Eliashberg spectral function and integrates ML screening with first-principles calculations, stability filtering and experiments. The 2026 report describes 741 computationally stable candidates and synthesis/experimental confirmation of two previously unreported compounds. This is a genuine workflow milestone, but it must remain a separate computational-label and experimental-confirmation track.
 
+## Published baseline inventory
+
+The machine-readable inventory at `data/research/superconductivity_published_baseline_registry_v0_1.json` pins the published AutoSuperCon, BEE-NET and HTSC-2025 baseline definitions, including label authority, dataset size, test split and reproduction status. It is an inventory, not a downloaded dataset or an independent reproduction.
+
+BEE-NET's public repository README reports 5,241 calculated examples, a 1,049-entry held-out ID list and 100-model CSO/CPD ensembles. The selected database and model checkpoints are documented as not tracked in the repository. Its README warns that training/validation indices are DataFrame row labels but its test list contains Alexandria IDs; this alignment must be verified before replay. The associated Materials Cloud source archive is about 48.1 GiB, so acquisition and local compute should be an explicit, resource-aware decision. The archive metadata lists CC BY 4.0, but rights to reuse the BEE-NET code and model artifacts require separate review.
+
 ## Split contract
 
 - Family holdout: no family may appear in both train and test.
