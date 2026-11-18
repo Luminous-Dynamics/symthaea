@@ -1,0 +1,443 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:lightshell-manufacturing-route:0.1.0",
+  "title": "Atelier Lightshell Topology-Bound Manufacturing Route",
+  "description": "Robot-garment-specific operation graph referencing generic MFG-PROC capabilities. Not a machine program, production executor or manufacturing authorization.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "route_id",
+    "state",
+    "candidate_id",
+    "platform_id",
+    "article_revision",
+    "geometry_digest",
+    "topology_ref",
+    "topology_revision",
+    "topology_digest",
+    "topology_state",
+    "material_lots",
+    "topology_panels",
+    "topology_connections",
+    "articulation_features",
+    "service_features",
+    "operations",
+    "evidence_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "route_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "proposed",
+        "process_review",
+        "route_reviewed"
+      ]
+    },
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "platform_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "article_revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "geometry_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "topology_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "topology_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "topology_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-fA-F]{64}$"
+    },
+    "topology_state": {
+      "enum": [
+        "proposed",
+        "source_bound",
+        "topology_preflighted"
+      ]
+    },
+    "material_lots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lot_id",
+          "material_ref",
+          "supplier_lot_ref",
+          "receipt_evidence_ref"
+        ],
+        "properties": {
+          "lot_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "material_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "supplier_lot_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "receipt_evidence_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "topology_panels": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "topology_connections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "connection_id",
+          "connection_kind"
+        ],
+        "properties": {
+          "connection_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "connection_kind": {
+            "enum": [
+              "sewn_seam",
+              "knit_integrated",
+              "bonded_seam",
+              "removable_attachment"
+            ]
+          }
+        }
+      }
+    },
+    "articulation_features": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "service_features": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation_id",
+          "operation_index",
+          "operation_kind",
+          "dependencies",
+          "topology_refs",
+          "material_lot_refs",
+          "input_component_refs",
+          "output_component_refs",
+          "process_binding",
+          "inspection_gate",
+          "rework_of_component_ref"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operation_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "operation_kind": {
+            "enum": [
+              "material_receipt",
+              "textile_forming",
+              "panel_cut",
+              "edge_finish",
+              "seam_join",
+              "knit_integrate",
+              "bond_join",
+              "removable_attach",
+              "sensor_install",
+              "clean_finish",
+              "in_process_inspect",
+              "final_inspect",
+              "rework",
+              "pack_release"
+            ]
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "topology_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "entity_kind",
+                "entity_ref"
+              ],
+              "properties": {
+                "entity_kind": {
+                  "enum": [
+                    "panel",
+                    "connection",
+                    "articulation_feature",
+                    "service_feature",
+                    "garment"
+                  ]
+                },
+                "entity_ref": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "material_lot_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "input_component_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "output_component_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "process_binding": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "owner_ref",
+              "process_profile_ref",
+              "capability_state",
+              "machine_ref",
+              "tool_ref",
+              "process_revision_ref",
+              "program_revision_ref",
+              "capability_evidence_ref"
+            ],
+            "properties": {
+              "owner_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "process_profile_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "capability_state": {
+                "enum": [
+                  "unknown",
+                  "pending",
+                  "qualified",
+                  "not_capable"
+                ]
+              },
+              "machine_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tool_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "process_revision_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "program_revision_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "capability_evidence_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "inspection_gate": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "gate_id",
+                  "method_selection_ref",
+                  "fixture_ref",
+                  "fixture_revision_ref",
+                  "acceptance_rule_ref",
+                  "result_state",
+                  "result_evidence_ref"
+                ],
+                "properties": {
+                  "gate_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "method_selection_ref": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "fixture_ref": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "fixture_revision_ref": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "acceptance_rule_ref": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "result_state": {
+                    "enum": [
+                      "not_run",
+                      "pass",
+                      "fail",
+                      "inconclusive"
+                    ]
+                  },
+                  "result_evidence_ref": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "rework_of_component_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "evidence_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability_is_external_owner_authority",
+        "every_topology_entity_has_operation_disposition",
+        "output_component_has_one_producer",
+        "dependencies_must_be_acyclic",
+        "inspection_is_evidence_gated",
+        "rework_preserves_failed_lineage",
+        "no_execution_or_release_authority"
+      ],
+      "properties": {
+        "capability_is_external_owner_authority": {
+          "const": true
+        },
+        "every_topology_entity_has_operation_disposition": {
+          "const": true
+        },
+        "output_component_has_one_producer": {
+          "const": true
+        },
+        "dependencies_must_be_acyclic": {
+          "const": true
+        },
+        "inspection_is_evidence_gated": {
+          "const": true
+        },
+        "rework_preserves_failed_lineage": {
+          "const": true
+        },
+        "no_execution_or_release_authority": {
+          "const": true
+        }
+      }
+    }
+  }
+}
