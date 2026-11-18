@@ -1,4 +1,4 @@
-name: SymFP spectral core reference
+name: SymFP spectral core exact-head qualification
 
 on:
   pull_request:
@@ -41,7 +41,7 @@ jobs:
         run: cargo test --locked --manifest-path research/symfp-spectral-core-001/Cargo.toml
       - name: Strict Clippy
         run: cargo clippy --locked --manifest-path research/symfp-spectral-core-001/Cargo.toml --all-targets -- -D warnings
-      - name: Test robust SymFP uncertainty envelope
+      - name: Regression test robust SymFP uncertainty envelope
         run: cargo test --locked --manifest-path research/symfp-spectral-core-001/Cargo.toml robust::tests
-      - name: Run deterministic SymFP rank-template probe
+      - name: Run deterministic exact-head SymFP rank-template probe
         run: cargo run --release --locked --manifest-path research/symfp-spectral-core-001/Cargo.toml --example rank_template_probe
