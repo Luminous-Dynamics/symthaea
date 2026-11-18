@@ -285,48 +285,93 @@ pub struct DiagnosabilityResult {
     pub unresolved_cross_decision_pairs: Vec<UnresolvedDecisionPair>,
 }
 
-/// Checks whether every cross-decision pair of worlds is separated by at
-/// least one active sensor. UNKNOWN on either side is non-informative.
-pub fn diagnose(
-    model: &DiagnosticPortfolioModel,
-    active_sensor_ids: &[String],
-) -> Result<DiagnosabilityResult, DiagnosticPortfolioError> {
-    model.validate()?;
-    let sensors = model.sensor_index();
-    let mut active = BTreeSet::new();
-    for sensor_id in active_sensor_ids {
-        non_empty(sensor_id, "active_sensor_id")?;
-        if !active.insert(sensor_id.as_str()) {
-            return Err(DiagnosticPortfolioError::new(format!(
-                "duplicate active sensor_id: {sensor_id}"
-            )));
+/// Cached structural index used by exhaustive subset oracles. World
+/// observations are arranged once in canonical model order, so enumerating
+/// candidate subsets does not rebuild sensor/world hash maps on every pass.
+struct DiagnosabilityContext<'a> {
+    model: &'a DiagnosticPortfolioModel,
+    sensor_outputs: BTreeMap<String, Vec<SensorObservation>>,
+    cross_decision_pairs: Vec<(usize, usize)>,
+}
+
+impl<'a> DiagnosabilityContext<'a> {
+    fn new(model: &'a DiagnosticPortfolioModel) -> Result<Self, DiagnosticPortfolioError> {
+        model.validate()?;
+        let mut sensor_outputs = BTreeMap::new();
+        for sensor in &model.sensors {
+            let outputs: BTreeMap<&str, SensorObservation> = sensor
+                .observations
+                .iter()
+                .map(|item| (item.world_id.as_str(), item.observation.clone()))
+                .collect();
+            let ordered = model
+                .worlds
+                .iter()
+                .map(|world| {
+                    outputs.get(world.world_id.as_str()).cloned().ok_or_else(|| {
+                        DiagnosticPortfolioError::new(format!(
+                            "sensor {} lost validated observation for world {}",
+                            sensor.sensor_id, world.world_id
+                        ))
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            sensor_outputs.insert(sensor.sensor_id.clone(), ordered);
         }
-        if !sensors.contains_key(sensor_id.as_str()) {
-            return Err(DiagnosticPortfolioError::new(format!(
-                "unknown active sensor_id: {sensor_id}"
-            )));
+
+        let mut cross_decision_pairs = Vec::new();
+        for (left_index, left) in model.worlds.iter().enumerate() {
+            for (right_index, right) in model.worlds.iter().enumerate().skip(left_index + 1) {
+                if left.decision_id != right.decision_id {
+                    cross_decision_pairs.push((left_index, right_index));
+                }
+            }
         }
+
+        Ok(Self {
+            model,
+            sensor_outputs,
+            cross_decision_pairs,
+        })
     }
 
-    let mut unresolved = Vec::new();
-    for (left_index, left) in model.worlds.iter().enumerate() {
-        for right in model.worlds.iter().skip(left_index + 1) {
-            if left.decision_id == right.decision_id {
-                continue;
+    fn diagnose(
+        &self,
+        active_sensor_ids: &[String],
+    ) -> Result<DiagnosabilityResult, DiagnosticPortfolioError> {
+        let known_ids: BTreeSet<&str> = self
+            .model
+            .sensors
+            .iter()
+            .map(|sensor| sensor.sensor_id.as_str())
+            .collect();
+        let mut active = BTreeSet::new();
+        for sensor_id in active_sensor_ids {
+            non_empty(sensor_id, "active_sensor_id")?;
+            if !active.insert(sensor_id.as_str()) {
+                return Err(DiagnosticPortfolioError::new(format!(
+                    "duplicate active sensor_id: {sensor_id}"
+                )));
             }
+            if !known_ids.contains(sensor_id.as_str()) {
+                return Err(DiagnosticPortfolioError::new(format!(
+                    "unknown active sensor_id: {sensor_id}"
+                )));
+            }
+        }
+
+        let active_sensor_ids: Vec<String> = active.iter().map(|id| (*id).to_owned()).collect();
+        let mut unresolved = Vec::new();
+        for (left_index, right_index) in &self.cross_decision_pairs {
+            let left = &self.model.worlds[*left_index];
+            let right = &self.model.worlds[*right_index];
             let mut separated = false;
-            for sensor_id in &active {
-                let sensor = sensors
-                    .get(sensor_id)
-                    .copied()
-                    .ok_or_else(|| DiagnosticPortfolioError::new("sensor index changed"))?;
-                let outputs: BTreeMap<&str, &SensorObservation> = sensor
-                    .observations
-                    .iter()
-                    .map(|item| (item.world_id.as_str(), &item.observation))
-                    .collect();
-                let left_value = outputs.get(left.world_id.as_str()).copied();
-                let right_value = outputs.get(right.world_id.as_str()).copied();
+            for sensor_id in &active_sensor_ids {
+                let outputs = self.sensor_outputs.get(sensor_id).ok_or_else(|| {
+                    DiagnosticPortfolioError::new("validated sensor output disappeared")
+                })?;
+                let left_value = outputs.get(*left_index);
+                let right_value = outputs.get(*right_index);
                 let (Some(SensorObservation::Known(left_value)), Some(SensorObservation::Known(right_value))) =
                     (left_value, right_value)
                 else {
@@ -346,13 +391,22 @@ pub fn diagnose(
                 });
             }
         }
-    }
 
-    Ok(DiagnosabilityResult {
-        diagnosable: unresolved.is_empty(),
-        active_sensor_ids: active.into_iter().map(str::to_owned).collect(),
-        unresolved_cross_decision_pairs: unresolved,
-    })
+        Ok(DiagnosabilityResult {
+            diagnosable: unresolved.is_empty(),
+            active_sensor_ids,
+            unresolved_cross_decision_pairs: unresolved,
+        })
+    }
+}
+
+/// Checks whether every cross-decision pair of worlds is separated by at
+/// least one active sensor. UNKNOWN on either side is non-informative.
+pub fn diagnose(
+    model: &DiagnosticPortfolioModel,
+    active_sensor_ids: &[String],
+) -> Result<DiagnosabilityResult, DiagnosticPortfolioError> {
+    DiagnosabilityContext::new(model)?.diagnose(active_sensor_ids)
 }
 
 /// Enumerates inclusion-minimal sufficient sensor sets exactly. This is an
