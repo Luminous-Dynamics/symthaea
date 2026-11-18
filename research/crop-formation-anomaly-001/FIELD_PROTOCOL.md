@@ -69,7 +69,7 @@ For each sampled plant or defined plant clump, record:
 
 ### Geometry and posture
 - specimen/sample ID and field-local x/y position;
-- stem base and tip coordinates or a calibrated 3D stem-axis vector, where feasible;
+- stem base and tip coordinates or a calibrated 3D stem-axis vector, where feasible; store the raw directed base-to-tip vector and coordinate frame;
 - stem inclination relative to gravity/vertical;
 - flow azimuth in a declared reference frame;
 - bend angle, bend location and curvature profile if measurable;
@@ -145,13 +145,14 @@ The existing simple Gaussian power reference is not a substitute for a spatially
 
 ## 9. Crop-flow analysis
 
-For calibrated samples, calculate:
+For calibrated 2D and 3D samples, calculate:
 - circular mean direction and resultant concentration;
 - direction histogram and normalized entropy;
 - local nearest-neighbour alignment;
 - centre-relative radial alignment: outward (+1) versus inward (-1);
 - centre-relative tangential alignment: counter-clockwise (+1) versus clockwise (-1);
-- bend-magnitude mean and spread.
+- bend-magnitude mean and spread;
+- for 3D stem vectors, mean inclination from vertical, horizontal azimuth/resultant, 3D axis-vector concentration and nearest-neighbour 3D alignment.
 
 Retain an undefined mean when circular directions cancel or are nearly isotropic. Centre-relative scores require a surveyed/calibrated centre in the same coordinate frame. Report uncertainty from centre location and individual stem-angle measurement. These scores describe geometry; they do not identify wind, human action, electromagnetic effects or any other cause.
 
