@@ -189,6 +189,17 @@ The Rust regression also pins the copied JSON fixture's exact byte length and FN
 
 The exact fixture oracle is still a synthetic benchmark, not a performance result. The quotient PR's own compiler work and this oracle use different construction paths for the group table, point-set stabilizers and polynomial algebra, so agreement is cross-path rather than self-comparison.
 
+
+
+## Context-indexed symmetry atlas oracle
+
+The Rust integration suite also uses one shared 16-candidate ordered-pair universe under three distinct task contexts. The exact local task-preserving subgroups are:
+- isotropic context: D4 (8 elements; 3 candidate orbits);
+- rotating/oriented context: C4 (4 elements; 4 candidate orbits);
+- asymmetric context: C1 (identity only; 16 singleton orbits).
+
+Each context receives its own quotient certificate and exact replay. A negative control relabels the D4 certificate with the C4 context ID; verification rejects the cross-context reuse. This is the executable version of the rule that there is no universal symmetry authority when task semantics depend on operating context.
+
 ## Claim boundary
 
 This protocol is a benchmark contract, not evidence that Symthaea currently beats LieFlow, SymFP, COLT 2026 methods, soft-equivariant transformers, JMLR noisy ODT/ASRN, MuJoCo, Chrono, Pinocchio or Drake. Any superiority claim requires matched baseline executions on the frozen corpus.
