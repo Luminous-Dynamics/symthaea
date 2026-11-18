@@ -57,7 +57,8 @@ The 2D helicity-modulus jump is \(\Upsilon(T_{BKT}^{-})=2k_BT_{BKT}/\pi\), using
 
 Reference sources:
 - Ueda & Oshikawa, *Resolving the Berezinskii-Kosterlitz-Thouless transition in the two-dimensional XY model with tensor-network-based level spectroscopy*, Phys. Rev. B 104, 165132 (2021), https://doi.org/10.1103/PhysRevB.104.165132. Reports \(0.892943(2)\) and removes leading logarithmic corrections through level spectroscopy.
-- Yu et al., *Tensor renormalization group study of the classical XY model on the square lattice*, Phys. Rev. E 89, 013308 (2014), https://doi.org/10.1103/PhysRevE.89.013308. An independent HOTRG comparison reports \(0.8921(19)\).
+- Jha, *Critical analysis of two-dimensional classical XY model*, J. Stat. Mech. (2020) 083203, https://doi.org/10.1088/1742-5468/aba686. HOTRG reports \(0.89290(5)\) and evaluates a lattice up to \(2^{50}\times2^{50}\).
+- Yu et al., *Tensor renormalization group study of the classical XY model on the square lattice*, Phys. Rev. E 89, 013308 (2014), https://doi.org/10.1103/PhysRevE.89.013308. A separate HOTRG estimate is \(0.8921(19)\).
 - Gottlob & Hasenbusch, *Critical behaviour of the 3D XY-model: a Monte Carlo study*, Physica A 201 (1993), https://doi.org/10.1016/0378-4371(93)90131-M. Reports \(K_c=0.45420(2)\) using single-cluster Monte Carlo.
 - Hasenbusch, *Eliminating leading and subleading corrections to scaling in the three-dimensional XY universality class*, Phys. Rev. B 112, 184512 (2025), https://doi.org/10.1103/1d4g-483z. A modern correction-to-scaling methodology comparator, not the same nearest-neighbour model.
 
@@ -116,3 +117,14 @@ The issue's 20% coherence-robustness target is a preregistered research target, 
 - Pair formation versus global coherence: https://github.com/Luminous-Dynamics/symthaea/issues/12677
 - Discovery tournament and prospective yield: https://github.com/Luminous-Dynamics/symthaea/issues/12634
 - Topology/disorder phase-network hypothesis: https://github.com/Luminous-Dynamics/symthaea/issues/12755
+
+
+## Physics and topology interpretation guardrails
+
+- In the unfrustrated aligned state, the harmonic phase-fluctuation Hessian is the **weighted graph Laplacian** formed from the actual edge couplings \(J_{ij}\). Its spectral gap is a local, zero-temperature harmonic diagnostic—not a finite-temperature transition, superfluid density or measured \(T_c\).
+- With nonzero gauge flux or frustration, the relevant small-fluctuation Hessian must be evaluated about the actual minimized phase configuration. An unweighted graph Laplacian is not a valid substitute.
+- The principal phase-coherence outputs remain helicity modulus / stiffness, correlation functions, vortex statistics and finite-size scaling. Graph descriptors are candidate covariates to test for incremental explanatory power.
+- The 2D nearest-neighbour XY reference has no finite-temperature spontaneous continuous-symmetry-breaking long-range order. Below BKT it has quasi-long-range order; at BKT, vortex–antivortex unbinding changes the correlation regime. A report must not label the BKT transition as an ordinary 2D magnetization-ordering transition.
+- Nonlocal rewiring can change the interaction range and effective dimensionality. Such edges must be physically embedded and their coupling / fabrication cost counted. Do not compare them to local lattices as though only graph topology had changed.
+- The reference solver must be compared against both Monte Carlo and tensor-network approaches. For the 2D BKT case, Ueda–Oshikawa level spectroscopy (0.892943(2)) and Jha HOTRG (0.89290(5)) are distinct high-precision comparators; neither is treated as a universal value for arbitrary graphs.
+- For the 3D XY control, retain critical-coupling and correction-to-scaling analysis. The 2025 Hasenbusch paper is a modern methodology comparator, but its improved clock-model Hamiltonian is not numerically identical to the nearest-neighbour XY model.
