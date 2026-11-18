@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Provider-neutral raw-session ingestion and bitemporal replay for MACE.
-// Tool success is not treated as an observed world outcome.
+// Transcript claims are never their own execution, outcome, or source authority.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -43,10 +43,6 @@ impl RawEvent {
     fn integer(&self, key: &str) -> Option<u64> {
         self.payload.get(key).and_then(Value::as_u64)
     }
-
-    fn boolean(&self, key: &str) -> bool {
-        self.payload.get(key).and_then(Value::as_bool).unwrap_or(false)
-    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -56,14 +52,39 @@ pub(super) struct VerifiedSource {
     pub measurement_error_bound: f64,
     pub trusted: bool,
 }
-
 pub(super) type VerifiedSourceRegistry = BTreeMap<String, VerifiedSource>;
+
+#[derive(Clone, Debug)]
+pub(super) struct VerifiedActionReceipt {
+    pub plan_event_id: u32,
+    pub action_id: String,
+    pub action: Action,
+    pub scope: Scope,
+    pub dispatched_at_ms: u64,
+    pub prediction_registered_at_ms: u64,
+    pub intervention: bool,
+    pub confounders_controlled: bool,
+    pub delayed_horizon_complete: bool,
+    pub trusted: bool,
+}
+pub(super) type VerifiedActionRegistry = BTreeMap<String, VerifiedActionReceipt>;
+
+#[derive(Clone, Debug)]
+pub(super) struct VerifiedOutcomeReceipt {
+    pub event_id: u32,
+    pub action_id: String,
+    pub observed_utility: f64,
+    pub reconciled: bool,
+}
+pub(super) type VerifiedOutcomeRegistry = BTreeMap<String, VerifiedOutcomeReceipt>;
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct IngestReport {
     pub raw_event_count: usize,
     pub visible_event_count: usize,
     pub tool_success_without_world_observation: usize,
+    pub unverified_outcome_receipt_count: usize,
+    pub raw_payload_outcome_mismatch_count: usize,
     pub retracted_observation_count: usize,
     pub experiences: Vec<Experience>,
 }
@@ -106,7 +127,6 @@ fn parse_jsonl(input: &str) -> Result<Vec<RawEvent>, String> {
         if !event_ids.insert(event_id) {
             return Err(format!("line {}: duplicate event_id", line_index + 1));
         }
-
         let current_session = required_string("session_id")?;
         if session_id.as_ref().is_some_and(|expected| expected != &current_session) {
             return Err(format!("line {}: mixed session IDs", line_index + 1));
@@ -118,12 +138,12 @@ fn parse_jsonl(input: &str) -> Result<Vec<RawEvent>, String> {
             return Err(format!("line {}: sequence is not increasing", line_index + 1));
         }
         previous_sequence = Some(sequence);
-
         let occurred_at_ms = required_u64("occurred_at_ms")?;
         let recorded_at_ms = required_u64("recorded_at_ms")?;
         if recorded_at_ms < occurred_at_ms {
             return Err(format!("line {}: knowledge time precedes event time", line_index + 1));
         }
+
         let optional_time = |key: &str| -> Result<Option<u64>, String> {
             match object.get(key) {
                 None | Some(Value::Null) => Ok(None),
@@ -142,7 +162,6 @@ fn parse_jsonl(input: &str) -> Result<Vec<RawEvent>, String> {
             .cloned()
             .filter(Value::is_object)
             .ok_or_else(|| format!("line {}: payload must be an object", line_index + 1))?;
-
         events.push(RawEvent {
             schema_version,
             event_id,
@@ -188,12 +207,9 @@ fn parse_action(payload: &Value) -> Option<Action> {
 
 #[derive(Clone, Debug)]
 struct ActionPlan {
+    event_id: u32,
     action: Action,
     scope: Scope,
-    intervention: bool,
-    prediction_registered_at_ms: Option<u64>,
-    confounders_controlled: bool,
-    delayed_horizon_complete: bool,
     occurred_at_ms: u64,
     recorded_at_ms: u64,
     sequence: u64,
@@ -214,12 +230,12 @@ fn apply_corrections(events: &[RawEvent], known_at_ms: u64) -> BTreeSet<u32> {
         .collect()
 }
 
-/// Derive candidate-visible experiences at (valid_at, known_at).
-/// Trust roots/error bounds come from the external verified-source registry.
 pub(super) fn derive_as_known(
     input: &str,
     valid_at_ms: u64,
     known_at_ms: u64,
+    verified_actions: &VerifiedActionRegistry,
+    verified_outcomes: &VerifiedOutcomeRegistry,
     verified_sources: &VerifiedSourceRegistry,
 ) -> Result<IngestReport, String> {
     let events = parse_jsonl(input)?;
@@ -245,12 +261,9 @@ pub(super) fn derive_as_known(
                     continue;
                 };
                 let plan = ActionPlan {
+                    event_id: event.event_id,
                     action,
                     scope,
-                    intervention: event.boolean("intervention"),
-                    prediction_registered_at_ms: event.integer("prediction_registered_at_ms"),
-                    confounders_controlled: event.boolean("confounders_controlled"),
-                    delayed_horizon_complete: event.boolean("delayed_horizon_complete"),
                     occurred_at_ms: event.occurred_at_ms,
                     recorded_at_ms: event.recorded_at_ms,
                     sequence: event.sequence,
@@ -301,45 +314,69 @@ pub(super) fn derive_as_known(
             continue;
         }
 
-        let pre_registered = plan
-            .prediction_registered_at_ms
-            .is_some_and(|registered| {
-                registered <= plan.occurred_at_ms
+        let execution_key = dispatch.string("execution_receipt_digest").unwrap_or("");
+        let execution = verified_actions.get(execution_key);
+        let execution_matches = execution.is_some_and(|receipt| {
+            receipt.trusted
+                && receipt.plan_event_id == plan.event_id
+                && receipt.action_id == action_id
+                && receipt.action == plan.action
+                && receipt.scope == plan.scope
+                && receipt.dispatched_at_ms == dispatch.occurred_at_ms
+        });
+        let pre_registered = execution_matches
+            && execution.is_some_and(|receipt| {
+                receipt.prediction_registered_at_ms <= plan.occurred_at_ms
+                    && plan.occurred_at_ms < dispatch.occurred_at_ms
                     && plan.recorded_at_ms < dispatch.recorded_at_ms
             });
-        let receipt_present = event
-            .string("observation_receipt")
-            .is_some_and(|receipt| !receipt.trim().is_empty());
-        let digest = event.string("source_artifact_digest").unwrap_or("");
-        let verified = verified_sources.get(digest);
-        let source_trusted =
-            verified.is_some_and(|source| source.trusted && source.source_root_id != 0);
-        let source_family = verified.map_or(0, |source| source.source_family);
-        let source_root_id = verified.map_or(0, |source| source.source_root_id);
-        let measurement_error_bound =
-            verified.map_or(1.0, |source| source.measurement_error_bound);
-        let Some(observed_utility) = event.number("observed_utility") else {
+
+        let outcome_key = event.string("observation_receipt").unwrap_or("");
+        let Some(outcome) = verified_outcomes.get(outcome_key).filter(|receipt| {
+            receipt.event_id == event.event_id && receipt.action_id == action_id
+        }) else {
+            report.unverified_outcome_receipt_count += 1;
             continue;
         };
-        let was_retracted = retracted_ids.contains(&event.event_id);
-        if was_retracted {
+        if event
+            .number("observed_utility")
+            .is_some_and(|claimed| (claimed - outcome.observed_utility).abs() > f64::EPSILON)
+        {
+            report.raw_payload_outcome_mismatch_count += 1;
+        }
+
+        let source_key = event.string("source_artifact_digest").unwrap_or("");
+        let source = verified_sources.get(source_key);
+        let source_trusted = source.is_some_and(|receipt| {
+            receipt.trusted && receipt.source_family != 0 && receipt.source_root_id != 0
+        });
+        let source_family = source.map_or(0, |receipt| receipt.source_family);
+        let source_root_id = source.map_or(0, |receipt| receipt.source_root_id);
+        let measurement_error_bound =
+            source.map_or(1.0, |receipt| receipt.measurement_error_bound);
+        let source_retracted = retracted_ids.contains(&event.event_id);
+        if source_retracted {
             report.retracted_observation_count += 1;
         }
+
         report.experiences.push(Experience {
             event_id: event.event_id,
             source_family,
             source_root_id,
             scope: plan.scope,
             action: plan.action,
-            observed_utility,
+            observed_utility: outcome.observed_utility,
             measurement_error_bound,
-            intervention: plan.intervention,
+            intervention: execution_matches
+                && execution.is_some_and(|receipt| receipt.intervention),
             prediction_pre_registered: pre_registered,
-            outcome_reconciled: receipt_present,
+            outcome_reconciled: outcome.reconciled,
             source_trusted,
-            source_retracted: was_retracted,
-            confounders_controlled: plan.confounders_controlled,
-            delayed_horizon_complete: plan.delayed_horizon_complete,
+            source_retracted,
+            confounders_controlled: execution_matches
+                && execution.is_some_and(|receipt| receipt.confounders_controlled),
+            delayed_horizon_complete: execution_matches
+                && execution.is_some_and(|receipt| receipt.delayed_horizon_complete),
         });
     }
 
@@ -389,16 +426,14 @@ mod tests {
     }
 
     fn observation_events() -> Vec<Value> {
-        let mut events = Vec::new();
         let rows = [
             (1, 2, 3, "a1", "A", 0.92, "digest-a1"),
             (4, 5, 6, "a2", "A", 0.90, "digest-a2"),
             (7, 8, 9, "b1", "B", 0.32, "digest-b1"),
             (10, 11, 12, "b2", "B", 0.34, "digest-b2"),
         ];
-        for (plan_id, dispatch_id, observation_id, action_id, action, utility, digest)
-            in rows
-        {
+        let mut events = Vec::new();
+        for (plan_id, dispatch_id, observation_id, action_id, action, utility, digest) in rows {
             events.push(raw_event(
                 plan_id,
                 u64::from(plan_id),
@@ -410,10 +445,10 @@ mod tests {
                     "action": action,
                     "regime": "baseline",
                     "objective": "quality",
-                    "intervention": true,
-                    "prediction_registered_at_ms": 9,
-                    "confounders_controlled": true,
-                    "delayed_horizon_complete": true
+                    "intervention": false,
+                    "prediction_registered_at_ms": 999,
+                    "confounders_controlled": false,
+                    "delayed_horizon_complete": false
                 }),
             ));
             events.push(raw_event(
@@ -422,7 +457,10 @@ mod tests {
                 "action_dispatched",
                 20,
                 20,
-                json!({ "action_id": action_id }),
+                json!({
+                    "action_id": action_id,
+                    "execution_receipt_digest": format!("exec-{action_id}")
+                }),
             ));
             events.push(raw_event(
                 observation_id,
@@ -441,7 +479,60 @@ mod tests {
         events
     }
 
-    fn registry() -> VerifiedSourceRegistry {
+    fn action_registry() -> VerifiedActionRegistry {
+        let rows = [
+            ("a1", 1, Action::A),
+            ("a2", 4, Action::A),
+            ("b1", 7, Action::B),
+            ("b2", 10, Action::B),
+        ];
+        rows.into_iter()
+            .map(|(action_id, plan_event_id, action)| {
+                (
+                    format!("exec-{action_id}"),
+                    VerifiedActionReceipt {
+                        plan_event_id,
+                        action_id: action_id.to_owned(),
+                        action,
+                        scope: Scope {
+                            regime: Regime::Baseline,
+                            objective: Objective::Quality,
+                        },
+                        dispatched_at_ms: 20,
+                        prediction_registered_at_ms: 9,
+                        intervention: true,
+                        confounders_controlled: true,
+                        delayed_horizon_complete: true,
+                        trusted: true,
+                    },
+                )
+            })
+            .collect()
+    }
+
+    fn outcome_registry() -> VerifiedOutcomeRegistry {
+        let rows = [
+            (3, "a1", 0.92),
+            (6, "a2", 0.90),
+            (9, "b1", 0.32),
+            (12, "b2", 0.34),
+        ];
+        rows.into_iter()
+            .map(|(event_id, action_id, observed_utility)| {
+                (
+                    format!("receipt-{event_id}"),
+                    VerifiedOutcomeReceipt {
+                        event_id,
+                        action_id: action_id.to_owned(),
+                        observed_utility,
+                        reconciled: true,
+                    },
+                )
+            })
+            .collect()
+    }
+
+    fn source_registry() -> VerifiedSourceRegistry {
         BTreeMap::from([
             ("digest-a1".to_owned(), VerifiedSource {
                 source_family: 10,
@@ -478,10 +569,37 @@ mod tests {
             .join("\n")
     }
 
+    fn derive_fixture(input: &str, valid_at: u64, known_at: u64) -> Result<IngestReport, String> {
+        derive_as_known(
+            input,
+            valid_at,
+            known_at,
+            &action_registry(),
+            &outcome_registry(),
+            &source_registry(),
+        )
+    }
+
+    fn derive_with_sources(
+        input: &str,
+        valid_at: u64,
+        known_at: u64,
+        sources: &VerifiedSourceRegistry,
+    ) -> Result<IngestReport, String> {
+        derive_as_known(
+            input,
+            valid_at,
+            known_at,
+            &action_registry(),
+            &outcome_registry(),
+            sources,
+        )
+    }
+
     #[test]
     fn raw_jsonl_ingestion_derives_a_qualified_memory_decision() {
-        let report = derive_as_known(&jsonl(observation_events()), 100, 100, &registry())
-            .expect("valid raw session");
+        let raw = jsonl(observation_events());
+        let report = derive_fixture(&raw, 100, 100).expect("valid raw session");
         assert_eq!(report.raw_event_count, 12);
         assert_eq!(report.experiences.len(), 4);
         let scope = Scope {
@@ -511,13 +629,9 @@ mod tests {
             40,
             json!({ "action_id": "a1", "success": true }),
         ));
-        let report = derive_as_known(&jsonl(events), 100, 100, &registry())
-            .expect("valid tool-only session");
+        let report = derive_fixture(&jsonl(events), 100, 100).unwrap();
         assert_eq!(report.tool_success_without_world_observation, 1);
         assert_eq!(report.experiences.len(), 3);
-        assert!(report.experiences.iter().all(|experience| {
-            experience.action != Action::A || experience.source_family != 10
-        }));
     }
 
     #[test]
@@ -525,8 +639,8 @@ mod tests {
         let mut events = observation_events();
         events[2]["recorded_at_ms"] = json!(150);
         let raw = jsonl(events);
-        let early = derive_as_known(&raw, 100, 100, &registry()).unwrap();
-        let late = derive_as_known(&raw, 100, 160, &registry()).unwrap();
+        let early = derive_fixture(&raw, 100, 100).unwrap();
+        let late = derive_fixture(&raw, 100, 160).unwrap();
         assert_eq!(early.experiences.len(), 3);
         assert_eq!(late.experiences.len(), 4);
     }
@@ -543,8 +657,8 @@ mod tests {
             json!({ "target_event_id": 3, "reason": "independent correction" }),
         ));
         let raw = jsonl(events);
-        let before = derive_as_known(&raw, 100, 100, &registry()).unwrap();
-        let after = derive_as_known(&raw, 100, 160, &registry()).unwrap();
+        let before = derive_fixture(&raw, 100, 100).unwrap();
+        let after = derive_fixture(&raw, 100, 160).unwrap();
         let before_item = before.experiences.iter().find(|item| item.event_id == 3).unwrap();
         let after_item = after.experiences.iter().find(|item| item.event_id == 3).unwrap();
         assert!(!before_item.source_retracted);
@@ -564,29 +678,72 @@ mod tests {
     }
 
     #[test]
+    fn raw_payload_cannot_self_attest_action_causality_or_measurement_value() {
+        let mut events = observation_events();
+        events[2]["payload"]["observed_utility"] = json!(0.01);
+        let report = derive_fixture(&jsonl(events), 100, 100).unwrap();
+        let item = report.experiences.iter().find(|item| item.event_id == 3).unwrap();
+        assert_eq!(item.observed_utility, 0.92);
+        assert_eq!(report.raw_payload_outcome_mismatch_count, 1);
+        assert!(item.intervention);
+        assert!(item.prediction_pre_registered);
+        assert!(item.confounders_controlled);
+    }
+
+    #[test]
+    fn missing_execution_receipt_cannot_authorize_causal_use() {
+        let mut events = observation_events();
+        events[1]["payload"]["execution_receipt_digest"] = json!("not-in-registry");
+        let report = derive_fixture(&jsonl(events), 100, 100).unwrap();
+        let item = report.experiences.iter().find(|item| item.event_id == 3).unwrap();
+        assert!(!item.intervention);
+        assert!(!item.prediction_pre_registered);
+        assert!(!item.confounders_controlled);
+        let query = Query {
+            scope: Scope {
+                regime: Regime::Baseline,
+                objective: Objective::Quality,
+            },
+        };
+        assert_eq!(
+            decide(Policy::CausalQualified, &report.experiences, query).action,
+            None
+        );
+    }
+
+    #[test]
+    fn missing_or_mismatched_observation_receipt_is_not_reconciled() {
+        let mut events = observation_events();
+        events[2]["payload"]["observation_receipt"] = json!("forged-receipt");
+        let report = derive_fixture(&jsonl(events), 100, 100).unwrap();
+        assert_eq!(report.unverified_outcome_receipt_count, 1);
+        assert!(!report.experiences.iter().any(|item| item.event_id == 3));
+    }
+
+    #[test]
     fn unregistered_source_artifact_is_not_trusted_or_independent() {
         let mut events = observation_events();
         events[2]["payload"]["source_artifact_digest"] = json!("forged-digest");
-        let report = derive_as_known(&jsonl(events), 100, 100, &registry()).unwrap();
-        let unknown = report.experiences.iter().find(|item| item.event_id == 3).unwrap();
-        assert!(!unknown.source_trusted);
-        assert_eq!(unknown.source_root_id, 0);
+        let report = derive_fixture(&jsonl(events), 100, 100).unwrap();
+        let item = report.experiences.iter().find(|item| item.event_id == 3).unwrap();
+        assert!(!item.source_trusted);
+        assert_eq!(item.source_root_id, 0);
     }
 
     #[test]
     fn malformed_duplicate_or_out_of_order_raw_events_fail_closed() {
         let mut events = observation_events();
         events[1]["sequence"] = json!(1);
-        assert!(derive_as_known(&jsonl(events.clone()), 100, 100, &registry()).is_err());
+        assert!(derive_fixture(&jsonl(events.clone()), 100, 100).is_err());
         events = observation_events();
         events[1]["event_id"] = json!(1);
-        assert!(derive_as_known(&jsonl(events), 100, 100, &registry()).is_err());
-        assert!(derive_as_known("{not-json}", 100, 100, &registry()).is_err());
+        assert!(derive_fixture(&jsonl(events), 100, 100).is_err());
+        assert!(derive_fixture("{not-json}", 100, 100).is_err());
     }
 
     #[test]
-    fn unmeasurable_registry_bound_is_rejected_by_candidate_policy() {
-        let mut sources = registry();
+    fn invalid_registry_error_bound_is_rejected_by_candidate_policy() {
+        let mut sources = source_registry();
         sources.insert(
             "digest-a1".to_owned(),
             VerifiedSource {
@@ -596,16 +753,14 @@ mod tests {
                 trusted: true,
             },
         );
-        let report = derive_as_known(&jsonl(observation_events()), 100, 100, &sources).unwrap();
-        let item = report.experiences.iter().find(|item| item.event_id == 3).unwrap();
-        assert!(!item.measurement_error_bound.is_finite());
+        let raw = jsonl(observation_events());
+        let report = derive_with_sources(&raw, 100, 100, &sources).unwrap();
         let query = Query {
             scope: Scope {
                 regime: Regime::Baseline,
                 objective: Objective::Quality,
             },
         };
-        assert!(report.experiences.iter().filter(|item| item.action == Action::A).count() >= 2);
         assert_eq!(
             decide(Policy::CausalQualified, &report.experiences, query).action,
             None
@@ -617,8 +772,8 @@ mod tests {
         let mut events = observation_events();
         events[2]["valid_from_ms"] = json!(50);
         let raw = jsonl(events);
-        let before = derive_as_known(&raw, 40, 100, &registry()).unwrap();
-        let during = derive_as_known(&raw, 60, 100, &registry()).unwrap();
+        let before = derive_fixture(&raw, 40, 100).unwrap();
+        let during = derive_fixture(&raw, 60, 100).unwrap();
         assert_eq!(before.experiences.len(), 3);
         assert_eq!(during.experiences.len(), 4);
     }

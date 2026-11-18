@@ -1,3 +1,4 @@
+#[cfg(test)]
 mod raw_ingest;
 
 // Copyright (C) 2026 Luminous Dynamics
