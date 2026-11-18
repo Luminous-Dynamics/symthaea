@@ -7,6 +7,12 @@ on:
       - "tools/muse-factorial-audit/**"
       - "docs/research/MUSE_CAUSAL_FACTORIAL_PROTOCOL_V1.json"
       - ".github/workflows/muse-factorial-audit.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/muse-factorial-audit/**"
+      - "docs/research/MUSE_CAUSAL_FACTORIAL_PROTOCOL_V1.json"
+      - ".github/workflows/muse-factorial-audit.yml"
   workflow_dispatch:
 
 permissions:
