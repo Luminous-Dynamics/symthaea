@@ -389,6 +389,10 @@ mod tests {
     #[test]
     fn polynomial_representation_obeys_matrix_composition_exactly() {
         let source = polynomial_map(&C4_POLYNOMIAL);
+        assert_eq!(
+            transformed_polynomial(&C4_POLYNOMIAL, D4_MATRICES[0]),
+            source
+        );
         for left in 0..8 {
             for right in 0..8 {
                 let right_then_left = multiply_matrix(D4_MATRICES[right], D4_MATRICES[left]);
@@ -410,6 +414,5 @@ mod tests {
                 assert_eq!(sequential, composed);
             }
         }
-        assert_eq!(source, polynomial_map(&C4_POLYNOMIAL));
     }
 }
