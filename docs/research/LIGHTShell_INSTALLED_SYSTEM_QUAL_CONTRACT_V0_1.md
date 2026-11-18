@@ -18,7 +18,7 @@ A September 2026 robotic sewing system reports seam deviation within ±2.5 mm on
 
 ## Paradigm: baseline-versus-installed counterfactual
 
-Treat installation as a controlled system intervention. Use the same robot serial, firmware, robot configuration, tool/payload, mission profile, environment and fixture. First measure the uncovered robot; then install the exact garment digest and replay the same conditions.
+Treat installation as a controlled system intervention. Use the same robot serial, firmware, robot configuration, tool/payload, mission profile, environment and fixture across uncovered, incumbent-cover and Lightshell conditions. First measure the uncovered robot; then install the exact garment digest and replay the same conditions.
 
 Report claim-level deltas with uncertainty. P0 uses conservative uncertainty addition for paired measurements (U_delta = U_installed + U_baseline) rather than assuming independent errors or cancelling common-mode error. A later owner-reviewed covariance profile may refine this only with source evidence.
 
