@@ -91,13 +91,25 @@ impl Policy {
     }
 }
 
+pub const NORMALIZED_UTILITY_SCALE: u32 = 1_000_000;
+pub const DEFAULT_PROBE_BUDGET_MICROS: u32 = 120_000;
+
+/// Explicit environment-interaction request. This is a proposal, not authority
+/// to perform an experiment; the environment must validate safety and budget.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProbeRequest {
+    pub scope: Scope,
+    pub actions: [Action; 2],
+    pub replicates_per_action: u8,
+    pub max_cost_normalized_micros: u32,
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Decision {
     pub action: Option<Action>,
     pub causal_claim: Option<Action>,
     pub evidence_ids: Vec<u32>,
-    /// Request a bounded environment probe before committing to a downstream action.
-    pub requires_probe: bool,
+    pub probe: Option<ProbeRequest>,
 }
 
 impl Decision {
@@ -105,12 +117,17 @@ impl Decision {
         Self::default()
     }
 
-    pub fn request_probe() -> Self {
+    pub fn request_probe(scope: Scope) -> Self {
         Self {
             action: None,
             causal_claim: None,
             evidence_ids: Vec::new(),
-            requires_probe: true,
+            probe: Some(ProbeRequest {
+                scope,
+                actions: [Action::A, Action::B],
+                replicates_per_action: 2,
+                max_cost_normalized_micros: DEFAULT_PROBE_BUDGET_MICROS,
+            }),
         }
     }
 
@@ -119,7 +136,7 @@ impl Decision {
             action: Some(action),
             causal_claim: None,
             evidence_ids,
-            requires_probe: false,
+            probe: None,
         }
     }
 }
@@ -259,7 +276,7 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
                 action: Some(action),
                 causal_claim: (difference >= 0.05).then_some(action),
                 evidence_ids,
-                requires_probe: false,
+                probe: None,
             }
         }
     }
@@ -356,7 +373,7 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
         action: Some(action),
         causal_claim: (difference >= 0.05).then_some(action),
         evidence_ids,
-        requires_probe: false,
+        probe: None,
     }
 }
 
@@ -371,7 +388,7 @@ fn active_probe_policy(memory: &[Experience], query: Query) -> Decision {
         return transported;
     }
 
-    Decision::request_probe()
+    Decision::request_probe(query.scope)
 }
 
 #[cfg(test)]
@@ -566,7 +583,14 @@ mod tests {
         };
         let decision = decide(Policy::ActiveProbe, &memory, query);
         assert_eq!(decision.action, None);
-        assert!(decision.requires_probe);
+        let request = decision.probe.expect("probe request is explicit");
+        assert_eq!(request.scope, query.scope);
+        assert_eq!(request.actions, [Action::A, Action::B]);
+        assert_eq!(request.replicates_per_action, 2);
+        assert_eq!(
+            request.max_cost_normalized_micros,
+            DEFAULT_PROBE_BUDGET_MICROS
+        );
         assert!(decision.evidence_ids.is_empty());
     }
 
@@ -584,7 +608,7 @@ mod tests {
         ];
         let decision = decide(Policy::ActiveProbe, &memory, Query { scope });
         assert_eq!(decision.action, Some(Action::A));
-        assert!(!decision.requires_probe);
+        assert!(decision.probe.is_none());
     }
 
     #[test]
