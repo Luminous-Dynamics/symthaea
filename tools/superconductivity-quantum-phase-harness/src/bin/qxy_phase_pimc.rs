@@ -25,6 +25,7 @@ struct QxyModel {
     delta_tau: f64,
     k_spatial: f64,
     k_imaginary_time: f64,
+    random_seed: u64,
     node_count: usize,
     adjacency: Vec<Vec<Bond>>,
     spatial_bonds: Vec<(usize, usize)>,
@@ -388,8 +389,6 @@ impl QxyModel {
             }
         }
 
-        // Explicit seed is returned through the model receipt and passed to simulation.
-        let _ = seed;
         Ok(Self {
             lattice_linear_size: l,
             imaginary_time_slices: ntau,
@@ -400,6 +399,7 @@ impl QxyModel {
             delta_tau,
             k_spatial,
             k_imaginary_time,
+            random_seed: seed,
             node_count,
             adjacency,
             spatial_bonds: spacetime_spatial_bonds,
@@ -478,7 +478,11 @@ fn metropolis_sweep(
     (accepted, model.node_count)
 }
 
-fn sweep(model: &QxyModel, phases: &mut [f64], rng: &mut StdRng) -> (usize, usize, usize) {
+fn sweep(
+    model: &QxyModel,
+    phases: &mut [f64],
+    rng: &mut StdRng,
+) -> (usize, usize, usize, usize) {
     let mut flipped_sites = 0;
     let mut clusters = 0;
     let mut cluster_size_sum = 0;
@@ -489,7 +493,12 @@ fn sweep(model: &QxyModel, phases: &mut [f64], rng: &mut StdRng) -> (usize, usiz
         clusters += 1;
     }
     let (metropolis_accepted, metropolis_proposed) = metropolis_sweep(model, phases, rng);
-    (clusters, cluster_size_sum, metropolis_accepted + metropolis_proposed * 0)
+    (
+        clusters,
+        cluster_size_sum,
+        metropolis_accepted,
+        metropolis_proposed,
+    )
 }
 
 fn measure(model: &QxyModel, phases: &[f64]) -> Measurement {
@@ -499,11 +508,6 @@ fn measure(model: &QxyModel, phases: &[f64]) -> Measurement {
         let delta = phases[*source] - phases[*target];
         spatial_cosine += delta.cos();
         spatial_sine += delta.sin();
-    }
-
-    let mut temporal_cosine = 0.0;
-    for (source, target) in &model.temporal_bonds {
-        temporal_cosine += (phases[*source] - phases[*target]).cos();
     }
 
     let mut spatial_action = 0.0;
@@ -571,22 +575,24 @@ fn simulate(
     let mut metropolis_proposed = 0_usize;
 
     for _ in 0..warmup_sweeps {
-        let (clusters, cluster_sites, acceptance) = sweep(model, &mut phases, &mut rng);
+        let (clusters, cluster_sites, accepted, proposed) =
+            sweep(model, &mut phases, &mut rng);
         total_cluster_updates += clusters;
         total_cluster_sites += cluster_sites;
-        metropolis_accepted += acceptance;
-        metropolis_proposed += model.node_count;
+        metropolis_accepted += accepted;
+        metropolis_proposed += proposed;
     }
 
     let mut action_values = Vec::with_capacity(measurement_sweeps);
     let mut stiffness_values = Vec::with_capacity(measurement_sweeps);
     let mut vortex_values = Vec::with_capacity(measurement_sweeps);
     for _ in 0..measurement_sweeps {
-        let (clusters, cluster_sites, acceptance) = sweep(model, &mut phases, &mut rng);
+        let (clusters, cluster_sites, accepted, proposed) =
+            sweep(model, &mut phases, &mut rng);
         total_cluster_updates += clusters;
         total_cluster_sites += cluster_sites;
-        metropolis_accepted += acceptance;
-        metropolis_proposed += model.node_count;
+        metropolis_accepted += accepted;
+        metropolis_proposed += proposed;
         let measured = measure(model, &phases);
         action_values.push(measured.action_per_spacetime_site);
         stiffness_values.push(measured.stiffness);
@@ -659,7 +665,7 @@ fn main() {
     let mut output_path = None;
     let mut warmup_sweeps = 2_usize;
     let mut measurement_sweeps = 3_usize;
-    let mut seed = 7_u64;
+    let mut seed = None;
     let mut index = 1;
 
     while index < args.len() {
@@ -688,10 +694,10 @@ fn main() {
                         })
                     }
                     "--seed" => {
-                        seed = value.parse().unwrap_or_else(|_| {
+                        seed = Some(value.parse().unwrap_or_else(|_| {
                             eprintln!("seed must be unsigned integer");
                             process::exit(2);
-                        })
+                        }))
                     }
                     _ => unreachable!(),
                 }
@@ -719,7 +725,9 @@ fn main() {
         eprintln!("SC-QXY-PIMC-FAIL: {error}");
         process::exit(1);
     });
-    let receipt = simulate(&model, warmup_sweeps, measurement_sweeps, seed).unwrap_or_else(|error| {
+    let run_seed = seed.unwrap_or(model.random_seed);
+    let receipt =
+        simulate(&model, warmup_sweeps, measurement_sweeps, run_seed).unwrap_or_else(|error| {
         eprintln!("SC-QXY-PIMC-FAIL: {error}");
         process::exit(1);
     });
@@ -793,6 +801,20 @@ mod tests {
         let first = simulate(&model, 1, 2, 23).unwrap();
         let second = simulate(&model, 1, 2, 23).unwrap();
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn aligned_phase_configuration_has_unit_source_stiffness_and_zero_vortices() {
+        let (schema, fixture) = inputs();
+        let model = QxyModel::from_bytes(&schema, &fixture).unwrap();
+        let phases = vec![0.37; model.node_count];
+        let measured = measure(&model, &phases);
+        assert!((measured.stiffness - 1.0).abs() < 1.0e-10);
+        assert!(measured.vortex_density.abs() < 1.0e-12);
+        let expected_action = -(2.0 * model.k_spatial + model.k_imaginary_time);
+        assert!(
+            (measured.action_per_spacetime_site - expected_action).abs() < 1.0e-10
+        );
     }
 
     #[test]
