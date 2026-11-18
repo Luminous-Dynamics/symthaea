@@ -24,7 +24,12 @@
         "zone_ref": "ZONE-FOREARM-SYNTHETIC",
         "panel_ref": "PANEL-FOREARM-SYNTHETIC",
         "material_lot_ref": "MATERIAL-LOT-SYNTHETIC",
-        "construction_ref": "CONSTRUCTION-SYNTHETIC"
+        "construction_ref": "CONSTRUCTION-SYNTHETIC",
+        "cleanability_sample_location_refs": [
+          "TOPOLOGY-SURFACE-CENTER-SYNTHETIC",
+          "TOPOLOGY-SEAM-EDGE-SYNTHETIC",
+          "TOPOLOGY-FASTENER-POCKET-SYNTHETIC"
+        ]
       }
     ]
   },
@@ -79,7 +84,12 @@
         "recovery_minimum": 0.8,
         "recovery_maximum": 1.2,
         "controls_raw_data_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-      }
+      },
+      "required_sample_location_refs": [
+        "TOPOLOGY-SURFACE-CENTER-SYNTHETIC",
+        "TOPOLOGY-SEAM-EDGE-SYNTHETIC",
+        "TOPOLOGY-FASTENER-POCKET-SYNTHETIC"
+      ]
     },
     {
       "gate_id": "GATE-SEAM",
@@ -96,7 +106,12 @@
       "method_selection_ref": "SEAM-TEST-METHOD-SYNTHETIC",
       "method_applicability_ref": "SEAM-METHOD-APPLICABILITY-SYNTHETIC",
       "acceptance_rule_ref": "SEAM-ACCEPTANCE-RULE-SYNTHETIC",
-      "assay_controls": null
+      "assay_controls": null,
+      "required_sample_location_refs": [
+        "TOPOLOGY-SURFACE-CENTER-SYNTHETIC",
+        "TOPOLOGY-SEAM-EDGE-SYNTHETIC",
+        "TOPOLOGY-FASTENER-POCKET-SYNTHETIC"
+      ]
     }
   ],
   "cycles": [
