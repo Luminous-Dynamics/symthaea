@@ -877,6 +877,27 @@ fn simulate_replicates(
     let vortices = numeric_values("mean_total_vortex_density")?;
     drop(numeric_values);
 
+    let mut current_correlation_between_chains = Vec::with_capacity(model.imaginary_time_slices);
+    for tau_index in 0..model.imaginary_time_slices {
+        let mut values = Vec::with_capacity(replicate_count);
+        for receipt in &receipts {
+            let value = receipt
+                .get("current_correlation_function_F_tau")
+                .and_then(Value::as_array)
+                .and_then(|profile| profile.get(tau_index))
+                .and_then(|entry| entry.get("sampling"))
+                .and_then(|sampling| sampling.get("mean"))
+                .and_then(Value::as_f64)
+                .ok_or_else(|| format!("replicate receipt missing F(tau) at index {tau_index}"))?;
+            values.push(value);
+        }
+        current_correlation_between_chains.push(json!({
+            "imaginary_time_index": tau_index,
+            "imaginary_time": tau_index as f64 * model.delta_tau,
+            "between_chain_summary": ensemble_summary(&values)
+        }));
+    }
+
     Ok(json!({
         "status": "pass",
         "contract": "SC-QXY-INDEPENDENT-SEED-ENSEMBLE-0.1",
@@ -891,7 +912,8 @@ fn simulate_replicates(
         "between_chain_summary": {
             "action_per_spacetime_site": ensemble_summary(&action),
             "finite_size_stiffness": ensemble_summary(&stiffness),
-            "total_vortex_density": ensemble_summary(&vortices)
+            "total_vortex_density": ensemble_summary(&vortices),
+            "current_correlation_F_tau": current_correlation_between_chains
         },
         "per_chain_receipts": receipts,
         "claim_ceiling": "Independent-seed software ensemble only; between-seed dispersion is not an uncertainty-qualified thermodynamic result, source reproduction, or material observation."
