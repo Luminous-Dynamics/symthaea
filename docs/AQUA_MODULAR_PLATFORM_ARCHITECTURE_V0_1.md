@@ -229,3 +229,8 @@ The machine-readable evidence register now includes the UK ETL non-domestic show
 The UK ETL's 15 September 2026 update establishes a non-domestic pathway for electric showers: 4.5 L/min standard maximum; up to 9 L/min when electrical input is modulated to minimize energy while maintaining stable output temperature with ETL-compliant wastewater heat recovery; and up to 10.6 L/min where qualifying user-behaviour features are also present. Aqua treats this as an architecture research reference only. It does not imply South African compliance or product eligibility. The complete measured service boundary must include heater electricity, actual receiver-side recovered heat, fresh water, fouling, static losses, parasitics, temperature stability and task completion.
 
 See [AQUA_POWER_COUPLED_SHOWER_DWHR_BENCHMARK_V0_1.md](AQUA_POWER_COUPLED_SHOWER_DWHR_BENCHMARK_V0_1.md) and [#12816](https://github.com/Luminous-Dynamics/symthaea/issues/12816).
+
+
+## Formal shower test-method alignment
+
+The Aqua evidence chain now records test-method datums explicitly. EN 18021:2025, UWL 2023, UK ETL, WaterSense and South African SANS references use distinct product categories and pressure conditions. The generic pressure_curve helper rejects cross-datum comparisons, but does not represent UWL's separate hot/cold inlet channels or ETL's faceplate-centre pressure channel. See [AQUA_METHOD_CROSSWALK_V0_1.md](AQUA_METHOD_CROSSWALK_V0_1.md) and [#12817](https://github.com/Luminous-Dynamics/symthaea/issues/12817). No certification or standards conformity is claimed.
