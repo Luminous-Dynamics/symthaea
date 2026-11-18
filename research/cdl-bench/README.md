@@ -20,8 +20,9 @@ dependencies.
 - CLI file encode/decode and an E0 length comparison against installed
   Zstandard, Brotli, XZ and gzip commands.
 - SCM-specific typed-field, temporal-lag, oracle-parent, hybrid and
-  shuffled-parent byte predictors, exercised through the same arithmetic coder
-  and exact decoder path.
+  shuffled-parent byte predictors, plus a fixed-share online mixture of
+  typed-field/lag/parent experts, all using the same arithmetic coder and exact
+  decoder path.
 
 ## Run
 
@@ -172,6 +173,19 @@ metadata is retained in the evaluator-side `ScmTrace` and never serialized:
   misassigning downstream parent identities. This is a topology negative
   control, not a valid causal graph.
 
+- `online_mixture_frame`: combines the field, lag and parent-oracle
+  probabilities before each byte. After observing the byte, integer Bayesian
+  expert weights update from each expert's likelihood. A fixed-share rule
+  redistributes 1/256 of posterior mass across the three experts per byte, so
+  a weak expert can recover after a regime change without receiving an
+  intervention label or expert-selection symbol.
+
+The mixture shares one header and field/base histogram set across all experts;
+only lag and parent context tables are specialist-specific. This avoids
+duplicating identical per-stream statistics. Its state-size output exposes the
+memory cost, while its final expert weights are printed as diagnostics. The
+parent specialist still receives the known SCM topology and remains an oracle
+expert, not a learned mechanism.
 For parent, lag, hybrid and shuffled-parent arms, the predictor adds the
 field/lane base frequencies to the selected conditional-context frequencies
 when forming its integer CDF. Both histograms are updated after each decoded
@@ -188,6 +202,27 @@ conditioning structure is known in advance. The lag arm is deliberately a
 strong noncausal comparator. The shuffled-parent arm tests whether a result is
 specific to the correct variable identities.
 
+The specialist predictors share header/field statistics within the online
+mixture; every model resets to deterministic empty state for each stream. The
+runner prints inline predictor-state sizes and mixture weights. Code/executable
+costs and shared model distributions must still be accounted for in cold-start
+comparison. The per-stream frame size alone is not a complete deployed-system
+size.
+
+Interpretation order:
+1. Compare field/lane with order-0/order-1 to measure typed channel identity.
+2. Compare lag with field/lane to measure ordinary temporal persistence.
+3. Compare parent-oracle with lag to test whether known graph structure helps.
+4. Compare the fixed-share mixture with each specialist to measure adaptation
+   and switching regret across observational/interventional regimes.
+5. Only then test a learned mechanism model against the oracle and the matched
+   noncausal temporal control.
+
+No compression win is implied by source existence. The runner must be compiled
+and executed, and total-size/resource accounting must be complete, before
+reporting an encoded-bit result.
+
+<!-- Replaces the earlier specialist-only state-accounting paragraph. -->
 The predictors include a separate header histogram and reset to a
 deterministic empty state for each stream. Their inline state sizes are printed
 by the runner; their code/executable costs and any shared model distribution
