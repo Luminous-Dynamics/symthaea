@@ -1,0 +1,173 @@
+{
+  "schema_version": "0.1.0",
+  "manifest_id": "SYNTH-FLOORPLANBENCH-REPRO-MANIFEST-001",
+  "maturity": "SYNTHETIC_NOT_EXECUTED",
+  "benchmark": {
+    "name": "FloorPlanBench",
+    "repository": "https://github.com/Gariyuuu/floorplanbench",
+    "pinned_commit": "7dfcca3dda6b11b4808a259499143e9bd75ed878",
+    "license": "MIT",
+    "representation": "integer_decimetre_axis_aligned_room_rectangles_in_rectilinear_rect_L_U_boundaries",
+    "validator": "shared_upstream_exact_plan_validator",
+    "task_count": 28,
+    "complexity_tiers": [
+      "small",
+      "medium",
+      "large",
+      "realistic"
+    ],
+    "seeds_per_task": 10,
+    "evaluation_equivalent_budget_per_run": 50000,
+    "canonical_run_count": 1960,
+    "methods": [
+      "random",
+      "greedy",
+      "sa",
+      "sa-seeded",
+      "nsga2",
+      "cp",
+      "gradient"
+    ]
+  },
+  "source_files": [
+    {
+      "path": "src/core/objectives.ts",
+      "git_blob_sha1": "85f229d3656b546b66365ab8f1a5b37644429220"
+    },
+    {
+      "path": "src/core/pareto.ts",
+      "git_blob_sha1": "581b755a4996d6fc9abeb959bfb87b6cbe5a383c"
+    },
+    {
+      "path": "src/core/types.ts",
+      "git_blob_sha1": "731a22e8c96f573d0f0a4ecf0370f712bd3e4700"
+    }
+  ],
+  "metric_contract": {
+    "dominance_objectives": [
+      "efficiency",
+      "circulation",
+      "daylight",
+      "privacy",
+      "carbon"
+    ],
+    "raw_objective_inventory": [
+      {
+        "objective_id": "efficiency",
+        "direction": "MAXIMIZE",
+        "unit": "ratio",
+        "headline": true,
+        "definition": "non_circulation_room_area_divided_by_boundary_area"
+      },
+      {
+        "objective_id": "adjacency",
+        "direction": "MAXIMIZE",
+        "unit": "ratio",
+        "headline": false,
+        "definition": "preferred_adjacency_satisfaction_ratio"
+      },
+      {
+        "objective_id": "circulation",
+        "direction": "MINIMIZE",
+        "unit": "m",
+        "headline": true,
+        "definition": "trip_weighted_mean_shortest_path_through_door_graph"
+      },
+      {
+        "objective_id": "compactness",
+        "direction": "MAXIMIZE",
+        "unit": "ratio",
+        "headline": false,
+        "definition": "mean_room_aspect_shape_proxy"
+      },
+      {
+        "objective_id": "daylight",
+        "direction": "MAXIMIZE",
+        "unit": "ratio",
+        "headline": true,
+        "definition": "geometric_fraction_within_6m_window_proxy_not_daylight_simulation"
+      },
+      {
+        "objective_id": "privacy",
+        "direction": "MAXIMIZE",
+        "unit": "ratio",
+        "headline": true,
+        "definition": "door_graph_privacy_depth_proxy"
+      },
+      {
+        "objective_id": "exposure",
+        "direction": "MAXIMIZE",
+        "unit": "ratio",
+        "headline": false,
+        "definition": "exterior_wall_exposure_preference_proxy"
+      },
+      {
+        "objective_id": "accessibility",
+        "direction": "MAXIMIZE",
+        "unit": "ratio",
+        "headline": false,
+        "definition": "selected_clearance_proxy_with_separate_hard_validation"
+      },
+      {
+        "objective_id": "carbon",
+        "direction": "MINIMIZE",
+        "unit": "kgCO2e",
+        "headline": true,
+        "definition": "partition_envelope_and_slab_embodied_carbon_proxy_not_lifecycle_assessment"
+      }
+    ],
+    "normalized_space": "MINIMIZATION_VECTOR_0_TO_1",
+    "hypervolume_reference_point": [
+      1.0001,
+      1.0001,
+      1.0001,
+      1.0001,
+      1.0001
+    ],
+    "hypervolume_method": "EXACT_WFG_REFERENCE_IMPLEMENTATION",
+    "cross_task_hypervolume_comparison": "PROHIBITED_WITHOUT_RECONCILING_TASK_LEVEL_NORMALIZATION_REFERENCES"
+  },
+  "synthetic_task_normalization": {
+    "task_id": "SYNTHETIC_TASK_NOT_IN_FLOORPLANBENCH",
+    "task_program_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "normalization_rules": [
+      {
+        "objective_id": "efficiency",
+        "direction": "MAXIMIZE",
+        "lower_bound": 0,
+        "upper_bound": 1,
+        "formula": "(upper_bound - raw_value) / (upper_bound - lower_bound)"
+      },
+      {
+        "objective_id": "circulation",
+        "direction": "MINIMIZE",
+        "lower_bound": 0,
+        "upper_bound": 10,
+        "formula": "raw_value / (2 * boundary_diagonal_m) ; upper_bound is a synthetic stand-in"
+      },
+      {
+        "objective_id": "daylight",
+        "direction": "MAXIMIZE",
+        "lower_bound": 0,
+        "upper_bound": 1,
+        "formula": "(upper_bound - raw_value) / (upper_bound - lower_bound)"
+      },
+      {
+        "objective_id": "privacy",
+        "direction": "MAXIMIZE",
+        "lower_bound": 0,
+        "upper_bound": 1,
+        "formula": "(upper_bound - raw_value) / (upper_bound - lower_bound)"
+      },
+      {
+        "objective_id": "carbon",
+        "direction": "MINIMIZE",
+        "lower_bound": 300,
+        "upper_bound": 800,
+        "formula": "(raw_value - envelope_plus_slab_floor) / (task_worst_case_carbon_upper_bound - envelope_plus_slab_floor) ; both numeric bounds are synthetic stand-ins"
+      }
+    ]
+  },
+  "reproduction_status": "NOT_RUN",
+  "claim_ceiling": "PINNED_BENCHMARK_PROTOCOL_AND_SYNTHETIC_NORMALIZATION_EXAMPLE_ONLY_NO_REPRODUCED_BENCHMARK_RESULT"
+}
