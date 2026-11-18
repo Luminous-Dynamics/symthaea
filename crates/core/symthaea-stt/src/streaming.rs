@@ -575,6 +575,133 @@ mod tests {
     }
 
     #[test]
+    fn ring_buffer_uses_absolute_sample_positions_after_overwrite() {
+        let mut buffer = AudioRingBuffer::new(5);
+        buffer.write(&[0.0, 1.0, 2.0, 3.0]).unwrap();
+        buffer.write(&[4.0, 5.0, 6.0]).unwrap();
+
+        assert_eq!(buffer.base_sample_pos(), 2);
+        assert_eq!(buffer.total_written(), 7);
+        assert_eq!(buffer.read_frame(0, 2), None);
+        assert_eq!(
+            buffer.read_frame(2, 5).unwrap(),
+            vec![2.0, 3.0, 4.0, 5.0, 6.0]
+        );
+    }
+
+    #[test]
+    fn oversized_chunk_retains_its_tail_and_exact_origin() {
+        let mut buffer = AudioRingBuffer::new(4);
+        let samples: Vec<f32> = (0..9).map(|value| value as f32).collect();
+        buffer.write(&samples).unwrap();
+
+        assert_eq!(buffer.base_sample_pos(), 5);
+        assert_eq!(buffer.total_written(), 9);
+        assert_eq!(
+            buffer.read_frame(5, 4).unwrap(),
+            vec![5.0, 6.0, 7.0, 8.0]
+        );
+        assert_eq!(buffer.read_frame(4, 4), None);
+    }
+
+    fn small_stream_config() -> StreamConfig {
+        StreamConfig {
+            sample_rate: 1_000,
+            frame_duration: 0.01,
+            hop_duration: 0.01,
+            buffer_duration: 0.1,
+            n_mels: 10,
+            min_frames: 1,
+            smoothing_window: 2,
+        }
+    }
+
+    #[test]
+    fn processor_continues_for_more_than_ten_buffer_durations() {
+        let mut processor = StreamProcessor::new(small_stream_config());
+        let mut total_frames = 0usize;
+
+        // 1.2 seconds through a 100 ms buffer, processing after each irregular
+        // seven-sample chunk. This must not stall when the retained origin moves.
+        let samples: Vec<f32> = (0..1_200)
+            .map(|index| (index as f32 * 0.071).sin())
+            .collect();
+        for chunk in samples.chunks(7) {
+            processor.push_audio(chunk).unwrap();
+            total_frames += processor.process().len();
+        }
+
+        assert!(total_frames > 100, "frame count must keep advancing");
+        assert_eq!(processor.frame_count(), total_frames);
+        assert_eq!(processor.dropped_sample_count(), 0);
+        assert_eq!(processor.segment_index(), 0);
+    }
+
+    #[test]
+    fn overrun_emits_exact_gap_and_starts_a_new_segment() {
+        let mut processor = StreamProcessor::new(small_stream_config());
+
+        // Consume [0, 30) before blocking the consumer while 250 new samples
+        // arrive into the 100-sample buffer.
+        let initial: Vec<f32> = (0..30).map(|value| value as f32).collect();
+        processor.push_audio(&initial).unwrap();
+        let first = processor.process();
+        assert_eq!(first.len(), 3);
+        assert_eq!(first[0].source_start_sample, 0);
+        assert_eq!(first[2].source_end_sample, 30);
+        assert_eq!(processor.frame_count(), 3);
+
+        let overrun: Vec<f32> = (30..280).map(|value| value as f32).collect();
+        processor.push_audio(&overrun).unwrap();
+        let resumed = processor.process();
+
+        let gap = processor
+            .take_discontinuity()
+            .expect("overrun must be observable");
+        assert_eq!(gap.segment_index, 1);
+        assert_eq!(gap.lost_start_sample, 30);
+        assert_eq!(gap.lost_end_sample, 180);
+        assert_eq!(gap.lost_samples(), 150);
+        assert_eq!(processor.dropped_sample_count(), 150);
+        assert_eq!(processor.segment_index(), 1);
+
+        assert!(!resumed.is_empty());
+        assert_eq!(resumed[0].source_start_sample, 180);
+        assert_eq!(resumed[0].segment_index, 1);
+        assert_eq!(resumed[0].frame_idx, 3, "frame IDs remain monotonic");
+        assert!(resumed.iter().all(|frame| frame.source_start_sample >= 180));
+        assert!(resumed.iter().all(|frame| frame.segment_index == 1));
+        assert!(resumed.windows(2).all(|pair| {
+            pair[0].source_start_sample < pair[1].source_start_sample
+                && pair[0].frame_idx < pair[1].frame_idx
+        }));
+    }
+
+    #[test]
+    fn reset_starts_a_new_origin_and_clears_gap_counters() {
+        let mut processor = StreamProcessor::new(small_stream_config());
+        let initial: Vec<f32> = (0..30).map(|value| value as f32).collect();
+        let overrun: Vec<f32> = (30..280).map(|value| value as f32).collect();
+        processor.push_audio(&initial).unwrap();
+        processor.process();
+        processor.push_audio(&overrun).unwrap();
+        processor.process();
+        assert!(processor.take_discontinuity().is_some());
+
+        processor.reset();
+        assert_eq!(processor.frame_count(), 0);
+        assert_eq!(processor.segment_index(), 0);
+        assert_eq!(processor.dropped_sample_count(), 0);
+        assert!(processor.take_discontinuity().is_none());
+
+        let fresh: Vec<f32> = (0..20).map(|value| value as f32).collect();
+        processor.push_audio(&fresh).unwrap();
+        let frames = processor.process();
+        assert_eq!(frames[0].source_start_sample, 0);
+        assert_eq!(frames[0].segment_index, 0);
+    }
+
+    #[test]
     fn test_latency() {
         let low_latency = StreamConfig::low_latency();
         let high_quality = StreamConfig::high_quality();
