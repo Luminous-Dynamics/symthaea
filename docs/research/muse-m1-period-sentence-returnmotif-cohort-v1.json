@@ -1,0 +1,6151 @@
+{
+  "schema": "muse-m1-period-sentence-returnmotif-cohort-v1",
+  "schema_version": 1,
+  "created_at": "2026-11-18",
+  "status": "preregistered_not_executed",
+  "purpose": "Freeze a discovery and held-out confirmation matrix for the PeriodSentence ReturnMotif semantic audit consumed by the M1 Classical segment.",
+  "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12810",
+  "protocol_document": "docs/research/MUSE_M1_PERIOD_SENTENCE_SEMANTIC_AUDIT_001_V0_1_2026-11-18.md",
+  "engine_pin": {
+    "commit_sha": null,
+    "required_before_execution": true,
+    "dependency_prs": [
+      {
+        "number": 9832,
+        "head_sha": "74c573f0ab71ff270ebc3c2b6519b51f32c54a2d",
+        "state": "open_draft"
+      },
+      {
+        "number": 9883,
+        "head_sha": "c36ce37461bcf7a3a60535aebb05a8468b6af289",
+        "state": "open_draft"
+      }
+    ],
+    "note": "Replace commit_sha only after the producer/verifier dependencies are integrated on one exact source revision. Do not report results against a moving branch."
+  },
+  "frozen_fields": {
+    "style": "Classical",
+    "grammar_family": "PeriodSentence",
+    "valence": 0,
+    "energy": 0.6,
+    "tonic": "C"
+  },
+  "variable_fields": [
+    "bars",
+    "arousal",
+    "seed"
+  ],
+  "outcome_vocabulary": [
+    "Verified",
+    "InsufficientEvidence",
+    "Discrepancy",
+    "GenerationFailure"
+  ],
+  "accounting_policy": {
+    "retain_all_cases": true,
+    "discard_failures": false,
+    "discovery_data_may_select_fixtures": true,
+    "confirmation_data_may_not_tune_verifier": true,
+    "require_exact_engine_revision": true,
+    "require_score_and_trace_digests": true
+  },
+  "cohorts": [
+    {
+      "cohort": "discovery",
+      "case_count": 384,
+      "bars": [
+        8,
+        16
+      ],
+      "arousal": [
+        0.25,
+        0.5,
+        0.75
+      ],
+      "seed_range": {
+        "first": 0,
+        "last": 63
+      },
+      "purpose": "Diagnose producer coverage and select deterministic fixture candidates. Not a confirmatory accuracy estimate.",
+      "cases": [
+        {
+          "case_id": "DISC-B8-A025-S0000",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 0,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0001",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0002",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 2,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0003",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 3,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0004",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 4,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0005",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 5,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0006",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 6,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0007",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 7,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0008",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 8,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0009",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 9,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0010",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 10,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0011",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 11,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0012",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 12,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0013",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 13,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0014",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 14,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0015",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 15,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0016",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 16,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0017",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 17,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0018",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 18,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0019",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 19,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0020",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 20,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0021",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 21,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0022",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 22,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0023",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 23,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0024",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 24,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0025",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 25,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0026",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 26,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0027",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 27,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0028",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 28,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0029",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 29,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0030",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 30,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0031",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 31,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0032",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 32,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0033",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 33,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0034",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 34,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0035",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 35,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0036",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 36,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0037",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 37,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0038",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 38,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0039",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 39,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0040",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 40,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0041",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 41,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0042",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 42,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0043",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 43,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0044",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 44,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0045",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 45,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0046",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 46,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0047",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 47,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0048",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 48,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0049",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 49,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0050",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 50,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0051",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 51,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0052",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 52,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0053",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 53,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0054",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 54,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0055",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 55,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0056",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 56,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0057",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 57,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0058",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 58,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0059",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 59,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0060",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 60,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0061",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 61,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0062",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 62,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A025-S0063",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 63,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0000",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 0,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0001",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0002",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 2,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0003",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 3,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0004",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 4,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0005",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 5,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0006",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 6,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0007",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 7,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0008",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 8,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0009",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 9,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0010",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 10,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0011",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 11,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0012",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 12,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0013",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 13,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0014",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 14,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0015",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 15,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0016",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 16,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0017",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 17,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0018",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 18,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0019",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 19,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0020",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 20,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0021",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 21,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0022",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 22,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0023",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 23,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0024",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 24,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0025",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 25,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0026",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 26,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0027",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 27,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0028",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 28,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0029",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 29,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0030",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 30,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0031",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 31,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0032",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 32,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0033",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 33,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0034",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 34,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0035",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 35,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0036",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 36,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0037",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 37,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0038",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 38,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0039",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 39,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0040",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 40,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0041",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 41,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0042",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 42,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0043",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 43,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0044",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 44,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0045",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 45,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0046",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 46,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0047",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 47,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0048",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 48,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0049",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 49,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0050",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 50,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0051",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 51,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0052",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 52,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0053",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 53,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0054",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 54,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0055",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 55,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0056",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 56,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0057",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 57,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0058",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 58,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0059",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 59,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0060",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 60,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0061",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 61,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0062",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 62,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A05-S0063",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 63,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0000",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 0,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0001",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0002",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 2,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0003",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 3,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0004",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 4,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0005",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 5,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0006",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 6,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0007",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 7,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0008",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 8,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0009",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 9,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0010",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 10,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0011",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 11,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0012",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 12,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0013",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 13,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0014",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 14,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0015",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 15,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0016",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 16,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0017",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 17,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0018",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 18,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0019",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 19,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0020",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 20,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0021",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 21,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0022",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 22,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0023",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 23,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0024",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 24,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0025",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 25,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0026",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 26,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0027",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 27,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0028",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 28,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0029",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 29,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0030",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 30,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0031",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 31,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0032",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 32,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0033",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 33,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0034",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 34,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0035",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 35,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0036",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 36,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0037",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 37,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0038",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 38,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0039",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 39,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0040",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 40,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0041",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 41,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0042",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 42,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0043",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 43,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0044",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 44,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0045",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 45,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0046",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 46,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0047",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 47,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0048",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 48,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0049",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 49,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0050",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 50,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0051",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 51,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0052",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 52,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0053",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 53,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0054",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 54,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0055",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 55,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0056",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 56,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0057",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 57,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0058",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 58,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0059",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 59,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0060",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 60,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0061",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 61,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0062",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 62,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B8-A075-S0063",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 63,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0000",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 0,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0001",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 1,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0002",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 2,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0003",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 3,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0004",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 4,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0005",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 5,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0006",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 6,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0007",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 7,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0008",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 8,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0009",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 9,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0010",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 10,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0011",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 11,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0012",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 12,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0013",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 13,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0014",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 14,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0015",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 15,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0016",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 16,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0017",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 17,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0018",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 18,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0019",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 19,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0020",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 20,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0021",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 21,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0022",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 22,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0023",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 23,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0024",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 24,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0025",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 25,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0026",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 26,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0027",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 27,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0028",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 28,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0029",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 29,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0030",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 30,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0031",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 31,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0032",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 32,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0033",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 33,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0034",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 34,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0035",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 35,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0036",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 36,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0037",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 37,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0038",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 38,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0039",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 39,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0040",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 40,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0041",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 41,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0042",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 42,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0043",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 43,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0044",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 44,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0045",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 45,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0046",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 46,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0047",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 47,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0048",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 48,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0049",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 49,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0050",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 50,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0051",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 51,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0052",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 52,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0053",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 53,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0054",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 54,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0055",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 55,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0056",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 56,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0057",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 57,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0058",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 58,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0059",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 59,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0060",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 60,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0061",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 61,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0062",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 62,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A025-S0063",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 63,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0000",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 0,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0001",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 1,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0002",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 2,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0003",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 3,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0004",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 4,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0005",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 5,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0006",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 6,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0007",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 7,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0008",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 8,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0009",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 9,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0010",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 10,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0011",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 11,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0012",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 12,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0013",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 13,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0014",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 14,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0015",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 15,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0016",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 16,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0017",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 17,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0018",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 18,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0019",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 19,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0020",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 20,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0021",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 21,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0022",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 22,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0023",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 23,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0024",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 24,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0025",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 25,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0026",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 26,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0027",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 27,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0028",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 28,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0029",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 29,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0030",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 30,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0031",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 31,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0032",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 32,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0033",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 33,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0034",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 34,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0035",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 35,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0036",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 36,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0037",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 37,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0038",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 38,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0039",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 39,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0040",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 40,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0041",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 41,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0042",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 42,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0043",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 43,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0044",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 44,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0045",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 45,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0046",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 46,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0047",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 47,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0048",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 48,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0049",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 49,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0050",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 50,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0051",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 51,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0052",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 52,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0053",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 53,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0054",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 54,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0055",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 55,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0056",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 56,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0057",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 57,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0058",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 58,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0059",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 59,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0060",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 60,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0061",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 61,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0062",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 62,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A05-S0063",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 63,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0000",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 0,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0001",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 1,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0002",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 2,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0003",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 3,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0004",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 4,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0005",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 5,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0006",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 6,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0007",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 7,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0008",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 8,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0009",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 9,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0010",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 10,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0011",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 11,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0012",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 12,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0013",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 13,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0014",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 14,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0015",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 15,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0016",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 16,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0017",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 17,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0018",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 18,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0019",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 19,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0020",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 20,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0021",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 21,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0022",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 22,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0023",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 23,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0024",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 24,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0025",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 25,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0026",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 26,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0027",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 27,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0028",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 28,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0029",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 29,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0030",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 30,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0031",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 31,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0032",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 32,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0033",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 33,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0034",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 34,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0035",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 35,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0036",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 36,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0037",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 37,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0038",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 38,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0039",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 39,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0040",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 40,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0041",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 41,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0042",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 42,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0043",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 43,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0044",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 44,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0045",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 45,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0046",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 46,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0047",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 47,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0048",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 48,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0049",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 49,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0050",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 50,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0051",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 51,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0052",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 52,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0053",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 53,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0054",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 54,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0055",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 55,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0056",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 56,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0057",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 57,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0058",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 58,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0059",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 59,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0060",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 60,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0061",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 61,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0062",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 62,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "DISC-B16-A075-S0063",
+          "cohort": "discovery",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 16,
+            "seed": 63,
+            "tonic": "C"
+          }
+        }
+      ]
+    },
+    {
+      "cohort": "confirmation",
+      "case_count": 120,
+      "bars": [
+        8
+      ],
+      "arousal": [
+        0.25,
+        0.5,
+        0.75
+      ],
+      "seed_range": {
+        "first": 1000,
+        "last": 1039
+      },
+      "purpose": "Held-out confirmation after implementation and positive/negative fixtures have been frozen.",
+      "cases": [
+        {
+          "case_id": "CONF-B8-A025-S1000",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1000,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1001",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1001,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1002",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1002,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1003",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1003,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1004",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1004,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1005",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1005,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1006",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1006,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1007",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1007,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1008",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1008,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1009",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1009,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1010",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1010,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1011",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1011,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1012",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1012,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1013",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1013,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1014",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1014,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1015",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1015,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1016",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1016,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1017",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1017,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1018",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1018,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1019",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1019,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1020",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1020,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1021",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1021,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1022",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1022,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1023",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1023,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1024",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1024,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1025",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1025,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1026",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1026,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1027",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1027,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1028",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1028,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1029",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1029,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1030",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1030,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1031",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1031,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1032",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1032,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1033",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1033,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1034",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1034,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1035",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1035,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1036",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1036,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1037",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1037,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1038",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1038,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A025-S1039",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.25,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1039,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1000",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1000,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1001",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1001,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1002",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1002,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1003",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1003,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1004",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1004,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1005",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1005,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1006",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1006,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1007",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1007,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1008",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1008,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1009",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1009,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1010",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1010,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1011",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1011,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1012",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1012,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1013",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1013,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1014",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1014,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1015",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1015,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1016",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1016,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1017",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1017,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1018",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1018,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1019",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1019,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1020",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1020,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1021",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1021,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1022",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1022,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1023",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1023,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1024",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1024,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1025",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1025,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1026",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1026,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1027",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1027,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1028",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1028,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1029",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1029,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1030",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1030,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1031",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1031,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1032",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1032,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1033",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1033,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1034",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1034,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1035",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1035,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1036",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1036,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1037",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1037,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1038",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1038,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A05-S1039",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.5,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1039,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1000",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1000,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1001",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1001,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1002",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1002,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1003",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1003,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1004",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1004,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1005",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1005,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1006",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1006,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1007",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1007,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1008",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1008,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1009",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1009,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1010",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1010,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1011",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1011,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1012",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1012,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1013",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1013,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1014",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1014,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1015",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1015,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1016",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1016,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1017",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1017,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1018",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1018,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1019",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1019,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1020",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1020,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1021",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1021,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1022",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1022,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1023",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1023,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1024",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1024,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1025",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1025,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1026",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1026,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1027",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1027,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1028",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1028,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1029",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1029,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1030",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1030,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1031",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1031,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1032",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1032,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1033",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1033,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1034",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1034,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1035",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1035,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1036",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1036,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1037",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1037,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1038",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1038,
+            "tonic": "C"
+          }
+        },
+        {
+          "case_id": "CONF-B8-A075-S1039",
+          "cohort": "confirmation",
+          "intent": {
+            "valence": 0,
+            "arousal": 0.75,
+            "energy": 0.6,
+            "bars": 8,
+            "seed": 1039,
+            "tonic": "C"
+          }
+        }
+      ]
+    }
+  ],
+  "expected_total_cases": 504,
+  "execution_record": {
+    "executed": false,
+    "results_path": null,
+    "toolchain": null,
+    "started_at": null,
+    "completed_at": null,
+    "report_sha256": null,
+    "note": "No generation, compilation, test, or benchmark execution is represented by this manifest."
+  }
+}
