@@ -1,0 +1,55 @@
+name: Culinary Meal Proposal
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-culinary/src/meal_proposal.rs"
+      - "crates/domains/symthaea-culinary/schemas/**"
+      - "crates/domains/symthaea-culinary/tests/fixtures/**"
+      - "tools/culinary-meal-proposal-harness/**"
+      - ".github/workflows/culinary-meal-proposal.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: culinary-meal-proposal-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-contract:
+    name: Focused meal proposal contract (exact head)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      QUALIFIED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.QUALIFIED_SHA }}
+          persist-credentials: false
+
+      - name: Assert exact checkout
+        run: test "$(git rev-parse HEAD)" = "${QUALIFIED_SHA}"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.1
+          components: rustfmt, clippy
+
+      - name: Assert toolchain
+        run: |
+          test "$(rustc --version | awk '{print $2}')" = "1.96.1"
+          rustfmt --version
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/culinary-meal-proposal-harness/Cargo.toml --all -- --check
+
+      - name: Run production-source unit tests
+        run: cargo test --manifest-path tools/culinary-meal-proposal-harness/Cargo.toml
+
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path tools/culinary-meal-proposal-harness/Cargo.toml --all-targets -- -D warnings
