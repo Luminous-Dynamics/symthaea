@@ -10,6 +10,7 @@ license = "AGPL-3.0-or-later"
 uom.workspace = true
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-fep = { path = "../../core/symthaea-fep" }
+symthaea-observability = { path = "../symthaea-observability" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
