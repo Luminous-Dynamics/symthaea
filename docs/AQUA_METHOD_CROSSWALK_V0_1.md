@@ -176,8 +176,19 @@ A method-specific test record must additionally bind:
 - specimen count, conditioning, mounting, orientation, stabilization and test sequence;
 - calibration, uncertainty, sample result and exclusions.
 
-The generic pressure_curve module has 40 authored tests; standard_methods has 12 authored tests covering UWL inlet-channel and ETL faceplate-centre P2 admission. These are not current-head execution passes. Aqua's spatial deposition map is supplementary diagnostic evidence. It does not replace UWL, WaterSense or EN spray-coverage / functional performance methods.
+The generic pressure_curve module has 40 authored tests; standard_methods has 12 authored tests covering UWL inlet-channel and ETL faceplate-centre P2 admission. The task_phase module now binds exact fixture categories and qualification method scope, rejecting an EN 18021 tap boost clause being assigned to a shower-outlet capability. The three modules' tests are authored, not current-head execution passes. Aqua's spatial deposition map is supplementary diagnostic evidence. It does not replace UWL, WaterSense or EN spray-coverage / functional performance methods.
 
 ## 6. Claim ceiling
 
 This crosswalk is a method-analysis and software-contract artifact. It does not establish product compliance, certification, human comfort, hygiene or physical Aqua performance. Formal method testing requires the controlled standard, the full apparatus and appropriate independent or accredited test-lab review.
+
+
+## 7. Task-plan qualification scope
+
+The bounded task-phase planner carries two separate identities:
+- the fixture/product category (tap, shower outlet, shower system, other sanitary fixture);
+- the qualification method route (UWL 2023 boost clause 12.1, EN 18021 tap 7.3.3, shower outlet 8.3.2, shower system 10.3.8, or another independently qualified method).
+
+The Rust validator checks that the exact capability category matches the plan category and that a declared standard route matches that category. This prevents a tap-specific pass from silently qualifying a shower outlet. It does not implement any of the controlled standard procedures, infer their numerical criteria, or certify the mode. An independently qualified mode under another method must be explicitly identified as such; it cannot claim UWL or EN conformity.
+
+EN 18021's public excerpt shows the tap-specific numerical limits in 7.3.3.4, but the accessible excerpt does not disclose the complete shower-outlet/system boost acceptance criteria. The controlled EN text and the correct product category are required before adding a shower-specific numerical validator.
