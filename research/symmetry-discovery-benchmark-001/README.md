@@ -220,3 +220,8 @@ In addition to the Python exact-rational fixture verifier and deterministic gene
 The fixture workflow now runs both implementations on the exact triggering PR head: Python/Fraction validates the rational JSON and seeded generator, then pinned Rust 1.96 runs format, locked tests and strict Clippy. The two oracles use separate code paths; agreement is stronger than repeating one implementation twice.
 
 The Rust target is still fixture validation only. It does not run LieFlow, SymFP, the COLT learner, or external physics/active-acquisition baselines, and the corpus is not a held-out external benchmark result.
+
+
+## Exact fixture oracle status (2026-11-18)
+
+The single manifest-driven Rust oracle is under `oracle/`; there is no parallel reference crate. It loads the checked-in JSON manifest and tests D4 closure/inverses, exact point-set stabilizers, polynomial invariance and arithmetic overflow. The fixture/schema validation step passed on the earlier benchmark workflow head. The Rust formatter diff from that run was applied to the consolidated oracle. A fresh exact-head run is required to qualify the current branch. **No external baseline has yet been run and these fixtures are not benchmark results.**
