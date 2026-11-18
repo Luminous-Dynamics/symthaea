@@ -173,10 +173,10 @@ fn load_multiple_run_records(paths: &[String]) -> Result<(Value, Vec<Value>), St
             }
         }
         if expected_model.is_none() {
-            expected_model = model;
+            expected_model = model.clone();
         }
         if expected_profile.is_none() {
-            expected_profile = profile;
+            expected_profile = profile.clone();
         }
         let replace_metadata = match combined_metadata.as_ref() {
             None => true,
