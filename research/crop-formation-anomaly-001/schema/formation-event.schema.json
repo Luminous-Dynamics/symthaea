@@ -349,6 +349,13 @@
         "$ref": "#/$defs/stem_mechanical_sample"
       },
       "description": "Controlled stem mechanical test observations. Raw curves and protocol metadata are retained separately from derived model quantities."
+    },
+    "root_anchorage_samples": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/root_anchorage_sample"
+      },
+      "description": "Root/soil anchorage measurements for calibrating separate translational and rotational support components."
     }
   },
   "$defs": {
@@ -1429,6 +1436,196 @@
           }
         }
       ]
+    },
+    "root_anchorage_sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_id",
+        "protocol_id",
+        "coordinate_frame",
+        "force_translation_curve",
+        "moment_rotation_curve",
+        "method",
+        "failure_mode"
+      ],
+      "properties": {
+        "sample_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "parent_specimen_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "protocol_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "coordinate_frame": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "loading_direction": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "force_translation_curve": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "force_n",
+              "translation_m"
+            ],
+            "properties": {
+              "force_n": {
+                "type": "number"
+              },
+              "translation_m": {
+                "type": "number"
+              },
+              "time_s": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "moment_rotation_curve": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "moment_nm",
+              "rotation_rad"
+            ],
+            "properties": {
+              "moment_nm": {
+                "type": "number"
+              },
+              "rotation_rad": {
+                "type": "number"
+              },
+              "time_s": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "derived_translational_stiffness_n_per_m": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "derived_rotational_stiffness_nm_per_rad": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "root_plate_major_axis_m": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "root_plate_minor_axis_m": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "soil_water_mass_fraction": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "soil_bulk_density_kg_m3": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "failure_mode": {
+          "enum": [
+            "none",
+            "root_plate_rotation",
+            "root_pullout",
+            "soil_shear",
+            "stem_failure",
+            "other",
+            "unknown"
+          ]
+        },
+        "failure_moment_nm": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "instrument_or_calibration": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 512
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "observer_blinding_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "raw_measurement_url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        }
+      }
     }
   }
 }
