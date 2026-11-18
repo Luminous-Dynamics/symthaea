@@ -59,6 +59,40 @@ const CONFIRMATION_STYLES: [&str; 6] = [
 
 const DISCOVERY_SEEDS: [u64; 4] = [90_210, 130_363, 222_731, 918_273];
 
+const PINNED_COMPOSER_SOURCE_COMMIT: &str =
+    "bd227d416878a4373eb87a53e182e7067a2411a5";
+
+const PINNED_COMPOSER_BLOBS: [(&str, &str); 7] = [
+    (
+        "crates/domains/symthaea-music-theory/src/style.rs",
+        "81192045a724823b47107702185b814cb9921cbf",
+    ),
+    (
+        "crates/domains/symthaea-music-theory/src/grammar.rs",
+        "a44ec71c774cc749dcdbded96ec2ced5500ccd7c",
+    ),
+    (
+        "crates/domains/symthaea-music-theory/src/composer.rs",
+        "e9a7bf7de176a8f8091163c6809bb4e8855b3a5a",
+    ),
+    (
+        "crates/domains/symthaea-music-theory/src/spec.rs",
+        "2ea178ab065ab7582ab6d3619818b88a3da5787e",
+    ),
+    (
+        "crates/domains/symthaea-music-theory/src/fingerprint.rs",
+        "97c4f127a1b460f424cb4201d4290c89899932ae",
+    ),
+    (
+        "crates/domains/symthaea-music-theory/src/score.rs",
+        "7e42614f0bd79bb5d769d4bea7d289ebf6c503c8",
+    ),
+    (
+        "crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs",
+        "bf51ab11df3c1ca2c4ca28b894e8597eaef490e3",
+    ),
+];
+
 const CONFIRMATION_SEEDS: [u64; 12] = [
     1_000_003,
     1_000_033,
@@ -603,6 +637,28 @@ fn verify_source_revision(source_commit: &str) -> Result<(), String> {
             "source worktree is not clean; refusing to bind measurements to commit {head}"
         ));
     }
+    git_output(&[
+        "merge-base",
+        "--is-ancestor",
+        PINNED_COMPOSER_SOURCE_COMMIT,
+        "HEAD",
+    ])
+    .map_err(|_| {
+        format!(
+            "checked-out HEAD {head} is not descended from pinned composer source {}",
+            PINNED_COMPOSER_SOURCE_COMMIT
+        )
+    })?;
+
+    for (path, expected_blob) in PINNED_COMPOSER_BLOBS {
+        let revision = format!("HEAD:{path}");
+        let actual_blob = git_output(&["rev-parse", &revision])?;
+        if actual_blob != expected_blob {
+            return Err(format!(
+                "pinned composer source mismatch for {path}: expected blob {expected_blob}, got {actual_blob}"
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -757,6 +813,16 @@ mod tests {
 
         let truncated = csv.lines().take(100).collect::<Vec<_>>().join("\n");
         assert!(parse_manifest(&truncated, &expected).is_err());
+    }
+
+    #[test]
+    fn pinned_composer_manifest_has_seven_valid_blob_pins() {
+        assert_eq!(PINNED_COMPOSER_BLOBS.len(), 7);
+        assert!(is_commit_sha(PINNED_COMPOSER_SOURCE_COMMIT));
+        for (path, blob) in PINNED_COMPOSER_BLOBS {
+            assert!(!path.is_empty());
+            assert!(is_commit_sha(blob));
+        }
     }
 
     #[test]
