@@ -71,7 +71,7 @@ pub enum ProductPressureRangeStatus {
 }
 
 /// One exact pressure-point observation. Static and upstream pressures are contextual;
-/// dynamic pressure at the terminal fitting inlet is the primary test pressure.
+/// dynamic pressure is interpreted only at the explicitly recorded measurement datum.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PressureFlowObservation {
     pub run_id: String,
@@ -95,7 +95,7 @@ pub struct PressureFlowObservation {
     pub pressure_datum: PressureMeasurementDatum,
     /// Expanded or otherwise declared pressure uncertainty, in kPa.
     pub dynamic_pressure_uncertainty_kpa: f64,
-    /// Optional upstream pressure channels; never substitutes for fitting-inlet pressure.
+    /// Optional upstream pressure channels; never substitutes for the declared test datum.
     pub static_supply_pressure_kpa: Option<f64>,
     pub upstream_residual_pressure_kpa: Option<f64>,
     /// Measured flow at the declared fitting/mode, in litres per minute.
@@ -146,7 +146,7 @@ impl Display for PressureRunError {
             Self::InvalidRange { field } => write!(f, "invalid qualified pressure range: {field}"),
             Self::InvalidSetpoint => write!(f, "pressure setpoint must be finite and positive"),
             Self::InvalidDynamicPressure => {
-                write!(f, "dynamic fitting-inlet pressure must be finite and positive")
+                write!(f, "dynamic pressure at the declared datum must be finite and positive")
             }
             Self::InvalidSetpointTolerance => {
                 write!(f, "pressure setpoint tolerance must be finite and positive")
@@ -388,8 +388,8 @@ impl PressureFlowObservation {
 
 /// Validate that two observations are suitable for an exact-point pressure comparison.
 ///
-/// The maximum permissible difference between dynamic fitting-inlet pressure readings is
-/// supplied by the preregistered protocol, not chosen after seeing the flows. The pressure
+/// The maximum permissible difference between dynamic pressure readings at the same explicit
+/// datum is supplied by the preregistered protocol, not chosen after seeing the flows. The pressure
 /// uncertainty intervals are added conservatively. No interpolation between pressure
 /// points is performed.
 pub fn validate_matched_pressure_comparison(
