@@ -147,4 +147,37 @@ The validator:
 - permits matched pressure comparisons only with the same frozen context/protocol, same setpoint/tolerance and a preregistered maximum difference between actual measured pressure bands;
 - performs no interpolation and does not determine task success or comfort.
 
-The module has 20 authored tests. Manufacturer pressure documentation can be one-sided: a stated minimum without a maximum, or maximum without a minimum, is preserved as such. The evaluator reports `MeetsDeclaredMinimumOnly` / `MeetsDeclaredMaximumOnly` rather than claiming a complete declared operating range. It rejects an empty range and never manufactures an unpublished bound. These tests are not yet a current-head CI pass. Mycelix remains the authority for instrument identity/calibration/uncertainty admission; Symtropy remains the authority for hydraulic and resource modeling.
+The module now has 28 authored tests. Manufacturer pressure documentation can be one-sided: a stated minimum without a maximum, or maximum without a minimum, is preserved as such. The evaluator reports `MeetsDeclaredMinimumOnly` / `MeetsDeclaredMaximumOnly` rather than claiming a complete declared operating range. It rejects an empty range and never manufactures an unpublished bound. The paired pressure-retention comparison uses the same specimen, exact product variant, mode, geometry, pressure-invariant service context, protocol, rating evidence and instrument identities while allowing the per-run context digest to differ because pressure is intentionally changed. It reports central retention and conservative measurement-uncertainty bounds without interpolating or claiming a confidence interval across specimens. These tests are authored, not yet a current-head CI pass. Mycelix remains the authority for instrument identity/calibration/uncertainty admission; Symtropy remains the authority for hydraulic and resource modeling.
+
+
+## 11. International pressure-independence benchmark — UK ETL
+
+The UK government's Energy Technology List (ETL) shower criteria provide a relevant non-domestic market benchmark. The published page states that for shower heads / valves / systems:
+- maximum available flow is 9 L/min without user-behaviour features, or 10.6 L/min with such features;
+- pressure independence requires the lowest flow to be at least 60% of maximum available flow;
+- the reference pressure is 3 bar and the lower pressure is 1.5 bar, where flow at the reference pressure is at or below 8 L/min;
+- spray coverage follows the Unified Water Label procedure.
+
+Source: https://etl.energysecurity.gov.uk/products/showers/showers (sections 1.3–1.4).
+
+This scheme is for non-domestic products and is not South African law or a general domestic certification. It is a useful comparative benchmark, not an Aqua compliance claim. For Aqua, 150 kPa / 300 kPa exact-point flow retention should be reported as a separate response metric only when the product/mode is eligible for the matched comparison.
+
+### Research targets
+
+- External reference: >=0.60 measured flow retention at 150 kPa relative to 300 kPa, only under the ETL's own applicable conditions.
+- Aqua initial internal target: >=0.70 conservative measurement-bound retention.
+- Aqua stretch hypothesis: >=0.80 conservative measurement-bound retention.
+
+The 0.70 / 0.80 values are proposed research ambitions, not standard requirements. They are only useful if spray force/coverage, spatial task-region deposition, bather-plane temperature, completed task quality and service burden also remain non-inferior.
+
+### Exact-point paired calculation
+
+The pressure_curve helper now supports paired same-specimen observations at two measured pressure setpoints. It requires a shared pressure-invariant context digest for task, mode, inlet-water/temperature profile, room, mounting, specimen state and measurement setup; the run-specific context digests may differ because pressure changed.
+
+It calculates:
+- central low-pressure / high-pressure flow ratio;
+- conservative lower bound = (low flow - uncertainty) / (high flow + uncertainty);
+- conservative upper bound = (low flow + uncertainty) / (high flow - uncertainty);
+- threshold status: conservative-bound meet, optimistic-bound fail, or unresolved by measurement uncertainty.
+
+These bounds represent declared measurement uncertainty, not a statistical confidence interval across units or runs. The UK ETL's 60% criterion is not automatically applied to all products; eligibility depends on its exact product category, reference flow and UWL method. The helper does not certify ETL conformity or establish task quality.
