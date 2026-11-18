@@ -69,6 +69,7 @@ mycelix-zkp-core = { path = "stubs/mycelix-zkp-core", features = ["dilithium"] }
 
 # Mycelix Shared Deps (Bundled Standalone)
 sha2 = { version = "0.10", features = ["oid"] }
+sha1 = "0.10"
 pqcrypto-traits = "0.3"
 pqcrypto-dilithium = "0.5"
 subtle = "2.5"
