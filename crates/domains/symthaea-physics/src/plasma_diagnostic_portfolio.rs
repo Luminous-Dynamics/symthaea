@@ -975,7 +975,7 @@ pub fn evaluate_observation_frame(
         if !matches!(
             &channel.disposition,
             crate::plasma_observability::ObservationDisposition::Measured { .. }
-        ) && !matches!(evidence.observation, SensorObservation::Unknown)
+        ) && !matches!(&evidence.observation, SensorObservation::Unknown)
         {
             return Err(DiagnosticPortfolioError::new(
                 "non-measured observation was incorrectly promoted to a known category",
