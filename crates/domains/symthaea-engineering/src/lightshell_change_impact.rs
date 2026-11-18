@@ -8,7 +8,7 @@
 //! service authority, product passport or safety approval.
 
 use serde::Deserialize;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
