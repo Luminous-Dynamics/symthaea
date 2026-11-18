@@ -202,6 +202,20 @@ fn result_profile_name(results: &Value) -> Option<String> {
             }
         }
     }
+    if let Some(conditions) = results.get("conditions").and_then(Value::as_array) {
+        for condition in conditions {
+            if let Some(runs) = condition.get("runs").and_then(Value::as_array) {
+                for run in runs.iter().take(10) {
+                    if let Some(profile) = run.get("profile").and_then(Value::as_str) {
+                        if !profile.trim().is_empty() {
+                            profiles.insert(profile.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     if profiles.len() == 1 {
         return profiles.into_iter().next();
     }
@@ -242,10 +256,12 @@ fn load_multiple_run_records(
 
     for path in paths {
         let (results, runs) = load_run_records(path)?;
-        let model = require_single_identity(result_model_name(&results), "model", path)?;
-        let profile = require_single_identity(result_profile_name(&results), "profile", path)?;
+        let model = require_single_identity(result_model_name(&results), "model", path)?
+            .ok_or_else(|| format!("result file has no model identity: {path}"))?;
+        let profile = require_single_identity(result_profile_name(&results), "profile", path)?
+            .ok_or_else(|| format!("result file has no profile identity: {path}"))?;
 
-        if let Some(profile) = &profile {
+        if let Some(profile) = &Some(profile.clone()) {
             if profile != "legacy" && profile != expected_profile {
                 return Err(format!(
                     "expected {expected_profile} profile input, found {profile} ({path})"
@@ -254,14 +270,14 @@ fn load_multiple_run_records(
             observed_profiles.insert(profile.clone());
         }
 
-        if let (Some(expected), Some(actual)) = (&expected_model, &model) {
-            if expected != actual {
+        if let Some(expected) = &expected_model {
+            if expected != &model {
                 return Err(format!(
-                    "result files use different models: {expected} vs {actual} ({path})"
+                    "result files use different models: {expected} vs {model} ({path})"
                 ));
             }
-        } else if expected_model.is_none() {
-            expected_model = model.clone();
+        } else {
+            expected_model = Some(model.clone());
         }
         combined_runs.extend(runs);
     }
@@ -291,7 +307,6 @@ fn vote_values(run: &Value, field: &str) -> Vec<String> {
                     vote.get("vote")
                         .and_then(Value::as_str)
                         .unwrap_or("")
-                        .trim()
                         .to_string()
                 })
                 .collect()
@@ -528,21 +543,17 @@ fn score(
         if full_profile.as_deref().is_some_and(|value| value != "full" && value != "legacy") {
             return Err(format!("expected full-profile input, found {} ({full_path})", full_profile.unwrap_or_default()));
         }
-        if result_profile_name(&full_json)
-            .as_deref()
-            .is_some_and(|value| value != "full")
-        {
-            return Err("full-profile result input has non-full profile metadata".to_string());
-        }
-        if let (Some(hidden_model), Some(full_model)) = (
+        match (
             result_model_name(&results_json),
             result_model_name(&full_json),
         ) {
-            if hidden_model != full_model {
+            (Some(hidden_model), Some(full_model)) if hidden_model == full_model => {}
+            (Some(hidden_model), Some(full_model)) => {
                 return Err(format!(
                     "hidden and full-profile inputs use different models: {hidden_model} vs {full_model}"
                 ));
             }
+            _ => return Err("cannot verify that hidden and full-profile results use the same model".to_string()),
         }
         let mut full_by_task = BTreeMap::<String, Vec<f64>>::new();
         for (run_index, run) in full_runs.iter().enumerate() {
