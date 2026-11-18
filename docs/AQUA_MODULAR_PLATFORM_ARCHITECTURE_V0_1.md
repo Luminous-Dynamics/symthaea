@@ -222,7 +222,7 @@ Dynamic events—startup, pressure steps, concurrent basin/bath draw, pump/regul
 
 ## Versioned external evidence corpus
 
-The machine-readable evidence register now includes the UK ETL non-domestic shower criteria alongside exact Brondell and Hansgrohe product declarations, WaterSense criteria, SANS installation references and peer-reviewed spray studies. The corpus distinguishes programme criteria from manufacturer declarations and from Aqua results: [AQUA_EVIDENCE_CORPUS_V0_1.md](research/AQUA_EVIDENCE_CORPUS_V0_1.md), source JSON at [aqua-evidence-corpus-v0.1.json](research/aqua-evidence-corpus-v0.1.json). Current snapshot: 13 entries / 67 claims, including UK ETL electric-shower wastewater-heat-recovery pathways and peer-reviewed 2025/2026 DWHR system studies. This is an evidence register, not certification.
+The machine-readable evidence register now includes the UK ETL non-domestic shower criteria alongside exact Brondell and Hansgrohe product declarations, WaterSense criteria, SANS installation references and peer-reviewed spray studies. The corpus distinguishes programme criteria from manufacturer declarations and from Aqua results: [AQUA_EVIDENCE_CORPUS_V0_1.md](research/AQUA_EVIDENCE_CORPUS_V0_1.md), source JSON at [aqua-evidence-corpus-v0.1.json](research/aqua-evidence-corpus-v0.1.json). Current snapshot: 15 entries / 75 claims, including EN 18021:2025, UWL 2023 pressure-method criteria, UK ETL electric-shower wastewater-heat-recovery pathways and peer-reviewed 2025/2026 DWHR system studies. This is an evidence register, not certification.
 
 ## Power-coupled electric shower and DWHR architecture
 
