@@ -75,7 +75,7 @@ Keep base model, prompt, tool access, data split, retrieval budget and total tok
 
 ### Lineage and evidence quality
 - Provenance coverage: fraction of returned memories carrying expected source lineage.
-- Source-class / verification-claim lineage coverage; arbitrary source labels are excluded from durable replay metadata until a privacy-aware source-event contract exists.
+- Source-class / verification-claim lineage coverage; arbitrary source labels are excluded from the replay envelope until a privacy-aware source-event contract exists.
 - Verification-claim calibration: fraction of claimed-verified entries supported by an independent receipt.
 - Source-root independence and correlated-duplicate resistance.
 - Unsupported inference rate: conclusions with no sufficient source support.
@@ -107,7 +107,7 @@ These are targets to preregister and measure, not current results.
 
 ### P0 — deterministic invariants
 - 100% of graduation source class and producer verification claim survive into the provenance-bearing replay envelope.
-- Arbitrary producer labels are not copied into durable replay metadata; they may contain user content and are not source identities. A later receipt adapter must bind a privacy-reviewed source-event ID and payload digest.
+- Arbitrary producer labels are not copied into the replay envelope; they may contain user content and are not source identities. A later receipt adapter must bind a privacy-reviewed source-event ID and payload digest.
 - Exactly zero change to raw Psi from source class, verification claim, persistence bonus or Sigma bonus.
 - Exactly zero synthetic emotional-valence change from a verification claim.
 - Zero admission when raw Psi is non-finite, outside [0, 1], or below the configured threshold—even when a verification claim or priority bonus is present.
@@ -148,7 +148,7 @@ The accompanying source change is intended to close only the working-memory grad
 - keep the historic replay API while adding provenance-preserving top, sampling and similarity retrieval APIs;
 - reject non-finite/out-of-domain Psi and malformed priority inputs before replay-heap insertion.
 
-This is deliberately **not** a complete source receipt. It deliberately does not persist arbitrary labels and contains no immutable source-event/revision ID, payload digest, valid-time/transaction-time coordinates, signature, or independent verifier receipt. Those remain in #9075/#11816/#12846 and their Mycelix/Symtropy owners. No source trust, consent, or action authority is inferred from this envelope.
+This is deliberately **not** a complete source receipt or disk-backed persistence integration. `EpisodicMemory` remains an in-memory replay store; the new envelope is serializable, but this PR adds no database/file persistence. It excludes arbitrary labels and contains no immutable source-event/revision ID, payload digest, valid-time/transaction-time coordinates, signature, or independent verifier receipt. Those remain in #9075/#11816/#12846 and their Mycelix/Symtropy owners. No source trust, consent, or action authority is inferred from this envelope.
 
 ## 9. Exit criteria for a SOTA claim
 
