@@ -28,7 +28,7 @@ Do not merge resistive onset, zero resistance, diamagnetic onset, bulk thermodyn
 
 ## Metrics for a real benchmark run
 
-Report by property, label authority, family and split regime: MAE/RMSE in physical units and log-space; median absolute error; paired confidence intervals; prediction-interval coverage and width; calibration; risk-versus-coverage for abstaining models; precision/recall and top-k enrichment at fixed candidate budgets; and cost per independently confirmed candidate. Bootstrap by material/source groups, not individual rows.
+Report by property, measurement class, label authority, family and split regime: MAE/RMSE in physical units and log-space; median absolute error; paired confidence intervals; prediction-interval coverage and width; calibration; risk-versus-coverage for abstaining models; precision/recall and top-k enrichment at fixed candidate budgets; and cost per independently confirmed candidate. Bootstrap by material/source groups, not individual rows.
 
 A high global score must never conceal a catastrophic family-specific failure.
 
