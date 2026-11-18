@@ -1089,6 +1089,7 @@ mod tests {
             "role":"pareto_objective","lower_limit":null,"upper_limit":null,"requirement_ref":null,"acceptance_rule_ref":null
         }));
         for candidate in manifest["candidates"].as_array_mut().unwrap() {
+            let construction_ref = candidate["construction_ref"].clone();
             candidate["properties"].as_array_mut().unwrap().push(json!({
                 "metric_id":"transition_strain_concentration_ratio","unit":"ratio","lower_bound":0.8,"upper_bound":0.9,
                 "interval_semantics":"measurement_interval","coverage_fraction":0.95,"evidence_origin":"physical_measurement",
@@ -1098,7 +1099,7 @@ mod tests {
                 "coupon_evidence_ref":"COUPON-EVIDENCE-12751","coupon_run_ref":"RUN-TRANSITION-001",
                 "method_selection_ref":"METHOD-TRANSITION-01","raw_data_digest":format!("sha256:{}", "a".repeat(64)),
                 "evidence_material_lot_ref":"LOT-001","evidence_process_revision_ref":"PROCESS-REV-A",
-                "evidence_construction_ref":candidate["construction_ref"].clone()
+                "evidence_construction_ref":construction_ref
             }));
         }
         let report = parse_and_validate(&manifest.to_string()).unwrap();
