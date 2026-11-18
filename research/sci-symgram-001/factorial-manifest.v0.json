@@ -31,6 +31,11 @@
       "role": "canonical ScientificModel and PhysicsIR"
     },
     {
+      "repository": "Luminous-Dynamics/symthaea",
+      "issue": 11616,
+      "role": "task-preserving quotient compilation, orbit certificates and lifting"
+    },
+    {
       "repository": "Luminous-Dynamics/symtropy",
       "issue": 3749,
       "role": "analytic physics oracles and solver V&V"
@@ -213,6 +218,7 @@
     "no_benchmark_execution_claim",
     "no_new_physical_law_claim",
     "no_external_sota_claim",
-    "synthetic_results_do_not_establish_physical_truth"
+    "synthetic_results_do_not_establish_physical_truth",
+    "radial polynomial oracle does not grant quotient pruning permission"
   ]
 }
