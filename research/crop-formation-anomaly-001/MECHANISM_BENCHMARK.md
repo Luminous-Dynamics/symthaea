@@ -1,7 +1,7 @@
 # CROP-INTEL-001 — Mechanism discrimination and plant mechanics benchmark
 
 **Version:** 0.1 research design + analytical reference implementation  
-**Status:** first-order Rust equations authored; not compiled or executed; no field dataset or mechanical campaign exists  
+**Status:** first-order and piecewise root-coupled beam reference equations authored; not compiled or executed; no field dataset or mechanical campaign exists  
 **Claim ceiling:** this work does not identify the cause of any reported formation. It adds measurements and falsifiable comparators, not evidence for an extraordinary mechanism.
 
 ## Executive change: stop ranking anomalies; start discriminating mechanisms
@@ -80,11 +80,33 @@ It supplies a small set of transparent SI-unit calculations:
 
 The implementation validates finite positive dimensions and loads, supports solid or concentric hollow elliptical sections, and tests principal-axis anisotropy. The authored unit tests are analytical checks; they do not validate a living-plant constitutive model.
 
+### Piecewise stem stiffness and root–shoot support
+
+The lab now also contains a piecewise Euler–Bernoulli beam reference with piecewise-constant flexural rigidity and independent translational/rotational root springs. For a stem of length L, with segment i occupying [a_i,b_i] and principal-plane flexural rigidity EI_i, the ideal tip deflection under a tip force F is
+
+\[
+\delta_F = F \sum_i \frac{(L-a_i)^3-(L-b_i)^3}{3EI_i}
++ \frac{F}{k_t}+\frac{FL^2}{k_\theta}.
+\]
+
+For a uniform transverse load q over the length,
+
+\[
+\delta_q = q \sum_i \frac{(L-a_i)^4-(L-b_i)^4}{8EI_i}
++ \frac{qL}{k_t}+\frac{qL^3}{2k_\theta}.
+\]
+
+Here k_t is translational root stiffness (N/m) and k_theta is rotational root stiffness (N·m/rad). An absent spring is treated as rigid. The model recovers the standard uniform-cantilever formulas when all EI_i are equal and root springs are rigid.
+
+This is a deliberate *intermediate model*, not a validated whole-plant simulator. It represents one bending plane at a time; anisotropic stems require separate profiles for both principal axes and measured cross-section orientation. Root springs are linearized summaries of root–soil support, not root architecture. The model has no shear deformation, dynamic/inertial loading, nonlinear large rotations, hysteresis, damage evolution, viscoelasticity, taper within a segment, leaves, canopy contact or soil plasticity. Use it to define a baseline and design measurements, not to claim historic forces or assign mechanisms.
+
+The implementation validates full segment coverage, ordering, positive EI and positive root spring stiffness. Ten new analytical tests cover uniform-profile recovery, partition invariance, nonuniform stiffness gradients, root compliance, uniform loading and invalid profiles. Tests are authored only; they have not been compiled or executed.
+
 ### Assumptions and explicit limitations
 
 These are first-order Euler-Bernoulli beam relationships for idealized, small-deflection, linear-elastic cases. Crop stems can be tapered, hollow, elliptical, anisotropic, layered, viscoelastic, hydrated, locally damaged and coupled to leaves, nodes, roots and soil. The modulus and effective section may change with direction, moisture, loading rate and test preparation. A single global (EI) is not an adequate representation of a nonuniform stem unless that approximation is justified.
 
-Do not use the equations to infer material modulus from posture alone, infer a historic force from a final shape without boundary conditions, or infer the source of a formation. Preserve raw force-displacement curves and fit/calibrate model parameters from controlled measurements. For spatially varying stems, use segment-wise or finite-element models only after cross-section, material and boundary assumptions are independently justified.
+Do not use the equations to infer material modulus from posture alone, infer a historic force from a final shape without boundary conditions, or infer the source of a formation. Preserve raw force-displacement curves and fit/calibrate model parameters from controlled measurements. For spatially varying stems, use the new piecewise segment model as a transparent baseline, then compare it with a finite-element model only after cross-section, material and boundary assumptions are independently justified. Preserve the two principal bending axes separately.
 
 ### Protocol implications
 
@@ -209,6 +231,8 @@ cargo clippy --all-targets -- -D warnings
 ```
 
 ## References
+
+- Jing et al. (2026), [Multi-scale lodging in rice and wheat: bridging biomechanical traits, phenotypic detection, and intelligent harvesting systems](https://doi.org/10.3389/fpls.2026.1956108), *Frontiers in Plant Science* — identifies root–shoot coupling, standardized mechanics and cross-environment validation as active gaps; discusses stiffness gradients in stems and the need to calibrate remote sensing against mechanical ground truth.
 
 1. Tabaracci, K., Vos, J. & Robertson, D. J. (2024). [The effect of testing rate on biomechanical measurements related to stalk lodging](https://doi.org/10.1186/s13007-024-01253-9). *Plant Methods*, 20, 125.
 2. Ravichandran et al. (2025). [Precision phenotyping in wheat: LiDAR-based plant height estimation and lodging classification using uncrewed ground vehicles](https://doi.org/10.1080/07038992.2025.2516742).
