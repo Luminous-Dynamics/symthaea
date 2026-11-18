@@ -22,18 +22,27 @@ fn main() -> ExitCode {
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
-    let cohort_arg = args.next().ok_or(
-        "missing cohort; expected discovery, confirmation, or both",
-    )?;
+    let cohort_arg = args.next().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "missing cohort; expected discovery, confirmation, or both",
+        )
+    })?;
     if args.next().is_some() {
-        return Err("unexpected extra arguments".into());
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "unexpected extra arguments").into());
     }
 
     let cohorts: Vec<Cohort> = match cohort_arg.as_str() {
         "discovery" => vec![Cohort::Discovery],
         "confirmation" => vec![Cohort::Confirmation],
         "both" => vec![Cohort::Discovery, Cohort::Confirmation],
-        _ => return Err("unknown cohort; expected discovery, confirmation, or both".into()),
+        _ => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "unknown cohort; expected discovery, confirmation, or both",
+            )
+            .into());
+        }
     };
 
     let stdout = io::stdout();
