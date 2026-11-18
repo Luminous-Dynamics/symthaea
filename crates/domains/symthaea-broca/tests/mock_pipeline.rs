@@ -990,3 +990,62 @@ fn test_temporal_collapse_recovery_health_check() {
         "Temporal weights should differ after health check recovery"
     );
 }
+
+/// The local FEP temporal path must align a teacher-forced hidden-state trajectory
+/// to all 64 projected chunks before applying any updates.
+#[test]
+fn test_local_fep_temporal_teacher_trajectory_alignment() {
+    let config = LiquidMambaConfig {
+        temporal_projection: true,
+        temporal_enable_adapter: false,
+        enable_liquid_bottleneck: false,
+        enable_consciousness_gating: false,
+        ..Default::default()
+    };
+    let mut gen_obj = mock_gen(config);
+    let channels = ThoughtChannels::with_intent(2);
+    let thought_hv = gen_obj.encoder().encode(&channels);
+
+    let initial_weights = gen_obj.temporal_proj().unwrap().flatten_weights();
+    assert_eq!(gen_obj.temporal_proj().unwrap().num_chunks(), 64);
+
+    let loss = gen_obj
+        .local_fep_distill(&thought_hv, &[11, 22, 33, 44], 0.001)
+        .expect("64-chunk teacher-forced temporal distillation should succeed");
+
+    assert!(loss.is_finite(), "loss must be finite: {loss}");
+    assert!(loss >= 0.0, "cross-entropy loss must be non-negative: {loss}");
+
+    let final_weights = gen_obj.temporal_proj().unwrap().flatten_weights();
+    assert_eq!(initial_weights.len(), final_weights.len());
+    assert!(
+        final_weights.iter().all(|weight| weight.is_finite()),
+        "temporal weights must remain finite"
+    );
+    assert!(
+        initial_weights
+            .iter()
+            .zip(final_weights.iter())
+            .any(|(before, after)| (before - after).abs() > 1e-12),
+        "teacher-forced temporal distillation must update temporal projection weights"
+    );
+}
+
+#[test]
+fn test_local_fep_rejects_empty_teacher_target() {
+    let config = LiquidMambaConfig {
+        temporal_projection: true,
+        temporal_enable_adapter: false,
+        enable_liquid_bottleneck: false,
+        enable_consciousness_gating: false,
+        ..Default::default()
+    };
+    let mut gen_obj = mock_gen(config);
+    let channels = ThoughtChannels::with_intent(0);
+    let thought_hv = gen_obj.encoder().encode(&channels);
+
+    let error = gen_obj
+        .local_fep_distill(&thought_hv, &[], 0.001)
+        .expect_err("empty target must fail closed");
+    assert!(error.to_string().contains("teacher target sequence is empty"));
+}
