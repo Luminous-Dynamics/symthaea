@@ -760,6 +760,26 @@ mod tests {
     }
 
     #[test]
+    fn policy_digest_covers_thresholds_persistence_and_warning_interval() {
+        let original = config();
+        let digest = original.policy_config_sha256();
+        assert_eq!(digest.len(), 64);
+        assert!(digest.bytes().all(|byte| byte.is_ascii_hexdigit()));
+
+        let mut changed_threshold = original.clone();
+        changed_threshold.trigger_threshold += 0.01;
+        assert_ne!(digest, changed_threshold.policy_config_sha256());
+
+        let mut changed_warning = original.clone();
+        changed_warning.required_warning_ns += 1;
+        assert_ne!(digest, changed_warning.policy_config_sha256());
+
+        let mut changed_validation = original;
+        changed_validation.validation_receipt_sha256 = "b".repeat(64);
+        assert_ne!(digest, changed_validation.policy_config_sha256());
+    }
+
+    #[test]
     fn online_policy_raises_only_after_consecutive_measured_windows() {
         let mut policy = OnlinePlasmaAlarmPolicy::new(config()).expect("valid policy");
         policy.reset_for_shot("shot-1").expect("valid shot");
@@ -944,7 +964,14 @@ mod tests {
         let summary = summarize_alarm_evaluations(&[positive, negative]).expect("summary");
         assert_eq!(summary.policy_id, "fixed-test-policy-v1");
         assert_eq!(summary.validation_receipt_sha256, "a".repeat(64));
+        assert_eq!(summary.policy_config_sha256, config().policy_config_sha256());
         assert_eq!(summary.required_warning_ns, 50);
+        let tpr_ci = summary.event_tpr_wilson_95.expect("positive cohort interval");
+        assert!(tpr_ci.lower < 1.0 && (tpr_ci.upper - 1.0).abs() < 1e-12);
+        let far_ci = summary
+            .false_alarm_shot_rate_wilson_95
+            .expect("negative cohort interval");
+        assert!(far_ci.lower < 1.0 && (far_ci.upper - 1.0).abs() < 1e-12);
         assert_eq!(summary.disruptive_shots, 1);
         assert_eq!(summary.detected_disruptions, 1);
         assert_eq!(summary.non_disruptive_shots, 1);
@@ -988,6 +1015,7 @@ mod tests {
         .expect("positive shot");
         let summary = summarize_alarm_evaluations(&[positive]).expect("summary");
         assert_eq!(summary.false_alarm_shot_rate, None);
+        assert_eq!(summary.false_alarm_shot_rate_wilson_95, None);
         assert_eq!(summary.false_alarms_per_non_disruptive_shot, None);
     }
 
