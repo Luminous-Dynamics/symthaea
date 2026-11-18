@@ -1112,7 +1112,7 @@ mod tests {
             .map(|orbit| orbit.members.iter().map(|member| member.candidate_index).collect())
             .collect();
         assert_eq!(actual, oracle);
-        assert_eq!(actual.iter().map(Vec::len).collect::<Vec<_>>(), vec![4, 4, 8]);
+        assert_eq!(actual.iter().map(Vec::len).collect::<Vec<_>>(), vec![4, 8, 4]);
         verify_certificate(&problem, &action, &certificate, QualificationBudgetV1::default())
             .unwrap();
     }
