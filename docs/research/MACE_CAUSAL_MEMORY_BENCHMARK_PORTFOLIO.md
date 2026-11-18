@@ -26,10 +26,20 @@ Scores below are **not interchangeable**. Different benchmarks, tracks, models, 
 | [Agent Memory Leaderboard — Cycle 1, Textual / Open-source](https://agentmemories.ai/results/cycle-1/) | InvMem: **45.06 overall** | Same textual track, open-source division | Same limitation: high recall/composite score is not equivalent to lower decision regret after interventions |
 | [Agent Memory Leaderboard — Cycle 1, Coding](https://agentmemories.ai/results/cycle-1/) | Commercial: MemoraX **62.00% resolved**; open-source: AM-Link **52.67% resolved** | New-feature and bug-fix resolution using persistent coding memory, with resource categories | Does not isolate evidence qualification, causal mechanisms, or stale-knowledge revocation as primary outcomes |
 | [TimlMemBench (Findings of EMNLP 2026)](https://aclanthology.org/2026.findings-emnlp.507/) | **208** reviewed samples, **1,566** sessions, **1,715** questions, and **1,821** governance/activation cases | Raw-native governed memory: revocation, supersession, scope/boundary control, provenance, activation, restraint | Dialogue-oriented; does not by itself measure action-effect transport in continuous agent-environment loops |
+| [StateMemBench (Aug 2026)](https://arxiv.org/abs/2608.19652) | 234 multi-session state-tracking scenarios; StateMem reports **0.205 → 0.363** on DeepSeek-V4-Flash (1.8×) and **0.149 → 0.233** on Qwen-3.5-9B against its strongest reported baselines | Current vs superseded facts and relational dependencies over long interactions | Not primarily a causal intervention-transfer or signed-provenance benchmark; backbone, task split and protocol-specific scores must remain attached |
+| [Memora / FAMA (Findings of ACL 2026)](https://aclanthology.org/2026.findings-acl.1337/) | No single universal score in the abstract; introduces **Forgetting-Aware Memory Accuracy (FAMA)** | Weeks-to-months user conversations across remembering, reasoning and recommending, with penalties for obsolete-memory use | Personal memory benchmark; not an environment-intervention benchmark |
+| [ConsolidationBench (Sep 2026)](https://arxiv.org/abs/2609.33013) | One reported phase: **+22.7% task success at 7× compression**. A later external-transfer study reports pooled Spearman **ρ = −0.24**, n=12, confidence interval spanning zero, between consolidation-quality score and real transfer accuracy | Decisions to retain, compress, promote, abstract or forget; governance and auditability | Its key warning is directly relevant: consolidation quality is not a validated proxy for downstream transfer; score quality, governance and transfer independently |
+| [AgentMemoryBench (Lifelong Agent @ ICLR 2026)](https://openreview.net/attachment?id=MSXbrNExax&name=pdf) | Workshop benchmark; no single cross-track headline score used here | Joint system/experiential memory and personal/factual memory across online learning, transfer and forgetting | Useful for co-evolving procedural and personal memory; its protocol is distinct from MACE causal transfer |
 | [LongMemEval reproduction (Redis, 2026-09-21; page updated 2026-11-17)](https://redis.io/resources/agent-memory-benchmark-report/) | Redis Remis + Instruct: **86.5%** task-averaged accuracy on LongMemEval; reported at about **$0.0703/session** on the report's common GPT-4o reproduction | Long-term question answering and memory retrieval, including cost and query latency | QA accuracy should not be read as multi-session action competence; this is a vendor-authored reproduction report, not a cross-benchmark SOTA |
 | [Survey of World Model Benchmarks (snapshot 2026-11-08)](https://world-model-benchmarks.github.io/) | Catalogues **130** benchmarks across seven target categories, two protocol classes, two metric levels, and four data sources | Clarifies that claims must specify target, protocol, metric family and data source | A taxonomy, not a direct memory-agent score |
 
 ### Interpretation
+
+The industry now has distinct work on retrieval, state tracking, obsolete-memory penalties, consolidation decisions and interdependent agent-environment loops. Those are complementary—not interchangeable—capabilities.
+
+StateMemBench is especially important because it isolates current-vs-superseded state rather than treating all prior facts as equally useful. FAMA turns obsolete-memory use into an explicit penalty. ConsolidationBench warns that optimizing an internal consolidation score may not improve external transfer at all. MACE should therefore report at least four independent axes: state correctness, governance/lifecycle correctness, causal transfer and downstream task utility.
+
+### Prior interpretation (retained)
 
 The field has moved beyond “can the system remember a conversation?” MemoryArena couples memory with later action; AMA-Bench emphasizes machine-generated trajectories and causal/objective information; TimlMemBench tests governed use from raw sessions; the Agent Memory Leaderboard separates capability tracks; LongMemEval remains a useful retrieval/QA control.
 
@@ -49,6 +59,15 @@ These are programme targets for future matched evaluations, not current measured
 | Agent Memory Leaderboard — Coding | MemoraX **62.00%** resolved; AM-Link **52.67%** open-source | **≥70%** resolved overall; report new-feature and bug-fix rates separately | Same coding benchmark, repository/task split, toolchain, model and resource budget |
 | TimlMemBench | 1,821 governance/activation cases | **Zero known unauthorized activations** on the supplied revoked/scope-incompatible cases; report provenance recovery and legitimate activation separately | Run the raw-native track; system must ingest raw sessions itself, not receive a prebuilt canonical memory pool |
 | LongMemEval | Redis reproduction **86.5%**, about **$0.0703/session** | **≥87%** at **≤$0.07/session** on the same common GPT-4o setup | Separate QA/retrieval track; report ingest time, query latency, cost and accuracy together |
+
+### Additional external qualification targets
+
+| Benchmark | Proposed target | Qualification rule |
+|---|---:|---|
+| StateMemBench | At least **+5 percentage points** absolute current-state accuracy over the strongest reproduced same-backbone baseline | Official split and scoring; matched context/token budget; no future-knowledge leakage; separately report superseded-state errors |
+| Memora / FAMA | At least **+5 points** over a matched reproduced memory baseline; **zero** obsolete-memory reuse on deterministic retraction controls | Run the official task protocol and FAMA scoring; report forgetting/false-deletion trade-offs |
+| ConsolidationBench | Reproduce the official protocol, then target **+5 pp** downstream task success at a matched memory/storage budget without governance regressions | Do not optimize or claim victory on consolidation-quality score alone; require held-out external transfer, independent labels and separate poison/reversibility/audit metrics |
+| AgentMemoryBench | Reproduce its procedural/personal memory protocol, then report per-track gains under matched backbone and budget | Keep personal-memory privacy/governance separate from procedural transfer and causal evidence claims |
 
 ### MACE-specific qualification targets
 

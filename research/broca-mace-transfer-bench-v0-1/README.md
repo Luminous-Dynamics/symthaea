@@ -239,3 +239,7 @@ Run:
 ```bash
 cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-ingress
 ```
+
+## Additional evaluation targets
+
+The external portfolio also tracks StateMemBench (current-vs-superseded state), Memora/FAMA (obsolete-memory penalties), ConsolidationBench (retain/compress/promote/forget decisions and governance), and AgentMemoryBench (joint procedural/system and personal/factual memory). Their protocols and scores are distinct. In particular, ConsolidationBench reports that its internal consolidation-quality score did not predict external transfer in a later small study; MACE therefore scores consolidation governance and downstream transfer independently.
