@@ -319,11 +319,26 @@ def run_negative_controls(
     )
     controls += 1
 
+    inverted_range = copy.deepcopy(corpus)
+    claim = first_claim(
+        inverted_range,
+        "brondell-nebia-corre-n400ro",
+        "brondell.nebia.inlet-pressure.range",
+    )
+    claim["canonical_value"]["minimum"] = 600.0
+    claim["canonical_value"]["maximum"] = 500.0
+    require_negative_control(
+        "inverted manufacturer pressure range",
+        inverted_range,
+        validator,
+    )
+    controls += 1
+
     return controls
 
 
 def markdown_escape(value: Any) -> str:
-    return str(value).replace("|", "\\|").replace("\\n", " ").strip()
+    return str(value).replace("|", "\\|").replace("\n", " ").strip()
 
 
 def format_canonical_value(value: dict[str, Any]) -> str:
