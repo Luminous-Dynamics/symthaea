@@ -1,8 +1,8 @@
 # Luminous Aqua — Evidence Corpus v0.1
 
 **Snapshot:** 2026-11-18  
-**Entries:** 13  
-**Claims:** 67
+**Entries:** 15  
+**Claims:** 75
 
 > Source-classified evidence register. Manufacturer declarations, standards/programme criteria, local installation references, independent market samples and peer-reviewed results are kept distinct. Values marked unknown have not been inferred. This corpus is not a product certification or evidence of Aqua performance.
 
@@ -151,19 +151,22 @@
 
 | Claim ID | Parameter | Canonical value | Evidence class | Result class | Conditions / unknowns | Comparison status | Source |
 |---|---|---|---|---|---|---|---|
-| `sans10252.shower.table3.water-saving-design` | design_flow_and_pressure | 10 L/min design flow at 50–100 kPa; table also lists 12 L/min likely maximum | installation_design_reference | declared | pressure range=50–100 kPa; method=SANS 10252-1:2018 Edition 3.2 Table 3 | context_only: Building installation design reference, not a product-efficiency label or product pass criterion. | [SABS (publicly accessible copy hosted by Mossel Bay Municipality)](https://www.mosselbay.gov.za/storage/documents/cb942e034d7e086691fa18d41a15b553.pdf); official_standard_or_programme; date not stated |
+| `sans10252.shower.table3.water-saving-design` | design_flow_and_pressure | 10 L/min design flow at 50–100 kPa; 12 L/min likely-maximum user-demand planning value; 6 L/min likely minimum. | installation_design_reference | declared | pressure range=50–100 kPa; method=SANS 10252-1:2018 Edition 3.2 Table 3; Table 3 footnote (a) defines likely maximum as the flow a user would normally allow the fitting to discharge, not necessarily the maximum attainable. Footnote (b) says the design-flow pressure values are used where a manufacturer's flow-pressure curve is unavailable. | context_only: Building installation design reference, not a product-efficiency label or product pass criterion. | [SABS (publicly accessible copy hosted by Mossel Bay Municipality)](https://www.mosselbay.gov.za/storage/documents/cb942e034d7e086691fa18d41a15b553.pdf); official_standard_or_programme; date not stated |
 | `sans10252.shower.clause5332.maximum` | maximum_shower_discharge | 10 L/min | standard_or_programme_criterion | declared | method=SANS 10252-1:2018 Edition 3.2 clause 5.3.3.2 | context_only: Conservative clause-level design reference pending controlled SABS interpretation. | [Institute of Plumbing South Africa (IOPSA) notice quoting SANS 10252-1:2018 Edition 3.2](https://www.iopsa.org/news/7216337); industry_association_notice; date not stated |
 | `sans10252.basin.aerated-mixing.design` | design_flow_and_pressure | 9 L/min at 50 kPa | installation_design_reference | declared | pressure=50 kPa; method=SANS 10252-1:2018 Edition 3.2 Table 3 | context_only: Fixture-specific building design reference, not a product performance certification. | [SABS (publicly accessible copy hosted by Mossel Bay Municipality)](https://www.mosselbay.gov.za/storage/documents/cb942e034d7e086691fa18d41a15b553.pdf); official_standard_or_programme; date not stated |
 | `sans10252.bath.aerated-mixing.design` | design_flow_and_pressure | 20 L/min at 50 kPa | installation_design_reference | declared | pressure=50 kPa; method=SANS 10252-1:2018 Edition 3.2 Table 3 | context_only: Fixture-specific building design reference, not a product performance certification. | [SABS (publicly accessible copy hosted by Mossel Bay Municipality)](https://www.mosselbay.gov.za/storage/documents/cb942e034d7e086691fa18d41a15b553.pdf); official_standard_or_programme; date not stated |
 | `sans10252.bidet.mixer.design` | design_flow_and_pressure | 9 L/min at 50 kPa | installation_design_reference | declared | pressure=50 kPa; method=SANS 10252-1:2018 Edition 3.2 Table 3 | context_only: Fixture-specific building design reference, not a product performance certification. | [SABS (publicly accessible copy hosted by Mossel Bay Municipality)](https://www.mosselbay.gov.za/storage/documents/cb942e034d7e086691fa18d41a15b553.pdf); official_standard_or_programme; date not stated |
 
 **Limitations — `sans10252.shower.table3.water-saving-design`:**
-- The controlled SABS text and applicability must be verified.
-- Do not treat the 12 L/min likely-maximum column as permission to exceed clause 5.3.3.2.
+- Table 3 is an installation demand / design-flow reference, not a product efficiency label or performance test.
+- The 12 L/min likely-maximum figure is a user-demand planning value, not permission to exceed the separate clause 5.3.3.2 maximum discharge.
+- The 50–100 kPa design-flow pressure is used where the manufacturer's flow-pressure curve is unavailable; it is not a universal product minimum-pressure rating.
+- Confirm the controlled SABS text and project applicability.
 
 **Limitations — `sans10252.shower.clause5332.maximum`:**
-- IOPSA notice is a summary, not the controlled SABS publication.
-- The same accessible edition's Table 3 lists 12 L/min as likely maximum for the water-saving showerhead row; apparent internal inconsistency requires formal interpretation.
+- The cited IOPSA notice is a summary, not the controlled SABS publication.
+- Table 3's 12 L/min likely-maximum figure is a user-demand planning quantity, not necessarily the maximum attainable; it does not conflict with, or override, the separate clause-level 10 L/min discharge limit.
+- Confirm controlled SABS text, amendments and project applicability.
 
 **Limitations — `sans10252.basin.aerated-mixing.design`:**
 - Confirm controlled SABS edition and project applicability.
@@ -460,6 +463,70 @@
 **Limitations — `dhwr.2026.model-validation`:**
 - Do not transfer the numerical result to an Aqua design without matched whole-system testing.
 - Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary.
+
+## EN 18021:2025 — Sanitary tapware, measurement of functional performance of taps and showers
+
+- **Entry ID:** `en-18021-2025-functional-performance-testing`
+- **Subject type:** standard
+- **Manufacturer / publisher:** Not applicable / not stated
+- **SKU:** Not applicable / not stated
+- **Market:** European standard; national adoption varies
+- **Revision:** Current; UNI entry into force 2 July 2025
+
+| Claim ID | Parameter | Canonical value | Evidence class | Result class | Conditions / unknowns | Comparison status | Source |
+|---|---|---|---|---|---|---|---|
+| `en18021.2025.scope.type-tests` | functional_test_scope | Laboratory type-test standard for PN10 taps and shower systems and PN5 shower outlets and shower sets; not a manufacturing QC test. Excludes shower taps alone, taps for filling baths, combined-tap bath-filling functions, and body/side jets. | standard_or_programme_criterion | declared | mode=Taps, shower outlets, shower sets and shower systems; method=EN 18021:2025 scope; UNI catalogue summary; unknown: controlled standard text and full clauses required for formal testing; Current in UNI catalogue; entry into force 2 July 2025. | context_only: Current European laboratory type-test reference; not South African law or proof that any Aqua product passed. | [UNI — Ente Italiano di Normazione](https://store.uni.com/en/en-18021-2025); official_standard_or_programme; 2025-07-02 |
+| `en18021.2025.shower-outlet-pressure` | shower_outlet_operating_pressure | For shower outlets and shower sets: dynamic pressure lower operating limit 0.05 MPa (0.5 bar); static pressure maximum 0.5 MPa (5 bar); recommended dynamic pressure 0.1–0.3 MPa (1–3 bar). | standard_or_programme_criterion | declared | mode=PN5 shower outlets and PN5 shower sets; method=EN 18021:2025 Table 2; UNI catalogue summary; unknown: full Table 2 measurement procedure and tolerances in controlled standard; Do not infer task quality or performance at each pressure from the operating-range boundary. | context_only: Category-specific operating range and recommended pressure from a current type-test standard; not a product result. | [UNI — Ente Italiano di Normazione](https://store.uni.com/en/en-18021-2025); official_standard_or_programme; 2025-07-02 |
+| `en18021.2025.tap-system-pressure` | tap_shower_system_operating_pressure | For taps and shower systems: dynamic pressure lower operating limit 0.05 MPa (0.5 bar); static pressure maximum 1.0 MPa (10 bar); recommended dynamic pressure 0.1–0.5 MPa (1–5 bar), with recommended dynamic value measured at the point of discharge. | standard_or_programme_criterion | declared | mode=PN10 taps and PN10 shower systems; method=EN 18021:2025 Table 1; UNI catalogue summary; datum=point of discharge for recommended dynamic pressure per Table 1 footnote; unknown: full Table 1 measurement procedure and tolerances in controlled standard; Do not treat the point-of-discharge datum as the terminal fitting inlet. | context_only: Category-specific type-test operating range; point-of-discharge datum must be preserved. | [UNI — Ente Italiano di Normazione](https://store.uni.com/en/en-18021-2025); official_standard_or_programme; 2025-07-02 |
+| `en18021.2025.temperature-limits` | temperature_operating_limits | Maximum 70°C only for short periods not exceeding one hour; recommended temperature up to 42°C for shower outlets/sets and up to 65°C for taps/shower systems. | standard_or_programme_criterion | declared | mode=Table 1 taps/systems and Table 2 shower outlets/sets; method=EN 18021:2025 Tables 1–2; UNI catalogue summary; unknown: full temperature test procedure and tolerance in controlled standard; This is a functional-test operating summary, not an anti-scald setting or user-temperature recommendation for Aqua. | context_only: Category-specific standard temperature limits and recommended test temperatures. | [UNI — Ente Italiano di Normazione](https://store.uni.com/en/en-18021-2025); official_standard_or_programme; 2025-07-02 |
+
+**Limitations — `en18021.2025.scope.type-tests`:**
+- Do not treat type testing as production quality control.
+- Do not transfer pressure/temperature limits between product categories.
+- Verify controlled national adoption and the exact standard before a formal claim.
+
+**Limitations — `en18021.2025.shower-outlet-pressure`:**
+- The 0.5 bar lower limit is an operating-range boundary, not a guarantee of useful task performance at 0.5 bar.
+- Do not transfer this Table 2 envelope to taps or shower systems.
+
+**Limitations — `en18021.2025.tap-system-pressure`:**
+- Do not transfer this Table 1 envelope to PN5 shower outlets / sets.
+- The pressure limits alone do not demonstrate task quality or user comfort.
+
+**Limitations — `en18021.2025.temperature-limits`:**
+- Never use the 70°C short-duration limit as a point-of-use user setpoint.
+- Independent anti-scald and hot-water hygiene requirements remain separate.
+
+## Unified Water Label — Taps & Showers Technical Criteria
+
+- **Entry ID:** `uwl-taps-showers-technical-2023`
+- **Subject type:** programme
+- **Manufacturer / publisher:** Not applicable / not stated
+- **SKU:** Not applicable / not stated
+- **Market:** Unified Water Label programme
+- **Revision:** January 2023
+
+| Claim ID | Parameter | Canonical value | Evidence class | Result class | Conditions / unknowns | Comparison status | Source |
+|---|---|---|---|---|---|---|---|
+| `uwl.2023.type1.p1` | uwl_dynamic_pressure_point | Type 1 P1 = 150 kPa +10/-0 kPa, applied dynamically to each inlet. | standard_or_programme_criterion | declared | mode=Type 1 supply system; P1 lower pressure point; method=UWL Taps & Showers Technical Criteria January 2023, section 4.2 Table 1; datum=each inlet separately; unknown: full product-category-specific sequence in UWL procedure; Not a single upstream residual-pressure reading. | context_only: Method-specific dynamic inlet pressure; not interchangeable with point-of-discharge or faceplate-centre pressure. | [Unified Water Label Association](https://uwla.eu/wp-content/uploads/2023/05/TAPS-Showers-Technical-2023.pdf); official_standard_or_programme; 2023-01-01 |
+| `uwl.2023.type1.p2` | uwl_dynamic_pressure_point | Type 1 P2 = 300 kPa +20/-0 kPa, applied dynamically to each inlet. | standard_or_programme_criterion | declared | mode=Type 1 supply system; P2 reference pressure point; method=UWL Taps & Showers Technical Criteria January 2023, section 4.2 Table 1; datum=each inlet separately; unknown: full product-category-specific sequence in UWL procedure; ETL flow-rate procedure additionally requires P2 at the centre of the shower faceplate. | context_only: Method-specific dynamic inlet pressure; ETL also declares a faceplate-centre P2 requirement for maximum-flow testing. | [Unified Water Label Association](https://uwla.eu/wp-content/uploads/2023/05/TAPS-Showers-Technical-2023.pdf); official_standard_or_programme; 2023-01-01 |
+| `uwl.2023.type2.p3` | uwl_dynamic_pressure_point | Type 2 P3 = 10 kPa +2/-0 kPa, applied dynamically to each inlet. | standard_or_programme_criterion | declared | mode=Type 2 installation system; P3 low-pressure point; method=UWL Taps & Showers Technical Criteria January 2023, section 4.2 Table 1; datum=each inlet separately; unknown: full product-category-specific sequence in UWL procedure; Aqua's 50/75/100 kPa exploratory points do not cover this P3 test point. | context_only: Type 2 low-pressure method point, not a generic Aqua building supply condition. | [Unified Water Label Association](https://uwla.eu/wp-content/uploads/2023/05/TAPS-Showers-Technical-2023.pdf); official_standard_or_programme; 2023-01-01 |
+| `uwl.2023.calibration` | test_instrument_calibration_requirement | UWL requires measurement equipment to be calibrated to international or national standards. | standard_or_programme_criterion | declared | mode=UWL tap and shower test procedures; method=UWL Taps & Showers Technical Criteria January 2023, section 4.1; unknown: scheme-specific conformity evidence for an individual laboratory; Mycelix remains Aqua's evidence owner for instrument identity, calibration and uncertainty. | context_only: Test-method quality requirement, not product-performance evidence. | [Unified Water Label Association](https://uwla.eu/wp-content/uploads/2023/05/TAPS-Showers-Technical-2023.pdf); official_standard_or_programme; 2023-01-01 |
+
+**Limitations — `uwl.2023.type1.p1`:**
+- Each required inlet must be independently supplied and measured.
+- The asymmetric tolerance must not be converted to a symmetric ±10 kPa interval.
+
+**Limitations — `uwl.2023.type1.p2`:**
+- Each required inlet must be independently supplied and measured.
+- Do not substitute a terminal fitting inlet or upstream residual gauge for this method datum.
+
+**Limitations — `uwl.2023.type2.p3`:**
+- Each required inlet must be independently supplied and measured.
+- Asymmetric tolerance is +2/-0 kPa, not symmetric ±2 kPa.
+
+**Limitations — `uwl.2023.calibration`:**
+- Calibration status alone does not establish method applicability, measurement uncertainty or product compliance.
 
 ---
 
