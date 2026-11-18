@@ -503,7 +503,7 @@ fn failed_measurements(case_id: &str, error: &str, note: &str) -> Vec<Measuremen
         .iter()
         .map(|metric| Measurement {
             case_id: case_id.to_string(),
-            metric,
+            metric: *metric,
             status: "failed",
             value: None,
             artifact_sha256: String::new(),
