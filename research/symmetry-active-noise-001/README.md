@@ -115,9 +115,10 @@ The benchmark must count unresolved pairs rather than hiding them, and must neve
 
 ## Cross-layer static versus adaptive control
 
-The deterministic active-experiment crate now exposes an exact static probe-basis oracle for small finite cases. The noise-aware crate keeps its four-model greedy weighted set-cover design explicitly non-optimal, and the same frozen four-hypothesis deterministic fixture is now checked against:
+The deterministic active-experiment crate now separately exposes an exact static probe-basis oracle for small finite cases. The noise-aware crate retains its four-model greedy weighted set-cover design explicitly as a non-optimal baseline.
+
+On the shared four-hypothesis deterministic fixture:
 - noise-adapted greedy static design: cost 3;
-- exhaustive exact static basis: cost 3, with an optimality certificate;
 - exact adaptive minimax decision tree: worst-case cost 2.
 
-The added test requires the greedy static result to match the exact static optimum on this fixture, then measures the adaptive advantage separately. This does not promote the greedy method to exact or imply adaptive policies always cost less. The cross-layer test is part of the current pending Rust 1.96 qualification.
+The exact static oracle lives in the deterministic planner PR #12670. It exhaustively verifies the minimum static basis under a subset budget. This noise PR does not yet depend on that unmerged API; a direct cross-crate integration test should follow only after the deterministic crate is merged or otherwise released as a stable dependency. This separation keeps the current noise PR buildable from its own head and avoids tests that compile only against a moving base branch.
