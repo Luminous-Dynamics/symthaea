@@ -1082,8 +1082,9 @@ mod tests {
         assert_eq!(cases.len(), 153);
         for (case_id, points, expected_stabilizer) in cases {
             assert!(frozen_manifest.contains(case_id), "fixture missing: {case_id}");
+            let actual_stabilizer = structural_stabilizer(points);
             assert_eq!(
-                structural_stabilizer(points),
+                actual_stabilizer.as_slice(),
                 *expected_stabilizer,
                 "stabilizer mismatch for fixture {case_id}"
             );
