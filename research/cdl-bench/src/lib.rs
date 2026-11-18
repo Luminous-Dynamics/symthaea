@@ -582,10 +582,9 @@ pub fn generate_e0(kind: E0Kind, len: usize, seed: u64) -> Vec<u8> {
             }
         }
         E0Kind::LongRuns => {
-            let mut symbol = b'A';
             while out.len() < len {
                 let run = 1 + (rng.next() % 2048) as usize;
-                symbol = b'A' + (rng.next() % 8) as u8;
+                let symbol = b'A' + (rng.next() % 8) as u8;
                 let remaining = len - out.len();
                 out.extend(std::iter::repeat(symbol).take(run.min(remaining)));
             }
