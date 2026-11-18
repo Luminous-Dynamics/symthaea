@@ -444,8 +444,8 @@ pub(super) fn run(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use serde_json::json;
+    use super::{run, GlModel, SamplingOverrides};
+    use serde_json::{json, Value};
     use std::fs;
     use std::path::PathBuf;
 
@@ -531,7 +531,7 @@ mod tests {
 
     #[test]
     fn sampler_rejects_zero_temperature() {
-        let (model, fixture) = inputs();
+        let (_, fixture) = inputs();
         let mut value: Value = serde_json::from_slice(&fixture).unwrap();
         value["thermal"]["temperature"] = json!(0.0);
         let mutated = serde_json::to_vec(&value).unwrap();
@@ -545,6 +545,5 @@ mod tests {
         let zero_temperature_model =
             GlModel::from_bytes(&schema, &mutated).unwrap();
         assert!(run(&zero_temperature_model, &mutated, SamplingOverrides::default()).is_err());
-        let _ = model;
     }
 }
