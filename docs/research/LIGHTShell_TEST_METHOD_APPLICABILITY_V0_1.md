@@ -16,7 +16,7 @@ Official standard metadata is recorded for interoperability and method selection
 | ISO 9237 | 1995 | Fabric air permeability | Includes many technical fabrics, nonwovens and made-up articles; thick 3D spacer fixture still needs validation |
 | ISO 6330 | 2021 | Domestic washing/drying procedures | Requires exact machine, detergent, wash and drying selection; does not establish robot-specific industrial cleaning resistance |
 
-Edition metadata was checked against official ISO catalogue records in November 2026. ISO 13935-2:2026 was published in April 2026 and replaces the 2014 edition. ISO 12947-2:2016 and ISO 9237:1995 were confirmed in 2023; ISO 5470-2:2021 was confirmed in 2026. Always recheck the ISO catalogue before freezing a future method profile.
+Edition metadata was checked against official ISO catalogue records in November 2026. ISO 25086-1:2026 is the first edition, published January 2026, for snagging resistance of knitted and woven fabrics. ISO 13935-2:2026 was published in April 2026 and replaces the 2014 edition. ISO 12947-2:2016 and ISO 9237:1995 were confirmed in 2023; ISO 5470-2:2021 was confirmed in 2026. Always recheck the ISO catalogue before freezing a future method profile.
 
 ## Why automatic scope checks matter
 
@@ -40,6 +40,8 @@ Authored tests include:
 - ISO 9237:1995 on a thick spacer without a spacer-qualified fixture;
 - stale ISO 13935-2:2014 edition;
 - ISO 6330:2021 with robot-specific cleaning rather than a domestic wash profile;
+- ISO 25086-1:2026 with nonwoven or coated-laminate construction;
+- ISO 25086-1:2026 on a 3D spacer without spacer-specific fixture validation;
 - internal method impersonating an ISO method;
 - modified standard method without approved deviation;
 - ready-for-test selection without exact fixture validation and protocol.
@@ -63,8 +65,9 @@ This is an applicability/admission helper, not the licensed normative text, a co
 - [ISO 5470-2:2021](https://www.iso.org/standard/77552.html).
 - [ISO 9237:1995](https://www.iso.org/standard/16869.html).
 - [ISO 6330:2021](https://www.iso.org/standard/75934.html).
+- [ISO 25086-1:2026](https://www.iso.org/standard/88922.html).
 - Schwager et al. (2022), [Spacer-fabric test equipment and methods](https://doi.org/10.1007/s10443-021-09959-y).
 
 ## Current state
 
-The example is synthetic and in `proposed` state. It records five method profiles and proposed selections, including a spacer airflow test that is deliberately not ready until its fixture is validated. No physical tests, machine capability or laboratory accreditation are claimed.
+The example is synthetic and in `proposed` state. It records six method profiles and proposed selections, including a spacer airflow test that is deliberately not ready until its fixture is validated. No physical tests, machine capability or laboratory accreditation are claimed.
