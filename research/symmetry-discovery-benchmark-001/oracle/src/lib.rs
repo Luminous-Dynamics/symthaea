@@ -112,10 +112,7 @@ impl Manifest {
                 field(value, "matrix")?,
                 &format!("ambient_group.elements[{index}].matrix"),
             )?;
-            if by_matrix
-                .insert(matrix_key(matrix), id.clone())
-                .is_some()
-            {
+            if by_matrix.insert(matrix_key(matrix), id.clone()).is_some() {
                 return Err(format!("duplicate group matrix for element: {id}"));
             }
             elements.push(Element { id, matrix });
@@ -129,7 +126,10 @@ impl Manifest {
             let left = string_field(item, "left_element_id")?;
             let right = string_field(item, "right_element_id")?;
             let product = string_field(item, "product_element_id")?;
-            if multiplication.insert((left.clone(), right.clone()), product).is_some() {
+            if multiplication
+                .insert((left.clone(), right.clone()), product)
+                .is_some()
+            {
                 return Err(format!("duplicate multiplication entry ({left}, {right})"));
             }
         }
@@ -158,7 +158,9 @@ impl Manifest {
     fn verify_group_axioms(&self) -> Result<(), String> {
         let identity_id = string_field(field(&self.root, "ambient_group")?, "identity_element_id")?;
         if self.elements.len() != 8 || self.multiplication.len() != 64 || self.inverses.len() != 8 {
-            return Err("D4 manifest must contain 8 elements, 64 products and 8 inverses".to_owned());
+            return Err(
+                "D4 manifest must contain 8 elements, 64 products and 8 inverses".to_owned(),
+            );
         }
         let identity = self
             .elements
@@ -176,7 +178,9 @@ impl Manifest {
                 let table_id = self
                     .multiplication
                     .get(&(left.id.clone(), right.id.clone()))
-                    .ok_or_else(|| format!("missing multiplication entry {} * {}", left.id, right.id))?;
+                    .ok_or_else(|| {
+                        format!("missing multiplication entry {} * {}", left.id, right.id)
+                    })?;
                 if product_id != table_id {
                     return Err(format!(
                         "multiplication table mismatch {} * {}: matrix gives {product_id}, table gives {table_id}",
@@ -214,7 +218,10 @@ impl Manifest {
                     let lhs = self.multiplication[&(ab, c.id.clone())].clone();
                     let rhs = self.multiplication[&(a.id.clone(), bc)].clone();
                     if lhs != rhs {
-                        return Err(format!("associativity fails for {}, {}, {}", a.id, b.id, c.id));
+                        return Err(format!(
+                            "associativity fails for {}, {}, {}",
+                            a.id, b.id, c.id
+                        ));
                     }
                 }
             }
@@ -247,7 +254,9 @@ impl Manifest {
             for right in &set {
                 let product = self.multiplication[&(left.clone(), right.clone())].clone();
                 if !set.contains(&product) {
-                    return Err(format!("target subgroup is not closed: {left} * {right} = {product}"));
+                    return Err(format!(
+                        "target subgroup is not closed: {left} * {right} = {product}"
+                    ));
                 }
             }
         }
@@ -443,10 +452,7 @@ fn pow(base: i128, exponent: u32) -> Result<i128, String> {
         .ok_or_else(|| "polynomial monomial power overflow".to_owned())
 }
 
-fn transform_polynomial(
-    polynomial: &Polynomial,
-    matrix: Matrix2,
-) -> Result<Polynomial, String> {
+fn transform_polynomial(polynomial: &Polynomial, matrix: Matrix2) -> Result<Polynomial, String> {
     let mut transformed = Polynomial::new();
     for ((p, q), coefficient) in polynomial {
         for i in 0..=*p {
@@ -511,10 +517,7 @@ mod tests {
     #[test]
     fn square_chiral_and_near_symmetry_controls_are_not_collapsed() {
         let manifest = manifest();
-        let cases = field(&manifest.root, "cases")
-            .unwrap()
-            .as_array()
-            .unwrap();
+        let cases = field(&manifest.root, "cases").unwrap().as_array().unwrap();
         for (case_id, expected_order) in [
             ("D4-SQUARE-POINTSET-001", 8),
             ("C4-CHIRAL-ORBIT-001", 4),
@@ -534,10 +537,7 @@ mod tests {
     #[test]
     fn false_subgroup_promotion_is_detected_by_exact_point_set_oracle() {
         let manifest = manifest();
-        let cases = field(&manifest.root, "cases")
-            .unwrap()
-            .as_array()
-            .unwrap();
+        let cases = field(&manifest.root, "cases").unwrap().as_array().unwrap();
         let chiral = cases
             .iter()
             .find(|case| string_field(case, "case_id").unwrap() == "C4-CHIRAL-ORBIT-001")
