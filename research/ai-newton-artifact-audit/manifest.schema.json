@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ai-newton-artifact-audit/manifest.schema.json",
+  "title": "SCI-AINEWTON-001 pinned public artifact inventory",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "audit_id",
+    "status",
+    "upstream",
+    "environment_requirements",
+    "selected_source_files",
+    "registered_example",
+    "human_operating_example",
+    "numbered_output",
+    "logs",
+    "summary",
+    "claim_boundaries"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ai-newton-public-artifact-audit-v0"
+    },
+    "audit_id": {
+      "const": "SCI-AINEWTON-001"
+    },
+    "status": {
+      "const": "SOURCE_AND_ARTIFACT_INVENTORY_ONLY"
+    },
+    "upstream": {
+      "type": "object"
+    },
+    "environment_requirements": {
+      "type": "object"
+    },
+    "selected_source_files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "git_blob_sha",
+          "size_bytes"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "git_blob_sha": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "artifact_kind": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "registered_example": {
+      "type": "object"
+    },
+    "human_operating_example": {
+      "type": "object",
+      "properties": {
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "path",
+              "git_blob_sha",
+              "size_bytes"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "git_blob_sha": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              "size_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "artifact_kind": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "numbered_output": {
+      "type": "object",
+      "required": [
+        "directory_count",
+        "directories"
+      ],
+      "properties": {
+        "directory_count": {
+          "const": 12
+        },
+        "directories": {
+          "type": "array",
+          "minItems": 12,
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "required": [
+              "directory",
+              "artifact_count",
+              "artifacts"
+            ],
+            "properties": {
+              "directory": {
+                "type": "string"
+              },
+              "artifact_count": {
+                "const": 7
+              },
+              "artifacts": {
+                "type": "array",
+                "minItems": 7,
+                "maxItems": 7,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "path",
+                    "git_blob_sha",
+                    "size_bytes"
+                  ],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "git_blob_sha": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{40}$"
+                    },
+                    "size_bytes": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "artifact_kind": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "logs": {
+      "type": "object",
+      "properties": {
+        "file_count": {
+          "const": 14
+        },
+        "artifacts": {
+          "type": "array",
+          "minItems": 14,
+          "maxItems": 14,
+          "items": {
+            "type": "object",
+            "required": [
+              "path",
+              "git_blob_sha",
+              "size_bytes"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "git_blob_sha": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              "size_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "artifact_kind": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object"
+    },
+    "claim_boundaries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "required": [
+        "path",
+        "git_blob_sha",
+        "size_bytes"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "git_blob_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "artifact_kind": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

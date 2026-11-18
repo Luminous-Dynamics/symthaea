@@ -1,0 +1,821 @@
+{
+  "schema_version": "ai-newton-public-artifact-audit-v0",
+  "audit_id": "SCI-AINEWTON-001",
+  "status": "SOURCE_AND_ARTIFACT_INVENTORY_ONLY",
+  "upstream": {
+    "repository_url": "https://github.com/Science-Discovery/AI-Newton",
+    "commit_sha": "c143e865be42e067faf64cd8117cbeffd0fccfb6",
+    "commit_date": "2026-01-27T12:54:19Z",
+    "commit_message": "test: example output of AI-Newton (#4)",
+    "paper_publication_date": "2026-11-04",
+    "days_between_source_commit_and_paper_publication": 281,
+    "commit_to_paper_artifact_mapping": "NOT_ESTABLISHED",
+    "license": {
+      "spdx": "MIT",
+      "copyright": "Science-Discovery (2025)",
+      "license_file": "LICENSE",
+      "git_blob_sha": "6a3fa6134b85f30773e4a837d035568ce28dd76f"
+    }
+  },
+  "environment_requirements": {
+    "operating_system": "Linux",
+    "accelerator": "CUDA required per upstream README; exact version NOT PINNED in inspected root files",
+    "python": "README >=3.11.9; pyproject metadata >=3.10",
+    "rust": "1.84.0",
+    "maple": "2024",
+    "full_example_runtime": "Several days per README; no local measurement",
+    "hardware_examples": [
+      "Intel Xeon Platinum 8370C + NVIDIA A40",
+      "Intel Xeon Silver 4314 + NVIDIA RTX 4080"
+    ]
+  },
+  "selected_source_files": [
+    {
+      "path": "README.md",
+      "git_blob_sha": "635848d88a41dffb44490e47b4dbf1107ee17356",
+      "size_bytes": 3238
+    },
+    {
+      "path": "LICENSE",
+      "git_blob_sha": "6a3fa6134b85f30773e4a837d035568ce28dd76f",
+      "size_bytes": 1074
+    },
+    {
+      "path": "Cargo.toml",
+      "git_blob_sha": "629f43a790a83bd2fa3525545a1e39e982f45b37",
+      "size_bytes": 759
+    },
+    {
+      "path": "Cargo.lock",
+      "git_blob_sha": "8395ca4e849451b4012d1dcb510f7603d3c43eac",
+      "size_bytes": 42359
+    },
+    {
+      "path": "requirements.txt",
+      "git_blob_sha": "63e41ad7905185cb674f927196b931077cd2ebc2",
+      "size_bytes": 120
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "git_blob_sha": "775a327eded69580885112f701e333daa952af9c",
+      "size_bytes": 124
+    },
+    {
+      "path": "pyproject.toml",
+      "git_blob_sha": "ac9e42fe90e3e5e2a9134978194230551fefd16a",
+      "size_bytes": 385
+    },
+    {
+      "path": "test/examples/test_example_1.py",
+      "git_blob_sha": "943517a60a18e68505e8a5d360a1c7dc3bf15c34",
+      "size_bytes": 4587
+    },
+    {
+      "path": "data/init_general_model.json",
+      "git_blob_sha": "8a9392fee566834cae0727fd3323145a985375c8",
+      "size_bytes": 169
+    },
+    {
+      "path": "data/init_knowledge.txt",
+      "git_blob_sha": "148f901e38c846263f1cf7efe6099817da2344f8",
+      "size_bytes": 120029
+    },
+    {
+      "path": "data/init_memory.json",
+      "git_blob_sha": "db785e2731c2c173869e64151ea9075176965d30",
+      "size_bytes": 4493
+    },
+    {
+      "path": "data/init_object_model.json",
+      "git_blob_sha": "9e26dfeeb6e641a33dae4961196235bdb965b21b",
+      "size_bytes": 2
+    },
+    {
+      "path": "data/init_specific_model.json",
+      "git_blob_sha": "5e2621bc0467ff404afe30ef43f7b7bea09d879a",
+      "size_bytes": 66723
+    },
+    {
+      "path": "aiphy/test_human_operating-benchmark.ipynb",
+      "git_blob_sha": "f493a469f9da857feba75bc1bdccd4ec7f2418a3",
+      "size_bytes": 196012
+    }
+  ],
+  "registered_example": {
+    "source_path": "test/examples/test_example_1.py",
+    "source_blob_sha": "943517a60a18e68505e8a5d360a1c7dc3bf15c34",
+    "register_experiment_calls": 38,
+    "configured_iterations": 1200,
+    "configured_threads": 32,
+    "actual_run_identity": "NOT_ESTABLISHED"
+  },
+  "human_operating_example": {
+    "directory": "data/human/example_output",
+    "semantic_label": "UPSTREAM HUMAN-OPERATING EXAMPLE",
+    "artifacts": [
+      {
+        "path": "data/human/example_output/jds_general_model.json",
+        "git_blob_sha": "4fcaed31dfb38f50a2003b48d0d904801cb63be0",
+        "size_bytes": 985022
+      },
+      {
+        "path": "data/human/example_output/jds_knowledge.txt",
+        "git_blob_sha": "39dc269704284f0148532b90a5020b405ce72b3c",
+        "size_bytes": 130754
+      },
+      {
+        "path": "data/human/example_output/jds_memory.json",
+        "git_blob_sha": "54bfb33a8b893930cc4cd8868d2119dbe51535da",
+        "size_bytes": 115301
+      },
+      {
+        "path": "data/human/example_output/jds_object_model.json",
+        "git_blob_sha": "3aa27389c6e2dccfbf03121643defbe208c8d5c5",
+        "size_bytes": 449
+      },
+      {
+        "path": "data/human/example_output/jds_specific_model.json",
+        "git_blob_sha": "f397054b1c9da27af17e86daf107b0954e080de8",
+        "size_bytes": 78792
+      }
+    ]
+  },
+  "numbered_output": {
+    "directory": "data/test_cases/example_1",
+    "directory_count": 12,
+    "directories": [
+      {
+        "directory": "1",
+        "artifact_count": 7,
+        "artifacts": [
+          {
+            "path": "data/test_cases/example_1/1/1_concept_grp_epoch_loss.txt",
+            "git_blob_sha": "5bea4eccdab50364c37db121e9bf100495d81ed8",
+            "size_bytes": 50674,
+            "artifact_kind": "concept_group_epoch_loss"
+          },
+          {
+            "path": "data/test_cases/example_1/1/1_general_model.json",
+            "git_blob_sha": "ef636f00d5b0c4c3667a8e865465acf481693c9c",
+            "size_bytes": 4771584,
+            "artifact_kind": "general_model"
+          },
+          {
+            "path": "data/test_cases/example_1/1/1_knowledge.txt",
+            "git_blob_sha": "b8e90a8fce1ee5af37f09f9d4f2c6d17e6086dc5",
+            "size_bytes": 137926,
+            "artifact_kind": "knowledge_text"
+          },
+          {
+            "path": "data/test_cases/example_1/1/1_memory.json",
+            "git_blob_sha": "98e1304548bb220f031a4377ab98ef3c9008e6ac",
+            "size_bytes": 41194409,
+            "artifact_kind": "memory_state"
+          },
+          {
+            "path": "data/test_cases/example_1/1/1_object_model.json",
+            "git_blob_sha": "063b45f98fdea94cdb46a6de4ad40f9ad8423091",
+            "size_bytes": 496,
+            "artifact_kind": "object_model"
+          },
+          {
+            "path": "data/test_cases/example_1/1/1_policy_nn.pth",
+            "git_blob_sha": "6dca14105ca9fae2786a9f9dcf961eb657377b4e",
+            "size_bytes": 21220,
+            "artifact_kind": "policy_checkpoint"
+          },
+          {
+            "path": "data/test_cases/example_1/1/1_specific_model.json",
+            "git_blob_sha": "220729c03baa93bdb19d817fe639230fcd4fa8fa",
+            "size_bytes": 113936,
+            "artifact_kind": "specific_model"
+          }
+        ]
+      },
+      {
+        "directory": "2",
+        "artifact_count": 7,
+        "artifacts": [
+          {
+            "path": "data/test_cases/example_1/2/2_concept_grp_epoch_loss.txt",
+            "git_blob_sha": "ecfcd1a78231e7bff5a67fe331c25f3a13169c4e",
+            "size_bytes": 54715,
+            "artifact_kind": "concept_group_epoch_loss"
+          },
+          {
+            "path": "data/test_cases/example_1/2/2_general_model.json",
+            "git_blob_sha": "8e3e8a60d3674dda61ee767b8017ef4ecc7b268c",
+            "size_bytes": 3249330,
+            "artifact_kind": "general_model"
+          },
+          {
+            "path": "data/test_cases/example_1/2/2_knowledge.txt",
+            "git_blob_sha": "c8509fade3d5a9765e83a8f37520582ddeeced37",
+            "size_bytes": 136621,
+            "artifact_kind": "knowledge_text"
+          },
+          {
+            "path": "data/test_cases/example_1/2/2_memory.json",
+            "git_blob_sha": "691392726e15fdb3fedf637efd375aa64daa636d",
+            "size_bytes": 61717031,
+            "artifact_kind": "memory_state"
+          },
+          {
+            "path": "data/test_cases/example_1/2/2_object_model.json",
+            "git_blob_sha": "3d29bed84ddaaa63275808e0b7c1e3c9a785fb46",
+            "size_bytes": 497,
+            "artifact_kind": "object_model"
+          },
+          {
+            "path": "data/test_cases/example_1/2/2_policy_nn.pth",
+            "git_blob_sha": "03865aafd1b533680da3b062b3fc9862134de84b",
+            "size_bytes": 21220,
+            "artifact_kind": "policy_checkpoint"
+          },
+          {
+            "path": "data/test_cases/example_1/2/2_specific_model.json",
+            "git_blob_sha": "b3b6dc6124190786c728e7228eddfbb7899b7b66",
+            "size_bytes": 119508,
+            "artifact_kind": "specific_model"
+          }
+        ]
+      },
+      {
+        "directory": "3",
+        "artifact_count": 7,
+        "artifacts": [
+          {
+            "path": "data/test_cases/example_1/3/3_concept_grp_epoch_loss.txt",
+            "git_blob_sha": "eaead7c5c4afeffdf3da283ee2315d0f94bd48e6",
+            "size_bytes": 54523,
+            "artifact_kind": "concept_group_epoch_loss"
+          },
+          {
+            "path": "data/test_cases/example_1/3/3_general_model.json",
+            "git_blob_sha": "f42985c67cf54cbeb8503410ad92ebafce373bda",
+            "size_bytes": 3331909,
+            "artifact_kind": "general_model"
+          },
+          {
+            "path": "data/test_cases/example_1/3/3_knowledge.txt",
+            "git_blob_sha": "cedf7f2e4278da0b62900198810ad9e582627655",
+            "size_bytes": 136714,
+            "artifact_kind": "knowledge_text"
+          },
+          {
+            "path": "data/test_cases/example_1/3/3_memory.json",
+            "git_blob_sha": "5da137824f0757dc6811fadd0f98ac64801694b0",
+            "size_bytes": 42063585,
+            "artifact_kind": "memory_state"
+          },
+          {
+            "path": "data/test_cases/example_1/3/3_object_model.json",
+            "git_blob_sha": "310671c9827e9cee9fcee79a69412f78c1be0c53",
+            "size_bytes": 496,
+            "artifact_kind": "object_model"
+          },
+          {
+            "path": "data/test_cases/example_1/3/3_policy_nn.pth",
+            "git_blob_sha": "de07b678f6bb9f3a7aab0468978b7ec6aa4b3f52",
+            "size_bytes": 21220,
+            "artifact_kind": "policy_checkpoint"
+          },
+          {
+            "path": "data/test_cases/example_1/3/3_specific_model.json",
+            "git_blob_sha": "c981f192d4666ae647a359b95f38e3db49cb0458",
+            "size_bytes": 119787,
+            "artifact_kind": "specific_model"
+          }
+        ]
+      },
+      {
+        "directory": "4",
+        "artifact_count": 7,
+        "artifacts": [
+          {
+            "path": "data/test_cases/example_1/4/4_concept_grp_epoch_loss.txt",
+            "git_blob_sha": "b1213601489dfe39b36aa1d905b375c3bb4f9b45",
+            "size_bytes": 19244,
+            "artifact_kind": "concept_group_epoch_loss"
+          },
+          {
+            "path": "data/test_cases/example_1/4/4_general_model.json",
+            "git_blob_sha": "8c2c5c9dbc6869d75abb26df40216e711ec99571",
+            "size_bytes": 3026946,
+            "artifact_kind": "general_model"
+          },
+          {
+            "path": "data/test_cases/example_1/4/4_knowledge.txt",
+            "git_blob_sha": "c845d394a8ee3a51cd1fec2f9c5a8343cb2ad074",
+            "size_bytes": 136951,
+            "artifact_kind": "knowledge_text"
+          },
+          {
+            "path": "data/test_cases/example_1/4/4_memory.json",
+            "git_blob_sha": "9758a8b772a577a4c85d63fce2a9208a3b9f3d98",
+            "size_bytes": 24176009,
+            "artifact_kind": "memory_state"
+          },
+          {
+            "path": "data/test_cases/example_1/4/4_object_model.json",
+            "git_blob_sha": "56c761fd1cdcc7b8b1b224ca79bbced289909a8a",
+            "size_bytes": 496,
+            "artifact_kind": "object_model"
+          },
+          {
+            "path": "data/test_cases/example_1/4/4_policy_nn.pth",
+            "git_blob_sha": "0de2deef8f25f1064c37c55355f11a9f3651d2e1",
+            "size_bytes": 21220,
+            "artifact_kind": "policy_checkpoint"
+          },
+          {
+            "path": "data/test_cases/example_1/4/4_specific_model.json",
+            "git_blob_sha": "a3308dc25be0632973b31c1ae1cbb29ca5101959",
+            "size_bytes": 111982,
+            "artifact_kind": "specific_model"
+          }
+        ]
+      },
+      {
+        "directory": "5",
+        "artifact_count": 7,
+        "artifacts": [
+          {
+            "path": "data/test_cases/example_1/5/5_concept_grp_epoch_loss.txt",
+            "git_blob_sha": "29f2758edeb01ee02a7ddad7ed35542d1590f31b",
+            "size_bytes": 16310,
+            "artifact_kind": "concept_group_epoch_loss"
+          },
+          {
+            "path": "data/test_cases/example_1/5/5_general_model.json",
+            "git_blob_sha": "efa1499bece64d9ce7dd79df26aedc6f6bbaee1b",
+            "size_bytes": 3558423,
+            "artifact_kind": "general_model"
+          },
+          {
+            "path": "data/test_cases/example_1/5/5_knowledge.txt",
+            "git_blob_sha": "36aa8f24081d819a39e0f7cb87f4074f1078eda4",
+            "size_bytes": 135928,
+            "artifact_kind": "knowledge_text"
+          },
+          {
+            "path": "data/test_cases/example_1/5/5_memory.json",
+            "git_blob_sha": "73d1a9ea39ca8c12c92258383dc31d163404f770",
+            "size_bytes": 22548487,
+            "artifact_kind": "memory_state"
+          },
+          {
+            "path": "data/test_cases/example_1/5/5_object_model.json",
+            "git_blob_sha": "01e16fe2dd92c14f072d00d7809d8c8a00e0cd13",
+            "size_bytes": 497,
+            "artifact_kind": "object_model"
+          },
+          {
+            "path": "data/test_cases/example_1/5/5_policy_nn.pth",
+            "git_blob_sha": "96eafa7fb55a42a2865601dc5a76b48ada3e29b5",
+            "size_bytes": 21220,
+            "artifact_kind": "policy_checkpoint"
+          },
+          {
+            "path": "data/test_cases/example_1/5/5_specific_model.json",
+            "git_blob_sha": "33059c5046c85a6b95f0a1abbba727fb609712a1",
+            "size_bytes": 114130,
+            "artifact_kind": "specific_model"
+          }
+        ]
+      },
+      {
+        "directory": "6",
+        "artifact_count": 7,
+        "artifacts": [
+          {
+            "path": "data/test_cases/example_1/6/6_concept_grp_epoch_loss.txt",
+            "git_blob_sha": "707d5bdf0fea6172f00cb69bcc6daa8536309059",
+            "size_bytes": 18421,
+            "artifact_kind": "concept_group_epoch_loss"
+          },
+          {
+            "path": "data/test_cases/example_1/6/6_general_model.json",
+            "git_blob_sha": "c96e34c863dda0a64e3b05b2c0cf8111671a3a69",
+            "size_bytes": 2222807,
+            "artifact_kind": "general_model"
+          },
+          {
+            "path": "data/test_cases/example_1/6/6_knowledge.txt",
+            "git_blob_sha": "25179c5663bbed2469bedadc8685eac61bafbcdc",
+            "size_bytes": 135853,
+            "artifact_kind": "knowledge_text"
+          },
+          {
+            "path": "data/test_cases/example_1/6/6_memory.json",
+            "git_blob_sha": "0797158976754585166df45d62142da95690637b",
+            "size_bytes": 24656763,
+            "artifact_kind": "memory_state"
+          },
+          {
+            "path": "data/test_cases/example_1/6/6_object_model.json",
+            "git_blob_sha": "0012eeabcae6e77762bcedd6a849f3a29a3eb2a2",
+            "size_bytes": 496,
+            "artifact_kind": "object_model"
+          },
+          {
+            "path": "data/test_cases/example_1/6/6_policy_nn.pth",
+            "git_blob_sha": "38688f9ad577a6e286f2ea7469f8d50acb784d1e",
+            "size_bytes": 21220,
+            "artifact_kind": "policy_checkpoint"
+          },
+          {
+            "path": "data/test_cases/example_1/6/6_specific_model.json",
+            "git_blob_sha": "c1f122368e9afff97c26c22eb4817b943204493e",
+            "size_bytes": 119291,
+            "artifact_kind": "specific_model"
+          }
+        ]
+      },
+      {
+        "directory": "7",
+        "artifact_count": 7,
+        "artifacts": [
+          {
+            "path": "data/test_cases/example_1/7/7_concept_grp_epoch_loss.txt",
+            "git_blob_sha": "7ccc43230dfe6509a9c1377359c3f6ee9f3b78ba",
+            "size_bytes": 36248,
+            "artifact_kind": "concept_group_epoch_loss"
+          },
+          {
+            "path": "data/test_cases/example_1/7/7_general_model.json",
+            "git_blob_sha": "dc4d05ef843d9fb5f7644512a866a93f62b05a33",
+            "size_bytes": 2119757,
+            "artifact_kind": "general_model"
+          },
+          {
+            "path": "data/test_cases/example_1/7/7_knowledge.txt",
+            "git_blob_sha": "06e544e396529d2df82f12cbeb946336d71815ea",
+            "size_bytes": 135616,
+            "artifact_kind": "knowledge_text"
+          },
+          {
+            "path": "data/test_cases/example_1/7/7_memory.json",
+            "git_blob_sha": "cb55650657b6f2d5dabcd95b0c0652081afac70a",
+            "size_bytes": 30541742,
+            "artifact_kind": "memory_state"
+          },
+          {
+            "path": "data/test_cases/example_1/7/7_object_model.json",
+            "git_blob_sha": "41b98a3a547648a61043a70dfcee3074883e27ba",
+            "size_bytes": 496,
+            "artifact_kind": "object_model"
+          },
+          {
+            "path": "data/test_cases/example_1/7/7_policy_nn.pth",
+            "git_blob_sha": "2a25228df9a12b23c8076da70a9f2c50d9fa512e",
+            "size_bytes": 21220,
+            "artifact_kind": "policy_checkpoint"
+          },
+          {
+            "path": "data/test_cases/example_1/7/7_specific_model.json",
+            "git_blob_sha": "878108bc9522963cdb7179f1ee8680281de85dda",
+            "size_bytes": 115783,
+            "artifact_kind": "specific_model"
+          }
+        ]
+      },
+      {
+        "directory": "8",
+        "artifact_count": 7,
+        "artifacts": [
+          {
+            "path": "data/test_cases/example_1/8/8_concept_grp_epoch_loss.txt",
+            "git_blob_sha": "23cc64b38fbf6ee0176b060a12265b7c881295d6",
+            "size_bytes": 37806,
+            "artifact_kind": "concept_group_epoch_loss"
+          },
+          {
+            "path": "data/test_cases/example_1/8/8_general_model.json",
+            "git_blob_sha": "ed7760ba939194af5fad522c2334a5fc717e85e7",
+            "size_bytes": 6655796,
+            "artifact_kind": "general_model"
+          },
+          {
+            "path": "data/test_cases/example_1/8/8_knowledge.txt",
+            "git_blob_sha": "f571e300c05f09ca0d6ab0cc4328bdeb67f09584",
+            "size_bytes": 138379,
+            "artifact_kind": "knowledge_text"
+          },
+          {
+            "path": "data/test_cases/example_1/8/8_memory.json",
+            "git_blob_sha": "113f64ff9552563ee3d9b064612763fd454d6d06",
+            "size_bytes": 38095018,
+            "artifact_kind": "memory_state"
+          },
+          {
+            "path": "data/test_cases/example_1/8/8_object_model.json",
+            "git_blob_sha": "4e54d85b676ef65803c5cabf4fd9d299955b7393",
+            "size_bytes": 496,
+            "artifact_kind": "object_model"
+          },
+          {
+            "path": "data/test_cases/example_1/8/8_policy_nn.pth",
+            "git_blob_sha": "ab68a5171504134529f2acbbb0998b00223dd102",
+            "size_bytes": 21220,
+            "artifact_kind": "policy_checkpoint"
+          },
+          {
+            "path": "data/test_cases/example_1/8/8_specific_model.json",
+            "git_blob_sha": "087e774cb51d294d90c627585c7248900d864cca",
+            "size_bytes": 143610,
+            "artifact_kind": "specific_model"
+          }
+        ]
+      },
+      {
+        "directory": "9",
+        "artifact_count": 7,
+        "artifacts": [
+          {
+            "path": "data/test_cases/example_1/9/9_concept_grp_epoch_loss.txt",
+            "git_blob_sha": "eb1fa72b2e2e18639480cdae3eedac0ad559bdd9",
+            "size_bytes": 18313,
+            "artifact_kind": "concept_group_epoch_loss"
+          },
+          {
+            "path": "data/test_cases/example_1/9/9_general_model.json",
+            "git_blob_sha": "f719f23d2bbde76c638a5cd7f0633be1a05835f8",
+            "size_bytes": 1901650,
+            "artifact_kind": "general_model"
+          },
+          {
+            "path": "data/test_cases/example_1/9/9_knowledge.txt",
+            "git_blob_sha": "47e2ab8c3a5b5d2bd9017af3a1d7f1327985e4c9",
+            "size_bytes": 136076,
+            "artifact_kind": "knowledge_text"
+          },
+          {
+            "path": "data/test_cases/example_1/9/9_memory.json",
+            "git_blob_sha": "536be005d9c852b35d1cb9f618b355b3c3fc0252",
+            "size_bytes": 32755350,
+            "artifact_kind": "memory_state"
+          },
+          {
+            "path": "data/test_cases/example_1/9/9_object_model.json",
+            "git_blob_sha": "8029d65a5e52155ed5fce02b2c4835a465cf9dc1",
+            "size_bytes": 496,
+            "artifact_kind": "object_model"
+          },
+          {
+            "path": "data/test_cases/example_1/9/9_policy_nn.pth",
+            "git_blob_sha": "dcda716a8fa9afe4b356da5a0fc52359c45da16c",
+            "size_bytes": 21220,
+            "artifact_kind": "policy_checkpoint"
+          },
+          {
+            "path": "data/test_cases/example_1/9/9_specific_model.json",
+            "git_blob_sha": "8ab6bfdc0740b1f4bdd2a7ce3a6ac985bbeae075",
+            "size_bytes": 114532,
+            "artifact_kind": "specific_model"
+          }
+        ]
+      },
+      {
+        "directory": "10",
+        "artifact_count": 7,
+        "artifacts": [
+          {
+            "path": "data/test_cases/example_1/10/10_concept_grp_epoch_loss.txt",
+            "git_blob_sha": "37e90cad1b0e3949ab9fe68f1be59659f1e3aafc",
+            "size_bytes": 35096,
+            "artifact_kind": "concept_group_epoch_loss"
+          },
+          {
+            "path": "data/test_cases/example_1/10/10_general_model.json",
+            "git_blob_sha": "450a37d7508b8f493bb333df3351387b187cef15",
+            "size_bytes": 2608497,
+            "artifact_kind": "general_model"
+          },
+          {
+            "path": "data/test_cases/example_1/10/10_knowledge.txt",
+            "git_blob_sha": "0510f2ed686232cab63216b3f0759365af510fb5",
+            "size_bytes": 134299,
+            "artifact_kind": "knowledge_text"
+          },
+          {
+            "path": "data/test_cases/example_1/10/10_memory.json",
+            "git_blob_sha": "9937d8a0a4836f87f18e698f53fe2d13501ae40f",
+            "size_bytes": 21690109,
+            "artifact_kind": "memory_state"
+          },
+          {
+            "path": "data/test_cases/example_1/10/10_object_model.json",
+            "git_blob_sha": "cdfc3a2631d5fee4338d0628b2901b8267177f48",
+            "size_bytes": 496,
+            "artifact_kind": "object_model"
+          },
+          {
+            "path": "data/test_cases/example_1/10/10_policy_nn.pth",
+            "git_blob_sha": "25cc5223fe411b2bde56074fa827e877e9b4c3fe",
+            "size_bytes": 21220,
+            "artifact_kind": "policy_checkpoint"
+          },
+          {
+            "path": "data/test_cases/example_1/10/10_specific_model.json",
+            "git_blob_sha": "920f00e1a9d036961e6a7b2fa25e093d625f01b1",
+            "size_bytes": 109355,
+            "artifact_kind": "specific_model"
+          }
+        ]
+      },
+      {
+        "directory": "11",
+        "artifact_count": 7,
+        "artifacts": [
+          {
+            "path": "data/test_cases/example_1/11/11_concept_grp_epoch_loss.txt",
+            "git_blob_sha": "35e1abc3a74674594e7f6e8e30f02e7ac7a7363b",
+            "size_bytes": 18740,
+            "artifact_kind": "concept_group_epoch_loss"
+          },
+          {
+            "path": "data/test_cases/example_1/11/11_general_model.json",
+            "git_blob_sha": "6d4bccb78810ee6ce7bdd1469703f0b6cbfadefe",
+            "size_bytes": 3514632,
+            "artifact_kind": "general_model"
+          },
+          {
+            "path": "data/test_cases/example_1/11/11_knowledge.txt",
+            "git_blob_sha": "b1aa689d2ae75d176f804eb0f7588a9c0aae68cd",
+            "size_bytes": 135148,
+            "artifact_kind": "knowledge_text"
+          },
+          {
+            "path": "data/test_cases/example_1/11/11_memory.json",
+            "git_blob_sha": "2612c8ce23d0c82abaa87e387e024eddd3cc94b2",
+            "size_bytes": 24229416,
+            "artifact_kind": "memory_state"
+          },
+          {
+            "path": "data/test_cases/example_1/11/11_object_model.json",
+            "git_blob_sha": "2286c36ef482f3681fae56d1b0a5721999da4ca7",
+            "size_bytes": 496,
+            "artifact_kind": "object_model"
+          },
+          {
+            "path": "data/test_cases/example_1/11/11_policy_nn.pth",
+            "git_blob_sha": "37f3fa8cf412b9f58c14cdced391df9ab93e6584",
+            "size_bytes": 21220,
+            "artifact_kind": "policy_checkpoint"
+          },
+          {
+            "path": "data/test_cases/example_1/11/11_specific_model.json",
+            "git_blob_sha": "6edafe37614f78644aee21336fa604533bc68aff",
+            "size_bytes": 109946,
+            "artifact_kind": "specific_model"
+          }
+        ]
+      },
+      {
+        "directory": "12",
+        "artifact_count": 7,
+        "artifacts": [
+          {
+            "path": "data/test_cases/example_1/12/12_concept_grp_epoch_loss.txt",
+            "git_blob_sha": "fc8ffa9d83cf26aec0fdbc6596591a9526c4a1e1",
+            "size_bytes": 19328,
+            "artifact_kind": "concept_group_epoch_loss"
+          },
+          {
+            "path": "data/test_cases/example_1/12/12_general_model.json",
+            "git_blob_sha": "aeeba3b679672f2ce65063cf864695192007c794",
+            "size_bytes": 2778149,
+            "artifact_kind": "general_model"
+          },
+          {
+            "path": "data/test_cases/example_1/12/12_knowledge.txt",
+            "git_blob_sha": "b910097e0d17293501e14a2f75cf4677c6a1573f",
+            "size_bytes": 137303,
+            "artifact_kind": "knowledge_text"
+          },
+          {
+            "path": "data/test_cases/example_1/12/12_memory.json",
+            "git_blob_sha": "69cf4ff018095cc4820f186318516590ca693f0e",
+            "size_bytes": 23255593,
+            "artifact_kind": "memory_state"
+          },
+          {
+            "path": "data/test_cases/example_1/12/12_object_model.json",
+            "git_blob_sha": "6193c74c0c409d13ae6903ab2115ce7913384356",
+            "size_bytes": 605,
+            "artifact_kind": "object_model"
+          },
+          {
+            "path": "data/test_cases/example_1/12/12_policy_nn.pth",
+            "git_blob_sha": "5b4975fe092289795bd182254858a17505a645ac",
+            "size_bytes": 21220,
+            "artifact_kind": "policy_checkpoint"
+          },
+          {
+            "path": "data/test_cases/example_1/12/12_specific_model.json",
+            "git_blob_sha": "387b3cd53563d75866dbd8b111b920546c02774d",
+            "size_bytes": 116577,
+            "artifact_kind": "specific_model"
+          }
+        ]
+      }
+    ],
+    "numeric_folder_semantics": "UNKNOWN; not presumed to be trial IDs, random seeds, independent replicates, or paper benchmark cells."
+  },
+  "logs": {
+    "directory": "data/test_cases/logs/example_1",
+    "file_count": 14,
+    "artifacts": [
+      {
+        "path": "data/test_cases/logs/example_1/1.log",
+        "git_blob_sha": "bddfd34fc749775598e53f3b958d913f166aa6a4",
+        "size_bytes": 7466164
+      },
+      {
+        "path": "data/test_cases/logs/example_1/10.log",
+        "git_blob_sha": "cee23db10914b15b838f7d2adbf295327005c74d",
+        "size_bytes": 6684937
+      },
+      {
+        "path": "data/test_cases/logs/example_1/11.log",
+        "git_blob_sha": "f58d36c045829a83c07a5de7c2c29701504b6ce8",
+        "size_bytes": 6243990
+      },
+      {
+        "path": "data/test_cases/logs/example_1/12.log",
+        "git_blob_sha": "bff0bbbb87271b08e346efa6326865938ee70473",
+        "size_bytes": 6915739
+      },
+      {
+        "path": "data/test_cases/logs/example_1/2.log",
+        "git_blob_sha": "ac99ac6659c55600582c8c1acc245f26a739999f",
+        "size_bytes": 10397414
+      },
+      {
+        "path": "data/test_cases/logs/example_1/3.log",
+        "git_blob_sha": "38bc94fb60168722c18d4baa153b707887c97588",
+        "size_bytes": 7615921
+      },
+      {
+        "path": "data/test_cases/logs/example_1/4.log",
+        "git_blob_sha": "d5c2c4ebcc1d322ea824cac7a2158c7773995a7d",
+        "size_bytes": 23489897
+      },
+      {
+        "path": "data/test_cases/logs/example_1/5.log",
+        "git_blob_sha": "a9678ea5d7e35f5fa9caccaa73b2bc0da0f27818",
+        "size_bytes": 8237511
+      },
+      {
+        "path": "data/test_cases/logs/example_1/6(1).log",
+        "git_blob_sha": "dc3a1d34f188bc6c47dc0c54987dd152b2331aa6",
+        "size_bytes": 10169340
+      },
+      {
+        "path": "data/test_cases/logs/example_1/6(2).log",
+        "git_blob_sha": "e54e53d496b65f4586687817f22a488b7bfa0555",
+        "size_bytes": 317367
+      },
+      {
+        "path": "data/test_cases/logs/example_1/6.log",
+        "git_blob_sha": "31b9582849ff5ff02b9126a502185bb4d57afc61",
+        "size_bytes": 6233776
+      },
+      {
+        "path": "data/test_cases/logs/example_1/7.log",
+        "git_blob_sha": "3c4a87f2d8db4c407b4c3478b58deb8d8dc5431e",
+        "size_bytes": 6998585
+      },
+      {
+        "path": "data/test_cases/logs/example_1/8.log",
+        "git_blob_sha": "f12003de8c4700d8e3677b9ae1c6e8125350f223",
+        "size_bytes": 12805733
+      },
+      {
+        "path": "data/test_cases/logs/example_1/9.log",
+        "git_blob_sha": "3f871ac744e8a455bea13caaef776256f2b42d74",
+        "size_bytes": 6839284
+      }
+    ],
+    "mapping_to_numbered_folders": "NOT_ESTABLISHED; 14 log files exist for 12 numbered folders and log names include 6.log, 6(1).log and 6(2).log."
+  },
+  "summary": {
+    "numbered_directories": 12,
+    "numbered_output_artifacts": 84,
+    "each_numbered_directory_has_seven_files": true,
+    "human_example_artifacts": 5,
+    "log_files": 14,
+    "numbered_memory_json_total_bytes": 386923512,
+    "logs_total_bytes": 120415658,
+    "logs_form_one_to_one_mapping_with_numbered_directories": false
+  },
+  "claim_boundaries": [
+    "Inventory counts and Git blob hashes establish repository artifact identity only.",
+    "The 12 numbered folders are not asserted to be 12 paper trials or independent runs.",
+    "The 14 logs are not mapped to the 12 folders.",
+    "These sample artifacts are not asserted to reproduce the November 2026 paper's reported metrics.",
+    "Native 'is conserved' and 'is zero' labels are not formal proof receipts.",
+    "No AI-Newton re-execution, Symthaea head-to-head or SOTA superiority is claimed."
+  ]
+}
