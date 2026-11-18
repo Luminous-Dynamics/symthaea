@@ -80,7 +80,10 @@
             "enum": [
               "family_id",
               "prototype_id",
-              "source_id"
+              "source_id",
+              "field_orientation",
+              "sample_form",
+              "tc_criterion"
             ]
           }
         }
@@ -264,7 +267,10 @@
             "enum": [
               "family_id",
               "prototype_id",
-              "source_id"
+              "source_id",
+              "field_orientation",
+              "sample_form",
+              "tc_criterion"
             ]
           },
           "held_out_values": {
