@@ -89,6 +89,12 @@ struct VortexDiagnostics {
     skipped_low_amplitude_plaquettes: usize,
 }
 
+#[derive(Clone, Debug)]
+struct TwistResponse {
+    current: Vec<f64>,
+    diamagnetic: Vec<Vec<f64>>,
+}
+
 fn required_text<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
     value
         .get(key)
@@ -521,6 +527,60 @@ impl GlModel {
             return Err("local GL energy difference is non-finite".to_owned());
         }
         Ok(delta)
+    }
+
+    fn twist_response(
+        &self,
+        fields: &[Complex],
+        gauge_phases: &[f64],
+    ) -> Result<TwistResponse, String> {
+        if fields.len() != self.nodes.len() || gauge_phases.len() != self.edges.len() {
+            return Err("twist-response field or link count mismatch".to_owned());
+        }
+        let mut current = vec![0.0; self.dimension];
+        let mut diamagnetic = vec![vec![0.0; self.dimension]; self.dimension];
+
+        for (edge, gauge_phase) in self.edges.iter().zip(gauge_phases) {
+            let transported_target = fields[edge.target].rotate(*gauge_phase);
+            let source = fields[edge.source];
+            let z_real = source.re * transported_target.re + source.im * transported_target.im;
+            let z_imag = source.re * transported_target.im - source.im * transported_target.re;
+
+            let mut normalized_displacement = vec![0.0; self.dimension];
+            for (axis, component) in normalized_displacement.iter_mut().enumerate() {
+                let displacement = self.nodes[edge.target].position[axis]
+                    + edge.image_shift[axis] as f64 * self.box_lengths[axis]
+                    - self.nodes[edge.source].position[axis];
+                *component = displacement / self.box_lengths[axis];
+            }
+
+            for alpha in 0..self.dimension {
+                current[alpha] += 2.0
+                    * edge.coupling
+                    * z_imag
+                    * normalized_displacement[alpha];
+                for beta in 0..self.dimension {
+                    diamagnetic[alpha][beta] += 2.0
+                        * edge.coupling
+                        * z_real
+                        * normalized_displacement[alpha]
+                        * normalized_displacement[beta];
+                }
+            }
+        }
+
+        if current.iter().any(|value| !value.is_finite())
+            || diamagnetic
+                .iter()
+                .flatten()
+                .any(|value| !value.is_finite())
+        {
+            return Err("twist-response estimator produced non-finite components".to_owned());
+        }
+        Ok(TwistResponse {
+            current,
+            diamagnetic,
+        })
     }
 
     fn initial_fields(&self) -> Vec<Complex> {
@@ -1110,6 +1170,61 @@ mod tests {
             fields[site] = candidate;
             let after = model.free_energy_for(&fields, &links).unwrap().total;
             assert!((delta - (after - before)).abs() < 1.0e-10);
+        }
+    }
+
+    #[test]
+    fn uniform_zero_field_state_has_exact_bare_twist_curvature() {
+        let (schema, fixture) = inputs();
+        let model = GlModel::from_bytes(&schema, &fixture).unwrap();
+        let response = model
+            .twist_response(&model.initial_fields(), &model.initial_gauge_phases())
+            .unwrap();
+        assert_eq!(response.current.len(), 2);
+        assert!((response.current[0]).abs() < 1.0e-12);
+        assert!((response.current[1]).abs() < 1.0e-12);
+        assert!((response.diamagnetic[0][0] - 2.0).abs() < 1.0e-12);
+        assert!((response.diamagnetic[1][1] - 2.0).abs() < 1.0e-12);
+        assert!(response.diamagnetic[0][1].abs() < 1.0e-12);
+        assert!(response.diamagnetic[1][0].abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn twist_response_is_invariant_under_local_gauge_transform() {
+        let (schema, fixture) = inputs();
+        let model = GlModel::from_bytes(&schema, &fixture).unwrap();
+        let fields: Vec<Complex> = model
+            .nodes
+            .iter()
+            .enumerate()
+            .map(|(index, _)| Complex {
+                re: 0.9 + 0.07 * (index as f64 * 0.3).cos(),
+                im: 0.13 * (index as f64 * 0.41).sin(),
+            })
+            .collect();
+        let links: Vec<f64> = model
+            .edges
+            .iter()
+            .enumerate()
+            .map(|(index, _)| 0.11 * (index as f64 * 0.17).sin())
+            .collect();
+        let angles: Vec<f64> = (0..model.nodes.len())
+            .map(|index| 0.27 * (index as f64 + 0.7).cos())
+            .collect();
+        let before = model.twist_response(&fields, &links).unwrap();
+        let (fields_after, links_after) =
+            model.gauge_transform(&fields, &links, &angles).unwrap();
+        let after = model
+            .twist_response(&fields_after, &links_after)
+            .unwrap();
+        for alpha in 0..model.dimension {
+            assert!((before.current[alpha] - after.current[alpha]).abs() < 1.0e-10);
+            for beta in 0..model.dimension {
+                assert!(
+                    (before.diamagnetic[alpha][beta] - after.diamagnetic[alpha][beta]).abs()
+                        < 1.0e-10
+                );
+            }
         }
     }
 
