@@ -127,10 +127,10 @@ fn audit_manifest(
         let reference_tc = case["reference_tc_k"]
             .as_f64()
             .ok_or_else(|| format!("case {id} missing reference_tc_k"))?;
-        let README_tc = case["README_expectation_k"]
+        let readme_tc = case["README_expectation_k"]
             .as_f64()
             .ok_or_else(|| format!("case {id} missing README expectation"))?;
-        if (reference_tc - README_tc).abs() > 0.1 {
+        if (reference_tc - readme_tc).abs() > 0.1 {
             return Err(format!("case {id} reference Tc does not agree with README-level expectation"));
         }
         if case["reference_output_complete"].as_bool() != Some(true) {
