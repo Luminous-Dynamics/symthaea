@@ -4,8 +4,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use broca_mace_policy::{
-    decide, is_qualified, is_transfer_qualified, Action, Experience, Objective, Policy, Query,
-    Regime, Scope,
+    decide, is_qualified, is_transfer_qualified, Action, Decision, Experience, Objective,
+    Policy, Query, Regime, Scope,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -133,7 +133,7 @@ impl Rng {
 }
 
 fn generated_worlds(clusters: u64) -> Vec<Case> {
-    let mut cases = Vec::with_capacity(clusters as usize * 13);
+    let mut cases = Vec::with_capacity(clusters as usize * 14);
     let baseline = Scope {
         regime: Regime::Baseline,
         objective: Objective::Quality,
@@ -250,6 +250,17 @@ fn generated_worlds(clusters: u64) -> Vec<Case> {
             1.0,
             None,
             true,
+        ));
+
+        cases.push(case(
+            cluster,
+            "active_probe_when_target_unobserved",
+            pair(baseline, id + 220, family + 4, 0.90, 0.30),
+            shifted,
+            0.88,
+            0.32,
+            Some(Action::A),
+            false,
         ));
 
         let mut retracted = pair(baseline, id + 30, family + 12, 0.95, 0.42);
@@ -378,6 +389,61 @@ fn generated_worlds(clusters: u64) -> Vec<Case> {
     cases
 }
 
+const PROBE_COST: f64 = 0.12;
+
+fn apply_environment_probe(case: &Case) -> Option<Vec<Experience>> {
+    let max_event = case
+        .memory
+        .iter()
+        .map(|item| item.event_id)
+        .max()
+        .unwrap_or(0);
+    let max_family = case
+        .memory
+        .iter()
+        .map(|item| item.source_family)
+        .max()
+        .unwrap_or(0);
+    let first_event = max_event.checked_add(1)?;
+    let first_family = max_family.checked_add(1)?;
+    first_event.checked_add(3)?;
+    first_family.checked_add(3)?;
+
+    let mut memory = case.memory.clone();
+    for (action_index, action) in [Action::A, Action::B].into_iter().enumerate() {
+        for replicate in 0..2_u32 {
+            let offset = (action_index as u32) * 2 + replicate;
+            let noise = if replicate == 0 { -0.01 } else { 0.01 };
+            let observed = (case.truth.utility(action) + noise).clamp(0.0, 1.0);
+            memory.push(exp(
+                first_event + offset,
+                first_family + offset as u16,
+                case.query.scope,
+                action,
+                observed,
+            ));
+        }
+    }
+    Some(memory)
+}
+
+fn simulate(
+    policy: Policy,
+    case: &Case,
+) -> (Decision, Vec<Experience>, f64, bool, bool) {
+    let initial = decide(policy, &case.memory, case.query);
+    if !initial.requires_probe {
+        return (initial, case.memory.clone(), 0.0, false, false);
+    }
+
+    let Some(memory) = apply_environment_probe(case) else {
+        return (Decision::abstain(), case.memory.clone(), 0.0, true, false);
+    };
+    let final_decision = decide(Policy::CausalQualified, &memory, case.query);
+    let resolved = final_decision.action.is_some();
+    (final_decision, memory, PROBE_COST, true, resolved)
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 struct Score {
     count: u32,
@@ -388,12 +454,15 @@ struct Score {
     unsupported_a: u32,
     utility_sum: f64,
     regret_sum: f64,
+    probe_requests: u32,
+    probe_resolved: u32,
+    probe_cost_sum: f64,
 }
 
 fn evaluate(policy: Policy, cases: &[Case]) -> Score {
     let mut score = Score::default();
     for item in cases {
-        let decision = decide(policy, &item.memory, item.query);
+        let (decision, memory, probe_cost, requested, resolved) = simulate(policy, item);
         let action = match decision.action {
             Some(action) => action,
             None => {
@@ -402,14 +471,21 @@ fn evaluate(policy: Policy, cases: &[Case]) -> Score {
             }
         };
         score.count += 1;
+        if requested {
+            score.probe_requests += 1;
+        }
+        if resolved {
+            score.probe_resolved += 1;
+        }
+        score.probe_cost_sum += probe_cost;
         if action == item.truth.optimal_action() {
             score.correct += 1;
         }
-        score.utility_sum += item.truth.utility(action);
-        score.regret_sum += item.truth.optimal_utility() - item.truth.utility(action);
+        score.utility_sum += item.truth.utility(action) - probe_cost;
+        score.regret_sum +=
+            item.truth.optimal_utility() - (item.truth.utility(action) - probe_cost);
 
-        let by_id: BTreeMap<u32, &Experience> = item
-            .memory
+        let by_id: BTreeMap<u32, &Experience> = memory
             .iter()
             .map(|entry| (entry.event_id, entry))
             .collect();
@@ -439,10 +515,10 @@ fn evaluate(policy: Policy, cases: &[Case]) -> Score {
 fn cluster_means(policy: Policy, cases: &[Case]) -> BTreeMap<u64, f64> {
     let mut totals: BTreeMap<u64, (f64, usize)> = BTreeMap::new();
     for item in cases {
-        let decision = decide(policy, &item.memory, item.query);
+        let (decision, _, probe_cost, _, _) = simulate(policy, item);
         let action = decision.action.unwrap_or(Action::B);
         let entry = totals.entry(item.cluster).or_insert((0.0, 0));
-        entry.0 += item.truth.utility(action);
+        entry.0 += item.truth.utility(action) - probe_cost;
         entry.1 += 1;
     }
     totals
@@ -533,14 +609,15 @@ fn report(cases: &[Case]) {
     println!(
         concat!(
             "policy,accuracy_pct,mean_utility,mean_regret,abstentions,",
-            "overclaims,invalid_refs,unsupported_A"
+            "overclaims,invalid_refs,unsupported_A,probe_requests,",
+            "probe_resolved,probe_cost"
         )
     );
     for policy in Policy::ALL {
         let score = evaluate(policy, cases);
         let n = f64::from(score.count.max(1));
         println!(
-            "{},{:.2},{:.4},{:.4},{},{},{},{}",
+            "{},{:.2},{:.4},{:.4},{},{},{},{},{},{},{}",
             policy.name(),
             100.0 * f64::from(score.correct) / n,
             score.utility_sum / n,
@@ -548,7 +625,10 @@ fn report(cases: &[Case]) {
             score.abstentions,
             score.overclaims,
             score.invalid_refs,
-            score.unsupported_a
+            score.unsupported_a,
+            score.probe_requests,
+            score.probe_resolved,
+            score.probe_cost_sum
         );
     }
     println!("policy_by_scenario_family");
@@ -557,7 +637,11 @@ fn report(cases: &[Case]) {
     for item in cases {
         groups.entry(item.family).or_default().push(item);
     }
-    for policy in [Policy::CausalQualified, Policy::InvariantTransport] {
+    for policy in [
+        Policy::CausalQualified,
+        Policy::InvariantTransport,
+        Policy::ActiveProbe,
+    ] {
         for (family, items) in &groups {
             let family_cases: Vec<Case> =
                 items.iter().map(|item| (**item).clone()).collect();
@@ -646,11 +730,30 @@ mod tests {
     }
 
     #[test]
+    fn active_probe_resolves_a_target_regime_without_prior_witnesses() {
+        let cases = generated_worlds(1);
+        let item = cases
+            .iter()
+            .find(|case| case.family == "active_probe_when_target_unobserved")
+            .unwrap();
+        let (decision, memory, cost, requested, resolved) =
+            simulate(Policy::ActiveProbe, item);
+        let no_memory = simulate(Policy::NoMemory, item).0;
+
+        assert!(requested);
+        assert!(resolved);
+        assert_eq!(decision.action, Some(Action::A));
+        assert_eq!(no_memory.action, Some(Action::B));
+        assert_eq!(memory.len(), item.memory.len() + 4);
+        assert!((cost - PROBE_COST).abs() < f64::EPSILON);
+    }
+
+    #[test]
     fn generated_worlds_are_deterministic_and_rotate_source_families() {
         let first = generated_worlds(8);
         let second = generated_worlds(8);
         assert_eq!(format!("{first:?}"), format!("{second:?}"));
-        assert_eq!(first.len(), 104);
+        assert_eq!(first.len(), 112);
         assert_eq!(first[0].cluster, 1);
         assert_eq!(first[8].cluster, 2);
         assert_ne!(
