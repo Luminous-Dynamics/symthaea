@@ -3,22 +3,22 @@
 **Status:** decision-contract specification and preregistration template; no physical result or product qualification exists  
 **Workstream:** [AQUA-SERVICE-QUALIFICATION-001 #12865](https://github.com/Luminous-Dynamics/symthaea/issues/12865)  
 **Parent:** integrated bathing service #12660  
-**Implementation:** \`symthaea-aqua-bench::service_qualification\`  
+**Implementation:** `symthaea-aqua-bench::service_qualification`  
 **Related:** matched-service adapter PR #12662; spray field #12692; wet-path hygiene #12703; DHW cascade #12709; accessible experience #12712; circular serviceability #12727 / #12844
 
 ## 1. Decision problem
 
 Aqua already has contracts for matched test context, method scope, pressure/flow evidence, spray-field observations, service continuity, task-phase plans and repairability receipts. The matched-service adapter checks that the expected owner receipts exist and that two runs share the declared test conditions.
 
-That is necessary but not sufficient for a product-level decision. An evidence packet can be structurally complete while an independently assessed endpoint is failed or inconclusive. A low water or energy result must never compensate for a degraded bathing task, failed spray endpoint, unstable thermal delivery, invalid hygiene/exposure assessment, inaccessible operation or unqualified safety state.
+That is necessary but not sufficient for a product-level decision. An evidence packet can be structurally complete while an independently assessed endpoint is failed or inconclusive. A low water or energy result must never compensate for a degraded bathing task, failed fixture-performance endpoint, unstable thermal delivery, invalid hygiene/exposure assessment, inaccessible operation or unqualified safety state.
 
 The new decision boundary is:
 
-\`frozen claim profile
+`frozen claim profile
   -> exact required assessment domains
   -> authority + method + conditions + evidence binding
   -> Pass / Fail / Indeterminate per domain
-  -> Qualified / Failed / Indeterminate service result\`
+  -> Qualified / Failed / Indeterminate service result`
 
 The product is the **completed bathing service**, not the showerhead, heater, controller or drain heat exchanger in isolation.
 
@@ -40,7 +40,7 @@ Existing authorities remain unchanged:
 |---|---|
 | Measurement validity / calibration admission | Mycelix Metrology |
 | Task completion and comfort | Independent task assessor |
-| Standardized spray-force / coverage performance | Independent test laboratory |
+| Fixture-specific standardized performance method | Independent test laboratory |
 | Thermal stability | Independent test laboratory |
 | Water-quality assessment | Mycelix Water Quality |
 | Hygiene and exposure assessment | Independent hygiene / exposure assessor |
@@ -70,7 +70,7 @@ A claim cannot quietly omit an endpoint after results are known. The profile fix
 
 1. Measurement validity.
 2. Task completion and comfort.
-3. Standardized spray performance.
+3. Fixture-specific standardized performance method (for shower claims, the applicable independent spray-force / coverage method).
 4. Thermal stability.
 5. Water-quality assessment.
 6. Hygiene and exposure assessment.
@@ -86,10 +86,13 @@ Every assessment receipt binds:
 
 - exact assessment record ID;
 - evidence SHA-256;
-- method / protocol SHA-256;
-- test-condition SHA-256;
+- domain-specific method SHA-256;
+- domain-specific method-condition SHA-256;
+- the full matched-trial conditions SHA-256;
 - domain-specific authority;
 - one of three independent outcomes.
+
+The claim profile carries one frozen method binding for every required domain. These are intentionally allowed to differ: Mycelix metrology, a spray-force / coverage test, thermal stability, hygiene sampling and resource closure do not share one method or one apparatus. The profile's overall protocol digest identifies the preregistered claim package; each receipt must match its own domain method and its method-specific conditions while also matching the shared trial conditions. Missing, duplicate or out-of-scope method bindings are rejected.
 
 ### Outcomes
 
@@ -242,9 +245,9 @@ Synthetic tests validate the evidence gate only. They cannot prove physical perf
 
 ## 10. Source-level implementation status
 
-The Rust module defines seven claim profiles, thirteen evidence domains, explicit authority mapping, exact digest binding, three-state decisions and matched control/candidate qualification.
+The Rust module defines seven claim profiles, thirteen evidence domains, explicit authority mapping, per-domain method and method-condition bindings, shared matched-trial condition binding, three-state decisions and matched control/candidate qualification.
 
-It currently contains **31 authored unit tests**. This is a source inventory, not an execution pass. No cargo test, rustfmt, Clippy or repository CI pass is claimed for this branch until actually observed on its exact head.
+It currently contains **36 authored unit tests**. This is a source inventory, not an execution pass. No cargo test, rustfmt, Clippy or repository CI pass is claimed for this branch until actually observed on its exact head.
 
 ## 11. Decision gate
 
