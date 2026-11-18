@@ -47,7 +47,7 @@ Source: https://www.kohler.com/en/products/toilet-seats-bidet-seats/shop-toilet-
 
 ### Bathing vessels
 
-Use the locally applicable plumbing/building standard and exact manufacturer's data for overflow, waste, supply fittings and installation. A locally available copy of SANS 10252-1:2016 Edition 3.1 reports that it supersedes the 2012 edition; the controlled current edition and exact clauses must be checked in the SABS catalogue before engineering or compliance claims.
+Use the locally applicable plumbing/building standard and exact manufacturer's data for overflow, waste, supply fittings and installation. The accessible SANS 10252-1:2018 Edition 3.2 identifies itself as superseding SANS 10252-1:2016 Edition 3.1. The current controlled SABS edition, amendments and exact clauses must still be confirmed before engineering release or compliance claims.
 Reference copy:
 - https://www.ndlambe.gov.za/wp-content/uploads/2023/05/SANS-10252-Water-installation.pdf
 
