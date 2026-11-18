@@ -181,3 +181,10 @@ It calculates:
 - threshold status: conservative-bound meet, optimistic-bound fail, or unresolved by measurement uncertainty.
 
 These bounds represent declared measurement uncertainty, not a statistical confidence interval across units or runs. The UK ETL's 60% criterion is not automatically applied to all products; eligibility depends on its exact product category, reference flow and UWL method. The helper does not certify ETL conformity or establish task quality.
+
+
+## 12. Dynamic pressure and concurrent-demand extension
+
+Steady-state pressure-retention results do not establish performance during pressure steps, hot/cold supply disturbances, second-fixture demand, pump/regulator cycling or recovery. These event-driven conditions are separately preregistered in [AQUA_DYNAMIC_SUPPLY_TRANSIENT_PROTOCOL_V0_1.md](AQUA_DYNAMIC_SUPPLY_TRANSIENT_PROTOCOL_V0_1.md), tracked by [#12801](https://github.com/Luminous-Dynamics/symthaea/issues/12801).
+
+The steady-state pressure-invariant context digest must remain stable across the paired 150/300 kPa runs. For dynamic tests, the event script digest and time-series data are separately bound. Do not collapse transient overshoot, time outside the qualified envelope, temperature excursion, unserved service and safe-stop correctness into the steady-state flow-retention ratio.
