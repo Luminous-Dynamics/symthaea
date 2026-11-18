@@ -15,6 +15,7 @@ dependencies.
   bursty, long runs and pseudo-random incompressible bytes.
 - E1 finite-state generator with evaluator-only latent state and noisy/aliased emissions.
 - E2 five-variable fixed-point structural causal generator with serialized do-intervention manifests.
+- E3 factorized SCM mechanism configurations with held-out combinations assembled from individually seen mechanism components; hidden configs remain evaluator-side.
 - CLI file encode/decode and an E0 length comparison against installed
   Zstandard, Brotli, XZ and gzip commands.
 
@@ -137,3 +138,11 @@ synthetic demand-like source is not an external electricity or transit dataset.
 without reporting the fidelity difference.** A future bounded-error benchmark
 must include Cadence and classical error-bounded baselines on identical data,
 tolerance, entropy coder, context-bootstrap and resource accounting.
+
+### E3 mechanism recombination
+
+The same causal command also emits:
+- Three training SCM configurations.
+- Two held-out configurations that recombine mechanism component values seen in the training configurations, while keeping the full configuration tuple unseen.
+
+The hidden mechanism configuration is retained in the evaluator-side ScmTrace metadata and is not serialized into the learner-visible observation stream. The CLI labels the held-out streams and verifies codec round trips; it does not yet train a mechanism learner or measure transfer. This is a dataset-generation fixture only.
