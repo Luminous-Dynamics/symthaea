@@ -40,7 +40,8 @@
         "energy_unit",
         "temperature_unit",
         "charge_convention",
-        "phase_compactification"
+        "phase_compactification",
+        "pair_charge_convention"
       ],
       "properties": {
         "kind": {
@@ -79,6 +80,9 @@
         },
         "notes": {
           "type": "string"
+        },
+        "pair_charge_convention": {
+          "const": "2e_equals_1"
         }
       }
     },
