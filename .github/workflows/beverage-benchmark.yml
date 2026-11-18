@@ -4,8 +4,6 @@ on:
   push:
     branches: [main]
     paths:
-      - "Cargo.toml"
-      - "Cargo.lock"
       - "crates/domains/symthaea-culinary/**"
       - "tools/beverage-benchmark-harness/**"
       - "docs/research/BEVERAGE_ENGINEERING_BENCHMARK_V1.md"
