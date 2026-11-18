@@ -947,6 +947,24 @@ mod tests {
     }
 
     #[test]
+    fn stream_session_transcription_marks_audio_gaps() {
+        let mut session = StreamSession::new(small_stream_config());
+        session.phonemes = vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+        ];
+        session.boundaries = vec![1, 3];
+        session.segment_boundaries = vec![2];
+
+        assert_eq!(
+            session.get_transcription(),
+            "/a | b [audio gap] c | d/"
+        );
+    }
+
+    #[test]
     fn test_latency() {
         let low_latency = StreamConfig::low_latency();
         let high_quality = StreamConfig::high_quality();
