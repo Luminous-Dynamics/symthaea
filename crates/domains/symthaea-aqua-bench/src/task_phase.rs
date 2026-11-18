@@ -39,7 +39,7 @@ pub enum CapabilityQualification {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActivationRequirement {
     LocalQualifiedControl,
-    DirectUserHoldRequired,
+    DirectUserHoldWithAutoReturn,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,7 +87,11 @@ pub struct TaskPhasePlan {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TaskPhaseError {
     MissingTaskProfile,
+    MissingMarketVariant,
     InvalidConfigurationDigest,
+    InvalidDeliveryConditionsDigest,
+    DeliveryConditionsMismatch,
+    InvalidQualificationMethod,
     InvalidProtocolDigest,
     EmptyPhaseSequence,
     PrepareMustBeFirst,
@@ -121,7 +125,11 @@ impl Display for TaskPhaseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::MissingTaskProfile => write!(f, "task profile identifier is missing"),
+            Self::MissingMarketVariant => write!(f, "exact market variant identifier is missing"),
             Self::InvalidConfigurationDigest => write!(f, "invalid task configuration SHA-256"),
+            Self::InvalidDeliveryConditionsDigest => write!(f, "invalid delivery conditions SHA-256"),
+            Self::DeliveryConditionsMismatch => write!(f, "mode qualification does not cover the plan delivery conditions"),
+            Self::InvalidQualificationMethod => write!(f, "invalid qualification method SHA-256"),
             Self::InvalidProtocolDigest => write!(f, "invalid task protocol SHA-256"),
             Self::EmptyPhaseSequence => write!(f, "task phase sequence is empty"),
             Self::PrepareMustBeFirst => write!(f, "PREPARE must be the first task phase"),
@@ -254,7 +262,7 @@ pub fn validate_task_phase_plan(
         return Err(TaskPhaseError::InvalidConfigurationDigest);
     }
     if !is_sha256(&plan.delivery_conditions_sha256) {
-        return Err(TaskPhaseError::InvalidConfigurationDigest);
+        return Err(TaskPhaseError::InvalidDeliveryConditionsDigest);
     }
     if !is_sha256(&plan.protocol_sha256) {
         return Err(TaskPhaseError::InvalidProtocolDigest);
@@ -345,14 +353,16 @@ pub fn validate_task_phase_plan(
                         mode_id: mode_id.to_owned(),
                     });
                 }
-                if capability.delivery_conditions_sha256 != plan.delivery_conditions_sha256
-                    || !is_sha256(&capability.delivery_conditions_sha256)
-                {
-                    return Err(TaskPhaseError::ConfigurationMismatch {
-                        mode_id: mode_id.to_owned(),
-                    });
+                if !is_sha256(&capability.delivery_conditions_sha256) {
+                    return Err(TaskPhaseError::InvalidDeliveryConditionsDigest);
+                }
+                if capability.delivery_conditions_sha256 != plan.delivery_conditions_sha256 {
+                    return Err(TaskPhaseError::DeliveryConditionsMismatch);
                 }
                 if !is_sha256(&capability.qualification_method_sha256) {
+                    return Err(TaskPhaseError::InvalidQualificationMethod);
+                }
+                if !is_sha256(&capability.qualification_receipt_sha256) {
                     return Err(TaskPhaseError::InvalidQualificationReceipt {
                         mode_id: mode_id.to_owned(),
                     });
@@ -377,7 +387,7 @@ pub fn validate_task_phase_plan(
 
                 match expected_role {
                     CapabilityRole::Boost => {
-                        if capability.activation != ActivationRequirement::DirectUserHoldRequired {
+                        if capability.activation != ActivationRequirement::DirectUserHoldWithAutoReturn {
                             return Err(TaskPhaseError::ActivationMismatch {
                                 mode_id: mode_id.to_owned(),
                             });
@@ -798,4 +808,66 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn rejects_wrong_market_variant_and_delivery_conditions() {
+        let mut caps = capabilities();
+        caps[1].market_variant_id = "OTHER-SKU".to_owned();
+        assert_eq!(
+            validate_task_phase_plan(&plan(), &caps),
+            Err(TaskPhaseError::ConfigurationMismatch {
+                mode_id: "boost".to_owned()
+            })
+        );
+
+        let mut caps = capabilities();
+        caps[1].delivery_conditions_sha256 = digest('9');
+        assert_eq!(
+            validate_task_phase_plan(&plan(), &caps),
+            Err(TaskPhaseError::DeliveryConditionsMismatch)
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_qualification_method_and_plan_condition_digest() {
+        let mut caps = capabilities();
+        caps[1].qualification_method_sha256 = "unknown".to_owned();
+        assert_eq!(
+            validate_task_phase_plan(&plan(), &caps),
+            Err(TaskPhaseError::InvalidQualificationMethod)
+        );
+
+        let mut candidate = plan();
+        candidate.delivery_conditions_sha256 = "unknown".to_owned();
+        assert_eq!(
+            validate_task_phase_plan(&candidate, &capabilities()),
+            Err(TaskPhaseError::InvalidDeliveryConditionsDigest)
+        );
+    }
+
+    #[test]
+    fn rejects_boost_after_pause_or_an_interior_prepare_phase() {
+        let mut candidate = plan();
+        candidate.phases.swap(2, 3);
+        assert_eq!(
+            validate_task_phase_plan(&candidate, &capabilities()),
+            Err(TaskPhaseError::InvalidPhaseOrder { phase_index: 2 })
+        );
+
+        let mut candidate = plan();
+        candidate.phases.insert(
+            2,
+            TaskPhase {
+                kind: TaskPhaseKind::Prepare,
+                duration_seconds: 1,
+                mode_id: None,
+                boost_consent: BoostConsent::NotRequired,
+            },
+        );
+        assert_eq!(
+            validate_task_phase_plan(&candidate, &capabilities()),
+            Err(TaskPhaseError::InvalidPhaseOrder { phase_index: 2 })
+        );
+    }
+
 }
