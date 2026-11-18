@@ -109,7 +109,7 @@ pub enum TaskPhaseError {
     CapabilityNotIndependentlyQualified { mode_id: String },
     RoleMismatch { phase_index: usize, mode_id: String },
     ActivationMismatch { mode_id: String },
-    InvalidDeclaredFlow { mode_id: String },
+    InvalidQualifiedFlow { mode_id: String },
     MissingBoostDurationLimit { mode_id: String },
     UnexpectedBoostDurationLimit { mode_id: String },
     BoostConsentRequired { phase_index: usize },
@@ -171,7 +171,7 @@ impl Display for TaskPhaseError {
             Self::ActivationMismatch { mode_id } => {
                 write!(f, "mode activation requirement is inconsistent: {mode_id}")
             }
-            Self::InvalidDeclaredFlow { mode_id } => {
+            Self::InvalidQualifiedFlow { mode_id } => {
                 write!(f, "declared mode flow is invalid: {mode_id}")
             }
             Self::MissingBoostDurationLimit { mode_id } => {
@@ -218,15 +218,15 @@ fn is_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
-fn parse_declared_flow(mode: &QualifiedModeCapability) -> Result<f64, TaskPhaseError> {
+fn parse_qualified_flow(mode: &QualifiedModeCapability) -> Result<f64, TaskPhaseError> {
     let value = mode
         .qualified_flow_lpm
         .parse::<f64>()
-        .map_err(|_| TaskPhaseError::InvalidDeclaredFlow {
+        .map_err(|_| TaskPhaseError::InvalidQualifiedFlow {
             mode_id: mode.mode_id.clone(),
         })?;
     if !value.is_finite() || value <= 0.0 {
-        return Err(TaskPhaseError::InvalidDeclaredFlow {
+        return Err(TaskPhaseError::InvalidQualifiedFlow {
             mode_id: mode.mode_id.clone(),
         });
     }
@@ -256,7 +256,7 @@ pub fn validate_task_phase_plan(
         return Err(TaskPhaseError::MissingTaskProfile);
     }
     if plan.market_variant_id.trim().is_empty() {
-        return Err(TaskPhaseError::MissingTaskProfile);
+        return Err(TaskPhaseError::MissingMarketVariant);
     }
     if !is_sha256(&plan.configuration_sha256) {
         return Err(TaskPhaseError::InvalidConfigurationDigest);
@@ -288,11 +288,18 @@ pub fn validate_task_phase_plan(
         }
     }
 
+    let mut base_delivery_seen = false;
     for (phase_index, phase) in plan.phases.iter().enumerate() {
         if phase_index > 0 && phase_index + 1 < plan.phases.len()
             && matches!(phase.kind, TaskPhaseKind::Prepare | TaskPhaseKind::ReturnToReady)
         {
             return Err(TaskPhaseError::InvalidPhaseOrder { phase_index });
+        }
+        if phase.kind == TaskPhaseKind::Rinse && !base_delivery_seen {
+            return Err(TaskPhaseError::InvalidPhaseOrder { phase_index });
+        }
+        if phase.kind == TaskPhaseKind::BaseDelivery {
+            base_delivery_seen = true;
         }
         if phase.kind == TaskPhaseKind::OptionalBoost
             && !matches!(
@@ -383,7 +390,7 @@ pub fn validate_task_phase_plan(
                         mode_id: mode_id.to_owned(),
                     });
                 }
-                let _declared_flow = parse_declared_flow(capability)?;
+                let _declared_flow = parse_qualified_flow(capability)?;
 
                 match expected_role {
                     CapabilityRole::Boost => {
@@ -790,7 +797,7 @@ mod tests {
             caps[1].declared_flow_lpm = flow.to_owned();
             assert_eq!(
                 validate_task_phase_plan(&plan(), &caps),
-                Err(TaskPhaseError::InvalidDeclaredFlow {
+                Err(TaskPhaseError::InvalidQualifiedFlow {
                     mode_id: "boost".to_owned()
                 })
             );
