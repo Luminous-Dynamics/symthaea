@@ -18,7 +18,33 @@ This v0.1 slice begins with a deliberately narrow, deterministic evidence-flow c
 - `HIDDEN_INFO_FIXTURES_V0_1.json`: evaluator-only synthetic evidence-transfer fixtures.
 - `qualifier/`: standalone Rust structural qualifier and unit tests.
 
-The fixtures are synthetic structural controls. They are not a reproduction of HiddenBench, not LLM-agent trials, and not performance evidence. The `final.answer_correct` labels and expected metrics are evaluator-only fixture annotations; they must never be sent to an agent.
+The fixtures are synthetic structural controls. They are not a reproduction of HiddenBench, not LLM-agent trials, and not performance evidence.
+
+## Official corpus pinned
+
+The exact upstream `data/benchmark.json` is vendored under `external/hiddenbench/` with its MIT license and source manifest:
+- upstream: `Yassellee/HiddenBench_ICML`
+- source commit: `3be6ca16973e4fb751ffc0dfb7eb11f2d28335d1`
+- source Git blob SHA: `918366d953ecfe7e86a0e8cf7906cf757f574012`
+- 65 tasks: **58 four-agent tasks and 7 three-agent tasks**.
+
+The Rust `validate_hiddenbench` binary validates task identities, answer-option membership, non-empty fields, and this pinned group-size distribution. The copied benchmark file's Git blob SHA matches the upstream SHA exactly. The license is preserved in the adjacent `LICENSE`.
+
+The answer key and hidden-fact allocation are evaluator-only. Do not pass the corpus JSON, `correct_answer`, or source manifest to agents. Agent prompts should be constructed from only the assigned task description, shared facts and that agent's assigned private fact.
+
+## Official protocol details to reproduce
+
+The upstream reference simulator uses a 15-round discussion by default, randomized order of facts and private fact allocation under a recorded seed, an initial private vote, sequential/rotating agent turns, and a final vote prompted with the last round's transcript. The standard 65-task corpus does **not** have a single uniform group size: group size is determined by the number of hidden facts (3 or 4). The local reproduction adapter must preserve this rather than silently forcing a fixed team size.
+
+Official scoring reports:
+- individual-vote average accuracy before and after discussion;
+- strict-majority accuracy (strictly more than half correct);
+- post-minus-pre improvement;
+- Hidden-profile post accuracy minus Full-profile pre accuracy.
+
+Our planned scorer will preserve these official fields and additionally report task-clustered uncertainty. Duplicated runs on the same task are not independent task samples.
+
+ The `final.answer_correct` labels and expected metrics are evaluator-only fixture annotations; they must never be sent to an agent.
 
 ## Run locally
 
