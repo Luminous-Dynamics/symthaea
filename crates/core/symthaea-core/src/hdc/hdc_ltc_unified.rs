@@ -2204,8 +2204,9 @@ impl HdcLtcUnifiedNetwork {
     /// Restore a recurrent-state snapshot only when every shape and value is valid.
     ///
     /// Validation completes before the first mutation, so any error leaves the
-    /// destination network unchanged at the represented state surface. This is the required path for paired counterfactuals, episode
-    /// forks, and any caller that cannot tolerate partial restore.
+    /// destination network unchanged at the represented state surface. This is
+    /// the required path for paired counterfactuals, episode forks, and any
+    /// caller that cannot tolerate partial restore.
     ///
     /// The snapshot captures evolution state, not learned parameters or
     /// optimizer momentum; callers must bind it to the matching model revision.
@@ -3095,7 +3096,10 @@ mod tests {
 
         let mut after = NetworkStateSnapshot::default();
         target.snapshot_state_into(&mut after);
-        assert!(before.approx_eq(&after, 0.0), "config-rejected restore mutated destination");
+        assert!(
+            before.approx_eq(&after, 0.0),
+            "config-rejected restore mutated destination"
+        );
     }
 
     #[test]
