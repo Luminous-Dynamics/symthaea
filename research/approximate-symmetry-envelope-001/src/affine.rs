@@ -7,8 +7,6 @@
 //! This module derives bounds for affine systems only; it is not a nonlinear
 //! interval-analysis engine.
 
-use std::collections::BTreeSet;
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IntegerAffineMapV1 {
     /// Row-major integer matrix.
@@ -408,10 +406,17 @@ mod tests {
     }
 
     #[test]
-    fn arithmetic_overflow_in_affine_commutator_fails_closed() {
+    fn arithmetic_overflow_in_affine_lipschitz_bound_fails_closed() {
         let mut input = contract();
-        input.step_map.matrix[0][0] = i128::MAX;
-        input.action.matrix[0][0] = 2;
+        input.step_map.matrix = vec![vec![i128::MAX, i128::MAX], vec![0, 0]];
+        input.reference_region = IntegerBoxV1 {
+            lower: vec![0, 0],
+            upper: vec![0, 0],
+        };
+        input.certificate_domain = IntegerBoxV1 {
+            lower: vec![-1, -1],
+            upper: vec![1, 1],
+        };
         assert_eq!(
             derive_affine_witness(&input),
             Err(AffineErrorV1::ArithmeticOverflow)
