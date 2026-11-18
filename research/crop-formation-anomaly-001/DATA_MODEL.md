@@ -81,7 +81,21 @@ A spatially located measurement of how an individual stem or local crop patch is
 
 Direction must be a physical direction in a declared field coordinate frame, not an image-space line angle unless the image has been calibrated. Preserve individual samples; do not replace the field with a single averaged arrow. Opposing or multi-modal directions may have no meaningful circular mean.
 
-### 6. Observation / environmental context
+### 6. 3D stem-axis pose samples
+
+A spatially located 3D base-to-tip stem-axis measurement:
+- specimen/sample ID and parent plot/transect/event ID;
+- 3D base position and coordinate frame, unit, calibration and uncertainty;
+- directed 3D axis vector, with an explicit base-to-tip or tip-to-base convention;
+- inclination from vertical and horizontal azimuth derived from the raw vector, not stored as an unreferenced angle;
+- bend magnitude and unit, with measurement method and uncertainty;
+- crop, cultivar, phenological stage and local sampling context;
+- instrument, point-cloud/photogrammetry reconstruction version and transform provenance;
+- observer/blinding ID, raw measurement reference and quality-weight basis.
+
+Preserve the original measured vector and its coordinate frame. Do not collapse a 3D vector into one horizontal angle before retaining the vertical inclination. A stem near vertical has an undefined/unstable horizontal azimuth, and a multimodal 3D field may have no meaningful global mean axis.
+
+### 7. Observation / environmental context
 
 A time-bounded measurement with explicit provenance:
 - observation ID, type, value, unit and uncertainty;
@@ -93,7 +107,7 @@ A time-bounded measurement with explicit provenance:
 
 Never turn absent weather, soil or crop metadata into zero or a guessed value.
 
-### 7. Biological specimen and custody
+### 8. Biological specimen and custody
 
 A specimen record:
 - specimen ID and parent event;
