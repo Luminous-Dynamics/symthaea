@@ -1,0 +1,309 @@
+{
+  "schema_version": "0.1.0",
+  "route_id": "LIGHTSHELL-ROUTE-SYNTHETIC-001",
+  "state": "proposed",
+  "candidate_id": "ELBOW-GARMENT-CANDIDATE-001",
+  "platform_id": "SYNTHETIC-ROBOT-001",
+  "article_revision": null,
+  "geometry_digest": null,
+  "topology_ref": "LIGHTSHELL-TOPOLOGY-SYNTHETIC-001",
+  "topology_revision": "TOPOLOGY-REV-A",
+  "topology_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "topology_state": "proposed",
+  "material_lots": [
+    {
+      "lot_id": "LOT-001",
+      "material_ref": "MATERIAL-SPACER-001",
+      "supplier_lot_ref": null,
+      "receipt_evidence_ref": null
+    }
+  ],
+  "topology_panels": [
+    "upper_arm_shell",
+    "elbow_gusset",
+    "forearm_shell"
+  ],
+  "topology_connections": [
+    {
+      "connection_id": "SEAM-UPPER-GUSSET",
+      "connection_kind": "sewn_seam"
+    },
+    {
+      "connection_id": "ATTACH-GUSSET-FOREARM",
+      "connection_kind": "removable_attachment"
+    }
+  ],
+  "articulation_features": [
+    "ELBOW-ARTICULATION-001"
+  ],
+  "service_features": [
+    "FOREARM-SERVICE-001"
+  ],
+  "operations": [
+    {
+      "operation_id": "OP-RECEIVE",
+      "operation_index": 0,
+      "operation_kind": "material_receipt",
+      "dependencies": [],
+      "topology_refs": [],
+      "material_lot_refs": [
+        "LOT-001"
+      ],
+      "input_component_refs": [],
+      "output_component_refs": [
+        "COMP-MATERIAL-001"
+      ],
+      "process_binding": {
+        "owner_ref": "MFG-PROC-5686",
+        "process_profile_ref": null,
+        "capability_state": "unknown",
+        "machine_ref": null,
+        "tool_ref": null,
+        "process_revision_ref": null,
+        "program_revision_ref": null,
+        "capability_evidence_ref": null
+      },
+      "inspection_gate": null,
+      "rework_of_component_ref": null
+    },
+    {
+      "operation_id": "OP-FORM-UPPER",
+      "operation_index": 1,
+      "operation_kind": "textile_forming",
+      "dependencies": [
+        "OP-RECEIVE"
+      ],
+      "topology_refs": [
+        {
+          "entity_kind": "panel",
+          "entity_ref": "upper_arm_shell"
+        }
+      ],
+      "material_lot_refs": [
+        "LOT-001"
+      ],
+      "input_component_refs": [
+        "COMP-MATERIAL-001"
+      ],
+      "output_component_refs": [
+        "COMP-UPPER-001"
+      ],
+      "process_binding": {
+        "owner_ref": "MFG-PROC-5686",
+        "process_profile_ref": null,
+        "capability_state": "unknown",
+        "machine_ref": null,
+        "tool_ref": null,
+        "process_revision_ref": null,
+        "program_revision_ref": null,
+        "capability_evidence_ref": null
+      },
+      "inspection_gate": null,
+      "rework_of_component_ref": null
+    },
+    {
+      "operation_id": "OP-CUT-GUSSET",
+      "operation_index": 2,
+      "operation_kind": "panel_cut",
+      "dependencies": [
+        "OP-RECEIVE"
+      ],
+      "topology_refs": [
+        {
+          "entity_kind": "panel",
+          "entity_ref": "elbow_gusset"
+        }
+      ],
+      "material_lot_refs": [
+        "LOT-001"
+      ],
+      "input_component_refs": [
+        "COMP-MATERIAL-001"
+      ],
+      "output_component_refs": [
+        "COMP-GUSSET-001"
+      ],
+      "process_binding": {
+        "owner_ref": "MFG-PROC-5686",
+        "process_profile_ref": null,
+        "capability_state": "unknown",
+        "machine_ref": null,
+        "tool_ref": null,
+        "process_revision_ref": null,
+        "program_revision_ref": null,
+        "capability_evidence_ref": null
+      },
+      "inspection_gate": null,
+      "rework_of_component_ref": null
+    },
+    {
+      "operation_id": "OP-CUT-FOREARM",
+      "operation_index": 3,
+      "operation_kind": "panel_cut",
+      "dependencies": [
+        "OP-RECEIVE"
+      ],
+      "topology_refs": [
+        {
+          "entity_kind": "panel",
+          "entity_ref": "forearm_shell"
+        }
+      ],
+      "material_lot_refs": [
+        "LOT-001"
+      ],
+      "input_component_refs": [
+        "COMP-MATERIAL-001"
+      ],
+      "output_component_refs": [
+        "COMP-FOREARM-001"
+      ],
+      "process_binding": {
+        "owner_ref": "MFG-PROC-5686",
+        "process_profile_ref": null,
+        "capability_state": "unknown",
+        "machine_ref": null,
+        "tool_ref": null,
+        "process_revision_ref": null,
+        "program_revision_ref": null,
+        "capability_evidence_ref": null
+      },
+      "inspection_gate": null,
+      "rework_of_component_ref": null
+    },
+    {
+      "operation_id": "OP-SEW",
+      "operation_index": 4,
+      "operation_kind": "seam_join",
+      "dependencies": [
+        "OP-FORM-UPPER",
+        "OP-CUT-GUSSET"
+      ],
+      "topology_refs": [
+        {
+          "entity_kind": "connection",
+          "entity_ref": "SEAM-UPPER-GUSSET"
+        },
+        {
+          "entity_kind": "articulation_feature",
+          "entity_ref": "ELBOW-ARTICULATION-001"
+        }
+      ],
+      "material_lot_refs": [
+        "LOT-001"
+      ],
+      "input_component_refs": [
+        "COMP-UPPER-001",
+        "COMP-GUSSET-001"
+      ],
+      "output_component_refs": [
+        "COMP-UPPER-GUSSET-001"
+      ],
+      "process_binding": {
+        "owner_ref": "MFG-PROC-5686",
+        "process_profile_ref": null,
+        "capability_state": "unknown",
+        "machine_ref": null,
+        "tool_ref": null,
+        "process_revision_ref": null,
+        "program_revision_ref": null,
+        "capability_evidence_ref": null
+      },
+      "inspection_gate": null,
+      "rework_of_component_ref": null
+    },
+    {
+      "operation_id": "OP-ATTACH",
+      "operation_index": 5,
+      "operation_kind": "removable_attach",
+      "dependencies": [
+        "OP-SEW",
+        "OP-CUT-FOREARM"
+      ],
+      "topology_refs": [
+        {
+          "entity_kind": "connection",
+          "entity_ref": "ATTACH-GUSSET-FOREARM"
+        },
+        {
+          "entity_kind": "service_feature",
+          "entity_ref": "FOREARM-SERVICE-001"
+        }
+      ],
+      "material_lot_refs": [
+        "LOT-001"
+      ],
+      "input_component_refs": [
+        "COMP-UPPER-GUSSET-001",
+        "COMP-FOREARM-001"
+      ],
+      "output_component_refs": [
+        "COMP-ASSEMBLY-001"
+      ],
+      "process_binding": {
+        "owner_ref": "MFG-PROC-5686",
+        "process_profile_ref": null,
+        "capability_state": "unknown",
+        "machine_ref": null,
+        "tool_ref": null,
+        "process_revision_ref": null,
+        "program_revision_ref": null,
+        "capability_evidence_ref": null
+      },
+      "inspection_gate": null,
+      "rework_of_component_ref": null
+    },
+    {
+      "operation_id": "OP-FINAL-INSPECT",
+      "operation_index": 6,
+      "operation_kind": "final_inspect",
+      "dependencies": [
+        "OP-ATTACH"
+      ],
+      "topology_refs": [
+        {
+          "entity_kind": "garment",
+          "entity_ref": "ELBOW-GARMENT-CANDIDATE-001"
+        }
+      ],
+      "material_lot_refs": [
+        "LOT-001"
+      ],
+      "input_component_refs": [
+        "COMP-ASSEMBLY-001"
+      ],
+      "output_component_refs": [
+        "COMP-INSPECTED-001"
+      ],
+      "process_binding": {
+        "owner_ref": "MFG-PROC-5686",
+        "process_profile_ref": null,
+        "capability_state": "unknown",
+        "machine_ref": null,
+        "tool_ref": null,
+        "process_revision_ref": null,
+        "program_revision_ref": null,
+        "capability_evidence_ref": null
+      },
+      "inspection_gate": {
+        "gate_id": "FINAL-GATE-01",
+        "method_selection_ref": null,
+        "fixture_ref": null,
+        "fixture_revision_ref": null,
+        "acceptance_rule_ref": null,
+        "result_state": "not_run",
+        "result_evidence_ref": null
+      },
+      "rework_of_component_ref": null
+    }
+  ],
+  "evidence_policy": {
+    "capability_is_external_owner_authority": true,
+    "every_topology_entity_has_operation_disposition": true,
+    "output_component_has_one_producer": true,
+    "dependencies_must_be_acyclic": true,
+    "inspection_is_evidence_gated": true,
+    "rework_preserves_failed_lineage": true,
+    "no_execution_or_release_authority": true
+  }
+}
