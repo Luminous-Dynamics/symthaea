@@ -1,7 +1,9 @@
 //! Three-dimensional stem-axis orientation statistics for plant posture fields.
 //!
 //! Samples are already measured 3D positions and base-to-tip axis vectors.
-//! This module does not reconstruct stems from photographs or LiDAR point clouds.
+//! Convert tip-to-base source vectors before calling this module, retaining the
+//! original convention in the evidence record. This module does not reconstruct
+//! stems from photographs or LiDAR point clouds.
 
 use std::f64::consts::TAU;
 
@@ -51,6 +53,7 @@ impl Vector3 {
 pub struct StemPoseSample {
     pub base_position: Point3,
     /// Directed base-to-tip stem axis in a declared field/world coordinate frame.
+    /// The caller must normalize any tip-to-base source convention before analysis.
     pub axis: Vector3,
     /// Non-negative bend/deformation magnitude in a declared unit.
     pub bend_magnitude: f64,
