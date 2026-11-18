@@ -1,6 +1,6 @@
 use cdl_bench::{
-    compress, crc32, decompress, generate_e0, generate_fsm, generate_scm,
-    predictor_state_bytes, E0Kind, ModelKind, ScmIntervention,
+    compress, compress_i16, crc32, decompress, decompress_i16, generate_e0, generate_fsm,
+    generate_scm, predictor_state_bytes, E0Kind, ModelKind, NumericTransform, ScmIntervention,
 };
 use std::error::Error;
 use std::fs;
@@ -18,9 +18,10 @@ fn usage() -> &'static str {
   cdl-bench decode [--max-bytes N] INPUT OUTPUT
   cdl-bench e0 [--bytes N] [--seed N]
   cdl-bench causal [--steps N] [--seed N]
+  cdl-bench numeric [--values N] [--seed N]
 
-The E0 and causal commands check round-trip integrity and compare compressed
-lengths with installed zstd, brotli, xz, and gzip commands when available."
+The E0, causal and numeric commands check round-trip integrity and compare
+compressed lengths with installed system codecs where available."
 }
 
 fn parse_usize(value: Option<&String>, flag: &str) -> Result<usize, Box<dyn Error>> {
@@ -301,6 +302,98 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+
+fn numeric_command(args: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut count = 10_000usize;
+    let mut seed = 0x16_16u64;
+    let mut index = 1;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--values" => {
+                count = parse_usize(args.get(index + 1), "--values")?;
+                index += 2;
+            }
+            "--seed" => {
+                seed = parse_u64(args.get(index + 1), "--seed")?;
+                index += 2;
+            }
+            other => return Err(format!("unknown numeric option: {other}\n{}", usage()).into()),
+        }
+    }
+    if count > 1_000_000 {
+        return Err("numeric generator limit is 1,000,000 values per sequence".into());
+    }
+
+    let random_bytes = generate_e0(E0Kind::Incompressible, count.saturating_mul(2), seed);
+    let random_values: Vec<i16> = random_bytes
+        .chunks_exact(2)
+        .map(|pair| i16::from_le_bytes([pair[0], pair[1]]))
+        .collect();
+
+    let constant = vec![512i16; count];
+    let ramp: Vec<i16> = (0..count)
+        .map(|i| ((i * 13) % 60_000) as i32 - 30_000)
+        .map(|value| value as i16)
+        .collect();
+    let mut walk = Vec::with_capacity(count);
+    let mut current = 0i32;
+    for byte in random_bytes.iter().take(count) {
+        current = (current + *byte as i32 - 128).clamp(i16::MIN as i32, i16::MAX as i32);
+        walk.push(current as i16);
+    }
+
+    let sources = [
+        ("constant", constant),
+        ("ramp", ramp),
+        ("random-walk", walk),
+        ("uniform-random", random_values),
+    ];
+
+    println!("# benchmark=CDL-Bench-numeric-i16-v1");
+    println!("# values={count}");
+    println!("# seed={seed}");
+    println!("source,transform,model,raw_bytes,frame_bytes,zstd_raw_bytes,ratio,round_trip");
+
+    for (name, values) in sources {
+        let mut raw = Vec::with_capacity(values.len() * 2);
+        for value in &values {
+            raw.extend_from_slice(&value.to_le_bytes());
+        }
+        let zstd = external_compressed_len("zstd", &["-q", "-c"], &raw)
+            .map_or_else(|| "NA".to_owned(), |value| value.to_string());
+
+        for transform in [
+            NumericTransform::Raw,
+            NumericTransform::Delta,
+            NumericTransform::DeltaOfDelta,
+            NumericTransform::XorPrevious,
+        ] {
+            for model in [ModelKind::Order0, ModelKind::Order1] {
+                let frame = compress_i16(&values, transform, model)?;
+                let decoded = decompress_i16(&frame, values.len())?;
+                if decoded != values {
+                    return Err(format!("numeric round-trip failure for {name}/{transform:?}/{model:?}").into());
+                }
+                let ratio = if raw.is_empty() {
+                    "n/a".to_owned()
+                } else {
+                    format!("{:.6}", frame.len() as f64 / raw.len() as f64)
+                };
+                let model_name = if model == ModelKind::Order0 { "order0" } else { "order1" };
+                println!(
+                    "{name},{:?},{model_name},{},{},{zstd},{ratio},exact",
+                    transform,
+                    raw.len(),
+                    frame.len()
+                );
+            }
+        }
+    }
+    println!("# note=frame lengths include both the 32-byte numeric wrapper and inner CDL frame");
+    println!("# note=Zstandard encodes the raw little-endian i16 bytes; Pco/Sprintz/TSCom-Bench/SEP are external follow-up baselines");
+    Ok(())
+}
+
 fn run() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
@@ -308,6 +401,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("decode") => decode_command(&args),
         Some("e0") => e0_command(&args),
         Some("causal") => causal_command(&args),
+        Some("numeric") => numeric_command(&args),
         _ => Err(usage().into()),
     }
 }
