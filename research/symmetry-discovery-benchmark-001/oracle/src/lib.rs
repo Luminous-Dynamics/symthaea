@@ -408,7 +408,7 @@ impl Manifest {
             ));
         }
         let expected_families = BTreeMap::from([
-            ("C1".to_owned(), 30_usize),
+            ("C1".to_owned(), 31_usize),
             ("C2_FX".to_owned(), 30_usize),
             ("C2_R180".to_owned(), 30_usize),
             ("C4".to_owned(), 31_usize),
