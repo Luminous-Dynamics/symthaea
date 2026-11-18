@@ -1,0 +1,245 @@
+{
+  "schema_version": "0.1.0",
+  "campaign_id": "LIGHTSHELL-TRIAL-DESIGN-SYNTHETIC-001",
+  "target_qualification_campaign_ref": "INSTALLED-SYSTEM-CAMPAIGN-SYNTHETIC-001",
+  "state": "proposed",
+  "design_mode": "randomized_counterbalanced_within_robot",
+  "frozen_before_first_run": true,
+  "preregistration_ref": "SYNTHETIC-PREREGISTRATION-RECEIPT",
+  "preregistered_at": "2026-11-18T00:00:00Z",
+  "protocol_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "condition_ids": [
+    "baseline_uncovered",
+    "incumbent_cover",
+    "lightshell_installed"
+  ],
+  "incumbent_comparator_ref": "SYNTHETIC-INCUMBENT-COVER-REVISION",
+  "strata": [
+    {
+      "stratum_id": "ROBOT-STRATUM-A",
+      "robot_serial": "ROBOT-SERIAL-SYNTHETIC",
+      "firmware_revision": "FIRMWARE-REV-SYNTHETIC",
+      "robot_configuration_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "tool_payload_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "mission_profile_ref": "MISSION-PROFILE-SYNTHETIC",
+      "environment_stratum_ref": "ENVIRONMENT-STRATUM-SYNTHETIC",
+      "minimum_blocks": 6
+    }
+  ],
+  "allocation_policy": {
+    "algorithm_ref": "COUNTERBALANCE-ALLOCATOR-SYNTHETIC",
+    "seed_commitment_sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "seed_reveal_ref": null,
+    "allocation_custodian_ref": "INDEPENDENT-CUSTODIAN-SYNTHETIC",
+    "allocation_method_ref": "ALLOCATION-METHOD-SYNTHETIC",
+    "locked_before_outcomes": true,
+    "no_outcome_adaptive_reassignment": true
+  },
+  "reset_policy": {
+    "reset_procedure_ref": "RESET-PROCEDURE-SYNTHETIC",
+    "stabilization_rule_ref": "STABILIZATION-RULE-SYNTHETIC",
+    "reset_before_every_period": true,
+    "carryover_check_between_periods": true
+  },
+  "drift_policy": {
+    "sentinel_metric_id": "REFERENCE-SENTINEL-SYNTHETIC",
+    "maximum_abs_drift": 0.5,
+    "uncertainty_guarded": true,
+    "start_end_measurements_required": true
+  },
+  "blocks": [
+    {
+      "block_id": "BLOCK-0",
+      "stratum_id": "ROBOT-STRATUM-A",
+      "sequence_id": "U-I-L",
+      "allocation_receipt_ref": "SYNTHETIC-ALLOCATION-0",
+      "periods": [
+        {
+          "period_index": 0,
+          "condition_id": "baseline_uncovered",
+          "linked_system_run_ref": null,
+          "reset_before": null,
+          "carryover_check": null
+        },
+        {
+          "period_index": 1,
+          "condition_id": "incumbent_cover",
+          "linked_system_run_ref": null,
+          "reset_before": null,
+          "carryover_check": null
+        },
+        {
+          "period_index": 2,
+          "condition_id": "lightshell_installed",
+          "linked_system_run_ref": null,
+          "reset_before": null,
+          "carryover_check": null
+        }
+      ],
+      "drift_check": null,
+      "block_evidence_ref": null,
+      "allocation_order_index": 0
+    },
+    {
+      "block_id": "BLOCK-1",
+      "stratum_id": "ROBOT-STRATUM-A",
+      "sequence_id": "U-L-I",
+      "allocation_receipt_ref": "SYNTHETIC-ALLOCATION-1",
+      "periods": [
+        {
+          "period_index": 0,
+          "condition_id": "baseline_uncovered",
+          "linked_system_run_ref": null,
+          "reset_before": null,
+          "carryover_check": null
+        },
+        {
+          "period_index": 1,
+          "condition_id": "lightshell_installed",
+          "linked_system_run_ref": null,
+          "reset_before": null,
+          "carryover_check": null
+        },
+        {
+          "period_index": 2,
+          "condition_id": "incumbent_cover",
+          "linked_system_run_ref": null,
+          "reset_before": null,
+          "carryover_check": null
+        }
+      ],
+      "drift_check": null,
+      "block_evidence_ref": null,
+      "allocation_order_index": 1
+    },
+    {
+      "block_id": "BLOCK-2",
+      "stratum_id": "ROBOT-STRATUM-A",
+      "sequence_id": "I-U-L",
+      "allocation_receipt_ref": "SYNTHETIC-ALLOCATION-2",
+      "periods": [
+        {
+          "period_index": 0,
+          "condition_id": "incumbent_cover",
+          "linked_system_run_ref": null,
+          "reset_before": null,
+          "carryover_check": null
+        },
+        {
+          "period_index": 1,
+          "condition_id": "baseline_uncovered",
+          "linked_system_run_ref": null,
+          "reset_before": null,
+          "carryover_check": null
+        },
+        {
+          "period_index": 2,
+          "condition_id": "lightshell_installed",
+          "linked_system_run_ref": null,
+          "reset_before": null,
+          "carryover_check": null
+        }
+      ],
+      "drift_check": null,
+      "block_evidence_ref": null,
+      "allocation_order_index": 2
+    },
+    {
+      "block_id": "BLOCK-3",
+      "stratum_id": "ROBOT-STRATUM-A",
+      "sequence_id": "I-L-U",
+      "allocation_receipt_ref": "SYNTHETIC-ALLOCATION-3",
+      "periods": [
+        {
+          "period_index": 0,
+          "condition_id": "incumbent_cover",
+          "linked_system_run_ref": null,
+          "reset_before": null,
+          "carryover_check": null
+        },
+        {
+          "period_index": 1,
+          "condition_id": "lightshell_installed",
+          "linked_system_run_ref": null,
+          "reset_before": null,
+          "carryover_check": null
+        },
+        {
+          "period_index": 2,
+          "condition_id": "baseline_uncovered",
+          "linked_system_run_ref": null,
+          "reset_before": null,
+          "carryover_check": null
+        }
+      ],
+      "drift_check": null,
+      "block_evidence_ref": null,
+      "allocation_order_index": 3
+    },
+    {
+      "block_id": "BLOCK-4",
+      "stratum_id": "ROBOT-STRATUM-A",
+      "sequence_id": "L-U-I",
+      "allocation_receipt_ref": "SYNTHETIC-ALLOCATION-4",
+      "periods": [
+        {
+          "period_index": 0,
+          "condition_id": "lightshell_installed",
+          "linked_system_run_ref": null,
+          "reset_before": null,
+          "carryover_check": null
+        },
+        {
+          "period_index": 1,
+          "condition_id": "baseline_uncovered",
+          "linked_system_run_ref": null,
+          "reset_before": null,
+          "carryover_check": null
+        },
+        {
+          "period_index": 2,
+          "condition_id": "incumbent_cover",
+          "linked_system_run_ref": null,
+          "reset_before": null,
+          "carryover_check": null
+        }
+      ],
+      "drift_check": null,
+      "block_evidence_ref": null,
+      "allocation_order_index": 4
+    },
+    {
+      "block_id": "BLOCK-5",
+      "stratum_id": "ROBOT-STRATUM-A",
+      "sequence_id": "L-I-U",
+      "allocation_receipt_ref": "SYNTHETIC-ALLOCATION-5",
+      "periods": [
+        {
+          "period_index": 0,
+          "condition_id": "lightshell_installed",
+          "linked_system_run_ref": null,
+          "reset_before": null,
+          "carryover_check": null
+        },
+        {
+          "period_index": 1,
+          "condition_id": "incumbent_cover",
+          "linked_system_run_ref": null,
+          "reset_before": null,
+          "carryover_check": null
+        },
+        {
+          "period_index": 2,
+          "condition_id": "baseline_uncovered",
+          "linked_system_run_ref": null,
+          "reset_before": null,
+          "carryover_check": null
+        }
+      ],
+      "drift_check": null,
+      "block_evidence_ref": null,
+      "allocation_order_index": 5
+    }
+  ],
+  "independent_review": null
+}
