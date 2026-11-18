@@ -18,7 +18,7 @@ This v0.1 slice begins with a deliberately narrow, deterministic evidence-flow c
 - `HIDDEN_INFO_FIXTURES_V0_1.json`: evaluator-only synthetic evidence-transfer fixtures.
 - `qualifier/`: standalone Rust structural qualifier and unit tests.
 
-The fixtures are synthetic structural controls. They are not a reproduction of HiddenBench, not LLM-agent trials, and not performance evidence.
+The fixtures are synthetic structural controls. They are not a reproduction of HiddenBench, not LLM-agent trials, and not performance evidence. The `final.answer_correct` labels and expected metrics are evaluator-only fixture annotations; they must never be sent to an agent.
 
 ## Run locally
 
