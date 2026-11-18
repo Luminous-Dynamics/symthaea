@@ -20,6 +20,12 @@ This v0.1 slice begins with a deliberately narrow, deterministic evidence-flow c
 
 The fixtures are synthetic structural controls. They are not a reproduction of HiddenBench, not LLM-agent trials, and not performance evidence.
 
+## Published result files pinned
+
+The original experiment-result release is separately catalogued in [PUBLIC_RESULT_SOURCE_MANIFEST_V0_1.json](external/hiddenbench/PUBLIC_RESULT_SOURCE_MANIFEST_V0_1.json). It identifies the three GPT-4.1 files needed for the original complete comparison: 80 hidden runs over eight manual/adapted tasks, 570 hidden runs over 57 generated tasks, and 650 full-profile runs over all 65 tasks. The publisher states these JSON result payloads are copied without modification. The result payloads themselves have not yet been downloaded or independently re-scored in this branch; the manifest is a source locator, not a reproduced score.
+
+The Rust scorer accepts both hidden files in one invocation and validates that their model/profile metadata agree. The full-profile file is optional and supplied with `--full`.
+
 ## Official corpus pinned
 
 The exact upstream `data/benchmark.json` is vendored under `external/hiddenbench/` with its MIT license and source manifest:
