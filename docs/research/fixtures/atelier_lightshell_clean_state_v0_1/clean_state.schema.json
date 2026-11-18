@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": [
     "schema_version", "campaign_id", "state", "frozen_before_first_cycle",
-    "preregistration_ref", "protocol_digest", "target_trial_design_ref",
+    "preregistration_ref", "protocol_digest", "required_cycle_count", "target_trial_design_ref",
     "article", "application", "soil_challenge", "gates", "cycles", "independent_review"
   ],
   "properties": {
@@ -16,6 +16,7 @@
     "frozen_before_first_cycle": { "type": "boolean" },
     "preregistration_ref": { "type": "string", "minLength": 1 },
     "protocol_digest": { "$ref": "#/$defs/digest" },
+    "required_cycle_count": { "type": "integer", "minimum": 1 },
     "target_trial_design_ref": { "type": ["string", "null"] },
     "article": { "$ref": "#/$defs/article" },
     "application": { "$ref": "#/$defs/application" },
