@@ -55,6 +55,8 @@ pub enum CircleLayoutError {
     InvalidClassCount { requested: usize, available: usize },
     ClassingLengthMismatch { circles: usize, labels: usize },
     InvalidContactIndex,
+    InvalidSensitivityConfig,
+    RadiusPerturbationExceedsMinimumRadius,
 }
 
 impl std::fmt::Display for CircleLayoutError {
@@ -89,11 +91,281 @@ impl std::fmt::Display for CircleLayoutError {
             Self::InvalidContactIndex => {
                 write!(f, "contact edge references an invalid or identical circle index")
             }
+            Self::InvalidSensitivityConfig => {
+                write!(f, "sensitivity configuration must have positive replicates and finite non-negative bounds")
+            }
+            Self::RadiusPerturbationExceedsMinimumRadius => {
+                write!(f, "maximum radius perturbation must be smaller than the minimum source radius")
+            }
         }
     }
 }
 
 impl std::error::Error for CircleLayoutError {}
+
+/// Configuration for an explicitly hypothetical image-space measurement stress test.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CircleSensitivityConfig {
+    pub replicates: usize,
+    pub seed: u64,
+    pub max_center_offset_px: f64,
+    pub max_radius_offset_px: f64,
+    pub class_count: usize,
+    pub tangent_gap_tolerance_px: f64,
+}
+
+/// Stability summary from rerunning the complete descriptive circle pipeline.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CircleSensitivitySummary {
+    pub seed: u64,
+    pub replicates: usize,
+    pub baseline_contact_edges: usize,
+    pub baseline_first_last_class_edges: usize,
+    pub baseline_aeb_motifs: usize,
+    pub baseline_bae_motifs: usize,
+    pub baseline_aea_motifs: usize,
+    pub mean_contact_edges: f64,
+    pub contact_edges_sample_std_dev: f64,
+    pub mean_first_last_class_edges: f64,
+    pub first_last_class_edges_sample_std_dev: f64,
+    pub mean_aeb_motifs: f64,
+    pub aeb_motifs_sample_std_dev: f64,
+    pub mean_bae_motifs: f64,
+    pub bae_motifs_sample_std_dev: f64,
+    pub mean_aea_motifs: f64,
+    pub aea_motifs_sample_std_dev: f64,
+    pub mean_radius_label_agreement: f64,
+    /// Fraction of replicates that preserve all five baseline counts exactly.
+    pub exact_baseline_signature_fraction: f64,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RunningStats {
+    count: usize,
+    mean: f64,
+    sum_squared_deviations: f64,
+}
+
+impl RunningStats {
+    fn new() -> Self {
+        Self {
+            count: 0,
+            mean: 0.0,
+            sum_squared_deviations: 0.0,
+        }
+    }
+
+    fn push(&mut self, value: f64) {
+        self.count += 1;
+        let delta = value - self.mean;
+        self.mean += delta / self.count as f64;
+        let delta_after = value - self.mean;
+        self.sum_squared_deviations += delta * delta_after;
+    }
+
+    fn sample_std_dev(self) -> f64 {
+        if self.count <= 1 {
+            0.0
+        } else {
+            (self.sum_squared_deviations / (self.count - 1) as f64)
+                .max(0.0)
+                .sqrt()
+        }
+    }
+}
+
+struct SensitivityRng {
+    state: u64,
+}
+
+impl SensitivityRng {
+    fn new(seed: u64) -> Self {
+        Self {
+            state: if seed == 0 {
+                0x9e37_79b9_7f4a_7c15
+            } else {
+                seed
+            },
+        }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        let mut value = self.state;
+        value ^= value << 13;
+        value ^= value >> 7;
+        value ^= value << 17;
+        self.state = value;
+        value
+    }
+
+    /// Uniform value in [0, 1), using the high 53 random bits.
+    fn unit_interval(&mut self) -> f64 {
+        ((self.next_u64() >> 11) as f64) * (1.0 / ((1_u64 << 53) as f64))
+    }
+
+    /// Uniform value in [-1, 1).
+    fn signed_unit(&mut self) -> f64 {
+        self.unit_interval() * 2.0 - 1.0
+    }
+}
+
+/// Rerun radius classes, radial classes, tangent-gap contacts and centred
+/// motifs after independent uniform perturbations of circle centres and radii.
+///
+/// The caller supplies assumed pixel-error bounds. This function does not
+/// estimate digitizer uncertainty. Outputs are sensitivity diagnostics only;
+/// do not treat them as confidence intervals or p-values.
+pub fn audit_circle_measurement_sensitivity(
+    circles: &[CircleRecord],
+    config: CircleSensitivityConfig,
+) -> Result<CircleSensitivitySummary, CircleLayoutError> {
+    validate_circles(circles)?;
+    if config.replicates == 0
+        || !config.max_center_offset_px.is_finite()
+        || config.max_center_offset_px < 0.0
+        || !config.max_radius_offset_px.is_finite()
+        || config.max_radius_offset_px < 0.0
+        || !config.tangent_gap_tolerance_px.is_finite()
+        || config.tangent_gap_tolerance_px < 0.0
+        || config.class_count == 0
+        || config.class_count > circles.len()
+    {
+        return Err(CircleLayoutError::InvalidSensitivityConfig);
+    }
+    let minimum_radius = circles
+        .iter()
+        .map(|circle| circle.radius)
+        .fold(f64::INFINITY, f64::min);
+    if config.max_radius_offset_px >= minimum_radius {
+        return Err(CircleLayoutError::RadiusPerturbationExceedsMinimumRadius);
+    }
+
+    let baseline_layout =
+        describe_circle_layout(circles, config.tangent_gap_tolerance_px)?;
+    let baseline_classes = class_circle_layout(circles, &baseline_layout, config.class_count)?;
+    let baseline_motifs =
+        count_centred_motifs(&baseline_classes.radius_labels, &baseline_layout.contacts)?;
+    let baseline_first_last = count_first_last_class_edges(
+        &baseline_classes.radius_labels,
+        &baseline_layout.contacts,
+        config.class_count,
+    );
+    let baseline_aeb = *baseline_motifs
+        .get(&(1, config.class_count, 2))
+        .unwrap_or(&0);
+    let baseline_bae = *baseline_motifs
+        .get(&(2, 1, config.class_count))
+        .unwrap_or(&0);
+    let baseline_aea = *baseline_motifs
+        .get(&(1, config.class_count, 1))
+        .unwrap_or(&0);
+
+    let mut rng = SensitivityRng::new(config.seed);
+    let mut contacts_stats = RunningStats::new();
+    let mut first_last_stats = RunningStats::new();
+    let mut aeb_stats = RunningStats::new();
+    let mut bae_stats = RunningStats::new();
+    let mut aea_stats = RunningStats::new();
+    let mut label_agreement_stats = RunningStats::new();
+    let mut exact_signatures = 0_usize;
+
+    for _ in 0..config.replicates {
+        let perturbed: Vec<CircleRecord> = circles
+            .iter()
+            .map(|circle| CircleRecord {
+                id: circle.id,
+                center: Point2::new(
+                    circle.center.x
+                        + rng.signed_unit() * config.max_center_offset_px,
+                    circle.center.y
+                        + rng.signed_unit() * config.max_center_offset_px,
+                ),
+                radius: circle.radius
+                    + rng.signed_unit() * config.max_radius_offset_px,
+            })
+            .collect();
+
+        let layout =
+            describe_circle_layout(&perturbed, config.tangent_gap_tolerance_px)?;
+        let classes = class_circle_layout(&perturbed, &layout, config.class_count)?;
+        let motifs = count_centred_motifs(&classes.radius_labels, &layout.contacts)?;
+        let first_last = count_first_last_class_edges(
+            &classes.radius_labels,
+            &layout.contacts,
+            config.class_count,
+        );
+        let aeb = *motifs
+            .get(&(1, config.class_count, 2))
+            .unwrap_or(&0);
+        let bae = *motifs
+            .get(&(2, 1, config.class_count))
+            .unwrap_or(&0);
+        let aea = *motifs
+            .get(&(1, config.class_count, 1))
+            .unwrap_or(&0);
+
+        contacts_stats.push(layout.contacts.len() as f64);
+        first_last_stats.push(first_last as f64);
+        aeb_stats.push(aeb as f64);
+        bae_stats.push(bae as f64);
+        aea_stats.push(aea as f64);
+
+        let matching_labels = classes
+            .radius_labels
+            .iter()
+            .zip(baseline_classes.radius_labels.iter())
+            .filter(|(candidate, baseline)| candidate == baseline)
+            .count();
+        label_agreement_stats.push(matching_labels as f64 / circles.len() as f64);
+
+        if layout.contacts.len() == baseline_layout.contacts.len()
+            && first_last == baseline_first_last
+            && aeb == baseline_aeb
+            && bae == baseline_bae
+            && aea == baseline_aea
+        {
+            exact_signatures += 1;
+        }
+    }
+
+    Ok(CircleSensitivitySummary {
+        seed: config.seed,
+        replicates: config.replicates,
+        baseline_contact_edges: baseline_layout.contacts.len(),
+        baseline_first_last_class_edges: baseline_first_last,
+        baseline_aeb_motifs: baseline_aeb,
+        baseline_bae_motifs: baseline_bae,
+        baseline_aea_motifs: baseline_aea,
+        mean_contact_edges: contacts_stats.mean,
+        contact_edges_sample_std_dev: contacts_stats.sample_std_dev(),
+        mean_first_last_class_edges: first_last_stats.mean,
+        first_last_class_edges_sample_std_dev: first_last_stats.sample_std_dev(),
+        mean_aeb_motifs: aeb_stats.mean,
+        aeb_motifs_sample_std_dev: aeb_stats.sample_std_dev(),
+        mean_bae_motifs: bae_stats.mean,
+        bae_motifs_sample_std_dev: bae_stats.sample_std_dev(),
+        mean_aea_motifs: aea_stats.mean,
+        aea_motifs_sample_std_dev: aea_stats.sample_std_dev(),
+        mean_radius_label_agreement: label_agreement_stats.mean,
+        exact_baseline_signature_fraction: exact_signatures as f64 / config.replicates as f64,
+    })
+}
+
+fn count_first_last_class_edges(
+    labels: &[usize],
+    contacts: &[CircleContact],
+    class_count: usize,
+) -> usize {
+    contacts
+        .iter()
+        .filter(|edge| {
+            let first = labels[edge.first_index];
+            let second = labels[edge.second_index];
+            (first == 1 && second == class_count)
+                || (first == class_count && second == 1)
+        })
+        .count()
+}
 
 /// Parse the strict, four-column CCAT-style circle CSV.
 ///
@@ -583,6 +855,89 @@ mod tests {
         assert_eq!(
             count_centred_motifs(&[1, 2], &[bad_edge]),
             Err(CircleLayoutError::InvalidContactIndex)
+        );
+    }
+
+    #[test]
+    fn zero_perturbation_preserves_baseline_signature_exactly() {
+        let circles = parse_circle_csv(CCAT_ZEALS_KNOLL).expect("valid CCAT fixture");
+        let result = audit_circle_measurement_sensitivity(
+            &circles,
+            CircleSensitivityConfig {
+                replicates: 5,
+                seed: 123,
+                max_center_offset_px: 0.0,
+                max_radius_offset_px: 0.0,
+                class_count: 5,
+                tangent_gap_tolerance_px: 45.0,
+            },
+        )
+        .expect("valid zero-noise stress test");
+
+        assert_eq!(result.baseline_contact_edges, 66);
+        assert_eq!(result.baseline_first_last_class_edges, 12);
+        assert_eq!(result.baseline_aeb_motifs, 10);
+        assert_eq!(result.baseline_bae_motifs, 10);
+        assert_eq!(result.baseline_aea_motifs, 8);
+        assert_eq!(result.exact_baseline_signature_fraction, 1.0);
+        assert_eq!(result.mean_radius_label_agreement, 1.0);
+    }
+
+    #[test]
+    fn sensitivity_audit_is_deterministic_for_a_frozen_seed() {
+        let circles = parse_circle_csv(CCAT_ZEALS_KNOLL).expect("valid CCAT fixture");
+        let config = CircleSensitivityConfig {
+            replicates: 20,
+            seed: 20261118,
+            max_center_offset_px: 1.0,
+            max_radius_offset_px: 1.0,
+            class_count: 5,
+            tangent_gap_tolerance_px: 45.0,
+        };
+        let first =
+            audit_circle_measurement_sensitivity(&circles, config).expect("first replay");
+        let second =
+            audit_circle_measurement_sensitivity(&circles, config).expect("second replay");
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn sensitivity_audit_rejects_invalid_bounds_and_replica_counts() {
+        let circles = parse_circle_csv(CCAT_ZEALS_KNOLL).expect("valid CCAT fixture");
+        let base = CircleSensitivityConfig {
+            replicates: 10,
+            seed: 7,
+            max_center_offset_px: 1.0,
+            max_radius_offset_px: 1.0,
+            class_count: 5,
+            tangent_gap_tolerance_px: 45.0,
+        };
+        assert_eq!(
+            audit_circle_measurement_sensitivity(
+                &circles,
+                CircleSensitivityConfig { replicates: 0, ..base }
+            ),
+            Err(CircleLayoutError::InvalidSensitivityConfig)
+        );
+        assert_eq!(
+            audit_circle_measurement_sensitivity(
+                &circles,
+                CircleSensitivityConfig {
+                    max_radius_offset_px: 100.0,
+                    ..base
+                }
+            ),
+            Err(CircleLayoutError::RadiusPerturbationExceedsMinimumRadius)
+        );
+        assert_eq!(
+            audit_circle_measurement_sensitivity(
+                &circles,
+                CircleSensitivityConfig {
+                    max_center_offset_px: f64::NAN,
+                    ..base
+                }
+            ),
+            Err(CircleLayoutError::InvalidSensitivityConfig)
         );
     }
 }
