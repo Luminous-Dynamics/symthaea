@@ -1,0 +1,18 @@
+[package]
+name = "cdl-bench"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Standalone deterministic lossless codec laboratory for CDL-Bench"
+
+[lib]
+name = "cdl_bench"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cdl-bench"
+path = "src/main.rs"
+
+[dependencies]
