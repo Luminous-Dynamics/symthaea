@@ -46,7 +46,21 @@
       "strain": null,
       "field_magnitude": null,
       "field_unit": "not extracted",
-      "field_orientation": "not extracted"
+      "field_orientation": "not extracted",
+      "calculation_provenance": {
+        "calculation_family": "scdft",
+        "code_name": "Quantum ESPRESSO + Superconducting-Toolkit (SCTK)",
+        "code_version": null,
+        "exchange_correlation_method": "PBE for normal-state DFT; Eliashberg-combined SCDFT functional; RPA plasmon-assisted kernel and mass renormalization; adiabatic-LDA spin-fluctuation kernel",
+        "pseudopotential_or_basis_set": "Material-specific PSL/GBRV/SG15 library; exact per-material choice not extracted in this abstract-level record",
+        "k_mesh": null,
+        "q_mesh": null,
+        "energy_cutoff": null,
+        "energy_cutoff_unit": "per-material cutoff in Ry; not extracted",
+        "phonon_treatment": "DFPT",
+        "spin_orbit_included": null,
+        "provenance_note": "Method-level summary only. Exact settings belong to the separately versioned arXiv:2603.05123v2 material fixtures; no numeric outputs or code version are inferred here."
+      }
     }
   ],
   "microscopic_method": {
