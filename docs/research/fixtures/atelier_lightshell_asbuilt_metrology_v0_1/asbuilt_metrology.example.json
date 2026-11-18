@@ -30,7 +30,8 @@
         "panel_surface_deviation_mm"
       ],
       "minimum_coverage_fraction": 0.95,
-      "acceptance_rule_ref": "PANEL-ACCEPTANCE-01"
+      "acceptance_rule_ref": "PANEL-ACCEPTANCE-01",
+      "required_pose_refs": []
     },
     {
       "feature_ref": "elbow_seam",
@@ -42,7 +43,8 @@
         "seam_path_deviation_mm"
       ],
       "minimum_coverage_fraction": 0.98,
-      "acceptance_rule_ref": "SEAM-ACCEPTANCE-01"
+      "acceptance_rule_ref": "SEAM-ACCEPTANCE-01",
+      "required_pose_refs": []
     },
     {
       "feature_ref": "forearm_service_opening",
@@ -54,7 +56,8 @@
         "service_opening_position_error_mm"
       ],
       "minimum_coverage_fraction": 0.95,
-      "acceptance_rule_ref": "SERVICE-OPENING-ACCEPTANCE-01"
+      "acceptance_rule_ref": "SERVICE-OPENING-ACCEPTANCE-01",
+      "required_pose_refs": []
     }
   ],
   "measurement_session": null,
