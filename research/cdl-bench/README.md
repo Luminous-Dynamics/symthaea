@@ -26,6 +26,7 @@ cargo test
 cargo run --release -- e0 --bytes 65536 --seed 42
 cargo run --release -- causal --steps 10000 --seed 42
 cargo run --release -- numeric --values 10000 --seed 42
+cargo run --release -- bounded --values 10000 --seed 42 --tolerance 5
 cargo run --release -- encode --model order1 input.bin output.cdl
 cargo run --release -- decode output.cdl reconstructed.bin
 cmp input.bin reconstructed.bin
@@ -103,3 +104,36 @@ checks both the inner frame and reconstructed raw i16 data. This is a baseline
 transform layer, not a reimplementation of Pco and not yet a causal predictor.
 The next comparisons should include Pco, Sprintz, Gorilla/Chimp, TSCom-Bench
 and SEP under matched dataset preparation and hardware.
+
+## Separate bounded-error i16 experiment
+
+`cdl-bench bounded --values 10000 --seed 42 --tolerance 5` runs a
+**lossy** predictive coding experiment with a hard absolute error tolerance.
+It is intentionally not part of the exact-lossless scorecard.
+
+The bounded-error codec currently compares:
+- Previous-value predictor.
+- Linear predictor: `2 * previous - previous_previous`.
+- Order-0 and order-1 adaptive byte models.
+- Four synthetic source families: constant, ramp, random walk and demand-like.
+
+For integer tolerance `tau`, it uses residual reconstruction step
+`2 * tau + 1`. Each input sample is mapped to the nearest integer point on
+the predictor-relative grid. The maximum quantization error before clipping is
+`floor((2*tau + 1)/2) = tau`; clipping the reconstructed value to the i16
+range cannot increase error for an i16 source sample.
+
+Encoder and decoder both update predictors from reconstructed samples only.
+This makes predictor state deterministic and decoder-synchronous. The format
+stores the tolerance, predictor ID, entropy-model ID, sample count, payload
+length and reconstructed-output checksum.
+
+The command independently checks the maximum absolute error after decoding and
+prints `PASS` only when every sample satisfies the configured tolerance. This
+is a prototype baseline, not an implementation of Cadence, SZ3 or Pco; its
+synthetic demand-like source is not an external electricity or transit dataset.
+
+**Never compare its compressed size directly with an exact-lossless result
+without reporting the fidelity difference.** A future bounded-error benchmark
+must include Cadence and classical error-bounded baselines on identical data,
+tolerance, entropy coder, context-bootstrap and resource accounting.
