@@ -1,0 +1,7028 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "LUMINOUS-SYMM-QUALIFIED-DISCOVERY-001",
+  "benchmark_track": "exact_finite_structural_stabilizer",
+  "split": "discovery",
+  "cases": [
+    {
+      "case_id": "CASE-00c289819fb4e771",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -14,
+            -21
+          ],
+          [
+            -14,
+            21
+          ],
+          [
+            14,
+            -21
+          ],
+          [
+            14,
+            21
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-0156726fc9b3a8b9",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -43,
+            -35
+          ],
+          [
+            -43,
+            35
+          ],
+          [
+            -35,
+            -43
+          ],
+          [
+            -35,
+            43
+          ],
+          [
+            35,
+            -43
+          ],
+          [
+            35,
+            43
+          ],
+          [
+            43,
+            -35
+          ],
+          [
+            43,
+            35
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-02c6e093f1d7ea10",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -43,
+            -49
+          ],
+          [
+            43,
+            -49
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-034250cd3ed1ae31",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -5,
+            -49
+          ],
+          [
+            5,
+            49
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-06410b6f8b3fd35f",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -48,
+            -14
+          ],
+          [
+            -48,
+            14
+          ],
+          [
+            48,
+            -14
+          ],
+          [
+            48,
+            14
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-06febc091629b0b5",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            39,
+            33
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-097c2e08d1bc2ea2",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -40,
+            28
+          ],
+          [
+            40,
+            28
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-0ab70f362b1f1c4d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -41,
+            24
+          ],
+          [
+            -24,
+            -41
+          ],
+          [
+            24,
+            41
+          ],
+          [
+            41,
+            -24
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-0b7a05098f50b337",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -48,
+            -43
+          ],
+          [
+            -43,
+            -48
+          ],
+          [
+            43,
+            48
+          ],
+          [
+            48,
+            43
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-0c6fefb3179f0d64",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            39,
+            -27
+          ],
+          [
+            39,
+            27
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-0ceba52a8233c8fa",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -16,
+            -1
+          ],
+          [
+            16,
+            -1
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-0d15276d52fe9bdb",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            5,
+            23
+          ],
+          [
+            23,
+            5
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-0d3978a58129f047",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -30,
+            -5
+          ],
+          [
+            -5,
+            -30
+          ],
+          [
+            5,
+            30
+          ],
+          [
+            30,
+            5
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-0d509703bcbf113d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -11,
+            37
+          ],
+          [
+            37,
+            -11
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-0f6f0033f4fbcbbd",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -12,
+            -1
+          ],
+          [
+            -1,
+            12
+          ],
+          [
+            1,
+            -12
+          ],
+          [
+            12,
+            1
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-0fd004df0bca399d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -37,
+            -17
+          ],
+          [
+            -17,
+            37
+          ],
+          [
+            17,
+            -37
+          ],
+          [
+            37,
+            17
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-12522f5c96d021c1",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            6,
+            -25
+          ],
+          [
+            25,
+            -6
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-1294052267891811",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            5,
+            -45
+          ],
+          [
+            45,
+            -5
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-12d2bd48fd665865",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -30,
+            -40
+          ],
+          [
+            40,
+            30
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-144589ce4a522b29",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            21,
+            50
+          ],
+          [
+            50,
+            21
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-16936c21fa2391e1",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            33,
+            -45
+          ],
+          [
+            45,
+            -33
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-187e52f97c985356",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -5,
+            -8
+          ],
+          [
+            5,
+            -8
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-1ace7583872c9d8b",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -45,
+            22
+          ],
+          [
+            -22,
+            45
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-1e47d529e1186461",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -13,
+            -17
+          ],
+          [
+            -13,
+            17
+          ],
+          [
+            13,
+            -17
+          ],
+          [
+            13,
+            17
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-1f3f57047e31b563",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -39,
+            -6
+          ],
+          [
+            -39,
+            6
+          ],
+          [
+            39,
+            -6
+          ],
+          [
+            39,
+            6
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-1fa2974da8411707",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -13,
+            21
+          ],
+          [
+            21,
+            -13
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-20064c14359acba7",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -13,
+            32
+          ],
+          [
+            32,
+            -13
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-20e2fb08fcd43d83",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -15,
+            -10
+          ],
+          [
+            -10,
+            -15
+          ],
+          [
+            10,
+            15
+          ],
+          [
+            15,
+            10
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-21c5ce47154bd6fa",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            4,
+            -13
+          ],
+          [
+            4,
+            13
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-21dc30204da2d9e2",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -43,
+            29
+          ],
+          [
+            43,
+            29
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-2290bfb13a2fa926",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            10,
+            33
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-2311ec0d12dbf41d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -16,
+            -8
+          ],
+          [
+            -8,
+            16
+          ],
+          [
+            8,
+            -16
+          ],
+          [
+            16,
+            8
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-237acdda2097dcae",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -29,
+            45
+          ],
+          [
+            29,
+            45
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-239e55c5463c8913",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            19,
+            41
+          ],
+          [
+            41,
+            19
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-23c69f952d55f7d1",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -1,
+            13
+          ],
+          [
+            13,
+            -1
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-2410031b9bf3a2fd",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -49,
+            24
+          ],
+          [
+            -24,
+            -49
+          ],
+          [
+            24,
+            49
+          ],
+          [
+            49,
+            -24
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-2411c220a1f77fe9",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -19,
+            -22
+          ],
+          [
+            -19,
+            22
+          ],
+          [
+            19,
+            -22
+          ],
+          [
+            19,
+            22
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-256e12aa0b011c34",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -6,
+            41
+          ],
+          [
+            6,
+            41
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-2575ea09a0664881",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -9,
+            44
+          ],
+          [
+            44,
+            -9
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-25981aaceafd8e8d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -49,
+            35
+          ],
+          [
+            35,
+            -49
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-287f34ba10bee035",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            20,
+            -47
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-289c1d0453bd1f50",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -35,
+            -49
+          ],
+          [
+            -35,
+            49
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-2961763c9912d619",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -34,
+            -2
+          ],
+          [
+            -2,
+            34
+          ],
+          [
+            2,
+            -34
+          ],
+          [
+            34,
+            2
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-29e8955fd0c0ebd1",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -16,
+            -11
+          ],
+          [
+            -11,
+            -16
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-2aa55e3ebda79d01",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -26,
+            -5
+          ],
+          [
+            -26,
+            5
+          ],
+          [
+            -5,
+            -26
+          ],
+          [
+            -5,
+            26
+          ],
+          [
+            5,
+            -26
+          ],
+          [
+            5,
+            26
+          ],
+          [
+            26,
+            -5
+          ],
+          [
+            26,
+            5
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-2b74ba0331359383",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -39,
+            38
+          ],
+          [
+            -38,
+            39
+          ],
+          [
+            38,
+            -39
+          ],
+          [
+            39,
+            -38
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-2c47af2547954572",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -4,
+            -28
+          ],
+          [
+            -4,
+            28
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-2c4eeeb30a724373",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            19,
+            -24
+          ],
+          [
+            24,
+            -19
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-2cc95b1f0d13c517",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -30,
+            17
+          ],
+          [
+            -17,
+            30
+          ],
+          [
+            17,
+            -30
+          ],
+          [
+            30,
+            -17
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-2d151c02c11ed27e",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -42,
+            -43
+          ],
+          [
+            42,
+            -43
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-2e46fe532f4ab171",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -44,
+            -36
+          ],
+          [
+            44,
+            36
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-2ed02f77403c233b",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -47,
+            -16
+          ],
+          [
+            47,
+            16
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-2fa8f74ef6fb5f42",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -39,
+            -15
+          ],
+          [
+            -39,
+            15
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-3032719395af560c",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -19,
+            -32
+          ],
+          [
+            -19,
+            32
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-30f54a3850dcc122",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -39,
+            -28
+          ],
+          [
+            -39,
+            28
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-31c2703c5954bb99",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -41,
+            -38
+          ],
+          [
+            -41,
+            38
+          ],
+          [
+            -38,
+            -41
+          ],
+          [
+            -38,
+            41
+          ],
+          [
+            38,
+            -41
+          ],
+          [
+            38,
+            41
+          ],
+          [
+            41,
+            -38
+          ],
+          [
+            41,
+            38
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-322a961b3233ce4b",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -41,
+            -20
+          ],
+          [
+            -20,
+            -41
+          ],
+          [
+            20,
+            41
+          ],
+          [
+            41,
+            20
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-322d336cc44c0de2",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -37,
+            -2
+          ],
+          [
+            37,
+            -2
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-3252baffbd9d5849",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -19,
+            -5
+          ],
+          [
+            -19,
+            5
+          ],
+          [
+            19,
+            -5
+          ],
+          [
+            19,
+            5
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-32f842bccf470909",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -49,
+            -36
+          ],
+          [
+            -49,
+            36
+          ],
+          [
+            -36,
+            -49
+          ],
+          [
+            -36,
+            49
+          ],
+          [
+            36,
+            -49
+          ],
+          [
+            36,
+            49
+          ],
+          [
+            49,
+            -36
+          ],
+          [
+            49,
+            36
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-333419ba17639d54",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            20,
+            -44
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-3348adb25ed58d9b",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -12,
+            -30
+          ],
+          [
+            12,
+            30
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-33872df566f75bf3",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -8,
+            -7
+          ],
+          [
+            -8,
+            7
+          ],
+          [
+            8,
+            -7
+          ],
+          [
+            8,
+            7
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-35f84211e1af118c",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            15,
+            -22
+          ],
+          [
+            15,
+            22
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-3706ff1dd2068255",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -7,
+            -4
+          ],
+          [
+            -7,
+            4
+          ],
+          [
+            -4,
+            -7
+          ],
+          [
+            -4,
+            7
+          ],
+          [
+            4,
+            -7
+          ],
+          [
+            4,
+            7
+          ],
+          [
+            7,
+            -4
+          ],
+          [
+            7,
+            4
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-379b5eb979faf29f",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            16,
+            44
+          ],
+          [
+            44,
+            16
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-380a55c409a068ef",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            4,
+            -34
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-3a064b648b526635",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -45,
+            -46
+          ],
+          [
+            46,
+            45
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-3af519a35875a979",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -34,
+            -21
+          ],
+          [
+            -34,
+            21
+          ],
+          [
+            -21,
+            -34
+          ],
+          [
+            -21,
+            34
+          ],
+          [
+            21,
+            -34
+          ],
+          [
+            21,
+            34
+          ],
+          [
+            34,
+            -21
+          ],
+          [
+            34,
+            21
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-3b26e9be624f26d3",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -47,
+            15
+          ],
+          [
+            -15,
+            47
+          ],
+          [
+            15,
+            -47
+          ],
+          [
+            47,
+            -15
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-3c0765d53175ca09",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -50,
+            -7
+          ],
+          [
+            -50,
+            7
+          ],
+          [
+            -7,
+            -50
+          ],
+          [
+            -7,
+            50
+          ],
+          [
+            7,
+            -50
+          ],
+          [
+            7,
+            50
+          ],
+          [
+            50,
+            -7
+          ],
+          [
+            50,
+            7
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-3d4aefe5a99c52e2",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -11,
+            -7
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-3e1d2c9beb328057",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -47,
+            24
+          ],
+          [
+            -24,
+            47
+          ],
+          [
+            24,
+            -47
+          ],
+          [
+            47,
+            -24
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-3e759cddc3dd23b5",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -44,
+            33
+          ],
+          [
+            -33,
+            -44
+          ],
+          [
+            33,
+            44
+          ],
+          [
+            44,
+            -33
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-3e76f47356c009b1",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -27,
+            -16
+          ],
+          [
+            -27,
+            16
+          ],
+          [
+            -16,
+            -27
+          ],
+          [
+            -16,
+            27
+          ],
+          [
+            16,
+            -27
+          ],
+          [
+            16,
+            27
+          ],
+          [
+            27,
+            -16
+          ],
+          [
+            27,
+            16
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-3e981672922b0a09",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -35,
+            -32
+          ],
+          [
+            -35,
+            32
+          ],
+          [
+            -32,
+            -35
+          ],
+          [
+            -32,
+            35
+          ],
+          [
+            32,
+            -35
+          ],
+          [
+            32,
+            35
+          ],
+          [
+            35,
+            -32
+          ],
+          [
+            35,
+            32
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-3ee5ab04de5bd141",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -40,
+            -7
+          ],
+          [
+            -40,
+            7
+          ],
+          [
+            -7,
+            -40
+          ],
+          [
+            -7,
+            40
+          ],
+          [
+            7,
+            -40
+          ],
+          [
+            7,
+            40
+          ],
+          [
+            40,
+            -7
+          ],
+          [
+            40,
+            7
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-40b56ea9f2e01b27",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -19,
+            50
+          ],
+          [
+            19,
+            -50
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-418d83f7f63100f6",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            18,
+            -12
+          ],
+          [
+            18,
+            12
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-467cb59827a026db",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -26,
+            27
+          ],
+          [
+            26,
+            -27
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-47f9d88bdf324f68",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -7,
+            -31
+          ],
+          [
+            -7,
+            31
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-499e709ce553dbb5",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -22,
+            -1
+          ],
+          [
+            -1,
+            -22
+          ],
+          [
+            1,
+            22
+          ],
+          [
+            22,
+            1
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-4af965da36123679",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -18,
+            -6
+          ],
+          [
+            -18,
+            6
+          ],
+          [
+            -6,
+            -18
+          ],
+          [
+            -6,
+            18
+          ],
+          [
+            6,
+            -18
+          ],
+          [
+            6,
+            18
+          ],
+          [
+            18,
+            -6
+          ],
+          [
+            18,
+            6
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-4c10354033e7c387",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -10,
+            -24
+          ],
+          [
+            -10,
+            24
+          ],
+          [
+            10,
+            -24
+          ],
+          [
+            10,
+            24
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-4c4e984b2e06aac5",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -50,
+            43
+          ],
+          [
+            -43,
+            -50
+          ],
+          [
+            43,
+            50
+          ],
+          [
+            50,
+            -43
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-4cad49d5a351fc65",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -43,
+            -39
+          ],
+          [
+            -39,
+            43
+          ],
+          [
+            39,
+            -43
+          ],
+          [
+            43,
+            39
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-4e1db9e8a8c126e4",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -10,
+            -32
+          ],
+          [
+            10,
+            -32
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-4ef96977db00d4a1",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -14,
+            -40
+          ],
+          [
+            40,
+            14
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-4f859aa2834df12d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -16,
+            22
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-4fc7376caf742580",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -40,
+            -14
+          ],
+          [
+            -40,
+            14
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-50b89775ff458925",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -39,
+            25
+          ],
+          [
+            -25,
+            -39
+          ],
+          [
+            25,
+            39
+          ],
+          [
+            39,
+            -25
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-517b30f6c53295b1",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -33,
+            30
+          ],
+          [
+            -30,
+            -33
+          ],
+          [
+            30,
+            33
+          ],
+          [
+            33,
+            -30
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-53662050dce4fab1",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -17,
+            -15
+          ],
+          [
+            -17,
+            15
+          ],
+          [
+            -15,
+            -17
+          ],
+          [
+            -15,
+            17
+          ],
+          [
+            15,
+            -17
+          ],
+          [
+            15,
+            17
+          ],
+          [
+            17,
+            -15
+          ],
+          [
+            17,
+            15
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-5370fc5e18e737a6",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -50,
+            40
+          ],
+          [
+            50,
+            40
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-53827f37d19008ad",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -16,
+            -13
+          ],
+          [
+            -13,
+            16
+          ],
+          [
+            13,
+            -16
+          ],
+          [
+            16,
+            13
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-559735f186eea41f",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -8,
+            -26
+          ],
+          [
+            26,
+            8
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-55ff44784b66bf01",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -45,
+            -31
+          ],
+          [
+            -45,
+            31
+          ],
+          [
+            -31,
+            -45
+          ],
+          [
+            -31,
+            45
+          ],
+          [
+            31,
+            -45
+          ],
+          [
+            31,
+            45
+          ],
+          [
+            45,
+            -31
+          ],
+          [
+            45,
+            31
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-562083b9611bd237",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -10,
+            36
+          ],
+          [
+            36,
+            -10
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-57149db9dcdced64",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -22,
+            -32
+          ],
+          [
+            -22,
+            32
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-5734a2783c75ccf2",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -3,
+            -42
+          ],
+          [
+            3,
+            -42
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-574acc932d748963",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            3,
+            -44
+          ],
+          [
+            44,
+            -3
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-585989063455dacd",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -37,
+            -24
+          ],
+          [
+            -24,
+            37
+          ],
+          [
+            24,
+            -37
+          ],
+          [
+            37,
+            24
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-589e497e37ed6ccf",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -37,
+            26
+          ],
+          [
+            -26,
+            37
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-59d2d9f43c15cef1",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -28,
+            -24
+          ],
+          [
+            -24,
+            28
+          ],
+          [
+            24,
+            -28
+          ],
+          [
+            28,
+            24
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-5a56f6964f542ad8",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -18,
+            -20
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-5aafc24efa9a9af2",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            6,
+            -1
+          ],
+          [
+            6,
+            1
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-5c102a69905da03a",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -6,
+            -31
+          ],
+          [
+            -6,
+            31
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-5cb92ba427b65d29",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -33,
+            -25
+          ],
+          [
+            -25,
+            -33
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-5efe8bc5bf9ec4e9",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            3,
+            -6
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-5f233b631dae7b59",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -20,
+            15
+          ],
+          [
+            20,
+            -15
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-60f6933e2493cb92",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -21,
+            37
+          ],
+          [
+            21,
+            37
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6224dcde4430bf69",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            20,
+            37
+          ],
+          [
+            37,
+            20
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6269821737214ee2",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -39,
+            -43
+          ],
+          [
+            39,
+            -43
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-635b1e4cbc6f5823",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            2,
+            -25
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6560eaf273da64e7",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -14,
+            -21
+          ],
+          [
+            14,
+            21
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-65dfd597c71f6860",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            2,
+            12
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-666fdd1407e64345",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            2,
+            35
+          ],
+          [
+            35,
+            2
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-678f34f266b96457",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -36,
+            -35
+          ],
+          [
+            -35,
+            -36
+          ],
+          [
+            35,
+            36
+          ],
+          [
+            36,
+            35
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6834c34ed2ef97fe",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -35,
+            -30
+          ],
+          [
+            35,
+            -30
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-69343eebd950a4a3",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -18,
+            11
+          ],
+          [
+            -11,
+            18
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-696ffbeaab3ef063",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -50,
+            -44
+          ],
+          [
+            -50,
+            44
+          ],
+          [
+            50,
+            -44
+          ],
+          [
+            50,
+            44
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-69a78bd6c06807e1",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -34,
+            16
+          ],
+          [
+            -16,
+            34
+          ],
+          [
+            16,
+            -34
+          ],
+          [
+            34,
+            -16
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6a6b3ed26a16f5a7",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -47,
+            40
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6a8e1eea5d815381",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -12,
+            -8
+          ],
+          [
+            -12,
+            8
+          ],
+          [
+            12,
+            -8
+          ],
+          [
+            12,
+            8
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6b4213177d11f4f0",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            49,
+            28
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6b86ed06084a293d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -27,
+            -4
+          ],
+          [
+            -4,
+            -27
+          ],
+          [
+            4,
+            27
+          ],
+          [
+            27,
+            4
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6bec28ec549c817f",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -11,
+            -8
+          ],
+          [
+            -11,
+            8
+          ],
+          [
+            11,
+            -8
+          ],
+          [
+            11,
+            8
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6c0832dd3b3ba581",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -40,
+            32
+          ],
+          [
+            -32,
+            -40
+          ],
+          [
+            32,
+            40
+          ],
+          [
+            40,
+            -32
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6c4b766772e72838",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -6,
+            21
+          ],
+          [
+            6,
+            21
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6ca9d41f94de3421",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -21,
+            -10
+          ],
+          [
+            -21,
+            10
+          ],
+          [
+            -10,
+            -21
+          ],
+          [
+            -10,
+            21
+          ],
+          [
+            10,
+            -21
+          ],
+          [
+            10,
+            21
+          ],
+          [
+            21,
+            -10
+          ],
+          [
+            21,
+            10
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6ce3c402d8e83c10",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            26,
+            -24
+          ],
+          [
+            26,
+            24
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6dde2335f66b9adf",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -29,
+            23
+          ],
+          [
+            -23,
+            29
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6e5d0891d2a6630d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -14,
+            39
+          ],
+          [
+            14,
+            -39
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6ebcf2a85b8f94a7",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -46,
+            -29
+          ],
+          [
+            -46,
+            29
+          ],
+          [
+            46,
+            -29
+          ],
+          [
+            46,
+            29
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6ed25366c9be8c9f",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -43,
+            -15
+          ],
+          [
+            -15,
+            -43
+          ],
+          [
+            15,
+            43
+          ],
+          [
+            43,
+            15
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6f8ccbe9adb0724f",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -29,
+            15
+          ],
+          [
+            -15,
+            29
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-6fc698b3824be4e1",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -48,
+            39
+          ],
+          [
+            -39,
+            48
+          ],
+          [
+            39,
+            -48
+          ],
+          [
+            48,
+            -39
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-70ce2c6f3a560099",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -28,
+            -23
+          ],
+          [
+            -28,
+            23
+          ],
+          [
+            -23,
+            -28
+          ],
+          [
+            -23,
+            28
+          ],
+          [
+            23,
+            -28
+          ],
+          [
+            23,
+            28
+          ],
+          [
+            28,
+            -23
+          ],
+          [
+            28,
+            23
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-72642e7f7e6ae46c",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -19,
+            -42
+          ],
+          [
+            19,
+            -42
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-72e50ae905a56233",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            2,
+            36
+          ],
+          [
+            36,
+            2
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-72f8df76f9457145",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -16,
+            -27
+          ],
+          [
+            -16,
+            27
+          ],
+          [
+            16,
+            -27
+          ],
+          [
+            16,
+            27
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-740ec6ccfddacc45",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -31,
+            -2
+          ],
+          [
+            -2,
+            31
+          ],
+          [
+            2,
+            -31
+          ],
+          [
+            31,
+            2
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-74bf9a4c51757407",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -34,
+            23
+          ],
+          [
+            34,
+            -23
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-75cdaee4d7c83aed",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -1,
+            -33
+          ],
+          [
+            -1,
+            33
+          ],
+          [
+            1,
+            -33
+          ],
+          [
+            1,
+            33
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-760cae68da7dabb3",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            7,
+            -39
+          ],
+          [
+            39,
+            -7
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-767f0e936906e895",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -14,
+            -35
+          ],
+          [
+            35,
+            14
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-77df92bf142e97ff",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -27,
+            -15
+          ],
+          [
+            -15,
+            -27
+          ],
+          [
+            15,
+            27
+          ],
+          [
+            27,
+            15
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-78dcf7ba2f5b6899",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -32,
+            18
+          ],
+          [
+            -18,
+            -32
+          ],
+          [
+            18,
+            32
+          ],
+          [
+            32,
+            -18
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-79f0dee5db91a671",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -21,
+            -27
+          ],
+          [
+            -21,
+            27
+          ],
+          [
+            21,
+            -27
+          ],
+          [
+            21,
+            27
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-7b5c000436b3bba9",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -5,
+            -2
+          ],
+          [
+            -2,
+            5
+          ],
+          [
+            2,
+            -5
+          ],
+          [
+            5,
+            2
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-7dbf61d689272423",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -19,
+            -36
+          ],
+          [
+            -19,
+            36
+          ],
+          [
+            19,
+            -36
+          ],
+          [
+            19,
+            36
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-7f14c8acb38214c6",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            20,
+            -3
+          ],
+          [
+            20,
+            3
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-7f175554721834eb",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -30,
+            -13
+          ],
+          [
+            -30,
+            13
+          ],
+          [
+            30,
+            -13
+          ],
+          [
+            30,
+            13
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-7f46082ef83b5f81",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -12,
+            -4
+          ],
+          [
+            -12,
+            4
+          ],
+          [
+            12,
+            -4
+          ],
+          [
+            12,
+            4
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-80b6104310b59ef3",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -42,
+            3
+          ],
+          [
+            -3,
+            42
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-80bfd6cf632c4711",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -47,
+            -20
+          ],
+          [
+            -47,
+            20
+          ],
+          [
+            -20,
+            -47
+          ],
+          [
+            -20,
+            47
+          ],
+          [
+            20,
+            -47
+          ],
+          [
+            20,
+            47
+          ],
+          [
+            47,
+            -20
+          ],
+          [
+            47,
+            20
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-8159698993dd3e2c",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -46,
+            -32
+          ],
+          [
+            -46,
+            32
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-815fe463cbac4e66",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -50,
+            -7
+          ],
+          [
+            50,
+            -7
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-824e7c93caae6de8",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -28,
+            -6
+          ],
+          [
+            -28,
+            6
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-826d34259e898fff",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -34,
+            -1
+          ],
+          [
+            -1,
+            -34
+          ],
+          [
+            1,
+            34
+          ],
+          [
+            34,
+            1
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-84816b661ae96f68",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -44,
+            -36
+          ],
+          [
+            -44,
+            36
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-8488f18066e9c47d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -24,
+            48
+          ],
+          [
+            24,
+            -48
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-87426eca83727d62",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -30,
+            -11
+          ],
+          [
+            30,
+            -11
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-8864ab853bd36ee5",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -5,
+            1
+          ],
+          [
+            5,
+            -1
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-88b4533acccf90a9",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -47,
+            -14
+          ],
+          [
+            -14,
+            47
+          ],
+          [
+            14,
+            -47
+          ],
+          [
+            47,
+            14
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-8a45e4d584935261",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -50,
+            22
+          ],
+          [
+            -22,
+            -50
+          ],
+          [
+            22,
+            50
+          ],
+          [
+            50,
+            -22
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-8acf2ad1fb842649",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -29,
+            15
+          ],
+          [
+            -15,
+            -29
+          ],
+          [
+            15,
+            29
+          ],
+          [
+            29,
+            -15
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-8c60394c65949bbd",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -20,
+            -2
+          ],
+          [
+            -2,
+            20
+          ],
+          [
+            2,
+            -20
+          ],
+          [
+            20,
+            2
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-8c626682113fd9db",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            47,
+            -13
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-8ce59e060c20fb50",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -27,
+            -47
+          ],
+          [
+            -27,
+            47
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-8e07d7031a41811f",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -22,
+            36
+          ],
+          [
+            36,
+            -22
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-8ea5b0daeffe0b71",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -37,
+            -5
+          ],
+          [
+            -37,
+            5
+          ],
+          [
+            -5,
+            -37
+          ],
+          [
+            -5,
+            37
+          ],
+          [
+            5,
+            -37
+          ],
+          [
+            5,
+            37
+          ],
+          [
+            37,
+            -5
+          ],
+          [
+            37,
+            5
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-8ef54caf1da01fe9",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -36,
+            39
+          ],
+          [
+            36,
+            -39
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-907f0669d485627d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -35,
+            13
+          ],
+          [
+            -13,
+            -35
+          ],
+          [
+            13,
+            35
+          ],
+          [
+            35,
+            -13
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-90c5db1f9cac48ff",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -40,
+            -49
+          ],
+          [
+            -40,
+            49
+          ],
+          [
+            40,
+            -49
+          ],
+          [
+            40,
+            49
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-91c6fee69b55aaab",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -8,
+            4
+          ],
+          [
+            4,
+            -8
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-94a9eab15e828ea9",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            2,
+            -12
+          ],
+          [
+            12,
+            -2
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-959d6c23efec43f9",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -38,
+            -19
+          ],
+          [
+            -38,
+            19
+          ],
+          [
+            -19,
+            -38
+          ],
+          [
+            -19,
+            38
+          ],
+          [
+            19,
+            -38
+          ],
+          [
+            19,
+            38
+          ],
+          [
+            38,
+            -19
+          ],
+          [
+            38,
+            19
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-9621cb5cac495fe9",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            9,
+            -14
+          ],
+          [
+            14,
+            -9
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-96d37a7c639da2b9",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -43,
+            -27
+          ],
+          [
+            -27,
+            -43
+          ],
+          [
+            27,
+            43
+          ],
+          [
+            43,
+            27
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-98611c6189dbbf11",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -15,
+            5
+          ],
+          [
+            5,
+            -15
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-988fb990d2ad0c16",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -29,
+            -31
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-99743fe4f0c36c69",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            25,
+            -11
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-9a165471a4923072",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -13,
+            42
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-9ab1e63564ffdca1",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -30,
+            -14
+          ],
+          [
+            -30,
+            14
+          ],
+          [
+            -14,
+            -30
+          ],
+          [
+            -14,
+            30
+          ],
+          [
+            14,
+            -30
+          ],
+          [
+            14,
+            30
+          ],
+          [
+            30,
+            -14
+          ],
+          [
+            30,
+            14
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-9c120f0bba9460dd",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -37,
+            48
+          ],
+          [
+            48,
+            -37
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-9c3dafdd975cb16b",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -40,
+            -27
+          ],
+          [
+            -40,
+            27
+          ],
+          [
+            40,
+            -27
+          ],
+          [
+            40,
+            27
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-9c5390d123fa68f7",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -43,
+            -7
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-9c7088330b3f843b",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -46,
+            -3
+          ],
+          [
+            46,
+            3
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-9d15037234bc4b6b",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -35,
+            12
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-9d18b75574ac9805",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            42,
+            -32
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-9d65c4efa5fd35cb",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            23,
+            -36
+          ],
+          [
+            36,
+            -23
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-9e6c25932859a4aa",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -12,
+            21
+          ],
+          [
+            12,
+            21
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-9f26c4d8ff2e0c4d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -15,
+            -31
+          ],
+          [
+            15,
+            31
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-9f986962abe47073",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -29,
+            -40
+          ],
+          [
+            -29,
+            40
+          ],
+          [
+            29,
+            -40
+          ],
+          [
+            29,
+            40
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-a088b4c4c7faaeed",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -25,
+            -1
+          ],
+          [
+            -25,
+            1
+          ],
+          [
+            -1,
+            -25
+          ],
+          [
+            -1,
+            25
+          ],
+          [
+            1,
+            -25
+          ],
+          [
+            1,
+            25
+          ],
+          [
+            25,
+            -1
+          ],
+          [
+            25,
+            1
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-a0adcb2d0060b63b",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -32,
+            19
+          ],
+          [
+            -19,
+            32
+          ],
+          [
+            19,
+            -32
+          ],
+          [
+            32,
+            -19
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-a11edb05f58f504f",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -9,
+            -43
+          ],
+          [
+            43,
+            9
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-a131a84cfd5dd585",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -47,
+            -10
+          ],
+          [
+            -10,
+            -47
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-a1c26a82546e29eb",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -21,
+            9
+          ],
+          [
+            -9,
+            21
+          ],
+          [
+            9,
+            -21
+          ],
+          [
+            21,
+            -9
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-a3ad9dfa18bdeb53",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -35,
+            29
+          ],
+          [
+            -29,
+            35
+          ],
+          [
+            29,
+            -35
+          ],
+          [
+            35,
+            -29
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-a3c5a2cbbc8ffeeb",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -34,
+            9
+          ],
+          [
+            -9,
+            34
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-a5d6d1f629be3d28",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            7,
+            37
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-a716d38536af61a5",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            28,
+            -41
+          ],
+          [
+            41,
+            -28
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-a77147740e2aae8f",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -11,
+            -4
+          ],
+          [
+            -11,
+            4
+          ],
+          [
+            11,
+            -4
+          ],
+          [
+            11,
+            4
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-a882d2fabc3225a1",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -38,
+            -2
+          ],
+          [
+            -38,
+            2
+          ],
+          [
+            38,
+            -2
+          ],
+          [
+            38,
+            2
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-aaa707611e3d708b",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            18,
+            -31
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-ab3dd488a1d18bb5",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -39,
+            19
+          ],
+          [
+            -19,
+            39
+          ],
+          [
+            19,
+            -39
+          ],
+          [
+            39,
+            -19
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-abaea1a1d1834a1c",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -39,
+            -21
+          ],
+          [
+            -39,
+            21
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-ae7a491551932b2e",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -2,
+            -10
+          ],
+          [
+            -2,
+            10
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-aec052379d74162d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -34,
+            -13
+          ],
+          [
+            -13,
+            34
+          ],
+          [
+            13,
+            -34
+          ],
+          [
+            34,
+            13
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-aed269374d0890d9",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            41,
+            34
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-afc8b9d89e1f6fd9",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -46,
+            -45
+          ],
+          [
+            -45,
+            -46
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-b058b99f24a476a3",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -38,
+            -11
+          ],
+          [
+            38,
+            11
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-b1ae764a41fa7fdd",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -24,
+            -7
+          ],
+          [
+            -24,
+            7
+          ],
+          [
+            -7,
+            -24
+          ],
+          [
+            -7,
+            24
+          ],
+          [
+            7,
+            -24
+          ],
+          [
+            7,
+            24
+          ],
+          [
+            24,
+            -7
+          ],
+          [
+            24,
+            7
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-b1bf18f9a4ebf9b7",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -41,
+            -13
+          ],
+          [
+            -13,
+            -41
+          ],
+          [
+            13,
+            41
+          ],
+          [
+            41,
+            13
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-b22f95d9e92ebf37",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -30,
+            -43
+          ],
+          [
+            43,
+            30
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-b4fcc6e3bc09c1fe",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            35,
+            -7
+          ],
+          [
+            35,
+            7
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-b5cf0775ee1cc1e4",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            19,
+            -4
+          ],
+          [
+            19,
+            4
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-b6d4660835c0f6a9",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -17,
+            -30
+          ],
+          [
+            17,
+            30
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-b78ea4b47ad64e13",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -41,
+            -19
+          ],
+          [
+            41,
+            19
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-b7a8a8f3eb88a8f9",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -38,
+            -22
+          ],
+          [
+            -38,
+            22
+          ],
+          [
+            -22,
+            -38
+          ],
+          [
+            -22,
+            38
+          ],
+          [
+            22,
+            -38
+          ],
+          [
+            22,
+            38
+          ],
+          [
+            38,
+            -22
+          ],
+          [
+            38,
+            22
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-b7e11c6fe57142df",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            30,
+            42
+          ],
+          [
+            42,
+            30
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-b86a24197bdfcb65",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -26,
+            -18
+          ],
+          [
+            -18,
+            26
+          ],
+          [
+            18,
+            -26
+          ],
+          [
+            26,
+            18
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-b9403d0efb17a882",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            4,
+            -15
+          ],
+          [
+            4,
+            15
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-b9d09337dfd3c2b1",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -41,
+            -2
+          ],
+          [
+            -41,
+            2
+          ],
+          [
+            41,
+            -2
+          ],
+          [
+            41,
+            2
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-ba0aaa74923865b4",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            24,
+            -21
+          ],
+          [
+            24,
+            21
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-bb68009261583791",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -20,
+            -18
+          ],
+          [
+            -20,
+            18
+          ],
+          [
+            -18,
+            -20
+          ],
+          [
+            -18,
+            20
+          ],
+          [
+            18,
+            -20
+          ],
+          [
+            18,
+            20
+          ],
+          [
+            20,
+            -18
+          ],
+          [
+            20,
+            18
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-bb6f60a654436adb",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -1,
+            32
+          ],
+          [
+            1,
+            -32
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-bcf5ad828639c0ec",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -37,
+            -48
+          ],
+          [
+            37,
+            -48
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-bd13b6f30aedebce",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -22,
+            38
+          ],
+          [
+            22,
+            38
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-bd4cb9b751a7389d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -37,
+            -7
+          ],
+          [
+            -7,
+            37
+          ],
+          [
+            7,
+            -37
+          ],
+          [
+            37,
+            7
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-bf093dc63c13ecaa",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -28,
+            -49
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-bf0e3741387d74c9",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -32,
+            19
+          ],
+          [
+            19,
+            -32
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-bf4fe7d18d19d60b",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -4,
+            -46
+          ],
+          [
+            -4,
+            46
+          ],
+          [
+            4,
+            -46
+          ],
+          [
+            4,
+            46
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-c0c70670534e9e99",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -14,
+            -10
+          ],
+          [
+            -14,
+            10
+          ],
+          [
+            -10,
+            -14
+          ],
+          [
+            -10,
+            14
+          ],
+          [
+            10,
+            -14
+          ],
+          [
+            10,
+            14
+          ],
+          [
+            14,
+            -10
+          ],
+          [
+            14,
+            10
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-c1743d9a80ff5fa1",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            25,
+            38
+          ],
+          [
+            38,
+            25
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-c1c50e7dace2263d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            42,
+            -49
+          ],
+          [
+            49,
+            -42
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-c1f8ee2fdda2cd9f",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -49,
+            -37
+          ],
+          [
+            49,
+            37
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-c2ebf538dcaf51ef",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -24,
+            -16
+          ],
+          [
+            -16,
+            -24
+          ],
+          [
+            16,
+            24
+          ],
+          [
+            24,
+            16
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-c2f540e863dc0c1d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -37,
+            -32
+          ],
+          [
+            -32,
+            37
+          ],
+          [
+            32,
+            -37
+          ],
+          [
+            37,
+            32
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-c31d8d2c38376cb0",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            46,
+            -45
+          ],
+          [
+            46,
+            45
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-c3223ec160f9be9d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -48,
+            -26
+          ],
+          [
+            48,
+            26
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-c3a14293fb9fa01d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -37,
+            8
+          ],
+          [
+            -8,
+            -37
+          ],
+          [
+            8,
+            37
+          ],
+          [
+            37,
+            -8
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-c4015d18936c5528",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            14,
+            40
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-c462f458f712e7a1",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -20,
+            46
+          ],
+          [
+            20,
+            -46
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-c4ed1c821385c1df",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -29,
+            41
+          ],
+          [
+            29,
+            -41
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-c5ab50cb9424ecb6",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -39,
+            -34
+          ],
+          [
+            39,
+            -34
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-c68bc41daa484da8",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -13,
+            -9
+          ],
+          [
+            -13,
+            9
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-c7ae2444e2509993",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -30,
+            -8
+          ],
+          [
+            -8,
+            -30
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-cd2ae02802fb7a07",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -27,
+            -42
+          ],
+          [
+            -27,
+            42
+          ],
+          [
+            27,
+            -42
+          ],
+          [
+            27,
+            42
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-cdf13e93d9ada3dd",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -42,
+            -5
+          ],
+          [
+            -42,
+            5
+          ],
+          [
+            -5,
+            -42
+          ],
+          [
+            -5,
+            42
+          ],
+          [
+            5,
+            -42
+          ],
+          [
+            5,
+            42
+          ],
+          [
+            42,
+            -5
+          ],
+          [
+            42,
+            5
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-ce47529f7171e94d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -43,
+            -42
+          ],
+          [
+            -42,
+            43
+          ],
+          [
+            42,
+            -43
+          ],
+          [
+            43,
+            42
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-cea8405a0872faf9",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -49,
+            -34
+          ],
+          [
+            -34,
+            -49
+          ],
+          [
+            34,
+            49
+          ],
+          [
+            49,
+            34
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-cfbc3866981c4299",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            48,
+            42
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-d1613e94dd30a299",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -33,
+            -3
+          ],
+          [
+            -33,
+            3
+          ],
+          [
+            -3,
+            -33
+          ],
+          [
+            -3,
+            33
+          ],
+          [
+            3,
+            -33
+          ],
+          [
+            3,
+            33
+          ],
+          [
+            33,
+            -3
+          ],
+          [
+            33,
+            3
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-d20e784f1d4b8a18",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            9,
+            -8
+          ],
+          [
+            9,
+            8
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-d25bea75f1a25cf3",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -18,
+            -15
+          ],
+          [
+            -15,
+            -18
+          ],
+          [
+            15,
+            18
+          ],
+          [
+            18,
+            15
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-d2beb8b782ccaaad",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            1,
+            48
+          ],
+          [
+            48,
+            1
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-d49698e8567dc68a",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -23,
+            -37
+          ],
+          [
+            23,
+            -37
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-d4e7cd90f2c79569",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -26,
+            -12
+          ],
+          [
+            -26,
+            12
+          ],
+          [
+            -12,
+            -26
+          ],
+          [
+            -12,
+            26
+          ],
+          [
+            12,
+            -26
+          ],
+          [
+            12,
+            26
+          ],
+          [
+            26,
+            -12
+          ],
+          [
+            26,
+            12
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-d612f8051ffe1137",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -13,
+            -34
+          ],
+          [
+            34,
+            13
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-daab5ccfa0228621",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -38,
+            -6
+          ],
+          [
+            -6,
+            -38
+          ],
+          [
+            6,
+            38
+          ],
+          [
+            38,
+            6
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-daccfc0eb243467d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -28,
+            20
+          ],
+          [
+            20,
+            -28
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-de064a7a62a6ed02",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -21,
+            33
+          ],
+          [
+            21,
+            33
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-dfdbb17c648c7b4b",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -38,
+            31
+          ],
+          [
+            -31,
+            38
+          ],
+          [
+            31,
+            -38
+          ],
+          [
+            38,
+            -31
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-e08a44a7e7fd46c7",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -27,
+            -25
+          ],
+          [
+            27,
+            25
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-e17b3e66101b971b",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -10,
+            -9
+          ],
+          [
+            -10,
+            9
+          ],
+          [
+            10,
+            -9
+          ],
+          [
+            10,
+            9
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-e3a0b4f25b9fba97",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -1,
+            32
+          ],
+          [
+            32,
+            -1
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-e86b554b71f54cb7",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -15,
+            -14
+          ],
+          [
+            -15,
+            14
+          ],
+          [
+            15,
+            -14
+          ],
+          [
+            15,
+            14
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-e87658e72294d822",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -49,
+            24
+          ],
+          [
+            49,
+            24
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-ed27e7da45dcaf49",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -48,
+            -41
+          ],
+          [
+            -48,
+            41
+          ],
+          [
+            -41,
+            -48
+          ],
+          [
+            -41,
+            48
+          ],
+          [
+            41,
+            -48
+          ],
+          [
+            41,
+            48
+          ],
+          [
+            48,
+            -41
+          ],
+          [
+            48,
+            41
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-ee40bbdce375b693",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -2,
+            8
+          ],
+          [
+            2,
+            -8
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-f07207b96c655df3",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -41,
+            -40
+          ],
+          [
+            -40,
+            -41
+          ],
+          [
+            40,
+            41
+          ],
+          [
+            41,
+            40
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-f139a4731515fa9b",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -3,
+            10
+          ],
+          [
+            3,
+            -10
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-f16a08158be16625",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            34,
+            -39
+          ],
+          [
+            39,
+            -34
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-f23dcaa7d2eed2ff",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -11,
+            -34
+          ],
+          [
+            34,
+            11
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-f2996e5a5a72362b",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -50,
+            22
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-f5fb2e0536264f4e",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -48,
+            -7
+          ],
+          [
+            48,
+            -7
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-f65b944d605aa872",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -44,
+            19
+          ],
+          [
+            44,
+            19
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-f66a7c7fbdc9f137",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -47,
+            3
+          ],
+          [
+            -3,
+            47
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-f6955e76719fd45d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -40,
+            20
+          ],
+          [
+            40,
+            -20
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-f6caced75cfb045d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -21,
+            -25
+          ],
+          [
+            -21,
+            25
+          ],
+          [
+            21,
+            -25
+          ],
+          [
+            21,
+            25
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-f702514b554ead99",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -23,
+            -2
+          ],
+          [
+            -23,
+            2
+          ],
+          [
+            -2,
+            -23
+          ],
+          [
+            -2,
+            23
+          ],
+          [
+            2,
+            -23
+          ],
+          [
+            2,
+            23
+          ],
+          [
+            23,
+            -2
+          ],
+          [
+            23,
+            2
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-f74029e1fad2c727",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -5,
+            -43
+          ],
+          [
+            43,
+            5
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-f7b3477f425bf7bb",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -19,
+            -27
+          ],
+          [
+            -19,
+            27
+          ],
+          [
+            19,
+            -27
+          ],
+          [
+            19,
+            27
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-f7ca1a5eae2ce67c",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            34,
+            -43
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-f9f4cb037dbac775",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -43,
+            -21
+          ],
+          [
+            -21,
+            43
+          ],
+          [
+            21,
+            -43
+          ],
+          [
+            43,
+            21
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-fab4d9fe6daeab11",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -37,
+            -18
+          ],
+          [
+            37,
+            18
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-fb118849bcf8b451",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -18,
+            26
+          ],
+          [
+            18,
+            -26
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-fb222096160fcbe5",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -31,
+            -22
+          ],
+          [
+            31,
+            22
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-fb28671d505f56fb",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -47,
+            -9
+          ],
+          [
+            -9,
+            -47
+          ],
+          [
+            9,
+            47
+          ],
+          [
+            47,
+            9
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-fcbbe293eca300b0",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            24,
+            -14
+          ],
+          [
+            24,
+            14
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-fce9bb041b9ae4ed",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -43,
+            -10
+          ],
+          [
+            -10,
+            -43
+          ],
+          [
+            10,
+            43
+          ],
+          [
+            43,
+            10
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-fd12adfcdb87dd16",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -11,
+            27
+          ],
+          [
+            11,
+            27
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-fdacd2595c5ed589",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -43,
+            -31
+          ],
+          [
+            -43,
+            31
+          ],
+          [
+            -31,
+            -43
+          ],
+          [
+            -31,
+            43
+          ],
+          [
+            31,
+            -43
+          ],
+          [
+            31,
+            43
+          ],
+          [
+            43,
+            -31
+          ],
+          [
+            43,
+            31
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-ff224215ae3688d1",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            3,
+            -48
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-ff948a4be51a996d",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -15,
+            24
+          ],
+          [
+            24,
+            -15
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-ff95000c92e7b49e",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -25,
+            -22
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    },
+    {
+      "case_id": "CASE-ff96c15e41d9dde2",
+      "split": "discovery",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -28,
+            -23
+          ],
+          [
+            28,
+            -23
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      }
+    }
+  ]
+}
