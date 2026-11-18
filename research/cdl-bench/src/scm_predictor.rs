@@ -2,7 +2,7 @@
 //!
 //! These are deliberately simple controls, not learned causal mechanisms:
 //! - ScmFieldPredictor: one adaptive byte histogram per (variable, byte lane).
-//! - ScmParentPredictor: conditions on declared same-timestep parent bytes;
+//! - ScmParentPredictor: conditions on declared same-timestep parent i16 values;
 //!   this is an oracle-topology control, not learned graph discovery.
 //! - ScmLagPredictor: conditions on the same field in the previous timestep.
 //! - ScmHybridPredictor: combines coarse parent context with temporal lag.
