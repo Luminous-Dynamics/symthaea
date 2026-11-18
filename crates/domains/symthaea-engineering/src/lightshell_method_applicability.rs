@@ -101,6 +101,7 @@ pub struct ValidationReport {
     pub profile_count: usize,
     pub selection_count: usize,
     pub ready_for_test_count: usize,
+    pub manifest_ready_for_test: bool,
 }
 
 impl ValidationReport {
@@ -109,7 +110,7 @@ impl ValidationReport {
     }
 
     pub fn can_start_tests(&self) -> bool {
-        self.is_valid() && self.ready_for_test_count > 0
+        self.is_valid() && self.manifest_ready_for_test && self.ready_for_test_count > 0
     }
 }
 
@@ -271,6 +272,7 @@ impl MethodSelectionManifest {
             profile_count: self.method_profiles.len(),
             selection_count: self.selections.len(),
             ready_for_test_count,
+            manifest_ready_for_test: self.state == "ready_for_test",
         }
     }
 }
@@ -697,6 +699,21 @@ mod tests {
         manifest["selections"][1]["execution_mode"] = json!("modified_with_deviation");
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|f| f.code == "modified_method_missing_approval"));
+    }
+
+    #[test]
+    fn proposed_manifest_cannot_start_a_ready_selection() {
+        let mut manifest = base_manifest();
+        manifest["selections"][0]["state"] = json!("ready_for_test");
+        manifest["selections"][0]["fixture_ref"] = json!("CRE-001");
+        manifest["selections"][0]["fixture_revision"] = json!("REV-A");
+        manifest["selections"][0]["fixture_validation_state"] = json!("qualified_generic");
+        manifest["selections"][0]["fixture_validation_ref"] = json!("FIXTURE-VALIDATION-A");
+        manifest["selections"][0]["protocol_ref"] = json!("PROTOCOL-A");
+        manifest["selections"][0]["acceptance_rule_ref"] = json!("ACCEPT-A");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.is_valid(), "{:?}", report.findings);
+        assert!(!report.can_start_tests());
     }
 
     #[test]
