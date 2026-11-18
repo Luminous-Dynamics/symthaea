@@ -1201,6 +1201,113 @@ pub fn exact_pareto_front(evaluations: &[OracleEvaluation]) -> Result<Vec<String
     Ok(front)
 }
 
+/// Exact minimization-oriented hypervolume of a union of reference-point boxes.
+/// Coordinates must already share a declared normalization/unit system.
+fn dominated_hypervolume_recursive(points: &[Vec<f64>], reference: &[f64]) -> f64 {
+    if points.is_empty() || reference.is_empty() {
+        return 0.0;
+    }
+    if reference.len() == 1 {
+        let best = points.iter().map(|point| point[0]).fold(f64::INFINITY, f64::min);
+        return (reference[0] - best).max(0.0);
+    }
+
+    let mut boundaries: Vec<f64> = points
+        .iter()
+        .map(|point| point[0])
+        .filter(|coordinate| *coordinate < reference[0])
+        .collect();
+    boundaries.sort_by(f64::total_cmp);
+    boundaries.dedup_by(|left, right| *left == *right);
+
+    let mut volume = 0.0;
+    for (index, boundary) in boundaries.iter().enumerate() {
+        let next = boundaries.get(index + 1).copied().unwrap_or(reference[0]);
+        let width = next - boundary;
+        if width <= 0.0 {
+            continue;
+        }
+        let active: Vec<Vec<f64>> = points
+            .iter()
+            .filter(|point| point[0] <= *boundary)
+            .map(|point| point[1..].to_vec())
+            .collect();
+        volume += width * dominated_hypervolume_recursive(&active, &reference[1..]);
+    }
+    volume
+}
+
+/// Compute exact hypervolume for PASS candidates only.
+///
+/// The reference point is expressed in each objective's native direction and
+/// units. It must be worse than the solutions being measured: higher for a
+/// minimized objective and lower for a maximized objective. Objectives should
+/// be normalized before cross-case comparison; this function does not invent
+/// normalization bounds. FAIL/UNKNOWN/CONDITIONAL candidates contribute zero.
+/// A malformed PASS receipt or mismatched objective schema is an error.
+pub fn exact_hypervolume(
+    evaluations: &[OracleEvaluation],
+    reference_point: &[f64],
+) -> Result<f64, String> {
+    if reference_point.is_empty() || reference_point.iter().any(|value| !value.is_finite()) {
+        return Err("hypervolume reference point must be non-empty and finite".to_owned());
+    }
+
+    let front_ids = exact_pareto_front(evaluations)?;
+    if front_ids.is_empty() {
+        return Ok(0.0);
+    }
+
+    let first = evaluations
+        .iter()
+        .find(|evaluation| evaluation.candidate_id == front_ids[0])
+        .ok_or_else(|| "exact Pareto front referenced a missing candidate".to_owned())?;
+    if first.objectives.len() != reference_point.len() {
+        return Err("hypervolume reference-point dimension differs from objective schema".to_owned());
+    }
+
+    let mut normalized_points = Vec::new();
+    for candidate_id in front_ids {
+        let candidate = evaluations
+            .iter()
+            .find(|evaluation| evaluation.candidate_id == candidate_id)
+            .ok_or_else(|| format!("Pareto candidate {candidate_id} is missing"))?;
+
+        let mut point = Vec::with_capacity(candidate.objectives.len());
+        let mut inside_reference_box = true;
+        for (objective, reference) in candidate.objectives.iter().zip(reference_point) {
+            let (value, transformed_reference) = match objective.direction {
+                ObjectiveDirection::Minimize => (objective.value, *reference),
+                ObjectiveDirection::Maximize => (-objective.value, -*reference),
+            };
+            if value > transformed_reference {
+                inside_reference_box = false;
+            }
+            point.push(value);
+        }
+        if inside_reference_box {
+            normalized_points.push(point);
+        }
+    }
+
+    let transformed_reference: Vec<f64> = first
+        .objectives
+        .iter()
+        .zip(reference_point)
+        .map(|(objective, value)| match objective.direction {
+            ObjectiveDirection::Minimize => *value,
+            ObjectiveDirection::Maximize => -*value,
+        })
+        .collect();
+
+    let volume = dominated_hypervolume_recursive(&normalized_points, &transformed_reference);
+    if volume.is_finite() && volume >= 0.0 {
+        Ok(volume)
+    } else {
+        Err("hypervolume calculation produced a non-finite or negative result".to_owned())
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ScenarioEvaluation {
     pub scenario_id: String,
@@ -2361,6 +2468,67 @@ mod tests {
             make("unknown",GateState::Unknown,0.5,0.5),
         ];
         assert_eq!(exact_pareto_front(&evaluations).unwrap(), vec!["a".to_owned(),"b".to_owned(),"c".to_owned()]);
+    }
+
+    #[test]
+    fn exact_hypervolume_matches_known_two_dimensional_union() {
+        let evaluations = vec![
+            OracleEvaluation {
+                candidate_id:"a".to_owned(),
+                gate_state:GateState::Pass,
+                objectives:vec![
+                    OracleObjective {objective_id:"energy".to_owned(),direction:ObjectiveDirection::Minimize,value:1.0},
+                    OracleObjective {objective_id:"water".to_owned(),direction:ObjectiveDirection::Minimize,value:3.0},
+                ],
+            },
+            OracleEvaluation {
+                candidate_id:"b".to_owned(),
+                gate_state:GateState::Pass,
+                objectives:vec![
+                    OracleObjective {objective_id:"energy".to_owned(),direction:ObjectiveDirection::Minimize,value:2.0},
+                    OracleObjective {objective_id:"water".to_owned(),direction:ObjectiveDirection::Minimize,value:2.0},
+                ],
+            },
+            OracleEvaluation {
+                candidate_id:"invalid".to_owned(),
+                gate_state:GateState::Unknown,
+                objectives:vec![
+                    OracleObjective {objective_id:"energy".to_owned(),direction:ObjectiveDirection::Minimize,value:0.0},
+                    OracleObjective {objective_id:"water".to_owned(),direction:ObjectiveDirection::Minimize,value:0.0},
+                ],
+            },
+        ];
+        assert_eq!(exact_hypervolume(&evaluations,&[4.0,4.0]).unwrap(),5.0);
+    }
+
+    #[test]
+    fn exact_hypervolume_supports_mixed_objective_directions() {
+        let evaluations = vec![
+            OracleEvaluation {
+                candidate_id:"mixed".to_owned(),
+                gate_state:GateState::Pass,
+                objectives:vec![
+                    OracleObjective {objective_id:"energy".to_owned(),direction:ObjectiveDirection::Minimize,value:2.0},
+                    OracleObjective {objective_id:"comfort".to_owned(),direction:ObjectiveDirection::Maximize,value:8.0},
+                ],
+            }
+        ];
+        assert_eq!(exact_hypervolume(&evaluations,&[5.0,4.0]).unwrap(),12.0);
+    }
+
+    #[test]
+    fn exact_hypervolume_rejects_bad_reference_points_and_dimensions() {
+        let evaluation = OracleEvaluation {
+            candidate_id:"single".to_owned(),
+            gate_state:GateState::Pass,
+            objectives:vec![
+                OracleObjective {objective_id:"energy".to_owned(),direction:ObjectiveDirection::Minimize,value:2.0},
+                OracleObjective {objective_id:"water".to_owned(),direction:ObjectiveDirection::Minimize,value:3.0},
+            ],
+        };
+        assert!(exact_hypervolume(&[evaluation.clone()],&[]).is_err());
+        assert!(exact_hypervolume(&[evaluation.clone()],&[5.0]).is_err());
+        assert!(exact_hypervolume(&[evaluation],&[f64::INFINITY,4.0]).is_err());
     }
 
     #[test]
