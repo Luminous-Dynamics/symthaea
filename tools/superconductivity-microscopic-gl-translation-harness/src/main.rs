@@ -86,9 +86,15 @@ fn validate_observable_value(observation: &Value) -> Result<(), String> {
         if value_kind != "scalar" {
             return Err(format!("observable {id}: lambda_L_scalar must be scalar"));
         }
-        if required_text(observation, "isotropy_assumption")? != "isotropic_declared" {
+        let scalar_semantics = required_text(observation, "isotropy_assumption")?;
+        let method = required_text(observation, "measurement_or_derivation_method")?;
+        let paper_scalar_allowed = scalar_semantics
+            == "scalar_paper_reported_directionality_unspecified"
+            && observation["evidence_status"] == "paper_reported"
+            && method.contains("directionality not specified");
+        if scalar_semantics != "isotropic_declared" && !paper_scalar_allowed {
             return Err(format!(
-                "observable {id}: scalar lambda_L requires an explicit isotropy assumption"
+                "observable {id}: scalar lambda_L requires isotropy or a paper-reported scalar explicitly marked directionality-unspecified"
             ));
         }
     }
