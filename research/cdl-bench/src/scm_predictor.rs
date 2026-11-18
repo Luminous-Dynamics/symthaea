@@ -1,4 +1,4 @@
-//! Typed, decoder-synchronous byte predictors for the fixed SCM1 record layout.
+//! Typed, decoder-synchronous byte predictors for the fixed SCM2 record layout.
 //!
 //! These are deliberately simple controls, not learned causal mechanisms:
 //! - ScmFieldPredictor: one adaptive byte histogram per (variable, byte lane).
@@ -7,12 +7,12 @@
 //! - ScmLagPredictor: conditions on the same field in the previous timestep.
 //! - ScmHybridPredictor: combines coarse parent context with temporal lag.
 //!
-//! The 33-byte SCM1 header is modeled separately. The five i16 variables then
+//! The 16-byte SCM2 schema/length header is modeled separately. The five i16 variables then
 //! arrive in topological order, little-endian, two bytes per variable.
 
 use crate::{ByteCdf, BytePredictor, BYTE_SYMBOLS};
 
-const SCM_HEADER_BYTES: u64 = 33;
+const SCM_HEADER_BYTES: u64 = 16;
 const SCM_VARIABLES: usize = 5;
 const BYTE_LANES: usize = 2;
 const CONTEXTS: usize = 16;
