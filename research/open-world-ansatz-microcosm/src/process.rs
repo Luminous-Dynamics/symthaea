@@ -580,6 +580,65 @@ mod tests {
         evidence_prefix: String,
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn generic_process_exchange_round_trips_through_a_real_child_and_exits_cleanly() {
+        use std::os::unix::fs::PermissionsExt;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock after Unix epoch")
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "symthaea-generic-jsonl-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&directory).expect("create temporary test directory");
+        let executable = directory.join("echo-agent.sh");
+        let script = concat!(
+            "#!/bin/sh\n",
+            "while IFS= read -r request; do\n",
+            "  printf '%s\\n' '{\"action_id\":\"calibrate\",\"evidence_prefix\":\"sha256:0123456789abcdef\"}'\n",
+            "done\n"
+        );
+        std::fs::write(&executable, script).expect("write child process script");
+        let mut permissions = std::fs::metadata(&executable)
+            .expect("read child process metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(&executable, permissions)
+            .expect("make child process executable");
+
+        let request = GenericRequest {
+            protocol: "symtropy-joint-world-v0".to_owned(),
+            action_catalogue: vec!["measure".to_owned(), "calibrate".to_owned()],
+        };
+        let config = ProcessAgentConfig::new(&executable).with_frame_limits(4096, 4096);
+        let mut agent = ProcessAgent::spawn(config).expect("spawn generic JSONL child");
+        let exchange = agent
+            .exchange::<GenericRequest, GenericResponse>(&request)
+            .expect("exchange typed JSONL request/response");
+
+        assert_eq!(exchange.response.action_id, "calibrate");
+        assert_eq!(
+            exchange.response.evidence_prefix,
+            "sha256:0123456789abcdef"
+        );
+        assert!(exchange.request_frame_sha256.starts_with("sha256:"));
+        assert!(exchange.response_frame_sha256.starts_with("sha256:"));
+        assert_eq!(
+            exchange.request_frame_sha256,
+            sha256_frame(
+                &encode_jsonl_frame(&request, 4096)
+                    .expect("serialize request")
+                    .0
+            )
+        );
+        assert!(agent.finish().is_ok(), "child must exit cleanly after EOF");
+        std::fs::remove_dir_all(directory).expect("remove temporary test directory");
+    }
+
     #[test]
     fn generic_jsonl_codec_round_trips_domain_specific_types_and_hashes_delimiters() {
         let request = GenericRequest {
