@@ -111,7 +111,7 @@ Run the actual Period/Sentence producer over a preregistered discovery matrix. O
 - seeds: 0 through 63 inclusive;
 - all other intent fields and engine revision frozen.
 
-This gives 384 producer runs. Record each result as `Verified`, `InsufficientEvidence`, `Discrepancy`, or generation failure. Retain all failures and the complete denominator. Do not discard seeds that fail to realize a return.
+This gives 384 producer runs. The exact machine-readable case grid is frozen in [`muse-m1-period-sentence-returnmotif-cohort-v1.json`](muse-m1-period-sentence-returnmotif-cohort-v1.json); it also declares a separate 120-case confirmation cohort on seeds 1000–1039. The manifest is marked `preregistered_not_executed`, pins no engine SHA yet, and makes no execution or accuracy claim. Record each result as `Verified`, `InsufficientEvidence`, `Discrepancy`, or generation failure. Retain all failures and the complete denominator. Do not discard seeds that fail to realize a return.
 
 Use discovery outcomes only to select candidate deterministic fixtures and diagnose the generator. Do not optimize the verifier against the eventual confirmation cohort.
 
