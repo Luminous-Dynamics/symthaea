@@ -37,6 +37,9 @@ The upstream reference simulator's relevant method details are:
 
 A reproduction must pin the exact upstream simulator, prompt templates, scorer, model endpoint/revision, decoding settings, seed derivation, number of duplications and concurrency settings. Any deviation is a separate treatment arm, not a silent implementation detail.
 
+The Rust scoring adapter reproduces the upstream run-weighted individual-vote average and strict-majority rules. It also reports task-level paired resampling intervals (10,000 deterministic bootstrap replicates) so repeated runs of a task remain clustered for uncertainty estimation. Keep official run-weighted SEM and the additional task-clustered estimate separately labelled; neither should be silently substituted for the other. For Hidden-vs-Full comparisons, report both the official run-weighted gap and a task-paired gap over matched task IDs.
+
+
 The task corpus and result metadata contain evaluator-only answer keys and private allocation records. Only agent-specific views may enter prompts, memory or controller state.
 
 ## Experimental unit and information model
