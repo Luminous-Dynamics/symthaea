@@ -27,7 +27,12 @@ The target is not whether an agent says it refused or whether its monitor emitte
 
 Existing public benchmarks—AgentDojo, InjecAgent, Agent Security Bench (ASB), AgentDyn and AgentHarm—cover important prompt-injection, tool-misuse and harmful-task dimensions. Google's November 12, 2026 evaluation covered 1,774 sessions across five public benchmarks and identified limited public labelled coverage for cascading failures and identity/privilege abuse. It also found poisoned-memory cases difficult for its evaluated monitor. This motivates AACB; it does not establish that no private or specialized tests exist.
 
-ASB is a useful security baseline. Reuse compatible tasks and preserve native scores. CyberGym is useful for vulnerability-exploitation capability, but a successful proof of concept is not a measure of whether an agent stayed within delegated authority.
+The closest new industry baselines are now directly relevant:
+
+- **AuthorizationBench** (2026-10-20) contains 286 executable tasks and reports 6,864 trajectories across four models, two reasoning-effort settings and three harnesses. The reported out-of-authorization rate is 19.2% overall (10.5%–26.6% across 24 configurations). The study reports that higher reasoning effort did not reliably remove the behavior. This is a benchmark-specific rate, not a deployment incident rate. <https://arxiv.org/abs/2610.27548>
+- **SABench** (2026-10-25) contains 201 email/calendar/ticket tasks and 2,211 model-task pairs across 11 models. It reports 15.2% collateral-damage runs and unauthorized writes in 12.8% of goal-satisfied runs; ambiguity was a particularly difficult trap family. <https://arxiv.org/abs/2610.34167>
+
+These results are the baseline to beat on matched tasks, not numbers to subtract from synthetic Symthaea/Mycelix fixtures. Reuse compatible upstream tasks only after licensing and semantic review; preserve each benchmark's native scoring. CyberGym remains useful for vulnerability-exploitation capability, but a successful proof of concept is not a measure of whether an agent stayed within delegated authority.
 
 A 2026 review of 15 mainstream agent benchmarks found safety/security and cost-efficiency often absent from primary scoring and many relied on binary task success. This describes that selected mainstream sample, not the entire dedicated security-benchmark landscape.
 
@@ -39,7 +44,7 @@ AACB is an evaluation layer, not a new control protocol or identity standard.
 
 | Existing work | AACB use | Boundary |
 |---|---|---|
-| OWASP Agent Control Standard (ACS) | Per-step Guardian decisions, immutable intent, control messages, trace and integrity profiles | Living specification. Pin release/profile; ACS-Core alone does not make a deployment secure or policies strict. |
+| OWASP Agent Control Standard (ACS v0.1.4) | Per-step Guardian decisions, immutable intent, control messages, trace, inspect, provenance, crypto and audit profiles | Useful wire-format comparator; conformance declarations are self-asserted in v0.1.4, with no shipped conformance suite/registry. Core alone does not make policies strict or audits independently tamper-evident. |
 | OAuth 2.0, token exchange, RAR, DPoP | Identity, audience, constrained delegation and proof-of-possession where implemented | Token validity does not establish safe composition of data and tools. |
 | SPIFFE / workload identity | Workload identity inputs | Identity labels alone do not prove infrastructure independence or behavior. |
 | IETF WIMSE AIMS | Track emerging agent identity/authentication/authorization guidance | Informational Internet-Draft, not a finalized standard or benchmark. |
@@ -182,8 +187,11 @@ A credible result would demonstrate, with an independent oracle and matched cand
 - OWASP, [Agent Control Standard](https://owaspacs.org/docs/acs/) and [project repository](https://github.com/GenAI-Security-Project/agent-control-standard).
 - IETF WIMSE, [AI Identity Management System, draft-ietf-wimse-aims-01](https://datatracker.ietf.org/doc/html/draft-ietf-wimse-aims-01), published 2026-11-02; informational draft, expires 2027-05-06.
 - NIST NCCoE, [Software and AI Agent Identity and Authorization concept paper](https://csrc.nist.gov/pubs/other/2026/02/05/accelerating-the-adoption-of-software-and-ai-agent/ipd), 2026-02-05; comments closed 2026-04-02.
+- [AuthorizationBench](https://arxiv.org/abs/2610.27548), 2026-10-20; 286 tasks / 6,864 trajectories.
+- [SABench](https://arxiv.org/abs/2610.34167), 2026-10-25; 201 tasks / 2,211 model-task pairs.
 - [Agent Security Bench](https://proceedings.iclr.cc/paper_files/paper/2025/hash/5750f91d8fb9d5c02bd8ad2c3b44456b-Abstract-Conference.html), ICLR 2025.
 - [CyberGym](https://www.cybergym.io/cybergym/), AI-agent cybersecurity capability benchmark.
+- [OWASP ACS v0.1.4 conformance profiles](https://owaspacs.org/docs/spec/conformance/); self-declared profile compatibility is not independent certification.
 - [Review of agentic AI evaluation](https://link.springer.com/article/10.1007/s10462-026-11571-0), Artificial Intelligence Review, 2026.
 
 - Mycelix LARP agent authorization/effect assurance: [#6170](https://github.com/Luminous-Dynamics/mycelix/issues/6170), [reference PR #6179](https://github.com/Luminous-Dynamics/mycelix/pull/6179), [candidate-blind scorecard #6235](https://github.com/Luminous-Dynamics/mycelix/issues/6235).
