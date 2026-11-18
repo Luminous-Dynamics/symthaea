@@ -147,6 +147,24 @@ impl Polynomial {
         result
     }
 
+    fn evaluate(&self, state: [i128; 4]) -> i128 {
+        let mut total = 0_i128;
+        for (monomial, coefficient) in &self.terms {
+            let mut term = *coefficient;
+            for (index, power) in monomial.iter().enumerate() {
+                for _ in 0..*power {
+                    term = term
+                        .checked_mul(state[index])
+                        .expect("polynomial evaluation overflow");
+                }
+            }
+            total = total
+                .checked_add(term)
+                .expect("polynomial evaluation overflow");
+        }
+        total
+    }
+
     /// Lie derivative of this scalar polynomial along a vector field.
     fn along(&self, vector_field: &[Self; 4]) -> Self {
         let mut result = Self::zero();
@@ -270,6 +288,37 @@ fn invariant_polynomials() -> (Polynomial, Polynomial, Polynomial, Polynomial) {
     let c = v1.mul(&v1).add(&v2.mul(&v2));
     let angular_momentum = x1.mul(&v2).sub(&x2.mul(&v1));
     (a, b, c, angular_momentum)
+}
+
+fn determinant3(matrix: [[i128; 3]; 3]) -> i128 {
+    matrix[0][0] * (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1])
+        - matrix[0][1] * (matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0])
+        + matrix[0][2] * (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0])
+}
+
+/// Whether the invariant map (a,b,c,ell) has differential rank three at a
+/// state. The origin is the non-free orbit; x=0 with v!=0 is regular.
+pub fn quotient_invariant_map_has_rank_three_at(state: [i128; 4]) -> bool {
+    let (a, b, c, angular_momentum) = invariant_polynomials();
+    let invariants = [a, b, c, angular_momentum];
+    let jacobian: [[i128; 4]; 4] = std::array::from_fn(|row| {
+        std::array::from_fn(|column| invariants[row].derivative(column).evaluate(state))
+    });
+
+    for omitted_row in 0..4 {
+        let rows: Vec<usize> = (0..4).filter(|row| *row != omitted_row).collect();
+        for omitted_column in 0..4 {
+            let columns: Vec<usize> =
+                (0..4).filter(|column| *column != omitted_column).collect();
+            let minor: [[i128; 3]; 3] = std::array::from_fn(|row| {
+                std::array::from_fn(|column| jacobian[rows[row]][columns[column]])
+            });
+            if determinant3(minor) != 0 {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// Check the exact SO(2)-equivariant radial family
@@ -437,6 +486,14 @@ mod tests {
         assert!(report.speed_squared_invariant, "{report:?}");
         assert!(report.signed_angular_momentum_invariant, "{report:?}");
         assert!(!report.absolute_x1_invariant, "{report:?}");
+    }
+
+    #[test]
+    fn regular_boundary_orbits_are_distinguished_from_the_fixed_origin() {
+        assert!(quotient_invariant_map_has_rank_three_at([0, 0, 1, 0]));
+        assert!(quotient_invariant_map_has_rank_three_at([0, 0, 0, 1]));
+        assert!(quotient_invariant_map_has_rank_three_at([1, 0, 2, 0]));
+        assert!(!quotient_invariant_map_has_rank_three_at([0, 0, 0, 0]));
     }
 
     #[test]
