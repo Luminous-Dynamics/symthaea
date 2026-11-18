@@ -33,7 +33,10 @@ pub use event_split::{
     grouped_event_kfold, validate_event_fold_plan, BenchmarkSample, EventFold, EventFoldPlan,
     EventSplitError,
 };
-pub use experiment_design::{expected_information_gain_bits, ExperimentDesignError};
+pub use experiment_design::{
+    expected_information_gain_bits, rank_experiment_actions, ExperimentAction,
+    ExperimentActionScore, ExperimentDesignError,
+};
 pub use geometry::{describe, Bounds2, GeometryDescriptor, GeometryError, Point2, SymmetryScore};
 pub use grid::{
     margin_preserving_shuffle, run_grid_tournament, standard_d4_ascii7_manifest, BinaryGrid,
