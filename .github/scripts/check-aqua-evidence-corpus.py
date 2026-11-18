@@ -81,6 +81,7 @@ EXPECTED_VALUES = {
     "boost_function_criteria": ("text", None),
     "design_for_disassembly_scope": ("text", None),
     "repairability_assessment_scope": ("text", None),
+    "shower_boost_function_scope": ("text", None),
 }
 
 
