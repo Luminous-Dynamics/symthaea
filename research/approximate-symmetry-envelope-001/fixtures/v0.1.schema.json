@@ -53,7 +53,13 @@
         "objective_gap",
         "expected_upper_bounds",
         "expected_epsilon_lift_candidate",
-        "expected_hard_prune_authorized"
+        "expected_hard_prune_authorized",
+        "state_unit_id",
+        "objective_unit_id",
+        "constraint_unit_id",
+        "defect_evidence_id",
+        "lipschitz_evidence_id",
+        "domain_evidence_id"
       ],
       "properties": {
         "contract_id": {
@@ -131,6 +137,30 @@
         },
         "expected_hard_prune_authorized": {
           "const": false
+        },
+        "state_unit_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "objective_unit_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "constraint_unit_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "defect_evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lipschitz_evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "domain_evidence_id": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
