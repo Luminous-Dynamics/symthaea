@@ -19,6 +19,7 @@ pub enum HoldReason {
     InsufficientIndependentRoots,
     MeasurementBoundMissing,
     MeasurementBoundTooWide,
+    InvalidPolicyConfiguration,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -37,6 +38,9 @@ pub struct ProcedurePromotionProposalV1 {
     pub independent_source_family_count: usize,
     pub independent_source_root_count: usize,
     pub maximum_measurement_error_bound: f64,
+    pub minimum_qualified_success_events: usize,
+    pub minimum_independent_source_families: usize,
+    pub minimum_independent_source_roots: usize,
     pub policy_revision: &'static str,
 }
 
@@ -72,6 +76,16 @@ impl ConsolidationPolicyV1 {
         &self,
         evidence: &ActionConsolidationEvidenceSummaryV1,
     ) -> ConsolidationProposalV1 {
+        if self.minimum_qualified_success_events == 0
+            || self.minimum_independent_source_families == 0
+            || self.minimum_independent_source_roots == 0
+            || !self.maximum_measurement_error_bound.is_finite()
+            || !(0.0..=1.0).contains(&self.maximum_measurement_error_bound)
+        {
+            return ConsolidationProposalV1::RetainProvisional(
+                HoldReason::InvalidPolicyConfiguration,
+            );
+        }
         if evidence.target_scope_event_count == 0 {
             return ConsolidationProposalV1::RetainProvisional(
                 HoldReason::NoTargetScopeEvidence,
@@ -143,6 +157,9 @@ impl ConsolidationPolicyV1 {
             independent_source_root_count:
                 evidence.qualified_success_source_root_count,
             maximum_measurement_error_bound,
+            minimum_qualified_success_events: self.minimum_qualified_success_events,
+            minimum_independent_source_families: self.minimum_independent_source_families,
+            minimum_independent_source_roots: self.minimum_independent_source_roots,
             policy_revision: "mace-consolidation-proposal-v1",
         })
     }
@@ -195,6 +212,10 @@ mod tests {
         assert_eq!(proposal.evidence_event_ids, vec![100, 101, 102]);
         assert_eq!(proposal.independent_source_root_count, 3);
         assert_eq!(proposal.independent_source_family_count, 3);
+        assert_eq!(proposal.minimum_qualified_success_events, 3);
+        assert_eq!(proposal.minimum_independent_source_families, 3);
+        assert_eq!(proposal.minimum_independent_source_roots, 3);
+        assert_eq!(proposal.maximum_measurement_error_bound, 0.05);
         assert_eq!(proposal.policy_revision, "mace-consolidation-proposal-v1");
     }
 
@@ -267,6 +288,27 @@ mod tests {
                 ConsolidationProposalV1::RetainProvisional(expected)
             );
         }
+    }
+
+    #[test]
+    fn invalid_policy_configuration_cannot_lower_the_promotion_gate() {
+        let mut policy = ConsolidationPolicyV1::default();
+        policy.minimum_independent_source_roots = 0;
+        assert_eq!(
+            policy.decide_procedure_promotion(&summary()),
+            ConsolidationProposalV1::RetainProvisional(
+                HoldReason::InvalidPolicyConfiguration
+            )
+        );
+
+        let mut invalid_bound = ConsolidationPolicyV1::default();
+        invalid_bound.maximum_measurement_error_bound = f64::NAN;
+        assert_eq!(
+            invalid_bound.decide_procedure_promotion(&summary()),
+            ConsolidationProposalV1::RetainProvisional(
+                HoldReason::InvalidPolicyConfiguration
+            )
+        );
     }
 
     #[test]
