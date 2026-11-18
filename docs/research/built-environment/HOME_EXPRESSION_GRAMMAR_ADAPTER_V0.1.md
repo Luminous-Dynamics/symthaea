@@ -15,7 +15,7 @@ NIST's building digitization work identifies semantic interoperability and machi
 
 ## 2. Pinned upstream snapshot
 
-Sol-Atlas PR #935 head at authoring time: 42caacb8b3e00f87fcf46c0dd8ceae87763aa1d6.
+Sol-Atlas PR #935 head at authoring time: e7020fee33254ae130417d7885a04b6d4d797ac6.
 
 Catalogue HOME-EXPRESSION-CATALOG-0.2.0 blob SHA: d784b285a706068aeba7bf7a88bdb857ed2053cc.
 Grammar schema v0.2 blob SHA: 661c2c5a96e13c7678b80714bdb9e59d787c5a7f.
