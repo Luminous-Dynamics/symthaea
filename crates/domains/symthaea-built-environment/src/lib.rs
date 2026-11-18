@@ -443,7 +443,7 @@ fn validate_expression_axis(
         if entry.role == ExpressionRole::ReferenceOnly {
             match vocabulary.style_sources.get(&entry.option_id) {
                 None => errors.push(format!("reference-only style {} is unknown", entry.option_id)),
-                Some(allowed) if entry.source_refs.is_empty() => {
+                Some(_allowed) if entry.source_refs.is_empty() => {
                     errors.push(format!("reference-only style {} has no source", entry.option_id));
                 }
                 Some(allowed) => {
@@ -1042,7 +1042,7 @@ mod tests {
             make("invalid",GateState::Fail,1.0,1.0),
             make("unknown",GateState::Unknown,0.5,0.5),
         ];
-        assert_eq!(exact_pareto_front(&evaluations).unwrap(), vec!["a","b","c"]);
+        assert_eq!(exact_pareto_front(&evaluations).unwrap(), vec!["a".to_owned(),"b".to_owned(),"c".to_owned()]);
     }
 
     #[test]
