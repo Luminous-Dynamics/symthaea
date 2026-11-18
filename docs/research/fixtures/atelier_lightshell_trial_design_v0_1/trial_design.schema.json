@@ -172,13 +172,14 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "block_id", "stratum_id", "sequence_id", "allocation_receipt_ref",
+        "block_id", "stratum_id", "sequence_id", "allocation_order_index", "allocation_receipt_ref",
         "periods", "drift_check", "block_evidence_ref"
       ],
       "properties": {
         "block_id": { "type": "string", "minLength": 1 },
         "stratum_id": { "type": "string", "minLength": 1 },
         "sequence_id": { "type": "string", "minLength": 1 },
+        "allocation_order_index": { "type": "integer", "minimum": 0 },
         "allocation_receipt_ref": { "type": "string", "minLength": 1 },
         "periods": {
           "type": "array",
