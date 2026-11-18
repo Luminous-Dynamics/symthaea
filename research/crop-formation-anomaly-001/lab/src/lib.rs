@@ -3,11 +3,13 @@
 //! The crate measures descriptive geometry and runs explicitly declared
 //! decoders. It does not infer authorship, origin, intent, or semantics.
 
+pub mod crop_flow;
 pub mod decoder;
 pub mod geometry;
 pub mod grid;
 pub mod statistics;
 
+pub use crop_flow::{CropFlowDescriptor, CropFlowError, CropFlowSample, describe_crop_flow};
 pub use decoder::{
     BitOrder, DecodeError, DecodeOutcome, DecoderSpec, PayloadEncoding, decode,
     encode_ascii7, run_tournament,
