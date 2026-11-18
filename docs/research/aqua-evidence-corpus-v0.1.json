@@ -3460,6 +3460,89 @@
           "limitations": [
             "Calibration status alone does not establish method applicability, measurement uncertainty or product compliance."
           ]
+        },
+        {
+          "claim_id": "uwl.2023.boost.definition",
+          "parameter": "boost_function_definition",
+          "original_value": "A boost function temporarily allows an increase in flow rate and is automatically cancelled on closure of the flow control.",
+          "canonical_value": {
+            "kind": "text",
+            "text": "Temporary flow increase for a specific user action; automatically cancelled when the flow control is closed."
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "UWL Taps & Showers boost-function feature",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": "Specific user action",
+            "method": "UWL Taps & Showers Technical Criteria January 2023, definition 3.12",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "product-specific boost-control mechanism",
+              "product-specific maximum boost duration"
+            ],
+            "notes": "This is a feature definition, not proof that an exact model passes clause 12.1."
+          },
+          "source": {
+            "url": "https://uwla.eu/wp-content/uploads/2023/05/TAPS-Showers-Technical-2023.pdf",
+            "publisher": "Unified Water Label Association",
+            "source_type": "official_standard_or_programme",
+            "published_on": "2023-01-01",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Common method vocabulary for classifying temporary boost; a manufacturer's boost button is not automatically a verified UWL result."
+          },
+          "limitations": [
+            "This does not establish task quality, energy savings or ETL user-behaviour-feature eligibility."
+          ]
+        },
+        {
+          "claim_id": "uwl.2023.boost.criteria",
+          "parameter": "boost_function_criteria",
+          "original_value": "At Type 1 P2, record Qreg, Qboost, close flow control, reopen without boost and record Qmax; require Qmax = Qreg, Qboost < 2 Qreg, and Qreg listed on the scheme label.",
+          "canonical_value": {
+            "kind": "text",
+            "text": "UWL 12.1 requires automatic return to regular flow after flow-control shutoff; Qmax = Qreg; Qboost < 2 × Qreg; regular flow Qreg must be labelled."
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "UWL Type 1 boost-function test",
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": "Regular / boosted / post-close flow sequence",
+            "method": "UWL Taps & Showers Technical Criteria January 2023, sections 4.2 Table 1 and 12.1",
+            "sample_count": null,
+            "pressure_datum": "P2 dynamic pressure applied to each inlet separately; 300 kPa +20/-0 kPa",
+            "unknown_conditions": [
+              "absolute L/min equality tolerance for Qmax = Qreg is not specified in clause 12.1",
+              "exact laboratory uncertainty decision rule"
+            ],
+            "notes": "Aqua preserves measurement uncertainty and requires Qmax/Qreg agreement within combined declared measurement uncertainty; this is a software screening rule, not a substitute for scheme interpretation."
+          },
+          "source": {
+            "url": "https://uwla.eu/wp-content/uploads/2023/05/TAPS-Showers-Technical-2023.pdf",
+            "publisher": "Unified Water Label Association",
+            "source_type": "official_standard_or_programme",
+            "published_on": "2023-01-01",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Method-specific boost test at the UWL P2 datum; use the complete controlled method and exact product configuration."
+          },
+          "limitations": [
+            "Do not compare nominal manufacturer mode declarations as a UWL result.",
+            "The numeric method check does not assess task-quality, comfort, aerosol, safety or energy outcome."
+          ]
         }
       ]
     }
@@ -3480,6 +3563,10 @@
     {
       "date": "2026-11-18",
       "change": "Corrected SANS Table 3 likely-maximum and design-pressure semantics using footnotes (a)/(b); added current EN 18021:2025 and UWL 2023 separate-inlet pressure criteria."
+    },
+    {
+      "date": "2026-11-18",
+      "change": "Added UWL 2023 boost-function definition and clause 12.1 test criteria; linked method-specific Rust validation."
     }
   ]
 }
