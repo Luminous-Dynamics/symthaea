@@ -105,7 +105,8 @@
       "trigger_persistence_windows",
       "clear_persistence_windows",
       "required_warning_ns",
-      "risk_model_binding"
+      "risk_model_binding",
+      "max_warning_ns"
     ],
     "policy_config_sha256": "computed from exact policy ID, score scale ID, validation receipt, threshold bit patterns, persistence counts and required warning interval",
     "risk_score_contract": {
@@ -155,8 +156,8 @@
       "exact_model_and_calibration_binding_required": true,
       "model_training_split_calibration_uncertainty_must_match_frozen_policy": true
     },
-    "policy_config_digest_schema": "luminous.plasma-alarm-policy.v0.4",
-    "policy_config_digest_encoding": "length-prefixed UTF-8 fields plus exact IEEE-754 threshold bit patterns; delimiter characters in IDs cannot create ambiguous field boundaries; includes exact model artifact, training split, calibration identity/receipt, uncertainty method and nominal coverage",
+    "policy_config_digest_schema": "luminous.plasma-alarm-policy.v0.5",
+    "policy_config_digest_encoding": "length-prefixed UTF-8 fields plus exact IEEE-754 threshold bit patterns; delimiter characters in IDs cannot create ambiguous field boundaries; includes exact model artifact, training split, calibration identity/receipt, uncertainty method and nominal coverage; includes maximum allowed warning lead time",
     "risk_model_binding_fields": [
       "model_id",
       "model_revision",
@@ -167,7 +168,24 @@
       "calibration_receipt_sha256",
       "uncertainty_method_id",
       "nominal_coverage"
-    ]
+    ],
+    "rolling_inference_contract": {
+      "reference_task": "GenToka/TokaMind Group 6",
+      "history_duration_ns": 100000000,
+      "cut_interval_ns": 10000000,
+      "input_rule": "for each cut time, use only the previous 100 ms of observations strictly before or at that cut",
+      "execution_rule": "re-run the fixed model/policy on each chronological cut with updated measured context; do not condition a cut on later windows or t_cut",
+      "report": [
+        "per_cut_latency_ns",
+        "p50_latency_ns",
+        "p95_latency_ns",
+        "p99_latency_ns",
+        "deadline_miss_rate",
+        "abstention_rate",
+        "alarm_transition_times"
+      ],
+      "paper_comparison_note": "GenToka uses one conditional pass to generate a complete output window; this benchmark's rolling mode is repeated causal inference at successive cuts, not a claim that the published model itself is autoregressive"
+    }
   },
   "offline_scoring_contract": {
     "event_reference_entered_after_trace_generation": true,
@@ -182,16 +200,28 @@
       "warning_time_p10",
       "warning_time_p50",
       "false_alarms_per_non_disruptive_hour",
-      "total_non_disruptive_exposure_ns"
+      "total_non_disruptive_exposure_ns",
+      "false_alarm_events_on_disruptive_shots",
+      "false_alarm_events_on_non_disruptive_shots"
     ],
     "warning_requirement_ns": 50000000,
     "warning_requirement_is_research_target_not_achieved_result": true,
     "confidence_intervals": "Wilson score 95% intervals for event TPR and false-alarm-shot rate; for multi-machine or event-class subgroup aggregates, add a shot-level stratified bootstrap and report the resampling seed",
     "undefined_metrics": "return null when the denominator cohort is empty",
     "false_alarm_rate_denominators": {
-      "per_shot": "number of non-disruptive shots",
+      "per_shot": "false alarm episodes from non-disruptive shots divided by non-disruptive shots; out-of-window episodes on disruptive shots are reported separately",
       "per_hour": "sum of non-disruptive shot exposure durations in hours",
       "alarm_events": "timestamps at which the online policy transitions into Raised"
+    },
+    "maximum_warning_horizon_source": "validation-selected and frozen in AlarmPolicyConfig.max_warning_ns",
+    "alarms_outside_warning_interval": "count as false alarm episodes; they do not satisfy event detection",
+    "warning_interval": {
+      "minimum_ns": 50000000,
+      "maximum_ns": "validation-selected and frozen in policy; must be >= minimum",
+      "event_detected_when": "at least one alarm episode has t_cut - alarm_time in [minimum_ns, maximum_ns]",
+      "alarm_episode_matching": "exactly one in-window alarm episode may match the disruption; all other episodes are false alarms",
+      "too_early": "alarm lead time > max_warning_ns counts as false alarm and cannot satisfy event detection",
+      "too_late": "alarm lead time < required_warning_ns counts as false alarm and cannot satisfy event detection"
     }
   },
   "required_ablation_families": [
@@ -363,6 +393,11 @@
         "GenToka improves F1 on all three nested input schemas but has slightly lower macro AUROC than TokaMind",
         "F1 uses a validation-selected common threshold of 0.4 and Soft-TTD windows with target >= 0.5 are positive",
         "Window-level F1/AUROC are not interchangeable with shot-level event TPR, false alarms per hour or warning-time distributions"
+      ],
+      "architecture_limitations": [
+        "GenToka generates a complete requested output window in one conditional pass, rather than advancing autoregressively with updated context",
+        "Published Group-6 AUROC and F1 are window-level and do not by themselves establish shot-level event TPR, false alarms per hour, or warning-time compliance",
+        "The published 100 ms history and 10 ms cut grid provide a reproducible rolling evaluation grid; each cut must use causal pre-anchor history"
       ]
     }
   }
