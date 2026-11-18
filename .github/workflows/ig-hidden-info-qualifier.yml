@@ -39,6 +39,13 @@ jobs:
         run: |
           cargo run --manifest-path research/ig-hidden-info-001/qualifier/Cargo.toml --bin validate_hiddenbench -- \
             research/ig-hidden-info-001/external/hiddenbench/benchmark.json
+      - name: Smoke score an official-format HiddenBench result
+        run: |
+          cargo run --manifest-path research/ig-hidden-info-001/qualifier/Cargo.toml --bin score_hiddenbench -- \
+            research/ig-hidden-info-001/external/hiddenbench/benchmark.json \
+            research/ig-hidden-info-001/fixtures/HIDDENBENCH_SCORE_SMOKE_V0_1.json
+      - name: Clippy
+        run: cargo clippy --manifest-path research/ig-hidden-info-001/qualifier/Cargo.toml --all-targets -- -D warnings
       - name: Qualify evidence-flow fixtures
         run: |
           cargo run --manifest-path research/ig-hidden-info-001/qualifier/Cargo.toml -- \
