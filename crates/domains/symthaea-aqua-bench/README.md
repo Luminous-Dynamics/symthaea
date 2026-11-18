@@ -75,3 +75,17 @@ The dependency-free spray_field module summarizes a complete, externally qualifi
 A second helper, `compare_spray_field_to_baseline`, reports matched baseline-to-scale, partial-blockage or post-clean deltas for the same specimen, geometry revision and frozen test context. It rejects cross-specimen, cross-geometry and cross-condition comparisons and validates the public summary's derived-field consistency.
 
 This is descriptive post-processing only. It does not calibrate instruments, prove capture completeness, assess comfort or hygiene, replace ASME/CSA or WaterSense methods, or authorize a physical test. The full protocol is in docs/AQUA_SPRAY_FIELD_METROLOGY_PROTOCOL_V0_1.md.
+
+
+## Essential-service continuity evaluator
+
+The dependency-free `service_continuity` module classifies externally supplied, owner-qualified state into:
+- QUALIFIED_FULL
+- QUALIFIED_REDUCED
+- MANUAL_ONLY
+- ISOLATED_STOP
+- RECOVERY_PENDING
+
+It fails closed on unqualified/unknown water-use status, local protection uncertainty, stale or contradictory critical evidence, pressure outside/unknown relative to the admitted envelope, blocked/unknown drainage and detected/unknown leaks. Reduced and manual-only modes are admitted only when explicitly qualified by the local device authority. Loss of optional digital recommendations does not reduce a qualified local service state. A cleared fault cannot automatically clear the requalification-required flag.
+
+This is a product-level classification function only. It does not actuate isolation, control water, establish safety limits, approve water quality, or replace independently qualified hardware protection. The 16 unit tests are authored; no execution pass is claimed until exact-head CI reports it.
