@@ -759,6 +759,47 @@ mod tests {
     }
 
     #[test]
+    fn expert_mixture_shifts_to_lag_during_intervention_without_boundary_labels() {
+        let steps = 4096usize;
+        let intervention_start = steps / 4;
+        let intervention_end = steps * 3 / 4;
+        let trace = generate_scm(
+            steps,
+            43,
+            Some(ScmIntervention {
+                variable: 1,
+                start_step: intervention_start,
+                end_step: intervention_end,
+                value: 20_000,
+            }),
+        )
+        .unwrap();
+
+        let mut predictor = ScmExpertMixturePredictor::default();
+        let mut before = None;
+        let mut during = None;
+        let mut after = None;
+        for (index, &symbol) in trace.stream.iter().enumerate() {
+            predictor.observe(symbol);
+            let observed_bytes = index + 1;
+            if observed_bytes == 16 + intervention_start * 10 {
+                before = Some(predictor.expert_weights());
+            } else if observed_bytes == 16 + ((intervention_start + intervention_end) / 2) * 10 {
+                during = Some(predictor.expert_weights());
+            } else if observed_bytes == 16 + intervention_end * 10 {
+                after = Some(predictor.expert_weights());
+            }
+        }
+
+        let before = before.expect("pre-intervention checkpoint");
+        let during = during.expect("intervention checkpoint");
+        let after = after.expect("post-intervention checkpoint");
+        assert!(during[1] > before[1], "lag expert should gain weight under intervention");
+        assert!(during[2] < before[2], "parent expert should lose weight under intervention");
+        assert!(after[2] > during[2], "parent expert should begin recovering after intervention");
+    }
+
+    #[test]
     fn all_scm_predictors_have_distinct_stable_ids() {
         assert_eq!(ScmFieldPredictor::default().model_id(), 2);
         assert_eq!(ScmParentPredictor::default().model_id(), 3);
