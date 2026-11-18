@@ -571,7 +571,12 @@ mod tests {
     #[test]
     fn periodic_image_shift_recovers_short_boundary_bond() {
         let (_, fixture) = inputs();
-        let edge = &fixture["graph"]["edges"][3];
+        let edge = fixture["graph"]["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|edge| edge["edge_id"] == "e03r")
+            .unwrap();
         assert_eq!(edge["physical_edge_length"], 1.0);
         assert_eq!(edge["periodic_image_shift"], json!([0, 1]));
         assert!(audit_mutated(fixture).is_ok());
