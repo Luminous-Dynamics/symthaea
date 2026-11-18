@@ -54,6 +54,7 @@ pub struct ZoneBinding {
     pub panel_ref: String,
     pub material_lot_ref: String,
     pub construction_ref: String,
+    pub cleanability_sample_location_refs: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -87,6 +88,7 @@ pub struct SoilChallenge {
 pub struct ClaimGate {
     pub gate_id: String,
     pub zone_ref: String,
+    pub required_sample_location_refs: Vec<String>,
     pub metric_family: String,
     pub comparison_mode: String,
     pub unit: String,
@@ -168,6 +170,7 @@ pub struct Inspection {
 pub struct ClaimObservation {
     pub gate_id: String,
     pub zone_ref: String,
+    pub sample_location_ref: String,
     pub replicate_index: u32,
     pub before: Option<Measurement>,
     pub after: Measurement,
@@ -254,7 +257,7 @@ impl CleanStateManifest {
         let mut cycle_ids = HashSet::new();
         let mut cleaning_run_ids = HashSet::new();
         let mut soil_application_ids = HashSet::new();
-        let mut observation_counts: HashMap<(&str, &str, u32), usize> = HashMap::new();
+        let mut observation_counts: HashMap<(&str, &str, &str, u32), usize> = HashMap::new();
         let mut observation_ids = HashSet::new();
         let mut assessments = Vec::new();
         let mut total_observations = 0usize;
@@ -305,6 +308,19 @@ impl CleanStateManifest {
             if !self.article.zones.iter().any(|zone| zone.zone_ref == gate.zone_ref) {
                 push(&mut findings, "gate_zone_not_in_article", format!("{path}.zone_ref"),
                     "Claim gate refers to a zone that is not bound to the exact article.");
+            }
+            let zone_binding = self.article.zones.iter().find(|zone| zone.zone_ref == gate.zone_ref);
+            let mut sample_locations = HashSet::new();
+            if gate.required_sample_location_refs.is_empty()
+                || gate.required_sample_location_refs.iter().any(|location| {
+                    is_blank(location)
+                        || !sample_locations.insert(location.as_str())
+                        || zone_binding.is_none_or(|zone| !zone.cleanability_sample_location_refs.contains(location))
+                })
+            {
+                push(&mut findings, "gate_sample_locations_not_topology_bound",
+                    format!("{path}.required_sample_location_refs"),
+                    "Every gate requires unique, non-empty sampling locations linked to the exact zone topology.");
             }
             if !metric_mode_is_compatible(&gate.metric_family, &gate.comparison_mode) {
                 push(&mut findings, "unsupported_metric_comparison", &path,
@@ -442,11 +458,25 @@ impl CleanStateManifest {
                         "Observation must link to an exact declared gate and zone.");
                     continue;
                 };
-                if !seen_observations.insert((observation.gate_id.as_str(), observation.zone_ref.as_str(), observation.replicate_index)) {
-                    push(&mut findings, "duplicate_observation_replicate", &obs_path,
-                        "Gate/zone/replicate observation identity must be unique within a cycle.");
+                if !gate.required_sample_location_refs.contains(&observation.sample_location_ref) {
+                    push(&mut findings, "observation_sample_location_unknown", format!("{obs_path}.sample_location_ref"),
+                        "Observation location must be one of the gate's topology-bound required sample locations.");
                 }
-                *observation_counts.entry((gate.gate_id.as_str(), gate.zone_ref.as_str(), cycle.cycle_index)).or_default() += 1;
+                if !seen_observations.insert((
+                    observation.gate_id.as_str(),
+                    observation.zone_ref.as_str(),
+                    observation.sample_location_ref.as_str(),
+                    observation.replicate_index
+                )) {
+                    push(&mut findings, "duplicate_observation_replicate", &obs_path,
+                        "Gate/zone/sample-location/replicate identity must be unique within a cycle.");
+                }
+                *observation_counts.entry((
+                    gate.gate_id.as_str(),
+                    gate.zone_ref.as_str(),
+                    observation.sample_location_ref.as_str(),
+                    cycle.cycle_index
+                )).or_default() += 1;
                 if self.state == "proposed" {
                     push(&mut findings, "proposed_cycle_contains_measurement", &obs_path,
                         "Proposed campaign cannot include measurement observations.");
@@ -468,13 +498,20 @@ impl CleanStateManifest {
 
             if gate.applicability == "required" {
                 for cycle in &self.cycles {
-                    let count = observation_counts.get(&(gate.gate_id.as_str(), gate.zone_ref.as_str(), cycle.cycle_index)).copied().unwrap_or(0);
-                    observation_count += count;
-                    if self.state != "proposed" && count < gate.minimum_replicates_per_cycle as usize {
-                        push(&mut findings, "required_gate_cycle_observations_missing", "cycles",
-                            format!("Gate {} / zone {} has {count} observations at cycle {}; {} required.",
-                                gate.gate_id, gate.zone_ref, cycle.cycle_index, gate.minimum_replicates_per_cycle));
-                        gate_disposition = merge_disposition(&gate_disposition, "insufficient_evidence");
+                    for sample_location in &gate.required_sample_location_refs {
+                        let count = observation_counts.get(&(
+                            gate.gate_id.as_str(),
+                            gate.zone_ref.as_str(),
+                            sample_location.as_str(),
+                            cycle.cycle_index
+                        )).copied().unwrap_or(0);
+                        observation_count += count;
+                        if self.state != "proposed" && count < gate.minimum_replicates_per_cycle as usize {
+                            push(&mut findings, "required_gate_location_observations_missing", "cycles",
+                                format!("Gate {} / zone {} / sample location {} has {count} observations at cycle {}; {} required.",
+                                    gate.gate_id, gate.zone_ref, sample_location, cycle.cycle_index, gate.minimum_replicates_per_cycle));
+                            gate_disposition = merge_disposition(&gate_disposition, "insufficient_evidence");
+                        }
                     }
                 }
                 for cycle in &self.cycles {
@@ -599,6 +636,16 @@ fn validate_article(article: &ArticleBinding, state: &str, findings: &mut Vec<Fi
         {
             push(findings, "zone_identity_incomplete_or_duplicate", format!("article.zones[{index}]"),
                 "Each zone must uniquely bind panel, material lot and construction.");
+        }
+        let mut sample_locations = HashSet::new();
+        if zone.cleanability_sample_location_refs.is_empty()
+            || zone.cleanability_sample_location_refs.iter().any(|location| {
+                is_blank(location) || !sample_locations.insert(location.as_str())
+            })
+        {
+            push(findings, "zone_cleanability_locations_missing_or_duplicate",
+                format!("article.zones[{index}].cleanability_sample_location_refs"),
+                "Each zone requires unique, non-empty sample locations bound to exact topology features.");
         }
     }
     if state == "proposed" && article.installed_article_digest == "sha256:" {
@@ -982,7 +1029,12 @@ mod tests {
                     "zone_ref": "ZONE-FOREARM-SYNTHETIC",
                     "panel_ref": "PANEL-FOREARM-SYNTHETIC",
                     "material_lot_ref": "MATERIAL-LOT-SYNTHETIC",
-                    "construction_ref": "CONSTRUCTION-SYNTHETIC"
+                    "construction_ref": "CONSTRUCTION-SYNTHETIC",
+                    "cleanability_sample_location_refs": [
+                        "TOPOLOGY-SURFACE-CENTER-SYNTHETIC",
+                        "TOPOLOGY-SEAM-EDGE-SYNTHETIC",
+                        "TOPOLOGY-FASTENER-POCKET-SYNTHETIC"
+                    ]
                 }]
             },
             "application": {
@@ -1009,6 +1061,11 @@ mod tests {
                 {
                     "gate_id": "GATE-SOIL",
                     "zone_ref": "ZONE-FOREARM-SYNTHETIC",
+                    "required_sample_location_refs": [
+                        "TOPOLOGY-SURFACE-CENTER-SYNTHETIC",
+                        "TOPOLOGY-SEAM-EDGE-SYNTHETIC",
+                        "TOPOLOGY-FASTENER-POCKET-SYNTHETIC"
+                    ],
                     "metric_family": "soil_residue",
                     "comparison_mode": "max_residual_fraction",
                     "unit": "mg",
@@ -1041,6 +1098,11 @@ mod tests {
                 {
                     "gate_id": "GATE-SEAM",
                     "zone_ref": "ZONE-FOREARM-SYNTHETIC",
+                    "required_sample_location_refs": [
+                        "TOPOLOGY-SURFACE-CENTER-SYNTHETIC",
+                        "TOPOLOGY-SEAM-EDGE-SYNTHETIC",
+                        "TOPOLOGY-FASTENER-POCKET-SYNTHETIC"
+                    ],
                     "metric_family": "seam_integrity",
                     "comparison_mode": "min_retention_fraction",
                     "unit": "N",
@@ -1184,26 +1246,36 @@ mod tests {
                 "evidence_ref": format!("INSPECTION-{index}"),
                 "defect_codes": []
             });
-            let soil_before = measured_value(10.0, 0.2, "mg", "SOIL-ASSAY-METHOD-SYNTHETIC", 'j');
-            let soil_after = measured_value(0.5, 0.05, "mg", "SOIL-ASSAY-METHOD-SYNTHETIC", 'k');
-            let seam_before = measured_value(100.0, 1.0, "N", "SEAM-TEST-METHOD-SYNTHETIC", 'l');
-            let seam_after = measured_value(96.0, 1.0, "N", "SEAM-TEST-METHOD-SYNTHETIC", 'm');
-            cycle["observations"] = json!([
-                {
+            let sample_locations = [
+                "TOPOLOGY-SURFACE-CENTER-SYNTHETIC",
+                "TOPOLOGY-SEAM-EDGE-SYNTHETIC",
+                "TOPOLOGY-FASTENER-POCKET-SYNTHETIC"
+            ];
+            let mut observations = Vec::new();
+            for (location_index, location) in sample_locations.iter().enumerate() {
+                let base = b'j' + (location_index as u8 * 4);
+                let soil_before = measured_value(10.0, 0.2, "mg", "SOIL-ASSAY-METHOD-SYNTHETIC", base as char);
+                let soil_after = measured_value(0.5, 0.05, "mg", "SOIL-ASSAY-METHOD-SYNTHETIC", (base + 1) as char);
+                let seam_before = measured_value(100.0, 1.0, "N", "SEAM-TEST-METHOD-SYNTHETIC", (base + 2) as char);
+                let seam_after = measured_value(96.0, 1.0, "N", "SEAM-TEST-METHOD-SYNTHETIC", (base + 3) as char);
+                observations.push(json!({
                     "gate_id": "GATE-SOIL",
                     "zone_ref": "ZONE-FOREARM-SYNTHETIC",
+                    "sample_location_ref": location,
                     "replicate_index": 0,
                     "before": soil_before,
                     "after": soil_after
-                },
-                {
+                }));
+                observations.push(json!({
                     "gate_id": "GATE-SEAM",
                     "zone_ref": "ZONE-FOREARM-SYNTHETIC",
+                    "sample_location_ref": location,
                     "replicate_index": 0,
                     "before": seam_before,
                     "after": seam_after
-                }
-            ]);
+                }));
+            }
+            cycle["observations"] = Value::Array(observations);
         }
     }
 
@@ -1351,10 +1423,21 @@ mod tests {
             cycle["observations"].as_array_mut().unwrap().push(json!({
                 "gate_id": "GATE-CLEANER-RESIDUE",
                 "zone_ref": "ZONE-FOREARM-SYNTHETIC",
+                "sample_location_ref": "TOPOLOGY-SURFACE-CENTER-SYNTHETIC",
                 "replicate_index": 0,
                 "before": null,
                 "after": measured_value(0.05,0.01,"mg/m2","CLEANER-RESIDUE-METHOD",'o')
             }));
+            for location in ["TOPOLOGY-SEAM-EDGE-SYNTHETIC", "TOPOLOGY-FASTENER-POCKET-SYNTHETIC"] {
+                cycle["observations"].as_array_mut().unwrap().push(json!({
+                    "gate_id": "GATE-CLEANER-RESIDUE",
+                    "zone_ref": "ZONE-FOREARM-SYNTHETIC",
+                    "sample_location_ref": location,
+                    "replicate_index": 0,
+                    "before": null,
+                    "after": measured_value(0.05,0.01,"mg/m2","CLEANER-RESIDUE-METHOD",'o')
+                }));
+            }
         }
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.is_valid(), "{:?}", report.findings);
@@ -1440,16 +1523,36 @@ mod tests {
         make_measured(&mut manifest);
         manifest["cycles"][2]["observations"].as_array_mut().unwrap().pop();
         let report = parse_and_validate(&manifest.to_string()).unwrap();
-        assert!(report.findings.iter().any(|f| f.code == "required_gate_cycle_observations_missing"));
+        assert!(report.findings.iter().any(|f| f.code == "required_gate_location_observations_missing"));
     }
 
     #[test]
-    fn duplicate_cycle_and_replicate_ids_are_rejected() {
+    fn each_declared_cleanability_hotspot_requires_per_cycle_coverage() {
+        let mut manifest = base_manifest();
+        make_measured(&mut manifest);
+        manifest["cycles"][0]["observations"].as_array_mut().unwrap().retain(|observation| {
+            observation["sample_location_ref"] != "TOPOLOGY-FASTENER-POCKET-SYNTHETIC"
+        });
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "required_gate_location_observations_missing"));
+    }
+
+    #[test]
+    fn observation_location_must_resolve_to_topology_sample_map() {
+        let mut manifest = base_manifest();
+        make_measured(&mut manifest);
+        manifest["cycles"][0]["observations"][0]["sample_location_ref"] = json!("UNKNOWN-POCKET");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "observation_sample_location_unknown"));
+    }
+
+
         let mut manifest = base_manifest();
         make_measured(&mut manifest);
         let first_cycle_id = manifest["cycles"][0]["cycle_id"].clone();
         manifest["cycles"][1]["cycle_id"] = first_cycle_id;
-        manifest["cycles"][1]["observations"][0]["replicate_index"] = json!(0);
+        let duplicate_observation = manifest["cycles"][1]["observations"][0].clone();
+        manifest["cycles"][1]["observations"].as_array_mut().unwrap().push(duplicate_observation);
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|f| f.code == "duplicate_or_blank_cycle_id"));
         assert!(report.findings.iter().any(|f| f.code == "duplicate_observation_replicate"));
