@@ -57,6 +57,25 @@ This quantity is only as reliable as the models and priors supplied to it. There
 
 Do not collapse all of these into a single "best experiment" score without retaining the component vector.
 
+## 3A. Goal-oriented design, identifiability and model discrepancy
+
+Parameter information is not always the scientific objective. A parameter posterior can become narrower while the downstream prediction or mechanism decision remains unchanged. Define the quantity of interest (QoI) first: for example, the held-out stem-deflection profile, the probability of root versus stem failure under a specified load, or the predictive difference between two physical mechanism families.
+
+Compare actions by expected change in the predictive distribution of the QoI or by expected discrimination among the live mechanism hypotheses—not only by entropy reduction over all model parameters. Record both parameter-identifiability diagnostics (profile likelihood, local sensitivity/Fisher-information rank, posterior correlations) and goal-oriented predictive uncertainty. If two parameters are not separately identifiable but their combination predicts the QoI accurately, preserve that distinction.
+
+Add an explicit model-discrepancy term. Sensor noise, biological variability and structural model error are different quantities; do not inflate one to conceal another. Use a model-inadequacy hypothesis when all registered beam models fail posterior-predictive checks. For the piecewise beam reference, test whether the predicted curve residuals show systematic curvature, hysteresis, rate dependence or load-direction effects before adding complexity.
+
+A staged fidelity ladder is preferable to jumping directly to an expensive simulator:
+1. analytical uniform beam;
+2. piecewise-EI beam with calibrated root springs;
+3. nonlinear/finite-element beam with measured cross-sections and material behaviour;
+4. root–soil interaction and canopy coupling;
+5. instrumented controlled-plot data.
+
+Every fidelity upgrade must demonstrate better held-out predictive accuracy or uncertainty calibration at a matched data and compute budget. More parameters alone are not progress.
+
+This is consistent with recent work on goal-oriented Bayesian design for nonlinear models, which targets information about predictive quantities of interest rather than parameters alone ([Zhong et al., SIAM/ASA JUQ, 2026](https://doi.org/10.1137/24M1649344)), and new work on experimental designs for practical parameter identifiability and model discrimination ([Mathematical Biosciences, 2026](https://doi.org/10.1016/j.mbs.2026.109710)).
+
 ## 4. Cost and feasibility
 
 A practical decision record should contain:
@@ -71,6 +90,18 @@ A practical decision record should contain:
 - required custody / calibration procedures.
 
 An infeasible or unauthorized experiment is not made acceptable by high EIG. Enforce permission, safety and rights as hard constraints before ranking.
+
+## 4A. Mechanical-model experiment ladder
+
+For plant mechanics, compare candidate actions that identify parameters and distinguish model structures:
+- multiple loading locations to separate a uniform EI profile from a rootward/upper-stem stiffness gradient;
+- bending in two orthogonal directions to identify cross-section anisotropy;
+- direct base translation and base rotation measurements to estimate root translational and rotational compliance;
+- repeat loading/unloading cycles to detect hysteresis and departures from linear elasticity;
+- controlled loading rates to quantify rate effects;
+- cross-section sampling along the internode to test whether an EI profile is supported by direct measurements.
+
+A single tip-force/tip-displacement observation cannot generally identify EI profile and root stiffness independently. The experiment registry must state this identifiability limit, and the model must not report unique parameters when multiple parameter sets predict the same response.
 
 ## 5. Worked example: centre-relative crop-flow discrimination
 
