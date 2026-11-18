@@ -900,6 +900,8 @@ mod tests {
             property["interval_semantics"] = json!("prediction_interval");
             property["calibration_receipt_ref"] = json!("CALIBRATION-01");
             property["predictor_generation_ref"] = json!("PREDICTOR-01");
+            property["calibration_receipt_predictor_generation_ref"] = json!("PREDICTOR-01");
+            property["calibration_domain_ref"] = json!("LIGHTSHELL-DOMAIN-REV-A");
             property["uncertainty_profile_ref"] = json!("MAT-UQ-01");
             property["applicability_state"] = json!("in_declared_domain");
             property["coupon_evidence_ref"] = json!(null);
