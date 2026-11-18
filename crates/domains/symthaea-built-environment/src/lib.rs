@@ -18,6 +18,9 @@ pub const INTENT_ONLY_CLAIM_CEILING: &str =
 const SYNTHETIC_PROBLEM: &str = include_str!(
     "../../../../docs/research/built-environment/HOME_EXPRESSION_DESIGN_PROBLEM_SYNTHETIC_V0.1.json"
 );
+const SYNTHETIC_CANDIDATE_SET: &str = include_str!(
+    "../../../../docs/research/built-environment/HOME_EXPRESSION_CANDIDATE_SET_SYNTHETIC_V0.1.json"
+);
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -694,6 +697,52 @@ pub struct ReplayReceipt {
     pub ordered_candidate_ids: Vec<String>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CandidateSetGenerator {
+    pub name: String,
+    pub version: Option<String>,
+    pub build_digest: Option<String>,
+    pub method: String,
+    pub seed: Option<u64>,
+    pub replay_status: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CandidateSourceIntent {
+    pub axis: String,
+    pub option_id: String,
+    pub preference: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ConceptCandidateReceipt {
+    pub candidate_id: String,
+    pub candidate_state: String,
+    pub interpretation: String,
+    pub source_intents: Vec<CandidateSourceIntent>,
+    pub parameter_deltas: Vec<Value>,
+    pub geometry_ref: Option<String>,
+    pub hard_gate_state: String,
+    pub physical_evaluation_state: String,
+    pub pareto_state: String,
+    pub resident_choice_state: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct CandidateSetReceipt {
+    pub schema_version: String,
+    pub candidate_set_id: String,
+    pub maturity: String,
+    pub source_problem_id: String,
+    pub source_problem_revision: String,
+    pub source_catalogue_revision: String,
+    pub generation_status: String,
+    pub generator: CandidateSetGenerator,
+    pub candidate_count: usize,
+    pub candidates: Vec<ConceptCandidateReceipt>,
+    pub claim_ceiling: String,
+}
+
 pub fn design_problem_digest(problem: &DesignProblem) -> Result<String, serde_json::Error> {
     Ok(blake3::hash(&serde_json::to_vec(problem)?).to_hex().to_string())
 }
@@ -717,6 +766,105 @@ pub fn derive_candidate_id(
 
 pub fn replay_matches(expected: &ReplayReceipt, actual: &ReplayReceipt) -> bool {
     expected == actual
+}
+
+/// Validate the illustrative candidate-set receipt without promoting it to a
+/// generated set. Executable generation requires a later, reviewed authority
+/// bridge and a separately qualified design/geometry provider.
+pub fn validate_illustrative_candidate_set(
+    receipt: &CandidateSetReceipt,
+    problem: &DesignProblem,
+    vocabulary: &CatalogueVocabulary,
+) -> Result<(), Vec<String>> {
+    let mut errors = Vec::new();
+    if receipt.schema_version != CANDIDATE_SET_SCHEMA_VERSION {
+        errors.push("unsupported candidate-set schema version".to_owned());
+    }
+    if receipt.candidate_set_id.trim().is_empty() {
+        errors.push("candidate_set_id is required".to_owned());
+    }
+    if receipt.source_problem_id != problem.problem_id
+        || receipt.source_problem_revision != problem.input.design_revision_ref
+    {
+        errors.push("candidate set is not bound to this exact design problem revision".to_owned());
+    }
+    if receipt.source_catalogue_revision != problem.source_bindings.catalogue_revision
+        || receipt.source_catalogue_revision != vocabulary.catalogue_revision
+    {
+        errors.push("candidate set catalogue revision differs from the source problem".to_owned());
+    }
+    if receipt.maturity != "ILLUSTRATIVE_NOT_EXECUTED"
+        || receipt.generation_status != "EXAMPLE_ONLY_NOT_EXECUTED"
+        || receipt.claim_ceiling
+            != "CONCEPTUAL_INTENT_DERIVATIVES_ONLY_NO_GEOMETRY_COST_PERFORMANCE_OR_FEASIBILITY"
+    {
+        errors.push("candidate set claims exceed the illustrative, non-executed envelope".to_owned());
+    }
+    if receipt.generator.name != "NOT_IMPLEMENTED"
+        || receipt.generator.version.is_some()
+        || receipt.generator.build_digest.is_some()
+        || receipt.generator.seed.is_some()
+        || receipt.generator.method != "NOT_SELECTED"
+        || receipt.generator.replay_status != "NOT_RUN"
+    {
+        errors.push("illustrative candidate set must not invent an executed generator identity".to_owned());
+    }
+    if receipt.candidate_count != receipt.candidates.len() || receipt.candidate_count != 3 {
+        errors.push("candidate_count must exactly match the three illustrative records".to_owned());
+    }
+
+    let mut candidate_ids = BTreeSet::new();
+    for candidate in &receipt.candidates {
+        if candidate.candidate_id.trim().is_empty()
+            || !candidate_ids.insert(candidate.candidate_id.clone())
+        {
+            errors.push("candidate IDs must be non-empty and unique".to_owned());
+        }
+        if candidate.candidate_state != "ILLUSTRATIVE_NOT_GENERATED"
+            || candidate.interpretation.trim().is_empty()
+            || !candidate.parameter_deltas.is_empty()
+            || candidate.geometry_ref.is_some()
+            || candidate.hard_gate_state != "UNKNOWN_NOT_EVALUATED"
+            || candidate.physical_evaluation_state != "NOT_EVALUATED"
+            || candidate.pareto_state != "NOT_EVALUATED"
+            || candidate.resident_choice_state != "NOT_RECORDED"
+        {
+            errors.push(format!(
+                "candidate {} attempts to promote an illustrative intent into a generated or evaluated design",
+                candidate.candidate_id
+            ));
+        }
+
+        for source in &candidate.source_intents {
+            let known = match source.axis.as_str() {
+                "spatial_typology" => vocabulary.spatial_typology_ids.contains(&source.option_id),
+                "architectural_expression" => vocabulary.style_sources.contains_key(&source.option_id),
+                "material_tectonic_intent" => vocabulary.material_tectonic_ids.contains(&source.option_id),
+                "environmental_strategy_intent" => vocabulary.environmental_strategy_ids.contains(&source.option_id),
+                "experience_programme" => vocabulary.experience_package_ids.contains(&source.option_id),
+                _ => false,
+            };
+            if !known {
+                errors.push(format!(
+                    "candidate {} references unknown source intent {}:{}",
+                    candidate.candidate_id, source.axis, source.option_id
+                ));
+            }
+            if ![
+                "PRIMARY", "SECONDARY", "ACCENT", "REFERENCE_ONLY", "AVOID",
+                "ACCEPTABLE", "UNDECIDED", "PREFERRED", "CONSIDERED", "AVOIDED",
+            ]
+            .contains(&source.preference.as_str())
+            {
+                errors.push(format!(
+                    "candidate {} contains unsupported source preference {}",
+                    candidate.candidate_id, source.preference
+                ));
+            }
+        }
+    }
+
+    if errors.is_empty() { Ok(()) } else { Err(errors) }
 }
 
 /// A finite categorical variable used by the exact-enumeration oracle.
@@ -958,6 +1106,23 @@ mod tests {
         assert!(validate_design_problem(&problem, &vocabulary()).is_ok());
         assert_eq!(problem.input.axis_intent.spatial_typology.state, AxisState::Undecided);
         assert_eq!(problem.claim_ceiling, INTENT_ONLY_CLAIM_CEILING);
+    }
+
+    #[test]
+    fn illustrative_candidate_set_is_bound_and_non_executable() {
+        let problem = parsed_problem();
+        let vocabulary = vocabulary();
+        let receipt: CandidateSetReceipt =
+            serde_json::from_str(SYNTHETIC_CANDIDATE_SET).unwrap();
+        assert!(validate_illustrative_candidate_set(&receipt, &problem, &vocabulary).is_ok());
+
+        let mut promoted = receipt.clone();
+        promoted.candidates[0].geometry_ref = Some("geometry://not-qualified".to_owned());
+        assert!(validate_illustrative_candidate_set(&promoted, &problem, &vocabulary).is_err());
+
+        let mut stale = receipt;
+        stale.source_problem_revision = "STALE-REVISION".to_owned();
+        assert!(validate_illustrative_candidate_set(&stale, &problem, &vocabulary).is_err());
     }
 
     #[test]
