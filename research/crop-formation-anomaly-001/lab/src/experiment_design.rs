@@ -26,7 +26,7 @@ fn validate_probability_distribution(
         if !value.is_finite() || *value < 0.0 {
             return Err(ExperimentDesignError::InvalidOutcomeMatrix(name));
         }
-        total += value;
+        total += *value;
     }
 
     if !total.is_finite() || (total - 1.0).abs() > PROBABILITY_TOLERANCE {
@@ -103,7 +103,7 @@ pub fn expected_information_gain_bits(
         let joint: Vec<f64> = prior_probabilities
             .iter()
             .zip(conditional_outcome_probabilities)
-            .map(|(prior, row)| prior * row[outcome_index])
+            .map(|(prior, row)| *prior * row[outcome_index])
             .collect();
         let outcome_probability: f64 = joint.iter().sum();
 
@@ -113,7 +113,7 @@ pub fn expected_information_gain_bits(
 
         let posterior: Vec<f64> = joint
             .iter()
-            .map(|joint_probability| joint_probability / outcome_probability)
+            .map(|joint_probability| *joint_probability / outcome_probability)
             .collect();
         expected_posterior_entropy += outcome_probability * entropy_bits(&posterior);
     }
