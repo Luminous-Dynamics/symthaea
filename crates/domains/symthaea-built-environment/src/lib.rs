@@ -23,7 +23,7 @@ const SYNTHETIC_CANDIDATE_SET: &str = include_str!(
     "../../../../docs/research/built-environment/HOME_EXPRESSION_CANDIDATE_SET_SYNTHETIC_V0.1.json"
 );
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Copy)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AxisState {
     Undecided,
@@ -32,7 +32,7 @@ pub enum AxisState {
     ConflictUnresolved,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Copy)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ExperienceState {
     Undecided,
@@ -40,7 +40,7 @@ pub enum ExperienceState {
     ConflictUnresolved,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Copy)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Preference {
     Preferred,
@@ -49,7 +49,7 @@ pub enum Preference {
     Undecided,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Copy)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ExpressionRole {
     Primary,
