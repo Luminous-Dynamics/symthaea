@@ -51,6 +51,7 @@ pub mod grid;
 pub mod multiscale;
 pub mod nppad_validation;
 pub mod plasma_control;
+pub mod plasma_diagnostic_portfolio;
 pub mod plasma_hdc_encoder;
 pub mod threat;
 
@@ -69,6 +70,12 @@ pub use plasma_hdc_encoder::{
     // Streaming
     PlasmaStateBuffer,
     StabilityAssessment,
+};
+
+pub use plasma_diagnostic_portfolio::{
+    PlasmaDiagnosticCandidate, PlasmaDiagnosticPortfolioAnalysis,
+    PlasmaDiagnosticPortfolioSpec, PlasmaPortfolioError, PlasmaPortfolioSelection,
+    PLASMA_DIAGNOSTIC_PORTFOLIO_SCHEMA, PLASMA_PORTFOLIO_CLAIM_CEILING,
 };
 
 pub use plasma_control::{
