@@ -53,6 +53,10 @@ The checked-in fixtures include an `evaluation_only` section with realized outco
 
 A separate authoring-session cross-check matched all 12 frozen selector decisions and all 12 cost-adjusted oracle labels. This validates the fixture logic only; it is not a model-run evaluation.
 
+## Test-time-compute controls
+
+Do not compare a team only against one greedy sample. The v0.1 campaign must include single-agent best-of-N/self-consistency, independent parallel agents with no communication, communication over identical evidence, partitioned-evidence communication, and independently verified single-agent strategies at matched total budgets. See the November 2026 synthesis https://arxiv.org/abs/2611.17610. Count every sample, model call, input/output token, tool/verifier call, elapsed time and cost. The 45% capability threshold from the Nature paper is never a code constant.
+
 ## Claim ceiling
 
 A passing synthetic selector fixture only demonstrates that the rule implements the stated robust-gain/cost/calibration semantics. It does not establish that the rule predicts collaboration gains, selects an optimal architecture in production, beats any SOTA framework, or generalizes across models and task families.
