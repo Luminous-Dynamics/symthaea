@@ -16,14 +16,15 @@ This is important for gravity-fed, roof-tank, low-head and pressure-variable ins
 
 ## 2. Standards interpretation caveat
 
-Two statements in the accessible SANS 10252-1:2018 Edition 3.2 document need controlled interpretation:
+The accessible SANS 10252-1:2018 Edition 3.2 document has distinct demand/design columns that must not be conflated:
 
-- Amended clause 5.3.3.2 says showers must operate effectively at the manufacturer's recommended internal water pressure and sets maximum discharge at 10 L/min.
-- Table 3 lists the water-saving showerhead row as likely maximum 12 L/min, likely minimum 6 L/min, design flow 10 L/min and design flow pressure 50–100 kPa.
+- Amended clause 5.3.3.2 says showers must operate effectively at the manufacturer's recommended internal water pressure and sets a maximum discharge at 10 L/min.
+- Table 3 lists the water-saving showerhead as 12 L/min likely maximum, 6 L/min likely minimum, 10 L/min design flow and 50–100 kPa design flow pressure.
+- Table 3 footnote (a) defines likely maximum as the flow a user would normally allow the fitting to discharge, not necessarily the maximum attainable. Footnote (b) says its design-flow pressure values are used where a manufacturer's flow-pressure curve is unavailable.
 
-The 12 L/min Table 3 likely-maximum entry appears inconsistent with the clause-level 10 L/min maximum. Do not treat the table as permission to exceed clause 5.3.3.2. Confirm the controlled SABS text and technical interpretation before compliance or design-release decisions.
+Accordingly, do not call the 12 L/min likely-maximum column a permitted product discharge or a contradiction of the separate 10 L/min clause. Retain 10 L/min as the conservative clause-level maximum pending controlled-standard confirmation. Treat 50–100 kPa as an installation/design-flow reference that motivates low-head research, not proof that every showerhead can operate at 50 kPa or that 50 kPa is a universal product minimum.
 
-Table 3 pressure values are design-flow references; they are not WaterSense test points and are not product certification criteria.
+Table 3 pressure values are not WaterSense test points and are not product certification criteria. Confirm the controlled SABS text and project-specific interpretation before compliance or design-release decisions.
 
 Source copy for research: https://www.uj.ac.za/wp-content/uploads/2022/11/sans-10252-1-water-supply-and-drainage-for-buildings-part-1-water-supply-installations-for-buildings-2018.pdf
 
