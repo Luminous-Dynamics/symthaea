@@ -58,3 +58,14 @@ The adapter remains deliberately small: it binds paired Aqua test runs to equiva
 - `docs/AQUA_MODULAR_PLATFORM_ARCHITECTURE_V0_1.md`
 - `docs/AQUA_AQS1_INTERFACE_AND_FAULT_CONTRACT_V0_1.md`
 - `AQUA-ADAPTIVE-EXPERIENCE-001 #12712` — optional privacy-preserving preference/task assistance.
+
+
+## Spatial spray-field analysis
+
+The dependency-free spray_field module summarizes a complete, externally qualified deposition grid:
+- target-area coverage against a preregistered deposition-density threshold;
+- area-weighted target mean and coefficient of variation;
+- mapped off-target mass fraction and raw mass totals;
+- fail-closed handling for incomplete capture, duplicate/missing cells, invalid areas/masses and zero mapped mass.
+
+This is descriptive post-processing only. It does not calibrate instruments, prove capture completeness, assess comfort or hygiene, replace ASME/CSA or WaterSense methods, or authorize a physical test. The full protocol is in docs/AQUA_SPRAY_FIELD_METROLOGY_PROTOCOL_V0_1.md.
