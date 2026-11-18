@@ -602,5 +602,14 @@
     "https://doi.org/10.1103/PhysRevB.63.132504",
     "https://doi.org/10.1103/PhysRevB.96.174505"
   ],
-  "claim_ceiling": "Synthetic static GL input only; no Monte Carlo, Tc, material property, or experimental result is established."
+  "claim_ceiling": "Synthetic static GL input only; no Monte Carlo, Tc, material property, or experimental result is established.",
+  "sampling": {
+    "algorithm": "single_site_complex_field_metropolis",
+    "random_seed": 1729,
+    "warmup_sweeps": 20,
+    "measurement_sweeps": 100,
+    "thinning": 1,
+    "proposal_scale": 0.25,
+    "independent_chains": 4
+  }
 }
