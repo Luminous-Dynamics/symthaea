@@ -314,8 +314,11 @@ impl PressureFlowObservation {
     ///
     /// This is a manufacturer-document status only. It does not determine whether the
     /// task succeeded or whether the product is independently qualified.
-    pub fn product_pressure_range_status(&self) -> ProductPressureRangeStatus {
-        match &self.product_declared_range {
+    pub fn product_pressure_range_status(
+        &self,
+    ) -> Result<ProductPressureRangeStatus, PressureRunError> {
+        self.validate()?;
+        Ok(match &self.product_declared_range {
             None => ProductPressureRangeStatus::NotDeclared,
             Some(range) => {
                 let lower =
@@ -341,7 +344,7 @@ impl PressureFlowObservation {
                     }
                 }
             }
-        }
+        })
     }
 }
 
@@ -490,7 +493,7 @@ mod tests {
         assert_eq!(run.validate(), Ok(()));
         assert_eq!(
             run.product_pressure_range_status(),
-            ProductPressureRangeStatus::OutsideDeclaredRange
+            Ok(ProductPressureRangeStatus::OutsideDeclaredRange)
         );
     }
 
@@ -499,7 +502,7 @@ mod tests {
         let run = observation("run-01", "aqua-article", 100.0);
         assert_eq!(
             run.product_pressure_range_status(),
-            ProductPressureRangeStatus::NotDeclared
+            Ok(ProductPressureRangeStatus::NotDeclared)
         );
     }
 
@@ -513,7 +516,7 @@ mod tests {
         });
         assert_eq!(
             run.product_pressure_range_status(),
-            ProductPressureRangeStatus::WithinFullyDeclaredRange
+            Ok(ProductPressureRangeStatus::WithinFullyDeclaredRange)
         );
     }
 
@@ -602,7 +605,7 @@ mod tests {
         assert_eq!(run.validate(), Ok(()));
         assert_eq!(
             run.product_pressure_range_status(),
-            ProductPressureRangeStatus::MeetsDeclaredMinimumOnly
+            Ok(ProductPressureRangeStatus::MeetsDeclaredMinimumOnly)
         );
     }
 
@@ -618,7 +621,7 @@ mod tests {
         assert_eq!(run.validate(), Ok(()));
         assert_eq!(
             run.product_pressure_range_status(),
-            ProductPressureRangeStatus::MeetsDeclaredMaximumOnly
+            Ok(ProductPressureRangeStatus::MeetsDeclaredMaximumOnly)
         );
     }
 
