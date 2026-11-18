@@ -822,8 +822,8 @@ mod tests {
         let qualified = decide(Policy::CausalQualified, &item.memory, item.query);
 
         assert_eq!(frequency.action, Some(Action::A));
-        assert_eq!(qualified.action, Some(Action::B));
-        assert_eq!(qualified.evidence_ids.len(), 2);
+        assert_eq!(qualified.action, None);
+        assert!(qualified.evidence_ids.is_empty());
     }
 
     #[test]

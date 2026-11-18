@@ -269,9 +269,9 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
     let b_ok = b.is_qualified();
 
     match (a_ok, b_ok) {
-        (false, false) => Decision::abstain(),
-        (true, false) => Decision::choose(Action::A, a.evidence_ids),
-        (false, true) => Decision::choose(Action::B, b.evidence_ids),
+        // A comparison cannot be made from one-sided evidence. Unknown is
+        // not equivalent to inferior; the caller must abstain or probe.
+        (false, false) | (true, false) | (false, true) => Decision::abstain(),
         (true, true) => {
             let action = if a.mean() > b.mean() { Action::A } else { Action::B };
             let difference = (a.mean() - b.mean()).abs();
@@ -440,6 +440,8 @@ mod tests {
         let memory = vec![
             sample(1, 10, Action::A, 0.9, scope),
             sample(2, 11, Action::A, 0.9, scope),
+            sample(3, 20, Action::B, 0.4, scope),
+            sample(4, 21, Action::B, 0.4, scope),
         ];
         let decision = decide(
             Policy::CausalQualified,
@@ -643,8 +645,24 @@ mod tests {
             Some(Action::A)
         );
         let qualified = decide(Policy::CausalQualified, &memory, Query { scope });
-        assert_eq!(qualified.action, Some(Action::B));
-        assert_eq!(qualified.evidence_ids, vec![22, 23]);
+        assert_eq!(qualified.action, None);
+        assert!(qualified.evidence_ids.is_empty());
+    }
+
+    #[test]
+    fn one_sided_qualified_evidence_does_not_authorize_a_comparison() {
+        let scope = Scope {
+            regime: Regime::Baseline,
+            objective: Objective::Quality,
+        };
+        let memory = vec![
+            sample(40, 10, Action::A, 0.99, scope),
+            sample(41, 11, Action::A, 0.98, scope),
+            sample(42, 20, Action::B, 0.55, scope),
+        ];
+        let decision = decide(Policy::CausalQualified, &memory, Query { scope });
+        assert_eq!(decision.action, None);
+        assert!(decision.evidence_ids.is_empty());
     }
 
     #[test]

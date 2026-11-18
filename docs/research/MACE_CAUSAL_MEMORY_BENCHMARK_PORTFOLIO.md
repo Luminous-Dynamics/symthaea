@@ -12,7 +12,7 @@ The target architecture is therefore:
 
 `raw events → provenance-bound experience → causal/effect contract → applicability test → decision or safe abstention → observed outcome → correction/revocation`
 
-Memory is treated as an evidence-bearing control surface, not merely a retrieval index.
+Memory is treated as an evidence-bearing control surface, not merely a retrieval index. A comparative action choice requires qualified evidence for both alternatives; one-sided evidence must lead to abstention or a bounded information-gathering request.
 
 ## 2. Current external benchmark landscape
 
