@@ -114,7 +114,7 @@ Measure:
 - robustness to missingness, uneven sampling, spatial clustering and quality weights;
 - abstention when there is no stable global direction.
 
-The first Rust implementation supplies descriptive summaries only. Its optional centre-relative metrics test radial/inward/outward and tangential/clockwise/counter-clockwise alignment against a supplied calibrated centre. It is not an interpolated vector-field estimator, does not estimate vorticity/divergence, and does not attribute a flow field to any mechanism.
+The 2D Rust crop-flow module supplies descriptive summaries only. A separate 3D stem-pose module accepts measured base-to-tip axis vectors and reports mean inclination from vertical, horizontal azimuth, 3D orientation concentration, nearest-neighbour vector alignment and optional centre-relative radial/tangential alignment. Neither module reconstructs stems from point clouds, estimates vorticity/divergence, or attributes a field to any mechanism.
 
 **Synthetic target:** exact recovery within numerical tolerance for noiseless analytic fields; for noisy cases, publish error/coverage curves against the declared noise level. Do not choose a universal real-world degree threshold before instrument and sampling uncertainty are characterized.
 
