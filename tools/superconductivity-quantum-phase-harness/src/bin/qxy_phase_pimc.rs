@@ -839,8 +839,10 @@ mod tests {
     fn malformed_parallel_bond_topology_is_rejected() {
         let (schema, fixture) = inputs();
         let mut value: Value = serde_json::from_slice(&fixture).unwrap();
-        value["graph"]["edges"][1]["source"] = value["graph"]["edges"][0]["source"].clone();
-        value["graph"]["edges"][1]["target"] = value["graph"]["edges"][0]["target"].clone();
+        let duplicate_source = value["graph"]["edges"][0]["source"].clone();
+        let duplicate_target = value["graph"]["edges"][0]["target"].clone();
+        value["graph"]["edges"][1]["source"] = duplicate_source;
+        value["graph"]["edges"][1]["target"] = duplicate_target;
         let mutated = serde_json::to_vec(&value).unwrap();
         assert!(QxyModel::from_bytes(&schema, &mutated).is_err());
     }
