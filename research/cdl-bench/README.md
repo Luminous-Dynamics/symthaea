@@ -87,10 +87,10 @@ headline compression ratio.
 - A paired trace with `do(x1=20000)` active on the middle half of the stream.
 
 The command checks exact codec round-trips and reports framed lengths for
-the order-0/order-1 models, the typed field/lane model and the known-parent
-oracle model, plus Zstandard when installed. The parent model receives the
-correct SCM graph by construction; it is a topology-aware coding control, not a
-learned causal predictor. The finite-state latent labels remain evaluator-side;
+the order-0/order-1, typed-field, temporal-lag, parent-oracle and hybrid models,
+plus Zstandard when installed. The parent and hybrid models receive the correct
+SCM graph by construction; they are topology-aware coding controls, not
+learned causal predictors. The finite-state latent labels remain evaluator-side;
 the serialized SCM stream includes the intervention manifest and observed i16
 values. No causal-transfer result is implied.
 
@@ -152,19 +152,23 @@ traces. Both use the same arithmetic coder and 32-byte CDL frame as the built-in
 order-0/order-1 arms:
 
 - `field_frame`: separate adaptive byte histograms for each of the five
-  variables and each of their two little-endian byte lanes. This tests whether
-  preserving typed-channel identity helps beyond treating the input as one
-  undifferentiated byte stream.
-- `parent_oracle_frame`: the same field/lane model, conditioned on coarse
-  same-timestep parent-byte buckets from the known SCM graph. It tests whether
-  graph-aligned conditioning helps after typed-channel identity is already
-  accounted for.
+  variables and each of their two little-endian byte lanes. This tests typed
+  channel identity against one undifferentiated byte stream.
+- `lag_frame`: conditions each variable/lane on the previous timestep's
+  reconstructed full i16 value for that same variable. This is a noncausal
+  temporal baseline with no cross-variable graph.
+- `parent_oracle_frame`: conditions each field/lane on the full reconstructed
+  same-timestep parent values, quantized into four bins, using the known SCM
+  graph.
+- `hybrid_frame`: combines one-bit parent-sign context with the previous
+  timestep's four-bin same-variable context.
 
-The parent-conditioned predictor is an **oracle-topology control**. The graph is
-supplied in its implementation; this is not graph discovery, causal mechanism
-learning, intervention generalization, or a Symthaea HDC/CfC result. The
-conditional histograms are adaptive and decoder-synchronous, but the
-conditioning structure is known in advance.
+The parent and hybrid predictors are **oracle-topology controls**. The graph is
+supplied in their implementation; this is not graph discovery, causal
+mechanism learning, intervention generalization, or a Symthaea HDC/CfC result.
+The conditional histograms are adaptive and decoder-synchronous, but the
+conditioning structure is known in advance. The lag arm is deliberately a
+strong noncausal comparator.
 
 The two predictors include a separate header histogram and reset to a
 deterministic empty state for each stream. Their inline state sizes are printed
@@ -173,12 +177,16 @@ must be accounted for separately in a cold-start comparison. The per-stream
 frame size alone is not a complete deployed-system size.
 
 Interpretation order:
-1. First compare field/lane conditioning with order-0/order-1 to isolate the
-   value of typed channel identity.
-2. Then compare parent-oracle with field/lane to isolate the incremental value
-   of parent-conditioned context.
-3. Only after those controls work should a learned mechanism model be tested
-   against the oracle and a matched noncausal context model.
+1. Compare field/lane with order-0/order-1 to measure the value of typed
+   channel identity.
+2. Compare lag with field/lane to measure ordinary temporal persistence.
+3. Compare parent-oracle with lag to test whether known cross-variable
+   structure adds value beyond same-channel history, especially under
+   intervention.
+4. Compare hybrid with lag and parent-oracle to test whether the two contexts
+   are complementary.
+5. Only then test a learned mechanism model against the oracle and the matched
+   noncausal temporal control.
 
 No compression win is implied by source existence. The runner must be compiled
 and executed, and total-size/resource accounting must be complete, before
