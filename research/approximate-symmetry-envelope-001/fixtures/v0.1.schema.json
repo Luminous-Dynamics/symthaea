@@ -190,24 +190,26 @@
           "$ref": "#/$defs/affineMap"
         },
         "action": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/affineMap"
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "matrix",
+            "offset",
+            "order"
+          ],
+          "properties": {
+            "matrix": {
+              "$ref": "#/$defs/matrix2Integer"
             },
-            {
-              "type": "object",
-              "required": [
-                "order"
-              ],
-              "properties": {
-                "order": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 64
-                }
-              }
+            "offset": {
+              "$ref": "#/$defs/vector2Integer"
+            },
+            "order": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
             }
-          ]
+          }
         },
         "reference_region": {
           "$ref": "#/$defs/box2"
