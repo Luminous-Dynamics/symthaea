@@ -4,7 +4,7 @@ use cdl_bench::{
 };
 use std::error::Error;
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 use std::time::Instant;
 
@@ -136,9 +136,20 @@ fn external_compressed_len(command: &str, args: &[&str], input: &[u8]) -> Option
         stdin.write_all(input).ok()?;
     }
 
-    let output = child.wait_with_output().ok()?;
-    if output.status.success() {
-        Some(output.stdout.len())
+    let mut stdout = child.stdout.take()?;
+    let reader = std::thread::spawn(move || {
+        let mut output = Vec::new();
+        stdout.read_to_end(&mut output).map(|_| output)
+    });
+
+    let write_result = {
+        let mut stdin = child.stdin.take()?;
+        stdin.write_all(input)
+    };
+    let status = child.wait().ok()?;
+    let output = reader.join().ok()?.ok()?;
+    if write_result.is_ok() && status.success() {
+        Some(output.len())
     } else {
         None
     }
@@ -236,6 +247,9 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
             }
             other => return Err(format!("unknown causal option: {other}\n{}", usage()).into()),
         }
+    }
+    if steps < 4 {
+        return Err("causal generator requires at least four steps for its intervention window".into());
     }
     if steps > 1_000_000 {
         return Err("causal generator limit is 1,000,000 steps per trace".into());
