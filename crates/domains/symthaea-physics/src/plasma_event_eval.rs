@@ -1777,6 +1777,14 @@ mod tests {
             "70317a32958491acd8e0416639014d32e1f36b2c"
         );
         assert_eq!(
+            manifest["synthetic_replay_interop"]["consumer_contract_fixture"],
+            "benchmarks/plasma/symtropy-synthetic-observation-interop-v0.json"
+        );
+        assert_eq!(
+            manifest["synthetic_replay_interop"]["consumer_gate_test"],
+            "deserialize each frame as PlasmaObservationFrame and require DecisionInputGate::Abstain with exact SyntheticNotMeasurement, Unavailable, or Invalid reason"
+        );
+        assert_eq!(
             manifest["synthetic_replay_interop"]["frame_shot_id_namespace"],
             "synthetic-shot:<scenario_id>"
         );
