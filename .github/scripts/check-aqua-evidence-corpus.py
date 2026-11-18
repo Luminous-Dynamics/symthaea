@@ -79,6 +79,8 @@ EXPECTED_VALUES = {
     "test_instrument_calibration_requirement": ("text", None),
     "boost_function_definition": ("text", None),
     "boost_function_criteria": ("text", None),
+    "design_for_disassembly_scope": ("text", None),
+    "repairability_assessment_scope": ("text", None),
 }
 
 
