@@ -1686,8 +1686,8 @@ pub fn verify_shared_bias_probe_design_receipt(
 mod tests {
     use super::*;
     use symmetry_active_experiment_reference::{
-        ActiveExperimentProblemV1, ExperimentProbeV1, compile_active_experiment,
-        replay_observations,
+        ActiveExperimentProblemV1, ExperimentProbeV1, StaticProbeBudgetV1,
+        compile_active_experiment, replay_observations, solve_exact_static_probe_design,
     };
 
     fn bounded_fixture() -> BoundedNoiseProblemV1 {
@@ -1967,14 +1967,24 @@ mod tests {
         };
         let bounded = BoundedNoiseProblemV1::from_deterministic(&deterministic).unwrap();
         let static_design = design_bounded_noise_probe_set(&bounded).unwrap();
+        let exact_static = solve_exact_static_probe_design(
+            &deterministic,
+            Default::default(),
+            StaticProbeBudgetV1::default(),
+        )
+        .unwrap();
         let adaptive = compile_active_experiment(&deterministic, Default::default()).unwrap();
 
         assert_eq!(static_design.selected_probe_ids.len(), 3);
         assert_eq!(static_design.selected_cost, 3);
         assert!(static_design.complete_pairwise_separation);
         assert!(!static_design.optimality_certified);
+        assert_eq!(exact_static.selected_probe_ids.len(), 3);
+        assert_eq!(exact_static.selected_cost, 3);
+        assert!(exact_static.optimality_certified);
+        assert_eq!(static_design.selected_cost, exact_static.selected_cost);
         assert_eq!(adaptive.root_worst_case_cost, 2);
-        assert!(static_design.selected_cost > adaptive.root_worst_case_cost);
+        assert!(exact_static.selected_cost > adaptive.root_worst_case_cost);
 
         verify_bounded_noise_probe_design_receipt(&bounded, &static_design).unwrap();
         let mut forged = static_design.clone();
