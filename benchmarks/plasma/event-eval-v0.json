@@ -1,0 +1,136 @@
+{
+  "schema_version": "luminous.plasma-event-evaluation.v0.1",
+  "benchmark_id": "PLASMA-EVENT-EVAL-001",
+  "status": "protocol_specification",
+  "claim_ceiling": "OFFLINE_EVALUATION_PROTOCOL_ONLY_NOT_PHYSICAL_CONTROL_QUALIFICATION",
+  "references": {
+    "tokamark_dataset": "https://huggingface.co/datasets/UKAEA-IBM-STFC/tokamark-v1",
+    "robustness_repository": "https://github.com/Neerav-Gupta/tokamark-robustness",
+    "robustness_reference_commit": "a51d392c34567601c802edac0a614c179683566c",
+    "robustness_paper": "https://arxiv.org/abs/2607.11915",
+    "baseline_commit_pinned": true
+  },
+  "population_and_split_contract": {
+    "primary_split": "official shot-disjoint TokaMark split",
+    "all_transforms_fit_on": [
+      "train",
+      "validation"
+    ],
+    "thresholds_selected_on": "validation",
+    "alarm_persistence_selected_on": "validation",
+    "imputation_and_scaling_fit_on": "train",
+    "test_is_read_only": true,
+    "include_positive_and_negative_shots": true,
+    "if_negative_shots_unavailable": "report false-alarm rates as undefined; do not substitute zero"
+  },
+  "online_policy_contract": {
+    "input_fields": [
+      "shot_id",
+      "window_end_ns",
+      "risk_score",
+      "evidence_quality"
+    ],
+    "allowed_evidence_quality": [
+      "direct_measured"
+    ],
+    "abstain_evidence_quality": [
+      "synthetic",
+      "unavailable",
+      "invalid",
+      "delayed",
+      "degraded"
+    ],
+    "strictly_monotonic_window_end": true,
+    "event_labels_available_online": false,
+    "t_cut_available_online": false,
+    "future_windows_available_online": false,
+    "full_shot_statistics_available_online": false,
+    "test_threshold_optimization": false,
+    "active_alarm_cleared_by_missing_data": false,
+    "policy_config_fields": [
+      "policy_id",
+      "validation_receipt_sha256",
+      "trigger_threshold",
+      "clear_threshold",
+      "trigger_persistence_windows",
+      "clear_persistence_windows",
+      "required_warning_ns"
+    ]
+  },
+  "offline_scoring_contract": {
+    "event_reference_entered_after_trace_generation": true,
+    "metrics": [
+      "event_tpr",
+      "missed_disruptions",
+      "false_alarm_shot_rate",
+      "false_alarms_per_non_disruptive_shot",
+      "false_alarm_events",
+      "mean_warning_time",
+      "warning_time_p05",
+      "warning_time_p10",
+      "warning_time_p50"
+    ],
+    "warning_requirement_ns": 50000000,
+    "warning_requirement_is_research_target_not_achieved_result": true,
+    "confidence_intervals": "shot-level bootstrap, stratified by machine and event class",
+    "undefined_metrics": "return null when the denominator cohort is empty"
+  },
+  "required_ablation_families": [
+    "clean",
+    "random_dropout_10_25_50_percent",
+    "front_acquisition_gap_20_40_60_percent",
+    "pre_event_gap_10_25_50_percent",
+    "single_channel_ablation",
+    "plasma_current_ablation",
+    "correlated_diagnostic_system_failure",
+    "intermittent_dropout",
+    "delay_and_stale_data",
+    "saturation_bias_gain_drift",
+    "synthetic_reconstruction_vs_direct_measurement"
+  ],
+  "baseline_matrix": [
+    "published_XGBoost",
+    "published_LSTM",
+    "published_Transformer",
+    "TokaMark_CNN",
+    "TokaMind_when_artifacts_and_license_allow",
+    "GenToka_when_artifacts_and_license_allow",
+    "simple_persistence_and_last_value"
+  ],
+  "target_gates": {
+    "reproduce_published_protocol_before_claiming_improvement": true,
+    "clean_metric_relative_regression_max": 0.01,
+    "worst_case_pre_event_degradation_relative_improvement_min": 0.3,
+    "event_tpr_at_fpr_target": 0.95,
+    "false_positive_rate_max": 0.05,
+    "minimum_warning_time_ns": 50000000,
+    "all_values_are_research_targets": true
+  },
+  "runtime_reporting": [
+    "p50_latency_ns",
+    "p95_latency_ns",
+    "p99_latency_ns",
+    "deadline_miss_rate",
+    "peak_memory_bytes"
+  ],
+  "reproducibility_receipt_required": [
+    "repo_commit",
+    "dataset_revision",
+    "shot_split_digest",
+    "preprocessing_digest",
+    "policy_id",
+    "validation_receipt_sha256",
+    "model_revision",
+    "seed",
+    "hardware",
+    "metrics",
+    "uncertainty_intervals"
+  ],
+  "explicit_non_goals": [
+    "live_tokamak_control",
+    "actuator_authorization",
+    "claiming_synthetic_faults_are_physical_failure_distributions",
+    "claiming_benchmark_reproduction_without_exact_data_and_split",
+    "claiming_observability_from_evidence_provenance_alone"
+  ]
+}
