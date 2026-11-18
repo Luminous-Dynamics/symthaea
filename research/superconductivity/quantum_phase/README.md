@@ -253,3 +253,10 @@ The smoke receipt includes exact schema and fixture SHA-256 values, instance ide
 **Not implemented / not qualified yet:** production-size L=48 and larger runs, error bars, integrated autocorrelation / effective-sample-size analysis, warmup and convergence criteria, Δτ extrapolation, BKT finite-size scaling, zero-temperature 3D-XY scaling, quantum-critical finite-size collapse, current-current imaginary-time correlators, conductivity sum rules, analytic continuation and the dissipative bath extension.
 
 The reported \(U_c/t=5.72(1)\), \(z=1\), and \(\nu=0.671\) remain paper-reported targets. We have not reproduced them. The source's \(N_\tau=1000\) at L=48 and \(N_\tau=5000\) at T/t=0.05 illustrate the computational burden; do not promote the L=4 smoke to source parity.
+
+
+### Sampling diagnostics and evidence receipts
+
+The QXY smoke receipt is bound to the exact schema and fixture SHA-256 hashes, instance ID, source parameter set and actual random seed. For action, stiffness and vortex-density series it reports the sample mean, sample standard deviation, an explicitly labelled **iid-only** standard error, sample count and lag-one autocorrelation.
+
+These statistics are not a replacement for integrated autocorrelation time, effective sample size, thermalization analysis, multiple independent chains or systematic finite-\(N_\tau\) extrapolation. In particular, the iid standard error must never be used as a publication-quality uncertainty when lagged dependence is present or unquantified.
