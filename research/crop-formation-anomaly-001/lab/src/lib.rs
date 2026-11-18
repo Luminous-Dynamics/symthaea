@@ -38,7 +38,9 @@ pub use grid::{
 pub use mechanics::{
     cantilever_base_moment, cantilever_tip_load_flexural_rigidity, curvature_from_moment,
     outer_fibre_bending_stress_pa, three_point_bend_flexural_rigidity,
-    three_point_bend_peak_moment, EllipticalHollowSection, MechanicsError, SectionProperties,
+    three_point_bend_peak_moment, flexural_rigidity_from_modulus,
+    BeamProfile, BeamSegment, EllipticalHollowSection, MechanicsError, RootSupport,
+    SectionProperties,
 };
 pub use plant_pose_3d::{Point3, StemPose3DDescriptor, StemPose3DError, StemPoseSample, Vector3, describe_stem_pose_3d, describe_stem_pose_3d_about_center};
 pub use statistics::{
