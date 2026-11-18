@@ -90,9 +90,8 @@ pub struct GraduationProvenance {
     /// Broad origin class assigned by the producing memory pipeline.
     pub source: MemorySource,
     /// Whether the producer marked the item verified at graduation.
+    /// This is a claim only; it is never an independent verifier receipt.
     pub verification_claimed: bool,
-    /// Producer-supplied label; not a globally unique event identifier.
-    pub source_label: Option<String>,
 }
 
 /// An episode representing a single high-consciousness moment in the cognitive loop.
@@ -1963,7 +1962,6 @@ mod provenance_envelope_tests {
         let provenance = GraduationProvenance {
             source: MemorySource::ActionFeedback,
             verification_claimed: true,
-            source_label: Some("action-result:roundtrip".to_owned()),
         };
         assert!(memory.store_if_significant_with_provenance(
             episode(0.7, 11),
@@ -1992,8 +1990,8 @@ mod provenance_envelope_tests {
         assert_eq!(decoded.schema_version, PROVENANCED_EPISODE_SCHEMA_VERSION);
         assert_eq!(decoded.episode.psi, 0.7);
         assert_eq!(
-            decoded.graduation_provenance.unwrap().source_label.as_deref(),
-            Some("action-result:roundtrip")
+            decoded.graduation_provenance.unwrap().source,
+            MemorySource::ActionFeedback
         );
         assert_eq!(decoded.consolidation_priority_bonus, 0.2);
     }
@@ -2008,7 +2006,6 @@ mod provenance_envelope_tests {
         let provenance = GraduationProvenance {
             source: MemorySource::WebResearch,
             verification_claimed: false,
-            source_label: Some("research-note".to_owned()),
         };
         assert!(memory.store_if_significant_with_provenance(
             episode(0.6, 21),
