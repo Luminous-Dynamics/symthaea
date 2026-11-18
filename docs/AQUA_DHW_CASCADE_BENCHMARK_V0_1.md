@@ -151,3 +151,13 @@ For Aqua engineering, keep these as separate boundaries:
 - purchased energy and storage / distribution losses.
 
 Do not raise the user-delivery temperature to satisfy a storage-side hygiene regimen. Do not treat a tank reaching a specified temperature as proof that the entire installation, shower branch, hose, head or aerosol exposure is microbiologically controlled. Do not use an assumed pasteurization cycle as a substitute for Mycelix / competent water-quality assessment and wet-path hygiene evidence. The DHW optimizer must account for any required source-side thermal regimen and its energy burden without overriding independent anti-scald protection.
+
+## 12. Power-coupled electric shower pathway
+
+The UK ETL changed its non-domestic electric-shower criteria on 15 September 2026. The current criteria keep 4.5 L/min as the standard electric-shower maximum but allow up to 9 L/min where electric power is modulated to minimize energy while maintaining stable output temperature with ETL-compliant wastewater heat recovery; up to 10.6 L/min is possible with an additional qualifying user-behaviour feature. This is a UK non-domestic programme condition, not a South African requirement or domestic certification.
+
+The Aqua comparison must measure purchased electrical energy and useful recovered heat at the actual receiver, and include exchanger fouling, showerhead-to-drain losses, storage/standby losses, pump/control parasitics, warm-up, pause/boost, purge and completed-task quality. Never infer system savings by multiplying nominal exchanger efficiency and nominal heater COP.
+
+The October 2026 DWHR coupling study reports that mixer-side coupling performed best in its tested whole-system configurations, while some storage-side configurations increased losses and reduced heat-pump COP. This is a topology hypothesis for Aqua, not a universal rule. The 2025 14-month DWHR fouling study reports 66% overall exchanger efficiency and 52% system efficiency after showerhead-to-drain losses in its specific installation.
+
+Detailed preregistration: [AQUA_POWER_COUPLED_SHOWER_DWHR_BENCHMARK_V0_1.md](AQUA_POWER_COUPLED_SHOWER_DWHR_BENCHMARK_V0_1.md), tracked by [#12816](https://github.com/Luminous-Dynamics/symthaea/issues/12816).
