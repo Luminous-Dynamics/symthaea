@@ -50,6 +50,7 @@ The deterministic fixed corpus includes seventeen two-session cases:
 15. Mechanism-break negative control after a regime shift.
 16. Common-cause attack: two source-family labels share one upstream root.
 17. Error-interval negative control: point estimates are close but measurement bounds exceed the equivalence margin.
+17. Error-interval negative control: point estimates are close but measurement bounds exceed the equivalence margin.
 
 ## Compared policies
 
@@ -153,3 +154,43 @@ Each experience now carries a claimed absolute measurement-error bound. Invarian
 `abs(mean_source - mean_target) + source_mean_error_bound + target_mean_error_bound <= 0.12`
 
 This is a conservative deterministic interval-containment check, not a statistical confidence interval. Error bounds are candidate-visible claims in this prototype and need sensor/protocol attestation; future work should add calibrated uncertainty models, preregistered equivalence tests and independent target-regime witnesses.
+
+## Provider-ecosystem findings (snapshot: 2026-11-18)
+
+### OpenAI: durable memory is separate from session history
+
+The OpenAI Agents SDK describes sandbox-agent memory as distinct from conversational `Session` history. It stores durable memory artifacts in a sandbox workspace, uses progressive disclosure (a small summary first, detailed rollout summaries only when needed), and describes a two-phase generation pipeline: extract raw lessons from runs, then consolidate them into a memory layout. It also supports separate memory layouts for different agents. See the [Agent memory documentation](https://openai.github.io/openai-agents-python/sandbox/memory/) and the [Agents SDK sandbox announcement](https://openai.com/index/the-next-evolution-of-the-agents-sdk/).
+
+**Implication for Symthaea:** adopt the separation and progressive disclosure, but keep the canonical event ledger, provenance, corrections, confidence and authorization outside model-editable memory files. Model-generated memory should be a derived view with evidence references, not the source of truth. Separate layouts should map to explicit Mycelix principals/domains, not only directory names.
+
+### Anthropic: decouple session, harness and sandbox
+
+Anthropic's Managed Agents describes three replaceable interfaces: an append-only session log, a harness that invokes the model and routes tool calls, and a sandbox for execution. It warns that harness assumptions can become stale as model capabilities change. See [Scaling Managed Agents](https://www.anthropic.com/research/managed-agents). Anthropic's earlier [long-running agent harness](https://www.anthropic.com/research/effective-harnesses-for-long-running-agents) uses an initializer and incremental per-session work that leaves durable artifacts for subsequent sessions.
+
+**Implication for Luminous:** preserve model-provider and execution-provider neutrality. Treat OpenAI and Anthropic as interchangeable reasoning/harness adapters, not owners of canonical memory. Every model or SDK upgrade should rerun the same behavior contract and adversarial evaluation; do not preserve brittle prompt workarounds after a capability change.
+
+### TimlMemBench: raw-native ingestion is part of the test
+
+TimlMemBench reports 208 reviewed samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases. Its raw-native evaluation requires systems to ingest raw sessions, rather than merely query a prebuilt canonical memory pool. It finds that retrieval accuracy can mask lifecycle, scope, provenance, activation and restraint failures. See the [ACL Anthology paper](https://aclanthology.org/2026.findings-emnlp.507/).
+
+**Implication for MACE:** our current evaluator accepts structured `Experience` records; that is a policy-level harness, not a raw-native memory benchmark. A future adapter must ingest raw Session-A events, run consolidation, preserve evidence lineage, then evaluate Session-B decisions and Session-C corrections.
+
+### Agent Memory Challenge Cycle 2
+
+As of **November 18, 2026**, the official Cycle 2 page says leaderboard publication is **expected November 19, 2026**; that is an expected date, not a published result. The Cycle 2 submission deadline was October 31 and evaluation closed November 4, so this cycle is no longer open for new submissions. The platform standardizes Add/Search from the memory system and delegates Answer/Eval to the platform, with separate textual, coding and multimodal tracks. See the [official competition page](https://agentmemoryleaderboard.ai/competition/).
+
+**Implication for Luminous:** prepare a provider-neutral Add/Search adapter and target the next eligible cycle. Do not claim a Cycle 2 rank or infer results from interim displays. The MACE synthetic causal-transfer score is a separate axis and must never be presented as an AML leaderboard score.
+
+### Cross-platform reference architecture
+
+| Layer | Luminous responsibility | Provider relationship |
+|---|---|---|
+| Session/event log | Mycelix-backed, append-only, bitemporal event and provenance ledger | Import/export adapter; never canonical provider-only session storage |
+| Memory consolidation | Symthaea dreaming / evidence-qualified summarization | Consume provider-generated summaries only as untrusted candidates |
+| Durable memory view | Versioned, progressively disclosed memory packets with evidence references | Export into OpenAI memory files or Anthropic session/handoff artifacts |
+| Reasoning/harness | Symthaea/Broca policy and model adapter | OpenAI, Anthropic or local model interchangeable |
+| Execution sandbox | Symtropy/isolated execution provider | OpenAI/Anthropic or local sandbox interchangeable |
+| Authority and revocation | Mycelix policies, capabilities, receipts and correction propagation | Provider tool calls are requests, not authority |
+| Independent verification | SAM/evaluator and replayable evidence | Separate from candidate and model provider |
+
+The advantage should be durable semantics and auditability across providers—not duplicating every provider feature.
