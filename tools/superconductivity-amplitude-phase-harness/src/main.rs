@@ -78,6 +78,15 @@ struct FreeEnergy {
     total: f64,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct VortexDiagnostics {
+    positive_charge: usize,
+    negative_charge: usize,
+    absolute_charge_sum: usize,
+    valid_plaquettes: usize,
+    skipped_low_amplitude_plaquettes: usize,
+}
+
 fn required_text<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
     value
         .get(key)
@@ -498,7 +507,152 @@ impl GlModel {
         Ok((transformed_fields, transformed_links))
     }
 
-    fn receipt(&self, energy: FreeEnergy, gauge_residual: f64) -> Value {
+    fn vortex_diagnostics(
+        &self,
+        fields: &[Complex],
+        gauge_phases: &[f64],
+    ) -> Result<Option<VortexDiagnostics>, String> {
+        if self.dimension != 2
+            || gauge_phases.len() != self.edges.len()
+            || fields.len() != self.nodes.len()
+        {
+            return Ok(None);
+        }
+
+        let mut grid_lengths = Vec::with_capacity(2);
+        for length in &self.box_lengths {
+            let rounded = length.round();
+            if (*length - rounded).abs() > 1.0e-10 || rounded < 2.0 {
+                return Ok(None);
+            }
+            grid_lengths.push(rounded as usize);
+        }
+        let nx = grid_lengths[0];
+        let ny = grid_lengths[1];
+        let mut grid = vec![None; nx * ny];
+        for (index, node) in self.nodes.iter().enumerate() {
+            let x = node.position[0].round();
+            let y = node.position[1].round();
+            if (node.position[0] - x).abs() > 1.0e-10
+                || (node.position[1] - y).abs() > 1.0e-10
+                || x < 0.0
+                || y < 0.0
+                || x >= nx as f64
+                || y >= ny as f64
+            {
+                return Ok(None);
+            }
+            let slot = x as usize * ny + y as usize;
+            if grid[slot].replace(index).is_some() {
+                return Err("duplicate integer grid coordinate in GL vortex diagnostic".to_owned());
+            }
+        }
+        if grid.iter().any(Option::is_none) {
+            return Ok(None);
+        }
+
+        let mut edge_lookup = HashMap::with_capacity(self.edges.len());
+        for (edge_index, edge) in self.edges.iter().enumerate() {
+            edge_lookup.insert(
+                (edge.source.min(edge.target), edge.source.max(edge.target)),
+                edge_index,
+            );
+        }
+
+        let phase_of = |field: Complex| field.im.atan2(field.re);
+        let mut diagnostics = VortexDiagnostics {
+            positive_charge: 0,
+            negative_charge: 0,
+            absolute_charge_sum: 0,
+            valid_plaquettes: 0,
+            skipped_low_amplitude_plaquettes: 0,
+        };
+        let x_plaquettes = if self.periodic_axes.contains(&0) {
+            nx
+        } else {
+            nx.saturating_sub(1)
+        };
+        let y_plaquettes = if self.periodic_axes.contains(&1) {
+            ny
+        } else {
+            ny.saturating_sub(1)
+        };
+
+        for x in 0..x_plaquettes {
+            for y in 0..y_plaquettes {
+                let x_next = if x + 1 == nx { 0 } else { x + 1 };
+                let y_next = if y + 1 == ny { 0 } else { y + 1 };
+                let corners = [
+                    grid[x * ny + y].unwrap(),
+                    grid[x_next * ny + y].unwrap(),
+                    grid[x_next * ny + y_next].unwrap(),
+                    grid[x * ny + y_next].unwrap(),
+                ];
+                let low_amplitude = corners.iter().any(|index| {
+                    fields[*index].norm_sqr().sqrt()
+                        <= self.amplitude_threshold.max(f64::EPSILON)
+                });
+                if low_amplitude {
+                    diagnostics.skipped_low_amplitude_plaquettes += 1;
+                    continue;
+                }
+
+                let mut covariant_phase_sum = 0.0;
+                let mut oriented_gauge_flux = 0.0;
+                for side in 0..4 {
+                    let from = corners[side];
+                    let to = corners[(side + 1) % 4];
+                    let key = (from.min(to), from.max(to));
+                    let Some(edge_index) = edge_lookup.get(&key).copied() else {
+                        return Err(format!(
+                            "missing GL edge for plaquette link {} -> {}",
+                            self.nodes[from].id, self.nodes[to].id
+                        ));
+                    };
+                    let edge = &self.edges[edge_index];
+                    let signed_gauge = if edge.source == from && edge.target == to {
+                        edge.gauge_phase
+                    } else if edge.source == to && edge.target == from {
+                        -edge.gauge_phase
+                    } else {
+                        return Err("GL edge lookup endpoints are inconsistent".to_owned());
+                    };
+                    let phase_difference =
+                        phase_of(fields[to]) - phase_of(fields[from]) + signed_gauge;
+                    covariant_phase_sum += wrap_to_pi(phase_difference);
+                    oriented_gauge_flux += signed_gauge;
+                }
+
+                // The covariant phase circulation contains both integer winding
+                // and plaquette link flux. Subtract the link flux to recover the
+                // integer winding. Near-zero-amplitude plaquettes were skipped.
+                let charge_value =
+                    (covariant_phase_sum - oriented_gauge_flux) / std::f64::consts::TAU;
+                let integer_charge = charge_value.round();
+                if !charge_value.is_finite() || (charge_value - integer_charge).abs() > 1.0e-6 {
+                    return Err(format!(
+                        "non-integral gauge-covariant plaquette winding {charge_value}"
+                    ));
+                }
+                let charge = integer_charge as i64;
+                if charge > 0 {
+                    diagnostics.positive_charge += charge as usize;
+                } else if charge < 0 {
+                    diagnostics.negative_charge += charge.unsigned_abs() as usize;
+                }
+                diagnostics.absolute_charge_sum += charge.unsigned_abs() as usize;
+                diagnostics.valid_plaquettes += 1;
+            }
+        }
+        Ok(Some(diagnostics))
+    }
+
+    fn receipt(
+        &self,
+        energy: FreeEnergy,
+        gauge_residual: f64,
+        vortices: Option<VortexDiagnostics>,
+    ) -> Value {
         let mean_amplitude = self
             .nodes
             .iter()
@@ -546,6 +700,19 @@ impl GlModel {
                 "passed": gauge_residual <= 1.0e-9
             },
             "vortex_phase_amplitude_threshold": self.amplitude_threshold,
+            "vortex_diagnostics": vortices.map(|values| json!({
+                "positive_vortex_charge": values.positive_charge,
+                "negative_vortex_charge": values.negative_charge,
+                "absolute_vortex_charge_sum": values.absolute_charge_sum,
+                "valid_plaquette_count": values.valid_plaquettes,
+                "skipped_low_amplitude_plaquette_count": values.skipped_low_amplitude_plaquettes,
+                "absolute_vortex_charge_density_per_valid_plaquette": if values.valid_plaquettes > 0 {
+                    values.absolute_charge_sum as f64 / values.valid_plaquettes as f64
+                } else {
+                    0.0
+                },
+                "definition": "integer gauge-invariant winding from sum(wrap(delta_phase + oriented_link_A)) minus oriented plaquette link flux, divided by 2pi"
+            })),
             "claim_ceiling": "Static synthetic lattice GL input and free-energy evaluation only; no Monte Carlo, equilibrium, phase transition, Tc, material property, or experimental result is established."
         })
     }
@@ -586,7 +753,8 @@ fn audit_and_evaluate(schema: &[u8], fixture: &[u8]) -> Result<Value, String> {
             "local gauge transformation changed the GL free energy by {gauge_residual}"
         ));
     }
-    Ok(model.receipt(energy, gauge_residual))
+    let vortices = model.vortex_diagnostics(&fields, &links)?;
+    Ok(model.receipt(energy, gauge_residual, vortices))
 }
 
 fn main() {
@@ -671,7 +839,10 @@ mod tests {
                 let energy = model
                     .free_energy_for(&model.initial_fields(), &model.initial_gauge_phases())
                     .unwrap();
-                model.receipt(energy, 0.0)
+                model.receipt(energy, 0.0, model.vortex_diagnostics(
+                    &model.initial_fields(),
+                    &model.initial_gauge_phases(),
+                ).unwrap())
             })
     }
 
@@ -817,6 +988,66 @@ mod tests {
             format!("{:x}", Sha256::digest(&schema))
         );
         assert_eq!(receipt["gauge_invariance_test"]["passed"], true);
+    }
+
+    #[test]
+    fn uniform_complex_field_has_zero_gauge_invariant_vorticity() {
+        let (schema, fixture) = inputs();
+        let model = GlModel::from_bytes(&schema, &fixture).unwrap();
+        let vortices = model
+            .vortex_diagnostics(&model.initial_fields(), &model.initial_gauge_phases())
+            .unwrap()
+            .unwrap();
+        assert_eq!(vortices.positive_charge, 0);
+        assert_eq!(vortices.negative_charge, 0);
+        assert_eq!(vortices.absolute_charge_sum, 0);
+        assert_eq!(vortices.valid_plaquettes, 16);
+    }
+
+    #[test]
+    fn vortex_winding_is_invariant_under_a_local_gauge_transform() {
+        let (schema, fixture) = inputs();
+        let model = GlModel::from_bytes(&schema, &fixture).unwrap();
+        let fields: Vec<Complex> = model
+            .nodes
+            .iter()
+            .map(|node| {
+                let x = node.position[0] - 1.5;
+                let y = node.position[1] - 1.5;
+                let angle = y.atan2(x);
+                Complex { re: angle.cos(), im: angle.sin() }
+            })
+            .collect();
+        let links = model.initial_gauge_phases();
+        let angles: Vec<f64> = (0..model.nodes.len())
+            .map(|index| 0.23 * (index as f64 + 1.0).sin())
+            .collect();
+        let before = model.vortex_diagnostics(&fields, &links).unwrap().unwrap();
+        let (transformed_fields, transformed_links) =
+            model.gauge_transform(&fields, &links, &angles).unwrap();
+        let after = model
+            .vortex_diagnostics(&transformed_fields, &transformed_links)
+            .unwrap()
+            .unwrap();
+        assert_eq!(before.positive_charge, after.positive_charge);
+        assert_eq!(before.negative_charge, after.negative_charge);
+        assert_eq!(before.absolute_charge_sum, after.absolute_charge_sum);
+    }
+
+    #[test]
+    fn vortex_diagnostic_skips_plaquettes_with_suppressed_amplitude() {
+        let (schema, fixture) = inputs();
+        let mut value: Value = serde_json::from_slice(&fixture).unwrap();
+        value["graph"]["nodes"][0]["psi_real"] = json!(0.0);
+        value["graph"]["nodes"][0]["psi_imag"] = json!(0.0);
+        let model =
+            GlModel::from_bytes(&schema, &serde_json::to_vec(&value).unwrap()).unwrap();
+        let vortices = model
+            .vortex_diagnostics(&model.initial_fields(), &model.initial_gauge_phases())
+            .unwrap()
+            .unwrap();
+        assert_eq!(vortices.skipped_low_amplitude_plaquettes, 4);
+        assert_eq!(vortices.valid_plaquettes, 12);
     }
 
     #[test]
