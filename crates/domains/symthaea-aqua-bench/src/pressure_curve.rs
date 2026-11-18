@@ -24,6 +24,9 @@ pub struct DeclaredProductPressureRange {
     pub minimum_kpa: Option<f64>,
     /// Some products publish a maximum without publishing a minimum.
     pub maximum_kpa: Option<f64>,
+    /// Pressure datum used in the manufacturer's declaration, if the source states it.
+    /// Unknown datum is preserved and cannot be treated as a matched pressure comparison.
+    pub pressure_datum: Option<PressureMeasurementDatum>,
     /// Digest binding the exact SKU / market variant datasheet revision.
     pub source_sha256: String,
 }
@@ -43,6 +46,19 @@ pub enum StandardMethodOutcome {
     NotApplicable,
 }
 
+/// Exact location at which the dynamic pressure channel is measured.
+///
+/// UWL's simultaneous pressure applied to each hot/cold inlet and ETL's faceplate-centre
+/// P2 flow-test requirement are method-specific conditions. The single-channel generic
+/// adapter does not claim to reproduce those multi-datum UWL/ETL procedures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PressureMeasurementDatum {
+    /// Dynamic pressure measured immediately upstream of the terminal fitting.
+    TerminalFittingInlet,
+    /// Dynamic pressure measured at the point of discharge, as defined by the method.
+    PointOfDischarge,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProductPressureRangeStatus {
     WithinFullyDeclaredRange,
@@ -50,6 +66,8 @@ pub enum ProductPressureRangeStatus {
     MeetsDeclaredMaximumOnly,
     OutsideDeclaredRange,
     NotDeclared,
+    DeclaredDatumNotSpecified,
+    DeclaredDatumMismatch,
 }
 
 /// One exact pressure-point observation. Static and upstream pressures are contextual;
@@ -71,8 +89,10 @@ pub struct PressureFlowObservation {
     pub pressure_setpoint_kpa: f64,
     /// Preregistered maximum deviation from setpoint, in kPa.
     pub setpoint_tolerance_kpa: f64,
-    /// Measured while flowing at the terminal fitting inlet, in kPa.
-    pub dynamic_fitting_inlet_pressure_kpa: f64,
+    /// Measured while flowing at pressure_datum, in kPa.
+    pub dynamic_pressure_kpa: f64,
+    /// Datum for the dynamic pressure channel. Comparisons must use the same datum.
+    pub pressure_datum: PressureMeasurementDatum,
     /// Expanded or otherwise declared pressure uncertainty, in kPa.
     pub dynamic_pressure_uncertainty_kpa: f64,
     /// Optional upstream pressure channels; never substitutes for fitting-inlet pressure.
@@ -112,6 +132,7 @@ pub enum PressureRunError {
     ContextMismatch { field: &'static str },
     PressureTargetMismatch,
     PressureToleranceMismatch,
+    PressureDatumMismatch,
     PressureSeparationTooLarge,
 }
 
@@ -161,6 +182,9 @@ impl Display for PressureRunError {
             }
             Self::PressureToleranceMismatch => {
                 write!(f, "matched pressure runs use different setpoint tolerances")
+            }
+            Self::PressureDatumMismatch => {
+                write!(f, "matched pressure runs use different measurement datums")
             }
             Self::PressureSeparationTooLarge => {
                 write!(
@@ -244,16 +268,16 @@ impl PressureFlowObservation {
         {
             return Err(PressureRunError::InvalidPressureUncertainty);
         }
-        if !self.dynamic_fitting_inlet_pressure_kpa.is_finite()
-            || self.dynamic_fitting_inlet_pressure_kpa <= 0.0
+        if !self.dynamic_pressure_kpa.is_finite()
+            || self.dynamic_pressure_kpa <= 0.0
         {
             return Err(PressureRunError::InvalidDynamicPressure);
         }
 
         let pressure_lower =
-            self.dynamic_fitting_inlet_pressure_kpa - self.dynamic_pressure_uncertainty_kpa;
+            self.dynamic_pressure_kpa - self.dynamic_pressure_uncertainty_kpa;
         let pressure_upper =
-            self.dynamic_fitting_inlet_pressure_kpa + self.dynamic_pressure_uncertainty_kpa;
+            self.dynamic_pressure_kpa + self.dynamic_pressure_uncertainty_kpa;
 
         if pressure_lower < self.pressure_envelope.minimum_kpa
             || pressure_upper > self.pressure_envelope.maximum_kpa
@@ -261,7 +285,7 @@ impl PressureFlowObservation {
             return Err(PressureRunError::PressureOutsideQualifiedEnvelope);
         }
 
-        let setpoint_deviation = (self.dynamic_fitting_inlet_pressure_kpa
+        let setpoint_deviation = (self.dynamic_pressure_kpa
             - self.pressure_setpoint_kpa)
             .abs()
             + self.dynamic_pressure_uncertainty_kpa;
@@ -330,9 +354,9 @@ impl PressureFlowObservation {
             None => ProductPressureRangeStatus::NotDeclared,
             Some(range) => {
                 let lower =
-                    self.dynamic_fitting_inlet_pressure_kpa - self.dynamic_pressure_uncertainty_kpa;
+                    self.dynamic_pressure_kpa - self.dynamic_pressure_uncertainty_kpa;
                 let upper =
-                    self.dynamic_fitting_inlet_pressure_kpa + self.dynamic_pressure_uncertainty_kpa;
+                    self.dynamic_pressure_kpa + self.dynamic_pressure_uncertainty_kpa;
                 if range.minimum_kpa.is_some_and(|minimum| lower < minimum)
                     || range.maximum_kpa.is_some_and(|maximum| upper > maximum)
                 {
@@ -400,8 +424,8 @@ pub fn validate_matched_pressure_comparison(
         return Err(PressureRunError::PressureToleranceMismatch);
     }
 
-    let conservative_separation = (control.dynamic_fitting_inlet_pressure_kpa
-        - candidate.dynamic_fitting_inlet_pressure_kpa)
+    let conservative_separation = (control.dynamic_pressure_kpa
+        - candidate.dynamic_pressure_kpa)
         .abs()
         + control.dynamic_pressure_uncertainty_kpa
         + candidate.dynamic_pressure_uncertainty_kpa;
@@ -433,7 +457,7 @@ mod tests {
             protocol_sha256: digest('c'),
             pressure_setpoint_kpa: 100.0,
             setpoint_tolerance_kpa: 5.0,
-            dynamic_fitting_inlet_pressure_kpa: pressure_kpa,
+            dynamic_pressure_kpa: pressure_kpa,
             dynamic_pressure_uncertainty_kpa: 1.0,
             static_supply_pressure_kpa: Some(180.0),
             upstream_residual_pressure_kpa: Some(130.0),
@@ -680,7 +704,7 @@ mod tolerance_tests {
             protocol_sha256: digest('c'),
             pressure_setpoint_kpa: 100.0,
             setpoint_tolerance_kpa: 5.0,
-            dynamic_fitting_inlet_pressure_kpa: 100.0,
+            dynamic_pressure_kpa: 100.0,
             dynamic_pressure_uncertainty_kpa: 1.0,
             static_supply_pressure_kpa: Some(180.0),
             upstream_residual_pressure_kpa: Some(130.0),
@@ -702,7 +726,7 @@ mod tolerance_tests {
     #[test]
     fn rejects_invalid_dynamic_pressure_with_specific_error() {
         let mut run = observation("run-01", "aqua-article");
-        run.dynamic_fitting_inlet_pressure_kpa = f64::NAN;
+        run.dynamic_pressure_kpa = f64::NAN;
         assert_eq!(run.validate(), Err(PressureRunError::InvalidDynamicPressure));
     }
 
@@ -918,9 +942,9 @@ pub fn compare_flow_retention(
     {
         return Err(PressureRetentionError::InstrumentMismatch);
     }
-    let low_pressure_upper_kpa = low_pressure.dynamic_fitting_inlet_pressure_kpa
+    let low_pressure_upper_kpa = low_pressure.dynamic_pressure_kpa
         + low_pressure.dynamic_pressure_uncertainty_kpa;
-    let high_pressure_lower_kpa = high_pressure.dynamic_fitting_inlet_pressure_kpa
+    let high_pressure_lower_kpa = high_pressure.dynamic_pressure_kpa
         - high_pressure.dynamic_pressure_uncertainty_kpa;
     if low_pressure_upper_kpa >= high_pressure_lower_kpa {
         return Err(PressureRetentionError::PressureIntervalsNotSeparated);
@@ -954,8 +978,8 @@ pub fn compare_flow_retention(
     Ok(FlowRetentionComparison {
         low_pressure_setpoint_kpa: low_pressure.pressure_setpoint_kpa,
         high_pressure_setpoint_kpa: high_pressure.pressure_setpoint_kpa,
-        low_pressure_measured_kpa: low_pressure.dynamic_fitting_inlet_pressure_kpa,
-        high_pressure_measured_kpa: high_pressure.dynamic_fitting_inlet_pressure_kpa,
+        low_pressure_measured_kpa: low_pressure.dynamic_pressure_kpa,
+        high_pressure_measured_kpa: high_pressure.dynamic_pressure_kpa,
         low_pressure_flow_lpm: low_pressure.flow_lpm,
         high_pressure_flow_lpm: high_pressure.flow_lpm,
         flow_retention_fraction: central,
@@ -990,7 +1014,7 @@ mod retention_tests {
             protocol_sha256: digest('c'),
             pressure_setpoint_kpa: pressure_kpa,
             setpoint_tolerance_kpa: 5.0,
-            dynamic_fitting_inlet_pressure_kpa: pressure_kpa,
+            dynamic_pressure_kpa: pressure_kpa,
             dynamic_pressure_uncertainty_kpa: 1.0,
             static_supply_pressure_kpa: Some(350.0),
             upstream_residual_pressure_kpa: Some(pressure_kpa + 15.0),
@@ -1217,8 +1241,8 @@ mod retention_tests {
         let mut high = observation("run-high", 160.0, 4.2);
         low.setpoint_tolerance_kpa = 10.0;
         high.setpoint_tolerance_kpa = 10.0;
-        low.dynamic_fitting_inlet_pressure_kpa = 155.0;
-        high.dynamic_fitting_inlet_pressure_kpa = 156.0;
+        low.dynamic_pressure_kpa = 155.0;
+        high.dynamic_pressure_kpa = 156.0;
         assert_eq!(
             compare_flow_retention(&low, &high, 0.60),
             Err(PressureRetentionError::PressureIntervalsNotSeparated)
