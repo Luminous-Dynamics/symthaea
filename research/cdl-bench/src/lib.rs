@@ -4,6 +4,10 @@
 //! The adaptive model is reconstructed from decoded symbols; no model state is hidden
 //! in the payload. Every frame includes source and payload CRC-32 checksums.
 
+pub mod causal;
+
+pub use causal::{generate_fsm, generate_scm, FsmTrace, GeneratorError, ScmIntervention, ScmTrace};
+
 use std::fmt;
 
 const MAGIC: &[u8; 4] = b"CDL1";
