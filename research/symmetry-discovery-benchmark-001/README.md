@@ -183,6 +183,10 @@ The executable regression checks:
 - the minimum-cost orbit lifts to every original diagonal candidate, with four minimizers preserved;
 - changing one candidate's boundary-condition identity blocks hard pruning.
 
+
+
+The Rust regression also pins the copied JSON fixture's exact byte length and FNV-1a-64 fingerprint (`136742` bytes, `902219de12ff50d1`). This is a non-cryptographic accidental-drift detector, not an authenticity digest or signature. The authoritative generator/schema/semantic validator remains in #12711.
+
 The exact fixture oracle is still a synthetic benchmark, not a performance result. The quotient PR's own compiler work and this oracle use different construction paths for the group table, point-set stabilizers and polynomial algebra, so agreement is cross-path rather than self-comparison.
 
 ## Claim boundary
