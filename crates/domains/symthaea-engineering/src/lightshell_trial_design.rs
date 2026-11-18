@@ -81,6 +81,7 @@ pub struct TrialBlock {
     pub block_id: String,
     pub stratum_id: String,
     pub sequence_id: String,
+    pub allocation_order_index: u32,
     pub allocation_receipt_ref: String,
     pub periods: Vec<TrialPeriod>,
     pub drift_check: Option<BlockDriftCheck>,
@@ -175,6 +176,7 @@ impl TrialDesignManifest {
         let mut allocation_receipts = HashSet::new();
         let mut system_runs = HashSet::new();
         let mut blocks_per_stratum: HashMap<&str, usize> = HashMap::new();
+        let mut allocation_positions: HashMap<&str, HashSet<u32>> = HashMap::new();
         let mut sequence_counts: HashMap<(&str, &str), usize> = HashMap::new();
         let mut balanced_strata = 0usize;
         let mut period_count = 0usize;
@@ -278,6 +280,13 @@ impl TrialDesignManifest {
                     "Block references an undeclared stratum.");
             }
             *blocks_per_stratum.entry(block.stratum_id.as_str()).or_default() += 1;
+            if !allocation_positions.entry(block.stratum_id.as_str()).or_default()
+                .insert(block.allocation_order_index)
+            {
+                push(&mut findings, "duplicate_allocation_order_index",
+                    format!("{path}.allocation_order_index"),
+                    "Allocation order indices must be unique within each stratum.");
+            }
             if is_blank(&block.allocation_receipt_ref)
                 || !allocation_receipts.insert(block.allocation_receipt_ref.as_str())
             {
@@ -387,6 +396,14 @@ impl TrialDesignManifest {
                 push(&mut findings, "stratum_below_minimum_blocks", "blocks",
                     format!("Stratum {} has {count} blocks; {} are required.",
                         stratum.stratum_id, stratum.minimum_blocks));
+            }
+            let positions = allocation_positions.get(stratum.stratum_id.as_str());
+            if positions.is_none_or(|indices| {
+                indices.len() != count
+                    || (0..count).any(|expected| !indices.contains(&(expected as u32)))
+            }) {
+                push(&mut findings, "allocation_order_indices_not_contiguous", "blocks",
+                    format!("Stratum {} allocation indices must be contiguous from zero.", stratum.stratum_id));
             }
             if !sequence_catalog.is_empty() {
                 let mut counts = Vec::new();
@@ -607,6 +624,7 @@ mod tests {
                 "block_id": format!("BLOCK-{block_index}"),
                 "stratum_id": "ROBOT-STRATUM-A",
                 "sequence_id": sequence_id,
+                "allocation_order_index": block_index as u32,
                 "allocation_receipt_ref": format!("ALLOCATION-{block_index}"),
                 "periods": periods,
                 "drift_check": null,
@@ -756,6 +774,7 @@ mod tests {
                 "block_id": format!("TWO-ARM-BLOCK-{block_index}"),
                 "stratum_id": "ROBOT-STRATUM-A",
                 "sequence_id": sequence_id,
+                "allocation_order_index": block_index as u32,
                 "allocation_receipt_ref": format!("TWO-ARM-ALLOCATION-{block_index}"),
                 "periods": periods,
                 "drift_check": null,
@@ -901,6 +920,14 @@ mod tests {
         assert!(report.findings.iter().any(|finding| finding.code == "unknown_block_stratum"));
         manifest["invented_robot_authority"] = json!(true);
         assert!(parse_and_validate(&manifest.to_string()).is_err());
+    }
+
+    #[test]
+    fn allocation_order_indices_must_be_unique_and_contiguous() {
+        let mut manifest = base_manifest();
+        manifest["blocks"][2]["allocation_order_index"] = json!(1);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|finding| finding.code == "duplicate_allocation_order_index"));
     }
 
     #[test]
