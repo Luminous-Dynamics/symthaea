@@ -222,6 +222,18 @@ pub struct GateAssessment {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct SampleLocationAssessment {
+    pub gate_id: String,
+    pub zone_ref: String,
+    pub sample_location_ref: String,
+    pub cycle_index: u32,
+    pub disposition: String,
+    pub observation_count: usize,
+    pub passing_observation_count: usize,
+    pub worst_case_bound: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct ValidationReport {
     pub findings: Vec<Finding>,
     pub cycle_count: usize,
@@ -232,6 +244,7 @@ pub struct ValidationReport {
     pub insufficient_evidence_gate_count: usize,
     pub not_applicable_gate_count: usize,
     pub gate_assessments: Vec<GateAssessment>,
+    pub sample_location_assessments: Vec<SampleLocationAssessment>,
     pub cleaning_qualification_admitted: bool,
 }
 
@@ -262,6 +275,7 @@ impl CleanStateManifest {
         let mut observation_counts: HashMap<(&str, &str, &str, u32), usize> = HashMap::new();
         let mut observation_ids = HashSet::new();
         let mut assessments = Vec::new();
+        let mut sample_location_assessments = Vec::new();
         let mut total_observations = 0usize;
 
         if self.schema_version != "0.1.0" {
@@ -491,6 +505,8 @@ impl CleanStateManifest {
         for gate in &self.gates {
             let mut gate_disposition = if gate.applicability == "not_applicable" {
                 "not_applicable".to_string()
+            } else if self.state == "proposed" {
+                "not_evaluated".to_string()
             } else {
                 "pass".to_string()
             };
@@ -508,32 +524,70 @@ impl CleanStateManifest {
                             cycle.cycle_index
                         )).copied().unwrap_or(0);
                         observation_count += count;
-                        if self.state != "proposed" && count < gate.minimum_replicates_per_cycle as usize {
-                            push(&mut findings, "required_gate_location_observations_missing", "cycles",
-                                format!("Gate {} / zone {} / sample location {} has {count} observations at cycle {}; {} required.",
-                                    gate.gate_id, gate.zone_ref, sample_location, cycle.cycle_index, gate.minimum_replicates_per_cycle));
-                            gate_disposition = merge_disposition(&gate_disposition, "insufficient_evidence");
-                        }
-                    }
-                }
-                for cycle in &self.cycles {
-                    for observation in &cycle.observations {
-                        if observation.gate_id == gate.gate_id && observation.zone_ref == gate.zone_ref {
-                            if let Some((disposition, bound)) = assess_observation(observation, gate) {
-                                if disposition == "pass" { passing_count += 1; }
-                                gate_disposition = merge_disposition(&gate_disposition, disposition);
-                                if let Some(bound) = bound {
-                                    worst_bound = match (gate.comparison_mode.as_str(), worst_bound) {
-                                        ("max_residual_fraction" | "max_absolute_post", Some(existing)) => Some(existing.max(bound)),
-                                        ("min_retention_fraction", Some(existing)) => Some(existing.min(bound)),
-                                        (_, None) => Some(bound),
-                                        _ => worst_bound,
-                                    };
-                                }
-                            } else if self.state != "proposed" {
-                                gate_disposition = merge_disposition(&gate_disposition, "insufficient_evidence");
+                        let mut location_disposition = if self.state == "proposed" {
+                            "not_evaluated".to_string()
+                        } else {
+                            "pass".to_string()
+                        };
+                        let mut location_passing_count = 0usize;
+                        let mut location_worst_bound: Option<f64> = None;
+
+                        if self.state != "proposed" {
+                            if count < gate.minimum_replicates_per_cycle as usize {
+                                push(&mut findings, "required_gate_location_observations_missing", "cycles",
+                                    format!("Gate {} / zone {} / sample location {} has {count} observations at cycle {}; {} required.",
+                                        gate.gate_id, gate.zone_ref, sample_location, cycle.cycle_index, gate.minimum_replicates_per_cycle));
+                                location_disposition = merge_disposition(&location_disposition, "insufficient_evidence");
                             }
+                            for observation in &cycle.observations {
+                                if observation.gate_id == gate.gate_id
+                                    && observation.zone_ref == gate.zone_ref
+                                    && observation.sample_location_ref == *sample_location
+                                {
+                                    match assess_observation(observation, gate) {
+                                        Some((disposition, bound)) => {
+                                            if disposition == "pass" {
+                                                location_passing_count += 1;
+                                                passing_count += 1;
+                                            }
+                                            location_disposition = merge_disposition(&location_disposition, disposition);
+                                            if let Some(bound) = bound {
+                                                location_worst_bound = update_worst_bound(
+                                                    gate.comparison_mode.as_str(),
+                                                    location_worst_bound,
+                                                    bound
+                                                );
+                                            }
+                                        }
+                                        None => {
+                                            location_disposition = merge_disposition(
+                                                &location_disposition,
+                                                "insufficient_evidence"
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                            if let Some(bound) = location_worst_bound {
+                                worst_bound = update_worst_bound(
+                                    gate.comparison_mode.as_str(),
+                                    worst_bound,
+                                    bound
+                                );
+                            }
+                            gate_disposition = merge_disposition(&gate_disposition, &location_disposition);
                         }
+
+                        sample_location_assessments.push(SampleLocationAssessment {
+                            gate_id: gate.gate_id.clone(),
+                            zone_ref: gate.zone_ref.clone(),
+                            sample_location_ref: sample_location.clone(),
+                            cycle_index: cycle.cycle_index,
+                            disposition: location_disposition,
+                            observation_count: count,
+                            passing_observation_count: location_passing_count,
+                            worst_case_bound: location_worst_bound,
+                        });
                     }
                 }
             }
@@ -591,6 +645,7 @@ impl CleanStateManifest {
             insufficient_evidence_gate_count,
             not_applicable_gate_count,
             gate_assessments: assessments,
+            sample_location_assessments,
             cleaning_qualification_admitted,
         }
     }
@@ -963,6 +1018,19 @@ fn assess_observation(
             }
         }
         _ => Some(("insufficient_evidence", None)),
+    }
+}
+
+fn update_worst_bound(
+    comparison_mode: &str,
+    current: Option<f64>,
+    next: f64,
+) -> Option<f64> {
+    match (comparison_mode, current) {
+        ("max_residual_fraction" | "max_absolute_post", Some(existing)) => Some(existing.max(next)),
+        ("min_retention_fraction", Some(existing)) => Some(existing.min(next)),
+        (_, None) => Some(next),
+        _ => current,
     }
 }
 
@@ -1532,6 +1600,33 @@ mod tests {
         manifest["cycles"][2]["observations"].as_array_mut().unwrap().pop();
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|f| f.code == "required_gate_location_observations_missing"));
+    }
+
+    #[test]
+    fn per_location_assessments_preserve_hotspot_failure_without_averaging() {
+        let mut manifest = base_manifest();
+        make_measured(&mut manifest);
+        manifest["cycles"][0]["observations"].as_array_mut().unwrap().iter_mut().for_each(|observation| {
+            if observation["gate_id"] == "GATE-SOIL"
+                && observation["sample_location_ref"] == "TOPOLOGY-FASTENER-POCKET-SYNTHETIC"
+            {
+                observation["after"]["value"] = json!(5.0);
+            }
+        });
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        let pocket = report.sample_location_assessments.iter().find(|assessment| {
+            assessment.gate_id == "GATE-SOIL"
+                && assessment.sample_location_ref == "TOPOLOGY-FASTENER-POCKET-SYNTHETIC"
+                && assessment.cycle_index == 0
+        }).unwrap();
+        let surface = report.sample_location_assessments.iter().find(|assessment| {
+            assessment.gate_id == "GATE-SOIL"
+                && assessment.sample_location_ref == "TOPOLOGY-SURFACE-CENTER-SYNTHETIC"
+                && assessment.cycle_index == 0
+        }).unwrap();
+        assert_eq!(pocket.disposition, "fail");
+        assert_eq!(surface.disposition, "pass");
+        assert_eq!(report.gate_assessments.iter().find(|gate| gate.gate_id == "GATE-SOIL").unwrap().disposition, "fail");
     }
 
     #[test]
