@@ -205,6 +205,24 @@ Suno Studio 2.0 includes MIDI editing, automation, synths, effects and chat-assi
 
 Source: https://help.suno.com/en/articles/13670529
 
+### Primary-source benchmark update — 18 November 2026
+
+The current research comparison is stronger when the evaluation objects are kept distinct:
+
+- **YuE2 (27 September 2026)** is a direct symbolic-planning and editing comparator. Its paper reports 49.3% expert preference for the same checkpoint with symbolic planning versus 34.6% without planning, 6.73 SongBench Global Average (6.96 best-of-eight), and expert preference for best-of-eight over Suno v4.5 with near-balanced preferences against Suno v5. The model exposes a readable melody/harmony plan, uses it for audio realization, and describes agentic score revisions that largely preserve unedited content. This means Muse must not claim that readable score plans or conversational score editing are unique. Our testable hypotheses are stronger source-authored PartId/MaterialId lineage, typed localized operation contracts, zero unauthorized score mutations, reversible candidate receipts and explicit abstention.
+  Source: https://arxiv.org/abs/2609.33757
+
+- **SMEBench** contains 11,160 paired source/reference-edited examples in total, with a balanced 3,600-example test split (300 per operation across twelve edit types) and a separate 416-pair real-audio complement. Its 17-person study yielded 236 ratings: mean target quality 4.23/5, source alignment 4.65/5 and instruction alignment 3.99/5. Three operations (Legato, Remove_Instrument, Swap_Drums) did not reliably exceed the neutral midpoint for instruction following. This is a useful paired-target benchmark, not an infallible reference oracle. Its CC BY-NC-SA 4.0 licence and all upstream component licences remain applicable; repository issues #12003/#12029 own rights-bound admission. Do not use downloadable assets for commercial work without purpose-specific reviewed permission.
+  Source: https://arxiv.org/abs/2610.36715
+
+- **MMAE / ICASSP 2027** released the challenge test sets and SDK on 10 November. The official final submission deadline is **25 November 2026**. Registration closed on 8 October; the Agent Track also requires model versions and weights to have been public before 1 November. Existing registered teams may still submit; new entrants must not assume eligibility. The organizer reports existing systems below 5% Exact Match Rate. The public development materials are useful for understanding task rubrics, but the dataset card's lack of a visible licence field is not a rights grant; #12003/#12029 continue to treat the assets as blocked until authoritative component and purpose-specific terms are recorded.
+  Source: https://audio-editing-challenge.github.io/
+
+- **Artificial Analysis** uses separate instrumental and vocal boards, same-prompt/same-modality blind pairwise comparisons, Bradley–Terry estimation, a minimum ten-second listen per track, and loudness/format normalization. This is a credible preference baseline, but it does not assess symbolic edit correctness or protected-event preservation. Keep it as a separate human-preference scorecard.
+  Source: https://artificialanalysis.ai/methodology/music
+
+This refresh changes our competitive framing: Muse must be compared against symbolic planning plus audio realization systems, not only text-to-audio systems. A score-side proof is a complementary capability, not a substitute for listening studies; equally, preference Elo cannot authorize a symbolic invariant violation.
+
 ## 7. Benchmark targets: proposed, not achieved
 
 | Dimension | Qualification target |
