@@ -255,3 +255,23 @@ A 2024 study of five showerheads and 18 spray patterns reported that pressure, n
 Aqua's spray-field experiment should therefore preserve separate water-distribution and thermal observations. At minimum capture inlet, outlet and bather-plane water temperatures, room conditions, pressure and flow. Add a spray-to-skin heat-transfer coefficient only if the measurement method and thermal boundary are independently validated. Any later claim of reduced heater energy at equivalent thermal sensation requires a matched whole-service energy balance and an independently qualified human-factors endpoint.
 
 Source: Zhang, Mui and Wong, Water (2024), 16(7), 928: https://www.mdpi.com/2073-4441/16/7/928
+
+
+## 15. Hyperbolic-vortex shower prior art and the Aqua research bar
+
+A 2019 study compared conventional and hyperbolic-vortex showerhead internals. It reported 14.4 ± 5.6% less water at similar mean jet velocity (p < 0.01) across its tested configurations. This is not a new Aqua discovery. The authors inferred equivalent shower comfort from earlier evidence linking jet velocity to shower experience; they did not perform a new human comfort trial. They also warned that central nozzles acting as air inlets changed spatial distribution, which might or might not be desirable. Their separate recirculating chemical-characterization rig observed dissolved-gas / pH / redox changes; this is not a hygiene or water-quality qualification.
+
+Aqua's ambitious research hypothesis is at least 20% less fresh water per completed task than the strongest exact low-flow comparator while meeting the preregistered standard spray-force / coverage endpoints, task-region map, temperature and independent task-quality endpoints, and including cleaning / purge burdens. This is more demanding than matching mean jet velocity alone and is not an achieved result.
+
+For any vortex / air-entraining candidate, preserve:
+- per-sector and radial jet velocity / deposition, not just weighted mean;
+- central versus peripheral target coverage;
+- droplet size and breakup length;
+- time-resolved aerosol number / size;
+- dynamic pressure loss and low-pressure startup / stability;
+- dissolved-gas / pH / other water-chemistry observations only when Mycelix / competent owner confirms their relevance;
+- scale / blockage / cleanability / post-clean recovery.
+
+A design that raises peripheral velocity while starving the centre, worsens aerosol outcomes, increases pressure demand, introduces hard-to-clean cavities or fails at 50–100 kPa is not a win.
+
+Source: van de Griend et al., Water (2019), 11(12), 2446, https://doi.org/10.3390/w11122446
