@@ -511,6 +511,8 @@ fn audit_bundle(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Stri
 
     let source_title = required_text(source, "title")?;
     let bundle_id = required_text(&fixture, "bundle_id")?;
+    let exportable = exportable_coefficients(coefficient_values);
+    let basis_rescaling = scalar_gl_basis_rescaling(-1.0, 2.0, 0.5, 3.0)?;
     Ok(json!({
         "status": "pass",
         "contract": "SC-MICROSCOPIC-GL-AUDIT-0.1",
@@ -533,6 +535,9 @@ fn audit_bundle(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Stri
         "observable_kind_counts": observable_kind_counts,
         "gl_coefficient_count": coefficient_values.len(),
         "coefficient_status_counts": coefficient_status_counts,
+        "exportable_gl_coefficients": exportable,
+        "exportable_coefficient_count": exportable.len(),
+        "basis_normalization_identifiability_demo": basis_rescaling,
         "translation_policy": {
             "xi0_and_xi_GL_are_distinct_observable_kinds": true,
             "scalar_lambda_requires_explicit_isotropy": true,
