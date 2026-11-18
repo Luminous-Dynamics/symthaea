@@ -457,7 +457,7 @@ mod tests {
 
     #[test]
     fn gram_determinant_relation_holds_exactly() {
-        for exponent in 0..=5 {
+        for exponent in 0..=8 {
             let report = qualify_radial_case(exponent, 3).unwrap();
             assert!(report.invariant_relation_holds, "{report:?}");
         }
@@ -465,7 +465,7 @@ mod tests {
 
     #[test]
     fn invariant_coordinate_dynamics_match_the_raw_vector_field() {
-        for exponent in 0..=5 {
+        for exponent in 0..=8 {
             for coupling in [1, 3] {
                 let report = qualify_radial_case(exponent, coupling).unwrap();
                 assert!(report.quotient_dynamics_match, "{report:?}");
@@ -476,7 +476,7 @@ mod tests {
 
     #[test]
     fn scaled_energy_is_exactly_conserved() {
-        for exponent in 0..=5 {
+        for exponent in 0..=8 {
             for coupling in [1, 2, 5] {
                 let report = qualify_radial_case(exponent, coupling).unwrap();
                 assert!(report.energy_conserved, "{report:?}");
@@ -486,7 +486,7 @@ mod tests {
 
     #[test]
     fn complete_radial_report_passes_every_exact_check() {
-        for exponent in 0..=5 {
+        for exponent in 0..=8 {
             for coupling in [1, 2, 5] {
                 let report = qualify_radial_case(exponent, coupling).unwrap();
                 assert!(report.all_exact_checks_pass(), "{report:?}");
