@@ -206,3 +206,8 @@ The product-level continuity vocabulary now has a deterministic Rust implementat
 ## Low-pressure validation protocol
 
 The detailed pressure-run matrix, pressure datum definitions, comparator admission rules and unoccupied sequence are now specified in [AQUA_LOW_PRESSURE_VALIDATION_PROTOCOL_V0_1.md](AQUA_LOW_PRESSURE_VALIDATION_PROTOCOL_V0_1.md), tracked by [#12784](https://github.com/Luminous-Dynamics/symthaea/issues/12784). It distinguishes static, upstream residual and dynamic fitting-inlet pressure and treats out-of-declared-range competitor tests as exploratory only.
+
+
+## Task-selective delivery research
+
+Aqua will benchmark low-flow base service with explicitly user-authorized, locally qualified task-specific bursts rather than assume a boost button is novel. Hansgrohe WaterBoost SKU 28036000 is an existing commercial precedent; its public page contains an unresolved 4 L/min regulator / maximum versus 6.6 / 9.4 L/min boost-flow scope ambiguity. The evidence corpus preserves the ambiguity, and the task-phase protocol requires independent reproduction before using the boosted figures as matched performance points. See [AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md](AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md) and [#12798](https://github.com/Luminous-Dynamics/symthaea/issues/12798).
