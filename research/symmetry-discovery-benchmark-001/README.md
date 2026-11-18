@@ -177,6 +177,14 @@ Sampled metrics must include their interval method, confidence level and sample 
 
 The fixture workflow validates this schema itself. It does not fabricate a scorecard or claim that any external baseline has run.
 
+
+
+The exact-head fixture workflow also runs `tools/validate_scorecard.py --self-test`. The self-test deliberately mutates duplicate IDs, completed-run coverage, denominator totals, input digests and unverified-prune counts; each mutation must be rejected. When a real baseline is eventually run, validate it with:
+
+    python3 -I research/symmetry-discovery-benchmark-001/tools/validate_scorecard.py --scorecard path/to/run_scorecard.json
+
+The validator checks that every completed scorecard covers each case in the selected manifest split exactly once, that partial runs are honestly marked partial, and that the status and verification totals reconcile with the per-case rows. It cryptographically binds the report to the README protocol, raw manifest, split IDs and canonical case inputs using SHA-256.
+
 ## Claim boundary
 
 This protocol is a benchmark contract, not evidence that Symthaea currently beats LieFlow, SymFP, COLT 2026 methods, soft-equivariant transformers, JMLR noisy ODT/ASRN, MuJoCo, Chrono, Pinocchio or Drake. Any superiority claim requires matched baseline executions on the frozen corpus.
