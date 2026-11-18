@@ -39,3 +39,36 @@ cargo run --release --locked --manifest-path research/symmetry-active-experiment
 ## Claim boundary
 
 Finite deterministic experiments only. It does not model noisy measurements, causal interventions, continuous group posteriors, physical experiment safety, or proof that a surviving candidate is a physical symmetry. No probe may be physically executed without a separate safety/authorization gate.
+
+
+## Exact static probe-basis oracle (v0.2)
+
+The crate now includes an exact non-adaptive comparator, `solve_exact_static_probe_design`. It enumerates every subset of admissible probes under an explicit subset budget and minimizes total acquisition cost, then probe count, then lexical probe-ID sequence.
+
+The certificate records:
+- the selected minimum-cost probe set;
+- every pair that can be distinguished by the admissible probe family;
+- pairs that remain intrinsically indistinguishable even with every admissible probe;
+- the exact number of subsets examined;
+- an optimality flag that is true only after exhaustive completion.
+
+The verifier recomputes the complete subset search from the original contract. If the subset budget is too small, the solver returns an error; it never returns an incomplete exploration as optimal.
+
+### Static versus adaptive result on the frozen four-hypothesis fixture
+
+The three unit-cost probes produce:
+- exact minimum static pair-separating basis: all three probes, cost **3**;
+- exact adaptive minimax policy: worst-case cumulative cost **2**.
+
+This is a fixture-specific demonstration that a fixed probe set and an adaptive decision tree optimize different objectives. It does not imply that adaptive policies always win, nor does it model noisy costs or probabilities.
+
+### Benchmark ladder
+
+For every frozen finite case, report separately:
+1. **Identifiability ceiling:** which candidate pairs can be distinguished by the entire available probe family?
+2. **Minimum static basis:** exact minimum-cost set of probes that separates every resolvable pair (on bounded small cases).
+3. **Greedy static basis:** weighted set-cover baseline and its gap from the exact static optimum.
+4. **Adaptive minimax:** minimum worst-case cumulative probe cost under outcome-dependent selection.
+5. **Myopic / entropy / learned acquisition:** policy cost and risk under separately declared priors and noise models.
+
+Do not collapse these into one information-gain score. Each has different assumptions and operational meaning.
