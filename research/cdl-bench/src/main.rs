@@ -1,8 +1,9 @@
 use cdl_bench::{
-    compress, compress_bounded_i16, compress_i16, crc32, decompress, decompress_bounded_i16,
-    decompress_i16, e3_mechanism_splits, generate_e0, generate_fsm, generate_scm,
-    generate_scm_with_config, predictor_state_bytes,
-    BoundedPredictor, E0Kind, ModelKind, NumericTransform, ScmIntervention,
+    compress, compress_bounded_i16, compress_i16, compress_with_predictor, crc32,
+    decompress, decompress_bounded_i16, decompress_i16, decompress_with_predictor,
+    e3_mechanism_splits, generate_e0, generate_fsm, generate_scm, generate_scm_with_config,
+    predictor_state_bytes, BoundedPredictor, E0Kind, ModelKind, NumericTransform,
+    ScmFieldPredictor, ScmIntervention, ScmParentPredictor,
 };
 use std::error::Error;
 use std::fs;
@@ -257,7 +258,7 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# benchmark=CDL-Bench-E1-E2-v1");
     println!("# steps={steps}");
     println!("# seed={seed}");
-    println!("source,raw_bytes,cdl_order0_frame,cdl_order1_frame,zstd,round_trip");
+    println!("source,raw_bytes,cdl_order0_frame,cdl_order1_frame,field_frame,parent_oracle_frame,zstd,round_trip");
 
     let fsm = generate_fsm(steps, 8, 4, seed)?;
     let scm_observational = generate_scm(steps, seed, None)?;
@@ -309,10 +310,43 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
         {
             return Err(format!("round-trip failure for {name}").into());
         }
+
+        // The SCM-specific arms require the declared SCM1 33-byte header and
+        // typed x0..x4 little-endian records. The partially observed FSM is
+        // deliberately excluded rather than misinterpreted as SCM data.
+        let (field_bytes, parent_oracle_bytes) = if name == "fsm-observations" {
+            ("NA".to_owned(), "NA".to_owned())
+        } else {
+            let mut field_encoder = ScmFieldPredictor::new();
+            let field_frame = compress_with_predictor(source, &mut field_encoder)?;
+            let mut field_decoder = ScmFieldPredictor::new();
+            if decompress_with_predictor(
+                &field_frame,
+                source.len(),
+                &mut field_decoder,
+            )?.as_slice() != source
+            {
+                return Err(format!("field-predictor round-trip failure for {name}").into());
+            }
+
+            let mut parent_encoder = ScmParentPredictor::new();
+            let parent_frame = compress_with_predictor(source, &mut parent_encoder)?;
+            let mut parent_decoder = ScmParentPredictor::new();
+            if decompress_with_predictor(
+                &parent_frame,
+                source.len(),
+                &mut parent_decoder,
+            )?.as_slice() != source
+            {
+                return Err(format!("parent-predictor round-trip failure for {name}").into());
+            }
+            (field_frame.len().to_string(), parent_frame.len().to_string())
+        };
+
         let zstd = external_compressed_len("zstd", &["-q", "-c"], source)
             .map_or_else(|| "NA".to_owned(), |value| value.to_string());
         println!(
-            "{name},{},{},{},{zstd},exact",
+            "{name},{},{},{},{field_bytes},{parent_oracle_bytes},{zstd},exact",
             source.len(),
             frame0.len(),
             frame1.len()
@@ -329,6 +363,12 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# e3_heldout_intervention_pairs={}", e3_held_out.len());
     println!("# note=each E3 held-out world has paired observational and do(x1=20000) streams using the same seed");
     println!("# note=E3 held-out tuples reuse mechanism component values but combine them in unseen configurations");
+    println!("# scm_field_predictor_state_bytes={}", ScmFieldPredictor::state_bytes());
+    println!("# scm_parent_oracle_predictor_state_bytes={}", ScmParentPredictor::state_bytes());
+    println!("# note=field_frame conditions on typed variable/byte-lane identity only");
+    println!("# note=parent_oracle_frame additionally receives the known SCM graph and conditions on same-step parent bytes");
+    println!("# note=parent_oracle is an oracle-topology control, not learned causal discovery or transfer");
+    println!("# note=per-stream frame sizes exclude predictor executable/code and inline state; report these separately for end-to-end accounting");
     println!("# note=these are deterministic generator and codec smoke measurements, not predictive transfer results");
     Ok(())
 }
