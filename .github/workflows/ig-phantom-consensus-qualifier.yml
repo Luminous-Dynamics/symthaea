@@ -1,0 +1,40 @@
+name: IG Phantom Consensus Qualifier
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "research/ig-phantom-consensus-001/**"
+      - ".github/workflows/ig-phantom-consensus-qualifier.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/ig-phantom-consensus-001/**"
+      - ".github/workflows/ig-phantom-consensus-qualifier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run qualifier tests
+        run: cargo test --manifest-path research/ig-phantom-consensus-001/qualifier/Cargo.toml
+      - name: Validate protocol, schemas and synthetic fixture corpus
+        run: |
+          cargo run --manifest-path research/ig-phantom-consensus-001/qualifier/Cargo.toml -- \
+            research/ig-phantom-consensus-001/PHANTOM_CONSENSUS_PROTOCOL_V0_1.json \
+            research/ig-phantom-consensus-001/PHANTOM_CONSENSUS_PROTOCOL_V0_1.schema.json \
+            research/ig-phantom-consensus-001/PHANTOM_CONSENSUS_FIXTURES_V0_1.json \
+            research/ig-phantom-consensus-001/PHANTOM_CONSENSUS_FIXTURES_V0_1.schema.json

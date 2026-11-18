@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ig-phantom-consensus-protocol-v0.1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_id",
+    "version",
+    "status",
+    "title",
+    "source",
+    "composition",
+    "stages",
+    "intervention_arms",
+    "transparency_arms",
+    "task_classes",
+    "metric_ids",
+    "qualification_gates",
+    "claim_ceiling",
+    "implementation_status"
+  ],
+  "properties": {
+    "protocol_id": {
+      "const": "IG-PHANTOM-CONSENSUS-001"
+    },
+    "version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "const": "research-proposal"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "arxiv_id",
+        "url",
+        "first_submitted",
+        "audit_status",
+        "note"
+      ],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "arxiv_id": {
+          "type": "string",
+          "pattern": "^\\d{4}\\.\\d{5}$"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "first_submitted": {
+          "type": "string",
+          "format": "date"
+        },
+        "audit_status": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "composition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contagion_issue",
+        "contagion_pr",
+        "communication_topology_issue",
+        "revision_ledger_issue",
+        "confidence_calibration_pr",
+        "delibbench_issue",
+        "summary_issue",
+        "opinion_shift_issue"
+      ],
+      "properties": {
+        "contagion_issue": {
+          "type": "string",
+          "format": "uri"
+        },
+        "contagion_pr": {
+          "type": "string",
+          "format": "uri"
+        },
+        "communication_topology_issue": {
+          "type": "string",
+          "format": "uri"
+        },
+        "revision_ledger_issue": {
+          "type": "string",
+          "format": "uri"
+        },
+        "confidence_calibration_pr": {
+          "type": "string",
+          "format": "uri"
+        },
+        "delibbench_issue": {
+          "type": "string",
+          "format": "uri"
+        },
+        "summary_issue": {
+          "type": "string",
+          "format": "uri"
+        },
+        "opinion_shift_issue": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "visibility",
+          "purpose"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "intervention_arms": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "transparency_arms": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "task_classes": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "metric_ids": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "qualification_gates": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_ceiling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "synthetic",
+        "agent_execution",
+        "excluded"
+      ],
+      "properties": {
+        "synthetic": {
+          "type": "string"
+        },
+        "agent_execution": {
+          "type": "string"
+        },
+        "excluded": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "implementation_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "implemented_metric_ids",
+        "deferred_metric_ids"
+      ],
+      "properties": {
+        "implemented_metric_ids": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "deferred_metric_ids": {
+          "type": "array",
+          "minItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
