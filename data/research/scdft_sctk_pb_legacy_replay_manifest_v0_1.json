@@ -28,7 +28,7 @@
       "converged_iterations": 41,
       "reference_run_date": "2023-11-28",
       "tc_output_path": "examples/Pb/withoutSF/output_reference/tc.out",
-      "tc_output_blob_sha": "afb481f5ae19f2613c68b652f96ee271c4a0637",
+      "tc_output_blob_sha": "afb481f5ae19f2613c68b652f96ee271c4ca0637",
       "reference_output_complete": true,
       "README_expectation_k": 4.4
     },
@@ -223,7 +223,7 @@
     },
     {
       "path": "examples/Pb/withoutSF/output_reference/tc.out",
-      "git_blob_sha1": "afb481f5ae19f2613c68b652f96ee271c4a0637",
+      "git_blob_sha1": "afb481f5ae19f2613c68b652f96ee271c4ca0637",
       "role": "reference_output",
       "case_scope": "without_spin_fluctuations",
       "required_for_replay": false
