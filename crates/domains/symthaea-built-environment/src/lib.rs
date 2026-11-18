@@ -1409,55 +1409,89 @@ mod tests {
         CatalogueVocabulary::from_catalogue_json(&synthetic_catalogue().to_string()).unwrap()
     }
 
+    #[derive(Deserialize)]
+    struct EvidenceDependencyNodeFixture {
+        node_id: String,
+        content_payload: String,
+        depends_on: Vec<String>,
+        evidence_receipt_payload: Option<String>,
+    }
+
+    #[derive(Deserialize)]
+    struct EvidenceDependencyGraphFixture {
+        graph_id: String,
+        graph_revision: String,
+        nodes: Vec<EvidenceDependencyNodeFixture>,
+        expected_cases: Vec<EvidenceInvalidationCaseFixture>,
+    }
+
+    #[derive(Deserialize)]
+    struct EvidenceInvalidationCaseFixture {
+        case_id: String,
+        changed_node_ids: Vec<String>,
+        invalidated_node_ids: Vec<String>,
+        preserved_evidence_node_ids: Vec<String>,
+    }
+
+    const SYNTHETIC_DEPENDENCY_GRAPH: &str = include_str!(
+        "../../../../docs/research/built-environment/EVIDENCE_DEPENDENCY_GRAPH_SYNTHETIC_V0.1.json"
+    );
+
+    fn dependency_graph_fixture() -> EvidenceDependencyGraphFixture {
+        serde_json::from_str(SYNTHETIC_DEPENDENCY_GRAPH)
+            .expect("synthetic evidence dependency graph must deserialize")
+    }
+
     fn sample_dependency_graph() -> EvidenceDependencyGraph {
-        let digest = |value: &str| blake3::hash(value.as_bytes()).to_hex().to_string();
+        let fixture = dependency_graph_fixture();
         EvidenceDependencyGraph {
-            graph_id: "SYNTH-HOME-EVIDENCE-GRAPH-001".to_owned(),
-            graph_revision: "REV-A".to_owned(),
-            nodes: vec![
-                EvidenceDependencyNode {
-                    node_id: "resident-brief".to_owned(),
-                    content_digest: digest("brief-a"),
-                    depends_on: vec![],
-                    evidence_receipt_digest: None,
-                },
-                EvidenceDependencyNode {
-                    node_id: "style-intent".to_owned(),
-                    content_digest: digest("style-a"),
-                    depends_on: vec!["resident-brief".to_owned()],
-                    evidence_receipt_digest: Some(digest("style-receipt-a")),
-                },
-                EvidenceDependencyNode {
-                    node_id: "typology-intent".to_owned(),
-                    content_digest: digest("typology-a"),
-                    depends_on: vec!["resident-brief".to_owned()],
-                    evidence_receipt_digest: Some(digest("typology-receipt-a")),
-                },
-                EvidenceDependencyNode {
-                    node_id: "geometry".to_owned(),
-                    content_digest: digest("geometry-a"),
-                    depends_on: vec!["style-intent".to_owned(), "typology-intent".to_owned()],
-                    evidence_receipt_digest: Some(digest("geometry-receipt-a")),
-                },
-                EvidenceDependencyNode {
-                    node_id: "energy-evaluation".to_owned(),
-                    content_digest: digest("energy-a"),
-                    depends_on: vec!["geometry".to_owned()],
-                    evidence_receipt_digest: Some(digest("energy-receipt-a")),
-                },
-                EvidenceDependencyNode {
-                    node_id: "water-policy".to_owned(),
-                    content_digest: digest("water-policy-a"),
-                    depends_on: vec![],
-                    evidence_receipt_digest: Some(digest("water-policy-receipt-a")),
-                },
-                EvidenceDependencyNode {
-                    node_id: "water-evaluation".to_owned(),
-                    content_digest: digest("water-evaluation-a"),
-                    depends_on: vec!["water-policy".to_owned()],
-                    evidence_receipt_digest: Some(digest("water-evaluation-receipt-a")),
-                },
-            ],
+            graph_id: fixture.graph_id,
+            graph_revision: fixture.graph_revision,
+            nodes: fixture
+                .nodes
+                .into_iter()
+                .map(|node| EvidenceDependencyNode {
+                    node_id: node.node_id,
+                    content_digest: blake3::hash(node.content_payload.as_bytes())
+                        .to_hex()
+                        .to_string(),
+                    depends_on: node.depends_on,
+                    evidence_receipt_digest: node
+                        .evidence_receipt_payload
+                        .map(|payload| blake3::hash(payload.as_bytes()).to_hex().to_string()),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn frozen_dependency_graph_fixture_matches_expected_invalidation_sets() {
+        let fixture = dependency_graph_fixture();
+        let graph = sample_dependency_graph();
+        for case in fixture.expected_cases {
+            let receipt = compute_invalidation_receipt(
+                &graph,
+                "REV-A",
+                "REV-B",
+                &case.changed_node_ids,
+            )
+            .unwrap_or_else(|errors| panic!("{}: {errors:?}", case.case_id));
+            assert_eq!(
+                receipt.invalidated_node_ids,
+                case.invalidated_node_ids,
+                "invalidated set differs for {}",
+                case.case_id
+            );
+            assert_eq!(
+                receipt
+                    .preserved_evidence
+                    .iter()
+                    .map(|reference| reference.node_id.clone())
+                    .collect::<Vec<_>>(),
+                case.preserved_evidence_node_ids,
+                "preserved evidence differs for {}",
+                case.case_id
+            );
         }
     }
 
