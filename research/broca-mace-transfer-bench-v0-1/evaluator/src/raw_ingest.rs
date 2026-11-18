@@ -248,19 +248,57 @@ struct ActionPlan {
     sequence: u64,
 }
 
-fn apply_corrections(events: &[RawEvent], known_at_ms: u64) -> BTreeSet<u32> {
-    events
-        .iter()
-        .filter(|event| {
-            event.recorded_at_ms <= known_at_ms
-                && (event.event_type == "source_retraction"
-                    || event.event_type == "source_supersession")
-        })
-        .filter_map(|event| {
-            event.integer("target_event_id")
-                .and_then(|id| u32::try_from(id).ok())
-        })
-        .collect()
+fn apply_corrections(
+    events: &[RawEvent],
+    valid_at_ms: u64,
+    known_at_ms: u64,
+) -> Result<BTreeSet<u32>, String> {
+    let by_id: BTreeMap<u32, &RawEvent> =
+        events.iter().map(|event| (event.event_id, event)).collect();
+    let mut corrected = BTreeSet::new();
+
+    for event in events.iter().filter(|event| {
+        event.event_type == "source_retraction"
+            || event.event_type == "source_supersession"
+    }) {
+        let raw_target = event
+            .integer("target_event_id")
+            .ok_or_else(|| format!("correction {} has no target_event_id", event.event_id))?;
+        let target_id = u32::try_from(raw_target)
+            .map_err(|_| format!("correction {} target exceeds u32", event.event_id))?;
+        let target = by_id
+            .get(&target_id)
+            .ok_or_else(|| {
+                format!("correction {} targets unknown event {}", event.event_id, target_id)
+            })?;
+
+        if target.event_type != "world_observation" {
+            return Err(format!(
+                "correction {} target {} is not a world observation",
+                event.event_id, target_id
+            ));
+        }
+        if event.sequence <= target.sequence
+            || event.recorded_at_ms < target.recorded_at_ms
+            || event.occurred_at_ms < target.occurred_at_ms
+        {
+            return Err(format!(
+                "correction {} predates source event {}",
+                event.event_id, target_id
+            ));
+        }
+
+        let effective_from = event.valid_from_ms.unwrap_or(event.occurred_at_ms);
+        let effective_at_valid_time = effective_from <= valid_at_ms
+            && event.valid_to_ms.is_none_or(|end| valid_at_ms < end);
+        let known_by_query = event.recorded_at_ms <= known_at_ms;
+
+        if known_by_query && effective_at_valid_time {
+            corrected.insert(target_id);
+        }
+    }
+
+    Ok(corrected)
 }
 
 pub(super) fn derive_as_known(
@@ -273,7 +311,7 @@ pub(super) fn derive_as_known(
     verified_consolidations: &VerifiedConsolidationRegistry,
 ) -> Result<IngestReport, String> {
     let events = parse_jsonl(input)?;
-    let retracted_ids = apply_corrections(&events, known_at_ms);
+    let retracted_ids = apply_corrections(&events, valid_at_ms, known_at_ms)?;
     let visible: Vec<&RawEvent> = events
         .iter()
         .filter(|event| event.visible_at(valid_at_ms, known_at_ms))
@@ -733,14 +771,16 @@ mod tests {
     #[test]
     fn retraction_changes_as_known_state_without_rewriting_history() {
         let mut events = observation_events();
-        events.push(raw_event(
+        let mut correction = raw_event(
             13,
             13,
             "source_retraction",
             150,
             150,
             json!({ "target_event_id": 3, "reason": "independent correction" }),
-        ));
+        );
+        correction["valid_from_ms"] = json!(0);
+        events.push(correction);
         let raw = jsonl(events);
         let before = derive_fixture(&raw, 100, 100).unwrap();
         let after = derive_fixture(&raw, 100, 160).unwrap();
@@ -760,6 +800,112 @@ mod tests {
             decide(Policy::CausalQualified, &after.experiences, Query { scope }).action,
             None
         );
+    }
+
+    #[test]
+    fn retroactive_correction_is_applied_only_when_known_and_effective() {
+        let mut events = observation_events();
+        let mut correction = raw_event(
+            13,
+            13,
+            "source_retraction",
+            150,
+            150,
+            json!({ "target_event_id": 3, "reason": "retroactive correction" }),
+        );
+        correction["valid_from_ms"] = json!(0);
+        events.push(correction);
+        let raw = jsonl(events);
+
+        let before_knowledge = derive_fixture(&raw, 100, 149).unwrap();
+        let after_knowledge = derive_fixture(&raw, 100, 150).unwrap();
+        assert!(before_knowledge
+            .experiences
+            .iter()
+            .any(|item| item.event_id == 3));
+        assert!(after_knowledge
+            .experiences
+            .iter()
+            .find(|item| item.event_id == 3)
+            .unwrap()
+            .source_retracted);
+    }
+
+    #[test]
+    fn known_future_effective_correction_does_not_rewrite_earlier_valid_time() {
+        let mut events = observation_events();
+        let mut correction = raw_event(
+            13,
+            13,
+            "source_retraction",
+            150,
+            150,
+            json!({ "target_event_id": 3, "reason": "future-effective correction" }),
+        );
+        correction["valid_from_ms"] = json!(150);
+        events.push(correction);
+        let raw = jsonl(events);
+
+        let before_effective_time = derive_fixture(&raw, 100, 160).unwrap();
+        let at_effective_time = derive_fixture(&raw, 150, 160).unwrap();
+        assert!(before_effective_time
+            .experiences
+            .iter()
+            .any(|item| item.event_id == 3));
+        assert!(at_effective_time
+            .experiences
+            .iter()
+            .find(|item| item.event_id == 3)
+            .unwrap()
+            .source_retracted);
+    }
+
+    #[test]
+    fn correction_with_unknown_target_fails_closed() {
+        let mut events = observation_events();
+        events.push(raw_event(
+            13,
+            13,
+            "source_retraction",
+            150,
+            150,
+            json!({ "target_event_id": 999 }),
+        ));
+        assert!(derive_fixture(&jsonl(events), 100, 160)
+            .unwrap_err()
+            .contains("targets unknown event 999"));
+    }
+
+    #[test]
+    fn correction_cannot_retract_a_non_observation_event() {
+        let mut events = observation_events();
+        events.push(raw_event(
+            13,
+            13,
+            "source_retraction",
+            150,
+            150,
+            json!({ "target_event_id": 1 }),
+        ));
+        assert!(derive_fixture(&jsonl(events), 100, 160)
+            .unwrap_err()
+            .contains("is not a world observation"));
+    }
+
+    #[test]
+    fn correction_cannot_predate_the_source_observation() {
+        let mut events = observation_events();
+        events.push(raw_event(
+            13,
+            13,
+            "source_retraction",
+            25,
+            25,
+            json!({ "target_event_id": 3 }),
+        ));
+        assert!(derive_fixture(&jsonl(events), 100, 160)
+            .unwrap_err()
+            .contains("predates source event 3"));
     }
 
     #[test]
