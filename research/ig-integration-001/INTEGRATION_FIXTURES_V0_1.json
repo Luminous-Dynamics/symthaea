@@ -223,7 +223,7 @@
           "candidate_id": "B",
           "attribute_id": "experience",
           "polarity": "supports",
-          "contribution": 2
+          "contribution": 3
         },
         {
           "evidence_id": "EB2",
@@ -231,7 +231,7 @@
           "candidate_id": "B",
           "attribute_id": "failure",
           "polarity": "opposes",
-          "contribution": -2
+          "contribution": -1
         },
         {
           "evidence_id": "EC1",
@@ -261,10 +261,10 @@
         "candidate_mapping_accuracy_milli": 1000,
         "attribute_mapping_accuracy_milli": 1000,
         "polarity_accuracy_milli": 1000,
-        "contribution_exact_milli": 600,
+        "contribution_exact_milli": 400,
         "duplicate_matrix_rows": 0,
         "provenance_violations": 0,
-        "matrix_decision_consistent": false,
+        "matrix_decision_consistent": true,
         "decision_correct": false
       },
       "required_decisive_evidence_ids": [
