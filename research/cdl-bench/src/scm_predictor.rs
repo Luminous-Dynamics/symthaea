@@ -65,7 +65,7 @@ impl StructuredState {
     fn parent_context(&self, variable: usize, _lane: usize) -> usize {
         let bucket = |parent: usize| Self::value_bucket(&self.current_record, parent);
 
-        // Each parent byte is quantized to four coarse bins. Parents are
+        // Each full signed parent value is quantized to four coarse bins. Parents are
         // earlier in the serialized topological order, so both encoder and
         // decoder have already observed them when this CDF is requested.
         match variable {
@@ -78,9 +78,9 @@ impl StructuredState {
         }
     }
 
-    fn hybrid_context(&self, variable: usize, lane: usize) -> usize {
+    fn hybrid_context(&self, variable: usize, _lane: usize) -> usize {
         // Reduce the supplied parent context to one bit per parent, then
-        // reserve two additional bits for the previous same-field byte.
+        // reserve two additional bits for the previous same-field value.
         // This caps the combined context space at 16 bins.
         let parent_bucket = |parent: usize| -> usize {
             (Self::value_bucket(&self.current_record, parent) >> 1) as usize
