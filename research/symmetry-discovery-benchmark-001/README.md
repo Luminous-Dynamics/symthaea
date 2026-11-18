@@ -209,7 +209,7 @@ The exact-head fixture workflow also runs `tools/validate_scorecard.py --self-te
 
     python3 -I research/symmetry-discovery-benchmark-001/tools/validate_scorecard.py --scorecard path/to/run_scorecard.json
 
-The validator checks that every completed scorecard covers each case in the selected manifest split exactly once, that partial runs are honestly marked partial, and that the status and verification totals reconcile with the per-case rows. It cryptographically binds the report to the README protocol, raw manifest, split IDs and canonical case inputs using SHA-256.
+The validator checks that every completed scorecard covers each case in the selected manifest split exactly once, that partial runs are honestly marked partial, and that the status and verification totals reconcile with the per-case rows. It cryptographically binds the report to a length-prefixed bundle of the README and every JSON schema, plus the raw manifest, sorted split IDs and canonical case inputs using SHA-256.
 
 ## Claim boundary
 
