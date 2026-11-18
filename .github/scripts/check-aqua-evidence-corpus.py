@@ -454,7 +454,7 @@ def render_markdown(corpus: dict[str, Any]) -> str:
             "",
         ]
     )
-    return "\\n".join(lines)
+    return "\n".join(lines)
 
 
 def main() -> None:
