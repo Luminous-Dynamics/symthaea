@@ -19,6 +19,7 @@ pub struct CleanStateManifest {
     pub frozen_before_first_cycle: bool,
     pub preregistration_ref: String,
     pub protocol_digest: String,
+    pub required_cycle_count: u32,
     pub target_trial_design_ref: Option<String>,
     pub article: ArticleBinding,
     pub application: ApplicationProfile,
@@ -251,6 +252,8 @@ impl CleanStateManifest {
         let mut findings = Vec::new();
         let mut gate_map: HashMap<(&str, &str), &ClaimGate> = HashMap::new();
         let mut cycle_ids = HashSet::new();
+        let mut cleaning_run_ids = HashSet::new();
+        let mut soil_application_ids = HashSet::new();
         let mut observation_counts: HashMap<(&str, &str, u32), usize> = HashMap::new();
         let mut observation_ids = HashSet::new();
         let mut assessments = Vec::new();
@@ -273,6 +276,10 @@ impl CleanStateManifest {
         {
             push(&mut findings, "protocol_not_frozen", "preregistration_ref",
                 "A pre-cycle frozen protocol and SHA-256 digest are required.");
+        }
+        if self.required_cycle_count == 0 || self.cycles.len() != self.required_cycle_count as usize {
+            push(&mut findings, "required_cycle_count_mismatch", "required_cycle_count",
+                "The observed/planned cycle list must exactly match the pre-registered required cycle count.");
         }
         if self.target_trial_design_ref.as_deref().is_some_and(is_blank) {
             push(&mut findings, "blank_trial_design_reference", "target_trial_design_ref",
@@ -393,6 +400,18 @@ impl CleanStateManifest {
                 {
                     push(&mut findings, "cycle_execution_provenance_missing", &path,
                         "Measured cycles require soil application, cleaning run, process receipt and raw-process SHA-256.");
+                }
+                if let Some(run_ref) = cycle.cleaning_run_ref.as_deref() {
+                    if !cleaning_run_ids.insert(run_ref) {
+                        push(&mut findings, "duplicate_cleaning_run_reference", format!("{path}.cleaning_run_ref"),
+                            "Each executed cycle must link to a unique cleaning-run identity.");
+                    }
+                }
+                if let Some(soil_ref) = cycle.soil_application_ref.as_deref() {
+                    if !soil_application_ids.insert(soil_ref) {
+                        push(&mut findings, "duplicate_soil_application_reference", format!("{path}.soil_application_ref"),
+                            "Each executed cycle must link to a unique soil-application identity.");
+                    }
                 }
                 match cycle.post_clean_inspection.as_ref() {
                     Some(inspection)
@@ -944,6 +963,7 @@ mod tests {
             "frozen_before_first_cycle": true,
             "preregistration_ref": "SYNTHETIC-PREREGISTRATION",
             "protocol_digest": digest('a'),
+            "required_cycle_count": 3,
             "target_trial_design_ref": "LIGHTSHELL-TRIAL-DESIGN-SYNTHETIC",
             "article": {
                 "candidate_id": "CANDIDATE-SYNTHETIC",
@@ -1193,6 +1213,23 @@ mod tests {
         assert!(report.is_valid(), "{:?}", report.findings);
         assert_eq!(report.cycle_count, 3);
         assert!(!report.can_admit_cleaning_qualification());
+    }
+
+    #[test]
+    fn campaign_must_include_the_pre_registered_cycle_horizon() {
+        let mut manifest = base_manifest();
+        manifest["required_cycle_count"] = json!(4);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "required_cycle_count_mismatch"));
+    }
+
+    #[test]
+    fn executed_cycles_require_unique_run_and_soil_application_refs() {
+        let mut manifest = base_manifest();
+        make_measured(&mut manifest);
+        manifest["cycles"][2]["cleaning_run_ref"] = manifest["cycles"][1]["cleaning_run_ref"].clone();
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "duplicate_cleaning_run_reference"));
     }
 
     #[test]
