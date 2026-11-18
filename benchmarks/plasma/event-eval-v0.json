@@ -444,5 +444,44 @@
         "The published 100 ms history and 10 ms cut grid provide a reproducible rolling evaluation grid; each cut must use causal pre-anchor history"
       ]
     }
+  },
+  "synthetic_replay_interop": {
+    "producer_repository": "Luminous-Dynamics/symtropy",
+    "producer_pull_request": 5905,
+    "producer_commit": "b9135a78d59a341d49c9fe6d230ec6111831bb53",
+    "producer_schema": "luminous.plasma-synthetic-observation-export.v0.1",
+    "waveform_receipt_schema": "luminous.plasma-synthetic-waveform.v0.1",
+    "observation_frame_schema": "luminous.plasma-observation-frame.v0.1",
+    "evidence_class": "SYNTHETIC_WAVEFORM_FAULT_REPLAY",
+    "physical_measurements": false,
+    "allowed_observation_statuses": [
+      "synthetic",
+      "unavailable",
+      "invalid"
+    ],
+    "forbidden_observation_statuses": [
+      "measured",
+      "delayed",
+      "degraded"
+    ],
+    "mapping": {
+      "synthetic_nominal": "synthetic",
+      "degraded": "synthetic",
+      "delayed_with_source_sample": "synthetic",
+      "delayed_without_source_sample": "unavailable",
+      "unavailable": "unavailable",
+      "invalid": "invalid"
+    },
+    "original_replay_state_fields_preserved": [
+      "sample_index",
+      "sample_state",
+      "source_sample_index",
+      "active_fault_id",
+      "sample_time_ns",
+      "waveform_receipt_sha256"
+    ],
+    "downstream_rule": "synthetic replay observations must abstain at a direct-measurement decision gate; they may be used only in explicitly synthetic robustness/research paths",
+    "claim_ceiling": "synthetic perturbation and evidence-state mapping only; no physical measurement, diagnostic accuracy, instrument failure-rate, observability, or safety claim",
+    "hashes_are_authentication": false
   }
 }
