@@ -347,6 +347,18 @@ impl<'a> ArithmeticDecoder<'a> {
     }
 }
 
+/// Estimate the adaptive model's frequency-array and context storage in bytes.
+/// This excludes allocator metadata and the codec executable.
+pub fn predictor_state_bytes(kind: ModelKind) -> usize {
+    let contexts = match kind {
+        ModelKind::Order0 => 1,
+        ModelKind::Order1 => SYMBOLS + 1,
+    };
+    contexts * SYMBOLS * std::mem::size_of::<u16>()
+        + contexts * std::mem::size_of::<u32>()
+        + std::mem::size_of::<usize>()
+}
+
 /// CRC-32/ISO-HDLC, implemented locally so the reference crate has no dependencies.
 pub fn crc32(bytes: &[u8]) -> u32 {
     let mut crc = !0u32;
@@ -571,7 +583,7 @@ pub fn generate_e0(kind: E0Kind, len: usize, seed: u64) -> Vec<u8> {
                 let run = 1 + (rng.next() % 2048) as usize;
                 symbol = b'A' + (rng.next() % 8) as u8;
                 let remaining = len - out.len();
-                out.extend(std::iter::repeat_n(symbol, run.min(remaining)));
+                out.extend(std::iter::repeat(symbol).take(run.min(remaining)));
             }
         }
     }
