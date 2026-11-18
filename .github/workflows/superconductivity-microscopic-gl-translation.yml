@@ -6,6 +6,7 @@ on:
       - "tools/superconductivity-microscopic-gl-translation-harness/**"
       - "data/schemas/superconductivity_microscopic_gl_translation_v0_1.schema.json"
       - "data/research/superconductivity_microscopic_gl_translation_fixture_v0_1.json"
+      - "data/research/superconductivity_microscopic_gl_translation_arxiv_2603_05123v2_fixture_v0_1.json"
       - "research/superconductivity/microscopic_gl_translation/**"
       - ".github/workflows/superconductivity-microscopic-gl-translation.yml"
   workflow_dispatch:
@@ -41,13 +42,21 @@ jobs:
       - name: Run state-linkage and coefficient-promotion negative controls
         run: cargo test --locked --manifest-path tools/superconductivity-microscopic-gl-translation-harness/Cargo.toml --bin sc_microscopic_gl_audit
 
-      - name: Audit paper-method source record without promoting missing values
+      - name: Audit PRL publication metadata without inventing unavailable values
         run: |
           cargo run --locked --manifest-path tools/superconductivity-microscopic-gl-translation-harness/Cargo.toml --bin sc_microscopic_gl_audit -- \
             --schema data/schemas/superconductivity_microscopic_gl_translation_v0_1.schema.json \
             --fixture data/research/superconductivity_microscopic_gl_translation_fixture_v0_1.json \
-            --out "$RUNNER_TEMP/sc-microscopic-gl-receipt.json"
-          cat "$RUNNER_TEMP/sc-microscopic-gl-receipt.json"
+            --out "$RUNNER_TEMP/sc-microscopic-gl-prl-metadata-receipt.json"
+          cat "$RUNNER_TEMP/sc-microscopic-gl-prl-metadata-receipt.json"
+
+      - name: Audit versioned arXiv v2 numerical response table
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-microscopic-gl-translation-harness/Cargo.toml --bin sc_microscopic_gl_audit -- \
+            --schema data/schemas/superconductivity_microscopic_gl_translation_v0_1.schema.json \
+            --fixture data/research/superconductivity_microscopic_gl_translation_arxiv_2603_05123v2_fixture_v0_1.json \
+            --out "$RUNNER_TEMP/sc-microscopic-gl-arxiv-v2-receipt.json"
+          cat "$RUNNER_TEMP/sc-microscopic-gl-arxiv-v2-receipt.json"
 
       - name: Run Clippy
         run: cargo clippy --locked --manifest-path tools/superconductivity-microscopic-gl-translation-harness/Cargo.toml --bin sc_microscopic_gl_audit -- -D warnings
@@ -61,6 +70,7 @@ jobs:
             echo "cargo=$(cargo --version)"
             sha256sum data/schemas/superconductivity_microscopic_gl_translation_v0_1.schema.json
             sha256sum data/research/superconductivity_microscopic_gl_translation_fixture_v0_1.json
+            sha256sum data/research/superconductivity_microscopic_gl_translation_arxiv_2603_05123v2_fixture_v0_1.json
             sha256sum tools/superconductivity-microscopic-gl-translation-harness/Cargo.toml
             sha256sum tools/superconductivity-microscopic-gl-translation-harness/src/main.rs
             if [ -f tools/superconductivity-microscopic-gl-translation-harness/Cargo.lock ]; then
@@ -79,4 +89,5 @@ jobs:
           path: |
             tools/superconductivity-microscopic-gl-translation-harness/Cargo.lock
             ${{ runner.temp }}/sc-microscopic-gl-environment.txt
-            ${{ runner.temp }}/sc-microscopic-gl-receipt.json
+            ${{ runner.temp }}/sc-microscopic-gl-prl-metadata-receipt.json
+            ${{ runner.temp }}/sc-microscopic-gl-arxiv-v2-receipt.json
