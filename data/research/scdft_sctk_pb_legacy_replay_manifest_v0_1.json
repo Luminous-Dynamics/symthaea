@@ -1,0 +1,243 @@
+{
+  "contract": "SCDFT-SCTK-REPLAY-0.1",
+  "manifest_id": "sctk-upstream-pb-sf-vs-no-sf-v0",
+  "upstream": {
+    "repository_url": "https://github.com/mitsuaki1987/sctk",
+    "commit_sha": "4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33",
+    "ref_name": "main",
+    "commit_date": "2026-10-09T09:24:14Z",
+    "commit_message": "(BugFix) To use static Coulomb, nmf=0 was incorrect and introduce new input parameter",
+    "inspected_at": "2026-11-18"
+  },
+  "example_scope": "contributed_legacy_pb_example",
+  "physics_scope": {
+    "material": "Pb",
+    "structure": "fcc",
+    "pressure_gpa": 0,
+    "spin_orbit_included": false,
+    "finite_q_method": false,
+    "literature_basis": "M. Kawamura, Y. Hizume and T. Ozaki, Phys. Rev. B 101, 134511 (2020), as stated by upstream examples/Pb/README.md; this is a legacy conventional SCDFT example, not the finite-Q Pb case from the 2026 PRL work.",
+    "not_equivalent_to_2026_prl_fixture": true
+  },
+  "cases": [
+    {
+      "case_id": "without_spin_fluctuations",
+      "spin_fluctuations": false,
+      "expected_tc_k": 4.4,
+      "reference_tc_k": 4.4251,
+      "converged_iterations": 41,
+      "reference_run_date": "2023-11-28",
+      "tc_output_path": "examples/Pb/withoutSF/output_reference/tc.out",
+      "tc_output_blob_sha": "afb481f5ae19f2613c68b652f96ee271c4a0637",
+      "reference_output_complete": true,
+      "README_expectation_k": 4.4
+    },
+    {
+      "case_id": "with_spin_fluctuations",
+      "spin_fluctuations": true,
+      "expected_tc_k": 3.7,
+      "reference_tc_k": 3.7233,
+      "converged_iterations": 45,
+      "reference_run_date": "2023-12-06",
+      "tc_output_path": "examples/Pb/withSF/output_reference/tc.out",
+      "tc_output_blob_sha": "a41f9c82d6ccaeac9f777a1db78a6c0e3f72f192",
+      "reference_output_complete": true,
+      "README_expectation_k": 3.7
+    }
+  ],
+  "files": [
+    {
+      "path": "examples/Pb/README.md",
+      "git_blob_sha1": "22c4c3290345c101033873192eb780403ac67ee0",
+      "role": "readme",
+      "case_scope": "shared",
+      "required_for_replay": true
+    },
+    {
+      "path": "examples/Pb/withSF/Pb_ONCV_PBE-1.2.upf",
+      "git_blob_sha1": "829414f8145b4bd6631494099a82a337212f51ac",
+      "role": "pseudopotential",
+      "case_scope": "shared",
+      "required_for_replay": true
+    },
+    {
+      "path": "examples/Pb/withSF/scf.in",
+      "git_blob_sha1": "17f87aaf6de96af1a9a05f0af15030eabb949bec",
+      "role": "qe_input",
+      "case_scope": "shared",
+      "required_for_replay": true
+    },
+    {
+      "path": "examples/Pb/withSF/ph.in",
+      "git_blob_sha1": "11d3617a5c42c5ec8b5ff0cb9756f3ad177c15de",
+      "role": "qe_input",
+      "case_scope": "shared",
+      "required_for_replay": true
+    },
+    {
+      "path": "examples/Pb/withSF/nscf.in",
+      "git_blob_sha1": "d026e3a7fbc535e7c8da6bf91b359a7ec58afe71",
+      "role": "qe_input",
+      "case_scope": "shared",
+      "required_for_replay": true
+    },
+    {
+      "path": "examples/Pb/withSF/twin.in",
+      "git_blob_sha1": "f7fe18a73b997e26f207a1e6c63f67cd967d36db",
+      "role": "qe_input",
+      "case_scope": "shared",
+      "required_for_replay": true
+    },
+    {
+      "path": "examples/Pb/withSF/epmat.in",
+      "git_blob_sha1": "d01dc5e6ab97066f5244931448d00b1118dd3705",
+      "role": "qe_input",
+      "case_scope": "with_spin_fluctuations",
+      "required_for_replay": true
+    },
+    {
+      "path": "examples/Pb/withSF/kel.in",
+      "git_blob_sha1": "38744af6be5531d9558cfe955704b7a867494766",
+      "role": "sctk_input",
+      "case_scope": "with_spin_fluctuations",
+      "required_for_replay": true
+    },
+    {
+      "path": "examples/Pb/withSF/tc.in",
+      "git_blob_sha1": "1cffcecf787f44cf76b8b4b8a81cea172c18c3fe",
+      "role": "sctk_input",
+      "case_scope": "with_spin_fluctuations",
+      "required_for_replay": true
+    },
+    {
+      "path": "examples/Pb/withSF/output_reference/scf.out",
+      "git_blob_sha1": "a55d14578c4815617ecf6c65ca81391e4e64defb",
+      "role": "reference_output",
+      "case_scope": "with_spin_fluctuations",
+      "required_for_replay": false
+    },
+    {
+      "path": "examples/Pb/withSF/output_reference/ph.out",
+      "git_blob_sha1": "2f34b279b05150814115721a28beb6a4e4750f1b",
+      "role": "reference_output",
+      "case_scope": "with_spin_fluctuations",
+      "required_for_replay": false
+    },
+    {
+      "path": "examples/Pb/withSF/output_reference/nscf.out",
+      "git_blob_sha1": "7b5b9c542af076301b902e3e4c1259a82346adf7",
+      "role": "reference_output",
+      "case_scope": "with_spin_fluctuations",
+      "required_for_replay": false
+    },
+    {
+      "path": "examples/Pb/withSF/output_reference/twin.out",
+      "git_blob_sha1": "480301dbdc6f3298f7cc9f0ff513e7a33a2cf593",
+      "role": "reference_output",
+      "case_scope": "with_spin_fluctuations",
+      "required_for_replay": false
+    },
+    {
+      "path": "examples/Pb/withSF/output_reference/epmat.out",
+      "git_blob_sha1": "d68f1b4e2973bfc8adf31b2cf665271d790c0b4f",
+      "role": "reference_output",
+      "case_scope": "with_spin_fluctuations",
+      "required_for_replay": false
+    },
+    {
+      "path": "examples/Pb/withSF/output_reference/kel.out",
+      "git_blob_sha1": "5daeef3a094d9c7cdccb1df03753b9e0683c60e2",
+      "role": "reference_output",
+      "case_scope": "with_spin_fluctuations",
+      "required_for_replay": false
+    },
+    {
+      "path": "examples/Pb/withSF/output_reference/tc.out",
+      "git_blob_sha1": "a41f9c82d6ccaeac9f777a1db78a6c0e3f72f192",
+      "role": "reference_output",
+      "case_scope": "with_spin_fluctuations",
+      "required_for_replay": false
+    },
+    {
+      "path": "examples/Pb/withoutSF/epmat.in",
+      "git_blob_sha1": "d79b582fac5ef7020e8f0f559c123bf1fe6a9c79",
+      "role": "qe_input",
+      "case_scope": "without_spin_fluctuations",
+      "required_for_replay": true
+    },
+    {
+      "path": "examples/Pb/withoutSF/kel.in",
+      "git_blob_sha1": "f78aa47f6074fe3a4fe9a36b0865bf2c3bc1d9d4",
+      "role": "sctk_input",
+      "case_scope": "without_spin_fluctuations",
+      "required_for_replay": true
+    },
+    {
+      "path": "examples/Pb/withoutSF/tc.in",
+      "git_blob_sha1": "803ae55fffb884415f6d48debb6e959a96ece84e",
+      "role": "sctk_input",
+      "case_scope": "without_spin_fluctuations",
+      "required_for_replay": true
+    },
+    {
+      "path": "examples/Pb/withoutSF/output_reference/scf.out",
+      "git_blob_sha1": "e464568a132dcd0c0c840e865d45e56f16407c28",
+      "role": "reference_output",
+      "case_scope": "without_spin_fluctuations",
+      "required_for_replay": false
+    },
+    {
+      "path": "examples/Pb/withoutSF/output_reference/ph.out",
+      "git_blob_sha1": "10eda277914da63ff3a7c04aa8e2732722cda84b",
+      "role": "reference_output",
+      "case_scope": "without_spin_fluctuations",
+      "required_for_replay": false
+    },
+    {
+      "path": "examples/Pb/withoutSF/output_reference/nscf.out",
+      "git_blob_sha1": "b9101923bdafeb4f8ab5e28cabdf8b98e0608aeb",
+      "role": "reference_output",
+      "case_scope": "without_spin_fluctuations",
+      "required_for_replay": false
+    },
+    {
+      "path": "examples/Pb/withoutSF/output_reference/twin.out",
+      "git_blob_sha1": "84ac43ad933a279fcfb6aefba43f3e0cc3ecf63f",
+      "role": "reference_output",
+      "case_scope": "without_spin_fluctuations",
+      "required_for_replay": false
+    },
+    {
+      "path": "examples/Pb/withoutSF/output_reference/epmat.out",
+      "git_blob_sha1": "f29071c23684ed919001fffa3bb9e81d78016fbf",
+      "role": "reference_output",
+      "case_scope": "without_spin_fluctuations",
+      "required_for_replay": false
+    },
+    {
+      "path": "examples/Pb/withoutSF/output_reference/kel.out",
+      "git_blob_sha1": "4f9716b335cb3999a1771cc0f8fc8022db055579",
+      "role": "reference_output",
+      "case_scope": "without_spin_fluctuations",
+      "required_for_replay": false
+    },
+    {
+      "path": "examples/Pb/withoutSF/output_reference/tc.out",
+      "git_blob_sha1": "afb481f5ae19f2613c68b652f96ee271c4a0637",
+      "role": "reference_output",
+      "case_scope": "without_spin_fluctuations",
+      "required_for_replay": false
+    }
+  ],
+  "replay_state": {
+    "execution_status": "not_executed",
+    "reference_output_integrity_status": "upstream_blob_ids_pinned_local_bytes_not_yet_verified",
+    "local_replay_receipt": null,
+    "qe_version": null,
+    "sctk_version": null,
+    "input_digest": null,
+    "output_digest": null,
+    "notes": "Reference tc.out files were inspected from the pinned upstream repository and contain successful convergence markers, exact transition temperatures, and JOB DONE. No local QE/SCTK calculation was executed; the repository README says the example requires HPC resources. The example explicitly excludes spin-orbit coupling."
+  },
+  "claim_ceiling": "Pinned upstream Pb SCDFT reference example only. No local calculation is executed or independently reproduced by this manifest."
+}
