@@ -261,6 +261,7 @@ impl Manifest {
         let expected_order = match label.as_str() {
             "D4" => 8,
             "C4" => 4,
+            "C2_R180" | "C2_FX" => 2,
             "C1" => 1,
             _ => return Err(format!("unknown fixture subgroup label: {label}")),
         };
@@ -374,12 +375,15 @@ impl Manifest {
         let mut ids = BTreeSet::new();
         let mut structural_count = 0;
         let mut regression_count = 0;
+        let mut structural_families = BTreeMap::<String, usize>::new();
         for case in cases {
             let case_id = string_field(case, "case_id")?;
             if !ids.insert(case_id.clone()) {
                 return Err(format!("duplicate case ID: {case_id}"));
             }
             let declared = self.declared_subgroup(case)?;
+            let label = string_field(case, "expected_subgroup_label")?;
+            *structural_families.entry(label).or_insert(0) += 1;
             let track = string_field(case, "track")?;
             let computed = match track.as_str() {
                 "exact_finite_structural_stabilizer" => {
@@ -401,6 +405,18 @@ impl Manifest {
         if structural_count != 153 || regression_count != 2 {
             return Err(format!(
                 "unexpected fixture lane counts: structural={structural_count}, regression={regression_count}"
+            ));
+        }
+        let expected_families = BTreeMap::from([
+            ("C1".to_owned(), 30_usize),
+            ("C2_FX".to_owned(), 30_usize),
+            ("C2_R180".to_owned(), 30_usize),
+            ("C4".to_owned(), 31_usize),
+            ("D4".to_owned(), 31_usize),
+        ]);
+        if structural_families != expected_families {
+            return Err(format!(
+                "unexpected structural family counts: {structural_families:?}"
             ));
         }
         Ok((structural_count, regression_count))
