@@ -48,5 +48,5 @@ pub use memory_coordinator::{
 };
 pub use semantic_memory::{
     PROVENANCED_SEMANTIC_ENTRY_SCHEMA_VERSION, ProvenancedSemanticEntry, SemanticEntry,
-    SemanticMemory, SemanticMemoryStats,
+    SemanticMemory, SemanticMemoryInputError, SemanticMemoryStats,
 };
