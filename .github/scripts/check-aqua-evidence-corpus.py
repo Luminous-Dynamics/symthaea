@@ -37,6 +37,7 @@ EXPECTED_VALUES = {
     "supply_pressure_range": ("range", "kPa"),
     "maximum_flow_rate": ("scalar", "L/min"),
     "minimum_operating_pressure": ("scalar", "kPa"),
+    "maximum_operating_pressure": ("range", "kPa"),
     "minimum_function_flow": ("scalar", "L/min"),
     "operating_pressure_range": ("range", "kPa"),
     "maximum_rated_flow": ("scalar", "L/min"),
@@ -123,6 +124,39 @@ def semantic_errors(corpus: dict[str, Any]) -> list[str]:
                         f"{location}: parameter {claim['parameter']} "
                         f"requires unit {expected_unit}, got {canonical.get('unit')}"
                     )
+
+            canonical = claim["canonical_value"]
+            if canonical["kind"] == "range":
+                minimum = canonical.get("minimum")
+                maximum = canonical.get("maximum")
+                if minimum is not None and minimum <= 0:
+                    errors.append(f"{location}: range minimum must be positive")
+                if maximum is not None and maximum <= 0:
+                    errors.append(f"{location}: range maximum must be positive")
+                if minimum is not None and maximum is not None and maximum < minimum:
+                    errors.append(
+                        f"{location}: range maximum {maximum} is below minimum {minimum}"
+                    )
+
+            if claim["evidence_class"] == "manufacturer_declaration":
+                if claim["result_class"] not in {"declared", "derived"}:
+                    errors.append(
+                        f"{location}: manufacturer declaration cannot be relabelled "
+                        f"as {claim['result_class']}"
+                    )
+            if claim["evidence_class"] == "independent_market_sample" and (
+                claim["result_class"] != "measured"
+            ):
+                errors.append(
+                    f"{location}: independent market sample must retain measured status"
+                )
+            if claim["evidence_class"] == "standard_or_programme_criterion" and (
+                claim["result_class"] not in {"declared", "derived"}
+            ):
+                errors.append(
+                    f"{location}: standard/programme criterion cannot be relabelled "
+                    f"as {claim['result_class']}"
+                )
 
             if claim["result_class"] == "derived" and "derivation" not in claim:
                 errors.append(f"{location}: derived result is missing its derivation record")
