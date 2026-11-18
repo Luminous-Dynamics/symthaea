@@ -22,7 +22,23 @@ The crate declares its own Cargo workspace so it remains isolated from Symthaea'
 5. The evaluator compares the observed outcome to the sealed predictions.
 6. A branch audit preserves missing, duplicate, unexpected, unsupported, failed, incomplete and resource-bound dispositions.
 
-The fixture includes known-answer, budget, no-discrimination, seal-ordering, experiment-substitution and denominator-accounting tests.
+The fixture includes known-answer, budget, no-discrimination, seal-ordering, experiment-substitution and denominator-accounting tests. It also contains a deliberately harder selector-comparison case in which observation noise and rollout cost vary across candidate experiments.
+
+### Selector comparator fixture
+
+The new three-design case has two friction hypotheses, equal prior weights and Gaussian observation noise:
+
+| Candidate | Steps | Noise σ | Predicted separation | Heuristic score |
+|---|---:|---:|---:|---:|
+| short-noisy | 1 | 0.15 | 0.0700 | 0.4667 |
+| medium-precise | 2 | 0.05 | 0.1337 | 1.8908 |
+| long-noisy | 5 | 0.20 | 0.2919 | 0.6527 |
+
+All three fit the same five-step budget. The current discrimination/noise/√cost selector chooses **medium-precise**. A maximum-separation-only baseline chooses **long-noisy**; a cheapest-only baseline chooses **short-noisy**.
+
+For this restricted equal-prior, two-Gaussian, equal-variance model, a deterministic Simpson-quadrature calculation of exact-family mutual information (expected information gain) gives approximately 0.0382, 0.6835 and 0.3056 bits, respectively. The principled EIG comparator also chooses medium-precise. Uniform-random selection has expected EIG of approximately 0.3424 bits across these three candidates.
+
+These values are independently recalculated reference values for the declared analytic fixture, not observed experiment outcomes or a generalized Bayesian optimizer result. The EIG calculation is valid only for this stated binary Gaussian family. It should not be used to describe the current selector's heuristic score as EIG. The authored Rust regression exercises the ranking comparison; it has not yet been compiled or run.
 
 ## Explicit limitations
 
