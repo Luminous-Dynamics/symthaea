@@ -1,0 +1,1533 @@
+{
+  "schema_version": "0.1.0",
+  "snapshot_date": "2026-11-18",
+  "entries": [
+    {
+      "entry_id": "brondell-nebia-corre-n400ro",
+      "subject": {
+        "type": "product",
+        "id": "brondell.nebia-corre.n400ro",
+        "name": "Nebia Corre Four-Function Fixed Showerhead",
+        "manufacturer": "Brondell",
+        "sku": "N400RO model family (N400ROCH, N400ROSRN, N400ROBL, N400RORB, N400ROBG)",
+        "market": "United States manufacturer specification",
+        "revision": null
+      },
+      "claims": [
+        {
+          "claim_id": "brondell.nebia.super-saver.flow",
+          "parameter": "flow_rate",
+          "original_value": "1.2 gpm (4.5 L/min)",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 4.5,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "Super Saver",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "flow_test_pressure",
+              "temperature_profile",
+              "test_method",
+              "sample_count"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.brondell.com/content/Nebia_Corre_Fixed_Showerhead_Spec_Sheet_web_010623.pdf",
+            "publisher": "Brondell",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Published mode-flow claim; pressure-specific matched performance is not supplied in the sheet."
+          },
+          "limitations": [
+            "Do not treat 4.5 L/min as a novel Aqua result.",
+            "Do not infer coverage, force, comfort or low-pressure task performance from mode flow alone."
+          ]
+        },
+        {
+          "claim_id": "brondell.nebia.other-modes.flow",
+          "parameter": "flow_rate",
+          "original_value": "1.5 gpm (5.7 L/min) Angel Hair, Hard Spray and Soft Spray modes",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 5.7,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "Angel Hair / Hard Spray / Soft Spray",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "flow_test_pressure",
+              "temperature_profile",
+              "test_method",
+              "sample_count"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.brondell.com/content/Nebia_Corre_Fixed_Showerhead_Spec_Sheet_web_010623.pdf",
+            "publisher": "Brondell",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Manufacturer-declared flow by mode; no matched task or spray-map measurements supplied."
+          },
+          "limitations": [
+            "Do not merge this value with Super Saver mode."
+          ]
+        },
+        {
+          "claim_id": "brondell.nebia.inlet-pressure.range",
+          "parameter": "supply_pressure_range",
+          "original_value": "20–80 psi (1.4–5.5 bar)",
+          "canonical_value": {
+            "kind": "range",
+            "minimum": 137.9,
+            "maximum": 551.6,
+            "unit": "kPa"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "derived",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "pressure datum",
+              "dynamic versus static definition",
+              "performance at each pressure point"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.brondell.com/content/Nebia_Corre_Fixed_Showerhead_Spec_Sheet_web_010623.pdf",
+            "publisher": "Brondell",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Declared supply-water pressure range, converted from 20–80 psi."
+          },
+          "limitations": [
+            "This is not a measured pressure-flow or spray-performance curve.",
+            "Aqua test points below the declared lower bound are exploratory, not supported-range comparisons."
+          ],
+          "derivation": {
+            "formula": "psi × 6.894757 = kPa",
+            "inputs": [
+              "20 psi",
+              "80 psi"
+            ],
+            "assumptions": [
+              "Rounded to one decimal kPa; original specification also prints 1.4–5.5 bar."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "entry_id": "hansgrohe-raindance-select-e-28729000",
+      "subject": {
+        "type": "product",
+        "id": "hansgrohe.raindance-select-e.28729000",
+        "name": "Raindance Select E Hand Shower 120 3jet PowderRain EcoSmart+",
+        "manufacturer": "Hansgrohe",
+        "sku": "28729000",
+        "market": "South Africa",
+        "revision": null
+      },
+      "claims": [
+        {
+          "claim_id": "hansgrohe.28729000.powderrain.flow",
+          "parameter": "flow_rate",
+          "original_value": "5.2 L/min at 3 bar",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 5.2,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "PowderRain",
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": "manufacturer nominal 3 bar",
+            "unknown_conditions": [
+              "independent flow confirmation",
+              "temperature profile",
+              "sample count"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28729000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Exact South African SKU and declared mode/pressure can anchor a physical matched test; the declaration itself is not an independent result."
+          },
+          "limitations": [
+            "Reproduce on the exact market variant and mode."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28729000.rain.flow",
+          "parameter": "flow_rate",
+          "original_value": "5.4 L/min at 3 bar",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 5.4,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "Rain",
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": "manufacturer nominal 3 bar",
+            "unknown_conditions": [
+              "independent flow confirmation",
+              "temperature profile",
+              "sample count"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28729000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Exact South African SKU and declared mode/pressure can anchor a physical matched test; the declaration itself is not an independent result."
+          },
+          "limitations": [
+            "Do not average Rain with PowderRain or massage."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28729000.massage.flow",
+          "parameter": "flow_rate",
+          "original_value": "5.2 L/min at 3 bar",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 5.2,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "Massage",
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": "manufacturer nominal 3 bar",
+            "unknown_conditions": [
+              "independent flow confirmation",
+              "temperature profile",
+              "sample count"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28729000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Exact South African SKU and declared mode/pressure can anchor a physical matched test; the declaration itself is not an independent result."
+          },
+          "limitations": [
+            "Mode-specific comparator only."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28729000.maximum-flow",
+          "parameter": "maximum_flow_rate",
+          "original_value": "Maximum 6 L/min at 3 bar",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 6,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": "manufacturer nominal 3 bar",
+            "unknown_conditions": [
+              "independent flow confirmation",
+              "test tolerance"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28729000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Manufacturer maximum-flow declaration for the named SKU."
+          },
+          "limitations": [
+            "Do not infer exact flow at other pressure points."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28729000.minimum-operating-pressure",
+          "parameter": "minimum_operating_pressure",
+          "original_value": "Minimum flow pressure 1.5 bar",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 150,
+            "unit": "kPa"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "derived",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "pressure measurement datum",
+              "performance at pressures below 1.5 bar"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28729000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "The datasheet states a 1.5 bar minimum flow pressure; converted to 150 kPa."
+          },
+          "limitations": [
+            "This is not an independent task-performance threshold or complete operating range."
+          ],
+          "derivation": {
+            "formula": "bar × 100 = kPa",
+            "inputs": [
+              "1.5 bar"
+            ],
+            "assumptions": [
+              "Exact unit conversion."
+            ]
+          }
+        },
+        {
+          "claim_id": "hansgrohe.28729000.minimum-function-flow",
+          "parameter": "minimum_function_flow",
+          "original_value": "Function from 4.6 L/min",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 4.6,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "exact test procedure",
+              "flow condition at minimum function"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28729000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Manufacturer statement about function onset; not a task-quality endpoint."
+          },
+          "limitations": [
+            "Do not confuse minimum function flow with minimum supply pressure."
+          ]
+        }
+      ]
+    },
+    {
+      "entry_id": "hansgrohe-activera-select-s-28048000",
+      "subject": {
+        "type": "product",
+        "id": "hansgrohe.activera-select-s.28048000",
+        "name": "Activera Select S Shower Set 95 2jet EcoSmart with Varia 72 cm bar",
+        "manufacturer": "Hansgrohe",
+        "sku": "28048000",
+        "market": "South Africa",
+        "revision": null
+      },
+      "claims": [
+        {
+          "claim_id": "hansgrohe.28048000.rain.flow",
+          "parameter": "flow_rate",
+          "original_value": "7.2 L/min at 3 bar",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 7.2,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "Rain",
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": "manufacturer nominal 3 bar",
+            "unknown_conditions": [
+              "independent flow confirmation",
+              "temperature profile",
+              "sample count"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/articledetail-activera-select-s-shower-set-95-2jet-ecosmart-with-shower-bar-varia-72-cm-28048000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Exact South African SKU and declared mode/pressure can anchor a physical matched test."
+          },
+          "limitations": [
+            "This is a manufacturer declaration, not an independent result."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28048000.impactrain.flow",
+          "parameter": "flow_rate",
+          "original_value": "6.5 L/min at 3 bar",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 6.5,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "ImpactRain",
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": "manufacturer nominal 3 bar",
+            "unknown_conditions": [
+              "independent flow confirmation",
+              "temperature profile",
+              "sample count"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/articledetail-activera-select-s-shower-set-95-2jet-ecosmart-with-shower-bar-varia-72-cm-28048000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Exact South African SKU and declared mode/pressure can anchor a physical matched test."
+          },
+          "limitations": [
+            "Do not average the two spray modes."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28048000.maximum-flow",
+          "parameter": "maximum_flow_rate",
+          "original_value": "Maximum flow rate 7.2 L/min at 3 bar",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 7.2,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": "manufacturer nominal 3 bar",
+            "unknown_conditions": [
+              "independent flow confirmation"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/articledetail-activera-select-s-shower-set-95-2jet-ecosmart-with-shower-bar-varia-72-cm-28048000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Manufacturer maximum-flow declaration for the exact named shower set."
+          },
+          "limitations": [
+            "Do not infer maximum flow under other pressures."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28048000.function-from",
+          "parameter": "minimum_function_flow",
+          "original_value": "Function from 3 L/min",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 3,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "task completion at function onset",
+              "flow test method"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/articledetail-activera-select-s-shower-set-95-2jet-ecosmart-with-shower-bar-varia-72-cm-28048000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Manufacturer function-onset statement; not a task outcome."
+          },
+          "limitations": [
+            "Do not confuse function onset with a verified useful bathing minimum."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28048000.operating-pressure.range",
+          "parameter": "operating_pressure_range",
+          "original_value": "Operating pressure min. 0.5 bar / max. 6 bar",
+          "canonical_value": {
+            "kind": "range",
+            "minimum": 50,
+            "maximum": 600,
+            "unit": "kPa"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "derived",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "pressure datum",
+              "performance at every point in the range"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/articledetail-activera-select-s-shower-set-95-2jet-ecosmart-with-shower-bar-varia-72-cm-28048000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Published operating range converted from 0.5–6 bar."
+          },
+          "limitations": [
+            "This is a product operating-pressure declaration, not evidence of non-inferior bathing task at 50 kPa or every intermediate pressure."
+          ],
+          "derivation": {
+            "formula": "bar × 100 = kPa",
+            "inputs": [
+              "0.5 bar",
+              "6 bar"
+            ],
+            "assumptions": [
+              "Exact unit conversion."
+            ]
+          }
+        },
+        {
+          "claim_id": "hansgrohe.28048000.pressure-responsive-nozzles",
+          "parameter": "pressure_compensation_feature",
+          "original_value": "FlexPower: nozzles automatically adjust by opening and closing with water pressure",
+          "canonical_value": {
+            "kind": "text",
+            "text": "Pressure-responsive nozzle feature"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": null,
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "measured flow-pressure curve",
+              "independent durability and clogging tests"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/articledetail-activera-select-s-shower-set-95-2jet-ecosmart-with-shower-bar-varia-72-cm-28048000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "The manufacturer describes FlexPower as pressure-responsive."
+          },
+          "limitations": [
+            "Feature description is not a measured pressure-compensation result."
+          ]
+        }
+      ]
+    },
+    {
+      "entry_id": "epa-watersense-showerhead-spec-v1-1",
+      "subject": {
+        "type": "programme",
+        "id": "epa.watersense.showerhead.v1.1",
+        "name": "EPA WaterSense Specification for Showerheads Version 1.1",
+        "manufacturer": "United States Environmental Protection Agency",
+        "sku": null,
+        "market": "United States programme",
+        "revision": "Version 1.1, 2018-07-26"
+      },
+      "claims": [
+        {
+          "claim_id": "epa.watersense.v11.maximum-rated-flow",
+          "parameter": "maximum_rated_flow",
+          "original_value": "Rated flow must be ≤2.0 gpm (7.6 L/min); maximum test flow is the highest result at 140, 310 and 550 ±7 kPa",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 7.6,
+            "unit": "L/min"
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "pressure_range_kpa": {
+              "kind": "range",
+              "minimum": 133,
+              "maximum": 557,
+              "unit": "kPa"
+            },
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "EPA WaterSense Specification for Showerheads v1.1 sections 3.1.1–3.1.2",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "individual three-point results",
+              "applicable current edition of referenced ASME/CSA method"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://nepis.epa.gov/Exe/ZyPURL.cgi?Dockey=P100VLRA.txt",
+            "publisher": "United States EPA WaterSense",
+            "source_type": "official_standard_or_programme",
+            "published_on": "2018-07-26",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Programme maximum rated-flow criterion; U.S. label programme, not a South African legal limit."
+          },
+          "limitations": [
+            "Formal conformity requires the full specification, sample rules and referenced ASME/CSA method."
+          ]
+        },
+        {
+          "claim_id": "epa.watersense.v11.minimum-flow-low-pressure",
+          "parameter": "minimum_flow_fraction",
+          "original_value": "At least 60% of the rated maximum at 140 ±7 kPa",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 60,
+            "unit": "% of rated maximum"
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": 140,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "EPA WaterSense v1.1 section 3.1.3.1",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "sample statistic and tolerance details in the specification"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://nepis.epa.gov/Exe/ZyPURL.cgi?Dockey=P100VLRA.txt",
+            "publisher": "United States EPA WaterSense",
+            "source_type": "official_standard_or_programme",
+            "published_on": "2018-07-26",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Low-pressure minimum-flow criterion in the programme specification."
+          },
+          "limitations": [
+            "This is a fraction of the rated maximum, not a universal absolute flow."
+          ]
+        },
+        {
+          "claim_id": "epa.watersense.v11.minimum-flow-high-pressure",
+          "parameter": "minimum_flow_fraction",
+          "original_value": "At least 75% of the rated maximum at 310 and 550 ±7 kPa",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 75,
+            "unit": "% of rated maximum"
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "pressure_range_kpa": {
+              "kind": "range",
+              "minimum": 303,
+              "maximum": 557,
+              "unit": "kPa"
+            },
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "EPA WaterSense v1.1 section 3.1.3.2",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "separate results at 310 and 550 kPa"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://nepis.epa.gov/Exe/ZyPURL.cgi?Dockey=P100VLRA.txt",
+            "publisher": "United States EPA WaterSense",
+            "source_type": "official_standard_or_programme",
+            "published_on": "2018-07-26",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "High-pressure minimum-flow criterion in the programme specification."
+          },
+          "limitations": [
+            "This is a fraction of the rated maximum, not a universal absolute flow."
+          ]
+        },
+        {
+          "claim_id": "epa.watersense.v11.spray-force-handheld",
+          "parameter": "minimum_spray_force",
+          "original_value": "≥0.56 N at 140 ±7 kPa flowing pressure",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 0.56,
+            "unit": "N"
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": 140,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "ASME A112.18.1/CSA B125.1 spray-force procedure referenced by WaterSense v1.1 section 4.1.1",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [],
+            "notes": null
+          },
+          "source": {
+            "url": "https://nepis.epa.gov/Exe/ZyPURL.cgi?Dockey=P100VLRA.txt",
+            "publisher": "United States EPA WaterSense",
+            "source_type": "official_standard_or_programme",
+            "published_on": "2018-07-26",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Standardized spray-force criterion for high-efficiency showerheads and handheld showers."
+          },
+          "limitations": [
+            "Not a direct measure of all aspects of human comfort."
+          ]
+        },
+        {
+          "claim_id": "epa.watersense.v11.spray-force-rain",
+          "parameter": "minimum_spray_force",
+          "original_value": "≥0.40 N at 140 ±7 kPa flowing pressure",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 0.4,
+            "unit": "N"
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": 140,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "ASME A112.18.1/CSA B125.1 rain-shower spray-force procedure referenced by WaterSense v1.1 section 4.1.2",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [],
+            "notes": null
+          },
+          "source": {
+            "url": "https://nepis.epa.gov/Exe/ZyPURL.cgi?Dockey=P100VLRA.txt",
+            "publisher": "United States EPA WaterSense",
+            "source_type": "official_standard_or_programme",
+            "published_on": "2018-07-26",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Standardized spray-force criterion for high-efficiency rain showers."
+          },
+          "limitations": [
+            "Not a direct measure of all aspects of human comfort."
+          ]
+        },
+        {
+          "claim_id": "epa.watersense.v11.annular-coverage",
+          "parameter": "spray_coverage_criteria",
+          "original_value": "Combined maximum volume in the 2- and 4-inch rings ≤75% of total; combined minimum volume in the 2-, 4- and 6-inch rings ≥25% of total",
+          "canonical_value": {
+            "kind": "text",
+            "text": "Annular-ring collection criteria"
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "ASME A112.18.1/CSA B125.1 spray-coverage procedure referenced by WaterSense v1.1 section 5.1",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [],
+            "notes": null
+          },
+          "source": {
+            "url": "https://nepis.epa.gov/Exe/ZyPURL.cgi?Dockey=P100VLRA.txt",
+            "publisher": "United States EPA WaterSense",
+            "source_type": "official_standard_or_programme",
+            "published_on": "2018-07-26",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Standardized coverage distribution criteria."
+          },
+          "limitations": [
+            "Aqua's bather-plane spatial map is supplementary and does not replace this method."
+          ]
+        }
+      ]
+    },
+    {
+      "entry_id": "sans-10252-1-2018-edition-3-2",
+      "subject": {
+        "type": "installation_reference",
+        "id": "za.sans.10252-1.2018.ed3.2",
+        "name": "SANS 10252-1:2018 Edition 3.2 — Water supply installations for buildings",
+        "manufacturer": "South African Bureau of Standards",
+        "sku": null,
+        "market": "South Africa",
+        "revision": "Edition 3.2"
+      },
+      "claims": [
+        {
+          "claim_id": "sans10252.shower.table3.water-saving-design",
+          "parameter": "design_flow_and_pressure",
+          "original_value": "Water-saving wall showerhead row: design flow 10 L/min at 50–100 kPa; likely maximum 12 L/min and likely minimum 6 L/min",
+          "canonical_value": {
+            "kind": "text",
+            "text": "10 L/min design flow at 50–100 kPa; table also lists 12 L/min likely maximum"
+          },
+          "evidence_class": "installation_design_reference",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "pressure_range_kpa": {
+              "kind": "range",
+              "minimum": 50,
+              "maximum": 100,
+              "unit": "kPa"
+            },
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "SANS 10252-1:2018 Edition 3.2 Table 3",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.mosselbay.gov.za/storage/documents/cb942e034d7e086691fa18d41a15b553.pdf",
+            "publisher": "SABS (publicly accessible copy hosted by Mossel Bay Municipality)",
+            "source_type": "official_standard_or_programme",
+            "published_on": "2018-01-01",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Building installation design reference, not a product-efficiency label or product pass criterion."
+          },
+          "limitations": [
+            "The controlled SABS text and applicability must be verified.",
+            "Do not treat the 12 L/min likely-maximum column as permission to exceed clause 5.3.3.2."
+          ]
+        },
+        {
+          "claim_id": "sans10252.shower.clause5332.maximum",
+          "parameter": "maximum_shower_discharge",
+          "original_value": "Clause 5.3.3.2 states maximum shower discharge 10 L/min and requires operation at the manufacturer's recommended internal pressure",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 10,
+            "unit": "L/min"
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "SANS 10252-1:2018 Edition 3.2 clause 5.3.3.2",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.iopsa.org/news/7216337",
+            "publisher": "Institute of Plumbing South Africa (IOPSA) notice quoting SANS 10252-1:2018 Edition 3.2",
+            "source_type": "industry_association_notice",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Conservative clause-level design reference pending controlled SABS interpretation."
+          },
+          "limitations": [
+            "IOPSA notice is a summary, not the controlled SABS publication.",
+            "The same accessible edition's Table 3 lists 12 L/min as likely maximum for the water-saving showerhead row; apparent internal inconsistency requires formal interpretation."
+          ]
+        },
+        {
+          "claim_id": "sans10252.basin.aerated-mixing.design",
+          "parameter": "design_flow_and_pressure",
+          "original_value": "Aerated basin mixing valve: design flow 9 L/min at 50 kPa",
+          "canonical_value": {
+            "kind": "text",
+            "text": "9 L/min at 50 kPa"
+          },
+          "evidence_class": "installation_design_reference",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": 50,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "SANS 10252-1:2018 Edition 3.2 Table 3",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.mosselbay.gov.za/storage/documents/cb942e034d7e086691fa18d41a15b553.pdf",
+            "publisher": "SABS (publicly accessible copy hosted by Mossel Bay Municipality)",
+            "source_type": "official_standard_or_programme",
+            "published_on": "2018-01-01",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Fixture-specific building design reference, not a product performance certification."
+          },
+          "limitations": [
+            "Confirm controlled SABS edition and project applicability."
+          ]
+        },
+        {
+          "claim_id": "sans10252.bath.aerated-mixing.design",
+          "parameter": "design_flow_and_pressure",
+          "original_value": "Aerated bath mixing valve: design flow 20 L/min at 50 kPa",
+          "canonical_value": {
+            "kind": "text",
+            "text": "20 L/min at 50 kPa"
+          },
+          "evidence_class": "installation_design_reference",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": 50,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "SANS 10252-1:2018 Edition 3.2 Table 3",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.mosselbay.gov.za/storage/documents/cb942e034d7e086691fa18d41a15b553.pdf",
+            "publisher": "SABS (publicly accessible copy hosted by Mossel Bay Municipality)",
+            "source_type": "official_standard_or_programme",
+            "published_on": "2018-01-01",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Fixture-specific building design reference, not a product performance certification."
+          },
+          "limitations": [
+            "Confirm controlled SABS edition and project applicability."
+          ]
+        },
+        {
+          "claim_id": "sans10252.bidet.mixer.design",
+          "parameter": "design_flow_and_pressure",
+          "original_value": "Bidet mixer / mixing valve: design flow 9 L/min at 50 kPa",
+          "canonical_value": {
+            "kind": "text",
+            "text": "9 L/min at 50 kPa"
+          },
+          "evidence_class": "installation_design_reference",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": 50,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "SANS 10252-1:2018 Edition 3.2 Table 3",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.mosselbay.gov.za/storage/documents/cb942e034d7e086691fa18d41a15b553.pdf",
+            "publisher": "SABS (publicly accessible copy hosted by Mossel Bay Municipality)",
+            "source_type": "official_standard_or_programme",
+            "published_on": "2018-01-01",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Fixture-specific building design reference, not a product performance certification."
+          },
+          "limitations": [
+            "Confirm controlled SABS edition and project applicability."
+          ]
+        }
+      ]
+    },
+    {
+      "entry_id": "south-africa-clasp-19-showerhead-sample-2022",
+      "subject": {
+        "type": "market_sample",
+        "id": "za.clasp.showerheads.19sample",
+        "name": "CLASP South African Shower Heads Testing Report — 19-product sample",
+        "manufacturer": "CLASP / report author Herman Strauss",
+        "sku": null,
+        "market": "South Africa",
+        "revision": "Published 2022; summarized by WRC in 2025"
+      },
+      "claims": [
+        {
+          "claim_id": "clasp.sa.sample.size",
+          "parameter": "sample_size",
+          "original_value": "19 showerheads",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 19,
+            "unit": "products"
+          },
+          "evidence_class": "independent_market_sample",
+          "result_class": "measured",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "CLASP South African Shower Heads Testing Report",
+            "sample_count": 19,
+            "pressure_datum": null,
+            "unknown_conditions": [],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.clasp.ngo/research/all/south-african-shower-heads-testing-report/",
+            "publisher": "CLASP",
+            "source_type": "independent_market_study",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Dated local product sample; product identities were removed from public report imagery."
+          },
+          "limitations": [
+            "Not a 2026 exhaustive market census.",
+            "Does not support exact-SKU comparisons."
+          ]
+        },
+        {
+          "claim_id": "clasp.sa.pressure-compensating.mean-flow",
+          "parameter": "mean_flow_rate",
+          "original_value": "Pressure-compensating showerheads averaged 6.6 L/min at 300 kPa",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 6.6,
+            "unit": "L/min"
+          },
+          "evidence_class": "independent_market_sample",
+          "result_class": "measured",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "CLASP report; WRC 2025 summary of 19-product sample",
+            "sample_count": 19,
+            "pressure_datum": null,
+            "unknown_conditions": [],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf",
+            "publisher": "Water Research Commission summarizing CLASP South African testing",
+            "source_type": "independent_market_study",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Aggregate mean for the pressure-compensating subset."
+          },
+          "limitations": [
+            "Not a named product result.",
+            "Do not treat 6.6 L/min as the current whole-market mean."
+          ]
+        },
+        {
+          "claim_id": "clasp.sa.fixed-orifice.mean-flow",
+          "parameter": "mean_flow_rate",
+          "original_value": "Fixed-orifice showerheads averaged about 24 L/min at 300 kPa",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 24,
+            "unit": "L/min"
+          },
+          "evidence_class": "independent_market_sample",
+          "result_class": "measured",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "CLASP report; WRC 2025 summary of 19-product sample",
+            "sample_count": 19,
+            "pressure_datum": null,
+            "unknown_conditions": [],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf",
+            "publisher": "Water Research Commission summarizing CLASP South African testing",
+            "source_type": "independent_market_study",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Aggregate mean for the fixed-orifice subset."
+          },
+          "limitations": [
+            "Not a named product result.",
+            "Sample composition and market availability may have changed."
+          ]
+        }
+      ]
+    },
+    {
+      "entry_id": "hyperbolic-vortex-showerhead-study-2019",
+      "subject": {
+        "type": "research_study",
+        "id": "study.van-de-griend.water.2019.11.12.2446",
+        "name": "Consequences of the Integration of a Hyperbolic Funnel into a Showerhead for Droplets, Jet Break-Up Lengths, and Physical-Chemical Parameters",
+        "manufacturer": null,
+        "sku": null,
+        "market": "Laboratory research",
+        "revision": "Water 2019, 11(12), 2446"
+      },
+      "claims": [
+        {
+          "claim_id": "vortex.showerhead.same-jet-velocity.water-reduction",
+          "parameter": "water_reduction_at_similar_mean_jet_velocity",
+          "original_value": "14.4 ± 5.6% less water at similar mean jet velocity (p < 0.01) in the tested configuration",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 14.4,
+            "unit": "%"
+          },
+          "evidence_class": "peer_reviewed_study_result",
+          "result_class": "measured",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Comparative laboratory measurements at 6, 7, 8 and 9 L/min; weighted jet-velocity analysis",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "human task quality in a new trial",
+              "independent replication in other showerhead geometry",
+              "full-service cleaning/purge burden"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.mdpi.com/2073-4441/11/12/2446",
+            "publisher": "Water journal / van de Griend et al.",
+            "source_type": "peer_reviewed_article",
+            "published_on": "2019-12-01",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Peer-reviewed prior art for hyperbolic vortex geometry; reported reduction is based on mean jet-velocity equivalence."
+          },
+          "limitations": [
+            "Authors inferred shower experience from earlier jet-velocity literature; no new human comfort trial was performed.",
+            "Authors noted changed centre/peripheral spray distribution may or may not be desirable.",
+            "Not an Aqua result or guaranteed transferable improvement."
+          ]
+        },
+        {
+          "claim_id": "vortex.showerhead.chemistry-observations",
+          "parameter": "water_chemistry_observation",
+          "original_value": "Study observed increased pH and reduced redox potential in its characterization rig, interpreted as degassing / oxygen intake",
+          "canonical_value": {
+            "kind": "text",
+            "text": "Qualitative water-chemistry changes observed"
+          },
+          "evidence_class": "peer_reviewed_study_result",
+          "result_class": "measured",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Separate recirculating chemical-characterization rig",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "different water chemistries",
+              "independent hygiene meaning",
+              "microbial outcomes"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.mdpi.com/2073-4441/11/12/2446",
+            "publisher": "Water journal / van de Griend et al.",
+            "source_type": "peer_reviewed_article",
+            "published_on": "2019-12-01",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Observation from the study's chemistry rig."
+          },
+          "limitations": [
+            "Not evidence of improved or degraded hygiene by itself.",
+            "Any relevance for Aqua must be decided by Mycelix / competent water-quality authority."
+          ]
+        }
+      ]
+    },
+    {
+      "entry_id": "shower-pattern-thermal-transfer-study-2024",
+      "subject": {
+        "type": "research_study",
+        "id": "study.zhang-mui-wong.water.2024.16.7.928",
+        "name": "Wise Choice of Showerhead Patterns: How to Save Energy during Showering While Maintaining Thermal Comfort",
+        "manufacturer": null,
+        "sku": null,
+        "market": "Laboratory research",
+        "revision": "Water 2024, 16(7), 928"
+      },
+      "claims": [
+        {
+          "claim_id": "thermal-pattern.energy-reduction",
+          "parameter": "potential_energy_reduction",
+          "original_value": "Around 20% potential energy reduction without sacrificing thermal comfort in the study's pattern comparison",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 20,
+            "unit": "%"
+          },
+          "evidence_class": "peer_reviewed_study_result",
+          "result_class": "derived",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Five showerheads, 18 spray patterns, six showering conditions (two water temperatures × three flow rates)",
+            "sample_count": 5,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "replication with Aqua geometry",
+              "whole-service water and energy accounting",
+              "independent human-factors endpoint"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.mdpi.com/2073-4441/16/7/928",
+            "publisher": "Water journal / Zhang, Mui and Wong",
+            "source_type": "peer_reviewed_article",
+            "published_on": "2024-03-22",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Study-specific comparison derived from tested spray-pattern thermal-transfer performance."
+          },
+          "limitations": [
+            "Not a universal 20% efficiency guarantee.",
+            "Do not apply directly to Aqua without matched test, calibrated thermal boundary and independent task/comfort assessment."
+          ]
+        },
+        {
+          "claim_id": "thermal-pattern.parameters",
+          "parameter": "influential_design_parameters",
+          "original_value": "Nozzle area ratio, water pressure and resistance factor influenced the spray-to-skin heat-transfer coefficient",
+          "canonical_value": {
+            "kind": "text",
+            "text": "Nozzle area ratio, pressure and resistance factor identified as influential parameters"
+          },
+          "evidence_class": "peer_reviewed_study_result",
+          "result_class": "measured",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Regression and statistical analyses of 18 patterns",
+            "sample_count": 5,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "Aqua material/manufacturing effects",
+              "pressure range beyond the study's conditions"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.mdpi.com/2073-4441/16/7/928",
+            "publisher": "Water journal / Zhang, Mui and Wong",
+            "source_type": "peer_reviewed_article",
+            "published_on": "2024-03-22",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Useful DOE prior art for spray/thermal co-design."
+          },
+          "limitations": [
+            "The paper's factor values and response relationships need exact replication before use as an Aqua design rule."
+          ]
+        }
+      ]
+    }
+  ]
+}
