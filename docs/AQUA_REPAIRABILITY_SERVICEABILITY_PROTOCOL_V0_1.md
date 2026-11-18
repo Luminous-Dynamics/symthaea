@@ -158,8 +158,20 @@ The dependency-free Rust module in `crates/domains/symthaea-aqua-bench/src/servi
 - reports an undefined fraction when no routine jobs are present;
 - validates matched incumbent/AQS job context.
 
-The authored tests exercise fail-closed behavior and denominator handling. They are not a CI pass until the exact PR head reports successful execution.
+The serviceability cohort now also distinguishes spare availability as AvailableBeforeJob / NotAvailableBeforeJob / Unknown, requires an exact spare-part identity before counting a part as available, reports unique spare-part count, and reports median disassembly depth separately. Unknown spare availability is excluded from the known-availability fraction but remains explicitly counted; a zero known denominator yields an undefined fraction. The authored tests exercise fail-closed behavior, return-to-service evidence, repair denominator handling, spare availability and disassembly-depth reporting. They are not a CI pass until the exact PR head reports successful execution.
 
 ## 9. Claim ceiling
 
 This is an evidence contract and timed-trial protocol. It does not establish that AQS-1 is repairable, lower-cost, circular, lower-carbon, safe to service or more durable. It authorizes no procurement, construction, occupied service or physical test outside a separately reviewed procedure.
+
+
+## 10. Extended cohort measures
+
+The Rust evaluator now records three distinct spare-availability states rather than a boolean:
+- AvailableBeforeJob (requires an exact part ID);
+- NotAvailableBeforeJob;
+- Unknown.
+
+For routine jobs it reports each count separately and computes an availability fraction only over the known Available + NotAvailable subset. Unknown observations do not silently become unavailable or available. If no known observations exist, the fraction is undefined.
+
+The cohort also reports unique spare-part IDs and median disassembly depth separately from technician time and downtime. These are descriptive serviceability measures; they are not lifecycle cost, repair-probability, circularity or environmental-impact calculations.
