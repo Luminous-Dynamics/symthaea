@@ -1,0 +1,378 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_intertwined_order_instance_v0_1.schema.json",
+  "title": "Superconductivity Intertwined / Multicomponent GL Instance",
+  "description": "Versioned synthetic basis and coupling contract for multiband, interband, sublattice-modulated and finite-momentum superconducting order parameters.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "instance_id",
+    "fixture_only",
+    "lattice",
+    "components",
+    "field_configuration",
+    "couplings",
+    "secondary_order_fields",
+    "stability_gates",
+    "source_references",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SC-INTERTWINED-ORDER-0.1"
+    },
+    "instance_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_only": {
+      "type": "boolean"
+    },
+    "lattice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dimension",
+        "shape",
+        "boundary_conditions",
+        "coordinate_convention"
+      ],
+      "properties": {
+        "dimension": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "shape": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "integer",
+            "minimum": 2
+          }
+        },
+        "boundary_conditions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "enum": [
+              "periodic",
+              "open"
+            ]
+          }
+        },
+        "coordinate_convention": {
+          "const": "integer_lattice_coordinates"
+        }
+      }
+    },
+    "components": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "component_id",
+          "component_role",
+          "band_orbital_id",
+          "symmetry_label",
+          "momentum_vector",
+          "form_factor",
+          "gauge_charge",
+          "complex_field"
+        ],
+        "properties": {
+          "component_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "component_role": {
+            "enum": [
+              "intraband_pair",
+              "interband_pair",
+              "uniform_pair",
+              "pdw_plus_q",
+              "pdw_minus_q",
+              "sublattice_pair_density_modulation",
+              "other_symmetry_component"
+            ]
+          },
+          "band_orbital_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "symmetry_label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "momentum_vector": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          },
+          "form_factor": {
+            "type": "string",
+            "minLength": 1
+          },
+          "gauge_charge": {
+            "const": "Cooper_pair_charge_2e"
+          },
+          "complex_field": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "field_configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sites"
+      ],
+      "properties": {
+        "sites": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "site_id",
+              "position",
+              "component_fields"
+            ],
+            "properties": {
+              "site_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "position": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 3,
+                "items": {
+                  "type": "number"
+                }
+              },
+              "component_fields": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 12,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "component_id",
+                    "psi_real",
+                    "psi_imag"
+                  ],
+                  "properties": {
+                    "component_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "psi_real": {
+                      "type": "number"
+                    },
+                    "psi_imag": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "couplings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "quadratic_matrix",
+        "gradient_matrices_by_axis",
+        "quartic_self_coefficients",
+        "quartic_density_density_terms",
+        "phase_locking_terms",
+        "gauge_convention"
+      ],
+      "properties": {
+        "quadratic_matrix": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 12,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 12,
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "gradient_matrices_by_axis": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 12,
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 12,
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "quartic_self_coefficients": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 12,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "quartic_density_density_terms": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "component_a",
+              "component_b",
+              "coefficient"
+            ],
+            "properties": {
+              "component_a": {
+                "type": "string",
+                "minLength": 1
+              },
+              "component_b": {
+                "type": "string",
+                "minLength": 1
+              },
+              "coefficient": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "phase_locking_terms": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "component_a",
+              "component_b",
+              "coefficient",
+              "convention"
+            ],
+            "properties": {
+              "component_a": {
+                "type": "string",
+                "minLength": 1
+              },
+              "component_b": {
+                "type": "string",
+                "minLength": 1
+              },
+              "coefficient": {
+                "type": "number"
+              },
+              "convention": {
+                "const": "minus_two_J_real_psi_a_conjugate_psi_b"
+              }
+            }
+          }
+        },
+        "gauge_convention": {
+          "const": "single_common_U1_gauge_transform_for_all_charge_2e_components"
+        }
+      }
+    },
+    "secondary_order_fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "field_id",
+          "field_kind",
+          "representation",
+          "coupling_scope"
+        ],
+        "properties": {
+          "field_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "field_kind": {
+            "enum": [
+              "charge_density",
+              "nematic",
+              "spin_density",
+              "structural_distortion",
+              "other"
+            ]
+          },
+          "representation": {
+            "enum": [
+              "real_scalar",
+              "real_vector",
+              "complex_scalar"
+            ]
+          },
+          "coupling_scope": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "stability_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "superfluid_stiffness_must_be_positive_semidefinite",
+        "negative_stiffness_is_hard_failure",
+        "stiffness_eigenvalue_tolerance"
+      ],
+      "properties": {
+        "superfluid_stiffness_must_be_positive_semidefinite": {
+          "const": true
+        },
+        "negative_stiffness_is_hard_failure": {
+          "const": true
+        },
+        "stiffness_eigenvalue_tolerance": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "source_references": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      }
+    },
+    "claim_ceiling": {
+      "const": "Synthetic multicomponent order-parameter basis and coupling declaration only; no equilibrium, PDW identification, stable superconductivity, Tc, or experimental result is established."
+    }
+  }
+}
