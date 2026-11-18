@@ -1,0 +1,59 @@
+{
+  "metadata": {
+    "benchmark": "HiddenBench",
+    "profile": "hidden",
+    "model": "synthetic-qualifier-smoke",
+    "rounds": 15,
+    "seed": 20261118
+  },
+  "runs": [
+    {
+      "task_id": 1,
+      "scenario": "evacuation_west_city",
+      "initial_votes": [
+        {
+          "agent": "Person 1",
+          "vote": "West City"
+        },
+        {
+          "agent": "Person 2",
+          "vote": "East Town"
+        }
+      ],
+      "final_votes": [
+        {
+          "agent": "Person 1",
+          "vote": "West City"
+        },
+        {
+          "agent": "Person 2",
+          "vote": "West City"
+        }
+      ]
+    },
+    {
+      "task_id": 2,
+      "scenario": "evacuation_north_hill",
+      "initial_votes": [
+        {
+          "agent": "Person 1",
+          "vote": "North Hill"
+        },
+        {
+          "agent": "Person 2",
+          "vote": "North Hill"
+        }
+      ],
+      "final_votes": [
+        {
+          "agent": "Person 1",
+          "vote": "North Hill"
+        },
+        {
+          "agent": "Person 2",
+          "vote": "West City"
+        }
+      ]
+    }
+  ]
+}
