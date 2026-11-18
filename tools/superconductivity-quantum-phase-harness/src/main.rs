@@ -776,6 +776,30 @@ mod tests {
     }
 
     #[test]
+    fn source_aligned_ponticelli_parameter_fixture_passes_as_input_only() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let schema = fs::read(
+            root.join("data/schemas/superconductivity_quantum_phase_instance_v0_1.schema.json"),
+        )
+        .unwrap();
+        let fixture: Value = serde_json::from_slice(
+            &fs::read(
+                root.join("data/research/superconductivity_quantum_phase_ponticelli_2026_U4_T03_input_fixture_v0_1.json"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let receipt = validate_instance(&schema, &serde_json::to_vec(&fixture).unwrap()).unwrap();
+        assert_eq!(receipt["status"], "pass");
+        assert_eq!(receipt["node_count"], 16);
+        assert_eq!(receipt["edge_count"], 32);
+        assert_eq!(receipt["charging_matrix_representation"], "diagonal_scalar");
+        assert_eq!(receipt["imaginary_time_slices"], 1000);
+        assert_eq!(receipt["temperature"], 0.3);
+        assert!(fixture["claim_ceiling"].as_str().unwrap().contains("not a QMC result"));
+    }
+
+    #[test]
     fn phase_path_integral_must_not_claim_charge_basis_cutoff() {
         let (_, mut fixture) = inputs();
         fixture["simulation"]["charge_basis_cutoff"]["mode"] = json!("symmetric_integer");
