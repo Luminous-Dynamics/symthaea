@@ -1997,6 +1997,41 @@ mod provenance_envelope_tests {
     }
 
     #[test]
+    fn replay_priority_bonus_survives_reconsolidation_rebuilds() {
+        let mut memory = EpisodicMemory::new(EpisodicReplayConfig {
+            psi_threshold: 0.0,
+            recency_weight: 0.2,
+            ..Default::default()
+        });
+        let provenance = GraduationProvenance {
+            source: MemorySource::ActionFeedback,
+            verification_claimed: false,
+        };
+        assert!(memory.store_if_significant_with_provenance(
+            episode(0.7, 11),
+            Some(provenance),
+            0.2,
+        ));
+
+        memory.boost_causal_consolidation(&[11], 0.1);
+        let stored = memory.episodes.iter().next().unwrap();
+        let expected = stored
+            .episode
+            .priority_score(memory.current_cycle, memory.config.recency_weight)
+            + stored.consolidation_priority_bonus;
+        assert_eq!(stored.score, expected);
+
+        memory.boost_recent_consolidation(0.1);
+        let stored = memory.episodes.iter().next().unwrap();
+        let expected = stored
+            .episode
+            .priority_score(memory.current_cycle, memory.config.recency_weight)
+            + stored.consolidation_priority_bonus;
+        assert_eq!(stored.score, expected);
+        assert_eq!(stored.consolidation_priority_bonus, 0.2);
+    }
+
+    #[test]
     fn legacy_sampling_api_remains_available_and_envelope_sampler_keeps_lineage() {
         let mut memory = EpisodicMemory::new(EpisodicReplayConfig {
             psi_threshold: 0.0,
