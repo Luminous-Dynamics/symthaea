@@ -120,6 +120,7 @@ pub struct VerifiedCausalAssessment {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerifiedOutcome {
     pub reconciled: bool,
+    pub success: bool,
     pub outcome_digest: String,
 }
 
@@ -209,6 +210,7 @@ pub struct EvidenceReceiptBundle {
     pub calibration_method_id: String,
     pub calibration_revision: String,
     pub causal_assessment_digest: String,
+    pub outcome_success: bool,
     pub outcome_digest: String,
 }
 
@@ -457,6 +459,7 @@ pub fn ingest_as_known(
             calibration_method_id: measurement.method_id,
             calibration_revision: measurement.calibration_revision,
             causal_assessment_digest: causal.assessment_digest,
+            outcome_success: outcome.success,
             outcome_digest: outcome.outcome_digest,
         },
     })
@@ -500,6 +503,7 @@ pub struct ConsolidationEvidenceRefV1 {
     outcome_reconciled: bool,
     confounders_controlled: bool,
     delayed_horizon_complete: bool,
+    outcome_success: bool,
     receipts: EvidenceReceiptBundle,
 }
 
@@ -564,6 +568,10 @@ impl ConsolidationEvidenceRefV1 {
         self.delayed_horizon_complete
     }
 
+    pub fn outcome_success(&self) -> bool {
+        self.outcome_success
+    }
+
     pub fn receipts(&self) -> &EvidenceReceiptBundle {
         &self.receipts
     }
@@ -583,6 +591,57 @@ pub struct ConsolidationEvidencePackV1 {
 }
 
 impl ConsolidationEvidencePackV1 {
+    /// Summarize verified support for a target scope without making a decision.
+    /// A success requires trusted lineage, a verified success outcome,
+    /// intervention, pre-registration, confounder control, reconciliation and
+    /// a completed delayed horizon.
+    pub fn summarize_for_scope(
+        &self,
+        target_scope: Scope,
+    ) -> ConsolidationEvidenceSummaryV1 {
+        let trusted_event_count = self
+            .events
+            .iter()
+            .filter(|event| {
+                event.source_trust_status == SourceTrustStatus::TrustedForScope
+            })
+            .count();
+        let independently_observed_successes = self
+            .events
+            .iter()
+            .filter(|event| {
+                event.source_trust_status == SourceTrustStatus::TrustedForScope
+                    && event.outcome_success
+                    && event.intervention
+                    && event.prediction_pre_registered
+                    && event.outcome_reconciled
+                    && event.confounders_controlled
+                    && event.delayed_horizon_complete
+            })
+            .count();
+        let all_trusted_predictions_pre_registered = trusted_event_count > 0
+            && self
+                .events
+                .iter()
+                .filter(|event| {
+                    event.source_trust_status == SourceTrustStatus::TrustedForScope
+                })
+                .all(|event| event.prediction_pre_registered);
+
+        ConsolidationEvidenceSummaryV1 {
+            as_known: self.as_known,
+            target_scope,
+            episode_count: self.events.len(),
+            trusted_source_family_count: self.source_family_count,
+            trusted_source_root_count: self.source_root_count,
+            independently_observed_successes,
+            untrusted_source_count: self.untrusted_event_count,
+            unknown_trust_source_count: self.unknown_trust_event_count,
+            scope_matches: self.events.iter().all(|event| event.scope == target_scope),
+            all_trusted_predictions_pre_registered,
+        }
+    }
+
     pub fn as_known(&self) -> AsKnownQuery {
         self.as_known
     }
@@ -611,6 +670,22 @@ impl ConsolidationEvidencePackV1 {
     pub fn unknown_trust_event_count(&self) -> usize {
         self.unknown_trust_event_count
     }
+}
+
+/// Decision-neutral summary of a verified evidence pack. It carries no
+/// consolidation action, evaluator oracle, or authorization grant.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ConsolidationEvidenceSummaryV1 {
+    pub as_known: AsKnownQuery,
+    pub target_scope: Scope,
+    pub episode_count: usize,
+    pub trusted_source_family_count: usize,
+    pub trusted_source_root_count: usize,
+    pub independently_observed_successes: usize,
+    pub untrusted_source_count: usize,
+    pub unknown_trust_source_count: usize,
+    pub scope_matches: bool,
+    pub all_trusted_predictions_pre_registered: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -688,6 +763,7 @@ pub fn build_consolidation_evidence_pack(
             outcome_reconciled: experience.outcome_reconciled,
             confounders_controlled: experience.confounders_controlled,
             delayed_horizon_complete: experience.delayed_horizon_complete,
+            outcome_success: item.receipts.outcome_success,
             receipts: item.receipts.clone(),
         });
     }
@@ -775,6 +851,7 @@ mod tests {
         family_id: u16,
         error_bound: f64,
         reconciled: bool,
+        outcome_success: bool,
         intervention: bool,
         delayed_complete: bool,
         retracted_at_ms: Option<i64>,
@@ -803,6 +880,7 @@ mod tests {
                 family_id: 7,
                 error_bound: 0.02,
                 reconciled: true,
+                outcome_success: true,
                 intervention: true,
                 delayed_complete: true,
                 retracted_at_ms: None,
@@ -950,6 +1028,7 @@ mod tests {
         ) -> Option<VerifiedOutcome> {
             Some(VerifiedOutcome {
                 reconciled: self.reconciled,
+                success: self.outcome_success,
                 outcome_digest: "3".repeat(64),
             })
         }
@@ -1449,6 +1528,7 @@ mod tests {
             ) -> Option<VerifiedOutcome> {
                 Some(VerifiedOutcome {
                     reconciled: true,
+                    success: true,
                     outcome_digest: "3".repeat(64),
                 })
             }
@@ -1580,6 +1660,29 @@ mod tests {
         let b = ingest_as_known(&raw(), query(180, 250), &second).unwrap();
         assert_ne!(a.experience.source_family, b.experience.source_family);
         assert_eq!(a.experience.source_root_id, b.experience.source_root_id);
+    }
+
+    #[test]
+    fn consolidation_summary_does_not_claim_preregistration_without_trusted_sources() {
+        let verifier = TestVerifier {
+            trust_status: SourceTrustStatus::Untrusted,
+            ..TestVerifier::default()
+        };
+        let batch = ingest_batch_as_known(
+            &[raw()],
+            query(180, 250),
+            &verifier,
+        )
+        .expect("untrusted but verified event remains preserved");
+        let pack = build_consolidation_evidence_pack(&batch, &[42]).unwrap();
+        let summary = pack.summarize_for_scope(scope());
+
+        assert_eq!(summary.episode_count, 1);
+        assert_eq!(summary.trusted_source_family_count, 0);
+        assert_eq!(summary.trusted_source_root_count, 0);
+        assert_eq!(summary.independently_observed_successes, 0);
+        assert_eq!(summary.untrusted_source_count, 1);
+        assert!(!summary.all_trusted_predictions_pre_registered);
     }
 
     #[test]
