@@ -941,6 +941,321 @@ fn transform_polynomial(polynomial: &Polynomial, matrix: Matrix2) -> Result<Poly
     Ok(transformed)
 }
 
+
+/// A bounded-coordinate observation can only *retain* an action as possible.
+/// It can never promote that action to an exact symmetry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BoundedNoiseWitnessV1 {
+    CompatiblePermutation {
+        source_to_target: Vec<usize>,
+        maximum_linf_residual_scaled: i128,
+    },
+    HallDeficiency {
+        source_indices: Vec<usize>,
+        neighbor_target_indices: Vec<usize>,
+        deficit: usize,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedNoiseElementDecisionV1 {
+    pub element_id: String,
+    pub possible_under_noise_bound: bool,
+    pub witness: BoundedNoiseWitnessV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedNoiseStabilizerReportV1 {
+    pub base_case_id: String,
+    pub epsilon_scaled: i128,
+    pub exact_stabilizer_elements: Vec<String>,
+    /// Not ruled out by the coordinate uncertainty envelope. This is not a
+    /// proven or accepted subgroup and need not itself be group-closed.
+    pub possible_elements: Vec<String>,
+    /// Each rejected action carries a Hall-deficiency counterexample.
+    pub ruled_out_elements: Vec<String>,
+    /// Soundness invariant: bounded observations must never reject a true
+    /// latent stabilizer element when the declared error bound is respected.
+    pub all_exact_stabilizer_elements_remain_possible: bool,
+    pub decisions: Vec<BoundedNoiseElementDecisionV1>,
+}
+
+fn linf_distance(left: Point, right: Point) -> Result<i128, String> {
+    let dx = left
+        .0
+        .checked_sub(right.0)
+        .and_then(i128::checked_abs)
+        .ok_or_else(|| "coordinate residual overflow".to_owned())?;
+    let dy = left
+        .1
+        .checked_sub(right.1)
+        .and_then(i128::checked_abs)
+        .ok_or_else(|| "coordinate residual overflow".to_owned())?;
+    Ok(dx.max(dy))
+}
+
+fn augment_bounded_matching(
+    source: usize,
+    adjacency: &[Vec<(usize, i128)>],
+    target_to_source: &mut [Option<usize>],
+    visited_targets: &mut [bool],
+) -> bool {
+    for (target, _) in &adjacency[source] {
+        if visited_targets[*target] {
+            continue;
+        }
+        visited_targets[*target] = true;
+        let current_owner = target_to_source[*target];
+        if current_owner.is_none()
+            || augment_bounded_matching(
+                current_owner.expect("checked as present"),
+                adjacency,
+                target_to_source,
+                visited_targets,
+            )
+        {
+            target_to_source[*target] = Some(source);
+            return true;
+        }
+    }
+    false
+}
+
+fn bounded_noise_matching_witness(
+    adjacency: &[Vec<(usize, i128)>],
+) -> Result<BoundedNoiseWitnessV1, String> {
+    let count = adjacency.len();
+    let mut target_to_source = vec![None; count];
+    let mut matched = 0_usize;
+    for source in 0..count {
+        let mut visited_targets = vec![false; count];
+        if augment_bounded_matching(
+            source,
+            adjacency,
+            &mut target_to_source,
+            &mut visited_targets,
+        ) {
+            matched += 1;
+        }
+    }
+
+    if matched == count {
+        let mut source_to_target = vec![usize::MAX; count];
+        for (target, source) in target_to_source.iter().enumerate() {
+            if let Some(source) = source {
+                source_to_target[*source] = target;
+            }
+        }
+        if source_to_target.iter().any(|target| *target == usize::MAX) {
+            return Err("perfect matching omitted a source vertex".to_owned());
+        }
+        let mut maximum_linf_residual_scaled = 0_i128;
+        for (source, target) in source_to_target.iter().enumerate() {
+            let residual = adjacency[source]
+                .iter()
+                .find(|(candidate, _)| candidate == target)
+                .map(|(_, residual)| *residual)
+                .ok_or_else(|| "matching edge is absent from compatibility graph".to_owned())?;
+            maximum_linf_residual_scaled = maximum_linf_residual_scaled.max(residual);
+        }
+        return Ok(BoundedNoiseWitnessV1::CompatiblePermutation {
+            source_to_target,
+            maximum_linf_residual_scaled,
+        });
+    }
+
+    // Alternating reachability from every unmatched left vertex constructs
+    // S with |N(S)| < |S|, a replayable Hall-deficiency witness.
+    let mut reachable_sources = vec![false; count];
+    let mut reachable_targets = vec![false; count];
+    let mut queue = std::collections::VecDeque::new();
+    for source in 0..count {
+        if !target_to_source.iter().any(|owner| *owner == Some(source)) {
+            reachable_sources[source] = true;
+            queue.push_back(source);
+        }
+    }
+    while let Some(source) = queue.pop_front() {
+        let matched_target = target_to_source
+            .iter()
+            .position(|owner| *owner == Some(source));
+        for (target, _) in &adjacency[source] {
+            if matched_target == Some(*target) || reachable_targets[*target] {
+                continue;
+            }
+            reachable_targets[*target] = true;
+            if let Some(next_source) = target_to_source[*target] {
+                if !reachable_sources[next_source] {
+                    reachable_sources[next_source] = true;
+                    queue.push_back(next_source);
+                }
+            }
+        }
+    }
+
+    let source_indices: Vec<usize> = reachable_sources
+        .iter()
+        .enumerate()
+        .filter_map(|(index, reachable)| reachable.then_some(index))
+        .collect();
+    let neighbor_target_indices: Vec<usize> = (0..count)
+        .filter(|target| {
+            source_indices
+                .iter()
+                .any(|source| adjacency[*source].iter().any(|(neighbor, _)| neighbor == target))
+        })
+        .collect();
+    if source_indices.len() <= neighbor_target_indices.len() {
+        return Err("maximum matching failed without a Hall-deficiency set".to_owned());
+    }
+    Ok(BoundedNoiseWitnessV1::HallDeficiency {
+        deficit: source_indices.len() - neighbor_target_indices.len(),
+        source_indices,
+        neighbor_target_indices,
+    })
+}
+
+impl Manifest {
+    /// Conservatively test each ambient action against a bounded coordinate
+    /// error model. An edge i->j exists when observed point i is within
+    /// 2*epsilon (L-infinity, in fixed-point units) of g(observed point j).
+    ///
+    /// A perfect matching means only "not falsified"; no matching yields a
+    /// Hall-deficiency witness proving that no compatible point permutation
+    /// exists under the declared bound.
+    pub fn bounded_noise_stabilizer_report(
+        &self,
+        base_case_id: &str,
+        observed_points_json: &Value,
+        epsilon_scaled: i128,
+    ) -> Result<BoundedNoiseStabilizerReportV1, String> {
+        if epsilon_scaled < 0 {
+            return Err("coordinate error bound must be nonnegative".to_owned());
+        }
+        let cases = field(&self.root, "cases")?
+            .as_array()
+            .ok_or_else(|| "cases must be an array".to_owned())?;
+        let base_case = cases
+            .iter()
+            .find(|case| {
+                string_field(case, "case_id").ok().as_deref() == Some(base_case_id)
+            })
+            .ok_or_else(|| format!("unknown base case {base_case_id}"))?;
+        let geometry = field(base_case, "geometry")?;
+        let latent_values = field(geometry, "points")?
+            .as_array()
+            .ok_or_else(|| "base geometry points must be an array".to_owned())?;
+        let observed_values = observed_points_json
+            .as_array()
+            .ok_or_else(|| "observed_points must be an array".to_owned())?;
+        if latent_values.len() != observed_values.len() || latent_values.is_empty() {
+            return Err("observed point count must equal non-empty latent point count".to_owned());
+        }
+
+        let latent_points = latent_values
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                point_from_json(value, 1000, &format!("latent_points[{index}]"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let observed_points = observed_values
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                point_from_json(value, 1000, &format!("observed_points[{index}]"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        for (index, (latent, observed)) in
+            latent_points.iter().zip(observed_points.iter()).enumerate()
+        {
+            let residual = linf_distance(*latent, *observed)?;
+            if residual > epsilon_scaled {
+                return Err(format!(
+                    "observed point {index} exceeds declared coordinate error bound: {residual} > {epsilon_scaled}"
+                ));
+            }
+        }
+
+        let two_epsilon = epsilon_scaled
+            .checked_mul(2)
+            .ok_or_else(|| "twice-coordinate-error bound overflow".to_owned())?;
+        let exact_stabilizer = self.declared_subgroup(base_case)?;
+        let mut possible_elements = Vec::new();
+        let mut ruled_out_elements = Vec::new();
+        let mut decisions = Vec::with_capacity(self.elements.len());
+
+        for element in &self.elements {
+            let mut adjacency = vec![Vec::<(usize, i128)>::new(); observed_points.len()];
+            for (source, observed_source) in observed_points.iter().enumerate() {
+                for (target, observed_target) in observed_points.iter().enumerate() {
+                    let transformed_target = point_apply(element.matrix, *observed_target);
+                    let residual = linf_distance(*observed_source, transformed_target)?;
+                    if residual <= two_epsilon {
+                        adjacency[source].push((target, residual));
+                    }
+                }
+            }
+            let witness = bounded_noise_matching_witness(&adjacency)?;
+            let possible_under_noise_bound =
+                matches!(witness, BoundedNoiseWitnessV1::CompatiblePermutation { .. });
+            if possible_under_noise_bound {
+                possible_elements.push(element.id.clone());
+            } else {
+                ruled_out_elements.push(element.id.clone());
+            }
+            decisions.push(BoundedNoiseElementDecisionV1 {
+                element_id: element.id.clone(),
+                possible_under_noise_bound,
+                witness,
+            });
+        }
+
+        possible_elements.sort();
+        ruled_out_elements.sort();
+        decisions.sort_by(|left, right| left.element_id.cmp(&right.element_id));
+        let all_exact_stabilizer_elements_remain_possible = exact_stabilizer
+            .iter()
+            .all(|element| possible_elements.binary_search(element).is_ok());
+        if !all_exact_stabilizer_elements_remain_possible {
+            return Err(
+                "bounded-noise filter eliminated an exact latent stabilizer element".to_owned(),
+            );
+        }
+
+        Ok(BoundedNoiseStabilizerReportV1 {
+            base_case_id: base_case_id.to_owned(),
+            epsilon_scaled,
+            exact_stabilizer_elements: exact_stabilizer.into_iter().collect(),
+            possible_elements,
+            ruled_out_elements,
+            all_exact_stabilizer_elements_remain_possible,
+            decisions,
+        })
+    }
+
+    /// Independently replay the bounded-noise decision report. Compatible
+    /// actions remain possibilities only; exact membership is still derived
+    /// from the latent manifest and never from this uncertainty report.
+    pub fn verify_bounded_noise_report(
+        &self,
+        base_case_id: &str,
+        observed_points_json: &Value,
+        epsilon_scaled: i128,
+        report: &BoundedNoiseStabilizerReportV1,
+    ) -> Result<(), String> {
+        let replayed =
+            self.bounded_noise_stabilizer_report(base_case_id, observed_points_json, epsilon_scaled)?;
+        if replayed != *report {
+            return Err(format!(
+                "bounded-noise report replay mismatch for {base_case_id}"
+            ));
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1254,5 +1569,201 @@ mod tests {
         let exact = manifest.structural_stabilizer(chiral).unwrap();
         assert_eq!(exact.len(), 4);
         assert!(!exact.contains("fx"));
+    }
+}
+
+
+#[cfg(test)]
+mod bounded_noise_tests {
+    use super::*;
+
+    fn manifest() -> Manifest {
+        let manifest = Manifest::parse().expect("frozen D4 manifest parses");
+        manifest.verify_group_axioms().expect("D4 group axioms");
+        manifest
+    }
+
+    fn noise_cases() -> Value {
+        serde_json::from_str(include_str!("../../fixtures/noisy-v0.1/cases.json"))
+            .expect("bounded-noise fixture JSON parses")
+    }
+
+    #[test]
+    fn bounded_noise_never_eliminates_a_true_stabilizer_element() {
+        let manifest = manifest();
+        let fixture = noise_cases();
+        let cases = fixture["cases"].as_array().unwrap();
+        assert_eq!(cases.len(), 12);
+        for case in cases {
+            let report = manifest
+                .bounded_noise_stabilizer_report(
+                    case["base_case_id"].as_str().unwrap(),
+                    &case["observed_points"],
+                    i128::from(case["epsilon_scaled"].as_i64().unwrap()),
+                )
+                .unwrap();
+            let expected_possible: Vec<String> = case["expected_possible_elements"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|value| value.as_str().unwrap().to_owned())
+                .collect();
+            let expected_ruled_out: Vec<String> = case["expected_ruled_out_elements"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|value| value.as_str().unwrap().to_owned())
+                .collect();
+            assert_eq!(report.possible_elements, expected_possible, "{}", case["noise_case_id"]);
+            assert_eq!(report.ruled_out_elements, expected_ruled_out, "{}", case["noise_case_id"]);
+            assert!(report.all_exact_stabilizer_elements_remain_possible);
+            assert_eq!(
+                report.exact_stabilizer_elements,
+                case["exact_stabilizer_elements"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|value| value.as_str().unwrap().to_owned())
+                    .collect::<Vec<_>>()
+            );
+            manifest
+                .verify_bounded_noise_report(
+                    case["base_case_id"].as_str().unwrap(),
+                    &case["observed_points"],
+                    report.epsilon_scaled,
+                    &report,
+                )
+                .unwrap();
+        }
+    }
+
+    #[test]
+    fn near_symmetry_uncertainty_expands_candidates_without_promoting_them() {
+        let manifest = manifest();
+        let fixture = noise_cases();
+        let cases = fixture["cases"].as_array().unwrap();
+        let tight = cases
+            .iter()
+            .find(|case| case["noise_case_id"] == "NOISE-NEAR-SYMMETRY-EPS-3")
+            .unwrap();
+        let wide = cases
+            .iter()
+            .find(|case| case["noise_case_id"] == "NOISE-NEAR-SYMMETRY-EPS-5")
+            .unwrap();
+        let tight_report = manifest
+            .bounded_noise_stabilizer_report(
+                tight["base_case_id"].as_str().unwrap(),
+                &tight["observed_points"],
+                i128::from(tight["epsilon_scaled"].as_i64().unwrap()),
+            )
+            .unwrap();
+        let wide_report = manifest
+            .bounded_noise_stabilizer_report(
+                wide["base_case_id"].as_str().unwrap(),
+                &wide["observed_points"],
+                i128::from(wide["epsilon_scaled"].as_i64().unwrap()),
+            )
+            .unwrap();
+        assert_eq!(tight_report.possible_elements, vec!["e"]);
+        assert_eq!(wide_report.possible_elements, vec!["e", "fx"]);
+        assert!(wide_report.exact_stabilizer_elements == vec!["e"]);
+        assert!(!wide_report.exact_stabilizer_elements.contains(&"fx".to_owned()));
+        assert!(wide_report
+            .possible_elements
+            .iter()
+            .all(|element| tight_report.possible_elements.contains(element)));
+    }
+
+    #[test]
+    fn every_ruled_out_action_has_a_hall_deficiency_counterexample() {
+        let manifest = manifest();
+        let fixture = noise_cases();
+        let case = fixture["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| case["noise_case_id"] == "NOISE-C4-SEED-01")
+            .unwrap();
+        let report = manifest
+            .bounded_noise_stabilizer_report(
+                case["base_case_id"].as_str().unwrap(),
+                &case["observed_points"],
+                i128::from(case["epsilon_scaled"].as_i64().unwrap()),
+            )
+            .unwrap();
+        for decision in report.decisions.iter().filter(|decision| !decision.possible_under_noise_bound) {
+            let BoundedNoiseWitnessV1::HallDeficiency {
+                source_indices,
+                neighbor_target_indices,
+                deficit,
+            } = &decision.witness
+            else {
+                panic!("ruled-out action lacks a Hall-deficiency witness");
+            };
+            assert!(!source_indices.is_empty());
+            assert!(source_indices.len() > neighbor_target_indices.len());
+            assert_eq!(*deficit, source_indices.len() - neighbor_target_indices.len());
+        }
+    }
+
+    #[test]
+    fn compatible_actions_have_bijection_witnesses_and_bounded_residuals() {
+        let manifest = manifest();
+        let fixture = noise_cases();
+        let case = fixture["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| case["noise_case_id"] == "NOISE-C2_FX-SEED-01")
+            .unwrap();
+        let epsilon = i128::from(case["epsilon_scaled"].as_i64().unwrap());
+        let report = manifest
+            .bounded_noise_stabilizer_report(
+                case["base_case_id"].as_str().unwrap(),
+                &case["observed_points"],
+                epsilon,
+            )
+            .unwrap();
+        for decision in report.decisions.iter().filter(|decision| decision.possible_under_noise_bound) {
+            let BoundedNoiseWitnessV1::CompatiblePermutation {
+                source_to_target,
+                maximum_linf_residual_scaled,
+            } = &decision.witness
+            else {
+                panic!("compatible action lacks permutation witness");
+            };
+            let mut sorted = source_to_target.clone();
+            sorted.sort_unstable();
+            assert_eq!(sorted, (0..source_to_target.len()).collect::<Vec<_>>());
+            assert!(*maximum_linf_residual_scaled <= 2 * epsilon);
+        }
+    }
+
+    #[test]
+    fn forged_report_and_out_of_bound_observation_are_rejected() {
+        let manifest = manifest();
+        let fixture = noise_cases();
+        let case = fixture["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| case["noise_case_id"] == "NOISE-C2_FX-SEED-01")
+            .unwrap();
+        let base_case_id = case["base_case_id"].as_str().unwrap();
+        let observed = &case["observed_points"];
+        let epsilon = i128::from(case["epsilon_scaled"].as_i64().unwrap());
+        let mut report = manifest
+            .bounded_noise_stabilizer_report(base_case_id, observed, epsilon)
+            .unwrap();
+        report.possible_elements.clear();
+        assert!(manifest
+            .verify_bounded_noise_report(base_case_id, observed, epsilon, &report)
+            .is_err());
+
+        let mut invalid_observed = observed.clone();
+        invalid_observed[0][0] = Value::from(1000.0);
+        assert!(manifest
+            .bounded_noise_stabilizer_report(base_case_id, &invalid_observed, epsilon)
+            .is_err());
     }
 }
