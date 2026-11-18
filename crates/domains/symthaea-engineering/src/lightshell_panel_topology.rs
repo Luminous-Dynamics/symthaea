@@ -96,6 +96,7 @@ pub struct InteropBinding {
     pub source_digest: String,
     pub semantic_loss_state: String,
     pub semantic_loss_report_ref: Option<String>,
+    pub semantic_loss_disposition_ref: Option<String>,
     pub unsupported_field_refs: Vec<String>,
     pub round_trip_receipt_ref: Option<String>,
 }
@@ -169,6 +170,7 @@ impl PanelTopologyManifest {
         let mut findings = Vec::new();
         let mut groups: HashMap<&str, &AssemblyGroup> = HashMap::new();
         let mut panels: HashMap<&str, &PanelPatternBinding> = HashMap::new();
+        let mut compiler_panel_refs = HashSet::new();
         let mut interfaces: HashMap<&str, &ProtectedInterface> = HashMap::new();
         let mut seam_ids = HashSet::new();
         let mut pattern_piece_refs = HashSet::new();
@@ -202,6 +204,14 @@ impl PanelTopologyManifest {
             push(&mut findings, "invalid_compiler_geometry_digest", "compiler.geometry_digest",
                 "Compiler geometry digest must use sha256: followed by 64 hexadecimal characters.");
         }
+        if matches!(self.state.as_str(), "pattern_bound" | "interop_reviewed" | "machine_preflight_admitted")
+            && (is_blank_option(&self.compiler.article_revision)
+                || !self.compiler.geometry_digest.as_deref().is_some_and(is_sha256_digest)
+                || is_blank_option(&self.compiler.zone_requirement_ref))
+        {
+            push(&mut findings, "pattern_state_missing_compiler_revision_binding", "compiler",
+                "Pattern-bound states require exact robot article revision, geometry digest and zone requirement reference.");
+        }
 
         if self.assembly_groups.is_empty() {
             push(&mut findings, "no_assembly_groups", "assembly_groups",
@@ -232,6 +242,14 @@ impl PanelTopologyManifest {
             if panels.insert(panel.panel_id.as_str(), panel).is_some() {
                 push(&mut findings, "duplicate_panel_id", format!("{path}.panel_id"),
                     "Panel IDs must be unique.");
+            }
+            if !compiler_panel_refs.insert(panel.compiler_panel_ref.as_str()) {
+                push(&mut findings, "duplicate_compiler_panel_ref", format!("{path}.compiler_panel_ref"),
+                    "Each upstream compiler panel must bind exactly once.");
+            }
+            if is_blank(&panel.coordinate_frame_ref) {
+                push(&mut findings, "panel_coordinate_frame_missing", format!("{path}.coordinate_frame_ref"),
+                    "Panel pattern correspondence must bind an explicit coordinate frame.");
             }
             if !groups.contains_key(panel.assembly_group_id.as_str()) {
                 push(&mut findings, "panel_unknown_assembly_group", format!("{path}.assembly_group_id"),
@@ -276,7 +294,7 @@ impl PanelTopologyManifest {
 
         for (index, interface) in self.protected_interfaces.iter().enumerate() {
             let path = format!("protected_interfaces[{index}]");
-            if is_blank(&interface.interface_ref) || is_blank(&interface.source_keepout_ref) {
+            if is_blank(&interface.interface_ref) || is_blank(&interface.source_keepout_ref) || is_blank(&interface.zone_id) {
                 push(&mut findings, "protected_interface_missing_identity", &path,
                     "Protected-interface and source keep-out references must be non-empty.");
             }
@@ -386,9 +404,12 @@ impl PanelTopologyManifest {
             }
         }
 
-        let machine_preflight_admitted = self.machine_preflight.as_ref().is_some_and(|preflight| {
+        let machine_preflight_evidence_valid = self.machine_preflight.as_ref().is_some_and(|preflight| {
             validate_machine_preflight(preflight, self.state.as_str(), &mut findings)
         });
+        let machine_preflight_admitted = self.state == "machine_preflight_admitted"
+            && machine_preflight_evidence_valid
+            && interoperability_reviewed;
         if self.state == "machine_preflight_admitted" {
             if !interoperability_reviewed {
                 push(&mut findings, "machine_preflight_without_interop_review", "interoperability",
@@ -514,15 +535,21 @@ fn validate_interop(interop: &InteropBinding, state: &str, findings: &mut Vec<Fi
     }
     match interop.semantic_loss_state.as_str() {
         "none" => {
-            if !interop.unsupported_field_refs.is_empty() || interop.semantic_loss_report_ref.is_some() {
+            if !interop.unsupported_field_refs.is_empty() || interop.semantic_loss_report_ref.is_some()
+                || is_blank_option(&interop.round_trip_receipt_ref)
+            {
                 push(findings, "loss_free_interop_has_loss_claims", "interoperability",
-                    "A loss-free interop projection cannot list unsupported fields or a semantic-loss report.");
+                    "A loss-free interop projection requires a round-trip receipt and cannot list unsupported fields or a semantic-loss report.");
             }
         }
         "explicitly_declared" => {
-            if is_blank_option(&interop.semantic_loss_report_ref) || interop.unsupported_field_refs.is_empty() {
+            if is_blank_option(&interop.semantic_loss_report_ref)
+                || is_blank_option(&interop.semantic_loss_disposition_ref)
+                || interop.unsupported_field_refs.is_empty()
+                || interop.unsupported_field_refs.iter().any(|value| is_blank(value))
+            {
                 push(findings, "declared_semantic_loss_incomplete", "interoperability",
-                    "Explicit semantic loss requires both a report reference and the list of unsupported owner-native fields.");
+                    "Explicit semantic loss requires a report, reviewed disposition and non-empty unsupported owner-native field references.");
             }
         }
         "unknown" => push(findings, "unknown_semantic_loss_blocks_interop", "interoperability.semantic_loss_state",
@@ -715,6 +742,7 @@ mod tests {
             "source_digest":format!("sha256:{}", "b".repeat(64)),
             "semantic_loss_state":loss_state,
             "semantic_loss_report_ref":if loss_state == "explicitly_declared" { Some("SEMANTIC-LOSS-REPORT-01") } else { None },
+            "semantic_loss_disposition_ref":if loss_state == "explicitly_declared" { Some("SEMANTIC-LOSS-DISPOSITION-01") } else { None },
             "unsupported_field_refs":if loss_state == "explicitly_declared" { vec!["unsupported:decorative-trim"] } else { vec![] },
             "round_trip_receipt_ref":if loss_state == "none" { Some("ROUND-TRIP-RECEIPT-01") } else { None }
         });
@@ -879,6 +907,37 @@ mod tests {
         assert!(report.is_machine_preflight_admitted());
         // The output type intentionally exposes no machine execution or article qualification flag.
         assert!(report.is_valid());
+    }
+
+    #[test]
+    fn machine_preflight_binding_does_not_advance_manifest_state_by_itself() {
+        let mut manifest = base_manifest();
+        bind_patterns(&mut manifest);
+        add_interop(&mut manifest, "none");
+        add_preflight(&mut manifest, "passed");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.is_valid(), "{:?}", report.findings);
+        assert!(!report.is_machine_preflight_admitted());
+    }
+
+    #[test]
+    fn pattern_bound_state_requires_exact_compiler_article_and_geometry() {
+        let mut manifest = base_manifest();
+        manifest["state"] = json!("pattern_bound");
+        bind_patterns(&mut manifest);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|item| item.code == "pattern_state_missing_compiler_revision_binding"));
+    }
+
+    #[test]
+    fn loss_free_interop_requires_round_trip_receipt() {
+        let mut manifest = base_manifest();
+        manifest["state"] = json!("interop_reviewed");
+        bind_patterns(&mut manifest);
+        add_interop(&mut manifest, "none");
+        manifest["interoperability"]["round_trip_receipt_ref"] = json!(null);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|item| item.code == "loss_free_interop_has_loss_claims"));
     }
 
     #[test]
