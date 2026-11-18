@@ -12,6 +12,7 @@ on:
       - ".github/scripts/check-aqua-evidence-corpus.py"
       - "docs/research/aqua-evidence-corpus-v0.1.schema.json"
       - "docs/research/aqua-evidence-corpus-v0.1.json"
+      - "docs/research/AQUA_EVIDENCE_CORPUS_V0_1.md"
       - "docs/AQUA_*.md"
   push:
     branches:
@@ -100,4 +101,4 @@ jobs:
         run: python -m pip install --disable-pip-version-check jsonschema==4.26.0
 
       - name: Validate schema, source classes and evidence semantics
-        run: python .github/scripts/check-aqua-evidence-corpus.py
+        run: python .github/scripts/check-aqua-evidence-corpus.py --check-render
