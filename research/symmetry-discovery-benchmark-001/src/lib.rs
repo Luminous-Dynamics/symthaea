@@ -11,9 +11,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use symmetry_quotient_reference::{
-    CompileOutcomeV1, FiniteActionV1, FiniteGroupV1, CandidateSemanticsV1,
-    QualificationBudgetV1, SearchProblemV1, compile_quotient, lift_representative_solution,
-    verify_certificate,
+    CandidateSemanticsV1, CompileOutcomeV1, FiniteActionV1, FiniteGroupV1,
+    MultiEnvironmentProblemV1, QualificationBudgetV1, QuotientErrorV1, SearchProblemV1,
+    TaskEnvironmentV1, compile_contextual_multi_environment_quotient, compile_quotient,
+    lift_representative_solution, verify_certificate,
+    verify_contextual_multi_environment_quotient,
 };
 
 pub type Matrix2 = [[i64; 2]; 2];
@@ -1185,6 +1187,123 @@ mod tests {
             compile_quotient(&problem, &action, QualificationBudgetV1::default()).unwrap(),
             CompileOutcomeV1::Blocked(_)
         ));
+    }
+
+    #[test]
+    fn contextual_atlas_qualifies_d4_c4_and_c1_without_globalizing_authority() {
+        let action = d4_group_and_action();
+        let mut candidate_ids = Vec::with_capacity(16);
+        let mut d4_semantics = Vec::with_capacity(16);
+        let mut c4_semantics = Vec::with_capacity(16);
+        let mut c1_semantics = Vec::with_capacity(16);
+
+        for source in 0_usize..4 {
+            for target in 0_usize..4 {
+                let delta = (target + 4 - source) % 4;
+                candidate_ids.push(format!("p{source}{target}"));
+                d4_semantics.push(CandidateSemanticsV1 {
+                    in_search_domain: true,
+                    admissible: true,
+                    feasible: true,
+                    objective_cost: 0,
+                    constraint_signature: vec![0],
+                    boundary_condition_id: "same-boundary".to_owned(),
+                    output_equivalence_id: "same-output".to_owned(),
+                });
+                c4_semantics.push(CandidateSemanticsV1 {
+                    in_search_domain: true,
+                    admissible: true,
+                    feasible: true,
+                    objective_cost: delta as i64,
+                    constraint_signature: vec![delta as i64],
+                    boundary_condition_id: "rotating-boundary".to_owned(),
+                    output_equivalence_id: "oriented-output".to_owned(),
+                });
+                c1_semantics.push(CandidateSemanticsV1 {
+                    in_search_domain: true,
+                    admissible: true,
+                    feasible: true,
+                    objective_cost: (source * 4 + target) as i64,
+                    constraint_signature: vec![0],
+                    boundary_condition_id: "asymmetric-boundary".to_owned(),
+                    output_equivalence_id: "unique-output".to_owned(),
+                });
+            }
+        }
+
+        let problem = MultiEnvironmentProblemV1 {
+            problem_id: "benchmark-contextual-d4-c4-c1-atlas-v0.1".to_owned(),
+            candidate_ids,
+            environments: vec![
+                TaskEnvironmentV1 {
+                    environment_id: "isotropic-context".to_owned(),
+                    semantics: d4_semantics,
+                },
+                TaskEnvironmentV1 {
+                    environment_id: "rotating-context".to_owned(),
+                    semantics: c4_semantics,
+                },
+                TaskEnvironmentV1 {
+                    environment_id: "asymmetric-context".to_owned(),
+                    semantics: c1_semantics,
+                },
+            ],
+        };
+
+        let mut atlas = compile_contextual_multi_environment_quotient(
+            &problem,
+            &action,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            atlas
+                .environment_quotients
+                .iter()
+                .map(|entry| {
+                    entry
+                        .task_preserving_subgroup
+                        .retained_ambient_elements
+                        .clone()
+                })
+                .collect::<Vec<_>>(),
+            vec![vec![0, 1, 2, 3, 4, 5, 6, 7], vec![0, 1, 2, 3], vec![0]]
+        );
+
+        let receipt = verify_contextual_multi_environment_quotient(
+            &problem,
+            &action,
+            &atlas,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            receipt
+                .environments
+                .iter()
+                .map(|entry| (
+                    entry.context_id.as_str(),
+                    entry.preserving_subgroup_order,
+                    entry.orbit_count
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                ("isotropic-context", 8, 3),
+                ("rotating-context", 4, 4),
+                ("asymmetric-context", 1, 16)
+            ]
+        );
+
+        atlas.environment_quotients[0].context_id = "rotating-context".to_owned();
+        assert_eq!(
+            verify_contextual_multi_environment_quotient(
+                &problem,
+                &action,
+                &atlas,
+                QualificationBudgetV1::default()
+            ),
+            Err(QuotientErrorV1::EnvironmentCertificateMismatch)
+        );
     }
 
     #[test]
