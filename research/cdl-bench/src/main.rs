@@ -312,7 +312,7 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
             return Err(format!("round-trip failure for {name}").into());
         }
 
-        // The SCM-specific arms require the declared SCM1 33-byte header and
+        // The SCM-specific arms require the label-free SCM2 16-byte header and
         // typed x0..x4 little-endian records. The partially observed FSM is
         // deliberately excluded rather than misinterpreted as SCM data.
         let (field_bytes, lag_bytes, parent_oracle_bytes, hybrid_bytes, shuffled_parent_bytes) = if name == "fsm-observations" {
