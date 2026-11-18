@@ -175,3 +175,13 @@ The Rust evaluator now records three distinct spare-availability states rather t
 For routine jobs it reports each count separately and computes an availability fraction only over the known Available + NotAvailable subset. Unknown observations do not silently become unavailable or available. If no known observations exist, the fraction is undefined.
 
 The cohort also reports unique spare-part IDs and median disassembly depth separately from technician time and downtime. These are descriptive serviceability measures; they are not lifecycle cost, repair-probability, circularity or environmental-impact calculations.
+
+## 11. Partial repair records versus qualified return
+
+A repair trial may legitimately be pending while some requalification evidence has already been collected. For example, a wet-path intervention may have a Mycelix water-quality receipt but still await the independent device-authority return-to-service receipt. Such an observation remains valid as a pending job record; it is not a qualified return and cannot count as a successful repair.
+
+The Rust evaluator therefore distinguishes:
+- **record validity:** the run and its partial observations are well-formed;
+- **qualified return:** the function check passed, return state is QualifiedReady, independent device-authority evidence exists, and every flagged Mycelix water-quality/metrology gate has its required receipt.
+
+The public qualified-return predicate validates the evidence record itself; it does not rely solely on a caller-supplied QualifiedReady enum. Known AvailableBeforeJob and NotAvailableBeforeJob spare states both require an exact spare-part identity. Unknown state may omit the ID but is reported separately.
