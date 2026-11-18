@@ -36,7 +36,8 @@
           "lower_limit": 0,
           "upper_limit": 1
         }
-      ]
+      ],
+      "required_pose_set_ref": null
     },
     {
       "feature_ref": "elbow_seam",
@@ -54,7 +55,8 @@
           "lower_limit": 0,
           "upper_limit": 2
         }
-      ]
+      ],
+      "required_pose_set_ref": null
     },
     {
       "feature_ref": "forearm_service_opening",
@@ -72,7 +74,8 @@
           "lower_limit": 0,
           "upper_limit": 2
         }
-      ]
+      ],
+      "required_pose_set_ref": null
     }
   ],
   "measurement_session": null,
