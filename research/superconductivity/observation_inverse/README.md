@@ -138,3 +138,12 @@ A key negative-control test changes the held-out vortex value: the posterior mea
 This Gaussian baseline assumes independent observations, known fixed standard uncertainties and a linear observation operator. It does not yet model shared calibration nuisance parameters, cross-modal covariance, nonlinear observation maps, posterior multimodality, model discrepancy, censoring, instrument resolution kernels, or material-specific GL simulation outputs. It is a mathematical calibration/leakage baseline, not a validated physical inverse model.
 
 The next inference gates are synthetic simulation-based calibration, nominal 90% interval coverage, prior/likelihood misspecification tests, and then replacing the synthetic linear operators with forward observables generated from independently qualified GL simulation ensembles.
+
+
+### Prior-predictive simulation-based calibration
+
+The inverse fitter now includes a deterministic seeded simulation-calibration test. It draws synthetic parameter vectors from the declared Gaussian prior, independently generates calibration observations and a held-out vortex observation from the declared linear operators with Gaussian noise, updates the posterior using calibration data only, and checks nominal 95% marginal parameter interval and 95% held-out predictive interval coverage over 512 trials.
+
+The current test accepts an empirical coverage range of 0.89–0.99 for each of the two parameters and the held-out observation. This is a broad software-calibration guard, not a claim of universal calibration. It verifies the conjugate implementation under its own correctly specified Gaussian assumptions; it does not test robustness to misspecification, model discrepancy, correlated errors or real experimental noise.
+
+The next calibration suite should include prior and likelihood misspecification, near-collinear observation operators, weakly identifiable parameter directions, shared calibration offsets, correlated modality noise, outliers, censoring, instrument-resolution kernels and nonlinear GL-generated observation maps. It should report simulation-based calibration rank histograms and coverage over many frozen parameter regimes, not just one average.
