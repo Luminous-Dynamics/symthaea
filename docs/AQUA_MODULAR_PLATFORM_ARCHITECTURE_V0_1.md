@@ -165,3 +165,8 @@ The first direct-flow reference article's interface register, measurement topolo
 ## Bounded bathing service compiler
 
 The optional experience layer may translate an explicit user-selected task into an inspectable candidate plan using only exact, qualified fixture capabilities. The plan is advisory; it cannot control or widen physical limits, authorize water use or replace manual operation. The schema, abstention rules, negative controls and baseline comparison protocol are defined in [AQUA_BOUNDED_BATHING_SERVICE_COMPILER_V0_1.md](AQUA_BOUNDED_BATHING_SERVICE_COMPILER_V0_1.md), tracked in [#12749](https://github.com/Luminous-Dynamics/symthaea/issues/12749).
+
+
+## Essential-service continuity
+
+AQS-1 is also evaluated under declared water-pressure, water-supply, electrical, communications and evidence disturbances. The product must distinguish qualified reduced service, manual-only operation, isolated stop and recovery-pending states. Continuity cannot override safety or source-quality requirements. See [AQUA_ESSENTIAL_SERVICE_CONTINUITY_PROTOCOL_V0_1.md](AQUA_ESSENTIAL_SERVICE_CONTINUITY_PROTOCOL_V0_1.md) and [#12760](https://github.com/Luminous-Dynamics/symthaea/issues/12760).
