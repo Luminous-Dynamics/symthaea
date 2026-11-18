@@ -167,7 +167,8 @@
           "const": "scalar"
         },
         "value": {
-          "type": "number"
+          "type": "number",
+          "minimum": 0
         },
         "unit": {
           "type": "string",
@@ -187,10 +188,12 @@
           "const": "range"
         },
         "minimum": {
-          "type": "number"
+          "type": "number",
+          "exclusiveMinimum": 0
         },
         "maximum": {
-          "type": "number"
+          "type": "number",
+          "exclusiveMinimum": 0
         },
         "unit": {
           "type": "string",
@@ -220,7 +223,7 @@
           "then": {
             "properties": {
               "maximum": {
-                "minimum": 0
+                "exclusiveMinimum": 0
               }
             }
           }
