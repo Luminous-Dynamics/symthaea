@@ -43,7 +43,7 @@ impl NumericTransform {
 }
 
 /// Errors in the typed numerical frame or reversible transform.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum NumericError {
     Codec(CodecError),
     TruncatedHeader,
@@ -442,16 +442,19 @@ mod tests {
 
     #[test]
     fn malformed_varints_are_rejected() {
+        let mut cursor = 0;
         assert_eq!(
-            read_varint(&[0x80], &mut 0),
+            read_varint(&[0x80], &mut cursor),
             Err(NumericError::TruncatedVarint)
         );
+        let mut cursor = 0;
         assert_eq!(
-            read_varint(&[0x80, 0x00], &mut 0),
+            read_varint(&[0x80, 0x00], &mut cursor),
             Err(NumericError::NonCanonicalVarint)
         );
+        let mut cursor = 0;
         assert_eq!(
-            read_varint(&[0xff, 0xff, 0xff, 0xff, 0x1f], &mut 0),
+            read_varint(&[0xff, 0xff, 0xff, 0xff, 0x1f], &mut cursor),
             Err(NumericError::VarintOverflow)
         );
     }
