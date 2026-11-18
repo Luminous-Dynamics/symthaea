@@ -1397,6 +1397,19 @@ mod tests {
             .grammar_trace
             .obligation_transitions
             .push(deferred);
+        // Preserve a valid independently recomputed Analyst report: the
+        // extra transition is lifecycle-continuous and must be rejected by
+        // the M1 rule that requires exactly Created -> Fulfilled.
+        let intent = result.intent.expect("M1 receipt must retain its intent");
+        let classical_score = result.segments[0].score.clone();
+        let classical_trace = result.segments[0].grammar_trace.clone();
+        result.segments[0].trace_verification = verify_trace_independently(
+            Style::Classical,
+            &intent,
+            &classical_score,
+            &classical_trace,
+        )
+        .expect("the extra deferred transition is structurally lifecycle-continuous");
         result.segments[0].evidence_sha256 =
             segment_evidence_sha256_v1(&result.segments[0]).unwrap();
         result.receipt_sha256 = m1_receipt_sha256_v1(&result).unwrap();
