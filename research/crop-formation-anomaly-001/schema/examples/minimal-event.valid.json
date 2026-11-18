@@ -1,0 +1,33 @@
+{
+  "schema_version": "0.1.0",
+  "event_id": "CFE-synthetic-fixture-001",
+  "record_status": "draft",
+  "discovery": {
+    "first_reported_at": null,
+    "last_reported_at": null,
+    "alleged_formation_interval": null,
+    "temporal_precision": "unknown"
+  },
+  "crop": {
+    "species_state": "unknown",
+    "species": null,
+    "cultivar": null,
+    "phenological_stage": null
+  },
+  "source_assertions": [
+    {
+      "assertion_id": "CFA-synthetic-source-001",
+      "source_name": "CROP-INTEL synthetic schema fixture",
+      "author_or_reporter": null,
+      "source_url": "https://example.org/crop-intel/synthetic-fixture",
+      "original_record_id": null,
+      "retrieved_at": null,
+      "assertion_type": "other",
+      "record_state": "asserted",
+      "asserted_value": "synthetic fixture only; not a reported formation",
+      "source_wording": null,
+      "reviewer_assessment": null
+    }
+  ],
+  "notes": "Machine-readable schema example only. This record does not describe a real crop formation."
+}
