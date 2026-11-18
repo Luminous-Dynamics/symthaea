@@ -124,7 +124,7 @@
       1.0001,
       1.0001
     ],
-    "hypervolume_method": "EXACT_WFG_REFERENCE_IMPLEMENTATION",
+    "hypervolume_method": "EXACT_DIMENSION_SWEEP_VALIDATED_AGAINST_UPSTREAM_WFG_REFERENCE",
     "cross_task_hypervolume_comparison": "PROHIBITED_WITHOUT_RECONCILING_TASK_LEVEL_NORMALIZATION_REFERENCES"
   },
   "synthetic_task_normalization": {
