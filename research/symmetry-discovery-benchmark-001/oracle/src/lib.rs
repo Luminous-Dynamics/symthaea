@@ -314,6 +314,50 @@ impl Manifest {
         })
     }
 
+    /// Return a frozen case by ID for an external proposal adapter.
+    pub fn case_by_id(&self, case_id: &str) -> Result<&Value, String> {
+        let cases = field(&self.root, "cases")?
+            .as_array()
+            .ok_or_else(|| "cases must be an array".to_owned())?;
+        cases
+            .iter()
+            .find(|case| {
+                string_field(case, "case_id")
+                    .map(|candidate| candidate == case_id)
+                    .unwrap_or(false)
+            })
+            .ok_or_else(|| format!("unknown frozen case ID: {case_id}"))
+    }
+
+    /// Enumerate every expected case ID for a scored track and split. An
+    /// adapter must emit one row for every returned ID, including abstentions.
+    pub fn case_ids_for_split_track(
+        &self,
+        split: &str,
+        track: &str,
+    ) -> Result<Vec<String>, String> {
+        let cases = field(&self.root, "cases")?
+            .as_array()
+            .ok_or_else(|| "cases must be an array".to_owned())?;
+        let mut case_ids = cases
+            .iter()
+            .filter_map(|case| {
+                let case_split = string_field(case, "split").ok()?;
+                let case_track = string_field(case, "track").ok()?;
+                if case_split == split && case_track == track {
+                    string_field(case, "case_id").ok()
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        case_ids.sort();
+        if case_ids.is_empty() {
+            return Err(format!("no frozen cases for split {split} and track {track}"));
+        }
+        Ok(case_ids)
+    }
+
     pub fn verify_group_axioms(&self) -> Result<(), String> {
         let identity_id = string_field(field(&self.root, "ambient_group")?, "identity_element_id")?;
         if self.elements.len() != 8 || self.multiplication.len() != 64 || self.inverses.len() != 8 {
@@ -1114,6 +1158,40 @@ mod tests {
             manifest
                 .verify_certificate(polynomial_case, &polynomial_certificate)
                 .is_err()
+        );
+    }
+
+    #[test]
+    fn external_adapter_can_enumerate_and_load_exact_split_cases() {
+        let oracle = manifest();
+        let discovery = oracle
+            .case_ids_for_split_track(
+                "discovery",
+                "exact_finite_structural_stabilizer",
+            )
+            .unwrap();
+        let calibration = oracle
+            .case_ids_for_split_track(
+                "calibration",
+                "exact_finite_structural_stabilizer",
+            )
+            .unwrap();
+        let holdout = oracle
+            .case_ids_for_split_track(
+                "final_holdout",
+                "exact_finite_structural_stabilizer",
+            )
+            .unwrap();
+        assert_eq!(discovery.len(), 300);
+        assert_eq!(calibration.len(), 300);
+        assert_eq!(holdout.len(), 300);
+        assert!(discovery.iter().all(|case_id| !calibration.contains(case_id)));
+        assert!(discovery.iter().all(|case_id| !holdout.contains(case_id)));
+        assert!(calibration.iter().all(|case_id| !holdout.contains(case_id)));
+        assert!(oracle.case_by_id(&holdout[0]).is_ok());
+        assert_eq!(
+            oracle.case_by_id("NOT-A-FROZEN-CASE"),
+            Err("unknown frozen case ID: NOT-A-FROZEN-CASE".to_owned())
         );
     }
 
