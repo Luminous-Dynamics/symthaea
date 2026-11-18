@@ -21,6 +21,7 @@ No Symthaea module is imported by the oracle.
 The oracle freezes these rules:
 
 - unknown state remains unknown; no probability distribution is invented;
+- `UNKNOWN` is non-informative on either side of a world pair: it never separates `UNKNOWN` from a known value or another `UNKNOWN`;
 - an explicitly failed/uninformative sensor may return `UNKNOWN`, which never creates discrimination by itself;
 - diagnosability is decision-specific: worlds in the same decision class need not be mutually distinguishable;
 - every cross-decision world pair must be separated by at least one active sensing path;
@@ -48,6 +49,8 @@ The self-test demonstrates:
 7. the corresponding independent common-mode group pairs are minimum group cut sets;
 8. malformed duplicate/incomplete sensor models fail closed;
 9. cut-set analysis refuses an already-undiagnosable baseline.
+
+The executable self-test also checks a mixed `UNKNOWN`/known-value pair: it remains unresolved unless another active sensing path separates the decision worlds.
 
 ## Important distinction
 
