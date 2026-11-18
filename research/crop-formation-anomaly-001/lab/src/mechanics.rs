@@ -270,10 +270,14 @@ impl BeamProfile {
             positive_finite(segment.flexural_rigidity_nm2, "segment_flexural_rigidity_nm2")?;
 
             if segment.end_m <= segment.start_m {
-                return Err(MechanicsError::InvalidBeamProfile("segment end must exceed segment start"));
+                return Err(MechanicsError::InvalidBeamProfile(
+                    "segment end must exceed segment start",
+                ));
             }
             if (segment.start_m - previous_end).abs() > tolerance {
-                return Err(MechanicsError::InvalidBeamProfile("segments must be contiguous and non-overlapping"));
+                return Err(MechanicsError::InvalidBeamProfile(
+                    "segments must be contiguous and non-overlapping",
+                ));
             }
             previous_end = segment.end_m;
         }
@@ -390,8 +394,11 @@ mod tests {
         ]).unwrap();
         assert!((one.tip_deflection_under_tip_load(2.0, RootSupport::RIGID).unwrap()
             - split.tip_deflection_under_tip_load(2.0, RootSupport::RIGID).unwrap()).abs() < EPS);
-        assert!((one.tip_deflection_under_uniform_load(3.0, RootSupport::RIGID).unwrap()
-            - split.tip_deflection_under_uniform_load(3.0, RootSupport::RIGID).unwrap()).abs() < EPS);
+        let one_uniform =
+            one.tip_deflection_under_uniform_load(3.0, RootSupport::RIGID).unwrap();
+        let split_uniform =
+            split.tip_deflection_under_uniform_load(3.0, RootSupport::RIGID).unwrap();
+        assert!((one_uniform - split_uniform).abs() < EPS);
     }
 
     #[test]
@@ -414,7 +421,9 @@ mod tests {
             BeamSegment { start_m: 0.0, end_m: 0.5, flexural_rigidity_nm2: 1.0 },
             BeamSegment { start_m: 0.5, end_m: 1.0, flexural_rigidity_nm2: 10.0 },
         ]).unwrap();
-        let rootward = stiff_at_root.tip_deflection_under_tip_load(1.0, RootSupport::RIGID).unwrap();
+        let rootward = stiff_at_root
+            .tip_deflection_under_tip_load(1.0, RootSupport::RIGID)
+            .unwrap();
         let tipward = stiff_at_tip.tip_deflection_under_tip_load(1.0, RootSupport::RIGID).unwrap();
         assert!(rootward < tipward);
     }
@@ -451,12 +460,22 @@ mod tests {
             BeamSegment { start_m: 0.0, end_m: 0.4, flexural_rigidity_nm2: 1.0 },
             BeamSegment { start_m: 0.5, end_m: 1.0, flexural_rigidity_nm2: 1.0 },
         ]);
-        assert_eq!(gap, Err(MechanicsError::InvalidBeamProfile("segments must be contiguous and non-overlapping")));
+        assert_eq!(
+            gap,
+            Err(MechanicsError::InvalidBeamProfile(
+                "segments must be contiguous and non-overlapping"
+            ))
+        );
         let overlap = BeamProfile::new(1.0, vec![
             BeamSegment { start_m: 0.0, end_m: 0.6, flexural_rigidity_nm2: 1.0 },
             BeamSegment { start_m: 0.5, end_m: 1.0, flexural_rigidity_nm2: 1.0 },
         ]);
-        assert_eq!(overlap, Err(MechanicsError::InvalidBeamProfile("segments must be contiguous and non-overlapping")));
+        assert_eq!(
+            overlap,
+            Err(MechanicsError::InvalidBeamProfile(
+                "segments must be contiguous and non-overlapping"
+            ))
+        );
     }
 
     #[test]
