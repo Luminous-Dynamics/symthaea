@@ -194,6 +194,15 @@ fn select_architecture(input: &SelectorInput) -> Result<Decision, String> {
             None,
         ));
     }
+    if !baseline.available {
+        return Ok(decision(
+            input,
+            "CALIBRATE",
+            None,
+            "single_baseline_unavailable",
+            None,
+        ));
+    }
     if !is_ready(baseline, policy) {
         return Ok(decision(
             input,
@@ -272,7 +281,7 @@ fn select_architecture(input: &SelectorInput) -> Result<Decision, String> {
     Ok(decision(
         input,
         "SINGLE",
-        Some("single"),
+        Some(&baseline.architecture_id),
         "no_robust_positive_net_gain",
         None,
     ))
