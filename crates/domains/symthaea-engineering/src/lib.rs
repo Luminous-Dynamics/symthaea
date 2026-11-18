@@ -16,7 +16,6 @@ pub mod lightshell_robust_downselect;
 pub mod lightshell_pattern_topology;
 pub mod lightshell_manufacturing_route;
 pub mod lightshell_asbuilt_metrology;
-pub mod lightshell_asbuilt_metrology;
 
 use serde::{Deserialize, Serialize};
 use symthaea_broca::{BrocaConfig, BrocaGenerator, ThoughtChannels};
