@@ -527,6 +527,13 @@
           "source_reference": {
             "type": "string",
             "format": "uri"
+          },
+          "length_scale_definition": {
+            "enum": [
+              "microscopic_xi0",
+              "GL_near_Tc_xi",
+              "not_applicable"
+            ]
           }
         }
       }
