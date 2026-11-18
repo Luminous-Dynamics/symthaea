@@ -23,8 +23,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "low",
-          "authorized": true,
-          "required": true
+          "authorized": true
         }
       ],
       "receiver_known_roots": [],
@@ -84,8 +83,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "medium",
-          "authorized": true,
-          "required": true
+          "authorized": true
         }
       ],
       "receiver_known_roots": [],
@@ -145,8 +143,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "low",
-          "authorized": true,
-          "required": true
+          "authorized": true
         }
       ],
       "receiver_known_roots": [
@@ -206,8 +203,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "low",
-          "authorized": true,
-          "required": true
+          "authorized": true
         },
         {
           "evidence_id": "E4b",
@@ -217,8 +213,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "low",
-          "authorized": true,
-          "required": true
+          "authorized": true
         }
       ],
       "receiver_known_roots": [],
@@ -304,8 +299,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "high",
-          "authorized": true,
-          "required": true
+          "authorized": true
         }
       ],
       "receiver_known_roots": [],
@@ -365,8 +359,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "low",
-          "authorized": true,
-          "required": true
+          "authorized": true
         }
       ],
       "receiver_known_roots": [],
@@ -426,8 +419,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "low",
-          "authorized": true,
-          "required": true
+          "authorized": true
         }
       ],
       "receiver_known_roots": [],
@@ -487,8 +479,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "low",
-          "authorized": true,
-          "required": true
+          "authorized": true
         }
       ],
       "receiver_known_roots": [],
@@ -547,8 +538,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "high",
-          "authorized": true,
-          "required": true
+          "authorized": true
         }
       ],
       "receiver_known_roots": [],
@@ -607,8 +597,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "low",
-          "authorized": true,
-          "required": true
+          "authorized": true
         }
       ],
       "receiver_known_roots": [],
@@ -667,8 +656,7 @@
           "scope": "task-1",
           "freshness": "stale",
           "uncertainty": "high",
-          "authorized": true,
-          "required": true
+          "authorized": true
         }
       ],
       "receiver_known_roots": [],
@@ -728,8 +716,7 @@
           "scope": "task-1",
           "freshness": "stale",
           "uncertainty": "medium",
-          "authorized": true,
-          "required": true
+          "authorized": true
         }
       ],
       "receiver_known_roots": [],
@@ -788,8 +775,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "low",
-          "authorized": false,
-          "required": true
+          "authorized": false
         }
       ],
       "receiver_known_roots": [],
@@ -847,8 +833,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "low",
-          "authorized": false,
-          "required": true
+          "authorized": false
         }
       ],
       "receiver_known_roots": [],
@@ -906,8 +891,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "low",
-          "authorized": true,
-          "required": true
+          "authorized": true
         }
       ],
       "receiver_known_roots": [],
@@ -967,8 +951,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "low",
-          "authorized": true,
-          "required": true
+          "authorized": true
         },
         {
           "evidence_id": "E16b",
@@ -978,8 +961,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "low",
-          "authorized": true,
-          "required": true
+          "authorized": true
         },
         {
           "evidence_id": "E16c",
@@ -989,8 +971,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "low",
-          "authorized": true,
-          "required": true
+          "authorized": true
         }
       ],
       "receiver_known_roots": [],
@@ -1102,8 +1083,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "low",
-          "authorized": true,
-          "required": true
+          "authorized": true
         }
       ],
       "receiver_known_roots": [],
@@ -1163,8 +1143,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "unknown",
-          "authorized": true,
-          "required": false
+          "authorized": true
         }
       ],
       "receiver_known_roots": [],
@@ -1222,8 +1201,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "unknown",
-          "authorized": true,
-          "required": false
+          "authorized": true
         }
       ],
       "receiver_known_roots": [],
@@ -1281,8 +1259,7 @@
           "scope": "task-1",
           "freshness": "current",
           "uncertainty": "low",
-          "authorized": true,
-          "required": true
+          "authorized": true
         }
       ],
       "receiver_known_roots": [],
