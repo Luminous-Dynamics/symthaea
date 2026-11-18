@@ -5,6 +5,7 @@ This is the first executable component of CROP-INTEL-001. It is deliberately sma
 ## Current scope
 
 - 2D point-set geometry descriptors: centroid, bounds, radius statistics, radial/angular histograms and approximate rotational symmetry residuals.
+- Circle-layout replay: strict CSV ingestion, circle validation, tangent-gap contact graph, quantile-initialized radius/radial classes and centred neighbourhood motif counts.
 - Crop-flow orientation-field descriptors: circular mean/resultant, direction entropy, bend-magnitude spread and nearest-neighbour alignment.
 - Binary-grid representation with explicit D4 transforms (four rotations/reflections) and row-major/column-major traversal.
 - Immutable-in-use decoder manifests with unique IDs; a standard 32-way D4 × traversal × ASCII-7 bit-order family; persist a canonical manifest digest/timestamp externally before challenge analysis.
@@ -30,7 +31,7 @@ cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 ```
 
-The crate has no third-party dependencies. It includes a local `[workspace]` declaration so that it is not silently pulled into the root Symthaea workspace. The current source contains 36 authored unit tests; their execution remains pending because this editing environment has no Rust toolchain.
+The crate has no third-party dependencies. It includes a local `[workspace]` declaration so that it is not silently pulled into the root Symthaea workspace. The current source contains 44 authored unit tests; their execution remains pending because this editing environment has no Rust toolchain.
 
 ## Statistical interpretation
 
