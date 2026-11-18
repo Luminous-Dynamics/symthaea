@@ -459,6 +459,12 @@ pub struct SprayFieldDelta {
     pub off_target_mass_fraction_delta_percentage_points: f64,
 }
 
+fn approximately_equal(left: f64, right: f64) -> bool {
+    left.is_finite()
+        && right.is_finite()
+        && (left - right).abs() <= 1e-9 * left.abs().max(right.abs()).max(1.0)
+}
+
 fn valid_spray_field_summary(summary: &SprayFieldSummary) -> bool {
     let finite_nonnegative = [
         summary.total_mapped_mass_mg,
@@ -488,12 +494,27 @@ fn valid_spray_field_summary(summary: &SprayFieldSummary) -> bool {
     let coefficient_valid = summary
         .target_deposition_coefficient_of_variation
         .is_none_or(|value| value.is_finite() && value >= 0.0);
+    let derived_values_valid = summary.total_mapped_mass_mg > 0.0
+        && summary.target_area_cm2 > 0.0
+        && approximately_equal(
+            summary.mean_target_deposition_mg_per_cm2,
+            summary.target_mapped_mass_mg / summary.target_area_cm2,
+        )
+        && approximately_equal(
+            summary.target_area_coverage_fraction,
+            summary.covered_target_area_cm2 / summary.target_area_cm2,
+        )
+        && approximately_equal(
+            summary.off_target_mapped_mass_fraction,
+            summary.off_target_mapped_mass_mg / summary.total_mapped_mass_mg,
+        );
 
     finite_nonnegative
         && ratios_valid
         && areas_valid
         && mass_valid
         && coefficient_valid
+        && derived_values_valid
 }
 
 /// Compare a stress or post-clean state against the same specimen's baseline.
