@@ -248,6 +248,16 @@ fn run_chain(
     let mut positive_vortex_series = Vec::with_capacity(config.measurement_sweeps);
     let mut negative_vortex_series = Vec::with_capacity(config.measurement_sweeps);
     let mut skipped_core_plaquette_series = Vec::with_capacity(config.measurement_sweeps);
+    let mut twist_current_series: Vec<Vec<f64>> = (0..model.dimension)
+        .map(|_| Vec::with_capacity(config.measurement_sweeps))
+        .collect();
+    let mut diamagnetic_series: Vec<Vec<Vec<f64>>> = (0..model.dimension)
+        .map(|_| {
+            (0..model.dimension)
+                .map(|_| Vec::with_capacity(config.measurement_sweeps))
+                .collect()
+        })
+        .collect();
 
     for _ in 0..config.measurement_sweeps {
         for _ in 0..config.thinning {
@@ -283,6 +293,14 @@ fn run_chain(
         amplitude_series.push(amplitude_mean);
         squared_amplitude_series.push(squared_amplitude_mean);
 
+        let twist = model.twist_response(&fields, &links)?;
+        for alpha in 0..model.dimension {
+            twist_current_series[alpha].push(twist.current[alpha]);
+            for beta in 0..model.dimension {
+                diamagnetic_series[alpha][beta].push(twist.diamagnetic[alpha][beta]);
+            }
+        }
+
         if let Some(vortices) = model.vortex_diagnostics(&fields, &links)? {
             let density = if vortices.valid_plaquettes > 0 {
                 vortices.absolute_charge_sum as f64 / vortices.valid_plaquettes as f64
@@ -301,6 +319,38 @@ fn run_chain(
         || amplitude_series.iter().any(|value| !value.is_finite())
     {
         return Err("GL sampler produced a non-finite measurement".to_owned());
+    }
+
+    let mean = |values: &[f64]| values.iter().sum::<f64>() / values.len() as f64;
+    let current_means: Vec<f64> = twist_current_series
+        .iter()
+        .map(|series| mean(series))
+        .collect();
+    let mut diamagnetic_means = vec![vec![0.0; model.dimension]; model.dimension];
+    let mut current_covariance = vec![vec![0.0; model.dimension]; model.dimension];
+    let mut helicity_modulus = vec![vec![0.0; model.dimension]; model.dimension];
+    for alpha in 0..model.dimension {
+        for beta in 0..model.dimension {
+            diamagnetic_means[alpha][beta] = mean(&diamagnetic_series[alpha][beta]);
+            let current_product_mean = twist_current_series[alpha]
+                .iter()
+                .zip(&twist_current_series[beta])
+                .map(|(left, right)| left * right)
+                .sum::<f64>()
+                / config.measurement_sweeps as f64;
+            current_covariance[alpha][beta] =
+                current_product_mean - current_means[alpha] * current_means[beta];
+            helicity_modulus[alpha][beta] = diamagnetic_means[alpha][beta]
+                - current_covariance[alpha][beta] / model.temperature;
+        }
+    }
+
+    if helicity_modulus
+        .iter()
+        .flatten()
+        .any(|value| !value.is_finite())
+    {
+        return Err("GL helicity-modulus estimator produced a non-finite tensor".to_owned());
     }
     let acceptance_rate = if attempted > 0 {
         accepted as f64 / attempted as f64
@@ -321,6 +371,15 @@ fn run_chain(
         "proposals_accepted": accepted,
         "invalid_proposals": invalid,
         "acceptance_rate": acceptance_rate,
+        "twist_response": {
+            "twist_convention": "A_ij(theta)=A_ij+sum_mu theta_mu*edge_displacement_mu/box_length_mu",
+            "first_derivative_current_mean": current_means,
+            "second_derivative_diamagnetic_mean": diamagnetic_means,
+            "current_covariance": current_covariance,
+            "thermal_helicity_modulus_tensor": helicity_modulus,
+            "formula": "Y_mu_nu=<d2F/dtheta_mu dtheta_nu> - Cov(dF/dtheta_mu,dF/dtheta_nu)/T",
+            "unit": "dimensionless_lattice_energy"
+        },
         "observables": {
             "energy_per_node": series_summary(&energy_series),
             "local_potential_energy_per_node": series_summary(&local_energy_series),
@@ -411,6 +470,27 @@ pub(super) fn run(
                 .and_then(Value::as_f64)
         })
         .collect::<Vec<_>>();
+    let mut between_chain_helicity_modulus = vec![vec![Value::Null; model.dimension]; model.dimension];
+    for alpha in 0..model.dimension {
+        for beta in 0..model.dimension {
+            let values: Vec<f64> = chains
+                .iter()
+                .map(|chain| {
+                    chain
+                        .get("twist_response")
+                        .and_then(|response| response.get("thermal_helicity_modulus_tensor"))
+                        .and_then(Value::as_array)
+                        .and_then(|rows| rows.get(alpha))
+                        .and_then(Value::as_array)
+                        .and_then(|row| row.get(beta))
+                        .and_then(Value::as_f64)
+                        .ok_or_else(|| format!("chain missing helicity modulus component ({alpha},{beta})"))
+                })
+                .collect::<Result<_, _>>()?;
+            between_chain_helicity_modulus[alpha][beta] =
+                ensemble_summary(&values);
+        }
+    }
 
     Ok(json!({
         "status": "executed",
@@ -435,7 +515,8 @@ pub(super) fn run(
                 Value::Null
             } else {
                 ensemble_summary(&vortex_density)
-            }
+            },
+            "thermal_helicity_modulus_tensor": between_chain_helicity_modulus
         },
         "chain_receipts": chains,
         "claim_ceiling": "Synthetic finite-size GL Metropolis software pilot only; autocorrelation diagnostics and independent chains do not establish equilibration, phase classification, material Tc, or experimental evidence."
