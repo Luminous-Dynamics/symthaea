@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/approximate-symmetry-envelope-001/fixtures/v0.1.schema.json",
+  "title": "Approximate symmetry error envelope fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "scale",
+    "units",
+    "example",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "const": "approximate-symmetry-error-envelope-v0.1"
+    },
+    "scale": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "units": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "example": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_id",
+        "initial_state_error",
+        "one_step_equivariance_defect",
+        "step_lipschitz_scaled",
+        "horizon_steps",
+        "domain_invariance_verified",
+        "domain_boundary_margin",
+        "objective_lipschitz_scaled",
+        "direct_objective_defect",
+        "constraint_lipschitz_scaled",
+        "direct_constraint_defect",
+        "constraint_slack",
+        "max_state_error",
+        "max_objective_error",
+        "max_constraint_error",
+        "objective_gap",
+        "expected_upper_bounds",
+        "expected_epsilon_lift_candidate",
+        "expected_hard_prune_authorized"
+      ],
+      "properties": {
+        "contract_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "initial_state_error": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "one_step_equivariance_defect": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "step_lipschitz_scaled": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "horizon_steps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "domain_invariance_verified": {
+          "type": "boolean"
+        },
+        "domain_boundary_margin": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "objective_lipschitz_scaled": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "direct_objective_defect": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "constraint_lipschitz_scaled": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "direct_constraint_defect": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "constraint_slack": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_state_error": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_objective_error": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_constraint_error": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "objective_gap": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_upper_bounds": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "expected_epsilon_lift_candidate": {
+          "type": "boolean"
+        },
+        "expected_hard_prune_authorized": {
+          "const": false
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
