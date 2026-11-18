@@ -92,7 +92,10 @@
         "energy_cutoff_unit": "Ry",
         "phonon_treatment": "DFPT for phonons and electron-phonon interactions",
         "spin_orbit_included": false,
-        "provenance_note": "arXiv:2603.05123v2 Table S1. k meshes are twice q meshes in each direction. a_exp=4.05 Å; a_calc=4.04 Å. Pb main results include SOI; Pb no-SOI results are separate and not substituted."
+        "provenance_note": "arXiv:2603.05123v2 Table S1. k meshes are twice q meshes in each direction. a_exp=4.05 Å; a_calc=4.04 Å. Pb main results include SOI; Pb no-SOI results are separate and not substituted. Public SCTK upstream main head inspected 2026-11-18: 4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33; not asserted to be the exact revision used for this paper calculation.",
+        "upstream_code_repository": "https://github.com/mitsuaki1987/sctk",
+        "inspected_upstream_commit": "4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33",
+        "upstream_snapshot_relation": "inspected_current_upstream_not_asserted_as_paper_revision"
       }
     },
     {
@@ -133,7 +136,10 @@
         "energy_cutoff_unit": "Ry",
         "phonon_treatment": "DFPT for phonons and electron-phonon interactions",
         "spin_orbit_included": false,
-        "provenance_note": "arXiv:2603.05123v2 Table S1. k meshes are twice q meshes in each direction. a_exp=5.82 Å; a_calc=5.95 Å; c_exp=3.17 Å; c_calc=3.22 Å. Pb main results include SOI; Pb no-SOI results are separate and not substituted."
+        "provenance_note": "arXiv:2603.05123v2 Table S1. k meshes are twice q meshes in each direction. a_exp=5.82 Å; a_calc=5.95 Å; c_exp=3.17 Å; c_calc=3.22 Å. Pb main results include SOI; Pb no-SOI results are separate and not substituted. Public SCTK upstream main head inspected 2026-11-18: 4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33; not asserted to be the exact revision used for this paper calculation.",
+        "upstream_code_repository": "https://github.com/mitsuaki1987/sctk",
+        "inspected_upstream_commit": "4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33",
+        "upstream_snapshot_relation": "inspected_current_upstream_not_asserted_as_paper_revision"
       }
     },
     {
@@ -174,7 +180,10 @@
         "energy_cutoff_unit": "Ry",
         "phonon_treatment": "DFPT for phonons and electron-phonon interactions",
         "spin_orbit_included": false,
-        "provenance_note": "arXiv:2603.05123v2 Table S1. k meshes are twice q meshes in each direction. a_exp=4.59 Å; a_calc=4.70 Å; c_exp=4.94 Å; c_calc=4.99 Å. Pb main results include SOI; Pb no-SOI results are separate and not substituted."
+        "provenance_note": "arXiv:2603.05123v2 Table S1. k meshes are twice q meshes in each direction. a_exp=4.59 Å; a_calc=4.70 Å; c_exp=4.94 Å; c_calc=4.99 Å. Pb main results include SOI; Pb no-SOI results are separate and not substituted. Public SCTK upstream main head inspected 2026-11-18: 4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33; not asserted to be the exact revision used for this paper calculation.",
+        "upstream_code_repository": "https://github.com/mitsuaki1987/sctk",
+        "inspected_upstream_commit": "4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33",
+        "upstream_snapshot_relation": "inspected_current_upstream_not_asserted_as_paper_revision"
       }
     },
     {
@@ -215,7 +224,10 @@
         "energy_cutoff_unit": "Ry",
         "phonon_treatment": "DFPT for phonons and electron-phonon interactions",
         "spin_orbit_included": false,
-        "provenance_note": "arXiv:2603.05123v2 Table S1. k meshes are twice q meshes in each direction. a_exp=3.31 Å; a_calc=3.31 Å. Pb main results include SOI; Pb no-SOI results are separate and not substituted."
+        "provenance_note": "arXiv:2603.05123v2 Table S1. k meshes are twice q meshes in each direction. a_exp=3.31 Å; a_calc=3.31 Å. Pb main results include SOI; Pb no-SOI results are separate and not substituted. Public SCTK upstream main head inspected 2026-11-18: 4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33; not asserted to be the exact revision used for this paper calculation.",
+        "upstream_code_repository": "https://github.com/mitsuaki1987/sctk",
+        "inspected_upstream_commit": "4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33",
+        "upstream_snapshot_relation": "inspected_current_upstream_not_asserted_as_paper_revision"
       }
     },
     {
@@ -256,7 +268,10 @@
         "energy_cutoff_unit": "Ry",
         "phonon_treatment": "DFPT for phonons and electron-phonon interactions",
         "spin_orbit_included": true,
-        "provenance_note": "arXiv:2603.05123v2 Table S1. k meshes are twice q meshes in each direction. a_exp=4.95 Å; a_calc=5.05 Å; SOI included in principal reported results; no-SOI comparison is separate. Pb main results include SOI; Pb no-SOI results are separate and not substituted."
+        "provenance_note": "arXiv:2603.05123v2 Table S1. k meshes are twice q meshes in each direction. a_exp=4.95 Å; a_calc=5.05 Å; SOI included in principal reported results; no-SOI comparison is separate. Pb main results include SOI; Pb no-SOI results are separate and not substituted. Public SCTK upstream main head inspected 2026-11-18: 4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33; not asserted to be the exact revision used for this paper calculation.",
+        "upstream_code_repository": "https://github.com/mitsuaki1987/sctk",
+        "inspected_upstream_commit": "4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33",
+        "upstream_snapshot_relation": "inspected_current_upstream_not_asserted_as_paper_revision"
       }
     },
     {
@@ -297,7 +312,10 @@
         "energy_cutoff_unit": "Ry",
         "phonon_treatment": "DFPT for phonons and electron-phonon interactions",
         "spin_orbit_included": false,
-        "provenance_note": "arXiv:2603.05123v2 Table S1. k meshes are twice q meshes in each direction. a_exp=3.30 Å; a_calc=3.31 Å. Pb main results include SOI; Pb no-SOI results are separate and not substituted."
+        "provenance_note": "arXiv:2603.05123v2 Table S1. k meshes are twice q meshes in each direction. a_exp=3.30 Å; a_calc=3.31 Å. Pb main results include SOI; Pb no-SOI results are separate and not substituted. Public SCTK upstream main head inspected 2026-11-18: 4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33; not asserted to be the exact revision used for this paper calculation.",
+        "upstream_code_repository": "https://github.com/mitsuaki1987/sctk",
+        "inspected_upstream_commit": "4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33",
+        "upstream_snapshot_relation": "inspected_current_upstream_not_asserted_as_paper_revision"
       }
     },
     {
@@ -338,7 +356,10 @@
         "energy_cutoff_unit": "Ry",
         "phonon_treatment": "DFPT for phonons and electron-phonon interactions",
         "spin_orbit_included": false,
-        "provenance_note": "arXiv:2603.05123v2 Table S1. k meshes are twice q meshes in each direction. a_exp=3.01 Å; a_calc=2.99 Å; high-pressure phase at 200 GPa. Pb main results include SOI; Pb no-SOI results are separate and not substituted."
+        "provenance_note": "arXiv:2603.05123v2 Table S1. k meshes are twice q meshes in each direction. a_exp=3.01 Å; a_calc=2.99 Å; high-pressure phase at 200 GPa. Pb main results include SOI; Pb no-SOI results are separate and not substituted. Public SCTK upstream main head inspected 2026-11-18: 4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33; not asserted to be the exact revision used for this paper calculation.",
+        "upstream_code_repository": "https://github.com/mitsuaki1987/sctk",
+        "inspected_upstream_commit": "4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33",
+        "upstream_snapshot_relation": "inspected_current_upstream_not_asserted_as_paper_revision"
       }
     },
     {
@@ -379,7 +400,10 @@
         "energy_cutoff_unit": "Ry",
         "phonon_treatment": "DFPT for phonons and electron-phonon interactions",
         "spin_orbit_included": false,
-        "provenance_note": "arXiv:2603.05123v2 Table S1. k meshes are twice q meshes in each direction. a_exp=4.719 Å; a_calc=4.69 Å. Pb main results include SOI; Pb no-SOI results are separate and not substituted."
+        "provenance_note": "arXiv:2603.05123v2 Table S1. k meshes are twice q meshes in each direction. a_exp=4.719 Å; a_calc=4.69 Å. Pb main results include SOI; Pb no-SOI results are separate and not substituted. Public SCTK upstream main head inspected 2026-11-18: 4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33; not asserted to be the exact revision used for this paper calculation.",
+        "upstream_code_repository": "https://github.com/mitsuaki1987/sctk",
+        "inspected_upstream_commit": "4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33",
+        "upstream_snapshot_relation": "inspected_current_upstream_not_asserted_as_paper_revision"
       }
     }
   ],
