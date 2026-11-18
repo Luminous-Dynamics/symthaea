@@ -47,10 +47,21 @@ pub struct RawInteractionV1 {
     pub outcome_receipt_id: String,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SourceTrustStatus {
+    /// Source is authorized for this source profile and scope, not proven true.
+    TrustedForScope,
+    Untrusted,
+    Unknown,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerifiedLineage {
     pub source_family: u16,
     pub source_root_id: u32,
+    pub trust_status: SourceTrustStatus,
+    /// Digest of the trust policy revision used to classify the source.
+    pub trust_policy_digest: String,
     pub acquisition_mode: String,
     pub upstream_source_id: String,
     pub source_artifact_digest: String,
@@ -188,6 +199,8 @@ pub struct EvidenceReceiptBundle {
     pub source_artifact_digest: String,
     pub transformation_digest: String,
     pub source_issuer_id: String,
+    pub source_trust_status: SourceTrustStatus,
+    pub source_trust_policy_digest: String,
     pub calibration_digest: String,
     pub measurement_unit: String,
     pub measurement_instrument_id: String,
@@ -239,6 +252,7 @@ pub enum IngestReject {
     UnverifiedLineage,
     UnknownSourceRoot,
     UnknownSourceFamily,
+    InvalidTrustPolicyDigest,
     UnverifiedCalibration,
     InvalidMeasurementBound,
     UnverifiedCausalAssessment,
@@ -343,6 +357,9 @@ pub fn ingest_as_known(
     {
         return Err(IngestReject::UnverifiedLineage);
     }
+    if !is_sha256_hex(&lineage.trust_policy_digest) {
+        return Err(IngestReject::InvalidTrustPolicyDigest);
+    }
 
     let measurement = verifier
         .verify_measurement(
@@ -407,7 +424,7 @@ pub fn ingest_as_known(
             intervention: causal.intervention_confirmed,
             prediction_pre_registered: causal.prediction_pre_registered,
             outcome_reconciled: outcome.reconciled,
-            source_trusted: true,
+            source_trusted: lineage.trust_status == SourceTrustStatus::TrustedForScope,
             source_retracted: false,
             confounders_controlled: causal.confounders_controlled,
             delayed_horizon_complete: causal.delayed_horizon_complete,
@@ -428,6 +445,8 @@ pub fn ingest_as_known(
             source_artifact_digest: lineage.source_artifact_digest,
             transformation_digest: lineage.transformation_digest,
             source_issuer_id: lineage.issuer_id,
+            source_trust_status: lineage.trust_status,
+            source_trust_policy_digest: lineage.trust_policy_digest,
             calibration_digest: measurement.calibration_digest,
             measurement_unit: measurement.unit,
             measurement_instrument_id: measurement.instrument_id,
@@ -471,6 +490,7 @@ pub struct ConsolidationEvidenceRefV1 {
     measurement_error_bound: f64,
     source_family: u16,
     source_root_id: u32,
+    source_trust_status: SourceTrustStatus,
     intervention: bool,
     prediction_pre_registered: bool,
     outcome_reconciled: bool,
@@ -516,6 +536,10 @@ impl ConsolidationEvidenceRefV1 {
         self.source_root_id
     }
 
+    pub fn source_trust_status(&self) -> SourceTrustStatus {
+        self.source_trust_status
+    }
+
     pub fn intervention(&self) -> bool {
         self.intervention
     }
@@ -549,6 +573,9 @@ pub struct ConsolidationEvidencePackV1 {
     events: Vec<ConsolidationEvidenceRefV1>,
     source_family_count: usize,
     source_root_count: usize,
+    trusted_event_count: usize,
+    untrusted_event_count: usize,
+    unknown_trust_event_count: usize,
 }
 
 impl ConsolidationEvidencePackV1 {
@@ -566,6 +593,19 @@ impl ConsolidationEvidencePackV1 {
 
     pub fn source_root_count(&self) -> usize {
         self.source_root_count
+    }
+
+    /// Number of events whose source was trusted under the identified policy.
+    pub fn trusted_event_count(&self) -> usize {
+        self.trusted_event_count
+    }
+
+    pub fn untrusted_event_count(&self) -> usize {
+        self.untrusted_event_count
+    }
+
+    pub fn unknown_trust_event_count(&self) -> usize {
+        self.unknown_trust_event_count
     }
 }
 
@@ -604,6 +644,9 @@ pub fn build_consolidation_evidence_pack(
     let mut events = Vec::with_capacity(requested_event_ids.len());
     let mut source_families = BTreeSet::new();
     let mut source_roots = BTreeSet::new();
+    let mut trusted_event_count = 0usize;
+    let mut untrusted_event_count = 0usize;
+    let mut unknown_trust_event_count = 0usize;
 
     for event_id in requested_event_ids {
         if !requested.insert(*event_id) {
@@ -616,8 +659,15 @@ pub fn build_consolidation_evidence_pack(
         if experience.source_family == 0 || experience.source_root_id == 0 {
             return Err(ConsolidationPackReject::InconsistentKnowledgeSnapshot);
         }
-        source_families.insert(experience.source_family);
-        source_roots.insert(experience.source_root_id);
+        match item.receipts.source_trust_status {
+            SourceTrustStatus::TrustedForScope => {
+                source_families.insert(experience.source_family);
+                source_roots.insert(experience.source_root_id);
+                trusted_event_count += 1;
+            }
+            SourceTrustStatus::Untrusted => untrusted_event_count += 1,
+            SourceTrustStatus::Unknown => unknown_trust_event_count += 1,
+        }
         events.push(ConsolidationEvidenceRefV1 {
             event_id: experience.event_id,
             session_id: item.receipts.session_id.clone(),
@@ -628,6 +678,7 @@ pub fn build_consolidation_evidence_pack(
             measurement_error_bound: experience.measurement_error_bound,
             source_family: experience.source_family,
             source_root_id: experience.source_root_id,
+            source_trust_status: item.receipts.source_trust_status,
             intervention: experience.intervention,
             prediction_pre_registered: experience.prediction_pre_registered,
             outcome_reconciled: experience.outcome_reconciled,
@@ -643,6 +694,9 @@ pub fn build_consolidation_evidence_pack(
         events,
         source_family_count: source_families.len(),
         source_root_count: source_roots.len(),
+        trusted_event_count,
+        untrusted_event_count,
+        unknown_trust_event_count,
     })
 }
 
@@ -716,6 +770,10 @@ mod tests {
         authority_status: AuthorityStatus,
         retraction_status_known: bool,
         vary_lineage_by_event: bool,
+        trust_status: SourceTrustStatus,
+        untrusted_event_id: Option<u32>,
+        unknown_trust_event_id: Option<u32>,
+        trust_policy_digest_valid: bool,
     }
 
     impl Default for TestVerifier {
@@ -738,6 +796,10 @@ mod tests {
                 authority_status: AuthorityStatus::ReceiptAttested,
                 retraction_status_known: true,
                 vary_lineage_by_event: false,
+                trust_status: SourceTrustStatus::TrustedForScope,
+                untrusted_event_id: None,
+                unknown_trust_event_id: None,
+                trust_policy_digest_valid: true,
             }
         }
     }
@@ -793,6 +855,18 @@ mod tests {
                     1_000 + event_id
                 } else {
                     self.root_id
+                },
+                trust_status: if self.untrusted_event_id == Some(event_id) {
+                    SourceTrustStatus::Untrusted
+                } else if self.unknown_trust_event_id == Some(event_id) {
+                    SourceTrustStatus::Unknown
+                } else {
+                    self.trust_status
+                },
+                trust_policy_digest: if self.trust_policy_digest_valid {
+                    "8".repeat(64)
+                } else {
+                    "invalid".into()
                 },
                 acquisition_mode: "api".into(),
                 upstream_source_id: "bis:dataflow:private-credit".into(),
@@ -905,6 +979,75 @@ mod tests {
 
     fn query(valid_at_ms: i64, known_at_ms: i64) -> AsKnownQuery {
         AsKnownQuery { valid_at_ms, known_at_ms }
+    }
+
+    #[test]
+    fn untrusted_and_unknown_lineage_are_preserved_but_never_qualified() {
+        for status in [SourceTrustStatus::Untrusted, SourceTrustStatus::Unknown] {
+            let verifier = TestVerifier {
+                trust_status: status,
+                ..TestVerifier::default()
+            };
+            let admitted = ingest_as_known(&raw(), query(180, 250), &verifier)
+                .expect("receipt validity is distinct from source trust");
+            assert!(!admitted.experience.source_trusted);
+            assert!(!is_qualified(
+                &admitted.experience,
+                Query { scope: scope() }
+            ));
+            assert_eq!(admitted.receipts.source_trust_status, status);
+            assert_eq!(admitted.receipts.source_trust_policy_digest, "8".repeat(64));
+        }
+    }
+
+    #[test]
+    fn trust_classification_requires_a_versioned_policy_digest() {
+        let verifier = TestVerifier {
+            trust_policy_digest_valid: false,
+            ..TestVerifier::default()
+        };
+        assert!(matches!(
+            ingest_as_known(&raw(), query(180, 250), &verifier),
+            Err(IngestReject::InvalidTrustPolicyDigest)
+        ));
+    }
+
+    #[test]
+    fn consolidation_counts_only_sources_trusted_under_the_policy() {
+        let mut second = raw();
+        second.event_id = 43;
+        second.session_id = "session-b".into();
+        second.task_id = "task-b".into();
+        second.payload_sha256 = "f".repeat(64);
+        second.raw_event_receipt_id = "raw-event-2".into();
+        let verifier = TestVerifier {
+            vary_lineage_by_event: true,
+            untrusted_event_id: Some(43),
+            ..TestVerifier::default()
+        };
+        let batch = ingest_batch_as_known(
+            &[raw(), second],
+            query(180, 250),
+            &verifier,
+        )
+        .expect("both receipts should be admitted even with different trust states");
+        let pack = build_consolidation_evidence_pack(&batch, &[42, 43])
+            .expect("pack retains both receipts");
+
+        assert_eq!(pack.events().len(), 2);
+        assert_eq!(pack.trusted_event_count(), 1);
+        assert_eq!(pack.untrusted_event_count(), 1);
+        assert_eq!(pack.unknown_trust_event_count(), 0);
+        assert_eq!(pack.source_family_count(), 1);
+        assert_eq!(pack.source_root_count(), 1);
+        assert_eq!(
+            pack.events()
+                .iter()
+                .find(|event| event.event_id() == 43)
+                .unwrap()
+                .source_trust_status(),
+            SourceTrustStatus::Untrusted
+        );
     }
 
     #[test]
@@ -1120,6 +1263,8 @@ mod tests {
                 Some(VerifiedLineage {
                     source_family: 7,
                     source_root_id: 700,
+                    trust_status: SourceTrustStatus::TrustedForScope,
+                    trust_policy_digest: "8".repeat(64),
                     acquisition_mode: "api".into(),
                     upstream_source_id: "bis:dataflow:private-credit".into(),
                     source_artifact_digest: "e".repeat(64),
