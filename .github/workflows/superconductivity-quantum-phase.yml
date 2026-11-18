@@ -6,6 +6,8 @@ on:
       - "tools/superconductivity-quantum-phase-harness/**"
       - "data/schemas/superconductivity_quantum_phase_instance_v0_1.schema.json"
       - "data/research/superconductivity_quantum_phase_fixture_v0_1.json"
+      - "data/research/superconductivity_quantum_phase_ponticelli_2026_U4_T03_input_fixture_v0_1.json"
+      - "data/research/superconductivity_quantum_phase_ponticelli_2026_source_record_v0_1.json"
       - "research/superconductivity/quantum_phase/**"
       - ".github/workflows/superconductivity-quantum-phase.yml"
   workflow_dispatch:
@@ -49,6 +51,14 @@ jobs:
             --out "$RUNNER_TEMP/sc-quantum-phase-input-receipt.json"
           cat "$RUNNER_TEMP/sc-quantum-phase-input-receipt.json"
 
+      - name: Run source-aligned Ponticelli QXY input audit
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-quantum-phase-harness/Cargo.toml --bin sc_quantum_phase_audit -- \
+            --schema data/schemas/superconductivity_quantum_phase_instance_v0_1.schema.json \
+            --fixture data/research/superconductivity_quantum_phase_ponticelli_2026_U4_T03_input_fixture_v0_1.json \
+            --out "$RUNNER_TEMP/sc-quantum-phase-ponticelli-input-receipt.json"
+          cat "$RUNNER_TEMP/sc-quantum-phase-ponticelli-input-receipt.json"
+
       - name: Run Clippy
         run: cargo clippy --locked --manifest-path tools/superconductivity-quantum-phase-harness/Cargo.toml --bin sc_quantum_phase_audit -- -D warnings
 
@@ -61,6 +71,8 @@ jobs:
             echo "cargo=$(cargo --version)"
             sha256sum data/schemas/superconductivity_quantum_phase_instance_v0_1.schema.json
             sha256sum data/research/superconductivity_quantum_phase_fixture_v0_1.json
+            sha256sum data/research/superconductivity_quantum_phase_ponticelli_2026_U4_T03_input_fixture_v0_1.json
+            sha256sum data/research/superconductivity_quantum_phase_ponticelli_2026_source_record_v0_1.json
             sha256sum tools/superconductivity-quantum-phase-harness/Cargo.toml
             sha256sum tools/superconductivity-quantum-phase-harness/src/main.rs
             if [ -f tools/superconductivity-quantum-phase-harness/Cargo.lock ]; then
@@ -80,3 +92,4 @@ jobs:
             tools/superconductivity-quantum-phase-harness/Cargo.lock
             ${{ runner.temp }}/sc-quantum-phase-environment.txt
             ${{ runner.temp }}/sc-quantum-phase-input-receipt.json
+            ${{ runner.temp }}/sc-quantum-phase-ponticelli-input-receipt.json
