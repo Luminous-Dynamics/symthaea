@@ -55,7 +55,8 @@ struct AlarmObservation {
     pub evidence_quality: AlarmEvidenceQuality,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AlarmPolicyConfig {
     pub policy_id: String,
     /// Identity of the numeric scale shared by thresholds and model score evidence.
@@ -605,13 +606,15 @@ impl OnlinePlasmaAlarmPolicy {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ShotReferenceOutcome {
     Disruptive { t_cut_ns: u64 },
     NonDisruptive { observation_end_ns: u64 },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ShotAlarmEvaluation {
     pub shot_id: String,
     pub policy_id: String,
@@ -624,6 +627,10 @@ pub struct ShotAlarmEvaluation {
     pub lead_time_ns: Option<u64>,
     /// Shot exposure from time zero to t_cut or observation end.
     pub exposure_duration_ns: u64,
+    /// Post-hoc event reference; never supplied to the online policy.
+    pub outcome: ShotReferenceOutcome,
+    /// One timestamp per transition into Raised, not each Active window.
+    pub alarm_times_ns: Vec<u64>,
 }
 
 /// Scores timestamps already emitted by the online policy. Event references
@@ -680,6 +687,8 @@ pub fn score_shot_alarms(
                 false_alarm_events: 0,
                 lead_time_ns,
                 exposure_duration_ns: t_cut_ns,
+                outcome,
+                alarm_times_ns: alarm_times_ns.to_vec(),
             })
         }
         ShotReferenceOutcome::NonDisruptive {
@@ -709,12 +718,15 @@ pub fn score_shot_alarms(
                 false_alarm_events: alarm_times_ns.len(),
                 lead_time_ns: None,
                 exposure_duration_ns: observation_end_ns,
+                outcome,
+                alarm_times_ns: alarm_times_ns.to_vec(),
             })
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AlarmEvaluationSummary {
     pub policy_id: String,
     pub validation_receipt_sha256: String,
@@ -745,7 +757,8 @@ pub struct AlarmEvaluationSummary {
     pub warning_time_p50_ns: Option<u64>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RateConfidenceInterval {
     pub lower: f64,
     pub upper: f64,
