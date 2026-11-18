@@ -170,3 +170,8 @@ The optional experience layer may translate an explicit user-selected task into 
 ## Essential-service continuity
 
 AQS-1 is also evaluated under declared water-pressure, water-supply, electrical, communications and evidence disturbances. The product must distinguish qualified reduced service, manual-only operation, isolated stop and recovery-pending states. Continuity cannot override safety or source-quality requirements. See [AQUA_ESSENTIAL_SERVICE_CONTINUITY_PROTOCOL_V0_1.md](AQUA_ESSENTIAL_SERVICE_CONTINUITY_PROTOCOL_V0_1.md) and [#12760](https://github.com/Luminous-Dynamics/symthaea/issues/12760).
+
+
+## Spray-field design of experiments
+
+The nozzle/manifold geometry work is now governed by a preregistered sequential DOE: comparator and metrology repeatability, manufacturable factor screening, response-surface refinement only after interaction review, robustness challenges, and an independent confirmation holdout. See [AQUA_SPRAY_GEOMETRY_DOE_PROTOCOL_V0_1.md](AQUA_SPRAY_GEOMETRY_DOE_PROTOCOL_V0_1.md) and [#12772](https://github.com/Luminous-Dynamics/symthaea/issues/12772). The first candidates remain passive zoned manifolds and replaceable nozzle cassettes; powered/AI-controlled zones do not precede proof of a passive-field advantage.
