@@ -1212,7 +1212,7 @@ impl Manifest {
             }
             let witness = bounded_noise_matching_witness(&adjacency)?;
             let possible_under_noise_bound =
-                matches!(witness, BoundedNoiseWitnessV1::CompatiblePermutation { .. });
+                matches!(&witness, BoundedNoiseWitnessV1::CompatiblePermutation { .. });
             if possible_under_noise_bound {
                 possible_elements.push(element.id.clone());
             } else {
