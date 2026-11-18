@@ -204,3 +204,19 @@ An independent deterministic replay of the current v0.1 manifest checked:
 - the D4 and C4 polynomial targets have exactly their declared stabilizers under symbolic integer expansion.
 
 This is a local fixture arithmetic preflight only. The exact-head CI fixture validator, full baseline adapters, holdout splits and benchmark runs remain separate gates. No accuracy or performance result is inferred from these fixture checks.
+
+
+## Independent Rust exact oracle
+
+In addition to the Python exact-rational fixture verifier and deterministic generator replay, `oracle/` is a Rust 1.96 test crate which parses the checked-in JSON manifest itself. It independently verifies:
+
+- all eight D4 matrices are unique and closed;
+- all 64 multiplication-table entries match matrix multiplication;
+- identity, two-sided inverses and associativity;
+- every declared target is a subgroup with the correct order/label, including the distinct (C_2) half-turn and reflection families;
+- all 153 structural fixtures have exactly the declared unordered point-set stabilizer;
+- both regression fixtures have exactly the declared polynomial invariance subgroup, using checked integer coefficient expansion.
+
+The fixture workflow now runs both implementations on the exact triggering PR head: Python/Fraction validates the rational JSON and seeded generator, then pinned Rust 1.96 runs format, locked tests and strict Clippy. The two oracles use separate code paths; agreement is stronger than repeating one implementation twice.
+
+The Rust target is still fixture validation only. It does not run LieFlow, SymFP, the COLT learner, or external physics/active-acquisition baselines, and the corpus is not a held-out external benchmark result.
