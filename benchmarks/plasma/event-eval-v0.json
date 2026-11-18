@@ -26,9 +26,24 @@
   "online_policy_contract": {
     "input_fields": [
       "shot_id",
-      "window_end_ns",
-      "risk_score",
-      "evidence_quality"
+      "frame_id",
+      "frame_time_ns",
+      "exact_serialized_input_frame_sha256",
+      "risk_score_evidence_schema_version",
+      "forecast_horizon_ns",
+      "forecast_target_time_ns",
+      "model_id",
+      "model_revision",
+      "model_artifact_sha256",
+      "training_split_sha256",
+      "calibration_id",
+      "calibration_revision",
+      "calibration_receipt_sha256",
+      "uncertainty_method_id",
+      "nominal_interval_coverage",
+      "estimate",
+      "lower_bound",
+      "upper_bound"
     ],
     "allowed_evidence_quality": [
       "direct_measured"
@@ -90,7 +105,14 @@
       "uncertainty_breaks_persistence": true,
       "digests_are_content_identity_not_authentication": true,
       "risk_evidence_schema_version": "luminous.plasma-risk-score-evidence.v0.1",
-      "uncertainty_method_and_nominal_coverage_required": true
+      "uncertainty_method_and_nominal_coverage_required": true,
+      "uncertainty_semantics": {
+        "trigger": "lower_bound >= trigger_threshold",
+        "clear": "upper_bound <= clear_threshold",
+        "otherwise": "uncertain; preserve current alert state and reset persistence counters"
+      },
+      "interval_coverage_claim": "nominal method metadata only; empirical coverage must be reported on held-out data",
+      "evidence_digest": "SHA-256 content identity only; not source/model/calibration authenticity proof"
     }
   },
   "offline_scoring_contract": {
