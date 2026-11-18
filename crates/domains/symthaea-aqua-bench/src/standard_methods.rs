@@ -625,6 +625,15 @@ mod tests {
 
 
     fn boost_observation() -> UwlBoostFunctionObservation {
+        let mut pressure = uwl_run(UwlPressurePoint::Type1P2, 304.0, 310.0);
+        pressure.run_id = "boost-run-01".to_owned();
+        pressure.specimen_id = "boost-specimen-01".to_owned();
+        pressure.market_variant_id = "boost-variant-01".to_owned();
+        pressure.mode_id = "RAIN-BOOST".to_owned();
+        pressure.hardware_configuration_sha256 = digest('a');
+        pressure.test_context_sha256 = digest('b');
+        pressure.protocol_sha256 = digest('c');
+
         UwlBoostFunctionObservation {
             run_id: "boost-run-01".to_owned(),
             specimen_id: "boost-specimen-01".to_owned(),
@@ -633,7 +642,7 @@ mod tests {
             hardware_configuration_sha256: digest('a'),
             test_context_sha256: digest('b'),
             protocol_sha256: digest('c'),
-            pressure: uwl_run(UwlPressurePoint::Type1P2, 304.0, 310.0),
+            pressure,
             regular_flow_lpm: 3.0,
             regular_flow_uncertainty_lpm: 0.05,
             boost_flow_lpm: 4.5,
