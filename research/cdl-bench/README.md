@@ -24,6 +24,30 @@ dependencies.
   typed-field/lag/parent experts, all using the same arithmetic coder and exact
   decoder path.
 
+## Independent fixed-share reference simulation
+
+The checked-in C++20 program
+`research/cdl-bench/reference/scm_expert_mixture_reference.cpp` independently
+reproduces the SCM2 generator, exact-rational three-expert probability mixture,
+posterior updates and fixed-share rule using `unsigned __int128`. It is a
+diagnostic/reference implementation only; it does not link to or execute the
+Rust crate and is not a substitute for Rust tests.
+
+Build and run it with GCC or Clang that supports `unsigned __int128`:
+
+```sh
+g++ -O3 -std=c++20 -Wall -Wextra \
+  research/cdl-bench/reference/scm_expert_mixture_reference.cpp \
+  -o /tmp/cdl_mixture_ref
+/tmp/cdl_mixture_ref
+```
+
+It prints per-stream ideal prequential bit costs and weight traces. The
+reproducibility report is
+`docs/research/CDL_EXPERT_MIXTURE_FIXED_SHARE_V1_2026-11-18.md`.
+These ideal-bit diagnostics must not be confused with actual arithmetic-coded
+frame lengths, which still require compiling and running the Rust CLI.
+
 ## Run
 
 ```sh
