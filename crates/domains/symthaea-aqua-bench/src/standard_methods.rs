@@ -267,6 +267,7 @@ pub struct UwlBoostFunctionObservation {
     pub boost_activated_receipt_sha256: String,
     pub flow_close_reopen_receipt_sha256: String,
     pub boost_reset_observed_after_close: bool,
+    pub regular_flow_labelled_on_scheme: bool,
     pub flow_instrument_id: String,
     pub flow_calibration_receipt_sha256: String,
 }
@@ -331,6 +332,9 @@ impl UwlBoostFunctionObservation {
         }
         if !self.boost_reset_observed_after_close {
             return Err(MethodPressureError::BoostDidNotResetAfterFlowClose);
+        }
+        if !self.regular_flow_labelled_on_scheme {
+            return Err(MethodPressureError::RegularFlowNotListed);
         }
 
         for (field, flow, uncertainty) in [
@@ -406,6 +410,7 @@ pub enum MethodPressureError {
     BoostRequiresType1P2,
     BoostPressureContextMismatch,
     BoostDidNotResetAfterFlowClose,
+    RegularFlowNotListed,
     BoostIncreaseNotResolved,
     BoostNotBelowTwoTimesRegular,
     BoostDidNotReturnToRegularFlow,
@@ -441,6 +446,9 @@ impl Display for MethodPressureError {
             }
             Self::BoostDidNotResetAfterFlowClose => {
                 write!(f, "boost mode did not reset after the flow control was closed")
+            }
+            Self::RegularFlowNotListed => {
+                write!(f, "UWL boost regular flow Qreg is not listed on the scheme label")
             }
             Self::BoostIncreaseNotResolved => {
                 write!(f, "boost flow increase is not resolved above regular flow uncertainty")
@@ -652,6 +660,7 @@ mod tests {
             boost_activated_receipt_sha256: digest('d'),
             flow_close_reopen_receipt_sha256: digest('e'),
             boost_reset_observed_after_close: true,
+            regular_flow_labelled_on_scheme: true,
             flow_instrument_id: "flow-boost-01".to_owned(),
             flow_calibration_receipt_sha256: digest('f'),
         }
@@ -736,6 +745,17 @@ mod tests {
             Err(MethodPressureError::InvalidDigest {
                 field: "boost_activated_receipt_sha256"
             })
+        );
+    }
+
+
+    #[test]
+    fn rejects_uwl_boost_when_regular_flow_is_not_labelled() {
+        let mut observation = boost_observation();
+        observation.regular_flow_labelled_on_scheme = false;
+        assert_eq!(
+            observation.validate(),
+            Err(MethodPressureError::RegularFlowNotListed)
         );
     }
 
