@@ -1916,9 +1916,17 @@ mod tests {
         changed_uncertainty.risk_model.uncertainty_method_id = "different-uncertainty-method".to_owned();
         assert_ne!(digest, changed_uncertainty.policy_config_sha256());
 
-        let mut changed_coverage = original;
+        let mut changed_coverage = original.clone();
         changed_coverage.risk_model.nominal_coverage = 0.95;
         assert_ne!(digest, changed_coverage.policy_config_sha256());
+
+        let mut changed_score_min = original.clone();
+        changed_score_min.score_min = -0.1;
+        assert_ne!(digest, changed_score_min.policy_config_sha256());
+
+        let mut changed_score_max = original;
+        changed_score_max.score_max = 2.0;
+        assert_ne!(digest, changed_score_max.policy_config_sha256());
     }
 
     #[test]
