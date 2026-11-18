@@ -804,7 +804,7 @@ mod tests {
     fn rejects_non_finite_or_non_positive_declared_flow() {
         for flow in ["NaN", "inf", "-1", "0", "unknown"] {
             let mut caps = capabilities();
-            caps[1].declared_flow_lpm = flow.to_owned();
+            caps[1].qualified_flow_lpm = flow.to_owned();
             assert_eq!(
                 validate_task_phase_plan(&plan(), &caps),
                 Err(TaskPhaseError::InvalidQualifiedFlow {
