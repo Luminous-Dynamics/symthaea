@@ -1,3 +1,8 @@
+use super::{
+    ApproximateSymmetryInputV1, ApproximateSymmetryReceiptV1, EnvelopeBudgetV1, EnvelopeErrorV1,
+    qualify_approximate_symmetry, verify_receipt,
+};
+
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -344,6 +349,169 @@ pub fn derive_affine_witness(
     })
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AffineTaskBoundsV1 {
+    pub task_contract_id: String,
+    pub state_unit_id: String,
+    pub objective_unit_id: String,
+    pub constraint_unit_id: String,
+    /// Fixed-point scale for the state/objective/constraint units.
+    pub scale: u128,
+    pub initial_state_error: u128,
+    pub horizon_steps: u32,
+    pub objective_lipschitz_scaled: u128,
+    pub direct_objective_defect: u128,
+    pub constraint_lipschitz_scaled: u128,
+    pub direct_constraint_defect: u128,
+    pub constraint_slack: u128,
+    pub max_state_error: u128,
+    pub max_objective_error: u128,
+    pub max_constraint_error: u128,
+    pub objective_gap: Option<u128>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AffineEnvelopeReceiptV1 {
+    pub schema_version: u32,
+    pub affine_witness: AffineSymmetryWitnessV1,
+    pub envelope_receipt: ApproximateSymmetryReceiptV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AffineTaskErrorV1 {
+    Affine(AffineErrorV1),
+    Envelope(EnvelopeErrorV1),
+    ArithmeticOverflow,
+}
+
+impl From<AffineErrorV1> for AffineTaskErrorV1 {
+    fn from(value: AffineErrorV1) -> Self {
+        Self::Affine(value)
+    }
+}
+
+impl From<EnvelopeErrorV1> for AffineTaskErrorV1 {
+    fn from(value: EnvelopeErrorV1) -> Self {
+        Self::Envelope(value)
+    }
+}
+
+fn scaled(value: u128, scale: u128) -> Result<u128, AffineTaskErrorV1> {
+    value
+        .checked_mul(scale)
+        .ok_or(AffineTaskErrorV1::ArithmeticOverflow)
+}
+
+/// Derive the affine witness and feed its exact defect, Lipschitz factor and
+/// domain margin into the finite-horizon envelope. Objective and constraint
+/// bounds remain explicit task inputs with their own units.
+pub fn qualify_affine_task(
+    contract: &AffineSymmetryDomainV1,
+    task: &AffineTaskBoundsV1,
+    budget: EnvelopeBudgetV1,
+) -> Result<AffineEnvelopeReceiptV1, AffineTaskErrorV1> {
+    let witness = derive_affine_witness(contract)?;
+    let scale = task.scale;
+    let input = ApproximateSymmetryInputV1 {
+        contract_id: task.task_contract_id.clone(),
+        state_unit_id: task.state_unit_id.clone(),
+        objective_unit_id: task.objective_unit_id.clone(),
+        constraint_unit_id: task.constraint_unit_id.clone(),
+        defect_evidence_id: format!("{}::affine-commutator-v1", contract.contract_id),
+        lipschitz_evidence_id: format!("{}::affine-lipschitz-v1", contract.contract_id),
+        domain_evidence_id: format!("{}::invariant-box-margin-v1", contract.contract_id),
+        scale,
+        initial_state_error: task.initial_state_error,
+        one_step_equivariance_defect: scaled(
+            witness.one_step_equivariance_defect_linf,
+            scale,
+        )?,
+        step_lipschitz_scaled: scaled(witness.step_lipschitz_linf, scale)?,
+        horizon_steps: task.horizon_steps,
+        domain_invariance_verified: witness.reference_region_invariant
+            && witness.action_has_declared_finite_order
+            && witness.certificate_domain_contains_reference_region,
+        domain_boundary_margin: scaled(witness.domain_boundary_margin_linf, scale)?,
+        objective_lipschitz_scaled: task.objective_lipschitz_scaled,
+        direct_objective_defect: task.direct_objective_defect,
+        constraint_lipschitz_scaled: task.constraint_lipschitz_scaled,
+        direct_constraint_defect: task.direct_constraint_defect,
+        constraint_slack: task.constraint_slack,
+        max_state_error: task.max_state_error,
+        max_objective_error: task.max_objective_error,
+        max_constraint_error: task.max_constraint_error,
+        objective_gap: task.objective_gap,
+    };
+    let envelope_receipt = qualify_approximate_symmetry(&input, budget)?;
+    Ok(AffineEnvelopeReceiptV1 {
+        schema_version: 1,
+        affine_witness: witness,
+        envelope_receipt,
+    })
+}
+
+pub fn verify_affine_task_receipt(
+    contract: &AffineSymmetryDomainV1,
+    task: &AffineTaskBoundsV1,
+    receipt: &AffineEnvelopeReceiptV1,
+) -> Result<(), AffineTaskErrorV1> {
+    if receipt.schema_version != 1 {
+        return Err(AffineTaskErrorV1::Envelope(
+            EnvelopeErrorV1::ReceiptMismatch,
+        ));
+    }
+    let expected = qualify_affine_task(
+        contract,
+        task,
+        receipt.envelope_receipt.budget,
+    )?;
+    if *receipt != expected {
+        return Err(AffineTaskErrorV1::Envelope(
+            EnvelopeErrorV1::ReceiptMismatch,
+        ));
+    }
+    verify_receipt(
+        &ApproximateSymmetryInputV1 {
+            contract_id: task.task_contract_id.clone(),
+            state_unit_id: task.state_unit_id.clone(),
+            objective_unit_id: task.objective_unit_id.clone(),
+            constraint_unit_id: task.constraint_unit_id.clone(),
+            defect_evidence_id: format!("{}::affine-commutator-v1", contract.contract_id),
+            lipschitz_evidence_id: format!("{}::affine-lipschitz-v1", contract.contract_id),
+            domain_evidence_id: format!("{}::invariant-box-margin-v1", contract.contract_id),
+            scale: task.scale,
+            initial_state_error: task.initial_state_error,
+            one_step_equivariance_defect: scaled(
+                receipt.affine_witness.one_step_equivariance_defect_linf,
+                task.scale,
+            )?,
+            step_lipschitz_scaled: scaled(
+                receipt.affine_witness.step_lipschitz_linf,
+                task.scale,
+            )?,
+            horizon_steps: task.horizon_steps,
+            domain_invariance_verified: receipt.affine_witness.reference_region_invariant
+                && receipt.affine_witness.action_has_declared_finite_order
+                && receipt.affine_witness.certificate_domain_contains_reference_region,
+            domain_boundary_margin: scaled(
+                receipt.affine_witness.domain_boundary_margin_linf,
+                task.scale,
+            )?,
+            objective_lipschitz_scaled: task.objective_lipschitz_scaled,
+            direct_objective_defect: task.direct_objective_defect,
+            constraint_lipschitz_scaled: task.constraint_lipschitz_scaled,
+            direct_constraint_defect: task.direct_constraint_defect,
+            constraint_slack: task.constraint_slack,
+            max_state_error: task.max_state_error,
+            max_objective_error: task.max_objective_error,
+            max_constraint_error: task.max_constraint_error,
+            objective_gap: task.objective_gap,
+        },
+        &receipt.envelope_receipt,
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -369,6 +537,78 @@ mod tests {
                 upper: vec![3, 3],
             },
         }
+    }
+
+    #[test]
+    fn derived_affine_bounds_feed_error_envelope_and_replay_as_one_receipt() {
+        let contract = contract();
+        let task = AffineTaskBoundsV1 {
+            task_contract_id: "projection-task-v1".to_owned(),
+            state_unit_id: "metre".to_owned(),
+            objective_unit_id: "joule".to_owned(),
+            constraint_unit_id: "metre-squared".to_owned(),
+            scale: 1_000,
+            initial_state_error: 0,
+            horizon_steps: 2,
+            objective_lipschitz_scaled: 1_000,
+            direct_objective_defect: 0,
+            constraint_lipschitz_scaled: 1_000,
+            direct_constraint_defect: 0,
+            constraint_slack: 3_000,
+            max_state_error: 2_000,
+            max_objective_error: 2_000,
+            max_constraint_error: 2_000,
+            objective_gap: Some(5_000),
+        };
+        let receipt = qualify_affine_task(
+            &contract,
+            &task,
+            EnvelopeBudgetV1::default(),
+        )
+        .unwrap();
+        assert_eq!(receipt.affine_witness.one_step_equivariance_defect_linf, 1);
+        assert_eq!(receipt.affine_witness.step_lipschitz_linf, 1);
+        assert_eq!(receipt.envelope_receipt.report.state_error_bound, 2_000);
+        assert_eq!(receipt.envelope_receipt.report.status, super::super::EnvelopeStatusV1::WithinDeclaredErrorBudgets);
+        assert!(receipt.envelope_receipt.report.epsilon_lift_candidate);
+        assert!(!receipt.envelope_receipt.report.hard_prune_authorized);
+        verify_affine_task_receipt(&contract, &task, &receipt).unwrap();
+    }
+
+    #[test]
+    fn affine_error_bound_exceeding_derived_domain_margin_abstains() {
+        let contract = contract();
+        let mut task = AffineTaskBoundsV1 {
+            task_contract_id: "projection-task-three-steps-v1".to_owned(),
+            state_unit_id: "metre".to_owned(),
+            objective_unit_id: "joule".to_owned(),
+            constraint_unit_id: "metre-squared".to_owned(),
+            scale: 1_000,
+            initial_state_error: 0,
+            horizon_steps: 3,
+            objective_lipschitz_scaled: 1_000,
+            direct_objective_defect: 0,
+            constraint_lipschitz_scaled: 1_000,
+            direct_constraint_defect: 0,
+            constraint_slack: 4_000,
+            max_state_error: 3_000,
+            max_objective_error: 3_000,
+            max_constraint_error: 3_000,
+            objective_gap: Some(10_000),
+        };
+        task.max_state_error = 3_000;
+        let receipt = qualify_affine_task(
+            &contract,
+            &task,
+            EnvelopeBudgetV1::default(),
+        )
+        .unwrap();
+        assert_eq!(receipt.envelope_receipt.report.state_error_bound, 3_000);
+        assert_eq!(
+            receipt.envelope_receipt.report.status,
+            super::super::EnvelopeStatusV1::Abstain
+        );
+        assert!(!receipt.envelope_receipt.report.epsilon_lift_candidate);
     }
 
     #[test]
