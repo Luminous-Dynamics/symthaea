@@ -106,7 +106,7 @@ Keep base model, prompt, tool access, data split, retrieval budget and total tok
 These are targets to preregister and measure, not current results.
 
 ### P0 — deterministic invariants
-- 100% of graduation source class and producer verification claim survive into the provenance-bearing replay envelope.
+- 100% of graduation source class and producer verification claim survive the working-memory → episodic → semantic → structured-recall path, including semantic ring-buffer replacement.
 - Arbitrary producer labels are not copied into the replay envelope; they may contain user content and are not source identities. A later receipt adapter must bind a privacy-reviewed source-event ID and payload digest.
 - Exactly zero change to raw Psi from source class, verification claim, persistence bonus or Sigma bonus.
 - Exactly zero synthetic emotional-valence change from a verification claim.
@@ -140,15 +140,20 @@ These are targets to preregister and measure, not current results.
 
 ## 8. Current implementation increment
 
-The accompanying source change is intended to close only the working-memory graduation seam:
-- preserve `MemorySource` and the producer's verification claim in a versioned `ProvenancedEpisode` replay envelope; arbitrary labels are deliberately not copied;
-- keep the public serialized `Episode` representation unchanged;
-- carry a separate persistence/Sigma-derived consolidation-priority bonus through replay and reconsolidation; a producer verification claim alone does not increase replay priority;
-- leave raw Psi and valence untouched;
-- keep the historic replay API while adding provenance-preserving top, sampling and similarity retrieval APIs;
-- reject non-finite/out-of-domain Psi and malformed priority inputs before replay-heap insertion.
+The current source patch closes a concrete two-tier handoff seam and exposes lineage at recall:
 
-This is deliberately **not** a complete source receipt or disk-backed persistence integration. `EpisodicMemory` remains an in-memory replay store; the new envelope is serializable, but this PR adds no database/file persistence. It excludes arbitrary labels and contains no immutable source-event/revision ID, payload digest, valid-time/transaction-time coordinates, signature, or independent verifier receipt. Those remain in #9075/#11816/#12846 and their Mycelix/Symtropy owners. No source trust, consent, or action authority is inferred from this envelope.
+- Preserve `MemorySource` and the producer's `verification_claimed` flag in a versioned `ProvenancedEpisode` replay envelope; arbitrary labels are deliberately excluded.
+- Keep the public serialized `Episode` representation and both legacy constructors unchanged.
+- Carry a separate persistence/Sigma-derived consolidation-priority bonus through replay and reconsolidation; a producer verification claim alone does not increase replay priority.
+- Keep raw Psi and valence unchanged; reject non-finite/out-of-domain Psi, thresholds and malformed priority inputs before replay-heap insertion.
+- Add provenance-preserving top, ordinary sampling, bath-conditioned sampling, embedding retrieval and input-vector retrieval APIs while retaining the old `Episode`-only APIs.
+- Preserve the episodic envelope into the semantic ring buffer via a parallel lineage array, leaving the serialized `SemanticEntry` layout unchanged. The ring's eviction return and similarity/get accessors expose the evicted/current lineage; clear/reuse removes parallel metadata.
+- Wire `EngineeringManager::dream_cycle` to promote from the provenance-bearing episodic API into semantic memory with the same source/claim.
+- Add `recall_wisdom_with_provenance` as a structured engineering API; the legacy string API and sovereign-design demo label producer claims as not independent receipts.
+
+The tests authored for this path cover raw-Psi admission and serialization, episodic retrieval and score rebuilds, semantic ring-wrap/eviction and clear/reuse, zero-capacity handling, plus an end-to-end engineering test for episode → semantic promotion → structured recall. These tests are **authored, not executed** in this environment.
+
+This is deliberately **not** a complete source receipt or disk-backed persistence integration. `EpisodicMemory` and `SemanticMemory` remain in-memory stores; the new envelopes are Serde/bincode serializable, but this PR adds no database/file persistence. It excludes arbitrary labels and contains no immutable source-event/revision ID, payload digest, valid-time/transaction-time coordinates, signature, independent verifier receipt, or source-root independence proof. Those remain in #9075/#11816/#12846 and their Mycelix/Symtropy owners. The producer claim is not mapped to source trust or outcome verification; no source truth, consent, or action authority is inferred.
 
 ## 9. Exit criteria for a SOTA claim
 
