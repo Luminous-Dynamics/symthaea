@@ -1017,6 +1017,14 @@ mod tests {
             true
         );
         assert_eq!(
+            manifest["online_policy_contract"]["risk_score_contract"]["uncertainty_method_and_nominal_coverage_required"],
+            true
+        );
+        assert_eq!(
+            manifest["online_policy_contract"]["risk_score_contract"]["risk_evidence_schema_version"],
+            PLASMA_RISK_SCORE_EVIDENCE_SCHEMA
+        );
+        assert_eq!(
             manifest["online_policy_contract"]["event_labels_available_online"],
             false
         );
@@ -1334,6 +1342,20 @@ mod tests {
         wrong_target.target_time_ns += 1;
         assert!(policy
             .update_from_frame(&frame, &requirements, Some(wrong_target))
+            .is_err());
+        assert_eq!(policy.last_window_end_ns, None);
+
+        let mut wrong_schema = risk_evidence(&frame, 0.9, 0.9, 0.9);
+        wrong_schema.schema_version = "unversioned-risk-score".to_owned();
+        assert!(policy
+            .update_from_frame(&frame, &requirements, Some(wrong_schema))
+            .is_err());
+        assert_eq!(policy.last_window_end_ns, None);
+
+        let mut invalid_coverage = risk_evidence(&frame, 0.9, 0.9, 0.9);
+        invalid_coverage.nominal_coverage = 1.0;
+        assert!(policy
+            .update_from_frame(&frame, &requirements, Some(invalid_coverage))
             .is_err());
         assert_eq!(policy.last_window_end_ns, None);
 
