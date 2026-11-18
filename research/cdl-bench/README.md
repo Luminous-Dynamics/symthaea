@@ -8,6 +8,7 @@ dependencies.
 
 - Deterministic adaptive order-0 and order-1 byte-frequency predictors.
 - A 32-bit arithmetic entropy coder / decoder.
+- A public `BytePredictor` / `ByteCdf` interface so external predictors can use the same coder with deterministic integer CDFs and decoder-synchronous updates.
 - A versioned frame with uncompressed length, payload length, source CRC-32 and
   payload CRC-32.
 - Output-size limits, strict frame-length checks, and checksum failure handling.
@@ -147,3 +148,17 @@ The same causal command also emits:
 - For each held-out configuration, a paired observational and `do(x1=20000)` trace with the same seed, so the intervention comparison is counterfactual.
 
 The hidden mechanism configuration is retained in the evaluator-side ScmTrace metadata and is not serialized into the learner-visible observation stream. The CLI labels the paired held-out streams and verifies codec round trips; it does not yet train a mechanism learner or measure transfer. A generator unit test also checks that the upstream x0 remains invariant while descendants x2 and x4 respond to the x1 intervention in each held-out world. This is a dataset-generation fixture only.
+
+## Plugging in a custom predictor
+
+The library exposes:
+- `ByteCdf = [u32; 257]`: cumulative integer frequencies for all 256 byte symbols.
+- `BytePredictor`: a stable model ID, `cumulative_frequency()`, and `observe(decoded_symbol)`.
+- `compress_with_predictor(input, &mut predictor)`.
+- `decompress_with_predictor(frame, max_output_bytes, &mut fresh_predictor)`.
+
+CDFs must start at zero, be monotonically nondecreasing, and have a positive final total. A symbol with zero width cannot be encoded. Custom model IDs 2–255 are reserved for caller-supplied predictors; IDs 0 and 1 remain the built-in order-0/order-1 models.
+
+The encoder and decoder must start from identical predictor configurations and update only after each symbol is coded/decoded. The frame includes the model ID but does not contain the custom checkpoint, configuration or initial state. Those are caller-supplied side information and must be counted separately in cold-start/amortized accounting.
+
+This makes it possible to compare HDC/CfC, context trees, transformer/SSM predictors or a causal residual model under the same arithmetic coder without changing the entropy-coding implementation. It does not by itself provide a Symthaea model adapter or prove a compression benefit.
