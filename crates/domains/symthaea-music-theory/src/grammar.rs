@@ -9,6 +9,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::obligation::{ObligationKind, ReturnTransformation};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GrammarFamily {
@@ -121,6 +123,9 @@ pub struct PeriodSentencePlan {
     pub cadence_strategy: String,
     pub continuation_strategy: String,
     pub return_obligation: String,
+    /// Explicit plan-side contract; old serialized plans remain untyped.
+    #[serde(default)]
+    pub typed_return_obligation: Option<ObligationKind>,
     pub ending_strategy: String,
 }
 
@@ -189,6 +194,13 @@ pub fn compose_with_grammar_plan(
                     cadence_strategy: "antecedent-half-close; consequent-full-close".into(),
                     continuation_strategy: "fragmentation-and-acceleration".into(),
                     return_obligation: "primary material returns before closure".into(),
+                    typed_return_obligation: Some(ObligationKind::ReturnMotif {
+                        motif_id: "motif-primary".into(),
+                        // Period/Sentence promises restoration of the theme's
+                        // identity; the verifier accepts literal or transposed
+                        // realizations, but not an unrelated contour match.
+                        transformation: ReturnTransformation::Restored,
+                    }),
                     ending_strategy: "motif-related cadential liquidation".into(),
                 }),
                 trace: Default::default(),

@@ -21,6 +21,7 @@ use symthaea_music_theory::{
     compose_with_grammar_plan, validate_score,
 };
 use symthaea_music_theory::score_validation::is_universal_invariant;
+use symthaea_music_theory::obligation::ObligationKind;
 use symthaea_music_theory::process_grammar::{
     verify_additive_process_score_v1, ProcessRealizationAuditError, ProcessRealizationAuditV1,
 };
@@ -197,7 +198,8 @@ pub struct StyleTrajectoryM1ReceiptVerificationV1 {
     pub verified_segment_count: usize,
     pub trace_integrity_verified_segment_count: usize,
     pub process_additive_score_verified_segment_count: usize,
-    /// False until the PeriodSentence score-semantic oracle is integrated.
+    /// True only when the existing Analyst ReturnMotif oracle has been
+    /// replayed successfully against the exact Classical segment score.
     pub period_sentence_semantics_verified: bool,
     pub total_beats: Duration,
 }
@@ -282,6 +284,20 @@ pub fn realize_classical_to_minimalism_m1(
         &minimalism.score,
         &minimalism.trace,
     )?;
+
+    // Trace integrity alone is not enough for the Classical segment. Require
+    // the existing Analyst ReturnMotif oracle to verify the exact source and
+    // target events emitted by the typed Period/Sentence producer.
+    if !period_sentence_return_semantics_verified(
+        &classical.plan,
+        &classical.trace,
+        &classical_trace_verification,
+    ) {
+        return Err(StyleTrajectoryM1Error::UnexpectedGrammarEvidence {
+            style: "Classical".into(),
+            reason: "M1 requires an independently verified typed Period/Sentence ReturnMotif obligation".into(),
+        });
+    }
 
     let classical_length = classical.score.total_beats;
     let minimalism_start = classical_length;
@@ -624,6 +640,21 @@ pub fn verify_classical_to_minimalism_m1_receipt_v1(
         return Err(StyleTrajectoryM1Error::ReceiptProcessAuditMismatch);
     }
 
+    // The per-segment trace report was independently recomputed above and
+    // compared byte-for-byte/structurally with the stored report. Derive the
+    // semantic flag only from that now-reconciled evidence and exact plan/trace.
+    let period_sentence_semantics_verified = period_sentence_return_semantics_verified(
+        &classical.grammar_plan,
+        &classical.grammar_trace,
+        &classical.trace_verification,
+    );
+    if !period_sentence_semantics_verified {
+        return Err(StyleTrajectoryM1Error::UnexpectedGrammarEvidence {
+            style: "Classical".into(),
+            reason: "receipt replay did not establish Period/Sentence ReturnMotif semantics".into(),
+        });
+    }
+
     let replayed_boundary =
         measure_hard_boundary(&classical.score, &minimalism.score, minimalism.start_beat)?;
     if replayed_boundary != result.boundary_evidence {
@@ -636,7 +667,7 @@ pub fn verify_classical_to_minimalism_m1_receipt_v1(
         verified_segment_count: 2,
         trace_integrity_verified_segment_count: 2,
         process_additive_score_verified_segment_count: 1,
-        period_sentence_semantics_verified: false,
+        period_sentence_semantics_verified,
         total_beats: result.composed_score.total_beats,
     })
 }
@@ -782,6 +813,77 @@ fn verify_trace_independently(
     Ok(report)
 }
 
+/// Return true only when the existing Analyst oracle has verified the exact
+/// typed Period/Sentence ReturnMotif lifecycle against this segment's score.
+///
+/// This checks the theory producer's promise/source binding as well as the
+/// independently recomputed Analyst disposition. It deliberately refuses a
+/// legacy untyped trace, an unresolved obligation, missing event identities,
+/// duplicate source/target references, or source/target overlap.
+fn period_sentence_return_semantics_verified(
+    plan: &GrammarPlanEvidence,
+    trace: &GrammarStructuralTrace,
+    report: &TraceVerificationReport,
+) -> bool {
+    let GrammarPlanEvidence::PeriodSentence(period) = plan else {
+        return false;
+    };
+    let Some(expected_definition) = period.typed_return_obligation.as_ref() else {
+        return false;
+    };
+    if !matches!(expected_definition, ObligationKind::ReturnMotif { .. })
+        || report.evidence.verification_status != VerificationStatus::Verified
+        || !report.issues.is_empty()
+    {
+        return false;
+    }
+
+    let lifecycle: Vec<_> = trace
+        .obligation_transitions
+        .iter()
+        .filter(|transition| transition.obligation_id == "thematic-return-and-closure")
+        .collect();
+    let created: Vec<_> = lifecycle
+        .iter()
+        .copied()
+        .filter(|transition| transition.to == AssertedObligationState::Created)
+        .collect();
+    let fulfilled: Vec<_> = lifecycle
+        .iter()
+        .copied()
+        .filter(|transition| transition.to == AssertedObligationState::Fulfilled)
+        .collect();
+    // A later Deferred/Abandoned/Unresolved transition must not be ignored
+    // simply because a previous transition once said Fulfilled.
+    if lifecycle.len() != 2 || created.len() != 1 || fulfilled.len() != 1 {
+        return false;
+    }
+
+    let source = created[0];
+    let target = fulfilled[0];
+    let source_events = &source.source_evidence;
+    let target_events = &target.evidence;
+    let source_unique = source_events
+        .iter()
+        .enumerate()
+        .all(|(index, event)| !source_events[..index].contains(event));
+    let target_unique = target_events
+        .iter()
+        .enumerate()
+        .all(|(index, event)| !target_events[..index].contains(event));
+
+    source.from.is_none()
+        && target.from == Some(AssertedObligationState::Created)
+        && source.definition.as_ref() == Some(expected_definition)
+        && target.definition.as_ref() == Some(expected_definition)
+        && source_events.len() >= 2
+        && !target_events.is_empty()
+        && source_unique
+        && target_unique
+        && source_events.iter().all(|event| !target_events.contains(event))
+        && source_events == &target.source_evidence
+}
+
 /// Build the same score-event identity projection used by Muse Studio and
 /// the existing Analyst flagship-verification tests. IDs are role-local
 /// ordinals scoped to this frozen segment Score, never global EventIds.
@@ -832,7 +934,28 @@ fn listen_bundle_for_score(
     // The trace verifier needs the same motif-family identity named by
     // composer_trace_from_theory. The definition is recipe-derived metadata;
     // actual occurrence validity is still checked against score event IDs.
-    let motif = style.spec().motif(intent.arousal, intent.seed);
+    // Mirror compose_with_grammar_plan's exact source-motif construction,
+    // including the optional hook-cell graft. The Analyst motif definition
+    // must describe the same recipe that the grammar trace used; a base-spec
+    // motif is not interchangeable with its grafted realization.
+    let spec = style.spec();
+    let motif = spec.motif(intent.arousal, intent.seed);
+    let (motif, motif_source_method) = if spec.texture.hook_cell {
+        (
+            symthaea_music_theory::graft_hook(
+                &motif,
+                &symthaea_music_theory::HookCell::generate_with(
+                    &spec.melody,
+                    intent.seed,
+                    spec.meter as f64,
+                ),
+                spec.meter as f64,
+            ),
+            "builtin-style-spec-motif-plus-hook-cell-v1",
+        )
+    } else {
+        (motif, "builtin-style-spec-motif-v1")
+    };
     let pitched: Vec<_> = motif
         .notes
         .iter()
@@ -845,7 +968,7 @@ fn listen_bundle_for_score(
         durations_beats: pitched.iter().map(|item| item.1).collect(),
         basis: EvidenceBasis {
             status: EvidenceStatus::Observed,
-            source_method: "builtin-style-spec-motif-v1".into(),
+            source_method: motif_source_method.into(),
             confidence: None,
             limitations: vec![
                 "The definition records the configured source motif; it is not a listener-recognition claim.".into(),
@@ -1195,9 +1318,174 @@ mod tests {
         assert_eq!(verified.verified_segment_count, 2);
         assert_eq!(verified.trace_integrity_verified_segment_count, 2);
         assert_eq!(verified.process_additive_score_verified_segment_count, 1);
-        assert!(!verified.period_sentence_semantics_verified);
+        assert!(verified.period_sentence_semantics_verified);
         assert_eq!(verified.total_beats, decoded.composed_score.total_beats);
         assert_eq!(verified.receipt_sha256, decoded.receipt_sha256);
+    }
+
+    #[test]
+    fn m1_receipt_rejects_period_sentence_fulfillment_without_typed_return_evidence_after_rehash() {
+        let mut result =
+            realize_classical_to_minimalism_m1(m1_intent(M1_SHARED_AROUSAL)).unwrap();
+        let fulfillment = result.segments[0]
+            .grammar_trace
+            .obligation_transitions
+            .iter_mut()
+            .find(|item| {
+                item.obligation_id == "thematic-return-and-closure"
+                    && item.to == AssertedObligationState::Fulfilled
+            })
+            .expect("Classical segment must retain its Period/Sentence return fulfillment");
+        fulfillment.definition = None;
+        result.segments[0].evidence_sha256 =
+            segment_evidence_sha256_v1(&result.segments[0]).unwrap();
+        result.receipt_sha256 = m1_receipt_sha256_v1(&result).unwrap();
+
+        let error = verify_classical_to_minimalism_m1_receipt_v1(&result).unwrap_err();
+        assert!(matches!(
+            error,
+            StyleTrajectoryM1Error::IndependentTraceVerificationFailed { .. }
+                | StyleTrajectoryM1Error::UnexpectedGrammarEvidence { .. }
+        ));
+    }
+
+    #[test]
+    fn m1_receipt_rejects_unresolved_period_sentence_return_after_rehash() {
+        let mut result =
+            realize_classical_to_minimalism_m1(m1_intent(M1_SHARED_AROUSAL)).unwrap();
+        let transition = result.segments[0]
+            .grammar_trace
+            .obligation_transitions
+            .iter_mut()
+            .find(|item| {
+                item.obligation_id == "thematic-return-and-closure"
+                    && item.to == AssertedObligationState::Fulfilled
+            })
+            .expect("Classical segment must retain its Period/Sentence return fulfillment");
+        transition.to = AssertedObligationState::Unresolved;
+        result.segments[0].evidence_sha256 =
+            segment_evidence_sha256_v1(&result.segments[0]).unwrap();
+        result.receipt_sha256 = m1_receipt_sha256_v1(&result).unwrap();
+
+        let error = verify_classical_to_minimalism_m1_receipt_v1(&result).unwrap_err();
+        assert!(matches!(
+            error,
+            StyleTrajectoryM1Error::IndependentTraceVerificationFailed { .. }
+                | StyleTrajectoryM1Error::UnexpectedGrammarEvidence { .. }
+        ));
+    }
+
+    #[test]
+    fn m1_receipt_rejects_post_fulfillment_obligation_transition_after_rehash() {
+        let mut result =
+            realize_classical_to_minimalism_m1(m1_intent(M1_SHARED_AROUSAL)).unwrap();
+        let mut deferred = result.segments[0]
+            .grammar_trace
+            .obligation_transitions
+            .iter()
+            .find(|item| {
+                item.obligation_id == "thematic-return-and-closure"
+                    && item.to == AssertedObligationState::Fulfilled
+            })
+            .expect("Classical segment must retain its Period/Sentence return fulfillment")
+            .clone();
+        deferred.from = Some(AssertedObligationState::Fulfilled);
+        deferred.to = AssertedObligationState::Deferred;
+        deferred.evidence.clear();
+        deferred.responsible_pass = "post-fulfillment-mutation-control".into();
+        result.segments[0]
+            .grammar_trace
+            .obligation_transitions
+            .push(deferred);
+        // Preserve a valid independently recomputed Analyst report: the
+        // extra transition is lifecycle-continuous and must be rejected by
+        // the M1 rule that requires exactly Created -> Fulfilled.
+        let intent = result.intent.expect("M1 receipt must retain its intent");
+        let classical_score = result.segments[0].score.clone();
+        let classical_trace = result.segments[0].grammar_trace.clone();
+        result.segments[0].trace_verification = verify_trace_independently(
+            Style::Classical,
+            &intent,
+            &classical_score,
+            &classical_trace,
+        )
+        .expect("the extra deferred transition is structurally lifecycle-continuous");
+        result.segments[0].evidence_sha256 =
+            segment_evidence_sha256_v1(&result.segments[0]).unwrap();
+        result.receipt_sha256 = m1_receipt_sha256_v1(&result).unwrap();
+
+        let error = verify_classical_to_minimalism_m1_receipt_v1(&result).unwrap_err();
+        assert!(matches!(
+            error,
+            StyleTrajectoryM1Error::UnexpectedGrammarEvidence { .. }
+                | StyleTrajectoryM1Error::IndependentTraceVerificationFailed { .. }
+        ));
+    }
+
+    #[test]
+    fn m1_receipt_rejects_unresolvable_return_source_identity_after_rehash() {
+        let mut result =
+            realize_classical_to_minimalism_m1(m1_intent(M1_SHARED_AROUSAL)).unwrap();
+        for transition in &mut result.segments[0].grammar_trace.obligation_transitions {
+            if transition.obligation_id == "thematic-return-and-closure"
+                && (transition.to == AssertedObligationState::Created
+                    || transition.to == AssertedObligationState::Fulfilled)
+            {
+                let source = transition
+                    .source_evidence
+                    .first_mut()
+                    .expect("typed return transition must retain source evidence");
+                source.role_index = usize::MAX;
+            }
+        }
+        result.segments[0].evidence_sha256 =
+            segment_evidence_sha256_v1(&result.segments[0]).unwrap();
+        result.receipt_sha256 = m1_receipt_sha256_v1(&result).unwrap();
+
+        let error = verify_classical_to_minimalism_m1_receipt_v1(&result).unwrap_err();
+        assert!(matches!(
+            error,
+            StyleTrajectoryM1Error::IndependentTraceVerificationFailed { .. }
+                | StyleTrajectoryM1Error::UnexpectedGrammarEvidence { .. }
+        ));
+    }
+
+    #[test]
+    fn m1_receipt_rejects_period_sentence_source_target_identity_overlap_after_rehash() {
+        let mut result =
+            realize_classical_to_minimalism_m1(m1_intent(M1_SHARED_AROUSAL)).unwrap();
+        let source = result.segments[0]
+            .grammar_trace
+            .obligation_transitions
+            .iter()
+            .find(|item| {
+                item.obligation_id == "thematic-return-and-closure"
+                    && item.to == AssertedObligationState::Created
+            })
+            .expect("Classical segment must retain the created return source")
+            .source_evidence
+            .clone();
+        let fulfilled = result.segments[0]
+            .grammar_trace
+            .obligation_transitions
+            .iter_mut()
+            .find(|item| {
+                item.obligation_id == "thematic-return-and-closure"
+                    && item.to == AssertedObligationState::Fulfilled
+            })
+            .expect("Classical segment must retain the fulfilled return target");
+        fulfilled.evidence = source;
+        fulfilled.source_evidence = fulfilled.evidence.clone();
+        result.segments[0].evidence_sha256 =
+            segment_evidence_sha256_v1(&result.segments[0]).unwrap();
+        result.receipt_sha256 = m1_receipt_sha256_v1(&result).unwrap();
+
+        let error = verify_classical_to_minimalism_m1_receipt_v1(&result).unwrap_err();
+        assert!(matches!(
+            error,
+            StyleTrajectoryM1Error::IndependentTraceVerificationFailed { .. }
+                | StyleTrajectoryM1Error::UnexpectedGrammarEvidence { .. }
+        ));
     }
 
     #[test]
