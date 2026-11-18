@@ -806,8 +806,8 @@ mod tests {
                 "treatment_state":"as_manufactured"
             },
             "feature_catalog":[
-                {"feature_ref":"forearm_panel","feature_kind":"panel","nominal_geometry_ref":"CAD-PANEL-001","nominal_revision_ref":"CAD-REV-A","mandatory":true,"required_metric_ids":["panel_surface_deviation_mm"],"minimum_coverage_fraction":0.95,"acceptance_rule_ref":"PANEL-ACCEPTANCE-01"},
-                {"feature_ref":"elbow_seam","feature_kind":"connection","nominal_geometry_ref":"SEAM-CURVE-001","nominal_revision_ref":"TOPOLOGY-REV-A","mandatory":true,"required_metric_ids":["seam_path_deviation_mm"],"minimum_coverage_fraction":0.98,"acceptance_rule_ref":"SEAM-ACCEPTANCE-01"}
+                {"feature_ref":"forearm_panel","feature_kind":"panel","nominal_geometry_ref":"CAD-PANEL-001","nominal_revision_ref":"CAD-REV-A","mandatory":true,"required_metrics":[{"metric_id":"panel_surface_deviation_mm","unit":"mm","lower_limit":0.0,"upper_limit":1.0}],"minimum_coverage_fraction":0.95,"acceptance_rule_ref":"PANEL-ACCEPTANCE-01"},
+                {"feature_ref":"elbow_seam","feature_kind":"connection","nominal_geometry_ref":"SEAM-CURVE-001","nominal_revision_ref":"TOPOLOGY-REV-A","mandatory":true,"required_metrics":[{"metric_id":"seam_path_deviation_mm","unit":"mm","lower_limit":0.0,"upper_limit":2.0}],"minimum_coverage_fraction":0.98,"acceptance_rule_ref":"SEAM-ACCEPTANCE-01"}
             ],
             "measurement_session":null,
             "observations":[],
@@ -1105,7 +1105,9 @@ mod tests {
     #[test]
     fn post_cleaning_dimensional_change_uses_percent_units() {
         let mut manifest = base_manifest();
-        manifest["feature_catalog"][0]["required_metric_ids"] = json!(["post_cleaning_dimensional_change_pct"]);
+        manifest["feature_catalog"][0]["required_metrics"] = json!([{
+            "metric_id":"post_cleaning_dimensional_change_pct","unit":"%","lower_limit":-2.0,"upper_limit":2.0
+        }]);
         make_measured(&mut manifest);
         manifest["observations"][0]["metric_id"] = json!("post_cleaning_dimensional_change_pct");
         manifest["observations"][0]["unit"] = json!("%");
@@ -1114,6 +1116,53 @@ mod tests {
         manifest["observations"][0]["upper_limit"] = json!(2.0);
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.is_valid(), "{:?}", report.findings);
+    }
+
+    #[test]
+    fn observation_cannot_widen_frozen_feature_acceptance_limits() {
+        let mut manifest = base_manifest();
+        make_measured(&mut manifest);
+        manifest["observations"][0]["upper_limit"] = json!(5.0);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "measurement_acceptance_rule_mismatch"));
+    }
+
+    #[test]
+    fn registration_fit_and_holdout_datums_must_be_disjoint() {
+        let mut manifest = base_manifest();
+        make_measured(&mut manifest);
+        manifest["measurement_session"]["fit_datum_refs"] = json!(["FIT-DATUM-01","HOLDOUT-DATUM-01"]);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "registration_fit_holdout_overlap"));
+    }
+
+    #[test]
+    fn every_holdout_datum_requires_its_own_residual_record() {
+        let mut manifest = base_manifest();
+        make_measured(&mut manifest);
+        manifest["measurement_session"]["holdout_datum_residuals"].as_array_mut().unwrap().pop();
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "holdout_residual_coverage_incomplete"));
+    }
+
+    #[test]
+    fn holdout_residual_plus_uncertainty_must_fit_registration_limit() {
+        let mut manifest = base_manifest();
+        make_measured(&mut manifest);
+        manifest["measurement_session"]["holdout_datum_residuals"][0]["residual_mm"] = json!(0.46);
+        manifest["measurement_session"]["holdout_datum_residuals"][0]["expanded_uncertainty_mm"] = json!(0.06);
+        manifest["measurement_session"]["observed_holdout_residual_mm"] = json!(0.46);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "holdout_residual_guard_band_exceeded"));
+    }
+
+    #[test]
+    fn every_mandatory_feature_is_excluded_from_registration_fit() {
+        let mut manifest = base_manifest();
+        make_measured(&mut manifest);
+        manifest["measurement_session"]["excluded_roi_feature_refs"] = json!(["forearm_panel"]);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "mandatory_feature_not_excluded_from_registration"));
     }
 
     #[test]
