@@ -344,7 +344,7 @@ fn derive_correctness_id(
         owned.push(mismatch.observed.to_be_bytes().to_vec());
     }
     ContentId::derive(
-        "symthaea.hdc-hamming-correctness.v1",
+        "symthaea.hdc-hamming-correctness.v2",
         owned.iter().map(Vec::as_slice),
     )
 }
