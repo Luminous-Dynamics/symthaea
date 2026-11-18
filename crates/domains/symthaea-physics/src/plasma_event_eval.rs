@@ -8,7 +8,8 @@
 //! from a test set, or authorize machine actions.
 
 use crate::plasma_observability::{
-    BlockedChannel, DecisionChannelRequirement, DecisionInputGate, PlasmaObservationFrame,
+    BlockedChannel, CalibrationIdentity, DecisionChannelRequirement, DecisionInputGate,
+    PlasmaObservationFrame, PLASMA_OBSERVATION_SCHEMA,
 };
 use crate::plasma_cluster_bootstrap::{
     ShotClusterBootstrapPlan, SHOT_CLUSTER_BOOTSTRAP_RNG_ALGORITHM,
@@ -2094,10 +2095,16 @@ mod tests {
                 "symtropy.synthetic-waveform-replay"
             );
 
-            let (expected_frame, mut requirements) =
-                observation_frame(measured_disposition(frame.frame_time_ns), frame.frame_time_ns);
-            requirements[0].expected_units = "10^20 m^-3".to_owned();
-            let _ = expected_frame;
+            let requirements = vec![DecisionChannelRequirement {
+                channel_id: "density".to_owned(),
+                expected_units: "10^20 m^-3".to_owned(),
+                max_age_ns: 1_000_000,
+                allowed_source_ids: vec!["direct-source".to_owned()],
+                calibration: CalibrationIdentity {
+                    calibration_id: "direct-calibration".to_owned(),
+                    calibration_revision: "rev-1".to_owned(),
+                },
+            }];
 
             let expected_status = case["expected_status"]
                 .as_str()
@@ -2114,11 +2121,32 @@ mod tests {
             let gate = frame
                 .evaluate_decision_requirements(&requirements)
                 .expect("valid synthetic/unavailable/invalid frame");
-            assert!(
-                matches!(gate, DecisionInputGate::Abstain { .. }),
-                "case {} must never satisfy a direct-measurement gate",
-                case["case_id"]
-            );
+            let DecisionInputGate::Abstain {
+                blocked_channels, ..
+            } = gate
+            else {
+                panic!(
+                    "case {} must never satisfy a direct-measurement gate",
+                    case["case_id"]
+                );
+            };
+            assert_eq!(blocked_channels.len(), 1);
+            let reason = blocked_channels[0].reason;
+            match expected_status {
+                "synthetic" => assert_eq!(
+                    reason,
+                    crate::plasma_observability::AbstentionReason::SyntheticNotMeasurement
+                ),
+                "unavailable" => assert_eq!(
+                    reason,
+                    crate::plasma_observability::AbstentionReason::Unavailable
+                ),
+                "invalid" => assert_eq!(
+                    reason,
+                    crate::plasma_observability::AbstentionReason::Invalid
+                ),
+                _ => panic!("unexpected replay status {expected_status}"),
+            }
         }
     }
 
