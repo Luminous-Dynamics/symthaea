@@ -350,6 +350,8 @@ impl BytePredictor for ScmHybridPredictor {
 
 const EXPERT_MIXTURE_TOTAL_WEIGHT: u32 = 1 << 24;
 const EXPERT_COUNT: usize = 3;
+// Fixed-share hazard: 1/256 of posterior mass is redistributed equally per byte.
+const EXPERT_SHARE_TOTAL_WEIGHT: u32 = EXPERT_MIXTURE_TOTAL_WEIGHT / 256;
 
 fn normalize_expert_cdf(cdf: &ByteCdf) -> [u32; BYTE_SYMBOLS] {
     let total = cdf[BYTE_SYMBOLS] as u64;
@@ -452,7 +454,43 @@ fn update_expert_weights(
     for &i in order.iter().take(leftover) {
         posterior[i] += 1;
     }
-    posterior
+
+    // Fixed-share switching gives every expert fresh probability mass at each
+    // byte. This avoids permanent lock-in after a long run of one expert while
+    // keeping all weights decoder-synchronous and integer deterministic.
+    let retained_total = EXPERT_MIXTURE_TOTAL_WEIGHT - EXPERT_SHARE_TOTAL_WEIGHT;
+    let share_base = EXPERT_SHARE_TOTAL_WEIGHT / EXPERT_COUNT as u32;
+    let share_remainder = EXPERT_SHARE_TOTAL_WEIGHT % EXPERT_COUNT as u32;
+    let mut shared = [share_base; EXPERT_COUNT];
+    let mut share_remainders = [0u64; EXPERT_COUNT];
+    let mut retained_assigned = 0u64;
+    for i in 0..EXPERT_COUNT {
+        let scaled = posterior[i] as u64 * retained_total as u64;
+        let retained = scaled / EXPERT_MIXTURE_TOTAL_WEIGHT as u64;
+        share_remainders[i] = scaled % EXPERT_MIXTURE_TOTAL_WEIGHT as u64;
+        shared[i] += retained as u32;
+        if i < share_remainder as usize {
+            shared[i] += 1;
+        }
+        retained_assigned += retained;
+    }
+    let missing = (EXPERT_MIXTURE_TOTAL_WEIGHT as u64
+        - shared.iter().map(|&weight| weight as u64).sum::<u64>()) as usize;
+    let mut share_order = [0usize, 1, 2];
+    share_order.sort_unstable_by(|left, right| {
+        share_remainders[*right]
+            .cmp(&share_remainders[*left])
+            .then_with(|| left.cmp(right))
+    });
+    for &i in share_order.iter().take(missing) {
+        shared[i] += 1;
+    }
+    debug_assert_eq!(
+        shared.iter().map(|&weight| weight as u64).sum::<u64>(),
+        EXPERT_MIXTURE_TOTAL_WEIGHT as u64
+    );
+    debug_assert!(retained_assigned <= retained_total as u64);
+    shared
 }
 
 /// Decoder-synchronous Bayesian mixture of typed-field, temporal-lag and
