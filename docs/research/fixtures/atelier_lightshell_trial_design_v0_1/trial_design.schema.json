@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/lightshell-trial-design-0.1.0.json",
+  "title": "Atelier Lightshell Pre-registered Trial Design",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "campaign_id", "target_qualification_campaign_ref", "state",
+    "design_mode", "frozen_before_first_run", "preregistration_ref", "preregistered_at",
+    "protocol_digest", "condition_ids", "incumbent_comparator_ref", "strata",
+    "allocation_policy", "reset_policy", "drift_policy", "blocks", "independent_review"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "campaign_id": { "type": "string", "minLength": 1 },
+    "target_qualification_campaign_ref": { "type": "string", "minLength": 1 },
+    "state": { "enum": ["proposed", "observed", "adjudicated"] },
+    "design_mode": { "const": "randomized_counterbalanced_within_robot" },
+    "frozen_before_first_run": { "type": "boolean" },
+    "preregistration_ref": { "type": "string", "minLength": 1 },
+    "preregistered_at": { "type": "string", "format": "date-time" },
+    "protocol_digest": { "$ref": "#/$defs/digest" },
+    "condition_ids": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": { "enum": ["baseline_uncovered", "incumbent_cover", "lightshell_installed"] }
+    },
+    "incumbent_comparator_ref": { "type": ["string", "null"] },
+    "strata": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/stratum" }
+    },
+    "allocation_policy": { "$ref": "#/$defs/allocationPolicy" },
+    "reset_policy": { "$ref": "#/$defs/resetPolicy" },
+    "drift_policy": { "$ref": "#/$defs/driftPolicy" },
+    "blocks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/block" }
+    },
+    "independent_review": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/independentReview" }
+      ]
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-fA-F]{64}$"
+    },
+    "stratum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stratum_id", "robot_serial", "firmware_revision",
+        "robot_configuration_digest", "tool_payload_digest",
+        "mission_profile_ref", "environment_stratum_ref", "minimum_blocks"
+      ],
+      "properties": {
+        "stratum_id": { "type": "string", "minLength": 1 },
+        "robot_serial": { "type": "string", "minLength": 1 },
+        "firmware_revision": { "type": "string", "minLength": 1 },
+        "robot_configuration_digest": { "$ref": "#/$defs/digest" },
+        "tool_payload_digest": { "$ref": "#/$defs/digest" },
+        "mission_profile_ref": { "type": "string", "minLength": 1 },
+        "environment_stratum_ref": { "type": "string", "minLength": 1 },
+        "minimum_blocks": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "allocationPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm_ref", "seed_commitment_sha256", "seed_reveal_ref",
+        "allocation_custodian_ref", "allocation_method_ref",
+        "locked_before_outcomes", "no_outcome_adaptive_reassignment"
+      ],
+      "properties": {
+        "algorithm_ref": { "type": "string", "minLength": 1 },
+        "seed_commitment_sha256": { "$ref": "#/$defs/digest" },
+        "seed_reveal_ref": { "type": ["string", "null"] },
+        "allocation_custodian_ref": { "type": "string", "minLength": 1 },
+        "allocation_method_ref": { "type": "string", "minLength": 1 },
+        "locked_before_outcomes": { "type": "boolean" },
+        "no_outcome_adaptive_reassignment": { "type": "boolean" }
+      }
+    },
+    "resetPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reset_procedure_ref", "stabilization_rule_ref",
+        "reset_before_every_period", "carryover_check_between_periods"
+      ],
+      "properties": {
+        "reset_procedure_ref": { "type": "string", "minLength": 1 },
+        "stabilization_rule_ref": { "type": "string", "minLength": 1 },
+        "reset_before_every_period": { "type": "boolean" },
+        "carryover_check_between_periods": { "type": "boolean" }
+      }
+    },
+    "driftPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sentinel_metric_id", "maximum_abs_drift",
+        "uncertainty_guarded", "start_end_measurements_required"
+      ],
+      "properties": {
+        "sentinel_metric_id": { "type": "string", "minLength": 1 },
+        "maximum_abs_drift": { "type": "number", "exclusiveMinimum": 0 },
+        "uncertainty_guarded": { "const": true },
+        "start_end_measurements_required": { "const": true }
+      }
+    },
+    "resetCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["disposition", "evidence_ref", "rule_ref"],
+      "properties": {
+        "disposition": { "enum": ["passed", "failed", "unknown"] },
+        "evidence_ref": { "type": "string", "minLength": 1 },
+        "rule_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "carryoverCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["disposition", "evidence_ref", "rule_ref"],
+      "properties": {
+        "disposition": { "enum": ["passed", "failed", "unknown"] },
+        "evidence_ref": { "type": "string", "minLength": 1 },
+        "rule_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "period": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "period_index", "condition_id", "linked_system_run_ref",
+        "reset_before", "carryover_check"
+      ],
+      "properties": {
+        "period_index": { "type": "integer", "minimum": 0 },
+        "condition_id": { "enum": ["baseline_uncovered", "incumbent_cover", "lightshell_installed"] },
+        "linked_system_run_ref": { "type": ["string", "null"] },
+        "reset_before": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/resetCheck" }] },
+        "carryover_check": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/carryoverCheck" }] }
+      }
+    },
+    "driftCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_value", "end_value", "expanded_uncertainty",
+        "start_evidence_ref", "end_evidence_ref"
+      ],
+      "properties": {
+        "start_value": { "type": "number" },
+        "end_value": { "type": "number" },
+        "expanded_uncertainty": { "type": "number", "minimum": 0 },
+        "start_evidence_ref": { "type": "string", "minLength": 1 },
+        "end_evidence_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "block_id", "stratum_id", "sequence_id", "allocation_receipt_ref",
+        "periods", "drift_check", "block_evidence_ref"
+      ],
+      "properties": {
+        "block_id": { "type": "string", "minLength": 1 },
+        "stratum_id": { "type": "string", "minLength": 1 },
+        "sequence_id": { "type": "string", "minLength": 1 },
+        "allocation_receipt_ref": { "type": "string", "minLength": 1 },
+        "periods": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/period" }
+        },
+        "drift_check": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/driftCheck" }] },
+        "block_evidence_ref": { "type": ["string", "null"] }
+      }
+    },
+    "independentReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["disposition", "reviewer_ref", "reviewed_at", "review_record_ref"],
+      "properties": {
+        "disposition": { "enum": ["admit", "reject"] },
+        "reviewer_ref": { "type": "string", "minLength": 1 },
+        "reviewed_at": { "type": "string", "format": "date-time" },
+        "review_record_ref": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
