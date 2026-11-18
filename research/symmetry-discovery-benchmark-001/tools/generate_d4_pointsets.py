@@ -47,6 +47,20 @@ def point_set_key(points):
     return tuple(sorted((int(point[0]), int(point[1])) for point in points))
 
 
+def opaque_case_id(points):
+    """Stable ID derived from canonical geometry, not target subgroup metadata."""
+    payload = json.dumps(
+        [list(point) for point in points],
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    value = 0xCBF29CE484222325
+    for byte in payload:
+        value ^= byte
+        value = (value * 0x100000001B3) & 0xFFFFFFFFFFFFFFFF
+    return f"CASE-{value:016x}"
+
+
 def exact_stabilizer(points, elements):
     point_set = set(points)
     return sorted(
@@ -65,7 +79,7 @@ def generate_cases(base_fixture):
     hand_authored = [
         {**case, "split": case.get("split", "fixture_sanity")}
         for case in base_fixture["cases"]
-        if not case["case_id"].startswith("GENERATED-")
+        if not case.get("controls", {}).get("generated", False)
     ]
     seen = {
         point_set_key(case["geometry"]["points"])
@@ -119,9 +133,7 @@ def generate_cases(base_fixture):
             )
             generated.append(
                 {
-                    "case_id": (
-                        f"GENERATED-{subgroup_label}-{index + 1:02d}"
-                    ),
+                    "case_id": opaque_case_id(points),
                     "split": split,
                     "track": "exact_finite_structural_stabilizer",
                     "geometry": {
@@ -182,7 +194,7 @@ def main():
     current = [
         case
         for case in fixture["cases"]
-        if case["case_id"].startswith("GENERATED-")
+        if case.get("controls", {}).get("generated", False)
     ]
     if current != generated:
         raise SystemExit("D4_GENERATOR_MISMATCH: regenerate with --write")
