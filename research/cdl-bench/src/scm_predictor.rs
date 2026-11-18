@@ -593,8 +593,9 @@ fn update_expert_weights(
 /// known-parent SCM byte experts. The posterior weights are updated from the
 /// likelihood of each decoded byte, with a positive integer floor so a weak
 /// expert can recover after a regime change. No expert-selection symbols are
-/// transmitted. The parent expert receives the known SCM topology and is an
-/// oracle control, not a learned causal model. Model ID 7.
+/// transmitted. A 1/256 fixed-share update per byte preserves adaptation
+/// capacity after expert weights fall. The parent expert receives the known
+/// SCM topology and is an oracle control, not a learned causal model. Model ID 7.
 pub struct ScmExpertMixturePredictor {
     state: ScmMixtureState,
     weights: [u32; EXPERT_COUNT],
@@ -903,5 +904,6 @@ mod tests {
         assert!(ScmHybridPredictor::state_bytes() > 0);
         assert!(ScmShuffledParentPredictor::state_bytes() > 0);
         assert!(ScmExpertMixturePredictor::state_bytes() > ScmLagPredictor::state_bytes());
+        assert!(ScmExpertMixturePredictor::state_bytes() < 2 * std::mem::size_of::<StructuredState>());
     }
 }
