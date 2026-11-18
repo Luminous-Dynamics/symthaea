@@ -1915,6 +1915,462 @@
           ]
         }
       ]
+    },
+    {
+      "entry_id": "hansgrohe-activera-waterboost-28036000",
+      "subject": {
+        "type": "product",
+        "id": "hansgrohe.activera-select-s.waterboost.28036000",
+        "name": "Activera Select S Hand Shower 95 2jet EcoSmart+ with WaterBoost",
+        "manufacturer": "Hansgrohe",
+        "sku": "28036000",
+        "market": "South Africa",
+        "revision": null
+      },
+      "claims": [
+        {
+          "claim_id": "hansgrohe.28036000.rain.base-flow",
+          "parameter": "flow_rate",
+          "original_value": "2.9 L/min Rain at 3 bar",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 2.9,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "Rain",
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Manufacturer product-page declaration",
+            "sample_count": null,
+            "pressure_datum": "manufacturer nominal 3 bar",
+            "unknown_conditions": [
+              "independent laboratory replication",
+              "temperature profile",
+              "sample count",
+              "boost duration and total permitted activation time"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Exact SKU and base spray mode are stated; this is not an independent matched result."
+          },
+          "limitations": [
+            "Keep base Rain separate from boosted Rain."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28036000.impactrain.base-flow",
+          "parameter": "flow_rate",
+          "original_value": "2.9 L/min ImpactRain at 3 bar",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 2.9,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "ImpactRain",
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Manufacturer product-page declaration",
+            "sample_count": null,
+            "pressure_datum": "manufacturer nominal 3 bar",
+            "unknown_conditions": [
+              "independent laboratory replication",
+              "temperature profile",
+              "sample count",
+              "boost duration and total permitted activation time"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Exact SKU and base spray mode are stated; this is not an independent matched result."
+          },
+          "limitations": [
+            "Keep base ImpactRain separate from boosted ImpactRain."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28036000.impactrain.boost-flow",
+          "parameter": "flow_rate",
+          "original_value": "6.6 L/min ImpactRain + Booster at 3 bar",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 6.6,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "ImpactRain + Booster",
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Manufacturer product-page declaration",
+            "sample_count": null,
+            "pressure_datum": "manufacturer nominal 3 bar",
+            "unknown_conditions": [
+              "independent laboratory replication",
+              "temperature profile",
+              "sample count",
+              "boost duration and total permitted activation time"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "not_eligible_until_reproduced",
+            "reason": "Manufacturer declares a mode-specific boosted flow."
+          },
+          "limitations": [
+            "Boost activation is described as press-and-hold; published maximum/regulator scope is ambiguous.",
+            "Boost duration and all-in task burden are not supplied."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28036000.rain.boost-flow",
+          "parameter": "flow_rate",
+          "original_value": "9.4 L/min Rain + Booster at 3 bar",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 9.4,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "Rain + Booster",
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Manufacturer product-page declaration",
+            "sample_count": null,
+            "pressure_datum": "manufacturer nominal 3 bar",
+            "unknown_conditions": [
+              "independent laboratory replication",
+              "temperature profile",
+              "sample count",
+              "boost duration and total permitted activation time"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "not_eligible_until_reproduced",
+            "reason": "Manufacturer declares a mode-specific boosted flow."
+          },
+          "limitations": [
+            "Boost activation is described as press-and-hold; published maximum/regulator scope is ambiguous.",
+            "Boost duration and all-in task burden are not supplied."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28036000.flow-regulator",
+          "parameter": "flow_regulator_setting",
+          "original_value": "Flow regulator 4 L/min (possible tolerances −20%)",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 4,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Manufacturer product-page declaration",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "pressure condition for regulator value",
+              "independent measurement of tolerance"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Manufacturer declaration of regulator setting."
+          },
+          "limitations": [
+            "Do not assume this figure governs or excludes WaterBoost without clarification; possible tolerance is stated separately."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28036000.maximum-flow",
+          "parameter": "maximum_flow_rate",
+          "original_value": "Maximum flow rate 4 L/min at 3 bar",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 4,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Manufacturer product-page declaration",
+            "sample_count": null,
+            "pressure_datum": "manufacturer nominal 3 bar",
+            "unknown_conditions": [
+              "independent laboratory replication",
+              "temperature profile",
+              "sample count",
+              "boost duration and total permitted activation time"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "not_eligible_until_reproduced",
+            "reason": "Manufacturer's product page lists a 4 L/min maximum while the same page lists boosted mode flows of 6.6 and 9.4 L/min."
+          },
+          "limitations": [
+            "Scope of the stated maximum relative to WaterBoost is not explained; preserve as an unresolved manufacturer specification ambiguity."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28036000.minimum-pressure",
+          "parameter": "minimum_operating_pressure",
+          "original_value": "Minimum flow pressure 0.8 bar",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 80,
+            "unit": "kPa"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "derived",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Manufacturer product-page declaration",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "flow and spray performance at exactly 0.8 bar",
+              "pressure measurement datum",
+              "complete upper operating range"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Manufacturer-declared minimum flow pressure converted to kPa."
+          },
+          "limitations": [
+            "Not independent task-performance evidence; pressure datum is not detailed on the page."
+          ],
+          "derivation": {
+            "formula": "bar × 100 = kPa",
+            "inputs": [
+              "0.8 bar"
+            ],
+            "assumptions": [
+              "Exact unit conversion."
+            ]
+          }
+        },
+        {
+          "claim_id": "hansgrohe.28036000.function-from",
+          "parameter": "minimum_function_flow",
+          "original_value": "Function from 3 L/min",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 3,
+            "unit": "L/min"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Manufacturer product-page declaration",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "pressure condition for function onset"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Manufacturer feature-onset statement, not task success."
+          },
+          "limitations": [
+            "Do not treat the function-onset number as proof of non-inferior task quality."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28036000.waterboost-feature",
+          "parameter": "task_selective_boost_feature",
+          "original_value": "WaterBoost: press and hold side boost button to temporarily increase hand-shower water flow",
+          "canonical_value": {
+            "kind": "text",
+            "text": "User-held side button temporarily increases flow; release ends the boost request"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "User-held boost",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Manufacturer product-page declaration",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "quantitative boost duration",
+              "boost flow at pressures other than 3 bar"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Commercial precedent for an explicitly user-held temporary flow increase."
+          },
+          "limitations": [
+            "The product page does not state a quantitative boost-duration limit or complete-task water saving result."
+          ]
+        },
+        {
+          "claim_id": "hansgrohe.28036000.specification-scope-ambiguity",
+          "parameter": "manufacturer_specification_scope_ambiguity",
+          "original_value": "Same product page states 4 L/min flow regulator / maximum flow at 3 bar and also lists boosted modes at 6.6 and 9.4 L/min",
+          "canonical_value": {
+            "kind": "text",
+            "text": "Unresolved scope ambiguity: the relationship between the stated 4 L/min regulator / maximum and the separately listed boosted mode flows is not explained on the page."
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Manufacturer product-page declaration",
+            "sample_count": null,
+            "pressure_datum": "manufacturer nominal 3 bar",
+            "unknown_conditions": [
+              "independent laboratory replication",
+              "temperature profile",
+              "sample count",
+              "boost duration and total permitted activation time"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000",
+            "publisher": "Hansgrohe South Africa",
+            "source_type": "manufacturer_datasheet",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "not_eligible_until_reproduced",
+            "reason": "This is a documentation-scope ambiguity that must be clarified or independently reproduced; it is not resolved by assuming the boost bypasses the limiter."
+          },
+          "limitations": [
+            "Do not select an assumed interpretation for benchmark scoring.",
+            "Physical comparator use requires exact SKU verification and recorded manual/boost state."
+          ]
+        }
+      ]
     }
   ]
 }
