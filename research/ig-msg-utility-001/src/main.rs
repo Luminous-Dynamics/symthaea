@@ -37,7 +37,6 @@ struct EvidenceAtom {
     freshness: String,
     uncertainty: String,
     authorized: bool,
-    required: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
