@@ -1,0 +1,358 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:lightshell-method-applicability:0.1.0",
+  "title": "Atelier Lightshell Test Method Applicability",
+  "description": "Checks textile test-method edition, scope, specimen, surface and fixture compatibility. Not a standards implementation or certification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "state",
+    "specimens",
+    "method_profiles",
+    "selections",
+    "evidence_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "proposed",
+        "method_review",
+        "ready_for_test"
+      ]
+    },
+    "specimens": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "specimen_id",
+          "candidate_id",
+          "construction_class",
+          "seam_geometry",
+          "thickness_mm"
+        ],
+        "properties": {
+          "specimen_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "candidate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "construction_class": {
+            "enum": [
+              "woven_or_knit",
+              "nonwoven",
+              "coated_laminated",
+              "3d_spacer",
+              "made_up_article",
+              "integrated_assembly",
+              "unknown"
+            ]
+          },
+          "seam_geometry": {
+            "enum": [
+              "not_applicable",
+              "straight",
+              "curved"
+            ]
+          },
+          "thickness_mm": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    },
+    "method_profiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "profile_id",
+          "profile_kind",
+          "method_id",
+          "edition",
+          "test_family",
+          "metadata_source_ref",
+          "metadata_state"
+        ],
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "profile_kind": {
+            "enum": [
+              "international_standard",
+              "internal_protocol"
+            ]
+          },
+          "method_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "edition": {
+            "type": "string",
+            "minLength": 1
+          },
+          "test_family": {
+            "enum": [
+              "seam_tensile",
+              "abrasion",
+              "airflow",
+              "cleaning_retention"
+            ]
+          },
+          "metadata_source_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "metadata_state": {
+            "enum": [
+              "verified_current_metadata",
+              "superseded",
+              "review_pending",
+              "internal_validation_pending",
+              "internal_validated"
+            ]
+          }
+        }
+      }
+    },
+    "selections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "selection_id",
+          "specimen_id",
+          "profile_id",
+          "test_family",
+          "selected_surface",
+          "fixture_class",
+          "fixture_ref",
+          "fixture_revision",
+          "fixture_validation_state",
+          "fixture_validation_ref",
+          "state",
+          "execution_mode",
+          "approved_deviation_ref",
+          "internal_method_validation_ref",
+          "protocol_ref",
+          "acceptance_rule_ref",
+          "cleaning_profile"
+        ],
+        "properties": {
+          "selection_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "specimen_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "profile_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "test_family": {
+            "enum": [
+              "seam_tensile",
+              "abrasion",
+              "airflow",
+              "cleaning_retention"
+            ]
+          },
+          "selected_surface": {
+            "enum": [
+              "seam",
+              "uncoated_surface",
+              "coated_surface",
+              "through_thickness",
+              "whole_article"
+            ]
+          },
+          "fixture_class": {
+            "enum": [
+              "cre_tensile",
+              "martindale_uncoated",
+              "martindale_coated",
+              "air_permeability",
+              "spacer_airflow_adapter",
+              "washing_machine",
+              "custom"
+            ]
+          },
+          "fixture_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fixture_revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fixture_validation_state": {
+            "enum": [
+              "unknown",
+              "pending",
+              "qualified_generic",
+              "qualified_spacer",
+              "qualified_coated",
+              "qualified_article"
+            ]
+          },
+          "fixture_validation_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "enum": [
+              "proposed",
+              "ready_for_test",
+              "rejected"
+            ]
+          },
+          "execution_mode": {
+            "enum": [
+              "normative_unmodified",
+              "modified_with_deviation",
+              "internal_protocol"
+            ]
+          },
+          "approved_deviation_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "internal_method_validation_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "protocol_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "acceptance_rule_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cleaning_profile": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "service_class",
+              "machine_type",
+              "detergent_ref",
+              "wash_procedure_ref",
+              "drying_procedure_ref",
+              "cycles"
+            ],
+            "properties": {
+              "service_class": {
+                "enum": [
+                  "domestic_wash",
+                  "industrial_wash",
+                  "robot_cleaning",
+                  "chemical_wipe"
+                ]
+              },
+              "machine_type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "detergent_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "wash_procedure_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "drying_procedure_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "cycles": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "evidence_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "standard_edition_is_exact",
+        "known_scope_exclusions_fail_closed",
+        "spacer_fixture_validation_required",
+        "modified_methods_are_not_standard_conformance",
+        "internal_methods_are_not_iso_methods"
+      ],
+      "properties": {
+        "standard_edition_is_exact": {
+          "const": true
+        },
+        "known_scope_exclusions_fail_closed": {
+          "const": true
+        },
+        "spacer_fixture_validation_required": {
+          "const": true
+        },
+        "modified_methods_are_not_standard_conformance": {
+          "const": true
+        },
+        "internal_methods_are_not_iso_methods": {
+          "const": true
+        }
+      }
+    }
+  }
+}
