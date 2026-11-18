@@ -778,10 +778,16 @@ impl Display for PressureRetentionError {
                 write!(f, "pressure-response observations use different protocol revisions")
             }
             Self::PressureEnvelopeMismatch => {
-                write!(f, "pressure-response observations use different test-article rating evidence")
+                write!(
+                    f,
+                    "pressure-response observations use different test-article rating evidence"
+                )
             }
             Self::ProductDeclarationMismatch => {
-                write!(f, "pressure-response observations use different product pressure declarations")
+                write!(
+                    f,
+                    "pressure-response observations use different product pressure declarations"
+                )
             }
             Self::InstrumentMismatch => {
                 write!(f, "pressure-response observations use different instrument identities")
@@ -1087,4 +1093,87 @@ mod retention_tests {
             Err(PressureRetentionError::ReferenceFlowUncertaintyDominates)
         );
     }
+
+    #[test]
+    fn rejects_different_product_variant_and_geometry() {
+        let low = observation("run-150", 150.0, 4.0);
+        let mut high = observation("run-300", 300.0, 5.0);
+        high.market_variant_id = "different-sku".to_owned();
+        assert_eq!(
+            compare_flow_retention(&low, &high, 0.60),
+            Err(PressureRetentionError::ProductVariantMismatch)
+        );
+
+        high.market_variant_id = low.market_variant_id.clone();
+        high.geometry_sha256 = digest('9');
+        assert_eq!(
+            compare_flow_retention(&low, &high, 0.60),
+            Err(PressureRetentionError::GeometryMismatch)
+        );
+    }
+
+    #[test]
+    fn rejects_protocol_rating_and_instrument_mismatches() {
+        let low = observation("run-150", 150.0, 4.0);
+        let mut high = observation("run-300", 300.0, 5.0);
+        high.protocol_sha256 = digest('8');
+        assert_eq!(
+            compare_flow_retention(&low, &high, 0.60),
+            Err(PressureRetentionError::ProtocolMismatch)
+        );
+
+        high = observation("run-300", 300.0, 5.0);
+        high.pressure_envelope.maximum_kpa = 500.0;
+        assert_eq!(
+            compare_flow_retention(&low, &high, 0.60),
+            Err(PressureRetentionError::PressureEnvelopeMismatch)
+        );
+
+        high = observation("run-300", 300.0, 5.0);
+        high.flow_instrument_id = "flow-02".to_owned();
+        assert_eq!(
+            compare_flow_retention(&low, &high, 0.60),
+            Err(PressureRetentionError::InstrumentMismatch)
+        );
+    }
+
+    #[test]
+    fn rejects_different_manufacturer_pressure_declarations() {
+        let low = observation("run-150", 150.0, 4.0);
+        let mut high = observation("run-300", 300.0, 5.0);
+        high.product_declared_range = Some(DeclaredProductPressureRange {
+            minimum_kpa: Some(50.0),
+            maximum_kpa: Some(500.0),
+            source_sha256: digest('e'),
+        });
+        assert_eq!(
+            compare_flow_retention(&low, &high, 0.60),
+            Err(PressureRetentionError::ProductDeclarationMismatch)
+        );
+    }
+
+    #[test]
+    fn preserves_task_and_standard_outcomes_separately_from_flow_retention() {
+        let mut low = observation("run-150", 150.0, 4.0);
+        low.task_outcome = TaskOutcome::Fail;
+        low.standard_method_outcome = StandardMethodOutcome::Fail;
+        let high = observation("run-300", 300.0, 5.0);
+
+        let result = compare_flow_retention(&low, &high, 0.60).expect("valid paired runs");
+        assert_eq!(result.threshold_status, RetentionThresholdStatus::MeetsOnConservativeMeasurementBound);
+        assert_eq!(result.low_pressure_task_outcome, TaskOutcome::Fail);
+        assert_eq!(result.low_pressure_standard_outcome, StandardMethodOutcome::Fail);
+    }
+
+    #[test]
+    fn missing_pressure_invariant_context_is_rejected_before_pairing() {
+        let mut low = observation("run-150", 150.0, 4.0);
+        low.pressure_invariant_context_sha256 = "missing".to_owned();
+        let high = observation("run-300", 300.0, 5.0);
+        assert_eq!(
+            compare_flow_retention(&low, &high, 0.60),
+            Err(PressureRetentionError::InvalidObservation { side: "low" })
+        );
+    }
+
 }
