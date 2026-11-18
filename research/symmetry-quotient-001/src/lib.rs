@@ -1998,6 +1998,30 @@ mod tests {
         }
     }
 
+    fn c3_action() -> FiniteActionV1 {
+        FiniteActionV1 {
+            action_id: "cyclic-three-objective-action-v1".to_owned(),
+            group: FiniteGroupV1 {
+                group_id: "C3-objective-v1".to_owned(),
+                identity: 0,
+                multiplication: vec![vec![0, 1, 2], vec![1, 2, 0], vec![2, 0, 1]],
+            },
+            permutations: vec![vec![0, 1, 2], vec![1, 2, 0], vec![2, 0, 1]],
+        }
+    }
+
+    fn c3_pairwise_drift_problem() -> SearchProblemV1 {
+        SearchProblemV1 {
+            problem_id: "three-member-objective-range-v1".to_owned(),
+            candidate_ids: vec!["C0".to_owned(), "C1".to_owned(), "C2".to_owned()],
+            semantics: vec![
+                semantics(10, 7, "same-boundary", "same-output"),
+                semantics(12, 7, "same-boundary", "same-output"),
+                semantics(8, 7, "same-boundary", "same-output"),
+            ],
+        }
+    }
+
     fn d4_action() -> FiniteActionV1 {
         let mut multiplication = vec![vec![0; 8]; 8];
         for left in 0..8 {
@@ -2306,6 +2330,117 @@ mod tests {
                 }
             ) if differing_fields == vec![TaskFieldV1::BoundaryConditionId]
         ));
+    }
+
+    #[test]
+    fn pairwise_objective_range_is_checked_not_only_representative_deviation() {
+        let problem = c3_pairwise_drift_problem();
+        let action = c3_action();
+        let contract = approximate_contract(ObjectiveSenseV1::Minimize, 2);
+        let outcome = compile_approximate_quotient(
+            &problem,
+            &action,
+            &contract,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        let ApproximateCompileOutcomeV1::Blocked(
+            ApproximateBlockedV1::ObjectiveDeviationExceedsTolerance {
+                group_element,
+                source_index,
+                image_index,
+                source_candidate_id,
+                image_candidate_id,
+                absolute_objective_deviation,
+                maximum_additive_gap,
+            },
+        ) = outcome
+        else {
+            panic!("pairwise 12-to-8 drift must exceed the declared tolerance");
+        };
+        assert_eq!(source_candidate_id, "C2");
+        assert_eq!(image_candidate_id, "C1");
+        assert_eq!((source_index, image_index), (2, 1));
+        assert_eq!(absolute_objective_deviation, 4);
+        assert_eq!(maximum_additive_gap, 2);
+        assert_eq!(action.permutations[group_element][source_index], image_index);
+    }
+
+    #[test]
+    fn pairwise_range_and_representative_regret_are_reported_separately() {
+        let problem = c3_pairwise_drift_problem();
+        let action = c3_action();
+        let contract = approximate_contract(ObjectiveSenseV1::Minimize, 4);
+        let ApproximateCompileOutcomeV1::Authorized(certificate) = compile_approximate_quotient(
+            &problem,
+            &action,
+            &contract,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap()
+        else {
+            panic!("four-unit pairwise objective span should be authorized");
+        };
+        assert_eq!(certificate.maximum_pairwise_objective_deviation, 4);
+        assert_eq!(certificate.certified_additive_optimality_gap, 2);
+        assert_eq!(certificate.evidence.pairwise_objective_range_checks, 1);
+
+        let result = optimize_approximate_representatives(
+            &problem,
+            &action,
+            &contract,
+            &certificate,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        assert_eq!(result.selected_candidate_id, "C0");
+        assert_eq!(result.selected_objective_value, 10);
+        assert_eq!(result.selected_objective_value - 8, 2);
+    }
+
+    #[test]
+    fn approximate_certificate_binds_full_problem_and_action_contracts() {
+        let problem = approximate_min_problem();
+        let action = c2_action();
+        let contract = approximate_contract(ObjectiveSenseV1::Minimize, 2);
+        let ApproximateCompileOutcomeV1::Authorized(certificate) = compile_approximate_quotient(
+            &problem,
+            &action,
+            &contract,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap()
+        else {
+            panic!("fixture must authorize");
+        };
+
+        let mut shifted_problem = problem.clone();
+        for semantics in &mut shifted_problem.semantics {
+            semantics.objective_cost += 100;
+        }
+        assert_eq!(
+            verify_approximate_certificate(
+                &shifted_problem,
+                &action,
+                &contract,
+                &certificate,
+                QualificationBudgetV1::default(),
+            ),
+            Err(ApproximateQuotientErrorV1::CertificateMismatch)
+        );
+
+        let mut changed_action = action.clone();
+        changed_action.permutations[1].swap(0, 1);
+        assert_eq!(
+            verify_approximate_certificate(
+                &problem,
+                &changed_action,
+                &contract,
+                &certificate,
+                QualificationBudgetV1::default(),
+            ),
+            Err(ApproximateQuotientErrorV1::CertificateMismatch)
+        );
     }
 
     #[test]
