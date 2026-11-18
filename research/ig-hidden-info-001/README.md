@@ -59,8 +59,9 @@ cargo run --manifest-path research/ig-hidden-info-001/qualifier/Cargo.toml --bin
   --full path/to/full-profile-results.json
 ```
 
-The scorer supports the upstream result shapes (`metadata -> runs` and legacy `conditions -> runs`). It reports the official per-run average and strict-majority accuracy fields, then adds task-clustered paired bootstrap intervals (10,000 resamples, pinned seed). It distinguishes the official run-weighted Hidden-post minus Full-pre gap from the task-paired gap. A small evaluator-only smoke result is checked in at `fixtures/HIDDENBENCH_SCORE_SMOKE_V0_1.json`; it is not model evidence.
- Agent prompts should be constructed from only the assigned task description, shared facts and that agent's assigned private fact.
+The scorer supports the upstream result shapes (`metadata -> runs` and legacy `conditions -> runs`). For legacy files it preserves condition metadata, extracts the unique model identity from condition records, recognises the legacy profile marker, and rejects merges across different models. Vote strings are compared exactly, matching the upstream scorer. It reports the official per-run average and strict-majority accuracy fields, then adds task-clustered paired bootstrap intervals (10,000 resamples, pinned seed). It distinguishes the official run-weighted Hidden-post minus Full-pre gap from the task-paired gap. A small evaluator-only smoke result is checked in at `fixtures/HIDDENBENCH_SCORE_SMOKE_V0_1.json`; it is not model evidence.
+
+Agent prompts must be constructed only from the assigned task description, shared facts and that agent's assigned private fact. Never pass answer keys, fact-assignment maps, result manifests or evaluator labels to agents.
 
 ## Official protocol details to reproduce
 
