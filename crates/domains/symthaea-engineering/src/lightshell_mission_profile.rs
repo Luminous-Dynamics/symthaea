@@ -144,6 +144,7 @@ pub struct ValidationReport {
     pub measured_observation_count: usize,
     pub manifest_profiled: bool,
     pub manifest_preregistered: bool,
+    pub lifetime_equivalence_claim_count: usize,
 }
 
 impl ValidationReport {
@@ -155,8 +156,10 @@ impl ValidationReport {
         self.is_valid() && self.manifest_preregistered
     }
 
-    pub fn has_lifetime_equivalence_claim(&self) -> bool {
-        self.is_valid() && self.manifest_preregistered
+    /// True only when at least one lifetime-equivalence claim passed structural
+    /// evidence admission. This is not an engineering validation of the model.
+    pub fn has_admitted_lifetime_equivalence_claim(&self) -> bool {
+        self.is_valid() && self.lifetime_equivalence_claim_count > 0
     }
 }
 
@@ -359,6 +362,10 @@ impl MissionExposureManifest {
                     "Measured or calibrated-derived exposures must bind an exact source run.");
             }
             if self.state == "profiled" || self.state == "preregistered" {
+                if observation.minimum.is_none() || observation.maximum.is_none() {
+                    push(&mut findings, "profiled_exposure_missing_range", format!("{path}.minimum/maximum"),
+                        "Profiled exposures must preserve both minimum and maximum, in addition to their tail statistics.");
+                }
                 if !matches!(observation.evidence_origin.as_str(), "measured" | "calibrated_derived") {
                     push(&mut findings, "nonphysical_exposure_in_profiled_manifest", format!("{path}.evidence_origin"),
                         "Only measured or calibrated-derived channels can support a profiled mission exposure.");
@@ -406,13 +413,22 @@ impl MissionExposureManifest {
                 push(&mut findings, "invalid_acceleration_mode", format!("{path}.acceleration_mode"),
                     "Acceleration mode must be none, unvalidated_hypothesis or validated.");
             }
-            if block.lifetime_equivalence_claim
-                && (block.acceleration_mode != "validated"
+            if block.lifetime_equivalence_claim {
+                lifetime_equivalence_claim_count += 1;
+                if block.acceleration_mode != "validated"
                     || is_blank_option(&block.acceleration_model_ref)
+                    || is_blank_option(&block.correlation_evidence_ref)
+                {
+                    push(&mut findings, "unvalidated_lifetime_equivalence", format!("{path}.lifetime_equivalence_claim"),
+                        "Lifetime equivalence requires a validated acceleration model and representative correlation evidence.");
+                }
+            }
+            if block.acceleration_mode == "validated"
+                && (is_blank_option(&block.acceleration_model_ref)
                     || is_blank_option(&block.correlation_evidence_ref))
             {
-                push(&mut findings, "unvalidated_lifetime_equivalence", format!("{path}.lifetime_equivalence_claim"),
-                    "Lifetime equivalence requires a validated acceleration model and representative correlation evidence.");
+                push(&mut findings, "validated_acceleration_missing_evidence", format!("{path}.acceleration_model_ref/correlation_evidence_ref"),
+                    "A validated acceleration profile requires both a model reference and representative correlation evidence.");
             }
             if block.acceleration_mode == "unvalidated_hypothesis" && block.lifetime_equivalence_claim {
                 push(&mut findings, "hypothesis_promoted_to_lifetime_claim", path.clone(),
@@ -452,6 +468,21 @@ impl MissionExposureManifest {
             if block.block_intent == "sequence_interaction" && is_blank_option(&block.sequence_group) {
                 push(&mut findings, "sequence_interaction_missing_group", format!("{path}.sequence_group"),
                     "A sequence-interaction block must bind an explicit interaction group.");
+            }
+        }
+
+        let mut sequence_groups: HashMap<&str, HashSet<&str>> = HashMap::new();
+        for block in &self.test_blocks {
+            if block.block_intent == "sequence_interaction" {
+                if let Some(group) = block.sequence_group.as_deref() {
+                    sequence_groups.entry(group).or_default().insert(block.exposure_kind.as_str());
+                }
+            }
+        }
+        for (group, exposure_kinds) in sequence_groups {
+            if exposure_kinds.len() < 2 {
+                push(&mut findings, "sequence_interaction_without_distinct_exposures", "test_blocks.sequence_group",
+                    format!("Sequence-interaction group {group} must include at least two distinct exposure kinds."));
             }
         }
 
@@ -506,6 +537,7 @@ impl MissionExposureManifest {
             measured_observation_count,
             manifest_profiled: self.state == "profiled",
             manifest_preregistered: self.state == "preregistered",
+            lifetime_equivalence_claim_count,
         }
     }
 }
@@ -819,6 +851,23 @@ mod tests {
         manifest["test_blocks"][0]["lifetime_equivalence_claim"] = json!(true);
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|f| f.code == "unvalidated_lifetime_equivalence"));
+    }
+
+    #[test]
+    fn sequence_interaction_requires_distinct_exposure_kinds() {
+        let mut manifest = base_manifest();
+        manifest["test_blocks"][0]["block_intent"] = json!("sequence_interaction");
+        manifest["test_blocks"][0]["sequence_group"] = json!("WASH-THEN-FLEX");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "sequence_interaction_without_distinct_exposures"));
+    }
+
+    #[test]
+    fn validated_acceleration_requires_model_and_correlation_evidence() {
+        let mut manifest = base_manifest();
+        manifest["test_blocks"][0]["acceleration_mode"] = json!("validated");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "validated_acceleration_missing_evidence"));
     }
 
     #[test]
