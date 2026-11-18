@@ -134,7 +134,7 @@ Stdout is reserved for action JSONL; errors and diagnostics go to stderr. Input 
 
 The existing `process::ProcessAgent` now exposes an additive generic `exchange<Request, Response>` method for any request implementing `Serialize` and response implementing `DeserializeOwned`. It reuses the same bounded JSONL framing, exact request/response frame SHA-256 digests (including newlines), environment clearing, executable identity, bounded stdout reader, clean-EOF check and child exit handling as the existing `AgentView -> AgentAction` path.
 
-The existing `next_action(&AgentView)` remains as a compatibility wrapper. It retains the current protocol-version and open-episode checks and returns the same `ProcessActionExchange` type. Generic transport does not validate domain-specific action legality, evidence-prefix semantics, world-model claims, hidden truth, or evaluator results; those remain with the corresponding episode owner.
+The existing `next_action(&AgentView)` remains as a compatibility wrapper. It retains the current protocol-version and open-episode checks and returns the same `ProcessActionExchange` type. Eight process tests are authored, including a Unix child-process round trip that exercises the actual pipe exchange, exact request/response frame hashes and clean EOF/exit. These are authored tests, not passing results until the exact-head workflow runs. Generic transport does not validate domain-specific action legality, evidence-prefix semantics, world-model claims, hidden truth, or evaluator results; those remain with the corresponding episode owner.
 
 Example for a future non-microcosm domain protocol:
 
