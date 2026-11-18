@@ -131,7 +131,7 @@ Declare only properties actually needed by the application:
 
 Every gate binds one exact zone, metric family, unit, comparison mode, owner limit, method selection, method applicability, acceptance rule and replicate minimum. Each required gate is evaluated at every declared cleaning cycle. A sensor-free article may mark sensor function not applicable only with an owner and rationale. Unknown is not not-applicable.
 
-All P0 required claim gates are non-compensable. Do not average a high soil-removal result against a failed seam, sensor, coating or attachment gate. Publish gate-specific outcomes.
+All P0 required claim gates are non-compensable (the schema fixes `hard_gate=true`). Do not average a high soil-removal result against a failed seam, sensor, coating or attachment gate. Publish gate-specific outcomes.
 
 ## Visual/physical inspection
 
