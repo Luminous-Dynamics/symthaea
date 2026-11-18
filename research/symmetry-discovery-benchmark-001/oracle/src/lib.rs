@@ -270,7 +270,8 @@ impl Manifest {
         let expected_order = match label.as_str() {
             "D4" => 8,
             "C4" => 4,
-            "C2_R180" | "C2_FX" => 2,
+            "C2_R180" | "C2_FX" | "C2_FY" | "C2_FDIAG" | "C2_FANTI" => 2,
+            "V4_AXIS" | "V4_DIAG" => 4,
             "C1" => 1,
             _ => return Err(format!("unknown fixture subgroup label: {label}")),
         };
@@ -411,7 +412,7 @@ impl Manifest {
                 ));
             }
         }
-        if structural_count != 153 || regression_count != 2 {
+        if structural_count != 303 || regression_count != 2 {
             return Err(format!(
                 "unexpected fixture lane counts: structural={structural_count}, regression={regression_count}"
             ));
@@ -419,9 +420,14 @@ impl Manifest {
         let expected_families = BTreeMap::from([
             ("C1".to_owned(), 31_usize),
             ("C2_FX".to_owned(), 30_usize),
+            ("C2_FY".to_owned(), 30_usize),
+            ("C2_FDIAG".to_owned(), 30_usize),
+            ("C2_FANTI".to_owned(), 30_usize),
             ("C2_R180".to_owned(), 30_usize),
             ("C4".to_owned(), 31_usize),
             ("D4".to_owned(), 31_usize),
+            ("V4_AXIS".to_owned(), 30_usize),
+            ("V4_DIAG".to_owned(), 30_usize),
         ]);
         if structural_families != expected_families {
             return Err(format!(
@@ -501,11 +507,11 @@ mod tests {
     }
 
     #[test]
-    fn all_153_structural_stabilizers_match_exact_oracle() {
+    fn all_303_structural_stabilizers_match_exact_oracle() {
         let counts = manifest()
             .validate_all_cases()
             .expect("all frozen labels must agree with exact integer oracle");
-        assert_eq!(counts.0, 153);
+        assert_eq!(counts.0, 303);
     }
 
     #[test]
