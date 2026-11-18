@@ -1490,6 +1490,34 @@ mod tests {
             manifest["offline_scoring_contract"]["alarms_outside_warning_interval"],
             "count as false alarm episodes; they do not satisfy event detection"
         );
+        assert_eq!(
+            manifest["online_policy_contract"]["policy_config_fields"]
+                .as_array()
+                .expect("policy field list")
+                .iter()
+                .any(|field| field == "max_warning_ns"),
+            true
+        );
+        assert_eq!(
+            manifest["offline_scoring_contract"]["warning_interval"]["event_detected_when"],
+            "at least one alarm episode has t_cut - alarm_time in [minimum_ns, maximum_ns]"
+        );
+        assert_eq!(
+            manifest["offline_scoring_contract"]["metrics"]
+                .as_array()
+                .expect("metrics array")
+                .iter()
+                .any(|metric| metric == "false_alarm_events_on_disruptive_shots"),
+            true
+        );
+        assert_eq!(
+            manifest["online_policy_contract"]["rolling_inference_contract"]["cut_interval_ns"],
+            10_000_000
+        );
+        assert_eq!(
+            manifest["reference_benchmarks"]["gen_toka_group6"]["architecture_limitations"][0],
+            "GenToka generates a complete requested output window in one conditional pass, rather than advancing autoregressively with updated context"
+        );
         assert!(
             manifest["offline_scoring_contract"]["metrics"]
                 .as_array()
