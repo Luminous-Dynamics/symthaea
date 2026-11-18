@@ -258,3 +258,8 @@ The dry-side service spine is now paired with a fault/job manifest and evidence 
 ## Repairability as a measured product property
 
 The dry-side service spine is now paired with a fault/job manifest and evidence contract. A routine repair counts as non-destructive only after the part is accessed without finish removal, the post-repair functional check passes, and all required independent device, water-quality and metrology gates are complete. See [AQUA_REPAIRABILITY_SERVICEABILITY_PROTOCOL_V0_1.md](AQUA_REPAIRABILITY_SERVICEABILITY_PROTOCOL_V0_1.md) and [#12844](https://github.com/Luminous-Dynamics/symthaea/issues/12844). ISO 20887:2020 informs design-for-disassembly decisions; it sets no universal numeric repairability performance threshold.
+
+
+## Evidence corpus expansion — repairability and design for disassembly
+
+The source-classified evidence register now includes ISO 20887:2020 and EN 45554:2020 with scope limits preserved: ISO 20887 informs building/component design for disassembly but sets no numeric threshold; EN 45554's stated scope is energy-related products and is not assumed directly applicable to passive plumbing fixtures. See the 17-entry / 79-claim evidence register and issue #12844.
