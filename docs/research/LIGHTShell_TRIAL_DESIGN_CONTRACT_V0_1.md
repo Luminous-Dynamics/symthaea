@@ -69,7 +69,7 @@ The proposed fixture contains six planned blocks and eighteen planned periods, b
 - Conditions are exactly U/L, or U/I/L with an exact incumbent comparator reference.
 - Every stratum has complete and equal sequence allocation; no sequence may be absent.
 - Period order exactly matches the allocated sequence.
-- Every block and allocation receipt is unique.
+- Every block and allocation receipt is unique; allocation-order indices are contiguous and unique per stratum.
 - Every observed period has one unique #12831 run reference.
 - Every observed period has a passed reset check; each period after the first has a passed carryover check.
 - Every observed block has start/end sentinel evidence and conservative drift within the frozen limit.
