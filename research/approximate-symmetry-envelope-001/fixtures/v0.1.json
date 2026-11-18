@@ -30,7 +30,13 @@
       "constraint": 20
     },
     "expected_epsilon_lift_candidate": true,
-    "expected_hard_prune_authorized": false
+    "expected_hard_prune_authorized": false,
+    "state_unit_id": "metre",
+    "objective_unit_id": "joule",
+    "constraint_unit_id": "metre-squared",
+    "defect_evidence_id": "fixture-defect-bound-v1",
+    "lipschitz_evidence_id": "fixture-lipschitz-bound-v1",
+    "domain_evidence_id": "fixture-domain-certificate-v1"
   },
   "claim_boundary": "Illustrative fixed-point contract only; no defect, Lipschitz or domain bounds are certified by this fixture."
 }
