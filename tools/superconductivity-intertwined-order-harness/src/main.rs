@@ -855,6 +855,147 @@ impl IntertwinedModel {
         self.edges.iter().map(|edge| edge.gauge_phase).collect()
     }
 
+    fn site_onsite_energy(
+        &self,
+        site_index: usize,
+        site_fields: &[Complex],
+    ) -> Result<f64, String> {
+        if site_index >= self.sites.len() || site_fields.len() != self.components.len() {
+            return Err("site onsite energy dimensions do not match model".to_owned());
+        }
+        if site_fields
+            .iter()
+            .any(|field| !field.re.is_finite() || !field.im.is_finite())
+        {
+            return Err("site onsite fields contain non-finite values".to_owned());
+        }
+        let count = self.components.len();
+        let mut energy = 0.0;
+        for first in 0..count {
+            for second in 0..count {
+                energy += self.quadratic[first][second]
+                    * site_fields[first].conj_product_real(site_fields[second]);
+            }
+            let rho_squared = site_fields[first].norm_sqr();
+            energy += 0.5 * self.quartic_self[first] * rho_squared * rho_squared;
+        }
+        for term in &self.density_terms {
+            energy += term.coefficient
+                * site_fields[term.first].norm_sqr()
+                * site_fields[term.second].norm_sqr();
+        }
+        for term in &self.phase_locking_terms {
+            energy -= 2.0
+                * term.coefficient
+                * site_fields[term.first].conj_product_real(site_fields[term.second]);
+        }
+        for secondary in &self.secondary_orders {
+            let order_value = secondary.site_values[site_index];
+            for (component, coefficient) in &secondary.component_coefficients {
+                energy += coefficient * order_value * site_fields[*component].norm_sqr();
+            }
+        }
+        if energy.is_finite() {
+            Ok(energy)
+        } else {
+            Err("site onsite energy is non-finite".to_owned())
+        }
+    }
+
+    fn edge_gradient_energy(
+        &self,
+        edge_index: usize,
+        source_fields: &[Complex],
+        target_fields: &[Complex],
+        gauge_phase: f64,
+    ) -> Result<f64, String> {
+        if edge_index >= self.edges.len()
+            || source_fields.len() != self.components.len()
+            || target_fields.len() != self.components.len()
+            || !gauge_phase.is_finite()
+        {
+            return Err("edge gradient energy dimensions or gauge phase are invalid".to_owned());
+        }
+        let transported_target: Vec<Complex> = target_fields
+            .iter()
+            .map(|field| field.rotate(gauge_phase))
+            .collect();
+        let differences: Vec<Complex> = source_fields
+            .iter()
+            .zip(&transported_target)
+            .map(|(source, target)| source.sub(*target))
+            .collect();
+        let edge = &self.edges[edge_index];
+        let matrix = &self.gradient_by_axis[edge.axis];
+        let mut energy = 0.0;
+        for first in 0..self.components.len() {
+            for second in 0..self.components.len() {
+                energy += matrix[first][second]
+                    * differences[first].conj_product_real(differences[second]);
+            }
+        }
+        if energy.is_finite() {
+            Ok(energy)
+        } else {
+            Err(format!("edge {} gradient energy is non-finite", edge.id))
+        }
+    }
+
+    fn site_component_energy_delta(
+        &self,
+        fields: &[Vec<Complex>],
+        site_index: usize,
+        component_index: usize,
+        candidate: Complex,
+        link_phases: &[f64],
+    ) -> Result<f64, String> {
+        if fields.len() != self.sites.len()
+            || link_phases.len() != self.edges.len()
+            || site_index >= self.sites.len()
+            || component_index >= self.components.len()
+            || !candidate.re.is_finite()
+            || !candidate.im.is_finite()
+        {
+            return Err("local multicomponent update has invalid dimensions or candidate".to_owned());
+        }
+        let original_site_fields = &fields[site_index];
+        let mut candidate_site_fields = original_site_fields.clone();
+        candidate_site_fields[component_index] = candidate;
+
+        let mut delta = self.site_onsite_energy(site_index, &candidate_site_fields)?
+            - self.site_onsite_energy(site_index, original_site_fields)?;
+
+        for (edge_index, edge) in self.edges.iter().enumerate() {
+            if edge.source != site_index && edge.target != site_index {
+                continue;
+            }
+            let (old_source, old_target) = (&fields[edge.source], &fields[edge.target]);
+            let (new_source, new_target) = if edge.source == site_index {
+                (&candidate_site_fields, old_target)
+            } else {
+                (old_source, &candidate_site_fields)
+            };
+            let old_energy = self.edge_gradient_energy(
+                edge_index,
+                old_source,
+                old_target,
+                link_phases[edge_index],
+            )?;
+            let new_energy = self.edge_gradient_energy(
+                edge_index,
+                new_source,
+                new_target,
+                link_phases[edge_index],
+            )?;
+            delta += new_energy - old_energy;
+        }
+        if delta.is_finite() {
+            Ok(delta)
+        } else {
+            Err("local multicomponent energy difference is non-finite".to_owned())
+        }
+    }
+
     fn energy_for(
         &self,
         fields: &[Vec<Complex>],
@@ -1484,6 +1625,45 @@ mod tests {
         }
         let after = model.energy_for(&independently_rotated, &links).unwrap();
         assert!((before.total - after.total).abs() > 1.0e-6);
+    }
+
+    #[test]
+    fn local_component_site_energy_delta_matches_full_lattice_difference() {
+        let (schema, fixture) = inputs();
+        let model = IntertwinedModel::from_bytes(&schema, &fixture).unwrap();
+        let mut fields = model.initial_fields();
+        for (site_index, site) in fields.iter_mut().enumerate() {
+            for (component_index, field) in site.iter_mut().enumerate() {
+                let x = (site_index * 7 + component_index * 3) as f64;
+                field.re += 0.12 * (0.27 * x).cos();
+                field.im += 0.09 * (0.39 * x).sin();
+            }
+        }
+        let links: Vec<f64> = model.edges.iter().enumerate()
+            .map(|(index, _)| 0.19 * (0.41 * index as f64).sin())
+            .collect();
+
+        for site in 0..model.sites.len() {
+            for component in 0..model.components.len() {
+                let current = fields[site][component];
+                let candidate = Complex {
+                    re: current.re + 0.071,
+                    im: current.im - 0.053,
+                };
+                let before = model.energy_for(&fields, &links).unwrap().total;
+                let delta = model
+                    .site_component_energy_delta(&fields, site, component, candidate, &links)
+                    .unwrap();
+                fields[site][component] = candidate;
+                let after = model.energy_for(&fields, &links).unwrap().total;
+                assert!(
+                    (delta - (after - before)).abs() < 1.0e-9,
+                    "local delta mismatch at site {site}, component {component}: {delta} vs {}",
+                    after - before
+                );
+                fields[site][component] = current;
+            }
+        }
     }
 
     #[test]
