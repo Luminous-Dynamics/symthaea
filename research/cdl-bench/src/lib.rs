@@ -5,6 +5,9 @@
 //! in the payload. Every frame includes source and payload CRC-32 checksums.
 
 pub mod causal;
+pub mod numeric;
+
+pub use numeric::{compress_i16, decompress_i16, NumericError, NumericTransform};
 
 pub use causal::{generate_fsm, generate_scm, FsmTrace, GeneratorError, ScmIntervention, ScmTrace};
 
