@@ -18,9 +18,9 @@ A September 2026 robotic sewing system reports seam deviation within ±2.5 mm on
 
 ## Paradigm: baseline-versus-installed counterfactual
 
-Treat installation as a controlled system intervention. Use the same robot serial, firmware, robot configuration, tool/payload, mission profile, environment and fixture across uncovered, incumbent-cover and Lightshell conditions. First measure the uncovered robot; then install the exact garment digest and replay the same conditions.
+Treat installation as a controlled system intervention. Use the same robot serial, firmware, robot configuration, tool/payload, mission profile, environment and fixture across three possible conditions: uncovered robot, a comparable incumbent protective cover, and Lightshell. Every delta gate names its control explicitly (`baseline_uncovered` or `incumbent_cover`); an incumbent control binds its exact product/configuration reference, test session and cover digest. First measure the uncovered robot; then test the incumbent and Lightshell under the same conditions. The incumbent comparison is required only where a genuinely comparable product exists; otherwise the non-applicability decision needs an owner and rationale.
 
-Report claim-level deltas with uncertainty. P0 uses conservative uncertainty addition for paired measurements (U_delta = U_installed + U_baseline) rather than assuming independent errors or cancelling common-mode error. A later owner-reviewed covariance profile may refine this only with source evidence.
+Report claim-level deltas with uncertainty. P0 uses conservative uncertainty addition for paired measurements (U_delta = U_installed + U_control) rather than assuming independent errors or cancelling common-mode error. A later owner-reviewed covariance profile may refine this only with source evidence.
 
 Do not compute a weighted overall score. Hard gates are non-compensable: a thermal, cable, clearance or actuator non-regression failure cannot be hidden by excellent airflow or soft-material scores.
 
