@@ -1977,6 +1977,15 @@ mod tests {
         assert!(!static_design.optimality_certified);
         assert_eq!(exact_static.selected_cost, 3);
         assert!(exact_static.optimality_certified);
+        assert!(exact_static.intrinsically_unresolved_pairs.is_empty());
+        assert_eq!(
+            static_design.covered_obligations.len(),
+            exact_static.distinguished_pairs.len()
+        );
+        assert_eq!(
+            static_design.required_obligations.len(),
+            exact_static.distinguished_pairs.len()
+        );
         verify_exact_static_probe_design(
             &deterministic,
             &exact_static,
