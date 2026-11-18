@@ -375,3 +375,34 @@ The M1 implementation now carries the music-theory layer's ProcessRealizationAud
 One new M1 unit test checks that the Classical segment has no ProcessAdditive audit, the Minimalism segment retains a schema-v1 report, and the report's cycle/maximum-prefix values agree with the typed process plan. The test is authored, not compiled or executed. The PR remains draft until Rust validation and exact-head workflow evidence are available.
 
 **Next semantic-verifier boundary:** implement or reuse the score-side typed-obligation path owned by #9797/#9835 for PeriodSentence. Do not infer that trace integrity alone establishes the Classical grammar semantics.
+
+
+---
+
+## 2026-11-18 M1 receipt replay and integrity binding
+
+The M1 result now carries the complete MusicalIntent, one per-segment evidence digest, and a root receipt digest. The hash domains are explicitly versioned:
+
+- muse-m1-segment-evidence-serde-json-sha256-v1
+- muse-m1-receipt-serde-json-sha256-v1
+
+The segment hash binds the segment-local score, exact interval, grammar plan, structural trace, independently replayable trace-verification report, ProcessAdditive audit report and validation report. The root hash binds the input intent, composed score and score digest, all segment evidence, transition/boundary measurements, trajectory plan and expert-review disposition.
+
+The public function verify_classical_to_minimalism_m1_receipt_v1 is a replay verifier, not merely a generation-time assertion. It:
+- leaves older serialized receipts readable, but refuses to verify those missing full intent or digest evidence;
+- recomputes the root and per-segment evidence hashes;
+- recomputes exact segment score digests;
+- replays universal score validation and Muse Analyst trace-integrity verification for both segments using the bound MusicalIntent;
+- checks that each segment is bound to the exact catalogue style owner/profile digest;
+- reconstructs the composed Score from the segment-local Scores using the exact rational offset and compares every field;
+- verifies the composed score digest and source-bound trajectory admission;
+- reruns the ProcessAdditive plan-to-score audit and compares its report;
+- recomputes the hard-boundary evidence and expert-review disposition.
+
+The replay report deliberately distinguishes evidence scopes: two segments have trace-integrity verification; one has the ProcessAdditive score-contract audit; PeriodSentence semantic fulfillment is explicitly false/unverified until the existing typed-obligation path is integrated.
+
+### Security boundary
+
+SHA-256 here provides content integrity relative to a previously pinned digest. It is not a digital signature or proof of authorship: an actor able to replace the complete receipt and its digest can recompute both. External authenticity requires a separately trusted signature, transparency log or immutable evidence store. The receipt also does not prove musician authorship, consent or rights clearance for source material.
+
+Five M1 replay/tamper tests have been added, bringing the M1 module to twelve authored tests (19 M0 + 12 M1 = 31 trajectory tests). Tests remain authored, not compiled or executed.

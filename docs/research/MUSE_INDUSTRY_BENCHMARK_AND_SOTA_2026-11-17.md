@@ -269,3 +269,79 @@ This paper is useful evidence that loss-only evaluation misses temporal failure 
 **Muse implication:** extend the control surface beyond coarse genre/tempo/density classes. Measure each requested control as an intervention; require exact supported symbolic constraints, quantify off-target drift, include negation/conflict/underspecified prompts, and report note density/polyphony distributions by style and section rather than optimizing one global mean. The paper's GAR/TAR/DAR values are comparison context only, not a directly matched benchmark result.
 
 Source: Mishra & Suma, *A lightweight natural language conditioning framework for controllable polyphonic music generation*, published 17 November 2026, https://doi.org/10.1007/s44163-026-02725-8
+
+
+---
+
+## 2026-11-18 refresh — symbolic control, long-range generation, editing and receipts
+
+### Direct symbolic controllability baseline
+
+Mishra & Suma, published 17 November 2026, convert prompts into deterministic genre, tempo and note-density tokens and compare LSTM with decoder-only Transformer generation. The paper reports 82.0% Genre Adherence Rate, 88.7% Tempo Adherence Rate and 88.0% Density Adherence Rate over 150 test generations (30 per genre). The Transformer produces 7.1 notes/s and 28.1% polyphony versus a held-out human cohort of 250 MIDI works at 5.20±2.14 notes/s and 32.50±8.42% polyphony. The LSTM exhibits temporal collapse at 47.3 notes/s and 86.4% polyphony.
+
+This is a useful low-resource symbolic-control baseline, not a full musical-quality benchmark:
+- Genre is estimated with a heuristic classifier that reaches 85.6% accuracy on a 250-track manual validation subset.
+- The deterministic parser does not handle negation or conflicting constraints and selects the last matched token in ambiguous cases.
+- The 150-generation adherence cohort is modest, and no human listening preference study is reported in the paper.
+- The measured controls are only coarse genre/tempo/density classes.
+
+**Muse opportunity:** exceed coarse categorical prompting with exact numeric and structural control, explicit negation/conflict handling, held-out counterfactual tests, localized score edits, and preservation of all unrequested events. Measure actual event-level effects rather than whether a generated classifier repeats the prompt label.
+
+Source: https://doi.org/10.1007/s44163-026-02725-8 (published 2026-11-17).
+
+### Long-range symbolic generation baseline
+
+CAST reports, over five independent runs on its GiantMIDI-Piano evaluation:
+- Structural error: 0.22±0.02 versus 0.58±0.03 for the MuseFormer baseline.
+- Chord accuracy: 0.96±0.01 versus 0.64±0.02.
+- Sequences up to 1,000 tokens and a 94.8% harmonic match rate in the paper's analysis.
+
+This work uses explicit skeleton-to-texture guidance and cross-attention, supporting the value of a persistent macro-structure representation. Its authors also disclose that the current setup is single-instrument piano and that chord skeletons do not adequately represent complex polyphonic counterpoint or atonal music. It is therefore a baseline for a matched piano reproduction, not a multitrack trajectory or orchestration SOTA score.
+
+**Qualification sequence:** first reproduce the exact split, tokenizer, training/evaluation details and five-run protocol. Then pursue structural error below 0.20 and chord accuracy above 0.97 on that same benchmark as prospective stretch targets. Build separate multi-part and non-tonal cohorts rather than claiming a cross-domain win from a piano-only metric.
+
+Source: https://doi.org/10.1038/s41598-026-46750-0 (Scientific Reports, 2026-04-14).
+
+### Neural editing and audio editing
+
+SMEBench (2026-10-27) has twelve MIDI-expressible edit operations and a 3,600-example paired synthetic test set, plus a 416-example real-audio set derived from 107 MoisesDB tracks. Its central lesson is that source preservation, target agreement and text compatibility are distinct objectives; a metric that rewards unchanged source audio can reward doing nothing. The dataset is CC BY-NC-SA 4.0, and incorporated MIDI and soundfont components retain their own licences. Its data is strongly weighted toward Western classical/orchestral/electronic/rock/pop music and Western soundfonts, so cultural or commercial generalization must not be inferred.
+
+The ICASSP 2027 MMAE audio-editing challenge uses 2,000 public development items and 17,741 atomic rubrics. Its IFR, CR and EMR metrics distinguish requested edit execution from preservation of unrelated audio; existing systems are reported below 5% EMR. The challenge has two tracks, Single Model and Agent, with different tool allowances and held-out test cohorts. Registration closed 2026-10-08, so do not assume submission eligibility; the public cohort remains valuable for internal diagnosis with exact track/protocol labeling.
+
+### Commercial product baseline
+
+Suno Studio 2.0 (2026-08-13) includes MIDI editing, automation, synths, effects and chat-assisted production. Its 2026-09-17 release notes also describe improved MIDI handling and generation. Therefore, basic MIDI editing and conversational production are table stakes. Melothaea's differentiation must be verifiable edit scope, event ancestry, exact undo/redo, preservation invariants and replayable receipts.
+
+### Artificial Analysis preference snapshot — 2026-11-18
+
+The current AA-Music-Instrumental v1.1 board shows Suno v6 at 1148±22 (2,208 samples), Suno v6-mini at 1114±21, and Mureka V9.5 at 1084±21. On AA-Music-Vocal v1.1, ACE Music v1 is at 1160±21 (2,119 samples), Suno v6 at 1144±18, and Suno v6-mini at 1132±18. ACE's 95% interval overlaps Suno v6's, so its point estimate is not a decisive statistical separation. Instrumental and vocal remain separate benchmarks.
+
+Artificial Analysis uses same-prompt, same-modality blind pairwise voting and Bradley–Terry estimation; listeners hear at least ten seconds of each track. Its current methodology specifies static loudness normalization toward -16 LUFS with a -1 dBTP ceiling, 320 kbps MP3 at 44.1 kHz, and no compression, limiting or EQ. Muse preference comparisons should reproduce these controls or explicitly disclose differences.
+
+### Updated benchmark targets — prospective, not achieved
+
+| Panel | Near-term target |
+|---|---|
+| Exact score controls | 100% valid/invalid fixture classification; no unrequested protected-event changes |
+| Natural-language controls | At least 95% held-out instruction adherence; separately score negation, conflicting and underspecified requests |
+| Causal controls | 100% admitted one-factor interventions show intended effect and report non-target drift |
+| ProcessAdditive | 100% frozen positive fixtures and 100% mutation-control rejection; 4,096 pinned generator cases |
+| M1 receipt replay | 100% valid JSON round-trip replay; 100% rejection of stale digests and mutated plan/trace/score/audit/boundary fixtures |
+| Paired editing | At least 95% held-out target/instruction agreement and at least 99% preservation of explicitly protected symbolic events; report source preservation and target agreement independently |
+| Long-range generation | Reproduce CAST first; then <0.20 structural error and >0.97 chord accuracy on the exact same piano protocol |
+| Human preference | First establish a duration-matched, blind, adequately powered baseline; aim for non-inferiority to the leader before claiming parity or superiority |
+| Collaboration | Measure contingent response, edit acceptance/rejection recovery, time-to-correct-edit and author-material preservation |
+| Engineering | Publish p50/p95/p99 planning, audit, rendering and response latency, compute, memory and cost |
+
+A verifier target is not a beauty target. A score that passes a symbolic contract can still be artistically weak, poorly rendered, culturally misattributed or disliked. Every scorecard must keep those evidence classes separate.
+
+### Sources checked 2026-11-18
+
+- Artificial Analysis instrument board: https://artificialanalysis.ai/music/leaderboard/instrumental
+- Artificial Analysis vocal board: https://artificialanalysis.ai/music/leaderboard/vocals
+- Artificial Analysis evaluation methodology: https://artificialanalysis.ai/methodology/music
+- Mishra & Suma, symbolic control (2026-11-17): https://doi.org/10.1007/s44163-026-02725-8
+- CAST (2026-04-14): https://doi.org/10.1038/s41598-026-46750-0
+- SMEBench (2026-10-27): https://arxiv.org/abs/2610.36715
+- ICASSP 2027 MMAE: https://audio-editing-challenge.github.io/
+- Suno Studio 2.0 (2026-08-13): https://help.suno.com/en/articles/13670529
