@@ -20,8 +20,10 @@ pub struct QualifiedPressureEnvelope {
 /// Optional manufacturer-declared operating range for an exact product variant.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DeclaredProductPressureRange {
-    pub minimum_kpa: f64,
-    pub maximum_kpa: f64,
+    /// Some products publish a minimum without publishing a maximum.
+    pub minimum_kpa: Option<f64>,
+    /// Some products publish a maximum without publishing a minimum.
+    pub maximum_kpa: Option<f64>,
     /// Digest binding the exact SKU / market variant datasheet revision.
     pub source_sha256: String,
 }
@@ -43,7 +45,9 @@ pub enum StandardMethodOutcome {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProductPressureRangeStatus {
-    WithinDeclaredRange,
+    WithinFullyDeclaredRange,
+    MeetsDeclaredMinimumOnly,
+    MeetsDeclaredMaximumOnly,
     OutsideDeclaredRange,
     NotDeclared,
 }
@@ -274,11 +278,28 @@ impl PressureFlowObservation {
         }
 
         if let Some(range) = &self.product_declared_range {
-            validate_range(
-                range.minimum_kpa,
-                range.maximum_kpa,
-                "product_declared",
-            )?;
+            if range.minimum_kpa.is_none() && range.maximum_kpa.is_none() {
+                return Err(PressureRunError::InvalidRange {
+                    field: "product_declared",
+                });
+            }
+            for (field, pressure) in [
+                ("product_declared.minimum_kpa", range.minimum_kpa),
+                ("product_declared.maximum_kpa", range.maximum_kpa),
+            ] {
+                if pressure.is_some_and(|value| !value.is_finite() || value <= 0.0) {
+                    return Err(PressureRunError::InvalidRange { field });
+                }
+            }
+            if let (Some(minimum), Some(maximum)) =
+                (range.minimum_kpa, range.maximum_kpa)
+            {
+                if maximum < minimum {
+                    return Err(PressureRunError::InvalidRange {
+                        field: "product_declared",
+                    });
+                }
+            }
             if !is_sha256(&range.source_sha256) {
                 return Err(PressureRunError::InvalidDigest {
                     field: "product_declared_range.source_sha256",
@@ -301,10 +322,23 @@ impl PressureFlowObservation {
                     self.dynamic_fitting_inlet_pressure_kpa - self.dynamic_pressure_uncertainty_kpa;
                 let upper =
                     self.dynamic_fitting_inlet_pressure_kpa + self.dynamic_pressure_uncertainty_kpa;
-                if lower >= range.minimum_kpa && upper <= range.maximum_kpa {
-                    ProductPressureRangeStatus::WithinDeclaredRange
-                } else {
+                if range.minimum_kpa.is_some_and(|minimum| lower < minimum)
+                    || range.maximum_kpa.is_some_and(|maximum| upper > maximum)
+                {
                     ProductPressureRangeStatus::OutsideDeclaredRange
+                } else {
+                    match (range.minimum_kpa, range.maximum_kpa) {
+                        (Some(_), Some(_)) => {
+                            ProductPressureRangeStatus::WithinFullyDeclaredRange
+                        }
+                        (Some(_), None) => {
+                            ProductPressureRangeStatus::MeetsDeclaredMinimumOnly
+                        }
+                        (None, Some(_)) => {
+                            ProductPressureRangeStatus::MeetsDeclaredMaximumOnly
+                        }
+                        (None, None) => ProductPressureRangeStatus::NotDeclared,
+                    }
                 }
             }
         }
@@ -449,8 +483,8 @@ mod tests {
     fn manufacturer_range_is_reported_separately_from_rig_admission() {
         let mut run = observation("run-01", "brondell-nebia-corre", 100.0);
         run.product_declared_range = Some(DeclaredProductPressureRange {
-            minimum_kpa: 138.0,
-            maximum_kpa: 552.0,
+            minimum_kpa: Some(138.0),
+            maximum_kpa: Some(552.0),
             source_sha256: digest('e'),
         });
         assert_eq!(run.validate(), Ok(()));
@@ -473,13 +507,13 @@ mod tests {
     fn reports_pressure_inside_manufacturer_range() {
         let mut run = observation("run-01", "hansgrohe-activera", 100.0);
         run.product_declared_range = Some(DeclaredProductPressureRange {
-            minimum_kpa: 50.0,
-            maximum_kpa: 500.0,
+            minimum_kpa: Some(50.0),
+            maximum_kpa: Some(500.0),
             source_sha256: digest('e'),
         });
         assert_eq!(
             run.product_pressure_range_status(),
-            ProductPressureRangeStatus::WithinDeclaredRange
+            ProductPressureRangeStatus::WithinFullyDeclaredRange
         );
     }
 
