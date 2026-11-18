@@ -8,6 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha1::{Digest, Sha1};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const DESIGN_PROBLEM_SCHEMA_VERSION: &str = "0.1.0";
@@ -288,6 +289,7 @@ pub struct DesignProblem {
 #[derive(Clone, Debug, Default)]
 pub struct CatalogueVocabulary {
     pub catalogue_revision: String,
+    pub catalogue_blob_sha: String,
     pub style_sources: BTreeMap<String, BTreeSet<String>>,
     pub spatial_typology_ids: BTreeSet<String>,
     pub material_tectonic_ids: BTreeSet<String>,
@@ -303,6 +305,7 @@ impl CatalogueVocabulary {
             .map_err(|error| format!("catalogue JSON is invalid: {error}"))?;
         let mut vocabulary = Self {
             catalogue_revision: required_string(&value, "catalog_revision")?,
+            catalogue_blob_sha: git_blob_sha1(source.as_bytes()),
             ..Self::default()
         };
         let styles = value
@@ -345,6 +348,14 @@ impl CatalogueVocabulary {
             DesignAxis::ExperienceProgramme => self.experience_package_ids.contains(option_id),
         }
     }
+}
+
+fn git_blob_sha1(bytes: &[u8]) -> String {
+    let header = format!("blob {}\\0", bytes.len());
+    let mut hasher = Sha1::new();
+    hasher.update(header.as_bytes());
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
 }
 
 fn required_string(value: &Value, key: &str) -> Result<String, String> {
@@ -616,6 +627,9 @@ pub fn validate_design_problem(
     }
     if problem.source_bindings.catalogue_revision != vocabulary.catalogue_revision {
         errors.push("catalogue revision does not match parsed vocabulary".to_owned());
+    }
+    if problem.source_bindings.catalogue_blob_sha != vocabulary.catalogue_blob_sha {
+        errors.push("catalogue blob SHA does not match the exact loaded catalogue bytes".to_owned());
     }
     if !problem.source_bindings.sol_atlas_pr.starts_with("https://github.com/Luminous-Dynamics/sol-atlas-leptos/pull/") {
         errors.push("Sol-Atlas source must be an explicit PR URL".to_owned());
@@ -1118,7 +1132,13 @@ mod tests {
     }
 
     fn parsed_problem() -> DesignProblem {
-        serde_json::from_str(SYNTHETIC_PROBLEM).expect("synthetic problem must deserialize")
+        let mut problem: DesignProblem =
+            serde_json::from_str(SYNTHETIC_PROBLEM).expect("synthetic problem must deserialize");
+        // Unit tests use a deliberately minimal vocabulary fixture. Bind its
+        // exact Git blob digest rather than pretending it is the full upstream
+        // Sol-Atlas catalogue.
+        problem.source_bindings.catalogue_blob_sha = vocabulary().catalogue_blob_sha;
+        problem
     }
 
     fn vocabulary() -> CatalogueVocabulary {
@@ -1210,6 +1230,11 @@ mod tests {
         physics.generation_permissions.physical_evaluation =
             PhysicalEvaluationPermission::AllowedWithQualifiedSolverInputs;
         assert!(validate_design_problem(&physics, &vocabulary()).is_err());
+    }
+
+    #[test]
+    fn git_blob_digest_matches_git_object_format() {
+        assert_eq!(git_blob_sha1(b"test\\n"), "9daeafb9864cf43055ae93beb0afd6c7d144bfa4");
     }
 
     #[test]
