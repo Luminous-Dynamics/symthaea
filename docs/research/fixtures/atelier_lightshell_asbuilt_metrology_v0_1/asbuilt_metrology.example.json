@@ -26,12 +26,17 @@
       "nominal_geometry_ref": "CAD-PANEL-001",
       "nominal_revision_ref": "CAD-REV-A",
       "mandatory": true,
-      "required_metric_ids": [
-        "panel_surface_deviation_mm"
-      ],
       "minimum_coverage_fraction": 0.95,
       "acceptance_rule_ref": "PANEL-ACCEPTANCE-01",
-      "required_pose_refs": []
+      "required_pose_refs": [],
+      "required_metrics": [
+        {
+          "metric_id": "panel_surface_deviation_mm",
+          "unit": "mm",
+          "lower_limit": 0,
+          "upper_limit": 1
+        }
+      ]
     },
     {
       "feature_ref": "elbow_seam",
@@ -39,12 +44,17 @@
       "nominal_geometry_ref": "SEAM-CURVE-001",
       "nominal_revision_ref": "TOPOLOGY-REV-A",
       "mandatory": true,
-      "required_metric_ids": [
-        "seam_path_deviation_mm"
-      ],
       "minimum_coverage_fraction": 0.98,
       "acceptance_rule_ref": "SEAM-ACCEPTANCE-01",
-      "required_pose_refs": []
+      "required_pose_refs": [],
+      "required_metrics": [
+        {
+          "metric_id": "seam_path_deviation_mm",
+          "unit": "mm",
+          "lower_limit": 0,
+          "upper_limit": 2
+        }
+      ]
     },
     {
       "feature_ref": "forearm_service_opening",
@@ -52,12 +62,17 @@
       "nominal_geometry_ref": "SERVICE-OPENING-001",
       "nominal_revision_ref": "TOPOLOGY-REV-A",
       "mandatory": false,
-      "required_metric_ids": [
-        "service_opening_position_error_mm"
-      ],
       "minimum_coverage_fraction": 0.95,
       "acceptance_rule_ref": "SERVICE-OPENING-ACCEPTANCE-01",
-      "required_pose_refs": []
+      "required_pose_refs": [],
+      "required_metrics": [
+        {
+          "metric_id": "service_opening_position_error_mm",
+          "unit": "mm",
+          "lower_limit": 0,
+          "upper_limit": 2
+        }
+      ]
     }
   ],
   "measurement_session": null,
