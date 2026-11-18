@@ -43,6 +43,8 @@ The upstream reference simulator's relevant method details are:
 
 A reproduction must pin the exact upstream simulator, prompt templates, scorer, model endpoint/revision, decoding settings, seed derivation, number of duplications and concurrency settings. Any deviation is a separate treatment arm, not a silent implementation detail.
 
+The upstream scorer's legacy schema flattens `conditions[].runs`, attaches condition metadata to each run, obtains model identity from condition-level `model`, and treats `percentage_special` as a legacy profile marker when no explicit profile is present. Our Rust adapter mirrors that behaviour, validates the one-model-per-file assumption when combining result files, and enforces the positional hidden/full role for legacy inputs. Vote strings are compared byte-for-byte without trimming, matching the reference Python implementation.
+
 The Rust scoring adapter reproduces the upstream run-weighted individual-vote average and strict-majority rules. It also reports task-level paired resampling intervals (10,000 deterministic bootstrap replicates) so repeated runs of a task remain clustered for uncertainty estimation. Keep official run-weighted SEM and the additional task-clustered estimate separately labelled; neither should be silently substituted for the other. For Hidden-vs-Full comparisons, report both the official run-weighted gap and a task-paired gap over matched task IDs.
 
 
