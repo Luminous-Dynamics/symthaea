@@ -136,14 +136,17 @@ The sampler supports deterministic multi-chain seeds and records per-chain:
 - relative-phase-lock cosine statistics;
 - quadratic, quartic, gradient and total energy;
 - heat-capacity fluctuation point estimate;
-- twist-current means, diamagnetic tensor, current covariance and a thermal helicity-modulus point-estimate tensor;
-- the minimum eigenvalue of the symmetric stiffness point-estimate tensor and an explicit gate status.
+- twist-current means, diamagnetic tensor, current covariance and the thermal helicity-modulus point-estimate tensor;
+- the minimum eigenvalue of the symmetric stiffness point-estimate tensor;
+- block-jackknife standard errors for the helicity-modulus tensor and minimum eigenvalue when at least 20 measurements are available.
 
-The stiffness status is deliberately conservative:
-- a negative point-estimate eigenvalue means a stable-superconductor claim is not permitted for that pilot result pending uncertainty/convergence;
-- a nonnegative point estimate remains explicitly uncertainty-unresolved.
+The stiffness interpretation is deliberately conservative:
+- a negative point estimate or approximate interval with upper endpoint below zero prohibits a stable-superconductor claim for the pilot result;
+- a nonnegative point estimate alone is not a pass;
+- if the chain is too short, the jackknife uncertainty is `null` and status is `insufficient_samples_for_stiffness_jackknife`;
+- when available, the approximate 95% jackknife interval describes finite-chain resampling variability only.
 
-The current CI smoke uses two chains, two warmup sweeps and four measurement sweeps. This is a software plumbing test only. The sampler currently uses a full energy recomputation at every measurement but local \(\Delta F\) for each proposal. It does not yet implement blocked jackknife uncertainties for the helicity modulus, chain convergence/thermalization criteria, replica exchange, HMC, or finite-size scaling.
+The current CI smoke uses two chains, two warmup sweeps and four measurement sweeps. This is a software plumbing test only and intentionally does not emit a stiffness error bar. The sampler uses a full energy recomputation at every measurement but local \(\Delta F\) for each proposal. It does not yet implement convergence/thermalization criteria, independent-start diagnostics, replica exchange, HMC, autocorrelation-aware blocked analysis beyond the initial block jackknife, or finite-size scaling.
 
 Still not implemented or scientifically qualified:
 - finite-Q PDW real-space phase factors, wave-vector stars, commensurability and symmetry-derived coupling selection;
@@ -205,7 +208,7 @@ For the current axis-aligned unit-edge lattice, off-diagonal spatial twist-curva
 \frac{\operatorname{Cov}(J_\mu,J_\nu)}{T}.
 \]
 
-The current branch is a static single-configuration evaluator: it has no thermal sampler, no temperature, and does not evaluate that covariance. The stiffness-positivity gate therefore remains `not_evaluated_by_static_configuration_auditor`. It must not be counted as a physically stable superconducting state or as a reproduction of PDW stability results.
+The branch now has a separate finite-temperature Metropolis pilot that samples the zero-momentum complex fields and evaluates the current covariance and thermal helicity-modulus point estimate. It also applies a block jackknife to the current and diamagnetic sample series when at least 20 measurements are available. The four-sample CI smoke deliberately reports `insufficient_samples_for_stiffness_jackknife`; longer runs report an approximate finite-chain interval. Neither outcome proves equilibration, autocorrelation adequacy or finite-size convergence. The stiffness-positivity gate therefore remains a research diagnostic, not a thermodynamic stability certificate and not a reproduction of PDW stability results.
 
 The zero-momentum evaluator also rejects a component labelled `pdw_plus_q` or `pdw_minus_q` with zero momentum, and rejects all nonzero-momentum components. This keeps the role metadata honest until the finite-Q lattice phase factors, translation-symmetry operations, and symmetry-allowed couplings have a separate executable contract.
 
