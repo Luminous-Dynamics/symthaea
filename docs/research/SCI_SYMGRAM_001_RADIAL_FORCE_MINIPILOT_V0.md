@@ -223,7 +223,7 @@ Include the fixed origin \(x=v=0\), where the SO(2) stabilizer is the full group
 
 ## 8. Independent qualification
 
-The standalone Rust oracle now has explicit arithmetic bounds (exponent `0..=8`, coupling `1..=1,000,000`) and rejects unsupported inputs before polynomial expansion. It includes exact scalar-output checks: `a`, `b`, `c` and signed `ell` are SO(2)-invariant, while absolute external-frame coordinate `x1` is rejected as non-invariant. This validates one observable-level obligation only; the complete task contract and pruning permission remain owned by #11616.
+The standalone Rust oracle now has explicit arithmetic bounds (exponent `0..=8`, coupling `1..=1,000,000`) and rejects unsupported inputs before polynomial expansion. It includes exact scalar-output checks: `a`, `b`, `c` and signed `ell` are SO(2)-invariant, while absolute external-frame coordinate `x1` is rejected as non-invariant. This validates one observable-level obligation only; the complete task contract and pruning permission remain owned by #11616. The oracle also evaluates the invariant-map Jacobian rank at selected boundary/stratum points: rank three at \(x=0, v\neq0\), and rank zero at the fixed origin. The Rust API rejects state coordinates outside its declared magnitude bound.
 
 The exact development oracle should independently verify:
 1. SO(2) group-generator algebra and the block action on \((x,v)\).
