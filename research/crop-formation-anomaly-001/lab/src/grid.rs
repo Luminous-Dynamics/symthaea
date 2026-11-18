@@ -372,6 +372,55 @@ impl GridDecoderManifest {
     }
 }
 
+/// Build a standard 32-way D4 × traversal × ASCII-7 bit-order search family.
+///
+/// This is a convenient starting protocol, not a universal decoder. Dimensions,
+/// segmentation, codebooks, and other transforms are intentionally not searched.
+/// Freeze and record the returned manifest before examining challenge cases.
+pub fn standard_d4_ascii7_manifest(
+    protocol_id: impl Into<String>,
+    version: u32,
+) -> Result<GridDecoderManifest, ManifestError> {
+    let transforms = [
+        (GridTransform::Identity, "identity"),
+        (GridTransform::Rotate90Clockwise, "rotate90_cw"),
+        (GridTransform::Rotate180, "rotate180"),
+        (GridTransform::Rotate270Clockwise, "rotate270_cw"),
+        (GridTransform::ReflectHorizontal, "reflect_horizontal"),
+        (GridTransform::ReflectVertical, "reflect_vertical"),
+        (GridTransform::Transpose, "transpose"),
+        (GridTransform::AntiTranspose, "anti_transpose"),
+    ];
+    let traversals = [
+        (TraversalOrder::RowMajor, "row_major"),
+        (TraversalOrder::ColumnMajor, "column_major"),
+    ];
+    let bit_orders = [
+        (crate::decoder::BitOrder::MostSignificantFirst, "msb"),
+        (crate::decoder::BitOrder::LeastSignificantFirst, "lsb"),
+    ];
+
+    let mut specifications = Vec::with_capacity(32);
+    for (transform, transform_name) in transforms {
+        for (traversal, traversal_name) in traversals {
+            for (bit_order, bit_order_name) in bit_orders {
+                let id = format!("{transform_name}-{traversal_name}-{bit_order_name}");
+                specifications.push(GridDecoderSpec {
+                    id: id.clone(),
+                    transform,
+                    traversal,
+                    decoder: crate::decoder::DecoderSpec::ascii7(
+                        format!("ascii7-{bit_order_name}"),
+                        bit_order,
+                    ),
+                });
+            }
+        }
+    }
+
+    GridDecoderManifest::new(protocol_id, version, specifications)
+}
+
 /// Execute every supplied grid interpretation and preserve all outcomes.
 /// The caller must freeze this complete list before looking at a challenge case.
 pub fn run_grid_tournament(
@@ -600,6 +649,28 @@ mod tests {
         assert_eq!(manifest.protocol_id(), "crop-intel-positive-control");
         assert_eq!(manifest.version(), 1);
         assert_eq!(manifest.run(&grid).len(), 1);
+    }
+
+    #[test]
+    fn standard_d4_manifest_has_exactly_32_unique_attempts() {
+        let manifest = standard_d4_ascii7_manifest("crop-intel-d4-ascii7-v1", 1)
+            .expect("standard decoder manifest");
+
+        assert_eq!(manifest.specifications().len(), 32);
+        let unique_ids: std::collections::HashSet<&str> = manifest
+            .specifications()
+            .iter()
+            .map(|specification| specification.id.as_str())
+            .collect();
+        assert_eq!(unique_ids.len(), 32);
+        assert!(manifest
+            .specifications()
+            .iter()
+            .any(|specification| specification.id == "identity-row_major-msb"));
+        assert!(manifest
+            .specifications()
+            .iter()
+            .any(|specification| specification.id == "anti_transpose-column_major-lsb"));
     }
 
     fn row_and_column_margins(grid: &BinaryGrid) -> (Vec<usize>, Vec<usize>) {
