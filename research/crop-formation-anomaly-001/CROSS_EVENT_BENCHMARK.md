@@ -80,6 +80,8 @@ The same physical event cannot cross folds under any of these tasks. If identity
 
 This implementation is a split primitive, not a complete training/evaluation runner. The generated plan must be written into a benchmark receipt, including the exact sample order and source hashes, before model fitting.
 
+The reference crate also exposes `CircleGrammarFamily`: a frozen list of class-count/contact-threshold configurations. Evaluating a family recomputes the centre, radius/radial clustering, contact graph and centred motifs for each configuration. Combine each predeclared score across that complete family with `familywise_max_statistic_p_value`, rerunning the same family on each null replicate. This current family covers only the declared class-count/tolerance grid; other choices (centre estimator, boundary selection, primitive extraction, motif families and image preprocessing) must be added whenever those are explored.
+
 ## 4. Data provenance classes
 
 Assign each geometric primitive one of the following observation classes. Do not collapse them into a single "ground truth" label.
@@ -222,4 +224,4 @@ Do not claim a leaderboard win on one case, one split, one metric or an unrelate
 6. Run event-held-out and site-held-out benchmarks separately.
 7. Only after those controls, assess whether any grammar generalizes across events.
 
-**Current claim ceiling:** event-split and family-wise statistical reference functions are authored, not executed. One CCAT event is available for fixed-input replay; FEEDIT contributes a metadata candidate index but its geometry JSON is not imported. No event-held-out model result exists yet.
+**Current claim ceiling:** event-split, frozen geometry-family and family-wise statistical reference functions are authored, not executed. One CCAT event is available for fixed-input replay; FEEDIT contributes a metadata candidate index but its geometry JSON is not imported. No event-held-out model result exists yet.
