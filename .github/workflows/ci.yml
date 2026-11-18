@@ -69,6 +69,21 @@ jobs:
       - name: Check formatting
         run: cargo fmt --check
 
+  clippy-built-environment:
+    name: Clippy (built-environment contract)
+    runs-on: ubuntu-latest
+    needs: fmt
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy
+
+      - name: Check the built-environment contract crate
+        run: cargo clippy --locked -p symthaea-built-environment --all-targets -- -D warnings
+
   cls-field-count:
     name: CLS Field-Count Ratchet
     runs-on: ubuntu-latest
@@ -1368,6 +1383,7 @@ jobs:
           - symthaea-dream
           - symthaea-causal-reasoning
           - symthaea-broca
+          - symthaea-built-environment
           - symthaea-physics
           - symthaea-cell-foundry
           - symthaea-genomics
