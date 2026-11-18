@@ -131,11 +131,6 @@ fn external_compressed_len(command: &str, args: &[&str], input: &[u8]) -> Option
         .spawn()
         .ok()?;
 
-    {
-        let mut stdin = child.stdin.take()?;
-        stdin.write_all(input).ok()?;
-    }
-
     let mut stdout = child.stdout.take()?;
     let reader = std::thread::spawn(move || {
         let mut output = Vec::new();
