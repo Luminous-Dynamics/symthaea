@@ -21,7 +21,9 @@ use std::fmt;
 
 pub const LEVEL_COUNT: usize = 3;
 pub const CONDITIONS_PER_BLOCK: usize = 81;
-pub const CONTRASTS_PER_BLOCK: usize = 32;
+pub const PRIMARY_CONTRASTS_PER_BLOCK: usize = 32;
+pub const HIGHER_ORDER_DIAGNOSTICS_PER_BLOCK: usize = 48;
+pub const CONTRASTS_PER_BLOCK: usize = 80;
 
 pub const DISCOVERY_STYLES: [&str; 29] = [
     "Classical",
@@ -323,41 +325,57 @@ impl ContrastTerm {
     }
 }
 
-/// Eight main-effect contrasts plus four contrast products for each of the
-/// six factor pairs: 8 + (6 * 4) = 32 terms.
+fn append_kind_products(
+    factors: &[Factor],
+    index: usize,
+    selected: &mut Vec<FactorContrast>,
+    terms: &mut Vec<ContrastTerm>,
+) {
+    if index == factors.len() {
+        terms.push(ContrastTerm {
+            components: selected.clone(),
+        });
+        return;
+    }
+
+    for kind in [ContrastKind::Linear, ContrastKind::Quadratic] {
+        selected.push(FactorContrast {
+            factor: factors[index],
+            kind,
+        });
+        append_kind_products(factors, index + 1, selected, terms);
+        selected.pop();
+    }
+}
+
+fn append_factor_combinations(
+    start: usize,
+    needed: usize,
+    selected: &mut Vec<Factor>,
+    terms: &mut Vec<ContrastTerm>,
+) {
+    if needed == 0 {
+        append_kind_products(&selected.clone(), 0, &mut Vec::new(), terms);
+        return;
+    }
+
+    let last_start = Factor::ALL.len() - needed;
+    for index in start..=last_start {
+        selected.push(Factor::ALL[index]);
+        append_factor_combinations(index + 1, needed - 1, selected, terms);
+        selected.pop();
+    }
+}
+
+/// Full orthogonal 3^4 basis excluding the intercept:
+/// 8 main + 24 pairwise primary terms + 32 three-way + 16 four-way
+/// higher-order diagnostics = 80 total. The primary result remains the
+/// first 32 terms; the remaining 48 are labelled diagnostic in each result.
 pub fn contrast_terms() -> Vec<ContrastTerm> {
-    let kinds = [ContrastKind::Linear, ContrastKind::Quadratic];
     let mut terms = Vec::with_capacity(CONTRASTS_PER_BLOCK);
-
-    for factor in Factor::ALL {
-        for kind in kinds {
-            terms.push(ContrastTerm {
-                components: vec![FactorContrast { factor, kind }],
-            });
-        }
+    for order in 1..=Factor::ALL.len() {
+        append_factor_combinations(0, order, &mut Vec::new(), &mut terms);
     }
-
-    for left_index in 0..Factor::ALL.len() {
-        for right_index in (left_index + 1)..Factor::ALL.len() {
-            for left_kind in kinds {
-                for right_kind in kinds {
-                    terms.push(ContrastTerm {
-                        components: vec![
-                            FactorContrast {
-                                factor: Factor::ALL[left_index],
-                                kind: left_kind,
-                            },
-                            FactorContrast {
-                                factor: Factor::ALL[right_index],
-                                kind: right_kind,
-                            },
-                        ],
-                    });
-                }
-            }
-        }
-    }
-
     terms
 }
 
@@ -375,12 +393,16 @@ pub struct Observation {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ContrastEstimate {
     pub term: String,
+    /// Number of factors in the orthogonal contrast product.
+    /// Orders 1–2 are primary; orders 3–4 are diagnostic only.
+    pub order: usize,
     pub estimate: f64,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct EffectSummary {
     pub term: String,
+    pub order: usize,
     pub seed_count: usize,
     pub mean: f64,
     /// Sample standard deviation across seed-block estimates.
@@ -471,6 +493,7 @@ pub fn estimate_block(
         }
         estimates.push(ContrastEstimate {
             term: term.id(),
+            order: term.components.len(),
             estimate: numerator / denominator,
         });
     }
@@ -488,12 +511,12 @@ pub fn summarize_seed_effects(
         return Err(AuditError::NoSeedBlocks);
     }
 
-    let expected_terms: Vec<String> = seed_blocks[0]
+    let expected_terms: Vec<(String, usize)> = seed_blocks[0]
         .iter()
-        .map(|estimate| estimate.term.clone())
+        .map(|estimate| (estimate.term.clone(), estimate.order))
         .collect();
     let mut seen_terms = HashSet::new();
-    for term in &expected_terms {
+    for (term, _) in &expected_terms {
         if !seen_terms.insert(term.as_str()) {
             return Err(AuditError::DuplicateContrast(term.clone()));
         }
@@ -505,9 +528,18 @@ pub fn summarize_seed_effects(
         }
         let observed: HashSet<&str> = block.iter().map(|item| item.term.as_str()).collect();
         if observed.len() != block.len()
-            || expected_terms.iter().any(|term| !observed.contains(term.as_str()))
+            || expected_terms.iter().any(|(term, _)| !observed.contains(term.as_str()))
         {
             return Err(AuditError::InconsistentContrastSet);
+        }
+        for (term, order) in &expected_terms {
+            let estimate = block
+                .iter()
+                .find(|item| item.term == *term)
+                .expect("contrast membership validated above");
+            if estimate.order != *order {
+                return Err(AuditError::InconsistentContrastSet);
+            }
         }
         if block.iter().any(|item| !item.estimate.is_finite()) {
             return Err(AuditError::NonFiniteEffect);
@@ -515,7 +547,7 @@ pub fn summarize_seed_effects(
     }
 
     let mut summaries = Vec::with_capacity(expected_terms.len());
-    for term in expected_terms {
+    for (term, order) in expected_terms {
         let values: Vec<f64> = seed_blocks
             .iter()
             .map(|block| {
@@ -541,6 +573,7 @@ pub fn summarize_seed_effects(
         let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
         summaries.push(EffectSummary {
             term,
+            order,
             seed_count: count,
             mean,
             sample_sd,
@@ -670,7 +703,12 @@ mod tests {
         assert_eq!(terms.len(), CONTRASTS_PER_BLOCK);
         assert_eq!(terms.iter().filter(|term| term.components.len() == 1).count(), 8);
         assert_eq!(terms.iter().filter(|term| term.components.len() == 2).count(), 24);
-        assert!(terms.iter().all(|term| term.components.len() <= 2));
+        assert_eq!(
+            terms.iter().filter(|term| term.components.len() >= 3).count(),
+            HIGHER_ORDER_DIAGNOSTICS_PER_BLOCK
+        );
+        assert_eq!(PRIMARY_CONTRASTS_PER_BLOCK, 32);
+        assert!(terms.iter().all(|term| (1..=4).contains(&term.components.len())));
     }
 
     #[test]
@@ -711,6 +749,47 @@ mod tests {
                 .abs()
                 < 1.0e-12
         );
+    }
+
+    #[test]
+    fn higher_order_terms_are_recovered_but_labelled_diagnostic() {
+        let observations = observations_for(
+            Cohort::Discovery,
+            "Classical",
+            DISCOVERY_SEEDS[0],
+            |cell| {
+                let linear = [-1.0, 0.0, 1.0];
+                let quadratic = [1.0, -2.0, 1.0];
+                5.0 * linear[cell.valence as usize]
+                    * quadratic[cell.arousal as usize]
+                    * linear[cell.energy as usize]
+                    + 6.0
+                        * quadratic[cell.valence as usize]
+                        * linear[cell.arousal as usize]
+                        * quadratic[cell.energy as usize]
+                        * linear[cell.bars as usize]
+            },
+        );
+        let estimates = estimate_block(
+            Cohort::Discovery,
+            "Classical",
+            DISCOVERY_SEEDS[0],
+            "synthetic_response",
+            &observations,
+        )
+        .unwrap();
+        let three_way = find(
+            &estimates,
+            "valence_linear__arousal_quadratic__energy_linear",
+        );
+        let four_way = find(
+            &estimates,
+            "valence_quadratic__arousal_linear__energy_quadratic__bars_linear",
+        );
+        assert_eq!(three_way.order, 3);
+        assert_eq!(four_way.order, 4);
+        assert!((three_way.estimate - 5.0).abs() < 1.0e-12);
+        assert!((four_way.estimate - 6.0).abs() < 1.0e-12);
     }
 
     #[test]
