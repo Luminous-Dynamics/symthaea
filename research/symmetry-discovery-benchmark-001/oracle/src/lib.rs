@@ -922,12 +922,17 @@ mod tests {
             .unwrap();
         let mut point_certificate = manifest.structural_certificate(point_case).unwrap();
         manifest.verify_certificate(point_case, &point_certificate).unwrap();
+        let rejected_point = point_certificate
+            .decisions
+            .iter_mut()
+            .find(|decision| !decision.accepted)
+            .expect("C4 chiral fixture has at least one rejected reflection");
         if let StabilizerWitnessV1::MovedPoint { transformed, .. } =
-            &mut point_certificate.decisions[0].witness
+            &mut rejected_point.witness
         {
             transformed.0 += 1;
         } else {
-            panic!("expected rejected element with a moved-point witness");
+            panic!("rejected structural action must carry a moved-point witness");
         }
         assert!(manifest.verify_certificate(point_case, &point_certificate).is_err());
 
@@ -939,14 +944,19 @@ mod tests {
         manifest
             .verify_certificate(polynomial_case, &polynomial_certificate)
             .unwrap();
+        let rejected_polynomial = polynomial_certificate
+            .decisions
+            .iter_mut()
+            .find(|decision| !decision.accepted)
+            .expect("C4-only polynomial has rejected reflections");
         if let StabilizerWitnessV1::PolynomialCoefficientMismatch {
             transformed_coefficient,
             ..
-        } = &mut polynomial_certificate.decisions[0].witness
+        } = &mut rejected_polynomial.witness
         {
             *transformed_coefficient += 1;
         } else {
-            panic!("expected rejected polynomial action with a coefficient witness");
+            panic!("rejected polynomial action must carry a coefficient witness");
         }
         assert!(
             manifest
