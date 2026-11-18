@@ -25,6 +25,26 @@ use symthaea_broca::training::TrainingDataset;
 
 use symthaea_core::genesis::GenesisSeed;
 
+/// Encode the supervised target with the exact tokenizer used by the Mamba teacher.
+///
+/// TrainingPair::target_ids may have been produced by Broca's separate BPE tokenizer
+/// (or by a stale tokenizer revision). Never trust cached IDs for Mamba distillation:
+/// the teacher's vocabulary is the only valid ID space for this forward pass.
+fn encode_teacher_target(
+    target_text: &str,
+    encode: impl FnOnce(&str) -> anyhow::Result<Vec<u32>>,
+) -> anyhow::Result<Vec<u32>> {
+    if target_text.trim().is_empty() {
+        anyhow::bail!("target_text is empty");
+    }
+
+    let target_ids = encode(target_text)?;
+    if target_ids.is_empty() {
+        anyhow::bail!("target_text encoded to zero Mamba tokens");
+    }
+    Ok(target_ids)
+}
+
 fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -317,9 +337,29 @@ fn main() {
             // Distill step: update projection using Local FEP (Predictive Coding)
             let lr = r#gen.compute_lr();
             let thought_hv = r#gen.encoder().encode(&channels);
-            r#gen
-                .local_fep_distill(&thought_hv, &result.token_ids, lr)
-                .unwrap();
+            // Supervise the projection against the actual dataset target, not its own
+            // sampled output. Re-encode from target_text with Mamba's tokenizer because
+            // TrainingPair::target_ids can belong to Broca's independent vocabulary.
+            let target_ids = match encode_teacher_target(&pair.target_text, |text| {
+                r#gen.mamba_mut().encode(text)
+            }) {
+                Ok(ids) => ids,
+                Err(e) => {
+                    eprintln!(
+                        "Invalid teacher target at sample {i} ({} chars): {e}",
+                        pair.target_text.len()
+                    );
+                    process::exit(1);
+                }
+            };
+
+            // Do not let the just-generated sample's recurrent state leak into the
+            // teacher-forced target pass or across training examples.
+            r#gen.mamba_mut().reset();
+            if let Err(e) = r#gen.local_fep_distill(&thought_hv, &target_ids, lr) {
+                eprintln!("Teacher-forced distillation failed at sample {i}: {e}");
+                process::exit(1);
+            }
 
             if (i + 1) % 10 == 0 {
                 tracing::info!(epoch, sample = i + 1, "Sample processed");
@@ -1201,4 +1241,46 @@ fn print_usage() {
     eprintln!("Other:");
     eprintln!("  --model ID             HuggingFace model ID (default: state-spaces/mamba-130m)");
     eprintln!("  --help, -h             Show this help message");
+}
+
+
+#[cfg(test)]
+mod teacher_target_tests {
+    use super::encode_teacher_target;
+
+    #[test]
+    fn target_text_is_encoded_by_the_teacher_tokenizer() {
+        let text = "the supplied target, not a generated completion";
+        let mut observed = String::new();
+
+        let ids = encode_teacher_target(text, |input| {
+            observed = input.to_owned();
+            Ok(vec![17, 23, 41])
+        })
+        .expect("non-empty target should encode");
+
+        assert_eq!(observed, text);
+        assert_eq!(ids, vec![17, 23, 41]);
+    }
+
+    #[test]
+    fn empty_teacher_encoding_fails_closed() {
+        let error = encode_teacher_target("not empty", |_| Ok(Vec::new()))
+            .expect_err("an empty token sequence must not silently train");
+
+        assert!(error.to_string().contains("zero Mamba tokens"));
+    }
+
+    #[test]
+    fn whitespace_only_target_fails_before_tokenizer_invocation() {
+        let mut invoked = false;
+        let error = encode_teacher_target("  \n\t ", |_| {
+            invoked = true;
+            Ok(vec![1])
+        })
+        .expect_err("whitespace-only targets must be rejected");
+
+        assert!(!invoked);
+        assert!(error.to_string().contains("target_text is empty"));
+    }
 }
