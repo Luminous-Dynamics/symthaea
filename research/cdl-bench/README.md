@@ -25,6 +25,7 @@ cd research/cdl-bench
 cargo test
 cargo run --release -- e0 --bytes 65536 --seed 42
 cargo run --release -- causal --steps 10000 --seed 42
+cargo run --release -- numeric --values 10000 --seed 42
 cargo run --release -- encode --model order1 input.bin output.cdl
 cargo run --release -- decode output.cdl reconstructed.bin
 cmp input.bin reconstructed.bin
@@ -85,3 +86,20 @@ order-0/order-1 models, plus Zstandard when installed. It is **not** yet a
 causal predictor comparison: it tests generator reproducibility and coding
 plumbing only. The finite-state latent labels remain evaluator-side; the
 serialized SCM stream includes the intervention manifest and observed i16 values.
+
+## Typed numerical i16 pipeline
+
+`cdl-bench numeric --values 10000 --seed 42` compares four reversible
+transforms (raw, delta, delta-of-delta and XOR-with-previous), each paired with
+the order-0 and order-1 byte models. It also reports Zstandard size on the raw
+little-endian i16 bytes when the command is installed.
+
+The library API is:
+- `compress_i16(values, transform, model)`
+- `decompress_i16(frame, max_values)`
+
+The numeric frame wraps the existing CDL frame, counts values explicitly, and
+checks both the inner frame and reconstructed raw i16 data. This is a baseline
+transform layer, not a reimplementation of Pco and not yet a causal predictor.
+The next comparisons should include Pco, Sprintz, Gorilla/Chimp, TSCom-Bench
+and SEP under matched dataset preparation and hardware.
