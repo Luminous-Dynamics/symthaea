@@ -177,6 +177,7 @@ impl MissionExposureManifest {
         let mut block_ids = HashSet::new();
         let mut sequence_indices = HashSet::new();
         let mut measured_observation_count = 0usize;
+        let mut lifetime_equivalence_claim_count = 0usize;
 
         if self.schema_version != "0.1.0" {
             push(&mut findings, "unsupported_schema_version", "schema_version",
@@ -258,6 +259,10 @@ impl MissionExposureManifest {
                         push(&mut findings, "reviewed_source_missing_provenance", format!("{path}.{field}"),
                             "A reviewed physical source requires article, time, clock and raw-data identity.");
                     }
+                }
+                if run.missing_data_fraction.is_none() {
+                    push(&mut findings, "reviewed_source_missing_data_status", format!("{path}.missing_data_fraction"),
+                        "A reviewed source must explicitly report its missing-data fraction, including zero.");
                 }
                 if run.instrument_refs.is_empty() || run.instrument_refs.iter().any(|v| is_blank(v)) {
                     push(&mut findings, "reviewed_source_missing_instruments", format!("{path}.instrument_refs"),
