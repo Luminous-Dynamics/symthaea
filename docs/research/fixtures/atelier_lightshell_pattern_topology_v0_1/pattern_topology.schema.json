@@ -1,0 +1,635 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:lightshell-pattern-topology:0.1.0",
+  "title": "Atelier Lightshell Robot Panel and Pattern Topology",
+  "description": "Binds robot compiler panels to source-native textile pattern pieces, seams, attachments, articulation and service access. It is not a CAD authoring, solver, machine-execution or physical qualification system.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "topology_id",
+    "state",
+    "compiler_binding",
+    "interop_binding",
+    "source_artifacts",
+    "compiler_panels",
+    "compiler_keepouts",
+    "panels",
+    "boundary_edges",
+    "connections",
+    "articulation_features",
+    "service_features",
+    "semantic_obligations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "topology_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "proposed",
+        "source_bound",
+        "topology_preflighted"
+      ]
+    },
+    "compiler_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compiler_issue_ref",
+        "compiler_revision",
+        "compilation_id",
+        "robot_id",
+        "robot_article_revision",
+        "geometry_state",
+        "geometry_digest",
+        "geometry_units"
+      ],
+      "properties": {
+        "compiler_issue_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "compiler_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "compilation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robot_article_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "geometry_state": {
+          "enum": [
+            "synthetic_fixture",
+            "cad_revision_bound"
+          ]
+        },
+        "geometry_digest": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-fA-F]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "geometry_units": {
+          "const": "mm"
+        }
+      }
+    },
+    "interop_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "interop_issue_ref",
+        "interop_contract_revision",
+        "sidecar_ref",
+        "sidecar_digest"
+      ],
+      "properties": {
+        "interop_issue_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "interop_contract_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sidecar_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sidecar_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        }
+      }
+    },
+    "source_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "artifact_id",
+          "source_format",
+          "format_version",
+          "artifact_ref",
+          "artifact_digest"
+        ],
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_format": {
+            "enum": [
+              "dxf",
+              "obj",
+              "usd",
+              "knitout",
+              "native_pattern"
+            ]
+          },
+          "format_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "artifact_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "artifact_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-fA-F]{64}$"
+          }
+        }
+      }
+    },
+    "compiler_panels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "panel_id",
+          "zone_id",
+          "coordinate_frame_ref"
+        ],
+        "properties": {
+          "panel_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "zone_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "coordinate_frame_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "compiler_keepouts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "keepout_id",
+          "kind",
+          "affected_zone_ids"
+        ],
+        "properties": {
+          "keepout_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "service_access",
+              "emergency_access",
+              "swept_motion",
+              "cable_route",
+              "sensor_aperture",
+              "thermal_vent",
+              "pinch_shear",
+              "charging_interface"
+            ]
+          },
+          "affected_zone_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "panels": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "panel_id",
+          "zone_id",
+          "compiler_panel_id",
+          "source_artifact_id",
+          "source_piece_id",
+          "pattern_revision_ref",
+          "pattern_piece_digest",
+          "surface_3d_ref",
+          "correspondence_ref",
+          "correspondence_state",
+          "coordinate_frame_ref",
+          "units",
+          "grain_direction",
+          "material_orientation_ref"
+        ],
+        "properties": {
+          "panel_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "zone_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "compiler_panel_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_artifact_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_piece_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pattern_revision_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pattern_piece_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-fA-F]{64}$"
+          },
+          "surface_3d_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "correspondence_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "correspondence_state": {
+            "enum": [
+              "verified",
+              "declared",
+              "unknown",
+              "lossy"
+            ]
+          },
+          "coordinate_frame_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "units": {
+            "const": "mm"
+          },
+          "grain_direction": {
+            "enum": [
+              "warp",
+              "weft",
+              "course",
+              "wale",
+              "bias",
+              "none",
+              "unknown"
+            ]
+          },
+          "material_orientation_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "boundary_edges": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "edge_id",
+          "panel_id",
+          "role",
+          "curve_ref",
+          "length_mm",
+          "length_tolerance_mm"
+        ],
+        "properties": {
+          "edge_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "panel_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "enum": [
+              "seam",
+              "attachment",
+              "service_opening",
+              "articulation_boundary",
+              "free_boundary"
+            ]
+          },
+          "curve_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "length_mm": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "length_tolerance_mm": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "connections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "connection_id",
+          "connection_kind",
+          "edge_refs",
+          "construction_route_ref",
+          "path_ref",
+          "max_length_mismatch_mm",
+          "construction_revision_ref",
+          "interface_design_ref",
+          "retention_evidence_ref"
+        ],
+        "properties": {
+          "connection_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "connection_kind": {
+            "enum": [
+              "sewn_seam",
+              "knit_integrated",
+              "bonded_seam",
+              "removable_attachment"
+            ]
+          },
+          "edge_refs": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "construction_route_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "max_length_mismatch_mm": {
+            "type": "number",
+            "minimum": 0
+          },
+          "construction_revision_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "interface_design_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retention_evidence_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "articulation_features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "feature_id",
+          "feature_kind",
+          "zone_id",
+          "joint_ref",
+          "motion_envelope_ref",
+          "affected_panel_ids",
+          "feature_region_ref",
+          "test_plan_ref"
+        ],
+        "properties": {
+          "feature_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "feature_kind": {
+            "enum": [
+              "gaiter",
+              "gusset",
+              "fold",
+              "pleat",
+              "slit",
+              "segmented_overlap"
+            ]
+          },
+          "zone_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "joint_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "motion_envelope_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "affected_panel_ids": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "feature_region_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "test_plan_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "service_features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "feature_id",
+          "panel_id",
+          "keepout_ref",
+          "opening_edge_refs",
+          "access_mode",
+          "access_path_ref",
+          "service_test_plan_ref"
+        ],
+        "properties": {
+          "feature_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "panel_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "keepout_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "opening_edge_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "access_mode": {
+            "enum": [
+              "removable_panel",
+              "zip_opening",
+              "roll_back",
+              "tool_access"
+            ]
+          },
+          "access_path_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "service_test_plan_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "semantic_obligations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "semantic_id",
+          "preservation_state",
+          "source_location_ref",
+          "sidecar_location_ref",
+          "evidence_ref",
+          "external_owner_ref",
+          "declared_out_of_scope",
+          "scope_disposition_ref"
+        ],
+        "properties": {
+          "semantic_id": {
+            "enum": [
+              "pattern_piece_identity",
+              "pattern_geometry_2d",
+              "seam_topology",
+              "correspondence_2d_3d",
+              "coordinate_frame_units",
+              "grain_direction",
+              "material_orientation",
+              "knit_operation_semantics",
+              "machine_capability",
+              "assembly_operation"
+            ]
+          },
+          "preservation_state": {
+            "enum": [
+              "native_preserved",
+              "sidecar_preserved",
+              "external_owner_ref",
+              "unsupported",
+              "lossy",
+              "unknown"
+            ]
+          },
+          "source_location_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sidecar_location_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "external_owner_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "declared_out_of_scope": {
+            "type": "boolean"
+          },
+          "scope_disposition_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
