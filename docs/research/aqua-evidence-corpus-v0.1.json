@@ -2371,6 +2371,202 @@
           ]
         }
       ]
+    },
+    {
+      "entry_id": "uk-energy-technology-list-showers",
+      "subject": {
+        "type": "programme",
+        "id": "uk.energy-technology-list.showers",
+        "name": "UK Energy Technology List — Showers",
+        "manufacturer": null,
+        "sku": null,
+        "market": "United Kingdom; non-domestic applications",
+        "revision": "Criteria page accessed 2026-11-18"
+      },
+      "claims": [
+        {
+          "claim_id": "uk.etl.showers.maximum-flow.no-ubf",
+          "parameter": "maximum_rated_flow",
+          "original_value": "Maximum available flow Qmax = 9 L/min without user-behaviour features",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 9,
+            "unit": "L/min"
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "Shower head / shower valve / shower system; no UBF",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "UK ETL Showers section 1.3.2",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "exact UWL test output for a selected commercial product",
+              "product-specific test report"
+            ],
+            "notes": "Non-domestic ETL eligibility criterion."
+          },
+          "source": {
+            "url": "https://etl.energysecurity.gov.uk/products/showers/showers",
+            "publisher": "UK Department for Energy Security and Net Zero — Energy Technology List",
+            "source_type": "official_standard_or_programme",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "External non-domestic programme criterion; apply only to the relevant product category and ETL method."
+          },
+          "limitations": [
+            "Not a South African legal limit or a domestic product certification.",
+            "Maximum available flow is not proof of task quality, spray coverage or thermal comfort."
+          ]
+        },
+        {
+          "claim_id": "uk.etl.showers.maximum-flow.ubf",
+          "parameter": "maximum_rated_flow",
+          "original_value": "Maximum available flow Qmax = 10.6 L/min with user-behaviour features",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 10.6,
+            "unit": "L/min"
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "Shower head / shower valve / shower system; with UBF",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "UK ETL Showers section 1.3.2",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "exact UWL test output for a selected commercial product",
+              "product-specific test report"
+            ],
+            "notes": "Non-domestic ETL eligibility criterion. UBF means user-behaviour feature."
+          },
+          "source": {
+            "url": "https://etl.energysecurity.gov.uk/products/showers/showers",
+            "publisher": "UK Department for Energy Security and Net Zero — Energy Technology List",
+            "source_type": "official_standard_or_programme",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Higher maximum flow allowance is conditional on defined user-behaviour features; it is not a blanket efficiency advantage."
+          },
+          "limitations": [
+            "Do not compare with the 9 L/min no-UBF ceiling without preserving the UBF condition.",
+            "This is a non-domestic programme criterion, not an Aqua target."
+          ]
+        },
+        {
+          "claim_id": "uk.etl.showers.pressure-independence.minimum-flow",
+          "parameter": "minimum_flow_fraction",
+          "original_value": "At least 60% of maximum available flow at 1.5 bar relative to the 3 bar reference, where reference flow is <=8.0 L/min",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 60,
+            "unit": "% of rated maximum"
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "Same exact shower product category and declared configuration",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "UK ETL Showers section 1.4.3.2; Unified Water Label scheme January 2023",
+            "sample_count": null,
+            "pressure_datum": "3 bar reference and 1.5 bar lower pressure",
+            "unknown_conditions": [
+              "product-specific specimen result",
+              "test uncertainty and sample size for a chosen model",
+              "exact UWL test report"
+            ],
+            "notes": "Only applies where 3 bar reference flow is <=8.0 L/min and the non-domestic ETL category applies.",
+            "pressure_points_kpa": [
+              150,
+              300
+            ]
+          },
+          "source": {
+            "url": "https://etl.energysecurity.gov.uk/products/showers/showers",
+            "publisher": "UK Department for Energy Security and Net Zero — Energy Technology List",
+            "source_type": "official_standard_or_programme",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Useful 1.5 bar / 3 bar pressure-independence comparator only when the ETL product, reference-flow and Unified Water Label method conditions apply."
+          },
+          "limitations": [
+            "The 60% value is a programme criterion, not a universal minimum for every shower.",
+            "Flow retention alone does not establish spray force, coverage, completed task quality, comfort or safety.",
+            "Do not claim ETL conformity from an Aqua two-point calculation alone."
+          ]
+        },
+        {
+          "claim_id": "uk.etl.showers.spray-coverage.method",
+          "parameter": "spray_coverage_criteria",
+          "original_value": "Spray coverage follows the Unified Water Label shower-outlet procedure published January 2023",
+          "canonical_value": {
+            "kind": "text",
+            "text": "Spray coverage tested using the Unified Water Label procedure published January 2023."
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "Shower heads and shower systems",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "UK ETL Showers section 1.4.3.3; Unified Water Label scheme January 2023",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "individual product spray-coverage outcome",
+              "complete test report for selected SKU"
+            ],
+            "notes": "Use the scheme's controlled method; the ETL summary page does not reproduce all UWL procedures."
+          },
+          "source": {
+            "url": "https://etl.energysecurity.gov.uk/products/showers/showers",
+            "publisher": "UK Department for Energy Security and Net Zero — Energy Technology List",
+            "source_type": "official_standard_or_programme",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "A standards/method reference, not evidence that any particular product passed the spray-coverage procedure."
+          },
+          "limitations": [
+            "Aqua's spatial deposition map remains supplementary and is not a substitute for the UWL method."
+          ]
+        }
+      ]
+    }
+  ],
+  "change_log": [
+    {
+      "date": "2026-11-18",
+      "change": "Added UK non-domestic ETL shower flow, pressure-independence and spray-coverage criteria as source-classified programme evidence."
     }
   ]
 }
