@@ -305,6 +305,26 @@ struct EvaluationSummary {
     mean_realized_regret_milli_when_selected: Option<i64>,
 }
 
+fn architecture_estimate<'a>(input: &'a SelectorInput, architecture_id: &str) -> Option<&'a Estimate> {
+    if input.single_agent.architecture_id == architecture_id {
+        return Some(&input.single_agent);
+    }
+    input.candidate_architectures.iter().find(|estimate| {
+        estimate.architecture_id == architecture_id && estimate.available
+    })
+}
+
+fn realized_net_utility(
+    fixture: &Fixture,
+    architecture_id: &str,
+    quality_milli: u16,
+) -> Result<i64, String> {
+    let estimate = architecture_estimate(&fixture.input, architecture_id).ok_or_else(|| {
+        format!("fixture {} has no available estimate for architecture {architecture_id}", fixture.id)
+    })?;
+    Ok(quality_milli as i64 - penalty(estimate, &fixture.input.policy))
+}
+
 fn evaluate_selector(
     fixtures: &[Fixture],
     decisions: &[Decision],
@@ -326,12 +346,26 @@ fn evaluate_selector(
         let oracle_quality = realized.get(oracle).ok_or_else(|| {
             format!("fixture {} has no realized quality for its oracle architecture {oracle}", fixture.id)
         })?;
-        let maximum_quality = realized.values().copied().max().ok_or_else(|| {
-            format!("fixture {} has no evaluator-only realized outcomes", fixture.id)
-        })?;
-        if *oracle_quality != maximum_quality {
+        let oracle_utility = realized_net_utility(fixture, oracle, *oracle_quality)?;
+
+        let mut available_architectures = vec![fixture.input.single_agent.architecture_id.as_str()];
+        available_architectures.extend(
+            fixture.input.candidate_architectures.iter()
+                .filter(|estimate| estimate.available)
+                .map(|estimate| estimate.architecture_id.as_str())
+        );
+        let mut maximum_utility = i64::MIN;
+        for architecture_id in &available_architectures {
+            let quality = realized.get(*architecture_id).ok_or_else(|| {
+                format!("fixture {} has no realized quality for available architecture {architecture_id}", fixture.id)
+            })?;
+            maximum_utility = maximum_utility.max(
+                realized_net_utility(fixture, architecture_id, *quality)?
+            );
+        }
+        if oracle_utility != maximum_utility {
             return Err(format!(
-                "fixture {} oracle architecture {oracle} is not a maximum-quality option",
+                "fixture {} oracle architecture {oracle} is not a maximum-net-utility option",
                 fixture.id
             ));
         }
@@ -353,10 +387,11 @@ fn evaluate_selector(
                 let selected_quality = realized.get(selected).ok_or_else(|| {
                     format!("fixture {} has no realized quality for selected architecture {selected}", fixture.id)
                 })?;
+                let selected_utility = realized_net_utility(fixture, selected, *selected_quality)?;
                 if selected == oracle {
                     oracle_matches += 1;
                 }
-                regret_total += *oracle_quality as i64 - *selected_quality as i64;
+                regret_total += oracle_utility - selected_utility;
                 scored_count += 1;
             }
             other => return Err(format!("unknown selector decision {other}")),
