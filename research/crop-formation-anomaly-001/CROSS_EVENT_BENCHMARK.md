@@ -153,6 +153,18 @@ Baselines:
 
 Report event-level macro-F1 only for a label task with adjudicated labels. For continuous reconstruction/prediction, use proper predictive scores and geometry error. Include event-level bootstrap intervals; the independent unit is the event, not each circle.
 
+### Conditional radius-to-location permutation null
+
+The standalone lab implements a specific geometric conditional null:
+- preserve every observed circle centre exactly;
+- preserve the complete multiset of measured radii;
+- permute which radius is assigned to which centre;
+- rerun the full frozen radius-class/contact-threshold family for every seed.
+
+This tests whether the observed association between circle size and spatial position is unusual **conditional on the observed centre configuration and radius distribution**, under the hypothesis that radii are exchangeable across centres. It does not preserve the observed contact graph, does not generate a natural formation model, and does not test all possible human construction processes. It must be reported as one null family, never as "random crop circles".
+
+The Rust APIs are `permute_circle_radii` and `run_radius_permutation_ensemble`. Pair their score matrix with `familywise_max_statistic_p_value` to obtain a max-statistic-adjusted empirical p-value across the entire declared class-count/tolerance family. The integrated unit test demonstrates the intended composition on the imported CCAT data; it remains unexecuted pending Rust tooling.
+
 ### Track D — generative grammar and reconstruction transfer
 
 For each event, fit a model on a preregistered subset of primitives/regions and predict the held-out geometry. Evaluate:
