@@ -199,11 +199,21 @@ MMAE for ICASSP 2027 exposes 2,000 public development examples and 17,741 atomic
 
 Source: https://audio-editing-challenge.github.io/
 
-### Commercial production UX
+### Commercial production UX and direct symbolic-input baselines
 
-Suno Studio 2.0 includes MIDI editing, automation, synths, effects and chat-assisted production. Basic editing controls are therefore table stakes. Muse's distinct hypothesis is that score edits can be semantic transactions with source identity, exact protected scope, reversible diffs and independent evidence receipts.
+Basic editing controls are no longer differentiators:
 
-Source: https://help.suno.com/en/articles/13670529
+- **Suno MIDI-in (2026-11-04)** accepts MIDI files as a starting point, letting users request exact following or motif development. Its Studio workflow also supports MIDI note/timing edits. This makes symbolic-input generation an explicit current product baseline, not a hypothetical future feature. Sources: https://help.suno.com/en/articles/14594177 and https://suno.com/blog/MIDI-in-create
+- **Eleven Music v2.5** supports structured composition plans with up to 30 ordered chunks, per-chunk duration/style/text, and audio-reference chunks that can be inserted unchanged. Its inpainting API can retain selected source slices while regenerating other chunks. Sources: https://elevenlabs.io/docs/eleven-api/guides/how-to/music/composition-plans and https://elevenlabs.io/docs/eleven-api/guides/how-to/music/inpainting
+- **Suno Studio 2.0** also exposes MIDI editing, automation, synths, effects and chat-assisted production. Source: https://help.suno.com/en/articles/13670529
+
+Muse must not claim novelty merely for accepting MIDI, rendering a score, chunking a composition, or editing a selected region. Its stronger testable hypothesis is a source-authored and replayable edit contract: persistent identity where supported, exact allowed/protected scope, independent target and preservation checks, explicit abstention when unsupported, and deterministic undo/redo receipts.
+
+### Comparator protocol caveat
+
+YuE2's public WildSongBench report includes a best-of-eight result, while its benchmark notes explain that candidate counts and selection protocols differ among systems. Report candidate budget, reranking metric, number of ASR repeats, and whether the displayed result is single-sample or selected-from-N. Do not treat the highest selected-candidate score as a matched one-sample head-to-head against every commercial baseline.
+
+Sources: https://map-yue2.github.io/ and https://github.com/dsmpd/YuE2/blob/main/docs/benchmarks.md
 
 ### Primary-source benchmark update — 18 November 2026
 
