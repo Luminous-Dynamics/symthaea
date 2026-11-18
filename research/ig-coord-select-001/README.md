@@ -43,6 +43,16 @@ cargo run --manifest-path research/ig-coord-select-001/Cargo.toml -- \
   research/ig-coord-select-001/COORD_SELECT_FIXTURES_V0_1.json
 ```
 
+## Evaluator-only routing analysis
+
+The checked-in fixtures include an `evaluation_only` section with realized outcomes and an oracle architecture. The selector function receives only `SelectorInput`; the oracle and realized outcomes are read afterward by a separate evaluator. That evaluator:
+- validates that the declared oracle is the available option with the highest realized net utility;
+- applies the same declared resource penalties to realized quality;
+- reports oracle agreement and mean realized regret only for SELECT/SINGLE decisions;
+- counts CALIBRATE separately and does not misreport calibration abstentions as zero-regret selections.
+
+A separate authoring-session cross-check matched all 12 frozen selector decisions and all 12 cost-adjusted oracle labels. This validates the fixture logic only; it is not a model-run evaluation.
+
 ## Claim ceiling
 
 A passing synthetic selector fixture only demonstrates that the rule implements the stated robust-gain/cost/calibration semantics. It does not establish that the rule predicts collaboration gains, selects an optimal architecture in production, beats any SOTA framework, or generalizes across models and task families.
