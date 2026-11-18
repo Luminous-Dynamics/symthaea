@@ -175,3 +175,10 @@ Sixteen unit tests are authored; no current-head test or Clippy pass is claimed.
 The new dependency-free serviceability module validates repair-job observations and summarizes a frozen cohort. It keeps destructive finish removal, unknown access, failed/pending repair and missing return-to-service evidence visible. A job only counts as a qualified non-destructive routine repair when access is non-destructive, the post-repair function check passes, an independent device-authority receipt exists, and any required Mycelix water-quality or metrology receipt exists.
 
 The module reports medians and counts, not lifecycle cost or resource totals. It leaves canonical cost/resource/environmental accounting with Symtropy and Mycelix. The protocol and frozen job manifest are in docs/AQUA_REPAIRABILITY_SERVICEABILITY_PROTOCOL_V0_1.md and issue #12844.
+
+
+## Product-category and standard-clause-bound task capabilities
+
+The task-phase compiler now binds each plan and qualified mode to an explicit fixture category (Tap, ShowerOutlet, ShowerSystem, or OtherSanitaryFixture) and a qualification method scope. It rejects an EN 18021 tap boost clause (7.3.3) being used to qualify a shower-outlet mode (8.3.2), and it binds shower-system boost to its own clause (10.3.8). UWL 2023 boost qualification is recorded as its own route. The generic independently qualified method route is explicitly not a claim of conformity to one of those standards.
+
+This is a scope-integrity contract only. It does not implement EN 18021 shower clauses, UWL certification, boost hardware, or actuator control. The shower-specific numerical acceptance requirements of EN 18021 need the controlled full standard before implementation. The task-phase module now has 23 authored tests; none is claimed executed on the current head.
