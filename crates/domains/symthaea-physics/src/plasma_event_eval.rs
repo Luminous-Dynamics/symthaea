@@ -2055,6 +2055,74 @@ mod tests {
     }
 
     #[test]
+    fn symtropy_synthetic_waveform_export_deserializes_and_always_abstains_at_measured_gate() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../benchmarks/plasma/symtropy-synthetic-observation-interop-v0.json"
+        )).expect("Symtropy interoperability fixture should parse");
+        assert_eq!(
+            fixture["producer_repository"],
+            "Luminous-Dynamics/symtropy"
+        );
+        assert_eq!(fixture["producer_pull_request"], 5905);
+        assert_eq!(
+            fixture["producer_commit"],
+            "70317a32958491acd8e0416639014d32e1f36b2c"
+        );
+        assert_eq!(
+            fixture["export_schema"],
+            "luminous.plasma-synthetic-observation-export.v0.1"
+        );
+        assert_eq!(
+            fixture["observation_frame_schema"],
+            PLASMA_OBSERVATION_SCHEMA
+        );
+        assert_eq!(fixture["physical_measurements"], false);
+
+        let cases = fixture["frame_fixture_cases"]
+            .as_array()
+            .expect("frame fixture cases");
+        assert_eq!(cases.len(), 6);
+
+        for case in cases {
+            let frame_json = &case["observation_frame"];
+            let frame: PlasmaObservationFrame = serde_json::from_value(frame_json.clone())
+                .expect("Symtropy observation frame must deserialize into Symthaea");
+            assert_eq!(frame.expected_channel_ids, vec!["density".to_owned()]);
+            assert_eq!(frame.channels.len(), 1);
+            assert_eq!(
+                frame.channels[0].diagnostic_system_id,
+                "symtropy.synthetic-waveform-replay"
+            );
+
+            let (expected_frame, mut requirements) =
+                observation_frame(measured_disposition(frame.frame_time_ns), frame.frame_time_ns);
+            requirements[0].expected_units = "10^20 m^-3".to_owned();
+            let _ = expected_frame;
+
+            let expected_status = case["expected_status"]
+                .as_str()
+                .expect("expected status");
+            let actual_status = frame_json["channels"][0]["disposition"]["status"]
+                .as_str()
+                .expect("disposition status");
+            assert_eq!(actual_status, expected_status);
+            assert!(matches!(
+                actual_status,
+                "synthetic" | "unavailable" | "invalid"
+            ));
+
+            let gate = frame
+                .evaluate_decision_requirements(&requirements)
+                .expect("valid synthetic/unavailable/invalid frame");
+            assert!(
+                matches!(gate, DecisionInputGate::Abstain { .. }),
+                "case {} must never satisfy a direct-measurement gate",
+                case["case_id"]
+            );
+        }
+    }
+
+    #[test]
     fn evaluation_receipt_roundtrips_and_recomputes_its_cohort() {
         let positive = score_shot_alarms(
             "positive",
