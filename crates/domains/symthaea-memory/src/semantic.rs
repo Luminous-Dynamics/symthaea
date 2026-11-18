@@ -1076,22 +1076,22 @@ mod tests {
     fn semantic_store_rejects_malformed_vectors_and_errors_before_mutation() {
         let mut mem = SemanticMemory::new(4);
 
-        assert_eq!(
+        assert!(matches!(
             mem.try_store_with_provenance(vec![], 0.1, None, None),
             Err(SemanticMemoryInputError::EmptyVector)
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             mem.try_store_with_provenance(vec![0.0, 0.0], 0.1, None, None),
             Err(SemanticMemoryInputError::ZeroNormVector)
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             mem.try_store_with_provenance(vec![1.0, f32::NAN], 0.1, None, None),
             Err(SemanticMemoryInputError::NonFiniteVector { index: 1 })
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             mem.try_store_with_provenance(vec![1.0, 0.0], f32::INFINITY, None, None),
             Err(SemanticMemoryInputError::NonFinitePredictionError)
-        );
+        ));
         assert!(mem.is_empty());
         assert_eq!(mem.stats.total_stored, 0);
 
@@ -1105,13 +1105,13 @@ mod tests {
         assert!(mem
             .try_store_with_provenance(vec![1.0, 0.0, 0.0], 0.1, None, None)
             .is_ok());
-        assert_eq!(
+        assert!(matches!(
             mem.try_store_with_provenance(vec![1.0, 0.0], 0.2, None, None),
             Err(SemanticMemoryInputError::DimensionMismatch {
                 expected: 3,
                 actual: 2
             })
-        );
+        ));
         assert_eq!(mem.len(), 1);
         assert_eq!(mem.stats.total_stored, 1);
     }
@@ -1160,10 +1160,10 @@ mod tests {
         );
         mem.set_similarity_threshold(f32::INFINITY);
         assert_eq!(mem.similarity_threshold(), 0.6);
-        assert_eq!(
+        assert!(matches!(
             SemanticMemory::try_with_threshold(4, f32::NAN),
             Err(SemanticMemoryInputError::InvalidSimilarityThreshold)
-        );
+        ));
         assert_eq!(SemanticMemory::with_threshold(4, f32::NAN).similarity_threshold(), 0.3);
     }
 
@@ -1179,10 +1179,10 @@ mod tests {
     #[test]
     fn zero_capacity_try_store_returns_explicit_error() {
         let mut mem = SemanticMemory::new(0);
-        assert_eq!(
+        assert!(matches!(
             mem.try_store_with_provenance(vec![1.0], 0.1, None, None),
             Err(SemanticMemoryInputError::ZeroCapacity)
-        );
+        ));
     }
 
     #[test]
