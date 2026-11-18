@@ -73,6 +73,7 @@ fn validate_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
     let mut observation_modalities = HashMap::with_capacity(observations.len());
     let mut condition_variants = HashSet::new();
     let mut observation_count_by_modality: HashMap<String, usize> = HashMap::new();
+    let mut measurement_timestamps = Vec::with_capacity(observations.len());
 
     for (index, observation) in observations.iter().enumerate() {
         let id = required_text(observation, "observation_id")?;
@@ -133,7 +134,22 @@ fn validate_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
         let pressure_unit = required_text(conditions, "pressure_unit")?;
         let geometry_id = required_text(conditions, "geometry_id")?;
         let timestamp = required_text(conditions, "measurement_timestamp")?;
-        let _ = (temperature_unit, field_unit, field_orientation, pressure_unit, geometry_id, timestamp);
+        if timestamp.len() != 20 || !timestamp.ends_with('Z') {
+            return Err(format!("observation {id} timestamp must be UTC RFC3339 seconds"));
+        }
+        measurement_timestamps.push(timestamp.to_owned());
+        let operator = observation
+            .get("forward_operator_coefficients")
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("observation {id} requires forward_operator_coefficients"))?;
+        if operator.len() != 2
+            || operator.iter().any(|value| {
+                value.as_f64().is_none_or(|number| !number.is_finite())
+            })
+        {
+            return Err(format!("observation {id} forward operator must contain two finite coefficients"));
+        }
+        let _ = (temperature_unit, field_unit, field_orientation, pressure_unit, geometry_id);
 
         // Keep condition variants explicit rather than requiring identical conditions
         // across distinct modalities on the same specimen.
@@ -152,6 +168,16 @@ fn validate_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
         .get("split")
         .ok_or_else(|| "missing calibration/holdout split".to_owned())?;
     let split_id = required_text(split, "split_id")?;
+    let pre_registered_at = required_text(split, "pre_registered_at")?;
+    if pre_registered_at.len() != 20 || !pre_registered_at.ends_with('Z') {
+        return Err("pre_registered_at must be UTC RFC3339 seconds".to_owned());
+    }
+    if measurement_timestamps
+        .iter()
+        .any(|timestamp| timestamp < pre_registered_at)
+    {
+        return Err("split registration must precede every observation acquisition".to_owned());
+    }
     if required_text(split, "holdout_rule")? != "leave_one_modality_out" {
         return Err("initial auditor supports leave_one_modality_out splits only".to_owned());
     }
@@ -456,6 +482,20 @@ mod tests {
         let (_, mut fixture) = inputs();
         fixture["observations"][2]["modality"] =
             json!("amplitude_sensitive_spectroscopy");
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn split_must_be_preregistered_before_any_observation() {
+        let (_, mut fixture) = inputs();
+        fixture["split"]["pre_registered_at"] = json!("2026-11-18T09:30:00Z");
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn each_observation_requires_a_finite_two_parameter_operator() {
+        let (_, mut fixture) = inputs();
+        fixture["observations"][1]["forward_operator_coefficients"] = json!([1.0, "invalid"]);
         assert!(audit_mutated(fixture).is_err());
     }
 }
