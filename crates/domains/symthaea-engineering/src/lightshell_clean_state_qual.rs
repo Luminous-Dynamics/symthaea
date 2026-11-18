@@ -1003,7 +1003,9 @@ mod tests {
     use serde_json::{json, Value};
 
     fn digest(character: char) -> String {
-        format!("sha256:{}", character.to_string().repeat(64))
+        // Convert arbitrary fixture labels to a deterministic, valid 64-hex placeholder.
+        let byte = format!("{:02x}", character as u32 % 256);
+        format!("sha256:{}", byte.repeat(32))
     }
 
     fn base_manifest() -> Value {
