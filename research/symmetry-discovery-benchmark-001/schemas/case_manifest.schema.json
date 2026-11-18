@@ -1,0 +1,370 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/symmetry-discovery-benchmark-001/schemas/case_manifest.schema.json",
+  "title": "Evidence-qualified symmetry benchmark manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "freeze_status",
+    "group_convention",
+    "ambient_group",
+    "cases",
+    "split_contract",
+    "benchmark_status"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "benchmark_id": {
+      "const": "LUMINOUS-SYMM-QUALIFIED-DISCOVERY-001"
+    },
+    "freeze_status": {
+      "enum": [
+        "protocol_fixtures_not_benchmark_results",
+        "frozen_for_benchmark",
+        "benchmark_executed"
+      ]
+    },
+    "group_convention": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ambient_group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group_id",
+        "description",
+        "elements",
+        "multiplication_contract",
+        "group_order",
+        "identity_element_id",
+        "inverse_table",
+        "multiplication_table"
+      ],
+      "properties": {
+        "group_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "elements": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "matrix"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "matrix": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "multiplication_contract": {
+          "type": "string",
+          "minLength": 1
+        },
+        "group_order": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "identity_element_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inverse_table": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "element_id",
+              "inverse_element_id"
+            ],
+            "properties": {
+              "element_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "inverse_element_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "multiplication_table": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "left_element_id",
+              "right_element_id",
+              "product_element_id"
+            ],
+            "properties": {
+              "left_element_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "right_element_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "product_element_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "track",
+          "target_subgroup",
+          "expected_subgroup_label",
+          "controls"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "track": {
+            "enum": [
+              "exact_finite_structural_stabilizer",
+              "finite_reference_group_regression_discovery"
+            ]
+          },
+          "geometry": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "dimension",
+              "points",
+              "point_order_semantics"
+            ],
+            "properties": {
+              "dimension": {
+                "const": 2
+              },
+              "points": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "number"
+                  }
+                }
+              },
+              "point_order_semantics": {
+                "const": "unordered set"
+              }
+            }
+          },
+          "ambient_group_id": {
+            "type": "string"
+          },
+          "polynomial": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "variables",
+              "terms",
+              "exact_rational"
+            ],
+            "properties": {
+              "variables": {
+                "const": [
+                  "x",
+                  "y"
+                ]
+              },
+              "exact_rational": {
+                "type": "boolean"
+              },
+              "terms": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "exponents",
+                    "coefficient"
+                  ],
+                  "properties": {
+                    "exponents": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "coefficient": {
+                      "type": "number",
+                      "not": {
+                        "const": 0
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "target_subgroup": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "expected_subgroup_label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "controls": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "type": [
+                "boolean",
+                "number",
+                "string"
+              ]
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "track": {
+                  "const": "exact_finite_structural_stabilizer"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "geometry"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "track": {
+                  "const": "finite_reference_group_regression_discovery"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "ambient_group_id",
+                "polynomial"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "split_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "discovery_split_id",
+        "calibration_split_id",
+        "final_holdout_split_id",
+        "rule"
+      ],
+      "properties": {
+        "discovery_split_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_split_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "final_holdout_split_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "benchmark_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixture_validation",
+        "external_baseline_runs",
+        "results",
+        "claim_boundary"
+      ],
+      "properties": {
+        "fixture_validation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "external_baseline_runs": {
+          "type": "string",
+          "minLength": 1
+        },
+        "results": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claim_boundary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
