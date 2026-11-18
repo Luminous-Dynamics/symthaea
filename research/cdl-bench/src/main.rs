@@ -291,8 +291,8 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
         let source = source.as_slice();
         let frame0 = compress(source, ModelKind::Order0)?;
         let frame1 = compress(source, ModelKind::Order1)?;
-        if decompress(&frame0, source.len())? != source
-            || decompress(&frame1, source.len())? != source
+        if decompress(&frame0, source.len())?.as_slice() != source
+            || decompress(&frame1, source.len())?.as_slice() != source
         {
             return Err(format!("round-trip failure for {name}").into());
         }
