@@ -1,0 +1,113 @@
+{
+  "schema_version": "luminous.plasma-task-schema-benchmark.v0.1",
+  "benchmark_id": "PLASMA-SCHEMA-001",
+  "status": "research_protocol",
+  "claim_ceiling": "schema validation and task-contract integrity only; no model accuracy or physical observability claim",
+  "references": {
+    "gentoka_paper": "https://arxiv.org/abs/2611.08153",
+    "gentoka_revision": "v1_2026-11-05",
+    "tokamark_dataset": "https://huggingface.co/datasets/UKAEA-IBM-STFC/tokamark-v1"
+  },
+  "schema_contract": {
+    "schema_version": "luminous.plasma-task-schema.v0.1",
+    "signal_descriptor_fields": [
+      "descriptor_id",
+      "signal_id",
+      "diagnostic_system_id",
+      "modality",
+      "role",
+      "native_units",
+      "native_shape",
+      "temporal_support",
+      "required",
+      "evidence_admission"
+    ],
+    "context_roles": [
+      "diagnostic_context",
+      "plasma_state_context",
+      "actuator_context",
+      "observed_response_context"
+    ],
+    "target_roles": [
+      "plasma_response_target",
+      "actuator_inversion_target",
+      "disruption_risk_target"
+    ],
+    "context_temporal_rule": "context_support_end_offset_ns_must_be_lte_zero",
+    "target_temporal_rule": "target_support_start_offset_ns_must_be_gte_zero",
+    "modality_rules": {
+      "scalar": "native_shape must be empty",
+      "time_series": "native_shape must be non-empty and sample_interval_ns must be positive",
+      "profile": "native_shape must be non-empty",
+      "field": "native_shape must be non-empty"
+    },
+    "multi_rate_rule": "per-signal native sample intervals are retained; no global zero-fill or forced rate conversion",
+    "evidence_rule": "every context signal declares an evidence admission policy; synthetic is permitted only when explicitly selected for research; targets do not declare input evidence admission",
+    "descriptor_id_rule": "descriptor IDs are unique; a physical signal ID may be reused across distinct context/target descriptors when the temporal supports and roles differ"
+  },
+  "example_schemas": {
+    "group6_task_6_3_single_plasma_current": {
+      "schema_version": "luminous.plasma-task-schema.v0.1",
+      "task_id": "task_6-3",
+      "anchor_semantics": "context_window_end",
+      "clock_domain": "shot-relative-ns",
+      "context_signals": [
+        {
+          "descriptor_id": "summary-ip-context",
+          "signal_id": "summary-ip",
+          "diagnostic_system_id": "plasma-current",
+          "modality": "time_series",
+          "role": "diagnostic_context",
+          "native_units": "A",
+          "native_shape": [
+            400
+          ],
+          "temporal_support": {
+            "start_offset_ns": -100000000,
+            "end_offset_ns": 0,
+            "sample_interval_ns": 250000
+          },
+          "required": true,
+          "evidence_admission": "direct_measured_only"
+        }
+      ],
+      "target_signals": [
+        {
+          "descriptor_id": "soft-ttd-risk-target",
+          "signal_id": "soft-ttd-risk",
+          "diagnostic_system_id": "derived-disruption-risk-target",
+          "modality": "scalar",
+          "role": "disruption_risk_target",
+          "native_units": "dimensionless",
+          "native_shape": [],
+          "temporal_support": {
+            "start_offset_ns": 0,
+            "end_offset_ns": 0,
+            "sample_interval_ns": null
+          },
+          "required": true,
+          "evidence_admission": null
+        }
+      ]
+    }
+  },
+  "gentoka_group6_reference": {
+    "test_shots": 933,
+    "test_windows": 39967,
+    "history_duration_ns": 100000000,
+    "cut_interval_ns": 10000000,
+    "nested_input_channel_counts": [
+      9,
+      5,
+      1
+    ],
+    "single_channel_task": "task_6-3",
+    "note": "This manifest includes only the one-channel task-6-3 schema example. It does not claim to reproduce the complete 9-channel or 5-channel signal descriptors without the paper's complete machine-readable signal registry."
+  },
+  "non_goals": [
+    "No live machine control or actuator authorization",
+    "No automatic promotion of synthetic to measured evidence",
+    "No inference of units or sampling rates from channel names",
+    "No claim to reproduce GenToka or its foundation model"
+  ]
+}
