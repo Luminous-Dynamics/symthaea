@@ -1,0 +1,60 @@
+{
+  "schema_version": "0.1.0",
+  "graph_id": "SYNTH-HOME-EVIDENCE-GRAPH-001",
+  "graph_revision": "REV-A",
+  "nodes": [
+    {
+      "node_id": "resident-brief",
+      "content_payload": "brief-a",
+      "depends_on": [],
+      "evidence_receipt_payload": null
+    },
+    {
+      "node_id": "style-intent",
+      "content_payload": "style-a",
+      "depends_on": [
+        "resident-brief"
+      ],
+      "evidence_receipt_payload": "style-receipt-a"
+    },
+    {
+      "node_id": "typology-intent",
+      "content_payload": "typology-a",
+      "depends_on": [
+        "resident-brief"
+      ],
+      "evidence_receipt_payload": "typology-receipt-a"
+    },
+    {
+      "node_id": "geometry",
+      "content_payload": "geometry-a",
+      "depends_on": [
+        "style-intent",
+        "typology-intent"
+      ],
+      "evidence_receipt_payload": "geometry-receipt-a"
+    },
+    {
+      "node_id": "energy-evaluation",
+      "content_payload": "energy-a",
+      "depends_on": [
+        "geometry"
+      ],
+      "evidence_receipt_payload": "energy-receipt-a"
+    },
+    {
+      "node_id": "water-policy",
+      "content_payload": "water-policy-a",
+      "depends_on": [],
+      "evidence_receipt_payload": "water-policy-receipt-a"
+    },
+    {
+      "node_id": "water-evaluation",
+      "content_payload": "water-evaluation-a",
+      "depends_on": [
+        "water-policy"
+      ],
+      "evidence_receipt_payload": "water-evaluation-receipt-a"
+    }
+  ]
+}
