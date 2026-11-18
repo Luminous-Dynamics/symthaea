@@ -275,9 +275,11 @@ impl MotorOutputBridge {
         }
 
         // 1. Check minimum cognitive-caution threshold.
+        let policy_min_phi = self.policy.capabilities.min_phi;
         let min_phi = self
             .min_phi_override
-            .unwrap_or(self.policy.capabilities.min_phi);
+            .map(|override_min| override_min.max(policy_min_phi))
+            .unwrap_or(policy_min_phi);
         if !min_phi.is_finite() || !(0.0..=1.0).contains(&min_phi) {
             return MotorOutputResult::skipped(
                 "Invalid configured min_phi: expected a finite value in [0, 1]",
@@ -896,4 +898,33 @@ mod authority_numeric_input_tests {
         assert!(!result.success);
         assert!(result.error.unwrap().contains("Invalid configured min_phi"));
     }
+
+    #[test]
+    fn motor_bridge_override_cannot_lower_policy_caution_floor() {
+        let mut bridge = MotorOutputBridge::with_defaults().unwrap();
+        bridge.policy.capabilities.min_phi = 0.3;
+        bridge.min_phi_override = Some(0.1);
+
+        let result = bridge.execute(&[0.0], 0.8, 0.2, &MotorActionRequest::default());
+        assert!(!result.success);
+        assert!(result
+            .error
+            .unwrap()
+            .contains("below motor output threshold 0.300"));
+    }
+
+    #[test]
+    fn motor_bridge_override_can_raise_policy_caution_floor() {
+        let mut bridge = MotorOutputBridge::with_defaults().unwrap();
+        bridge.policy.capabilities.min_phi = 0.3;
+        bridge.min_phi_override = Some(0.8);
+
+        let result = bridge.execute(&[0.0], 0.8, 0.7, &MotorActionRequest::default());
+        assert!(!result.success);
+        assert!(result
+            .error
+            .unwrap()
+            .contains("below motor output threshold 0.800"));
+    }
+
 }
