@@ -42,6 +42,8 @@ pub struct ArticleBinding {
     pub robot_configuration_digest: String,
     pub mission_profile_ref: String,
     pub topology_digest: String,
+    pub topology_sample_map_ref: String,
+    pub topology_sample_map_digest: String,
     pub asbuilt_inspection_ref: String,
     pub cleaning_mode: String,
     pub zones: Vec<ZoneBinding>,
@@ -604,6 +606,7 @@ fn validate_article(article: &ArticleBinding, state: &str, findings: &mut Vec<Fi
         ("firmware_revision", article.firmware_revision.as_str()),
         ("mission_profile_ref", article.mission_profile_ref.as_str()),
         ("asbuilt_inspection_ref", article.asbuilt_inspection_ref.as_str()),
+        ("topology_sample_map_ref", article.topology_sample_map_ref.as_str()),
     ] {
         if is_blank(value) {
             push(findings, "article_identity_missing", format!("article.{field}"),
@@ -614,6 +617,7 @@ fn validate_article(article: &ArticleBinding, state: &str, findings: &mut Vec<Fi
         ("installed_article_digest", article.installed_article_digest.as_str()),
         ("robot_configuration_digest", article.robot_configuration_digest.as_str()),
         ("topology_digest", article.topology_digest.as_str()),
+        ("topology_sample_map_digest", article.topology_sample_map_digest.as_str()),
     ] {
         if !is_sha256(digest) {
             push(findings, "article_digest_invalid", format!("article.{field}"),
@@ -1023,6 +1027,8 @@ mod tests {
                 "robot_configuration_digest": digest('c'),
                 "mission_profile_ref": "MISSION-PROFILE-SYNTHETIC",
                 "topology_digest": digest('d'),
+                "topology_sample_map_ref": "TOPOLOGY-SAMPLE-MAP-REV-SYNTHETIC",
+                "topology_sample_map_digest": digest('p'),
                 "asbuilt_inspection_ref": "ASBUILT-INSPECTION-SYNTHETIC",
                 "cleaning_mode": "installed_in_place",
                 "zones": [{
@@ -1566,6 +1572,16 @@ mod tests {
         assert!(report.findings.iter().any(|f| f.code == "gate_zone_not_in_article"));
         manifest["unqualified_microbial_kill_claim"] = json!(true);
         assert!(parse_and_validate(&manifest.to_string()).is_err());
+    }
+
+    #[test]
+    fn topology_sample_map_must_bind_to_exact_revision_and_digest() {
+        let mut manifest = base_manifest();
+        manifest["article"]["topology_sample_map_ref"] = json!("");
+        manifest["article"]["topology_sample_map_digest"] = json!("not-a-digest");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "article_identity_missing"));
+        assert!(report.findings.iter().any(|f| f.code == "article_digest_invalid"));
     }
 
     #[test]
