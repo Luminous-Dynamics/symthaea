@@ -218,6 +218,19 @@ The Rust oracle exposes the following reusable surface:
 The expected integration pattern is: fit/threshold a method using discovery and calibration only; freeze its source revision, configuration and threshold; emit one proposal or explicit abstention for every final-holdout ID; submit those proposals to the independent oracle; then validate the run scorecard against the same manifest and split digests. The oracle does not fit, tune or select the external method.
 
 
+
+## Counterexample-guided subgroup refinement (CEGIS-style)
+
+The proposal auditor can support an explicit refinement loop on discovery/calibration data:
+
+1. A candidate method submits a finite element set.
+2. The exact oracle identifies false promotions and missed symmetries, with a moved-point/coefficient counterexample for rejected elements and a constructive acceptance witness for omitted true elements.
+3. A proposer may revise its candidate set using those witnesses.
+4. The revised set is checked again for identity, inverse and closure, and against the exact stabilizer.
+5. The final-holdout split is evaluated only after the method, revision, configuration and refinement policy are frozen. Holdout witnesses must not be fed back into model refinement.
+
+A regression test demonstrates convergence in both directions: a D4 overproposal is reduced to C4 on a chiral point set, and a C4 underproposal is expanded to D4 on a square. This is a bounded exact demonstration of the oracle interface, not a claim that an arbitrary learner converges or that counterexample-guided refinement is novel in general.
+
 ## JSON proposal adapter and full-split smoke test
 
 The independent Rust oracle also ships a JSON CLI:
