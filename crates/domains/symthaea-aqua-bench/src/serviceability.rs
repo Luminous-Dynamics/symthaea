@@ -112,7 +112,13 @@ pub struct ServiceJobObservation {
     pub protocol_sha256: String,
     pub routine_job: bool,
     pub access_outcome: ServiceAccessOutcome,
+    /// Count of ordered disassembly actions from initial access to target component.
+    /// This is defined by the frozen job instruction, not by parts removed.
     pub disassembly_depth: u32,
+    /// Number of distinct components physically removed during the job.
+    pub components_removed_count: u32,
+    /// Number of fastener / connector separations required by the job.
+    pub fasteners_removed_count: u32,
     pub tools_used: Vec<String>,
     pub spare_part_id: Option<String>,
     pub spare_part_availability: SparePartAvailability,
@@ -331,6 +337,8 @@ pub struct ServiceabilityCohortSummary {
     pub routine_spare_available_fraction_among_known: Option<f64>,
     pub unique_spare_part_count: usize,
     pub median_disassembly_depth: f64,
+    pub median_components_removed_count: f64,
+    pub median_fasteners_removed_count: f64,
     pub qualified_return_count: usize,
     pub post_repair_function_pass_count: usize,
     pub unique_tool_count: usize,
@@ -357,6 +365,8 @@ pub fn summarize_serviceability_cohort(
     let mut routine_spare_availability_unknown_count = 0;
     let mut spare_parts = HashSet::new();
     let mut disassembly_depths = Vec::with_capacity(observations.len());
+    let mut components_removed = Vec::with_capacity(observations.len());
+    let mut fasteners_removed = Vec::with_capacity(observations.len());
     let mut qualified_return_count = 0;
     let mut post_repair_function_pass_count = 0;
     let mut technician_times = Vec::with_capacity(observations.len());
@@ -377,6 +387,8 @@ pub fn summarize_serviceability_cohort(
         technician_times.push(observation.technician_minutes);
         downtime_times.push(observation.downtime_minutes);
         disassembly_depths.push(observation.disassembly_depth as f64);
+        components_removed.push(observation.components_removed_count as f64);
+        fasteners_removed.push(observation.fasteners_removed_count as f64);
 
         if observation.routine_job {
             routine_job_count += 1;
@@ -416,6 +428,8 @@ pub fn summarize_serviceability_cohort(
     technician_times.sort_by(f64::total_cmp);
     downtime_times.sort_by(f64::total_cmp);
     disassembly_depths.sort_by(f64::total_cmp);
+    components_removed.sort_by(f64::total_cmp);
+    fasteners_removed.sort_by(f64::total_cmp);
     let median = |values: &[f64]| {
         let middle = values.len() / 2;
         if values.len() % 2 == 0 {
@@ -455,6 +469,8 @@ pub fn summarize_serviceability_cohort(
         routine_spare_available_fraction_among_known,
         unique_spare_part_count: spare_parts.len(),
         median_disassembly_depth: median(&disassembly_depths),
+        median_components_removed_count: median(&components_removed),
+        median_fasteners_removed_count: median(&fasteners_removed),
         qualified_return_count,
         post_repair_function_pass_count,
         unique_tool_count: tools.len(),
@@ -533,6 +549,8 @@ mod tests {
             routine_job: true,
             access_outcome,
             disassembly_depth: 2,
+            components_removed_count: 3,
+            fasteners_removed_count: 4,
             tools_used: vec!["hex-key".to_owned(), "spanner".to_owned()],
             spare_part_id: Some("nozzle-cassette-01".to_owned()),
             spare_part_availability: SparePartAvailability::AvailableBeforeJob,
@@ -825,8 +843,14 @@ mod tests {
         );
         first.disassembly_depth = 1;
         second.disassembly_depth = 4;
+        first.components_removed_count = 2;
+        second.components_removed_count = 6;
+        first.fasteners_removed_count = 1;
+        second.fasteners_removed_count = 5;
         let summary = summarize_serviceability_cohort(&[first, second]).expect("cohort");
         assert_eq!(summary.median_disassembly_depth, 2.5);
+        assert_eq!(summary.median_components_removed_count, 4.0);
+        assert_eq!(summary.median_fasteners_removed_count, 3.0);
     }
 
     #[test]
