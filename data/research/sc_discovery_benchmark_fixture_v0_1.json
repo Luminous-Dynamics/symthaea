@@ -13,7 +13,10 @@
     "required_group_keys": [
       "family_id",
       "prototype_id",
-      "source_id"
+      "source_id",
+      "field_orientation",
+      "sample_form",
+      "tc_criterion"
     ]
   },
   "models": [
@@ -129,7 +132,7 @@
       "measurement_temperature_k": 0,
       "field_t": 0,
       "field_orientation": "not_applicable",
-      "sample_form": "bulk",
+      "sample_form": "thin_film",
       "tc_criterion": "midpoint",
       "method": "synthetic demonstration",
       "specimen_id": "spec-la1111-01"
@@ -150,7 +153,7 @@
       "measurement_temperature_k": 0,
       "field_t": 0,
       "field_orientation": "not_applicable",
-      "sample_form": "bulk",
+      "sample_form": "thin_film",
       "tc_criterion": "midpoint",
       "method": "synthetic demonstration",
       "specimen_id": "spec-ba122-01"
@@ -228,6 +231,27 @@
       "property": "Tc",
       "unit": "K",
       "cutoff_date": "2005-01-01",
+      "train_record_ids": [
+        "syn-al-tc",
+        "syn-nb-tc",
+        "syn-mgb2-tc",
+        "syn-ybco-tc"
+      ],
+      "calibration_record_ids": [],
+      "test_record_ids": [
+        "syn-la1111-tc",
+        "syn-ba122-tc"
+      ]
+    },
+    {
+      "split_id": "sample-form-condition-holdout",
+      "mode": "group_holdout",
+      "property": "Tc",
+      "unit": "K",
+      "group_key": "sample_form",
+      "held_out_values": [
+        "thin_film"
+      ],
       "train_record_ids": [
         "syn-al-tc",
         "syn-nb-tc",
@@ -410,6 +434,50 @@
     {
       "prediction_id": "temporal-after-2005-mock_selective_predictor-syn-ba122-tc",
       "split_id": "temporal-after-2005",
+      "record_id": "syn-ba122-tc",
+      "model_id": "mock_selective_predictor",
+      "property": "Tc",
+      "abstained": true,
+      "predicted_value": null,
+      "lower": null,
+      "upper": null
+    },
+    {
+      "prediction_id": "sample-form-condition-holdout-training_mean_baseline-syn-la1111-tc",
+      "split_id": "sample-form-condition-holdout",
+      "record_id": "syn-la1111-tc",
+      "model_id": "training_mean_baseline",
+      "property": "Tc",
+      "abstained": false,
+      "predicted_value": 35.35,
+      "lower": null,
+      "upper": null
+    },
+    {
+      "prediction_id": "sample-form-condition-holdout-training_mean_baseline-syn-ba122-tc",
+      "split_id": "sample-form-condition-holdout",
+      "record_id": "syn-ba122-tc",
+      "model_id": "training_mean_baseline",
+      "property": "Tc",
+      "abstained": false,
+      "predicted_value": 35.35,
+      "lower": null,
+      "upper": null
+    },
+    {
+      "prediction_id": "sample-form-condition-holdout-mock_selective_predictor-syn-la1111-tc",
+      "split_id": "sample-form-condition-holdout",
+      "record_id": "syn-la1111-tc",
+      "model_id": "mock_selective_predictor",
+      "property": "Tc",
+      "abstained": false,
+      "predicted_value": 26.4,
+      "lower": 22,
+      "upper": 31
+    },
+    {
+      "prediction_id": "sample-form-condition-holdout-mock_selective_predictor-syn-ba122-tc",
+      "split_id": "sample-form-condition-holdout",
       "record_id": "syn-ba122-tc",
       "model_id": "mock_selective_predictor",
       "property": "Tc",
