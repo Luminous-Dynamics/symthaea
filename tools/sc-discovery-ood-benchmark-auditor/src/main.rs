@@ -219,7 +219,9 @@ fn summarize(
     }
     let mut seen = HashSet::new();
     let mut absolute_errors = Vec::new();
+    let mut relative_errors = Vec::new();
     let mut log_errors = Vec::new();
+    let mut log_pairs = Vec::new();
     let mut interval_hits = 0usize;
     let mut interval_count = 0usize;
     let mut covered_count = 0usize;
@@ -263,9 +265,16 @@ fn summarize(
             .get("value")
             .and_then(Value::as_f64)
             .ok_or_else(|| format!("test record {record_id} has no target value"))?;
-        absolute_errors.push((predicted - observed).abs());
+        let absolute_error = (predicted - observed).abs();
+        absolute_errors.push(absolute_error);
+        if observed > 0.0 {
+            relative_errors.push(absolute_error / observed);
+        }
         if predicted > 0.0 && observed > 0.0 {
-            log_errors.push((predicted.log10() - observed.log10()).abs());
+            let predicted_log = predicted.log10();
+            let observed_log = observed.log10();
+            log_errors.push((predicted_log - observed_log).abs());
+            log_pairs.push((predicted_log, observed_log));
         }
         if let (Some(lo), Some(hi)) = (lower, upper) {
             interval_count += 1;
@@ -290,6 +299,29 @@ fn summarize(
     } else {
         Some(log_errors.iter().sum::<f64>() / log_errors.len() as f64)
     };
+    relative_errors.sort_by(f64::total_cmp);
+    let median_relative_error = match relative_errors.len() {
+        0 => None,
+        count if count % 2 == 1 => Some(relative_errors[count / 2]),
+        count => Some((relative_errors[count / 2 - 1] + relative_errors[count / 2]) / 2.0),
+    };
+    let r2_log = if log_pairs.len() < 2 {
+        None
+    } else {
+        let mean_observed = log_pairs.iter().map(|(_, observed)| observed).sum::<f64>()
+            / log_pairs.len() as f64;
+        let residual_sum = log_pairs.iter()
+            .map(|(predicted, observed)| (predicted - observed).powi(2))
+            .sum::<f64>();
+        let total_sum = log_pairs.iter()
+            .map(|(_, observed)| (observed - mean_observed).powi(2))
+            .sum::<f64>();
+        if total_sum <= f64::EPSILON {
+            None
+        } else {
+            Some(1.0 - residual_sum / total_sum)
+        }
+    };
     Ok(json!({
         "model_id": model_id,
         "test_count": test.len(),
@@ -297,7 +329,9 @@ fn summarize(
         "coverage": covered_count as f64 / test.len() as f64,
         "abstention_count": test.len() - covered_count,
         "mae": mae,
+        "median_absolute_relative_error": median_relative_error,
         "mean_absolute_log10_error": log_mae,
+        "r2_log": r2_log,
         "interval_count": interval_count,
         "empirical_interval_coverage": if interval_count == 0 {
             None::<f64>
@@ -354,6 +388,7 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         }
     }
     let mut split_ids = HashSet::new();
+    let mut split_test_ids: HashMap<String, HashSet<String>> = HashMap::new();
     let mut reports = Vec::new();
     for split in splits {
         let split_id = required_text(split, "split_id")?;
@@ -370,9 +405,12 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
             }
         }
         let (train, calibration, test) = audit_split(split, &record_index, evidence_class)?;
+        split_test_ids.insert(split_id.to_owned(), test.clone());
         let property = required_text(split, "property")?;
+        let mut sorted_model_ids: Vec<String> = model_ids.iter().cloned().collect();
+        sorted_model_ids.sort();
         let mut model_reports = Vec::new();
-        for model_id in &model_ids {
+        for model_id in &sorted_model_ids {
             model_reports.push(summarize(
                 split_id,
                 model_id,
@@ -402,6 +440,20 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         let model_id = required_text(prediction, "model_id")?;
         if !model_ids.contains(model_id) {
             return Err(format!("prediction references unknown model {model_id}"));
+        }
+        let record_id = required_text(prediction, "record_id")?;
+        let record = record_index.get(record_id)
+            .ok_or_else(|| format!("prediction references unknown record {record_id}"))?;
+        let split = splits.iter().find(|split| split["split_id"].as_str() == Some(split_id))
+            .ok_or_else(|| format!("prediction references unknown split {split_id}"))?;
+        let expected_property = required_text(split, "property")?;
+        if required_text(prediction, "property")? != expected_property
+            || required_text(record, "property")? != expected_property
+        {
+            return Err(format!("prediction {record_id} does not match split {split_id} property"));
+        }
+        if !split_test_ids.get(split_id).is_some_and(|test| test.contains(record_id)) {
+            return Err(format!("prediction {record_id} is not part of split {split_id} test set"));
         }
     }
     Ok(json!({
