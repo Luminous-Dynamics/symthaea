@@ -92,3 +92,15 @@ The dependency-free `service_continuity` module classifies externally supplied, 
 It fails closed on unqualified/unknown water-use status, local protection uncertainty, stale or contradictory critical evidence, pressure outside/unknown relative to the admitted envelope, blocked/unknown drainage and detected/unknown leaks. Reduced and manual-only modes are admitted only when explicitly qualified by the local device authority. Loss of optional digital recommendations does not reduce a qualified local service state. A cleared fault cannot automatically clear the requalification-required flag.
 
 This is a product-level classification function only. It does not actuate isolation, control water, establish safety limits, approve water quality, or replace independently qualified hardware protection. The 16 unit tests are authored; no execution pass is claimed until exact-head CI reports it.
+
+
+## Exact-point pressure / flow evidence
+
+The dependency-free `pressure_curve` module validates exact-point pressure / flow observations. It:
+- requires dynamic pressure at the terminal fitting inlet and does not substitute static or upstream residual pressure;
+- checks the measured pressure plus its uncertainty against a preregistered setpoint tolerance and the complete test-article pressure-rating envelope;
+- reports manufacturer-declared operating-range status separately from test-rig admission, so an out-of-declared-range comparator point remains visibly exploratory;
+- validates exact-point matched comparisons using a shared context/protocol digest and a preregistered maximum pressure separation;
+- does not interpolate an untested pressure or infer a task/comfort result.
+
+Sixteen negative/contract tests are authored. The module validates measurement context only; Mycelix retains metrology admission and Symtropy retains hydraulic/resource authority.
