@@ -2094,6 +2094,33 @@ mod tests {
     use super::*;
 
     #[test]
+    fn dream_cycle_preserves_episode_lineage_into_semantic_memory() {
+        let mut manager = EngineeringManager::new();
+        let input =
+            symthaea_core::hdc::unified_hv::ContinuousHV::random(64, 314);
+        let output =
+            symthaea_core::hdc::unified_hv::ContinuousHV::random(64, 315);
+        let provenance = symthaea_memory::GraduationProvenance {
+            source: symthaea_memory::MemorySource::WebResearch,
+            verification_claimed: true,
+        };
+
+        assert!(manager.episodic_memory.store_if_significant_with_provenance(
+            Episode::new(input.clone(), output, 0.7, 12),
+            Some(provenance),
+            0.0,
+        ));
+
+        manager.dream_cycle();
+
+        let semantic = manager.semantic_memory.get_with_provenance(0).unwrap();
+        assert_eq!(semantic.entry.hdc_vector, input.as_slice());
+        let lineage = semantic.graduation_provenance.unwrap();
+        assert_eq!(lineage.source, symthaea_memory::MemorySource::WebResearch);
+        assert!(lineage.verification_claimed);
+    }
+
+    #[test]
     fn evaluate_structural_wires_solver_into_faculty() {
         use symthaea_structural::{Beam, LoadCase, Section, material::steel_a36};
         let mgr = EngineeringManager::new();
