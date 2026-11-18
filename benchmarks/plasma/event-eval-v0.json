@@ -530,7 +530,11 @@
     "claim_ceiling": "synthetic perturbation and evidence-state mapping only; no physical measurement, diagnostic accuracy, instrument failure-rate, observability, or safety claim",
     "hashes_are_authentication": false,
     "frame_shot_id_namespace": "synthetic-shot:<scenario_id>",
-    "synthetic_identifiers_must_not_equal_physical_discharge_ids": true
+    "synthetic_identifiers_must_not_equal_physical_discharge_ids": true,
+    "consumer_contract_fixture": "benchmarks/plasma/symtropy-synthetic-observation-interop-v0.json",
+    "consumer_contract_fixture_kind": "wire_compatibility_contract_not_a_captured_measurement_run",
+    "consumer_gate_test": "deserialize each frame as PlasmaObservationFrame and require DecisionInputGate::Abstain with exact SyntheticNotMeasurement, Unavailable, or Invalid reason",
+    "verified_producer_file": "Luminous-Dynamics/symtropy/crates/tools/plasma-diagnostic-fault-replay/src/observation_export.rs"
   },
   "uncertainty_protocols": {
     "window_level_metrics": {
