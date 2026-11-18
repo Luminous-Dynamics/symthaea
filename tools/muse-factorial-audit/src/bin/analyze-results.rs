@@ -384,14 +384,13 @@ fn analyze(
         return Err("at least one expected metric is required".to_string());
     }
 
-    let mut expected_case_ids = HashSet::with_capacity(cases.len());
-    for case in cases {
-        if !expected_case_ids.insert(case.case_id.as_str()) {
-            return Err(format!("duplicate expected case_id {:?}", case.case_id));
-        }
+    let expected_case_ids: HashSet<String> =
+        cases.iter().map(|case| case.case_id.clone()).collect();
+    if expected_case_ids.len() != cases.len() {
+        return Err("expected case set contains duplicate case IDs".to_string());
     }
 
-    let expected_metrics: HashSet<&str> = metrics.iter().map(String::as_str).collect();
+    let expected_metrics: HashSet<String> = metrics.iter().cloned().collect();
     if expected_metrics.len() != metrics.len() {
         return Err("expected metric list contains duplicates".to_string());
     }
@@ -402,10 +401,10 @@ fn analyze(
     let mut by_case_metric: HashMap<(String, String), &InputRecord> =
         HashMap::with_capacity(records.len());
     for record in records {
-        if !expected_case_ids.contains(record.case_id.as_str()) {
+        if !expected_case_ids.contains(&record.case_id) {
             return Err(format!("unexpected case_id {:?}", record.case_id));
         }
-        if !expected_metrics.contains(record.metric.as_str()) {
+        if !expected_metrics.contains(&record.metric) {
             return Err(format!("unregistered metric {:?}", record.metric));
         }
         let key = (record.case_id.clone(), record.metric.clone());
