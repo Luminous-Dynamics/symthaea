@@ -284,7 +284,6 @@ impl PlasmaDiagnosticPortfolioSpec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde::Deserialize;
     use std::collections::BTreeSet;
 
     fn fixture() -> PlasmaDiagnosticPortfolioSpec {
