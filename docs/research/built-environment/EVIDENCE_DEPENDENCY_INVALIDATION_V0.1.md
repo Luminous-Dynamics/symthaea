@@ -55,6 +55,24 @@ The receipt digest is BLAKE3 over all receipt fields other than the digest itsel
 
 No solver is run by this crate. An owner system receives the invalidation set and decides what to re-evaluate. Symtropy retains geometry and physical-solver authority. Mycelix retains decision authority, signatures, revocation and supersession. Sol-Atlas retains resident intent and decision receipts.
 
+## Deriving changes between adjacent revisions
+
+The initial `compute_invalidation_receipt` accepts a caller-supplied change set for a single graph revision. The stronger `compute_revision_invalidation_receipt(prior, current)` derives that set directly from two validated graph snapshots.
+
+It detects:
+- node additions and removals;
+- content digest changes;
+- dependency-edge changes (both new and removed edges); and
+- evidence-receipt digest changes.
+
+The invalidation closure follows the **union of the old and new dependency edges**. This matters when a dependency is removed: consumers that relied on it in the prior revision are still invalidated. Each changed node carries explicit reason codes and prior/current content, dependencies and receipt digests. The receipt includes both graph digests and both revisions.
+
+For affected evidence, the receipt retains the prior and current receipt digests as a transition. A current digest is **not automatically accepted as fresh**; the owner system must verify it. Preserved evidence is listed only from the current graph when the node is outside the invalidation closure under the exact validated before/after graph pair.
+
+A frozen before/after scenario is stored in `EVIDENCE_REVISION_DIFF_SYNTHETIC_V0.1.json` with its schema. The Rust test derives BLAKE3 digests from payloads in that fixture and checks exact changed-node reasons, invalidation and preservation sets.
+
+A revision change with no node-level content, edge or receipt change is rejected rather than generating an empty change receipt. Different graph identities are also rejected.
+
 ## Critical limitation: completeness of the dependency graph
 
 This mechanism proves only what the declared graph encodes. It cannot infer that a wind load depends on a geometry feature omitted from the graph, or that a weather-file revision affects a model that failed to declare that dependency.
@@ -76,12 +94,14 @@ Proposed, not yet measured:
 
 ## Current implementation state
 
-Authored in Rust with typed nodes, graph validation, canonical graph hashing, transitive invalidation, deterministic receipt digest and replay verification. Synthetic unit tests cover:
+Authored in Rust with typed nodes, graph validation, canonical graph hashing, transitive invalidation, caller-set invalidation and two-revision change derivation, deterministic receipt digests and replay verification. Synthetic unit tests cover:
 - branch-local invalidation in a diamond graph;
 - common-root invalidation;
 - cycles and missing dependencies;
 - duplicate edges and self-edges;
 - malformed hashes, stale prior revision and repeated changed IDs;
 - order-independent receipt generation and graph-drift rejection.
+- revision-diff detection for added/removed nodes, content changes, dependency rewires, receipt changes and union-of-edges invalidation;
+- frozen before/after revision fixture with exact changed reasons, invalidated closure and preserved evidence.
 
 **Exact-head CI and Rust compilation are pending.** These tests are authored, not claimed passed. This software contract does not establish physical, legal, professional or resident approval.
