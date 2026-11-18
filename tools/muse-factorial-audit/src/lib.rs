@@ -412,6 +412,13 @@ pub fn estimate_block(
             actual: observations.len(),
         });
     }
+    if metric.is_empty()
+        || !metric
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+    {
+        return Err(AuditError::InvalidMetric(metric.to_string()));
+    }
 
     let mut seen = HashSet::with_capacity(CONDITIONS_PER_BLOCK);
     for observation in observations {
@@ -444,12 +451,17 @@ pub fn estimate_block(
         });
     }
 
+    // Canonical order makes the floating-point reduction bit-stable even if
+    // a caller presents the manifest rows in a different order.
+    let mut ordered: Vec<&Observation> = observations.iter().collect();
+    ordered.sort_by_key(|observation| observation.cell);
+
     let terms = contrast_terms();
     let mut estimates = Vec::with_capacity(terms.len());
     for term in terms {
         let mut numerator = 0.0;
         let mut denominator = 0.0;
-        for observation in observations {
+        for observation in &ordered {
             let weight = term.weight(observation.cell);
             numerator += observation.value * weight;
             denominator += weight * weight;
@@ -559,6 +571,7 @@ pub enum AuditError {
     DuplicateContrast(String),
     InconsistentContrastSet,
     NonFiniteEffect,
+    InvalidMetric(String),
 }
 
 impl fmt::Display for AuditError {
@@ -796,6 +809,58 @@ mod tests {
         assert_eq!(valence.seed_count, 2);
         assert!((valence.mean - 2.0).abs() < 1.0e-12);
         assert!(valence.sample_sd.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn estimates_are_bit_stable_under_input_row_reordering() {
+        let observations = observations_for(
+            Cohort::Discovery,
+            "Classical",
+            DISCOVERY_SEEDS[0],
+            |cell| {
+                1.25 * [-1.0, 0.0, 1.0][cell.valence as usize]
+                    + 0.75 * [1.0, -2.0, 1.0][cell.energy as usize]
+            },
+        );
+        let forward = estimate_block(
+            Cohort::Discovery,
+            "Classical",
+            DISCOVERY_SEEDS[0],
+            "synthetic_response",
+            &observations,
+        )
+        .unwrap();
+        let mut reversed_rows = observations;
+        reversed_rows.reverse();
+        let reversed = estimate_block(
+            Cohort::Discovery,
+            "Classical",
+            DISCOVERY_SEEDS[0],
+            "synthetic_response",
+            &reversed_rows,
+        )
+        .unwrap();
+        assert_eq!(forward, reversed);
+    }
+
+    #[test]
+    fn metric_names_reject_unstable_delimiters() {
+        let observations = observations_for(
+            Cohort::Discovery,
+            "Classical",
+            DISCOVERY_SEEDS[0],
+            |_| 1.0,
+        );
+        assert!(matches!(
+            estimate_block(
+                Cohort::Discovery,
+                "Classical",
+                DISCOVERY_SEEDS[0],
+                "metric,name",
+                &observations
+            ),
+            Err(AuditError::InvalidMetric(_))
+        ));
     }
 
     #[test]
