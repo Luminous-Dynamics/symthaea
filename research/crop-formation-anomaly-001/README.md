@@ -192,6 +192,8 @@ Reuse the existing Symthaea falsification/power reference and open-world work ra
 - [Competitive landscape and SOTA positioning](COMPETITIVE_LANDSCAPE.md) — archives, exact-field geolocation, remote-sensing baselines and a matched comparison strategy.
 - [Active experiment selection](EXPERIMENT_SELECTION.md) — expected information gain, statistical power, cost, feasibility and model-misspecification safeguards.
 - [Prospective crop-flow field protocol](FIELD_PROTOCOL.md) — spatial sampling, blinded crop posture measurements, controls, mechanical ground truth and custody.
+- [CCAT geometry replay and cross-case benchmark](CCAT_REPLICATION.md) — attributed 60-circle Zeals Knoll fixture, independent descriptive replay and event-held-out extensions.
+- [Imported CCAT geometry fixture](datasets/ccat-zeals-knoll-2026/README.md) — CC BY 4.0 geometry only; no source photograph.
 - [Standalone Rust reference lab](lab/README.md) — dependency-free geometry and crop-flow descriptors (including centre-relative radial/tangential alignment), explicit binary-grid D4 × traversal × bit-order decoder family, 7-bit decoding and complete attempt logging, row/column-margin-preserving grid null generation, maximum-statistic calibration helper, entropy and Wilson intervals.
 
 The current reference crate includes crop-flow circular, radial and tangential statistics as well as geometry and grid decoding. It preserves per-sample direction and does not force a single mean direction when the resultant is near zero.
