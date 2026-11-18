@@ -1,0 +1,133 @@
+{
+  "contract": "SC-OBSERVATION-INVERSE-0.1",
+  "dataset_id": "synthetic-gl-multimodal-specimen-inverse-v0",
+  "fixture_only": true,
+  "material": {
+    "material_id": "synthetic-material-001",
+    "nominal_composition": "synthetic-AB2",
+    "structure_identity": "synthetic-square-lattice-proxy"
+  },
+  "specimen": {
+    "specimen_id": "synthetic-specimen-001",
+    "batch_id": "synthetic-batch-001",
+    "sample_state_id": "synthetic-state-ambient-001",
+    "region_id": "synthetic-region-centre",
+    "sample_form": "dimensionless-simulation-fixture"
+  },
+  "process_history": {
+    "synthesis_route_id": "not_applicable_synthetic",
+    "treatment_pressure": null,
+    "treatment_temperature": null,
+    "decompression_path_id": "not_applicable",
+    "storage_history_id": "not_applicable"
+  },
+  "observations": [
+    {
+      "observation_id": "obs-amplitude-001",
+      "modality": "amplitude_sensitive_spectroscopy",
+      "measurand": "normalized_local_amplitude_proxy",
+      "value": 0.92,
+      "unit": "dimensionless",
+      "standard_uncertainty": 0.04,
+      "measurement_scope": "local",
+      "method_id": "synthetic-amplitude-map-v1",
+      "calibration_id": "synthetic-calibration-a",
+      "conditions": {
+        "temperature": 0.2,
+        "temperature_unit": "dimensionless_GL_temperature",
+        "field_magnitude": 0,
+        "field_unit": "dimensionless",
+        "field_orientation": "z",
+        "pressure": null,
+        "pressure_unit": "not_applicable",
+        "doping": null,
+        "strain": 0,
+        "geometry_id": "synthetic-4x4-periodic",
+        "measurement_timestamp": "2026-11-18T09:00:00Z"
+      },
+      "raw_data_sha256": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "source_reference": "https://doi.org/10.1103/PhysRevB.110.134501"
+    },
+    {
+      "observation_id": "obs-heat-capacity-001",
+      "modality": "heat_capacity",
+      "measurand": "specific_heat_per_site_proxy",
+      "value": 0.18,
+      "unit": "dimensionless_lattice_energy_per_temperature",
+      "standard_uncertainty": 0.03,
+      "measurement_scope": "mesoscopic",
+      "method_id": "synthetic-energy-fluctuation-v1",
+      "calibration_id": "synthetic-calibration-b",
+      "conditions": {
+        "temperature": 0.2,
+        "temperature_unit": "dimensionless_GL_temperature",
+        "field_magnitude": 0,
+        "field_unit": "dimensionless",
+        "field_orientation": "z",
+        "pressure": null,
+        "pressure_unit": "not_applicable",
+        "doping": null,
+        "strain": 0,
+        "geometry_id": "synthetic-4x4-periodic",
+        "measurement_timestamp": "2026-11-18T09:05:00Z"
+      },
+      "raw_data_sha256": "1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b",
+      "source_reference": "https://doi.org/10.1103/PhysRevB.64.092506"
+    },
+    {
+      "observation_id": "obs-vorticity-001",
+      "modality": "vortex_imaging",
+      "measurand": "absolute_plaquette_winding_density_proxy",
+      "value": 0.07,
+      "unit": "integer_charge_per_valid_plaquette",
+      "standard_uncertainty": 0.02,
+      "measurement_scope": "mesoscopic",
+      "method_id": "synthetic-gauge-vortex-counter-v1",
+      "calibration_id": "synthetic-calibration-c",
+      "conditions": {
+        "temperature": 0.2,
+        "temperature_unit": "dimensionless_GL_temperature",
+        "field_magnitude": 0,
+        "field_unit": "dimensionless",
+        "field_orientation": "z",
+        "pressure": null,
+        "pressure_unit": "not_applicable",
+        "doping": null,
+        "strain": 0,
+        "geometry_id": "synthetic-4x4-periodic",
+        "measurement_timestamp": "2026-11-18T09:10:00Z"
+      },
+      "raw_data_sha256": "2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c",
+      "source_reference": "https://doi.org/10.1103/PhysRevB.63.132504"
+    }
+  ],
+  "split": {
+    "split_id": "synthetic-leave-vortex-modality-out-v0",
+    "calibration_observation_ids": [
+      "obs-amplitude-001",
+      "obs-heat-capacity-001"
+    ],
+    "heldout_observation_ids": [
+      "obs-vorticity-001"
+    ],
+    "holdout_rule": "leave_one_modality_out",
+    "pre_registered_at": "2026-11-18T08:50:00Z"
+  },
+  "model_target": {
+    "model_family": "lattice_ginzburg_landau",
+    "model_version": "SC-AMPLITUDE-PHASE-0.1",
+    "target_parameters": [
+      "a_uniform",
+      "b_uniform",
+      "K_uniform"
+    ],
+    "prior_definition_id": "synthetic-bounded-uniform-priors-v0",
+    "observation_operator_version": "synthetic-gl-observation-map-v0"
+  },
+  "source_references": [
+    "https://doi.org/10.1103/PhysRevB.110.134501",
+    "https://doi.org/10.1103/PhysRevB.64.092506",
+    "https://doi.org/10.1103/PhysRevB.63.132504"
+  ],
+  "claim_ceiling": "Specimen-linked synthetic observation and split contract only; no parameter posterior, calibrated material property, Tc, or experimental conclusion is established."
+}
