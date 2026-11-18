@@ -294,8 +294,9 @@ A credible result would demonstrate, with an independent oracle and matched cand
 - NIST NCCoE, [Software and AI Agent Identity and Authorization concept paper](https://csrc.nist.gov/pubs/other/2026/02/05/accelerating-the-adoption-of-software-and-ai-agent/ipd), 2026-02-05; comments closed 2026-04-02.
 - [AuthorizationBench](https://arxiv.org/abs/2610.27548), 2026-10-20; 286 tasks / 6,864 trajectories.
 - [SABench](https://arxiv.org/abs/2610.34167), 2026-10-25; 201 tasks / 2,211 model-task pairs.
-- [Mem2ActBench](https://aclanthology.org/2026.acl-long.XXX/), 2026; memory-dependent tool selection and parameter grounding across 2,029 sessions / 400 tasks (pin the final ACL identifier from the official anthology record before formal release).
-- [TimlMemBench](https://aclanthology.org/2026.findings-acl.XXX/), 2026; raw-native memory lifecycle, scope, provenance, activation and restraint (pin the official identifier/license before formal release).
+- [Mem2ActBench](https://aclanthology.org/2026.acl-long.370/), 2026; memory-dependent tool selection and parameter grounding across 2,029 sessions / 400 tasks (pin the final ACL identifier from the official anthology record before formal release).
+- [TimlMemBench](https://aclanthology.org/2026.findings-emnlp.507/), 2026; raw-native memory lifecycle, scope, provenance, activation and restraint (pin the official identifier/license before formal release).
+- [TiMem](https://aclanthology.org/2026.findings-acl.1091/), Findings of ACL 2026; reports 75.30% on LoCoMo and 76.88% on LongMemEval-S with 52.20% less recalled memory on LoCoMo under its evaluated setup. Use it as a temporal-memory quality/efficiency comparator, not as an authorization or action-safety score.
 - [Agent Security Bench](https://proceedings.iclr.cc/paper_files/paper/2025/hash/5750f91d8fb9d5c02bd8ad2c3b44456b-Abstract-Conference.html), ICLR 2025.
 - [CyberGym](https://www.cybergym.io/cybergym/), AI-agent cybersecurity capability benchmark.
 - [OWASP ACS v0.1.4 conformance profiles](https://owaspacs.org/docs/spec/conformance/); self-declared profile compatibility is not independent certification.
