@@ -152,3 +152,41 @@ Finite-Q components are accepted by the schema for provenance and future work, b
 ## Claim ceiling
 
 This is a synthetic zero-momentum multicomponent static GL evaluator. It does not establish a PDW, a time-reversal-breaking state, a stable superconducting phase, a microscopic mechanism, a measured Tc, room-temperature superconductivity or an experimentally actionable material design.
+
+
+## Bare common-twist response (configuration level only)
+
+The current evaluator also differentiates the intercomponent gradient energy under a common total boundary twist. For a positive unit link on axis \(\mu\), define
+
+\[
+A_{ij}(\boldsymbol\theta)=A_{ij}+\frac{\theta_\mu}{L_\mu},
+\]
+
+and let \(B_{ja}=e^{iA_{ij}}\psi_{ja}\). For the real symmetric intercomponent gradient matrix \(K^{(\mu)}\), the configuration-level first and second derivatives are
+
+\[
+J_\mu=2\sum_{(ij)\parallel\mu}\frac{1}{L_\mu}
+\operatorname{Im}\left[
+\sum_{ab}\psi_{ia}^*K_{ab}^{(\mu)}B_{jb}
+\right],
+\]
+
+\[
+D_{\mu\mu}=2\sum_{(ij)\parallel\mu}\frac{1}{L_\mu^2}
+\operatorname{Re}\left[
+\sum_{ab}\psi_{ia}^*K_{ab}^{(\mu)}B_{jb}
+\right].
+\]
+
+For the current axis-aligned unit-edge lattice, off-diagonal spatial twist-curvature components are zero by construction; diagonal entries are retained. The evaluator verifies that both \(J_\mu\) and \(D_{\mu\nu}\) are invariant under a common local U(1) gauge transformation, using nonuniform fields and nonzero links in a dedicated unit test.
+
+**This is not the thermal helicity modulus.** A thermodynamic helicity modulus also requires the current-fluctuation covariance over an equilibrated ensemble:
+
+\[
+\Upsilon_{\mu\nu}=\langle D_{\mu\nu}\rangle-
+\frac{\operatorname{Cov}(J_\mu,J_\nu)}{T}.
+\]
+
+The current branch is a static single-configuration evaluator: it has no thermal sampler, no temperature, and does not evaluate that covariance. The stiffness-positivity gate therefore remains `not_evaluated_by_static_configuration_auditor`. It must not be counted as a physically stable superconducting state or as a reproduction of PDW stability results.
+
+The zero-momentum evaluator also rejects a component labelled `pdw_plus_q` or `pdw_minus_q` with zero momentum, and rejects all nonzero-momentum components. This keeps the role metadata honest until the finite-Q lattice phase factors, translation-symmetry operations, and symmetry-allowed couplings have a separate executable contract.
