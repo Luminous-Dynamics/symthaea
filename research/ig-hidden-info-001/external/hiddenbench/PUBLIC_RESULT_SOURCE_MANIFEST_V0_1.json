@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "dataset": "YuxuanLi1225/HiddenBench-results",
+  "dataset_url": "https://huggingface.co/datasets/YuxuanLi1225/HiddenBench-results",
+  "dataset_revision": "d3efe77cd4f06c22250b352d72df49bbdf1da3f5",
+  "license": "MIT",
+  "contents_note": "The publisher states result JSON contents are copied without modification; only filenames/folder placement were changed.",
+  "paper_reference": "https://proceedings.mlr.press/v306/li26ej.html",
+  "model": "gpt-4.1",
+  "files": [
+    {
+      "path": "paper/hidden_manual_adapted/hidden_manual_adapted_gpt-4.1.json",
+      "profile": "hidden",
+      "tasks": 8,
+      "runs": 80,
+      "bytes": 5224474
+    },
+    {
+      "path": "paper/hidden_generated/hidden_generated_gpt-4.1.json",
+      "profile": "hidden",
+      "tasks": 57,
+      "runs": 570,
+      "bytes": 45262343
+    },
+    {
+      "path": "paper/full_profile/full_profile_gpt-4.1.json",
+      "profile": "full",
+      "tasks": 65,
+      "runs": 650,
+      "bytes": 7806139
+    }
+  ],
+  "reproduction_rule": "Combine both hidden result files in the Rust scorer; score against the pinned 65-task corpus. Supply the full-profile file separately with --full.",
+  "status": "Source manifest only; result payloads have not yet been downloaded or independently re-scored in this branch."
+}
