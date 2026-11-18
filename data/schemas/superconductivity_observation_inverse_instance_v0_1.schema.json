@@ -1,0 +1,382 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_observation_inverse_instance_v0_1.schema.json",
+  "title": "Superconductivity Specimen-Linked Inverse Observation Dataset",
+  "description": "Versioned specimen-linked multimodal observation and pre-registered calibration/holdout split contract. Does not itself establish a physical material property.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "dataset_id",
+    "fixture_only",
+    "material",
+    "specimen",
+    "process_history",
+    "observations",
+    "split",
+    "model_target",
+    "source_references",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SC-OBSERVATION-INVERSE-0.1"
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_only": {
+      "type": "boolean"
+    },
+    "material": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "material_id",
+        "nominal_composition",
+        "structure_identity"
+      ],
+      "properties": {
+        "material_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nominal_composition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "structure_identity": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "specimen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specimen_id",
+        "batch_id",
+        "sample_state_id",
+        "region_id",
+        "sample_form"
+      ],
+      "properties": {
+        "specimen_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "batch_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_state_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "region_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_form": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "process_history": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "synthesis_route_id",
+        "treatment_pressure",
+        "treatment_temperature",
+        "decompression_path_id",
+        "storage_history_id"
+      ],
+      "properties": {
+        "synthesis_route_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "treatment_pressure": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "treatment_temperature": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "decompression_path_id": {
+          "type": "string"
+        },
+        "storage_history_id": {
+          "type": "string"
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observation_id",
+          "modality",
+          "measurand",
+          "value",
+          "unit",
+          "standard_uncertainty",
+          "measurement_scope",
+          "method_id",
+          "calibration_id",
+          "conditions",
+          "raw_data_sha256",
+          "source_reference"
+        ],
+        "properties": {
+          "observation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "modality": {
+            "enum": [
+              "amplitude_sensitive_spectroscopy",
+              "shot_noise_pair_transfer",
+              "phase_correlation",
+              "josephson_response",
+              "helicity_modulus",
+              "superfluid_density",
+              "vortex_imaging",
+              "heat_capacity",
+              "resistivity",
+              "magnetic_response",
+              "thermodynamic_transition",
+              "other"
+            ]
+          },
+          "measurand": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "standard_uncertainty": {
+            "type": "number",
+            "minimum": 0
+          },
+          "measurement_scope": {
+            "enum": [
+              "local",
+              "mesoscopic",
+              "bulk",
+              "device",
+              "unknown"
+            ]
+          },
+          "method_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "calibration_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "conditions": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "temperature",
+              "temperature_unit",
+              "field_magnitude",
+              "field_unit",
+              "field_orientation",
+              "pressure",
+              "pressure_unit",
+              "doping",
+              "strain",
+              "geometry_id",
+              "measurement_timestamp"
+            ],
+            "properties": {
+              "temperature": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "temperature_unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field_magnitude": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "field_unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field_orientation": {
+                "type": "string",
+                "minLength": 1
+              },
+              "pressure": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "pressure_unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "doping": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "strain": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "geometry_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "measurement_timestamp": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "raw_data_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "source_reference": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    },
+    "split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "split_id",
+        "calibration_observation_ids",
+        "heldout_observation_ids",
+        "holdout_rule",
+        "pre_registered_at"
+      ],
+      "properties": {
+        "split_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_observation_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "heldout_observation_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "holdout_rule": {
+          "enum": [
+            "leave_one_modality_out",
+            "leave_one_condition_slice_out",
+            "leave_one_method_out",
+            "pre_registered_custom"
+          ]
+        },
+        "pre_registered_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "model_target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_family",
+        "model_version",
+        "target_parameters",
+        "prior_definition_id",
+        "observation_operator_version"
+      ],
+      "properties": {
+        "model_family": {
+          "enum": [
+            "lattice_ginzburg_landau",
+            "classical_xy",
+            "quantum_rotor",
+            "other"
+          ]
+        },
+        "model_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_parameters": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "prior_definition_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation_operator_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "source_references": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      }
+    },
+    "claim_ceiling": {
+      "const": "Specimen-linked synthetic observation and split contract only; no parameter posterior, calibrated material property, Tc, or experimental conclusion is established."
+    }
+  }
+}
