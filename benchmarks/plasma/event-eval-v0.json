@@ -196,7 +196,11 @@
     "hardware",
     "metrics",
     "uncertainty_intervals",
-    "policy_config_sha256"
+    "policy_config_sha256",
+    "event_evaluation_receipt_schema",
+    "per_shot_outcomes_and_alarm_episode_timestamps",
+    "recomputed_cohort_summary",
+    "outer_receipt_sha256"
   ],
   "explicit_non_goals": [
     "live_tokamak_control",
@@ -204,5 +208,26 @@
     "claiming_synthetic_faults_are_physical_failure_distributions",
     "claiming_benchmark_reproduction_without_exact_data_and_split",
     "claiming_observability_from_evidence_provenance_alone"
-  ]
+  ],
+  "evaluation_receipt_contract": {
+    "schema_version": "luminous.plasma-event-evaluation-receipt.v0.1",
+    "contains": [
+      "repository_commit",
+      "dataset_revision",
+      "shot_split_sha256",
+      "preprocessing_sha256",
+      "model_id",
+      "model_revision",
+      "model_artifact_sha256",
+      "seed",
+      "hardware",
+      "frozen_alarm_policy",
+      "per_shot_event_outcome",
+      "per_shot_alarm_episode_timestamps",
+      "recomputed_cohort_summary"
+    ],
+    "verify_recomputes_per_shot_scores": true,
+    "verify_recomputes_cohort_summary": true,
+    "outer_sha256_is_content_identity_not_authentication": true
+  }
 }
