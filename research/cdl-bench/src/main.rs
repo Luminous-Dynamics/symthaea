@@ -1,6 +1,7 @@
 use cdl_bench::{
-    compress, compress_i16, crc32, decompress, decompress_i16, generate_e0, generate_fsm,
-    generate_scm, predictor_state_bytes, E0Kind, ModelKind, NumericTransform, ScmIntervention,
+    compress, compress_bounded_i16, compress_i16, crc32, decompress, decompress_bounded_i16,
+    decompress_i16, generate_e0, generate_fsm, generate_scm, predictor_state_bytes,
+    BoundedPredictor, E0Kind, ModelKind, NumericTransform, ScmIntervention,
 };
 use std::error::Error;
 use std::fs;
@@ -19,9 +20,10 @@ fn usage() -> &'static str {
   cdl-bench e0 [--bytes N] [--seed N]
   cdl-bench causal [--steps N] [--seed N]
   cdl-bench numeric [--values N] [--seed N]
+  cdl-bench bounded [--values N] [--seed N] [--tolerance N]
 
-The E0, causal and numeric commands check round-trip integrity and compare
-compressed lengths with installed system codecs where available."
+The E0, causal and numeric commands check exact round-trip integrity.
+The bounded command uses a separate per-sample error guarantee."
 }
 
 fn parse_usize(value: Option<&String>, flag: &str) -> Result<usize, Box<dyn Error>> {
@@ -394,6 +396,117 @@ fn numeric_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+
+fn bounded_command(args: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut count = 10_000usize;
+    let mut seed = 0xB0_0D_16u64;
+    let mut tolerance = 5u16;
+    let mut index = 1;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--values" => {
+                count = parse_usize(args.get(index + 1), "--values")?;
+                index += 2;
+            }
+            "--seed" => {
+                seed = parse_u64(args.get(index + 1), "--seed")?;
+                index += 2;
+            }
+            "--tolerance" => {
+                let parsed = parse_u64(args.get(index + 1), "--tolerance")?;
+                tolerance = u16::try_from(parsed)
+                    .map_err(|_| "tolerance must be in 0..=32767")?;
+                index += 2;
+            }
+            other => return Err(format!("unknown bounded option: {other}\n{}", usage()).into()),
+        }
+    }
+    if count > 1_000_000 {
+        return Err("bounded generator limit is 1,000,000 values per sequence".into());
+    }
+    if tolerance > 32767 {
+        return Err("tolerance must be in 0..=32767".into());
+    }
+
+    let noise = generate_e0(E0Kind::IidSkewed, count, seed);
+    let constant = vec![8192i16; count];
+    let ramp: Vec<i16> = (0..count)
+        .map(|i| (i as i32 / 8 - 16_000).clamp(i16::MIN as i32, i16::MAX as i32) as i16)
+        .collect();
+    let mut random_walk = Vec::with_capacity(count);
+    let mut walk = 0i32;
+    for byte in &noise {
+        walk = (walk + *byte as i32 - 128).clamp(i16::MIN as i32, i16::MAX as i32);
+        random_walk.push(walk as i16);
+    }
+    let demand_like: Vec<i16> = (0..count)
+        .map(|i| {
+            let slow = ((i / 240) % 80) as i32 * 7;
+            let daily = ((i % 1440) / 24) as i32 * 2;
+            let pulse = if i % 997 < 12 { 900 } else { 0 };
+            (12_000 + slow + daily + pulse + (noise[i] as i32 - 128) / 2)
+                .clamp(i16::MIN as i32, i16::MAX as i32) as i16
+        })
+        .collect();
+
+    let sources = [
+        ("constant", constant),
+        ("ramp", ramp),
+        ("random-walk", random_walk),
+        ("demand-like-synthetic", demand_like),
+    ];
+
+    println!("# benchmark=CDL-Bench-bounded-i16-v1");
+    println!("# values={count}");
+    println!("# seed={seed}");
+    println!("# tolerance={tolerance}");
+    println!("source,predictor,model,raw_bytes,frame_bytes,zstd_raw_bytes,ratio,max_abs_error,guarantee");
+
+    for (name, values) in sources {
+        let mut raw = Vec::with_capacity(values.len() * 2);
+        for value in &values {
+            raw.extend_from_slice(&value.to_le_bytes());
+        }
+        let zstd = external_compressed_len("zstd", &["-q", "-c"], &raw)
+            .map_or_else(|| "NA".to_owned(), |value| value.to_string());
+
+        for predictor in [BoundedPredictor::Previous, BoundedPredictor::Linear] {
+            for model in [ModelKind::Order0, ModelKind::Order1] {
+                let frame = compress_bounded_i16(&values, tolerance, predictor, model)?;
+                let reconstructed = decompress_bounded_i16(&frame, values.len())?;
+                let max_error = values
+                    .iter()
+                    .zip(&reconstructed)
+                    .map(|(a, b)| (*a as i32 - *b as i32).unsigned_abs())
+                    .max()
+                    .unwrap_or(0);
+                if max_error > tolerance as u32 {
+                    return Err(format!("bounded-error guarantee failed for {name}").into());
+                }
+                let ratio = if raw.is_empty() {
+                    "n/a".to_owned()
+                } else {
+                    format!("{:.6}", frame.len() as f64 / raw.len() as f64)
+                };
+                let predictor_name = match predictor {
+                    BoundedPredictor::Previous => "previous",
+                    BoundedPredictor::Linear => "linear",
+                };
+                let model_name = if model == ModelKind::Order0 { "order0" } else { "order1" };
+                println!(
+                    "{name},{predictor_name},{model_name},{},{},{zstd},{ratio},{max_error},PASS",
+                    raw.len(),
+                    frame.len()
+                );
+            }
+        }
+    }
+    println!("# note=bounded-error frames are lossy and are not comparable to the exact-lossless leaderboard");
+    println!("# note=the tolerance applies to every sample; frame includes predictor, model, tolerance and reconstructed CRC");
+    println!("# note=synthetic demand-like sequence is not a real electricity or ridership dataset");
+    Ok(())
+}
+
 fn run() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
@@ -402,6 +515,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("e0") => e0_command(&args),
         Some("causal") => causal_command(&args),
         Some("numeric") => numeric_command(&args),
+        Some("bounded") => bounded_command(&args),
         _ => Err(usage().into()),
     }
 }
