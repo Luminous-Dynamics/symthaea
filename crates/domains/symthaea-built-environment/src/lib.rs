@@ -1274,20 +1274,20 @@ pub fn exact_hypervolume(
             .ok_or_else(|| format!("Pareto candidate {candidate_id} is missing"))?;
 
         let mut point = Vec::with_capacity(candidate.objectives.len());
-        let mut inside_reference_box = true;
         for (objective, reference) in candidate.objectives.iter().zip(reference_point) {
             let (value, transformed_reference) = match objective.direction {
                 ObjectiveDirection::Minimize => (objective.value, *reference),
                 ObjectiveDirection::Maximize => (-objective.value, -*reference),
             };
             if value > transformed_reference {
-                inside_reference_box = false;
+                return Err(format!(
+                    "hypervolume reference point does not bound PASS candidate {}",
+                    candidate.candidate_id
+                ));
             }
             point.push(value);
         }
-        if inside_reference_box {
-            normalized_points.push(point);
-        }
+        normalized_points.push(point);
     }
 
     let transformed_reference: Vec<f64> = first
@@ -2547,6 +2547,7 @@ mod tests {
         };
         assert!(exact_hypervolume(&[evaluation.clone()],&[]).is_err());
         assert!(exact_hypervolume(&[evaluation.clone()],&[5.0]).is_err());
+        assert!(exact_hypervolume(&[evaluation.clone()],&[1.0,4.0]).is_err());
         assert!(exact_hypervolume(&[evaluation],&[f64::INFINITY,4.0]).is_err());
     }
 
