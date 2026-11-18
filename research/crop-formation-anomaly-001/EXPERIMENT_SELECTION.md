@@ -95,7 +95,7 @@ Before sampling:
 
 A single centre-relative scalar is insufficient when the field is multimodal or the centre is poorly determined. Preserve all per-plant vectors and report directional distributions by zone.
 
-## 6. Sequential updating safeguards
+### Related boundary-orientation example
 
 Suppose two currently viable mechanisms predict similar plan-view geometry:
 - H1: a mechanical flattening process with a particular entry/exit path;
