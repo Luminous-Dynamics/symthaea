@@ -256,6 +256,36 @@ fn relative_phase_lock_cosines(
         .collect()
 }
 
+fn relative_phase_lock_sines(
+    model: &IntertwinedModel,
+    fields: &[Vec<Complex>],
+) -> Vec<f64> {
+    model
+        .phase_locking_terms
+        .iter()
+        .map(|term| {
+            let mut total = 0.0;
+            let mut count = 0_usize;
+            for site in fields {
+                let first = site[term.first];
+                let second = site[term.second];
+                let denominator = (first.norm_sqr() * second.norm_sqr()).sqrt();
+                if denominator > 1.0e-12 {
+                    // Im(conj(psi_a) * psi_b) / (|psi_a||psi_b|), invariant
+                    // under the single common electromagnetic U(1).
+                    total += (first.re * second.im - first.im * second.re) / denominator;
+                    count += 1;
+                }
+            }
+            if count == 0 {
+                0.0
+            } else {
+                total / count as f64
+            }
+        })
+        .collect()
+}
+
 fn mean(values: &[f64]) -> f64 {
     values.iter().sum::<f64>() / values.len() as f64
 }
@@ -434,6 +464,9 @@ fn run_chain(
     let mut phase_lock_series: Vec<Vec<f64>> = (0..model.phase_locking_terms.len())
         .map(|_| Vec::with_capacity(config.measurement_sweeps))
         .collect();
+    let mut phase_lock_sine_series: Vec<Vec<f64>> = (0..model.phase_locking_terms.len())
+        .map(|_| Vec::with_capacity(config.measurement_sweeps))
+        .collect();
     let mut current_series: Vec<Vec<f64>> = (0..dimension)
         .map(|_| Vec::with_capacity(config.measurement_sweeps))
         .collect();
@@ -484,6 +517,7 @@ fn run_chain(
             })
             .collect();
         let relative_cosines = relative_phase_lock_cosines(model, &fields);
+        let relative_sines = relative_phase_lock_sines(model, &fields);
         let energy_per_site = energy.total / fields.len() as f64;
 
         energy_series.push(energy_per_site);
@@ -497,6 +531,7 @@ fn run_chain(
         }
         for term in 0..relative_cosines.len() {
             phase_lock_series[term].push(relative_cosines[term]);
+            phase_lock_sine_series[term].push(relative_sines[term]);
         }
         for axis in 0..dimension {
             current_series[axis].push(twist.current[axis]);
@@ -517,6 +552,7 @@ fn run_chain(
             "component_mean_amplitudes": amplitudes,
             "component_mean_squared_amplitudes": squared_amplitudes,
             "relative_phase_lock_cosines": relative_cosines,
+            "relative_phase_lock_sines": relative_sines,
             "bare_twist_current": twist.current,
             "bare_twist_diamagnetic_tensor": twist.diamagnetic
         }));
@@ -597,7 +633,9 @@ fn run_chain(
             "component_a": model.components[term.first].id,
             "component_b": model.components[term.second].id,
             "coupling": term.coefficient,
-            "mean_relative_phase_cosine": series_summary(&phase_lock_series[index])
+            "mean_relative_phase_cosine": series_summary(&phase_lock_series[index]),
+            "mean_relative_phase_sine": series_summary(&phase_lock_sine_series[index]),
+            "time_reversal_classification": "not_inferred_from_relative_phase_sine_without_full_crystal_symmetry_action"
         }))
         .collect();
 
@@ -792,6 +830,37 @@ mod tests {
                 .all(|row| row["component_mean_amplitudes"]
                     .as_array()
                     .is_some_and(|values| values.len() == model.components.len())));
+        }
+    }
+
+    #[test]
+    fn relative_phase_sine_is_common_gauge_invariant_and_time_reversal_odd() {
+        let (model, _, _) = inputs();
+        let fields = model.initial_fields();
+        let before = relative_phase_lock_sines(&model, &fields);
+        assert!(!before.is_empty());
+
+        let angles: Vec<f64> = (0..model.sites.len())
+            .map(|index| 0.37 * (index as f64 + 0.4).sin())
+            .collect();
+        let links = model.initial_link_phases();
+        let (gauge_fields, _) =
+            model.common_gauge_transform(&fields, &links, &angles).unwrap();
+        let after_gauge = relative_phase_lock_sines(&model, &gauge_fields);
+        for index in 0..before.len() {
+            assert!((before[index] - after_gauge[index]).abs() < 1.0e-12);
+        }
+
+        let time_reversed: Vec<Vec<Complex>> = fields
+            .iter()
+            .map(|site| site.iter().map(|field| Complex {
+                re: field.re,
+                im: -field.im,
+            }).collect())
+            .collect();
+        let after_time_reversal = relative_phase_lock_sines(&model, &time_reversed);
+        for index in 0..before.len() {
+            assert!((before[index] + after_time_reversal[index]).abs() < 1.0e-12);
         }
     }
 
