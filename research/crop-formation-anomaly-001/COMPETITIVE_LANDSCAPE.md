@@ -130,7 +130,7 @@ Use accepted statistical controls as baselines, not proprietary AI novelty:
 - negative controls and independent replication;
 - explicit out-of-domain abstention.
 
-## 4. Adjacent crop-lodging measurement science
+### Adjacent crop-lodging measurement science
 
 Crop lodging is the closest mature measurement domain for the biological and mechanical observables we need, even though its task is not crop-circle origin inference.
 
