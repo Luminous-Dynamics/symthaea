@@ -63,7 +63,8 @@ impl SwarmConsciousness {
                 member_phis: Vec::new(),
                 conscious_collective_count: 0,
                 total_coalition_members: 0,
-                cognitive_influence: CollectiveCognitiveInfluence::without_collective_influence(individual_phi),
+                cognitive_influence:
+                    CollectiveCognitiveInfluence::without_collective_influence(individual_phi),
             };
         }
 
@@ -195,7 +196,7 @@ mod tests {
         let coalition = make_coalition(vec!["self", "peer1", "peer2"], 0.4, 0.9);
         let sc = SwarmConsciousness::compute(&[coalition], 0.9, Some("self"));
 
-        // Individual Phi > swarm Phi — effective should stay at individual
+        // Individual Phi > collective Phi — cognition stays at the individual estimate.
         assert!(sc.cognitive_influence.blended_cognitive_phi >= 0.9);
     }
 
