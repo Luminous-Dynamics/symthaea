@@ -280,6 +280,19 @@ Source-reviewed against Symthaea main at the PR base head. This is an integratio
 
 **Phase D — matched evaluation:** compare Symthaea baseline, Symthaea evidence/authority controls, and Symthaea + qualified Mycelix enforcement on the same frozen episodes. Report upstream baseline arms, all profile-specific strata, benign utility, false blocks, latency and resource cost. Seek an independent replay before any comparative claim.
 
+## 12A. Versioned paired-fixture manifest
+
+The first machine-readable profile sidecar is now authored:
+
+- [Paired fixture manifest](./SYMTHAEA_AUTHORITY_NONINTERFERENCE_PAIRS_V0_1.json)
+- [Strict JSON Schema](./SYMTHAEA_AUTHORITY_NONINTERFERENCE_PAIRS_V0_1.schema.json)
+
+It contains **18 paired cases**: eight pure cognitive metamorphic pairs (S1–S4) and ten composition controls (S5–S8). The pure pairs explicitly point to one unchanged upstream LARP scenario as the authority projection; only a named cognitive/evidence intervention changes between the two candidate runs. The composition controls are excluded from the AECP/NDD pure-cognition denominator.
+
+The manifest references 16 distinct scenario IDs from LARP suite `LARP-AGENT-AUTHZ-001`. A read-back structural check parsed both JSON documents, verified 18 unique pair IDs, checked the 8/10 partition and all family counts, and confirmed each referenced scenario exists in both the upstream 28-case input suite and its separate 28-row oracle. This check is **not** a full JSON Schema validator, candidate execution, oracle replay, or LARP conformance result.
+
+The sidecar does not copy expected LARP dispositions, alter the LARP/LISE closed schemas, or introduce a parallel evaluator. The upstream input/oracle and candidate-blind scorecard remain authoritative. All 18 pairs remain synthetic development fixtures and have not been executed.
+
 ## 13. What would count as a real advance over SOTA
 
 Do not claim superiority from aggregate scores on unlike tasks. Mycelix's existing LARP/LISE work is already building the benchmark, scorecard, route/revocation models and effect-boundary proof. Symthaea should compete on the *same frozen episodes* and show a specific additional result: changing Φ, reputation, memory quality, evidence confidence or collective consensus does not expand effect authority, while the system still improves task utility or epistemic quality.
