@@ -3,7 +3,7 @@
 **Status:** research baseline; not a certification, product specification, or claim of superiority  
 **Snapshot date:** 2026-11-18  
 **Parent work:** [AQUA-BATHING-SERVICE-001 #12660](https://github.com/Luminous-Dynamics/symthaea/issues/12660)  
-**Purpose:** freeze current comparators, system boundaries, and falsifiable design targets before optimizing fixtures.
+**Purpose:** freeze current comparators, system boundaries, and falsifiable design targets before optimizing fixtures. The source-classified claims are also published in a machine-readable [JSON corpus](research/aqua-evidence-corpus-v0.1.json) with a synchronized [human-readable rendering](research/AQUA_EVIDENCE_CORPUS_V0_1.md); neither replaces exact-source review.
 
 ## 1. Evaluation principle
 
@@ -287,3 +287,13 @@ Two different South African Activera Select S configurations are now separated:
 - **28048000** is the Shower Set 95 2jet EcoSmart with Varia 72 cm bar and no ShowerTablet; its product page states a 6 bar maximum operating pressure.
 
 Both publish Rain 7.2 and ImpactRain 6.5 L/min at 3 bar and minimum pressure 0.5 bar. Do not transfer the 28087000 thermostat / 10 bar properties to 28048000, or vice versa. These two SKUs are separate test articles, not a single merged comparator.
+
+
+## Machine-readable evidence register
+
+The current frozen source snapshot is available as:
+- [Aqua evidence corpus v0.1 (JSON)](research/aqua-evidence-corpus-v0.1.json)
+- [Aqua evidence corpus v0.1 (rendered Markdown)](research/AQUA_EVIDENCE_CORPUS_V0_1.md)
+- [JSON Schema (Draft 2020-12)](research/aqua-evidence-corpus-v0.1.schema.json)
+
+Snapshot 2026-11-18 contains nine entries and 41 claims, including separate Activera 28087000 shower-system and 28048000 shower-set identities. The GitHub Aqua workflow validates schema, source-class compatibility, units, pressure/mode disclosures, derivation requirements and negative controls, and checks the Markdown rendering against the JSON source. The corpus is not an Aqua performance claim; it is a source-classified baseline.
