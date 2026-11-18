@@ -123,7 +123,11 @@ pub struct AlarmPolicyConfig {
     pub clear_threshold: f64,
     pub trigger_persistence_windows: usize,
     pub clear_persistence_windows: usize,
+    /// Minimum lead time for an alarm to count as a valid disruption warning.
     pub required_warning_ns: u64,
+    /// Maximum lead time; alarms earlier than this belong to an excessive-early-warning region.
+    /// Freeze this value on validation, never tune it on the test cohort.
+    pub max_warning_ns: u64,
 }
 
 impl AlarmPolicyConfig {
@@ -146,6 +150,11 @@ impl AlarmPolicyConfig {
         self.risk_model.validate()?;
         if self.required_warning_ns == 0 {
             return Err(PlasmaEventEvalError::new("required_warning_ns must be positive"));
+        }
+        if self.max_warning_ns < self.required_warning_ns {
+            return Err(PlasmaEventEvalError::new(
+                "max_warning_ns must be greater than or equal to required_warning_ns",
+            ));
         }
         if !self.trigger_threshold.is_finite() || !self.clear_threshold.is_finite() {
             return Err(PlasmaEventEvalError::new(
@@ -175,7 +184,7 @@ impl AlarmPolicyConfig {
             canonical.extend_from_slice(&(field.len() as u64).to_be_bytes());
             canonical.extend_from_slice(field);
         };
-        append(b"luminous.plasma-alarm-policy.v0.4");
+        append(b"luminous.plasma-alarm-policy.v0.5");
         append(self.policy_id.as_bytes());
         append(self.score_scale_id.as_bytes());
         append(self.validation_receipt_sha256.as_bytes());
@@ -193,6 +202,7 @@ impl AlarmPolicyConfig {
         append(self.trigger_persistence_windows.to_string().as_bytes());
         append(self.clear_persistence_windows.to_string().as_bytes());
         append(self.required_warning_ns.to_string().as_bytes());
+        append(self.max_warning_ns.to_string().as_bytes());
         sha256_hex(&canonical)
     }
 }
@@ -702,6 +712,7 @@ pub struct ShotAlarmEvaluation {
     pub validation_receipt_sha256: String,
     pub policy_config_sha256: String,
     pub required_warning_ns: u64,
+    pub max_warning_ns: u64,
     pub disruptive: bool,
     pub event_detected: bool,
     pub false_alarm_events: usize,
@@ -813,6 +824,7 @@ pub struct AlarmEvaluationSummary {
     pub validation_receipt_sha256: String,
     pub policy_config_sha256: String,
     pub required_warning_ns: u64,
+    pub max_warning_ns: u64,
     pub shot_count: usize,
     pub disruptive_shots: usize,
     pub non_disruptive_shots: usize,
@@ -1218,6 +1230,7 @@ mod tests {
             trigger_persistence_windows: 2,
             clear_persistence_windows: 2,
             required_warning_ns: 50,
+            max_warning_ns: 90,
         }
     }
 
@@ -1407,7 +1420,7 @@ mod tests {
         );
         assert_eq!(
             manifest["online_policy_contract"]["risk_score_contract"]["policy_config_digest_schema"],
-            "luminous.plasma-alarm-policy.v0.4"
+            "luminous.plasma-alarm-policy.v0.5"
         );
         assert_eq!(
             manifest["online_policy_contract"]["policy_config_digest_schema"],
