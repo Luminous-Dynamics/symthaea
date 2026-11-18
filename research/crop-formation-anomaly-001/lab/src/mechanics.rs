@@ -15,6 +15,7 @@ pub enum MechanicsError {
     NonFinite(&'static str),
     NonPositive(&'static str),
     InvalidInnerAxes,
+    InvalidBeamProfile(&'static str),
 }
 
 /// Concentric hollow elliptical cross-section aligned to its principal axes.
@@ -192,11 +193,301 @@ pub fn outer_fibre_bending_stress_pa(
     Ok(bending_moment_nm.abs() / modulus)
 }
 
+
+/// One piecewise-constant flexural-rigidity interval along a stem axis.
+/// Positions are measured from the root in metres; EI is in N·m².
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BeamSegment {
+    pub start_m: f64,
+    pub end_m: f64,
+    pub flexural_rigidity_nm2: f64,
+}
+
+/// Piecewise Euler-Bernoulli cantilever profile. Segments must cover [0, L]
+/// exactly once, in increasing order, without gaps or overlaps.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BeamProfile {
+    length_m: f64,
+    segments: Vec<BeamSegment>,
+}
+
+/// Linearized root support. An absent stiffness means rigid in that degree
+/// of freedom; finite positive values represent compliant root/soil support.
+/// Translational stiffness is N/m and rotational stiffness is N·m/rad.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct RootSupport {
+    pub translational_stiffness_n_per_m: Option<f64>,
+    pub rotational_stiffness_nm_per_rad: Option<f64>,
+}
+
+impl RootSupport {
+    /// Ideal clamp: no root translation or rotation.
+    pub const RIGID: Self = Self {
+        translational_stiffness_n_per_m: None,
+        rotational_stiffness_nm_per_rad: None,
+    };
+
+    fn validate(self) -> Result<Self, MechanicsError> {
+        if let Some(value) = self.translational_stiffness_n_per_m {
+            positive_finite(value, "translational_root_stiffness_n_per_m")?;
+        }
+        if let Some(value) = self.rotational_stiffness_nm_per_rad {
+            positive_finite(value, "rotational_root_stiffness_nm_per_rad")?;
+        }
+        Ok(self)
+    }
+
+    fn tip_displacement_under_resultant(self, force_n: f64, moment_nm: f64, length_m: f64) -> f64 {
+        let translation = self
+            .translational_stiffness_n_per_m
+            .map_or(0.0, |stiffness| force_n / stiffness);
+        let rotation = self
+            .rotational_stiffness_nm_per_rad
+            .map_or(0.0, |stiffness| moment_nm / stiffness * length_m);
+        translation + rotation
+    }
+}
+
+impl BeamProfile {
+    /// Create a stem profile. Adjacent boundaries may differ only by a
+    /// scale-aware floating-point tolerance; the supplied intervals must
+    /// otherwise cover the complete length without overlap.
+    pub fn new(length_m: f64, segments: Vec<BeamSegment>) -> Result<Self, MechanicsError> {
+        positive_finite(length_m, "beam_length_m")?;
+        if segments.is_empty() {
+            return Err(MechanicsError::InvalidBeamProfile("at least one segment is required"));
+        }
+
+        let tolerance = 1.0e-12 * length_m.max(1.0);
+        if segments[0].start_m.abs() > tolerance {
+            return Err(MechanicsError::InvalidBeamProfile("first segment must start at zero"));
+        }
+
+        let mut previous_end = 0.0;
+        for segment in &segments {
+            finite(segment.start_m, "segment_start_m")?;
+            finite(segment.end_m, "segment_end_m")?;
+            positive_finite(segment.flexural_rigidity_nm2, "segment_flexural_rigidity_nm2")?;
+
+            if segment.end_m <= segment.start_m {
+                return Err(MechanicsError::InvalidBeamProfile("segment end must exceed segment start"));
+            }
+            if (segment.start_m - previous_end).abs() > tolerance {
+                return Err(MechanicsError::InvalidBeamProfile("segments must be contiguous and non-overlapping"));
+            }
+            previous_end = segment.end_m;
+        }
+
+        if (previous_end - length_m).abs() > tolerance {
+            return Err(MechanicsError::InvalidBeamProfile("segments must end at beam length"));
+        }
+
+        Ok(Self { length_m, segments })
+    }
+
+    pub fn length_m(&self) -> f64 {
+        self.length_m
+    }
+
+    pub fn segments(&self) -> &[BeamSegment] {
+        &self.segments
+    }
+
+    /// Tip deflection under a transverse point force applied at the free tip.
+    ///
+    /// For piecewise constant EI, the beam contribution is evaluated exactly:
+    /// F * sum(((L-a)^3 - (L-b)^3) / (3 EI_segment)).
+    /// Root translation and rotation are added using the linear spring model.
+    pub fn tip_deflection_under_tip_load(
+        &self,
+        force_n: f64,
+        root_support: RootSupport,
+    ) -> Result<f64, MechanicsError> {
+        finite(force_n, "force_n")?;
+        let root = root_support.validate()?;
+        let mut beam_deflection = 0.0;
+        for segment in &self.segments {
+            let outer = (self.length_m - segment.start_m).powi(3);
+            let inner = (self.length_m - segment.end_m).powi(3);
+            beam_deflection += (outer - inner) / (3.0 * segment.flexural_rigidity_nm2);
+        }
+        let applied_beam_deflection = force_n * beam_deflection;
+        let root_deflection = root.tip_displacement_under_resultant(
+            force_n,
+            force_n * self.length_m,
+            self.length_m,
+        );
+        Ok(applied_beam_deflection + root_deflection)
+    }
+
+    /// Tip deflection under a uniform transverse load q (N/m) over the full
+    /// stem length. This is a quasi-static small-deflection reference model.
+    pub fn tip_deflection_under_uniform_load(
+        &self,
+        load_n_per_m: f64,
+        root_support: RootSupport,
+    ) -> Result<f64, MechanicsError> {
+        finite(load_n_per_m, "load_n_per_m")?;
+        let root = root_support.validate()?;
+        let mut beam_deflection = 0.0;
+        for segment in &self.segments {
+            let outer = (self.length_m - segment.start_m).powi(4);
+            let inner = (self.length_m - segment.end_m).powi(4);
+            beam_deflection += (outer - inner) / (8.0 * segment.flexural_rigidity_nm2);
+        }
+        let total_force = load_n_per_m * self.length_m;
+        let root_moment = load_n_per_m * self.length_m.powi(2) / 2.0;
+        let root_deflection = root.tip_displacement_under_resultant(
+            total_force,
+            root_moment,
+            self.length_m,
+        );
+        Ok(load_n_per_m * beam_deflection + root_deflection)
+    }
+}
+
+/// Convert Young's modulus (Pa) and a matching principal second moment of area
+/// (m⁴) into flexural rigidity EI (N·m²).
+pub fn flexural_rigidity_from_modulus(
+    young_modulus_pa: f64,
+    second_moment_area_m4: f64,
+) -> Result<f64, MechanicsError> {
+    let modulus = positive_finite(young_modulus_pa, "young_modulus_pa")?;
+    let inertia = positive_finite(second_moment_area_m4, "second_moment_area_m4")?;
+    Ok(modulus * inertia)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     const EPS: f64 = 1.0e-10;
+
+
+    #[test]
+    fn modulus_and_second_moment_form_flexural_rigidity() {
+        assert!((flexural_rigidity_from_modulus(2.0e9, 1.0e-9).unwrap() - 2.0).abs() < EPS);
+    }
+
+    #[test]
+    fn uniform_profile_reproduces_constant_ei_cantilever_tip_load_solution() {
+        let profile = BeamProfile::new(0.5, vec![BeamSegment {
+            start_m: 0.0, end_m: 0.5, flexural_rigidity_nm2: 4.0,
+        }]).unwrap();
+        let actual = profile.tip_deflection_under_tip_load(2.0, RootSupport::RIGID).unwrap();
+        let expected = 2.0 * 0.5_f64.powi(3) / (3.0 * 4.0);
+        assert!((actual - expected).abs() < EPS);
+    }
+
+    #[test]
+    fn equal_stiffness_partition_is_invariant_for_tip_load_and_uniform_load() {
+        let one = BeamProfile::new(0.5, vec![BeamSegment {
+            start_m: 0.0, end_m: 0.5, flexural_rigidity_nm2: 4.0,
+        }]).unwrap();
+        let split = BeamProfile::new(0.5, vec![
+            BeamSegment { start_m: 0.0, end_m: 0.2, flexural_rigidity_nm2: 4.0 },
+            BeamSegment { start_m: 0.2, end_m: 0.5, flexural_rigidity_nm2: 4.0 },
+        ]).unwrap();
+        assert!((one.tip_deflection_under_tip_load(2.0, RootSupport::RIGID).unwrap()
+            - split.tip_deflection_under_tip_load(2.0, RootSupport::RIGID).unwrap()).abs() < EPS);
+        assert!((one.tip_deflection_under_uniform_load(3.0, RootSupport::RIGID).unwrap()
+            - split.tip_deflection_under_uniform_load(3.0, RootSupport::RIGID).unwrap()).abs() < EPS);
+    }
+
+    #[test]
+    fn uniform_load_profile_reproduces_closed_form_cantilever_solution() {
+        let profile = BeamProfile::new(0.5, vec![BeamSegment {
+            start_m: 0.0, end_m: 0.5, flexural_rigidity_nm2: 4.0,
+        }]).unwrap();
+        let actual = profile.tip_deflection_under_uniform_load(3.0, RootSupport::RIGID).unwrap();
+        let expected = 3.0 * 0.5_f64.powi(4) / (8.0 * 4.0);
+        assert!((actual - expected).abs() < EPS);
+    }
+
+    #[test]
+    fn a_stiffer_rootward_segment_reduces_tip_load_deflection() {
+        let stiff_at_root = BeamProfile::new(1.0, vec![
+            BeamSegment { start_m: 0.0, end_m: 0.5, flexural_rigidity_nm2: 10.0 },
+            BeamSegment { start_m: 0.5, end_m: 1.0, flexural_rigidity_nm2: 1.0 },
+        ]).unwrap();
+        let stiff_at_tip = BeamProfile::new(1.0, vec![
+            BeamSegment { start_m: 0.0, end_m: 0.5, flexural_rigidity_nm2: 1.0 },
+            BeamSegment { start_m: 0.5, end_m: 1.0, flexural_rigidity_nm2: 10.0 },
+        ]).unwrap();
+        let rootward = stiff_at_root.tip_deflection_under_tip_load(1.0, RootSupport::RIGID).unwrap();
+        let tipward = stiff_at_tip.tip_deflection_under_tip_load(1.0, RootSupport::RIGID).unwrap();
+        assert!(rootward < tipward);
+    }
+
+    #[test]
+    fn root_spring_compliance_adds_translational_and_rotational_displacement() {
+        let profile = BeamProfile::new(0.5, vec![BeamSegment {
+            start_m: 0.0, end_m: 0.5, flexural_rigidity_nm2: 4.0,
+        }]).unwrap();
+        let rigid = profile.tip_deflection_under_tip_load(2.0, RootSupport::RIGID).unwrap();
+        let compliant = profile.tip_deflection_under_tip_load(2.0, RootSupport {
+            translational_stiffness_n_per_m: Some(1_000.0),
+            rotational_stiffness_nm_per_rad: Some(20.0),
+        }).unwrap();
+        assert!((compliant - rigid - 0.027).abs() < EPS);
+    }
+
+    #[test]
+    fn root_spring_compliance_for_uniform_load_uses_resultant_and_base_moment() {
+        let profile = BeamProfile::new(0.5, vec![BeamSegment {
+            start_m: 0.0, end_m: 0.5, flexural_rigidity_nm2: 4.0,
+        }]).unwrap();
+        let rigid = profile.tip_deflection_under_uniform_load(3.0, RootSupport::RIGID).unwrap();
+        let compliant = profile.tip_deflection_under_uniform_load(3.0, RootSupport {
+            translational_stiffness_n_per_m: Some(1_000.0),
+            rotational_stiffness_nm_per_rad: Some(20.0),
+        }).unwrap();
+        assert!((compliant - rigid - 0.010875).abs() < EPS);
+    }
+
+    #[test]
+    fn beam_profile_rejects_gaps_and_overlaps() {
+        let gap = BeamProfile::new(1.0, vec![
+            BeamSegment { start_m: 0.0, end_m: 0.4, flexural_rigidity_nm2: 1.0 },
+            BeamSegment { start_m: 0.5, end_m: 1.0, flexural_rigidity_nm2: 1.0 },
+        ]);
+        assert_eq!(gap, Err(MechanicsError::InvalidBeamProfile("segments must be contiguous and non-overlapping")));
+        let overlap = BeamProfile::new(1.0, vec![
+            BeamSegment { start_m: 0.0, end_m: 0.6, flexural_rigidity_nm2: 1.0 },
+            BeamSegment { start_m: 0.5, end_m: 1.0, flexural_rigidity_nm2: 1.0 },
+        ]);
+        assert_eq!(overlap, Err(MechanicsError::InvalidBeamProfile("segments must be contiguous and non-overlapping")));
+    }
+
+    #[test]
+    fn beam_profile_rejects_missing_coverage_and_nonpositive_ei() {
+        assert_eq!(
+            BeamProfile::new(1.0, vec![BeamSegment {
+                start_m: 0.0, end_m: 0.9, flexural_rigidity_nm2: 1.0,
+            }]),
+            Err(MechanicsError::InvalidBeamProfile("segments must end at beam length"))
+        );
+        assert_eq!(
+            BeamProfile::new(1.0, vec![BeamSegment {
+                start_m: 0.0, end_m: 1.0, flexural_rigidity_nm2: 0.0,
+            }]),
+            Err(MechanicsError::NonPositive("segment_flexural_rigidity_nm2"))
+        );
+    }
+
+    #[test]
+    fn invalid_root_spring_stiffness_is_rejected() {
+        let profile = BeamProfile::new(1.0, vec![BeamSegment {
+            start_m: 0.0, end_m: 1.0, flexural_rigidity_nm2: 1.0,
+        }]).unwrap();
+        assert_eq!(
+            profile.tip_deflection_under_tip_load(1.0, RootSupport {
+                translational_stiffness_n_per_m: Some(0.0),
+                rotational_stiffness_nm_per_rad: None,
+            }),
+            Err(MechanicsError::NonPositive("translational_root_stiffness_n_per_m"))
+        );
+    }
 
     #[test]
     fn solid_ellipse_has_expected_principal_second_moments() {
