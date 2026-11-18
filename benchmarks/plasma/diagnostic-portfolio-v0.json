@@ -241,5 +241,25 @@
       "total_resource_cost": 4,
       "resource_unit": "synthetic_resource_unit"
     }
+  },
+  "frame_bridge_contract": {
+    "schema_version": "luminous.plasma-diagnostic-frame-portfolio-bridge.v0.1",
+    "requires_exactly_one_category_rule_per_candidate_sensor": true,
+    "category_rules_require_channel_and_diagnostic_system_binding": true,
+    "category_bands_are_lower_inclusive_upper_exclusive": true,
+    "category_gaps_produce_unknown": true,
+    "category_labels_must_exist_in_declared_world_signatures": true,
+    "decision_channel_requirements_are_checked_by_plasma_observability_gate": true,
+    "only_direct_measured_values_can_become_known_categories": true,
+    "synthetic_unavailable_invalid_delayed_degraded_values_remain_unknown": true,
+    "source_and_calibration_provenance_is_preserved_for_known_categories": true,
+    "distinguishable_outputs": [
+      "structural_diagnosability",
+      "frame_time_world_compatibility",
+      "compatible_world_set",
+      "compatible_decision_set",
+      "frame_decision_identified_ambiguous_or_no_compatible_world"
+    ],
+    "claim_ceiling": "FRAME_DECISION_IDENTIFICATION_ONLY_FOR_DECLARED_CATEGORICAL_MODEL_NOT_PHYSICAL_OBSERVABILITY"
   }
 }
