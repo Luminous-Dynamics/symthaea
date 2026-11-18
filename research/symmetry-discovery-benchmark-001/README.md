@@ -39,6 +39,51 @@ Every evaluated method produces a proposal/report with a typed evidence level. T
 
 A learned score, spectral match or proposal confidence never bypasses a later stage. An unsupported or unresolved case is an abstention, not a negative proof.
 
+## Published baseline metrics that must be reproduced natively
+
+### LieFlow — group-distribution distance
+
+The LieFlow project reports 3-seed ModelNet10 Wasserstein-1 distances from a sampled SO(3) hypothesis distribution to the target subgroup. These are **distributional support metrics**, not exact subgroup-label accuracy:
+
+| Target within SO(3) | LieGAN W1 | SGM W1 | Augerino W1 | LieFlow W1 |
+|---|---:|---:|---:|---:|
+| Tetrahedral (Tet) | 1.113 | 0.915 | 1.059 | **0.149** |
+| Octahedral (Oct) | 1.145 | 0.742 | 1.083 | **0.097** |
+| SO(2), z-axis | 0.101 | 1.848 | 1.236 | **0.050** |
+| SO(2), tilted axis | 0.072 | 1.832 | 1.244 | **0.053** |
+| Icosahedral (Ico) | 0.893 | 1.031 | 0.795 | **0.129** |
+
+Source: LieFlow project’s ModelNet10 table, averaged over three seeds, and the ICML 2026 paper. Reproduce the exact sampling, normalization, target construction, and evaluation code before treating these values as comparable. Our benchmark should report W1 plus exact finite subgroup recovery on the same generated samples, not replace W1 with classification accuracy. On MI-Motion, report the paper’s approximate C4-z support/histogram behavior as a separate unsupervised real-data lane; do not invent exact ground truth where none is supplied. [Project results](https://jypark0.github.io/lieflow/) · [ICML 2026 paper](https://proceedings.mlr.press/v306/chen26dg.html)
+
+### SymFP — degree-resolved spectral leakage
+
+For each degree (l) and target subgroup (H), reproduce the published leakage score from singular-value tail energy beyond the target fixed-subspace rank (m_l(H)):
+
+[
+\operatorname{LS}_{H}^{(l)}(\mathcal G)
+=
+\frac{\sum_{i>m_l(H)}(\sigma_i^{(l)})^2}
+{\sum_i(\sigma_i^{(l)})^2+\epsilon_{norm}},
+\qquad
+\operatorname{pLS}_{H}^{(l)}
+=
+-\log_{10}(\operatorname{LS}_{H}^{(l)}+\epsilon_{log}).
+]
+
+Preserve the paper's normalization constants and rank templates; aggregate over degrees only as specified by the reproduction protocol. Report per-degree LS/pLS, pooled LS/pLS, template accuracy, ambiguity, and local defect localization. The paper sets (\epsilon_{norm}=\epsilon_{log}=10^{-10}) in its stated default. These scores describe representation compatibility, not a verified group action or a physical invariant. [SymFP preprint](https://arxiv.org/abs/2611.07410)
+
+### Active acquisition — static, myopic, adaptive and lookahead
+
+AFABench evaluates static, greedy/myopic, non-myopic oracle/lookahead, and RL policies. The synthetic CUBE-NM task is particularly relevant: a context feature has zero immediate label information but reveals which later feature block is useful. A myopic policy therefore misses the value of the context observation; a non-myopic policy must invest in it. Include an analogous symmetry-experiment case where the first probe only identifies which second probe will separate the remaining group hypotheses.
+
+This complements our exact D4 fixture:
+- exact adaptive minimax versus greedy one-step;
+- static greedy weighted probe-set design;
+- pairwise identifiability ceiling;
+- shared persistent-noise and numeric-bias models.
+
+Report actual acquisition cost, worst-case/expected cost (where probabilities are supplied), hypothesis risk/coverage, abstentions, and planning/verifier overhead. AFABench is a framework, not an oracle for physical symmetry. [AFABench paper](https://arxiv.org/abs/2508.14734) · [AFA survey/POMDP formulation](https://ijcai.org/proceedings/2026/860)
+
 ## Non-pooled benchmark tracks
 
 ### A. Exact finite structural stabilizers
