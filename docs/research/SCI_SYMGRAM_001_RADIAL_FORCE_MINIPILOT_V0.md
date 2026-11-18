@@ -208,9 +208,12 @@ Keep the physical central-force system but apply an anisotropic observation map 
 
 Do not claim physical symmetry from raw sensor invariance or break the physical-law model just because the sensor coordinates are anisotropic.
 
-### 7.4 Orientation-sensitive target
+### 7.4 Orientation and signed-angular-momentum targets
 
-Add an observable that depends on orientation or signed angular momentum. A quotient that retains only \(a,b,c\) must fail the representation-sufficiency check. Retaining \(\ell\), or supplying a valid lift/gauge, is necessary for this task.
+Use two distinct outputs:
+
+- **Signed angular momentum:** a target depending on \(\ell=x_1v_2-x_2v_1\). A quotient retaining only \(a,b,c\) loses its sign and must fail the sufficiency check; retain \(\ell\) or an equivalent orientation-chirality variable.
+- **Absolute external-frame direction:** a target such as \(h(x)=x_1\) is not SO(2)-invariant. A quotient that removes global rotation is not admissible for this target unless the external reference frame is included in the state/observation contract and a valid lift is supplied. The quotient must not claim it can reconstruct absolute orientation from invariants alone.
 
 ### 7.5 Singular orbit
 
