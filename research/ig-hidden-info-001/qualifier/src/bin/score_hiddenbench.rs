@@ -140,6 +140,53 @@ fn load_run_records(path: &str) -> Result<(Value, Vec<Value>), String> {
     Ok((results, flattened))
 }
 
+fn load_multiple_run_records(paths: &[String]) -> Result<(Value, Vec<Value>), String> {
+    if paths.is_empty() {
+        return Err("at least one hidden-profile result file is required".to_string());
+    }
+
+    let mut combined_metadata: Option<Value> = None;
+    let mut combined_runs = Vec::new();
+    let mut expected_model: Option<String> = None;
+    let mut expected_profile: Option<String> = None;
+
+    for path in paths {
+        let (metadata, runs) = load_run_records(path)?;
+        let model = metadata_string(&metadata, "model");
+        let profile = metadata_string(&metadata, "profile");
+
+        if let (Some(expected), Some(actual)) = (&expected_model, &model) {
+            if expected != actual {
+                return Err(format!(
+                    "hidden result files use different models: {expected} vs {actual} ({path})"
+                ));
+            }
+        }
+        if let (Some(expected), Some(actual)) = (&expected_profile, &profile) {
+            if expected != actual {
+                return Err(format!(
+                    "hidden result files use different profiles: {expected} vs {actual} ({path})"
+                ));
+            }
+        }
+        if expected_model.is_none() {
+            expected_model = model;
+        }
+        if expected_profile.is_none() {
+            expected_profile = profile;
+        }
+        if combined_metadata.is_none() || metadata_string(&combined_metadata.clone().unwrap_or(Value::Null), "model").is_none() {
+            combined_metadata = Some(metadata);
+        }
+        combined_runs.extend(runs);
+    }
+
+    Ok((
+        combined_metadata.unwrap_or(Value::Null),
+        combined_runs,
+    ))
+}
+
 fn vote_values(run: &Value, field: &str) -> Vec<String> {
     run.get(field)
         .and_then(Value::as_array)
@@ -274,14 +321,14 @@ fn metadata_string(results: &Value, key: &str) -> Option<String> {
 
 fn score(
     benchmark_path: &str,
-    hidden_results_path: &str,
+    hidden_results_paths: &[String],
     full_results_path: Option<&str>,
 ) -> Result<ScoreReport, String> {
     const BOOTSTRAP_REPLICATES: usize = 10_000;
     const BOOTSTRAP_SEED: u64 = 20_261_118;
 
     let (tasks, lookup) = load_tasks(benchmark_path)?;
-    let (results_json, runs) = load_run_records(hidden_results_path)?;
+    let (results_json, runs) = load_multiple_run_records(hidden_results_paths)?;
     let mut per_run = Vec::with_capacity(runs.len());
     let mut by_task = BTreeMap::<String, TaskAccumulator>::new();
 
@@ -443,24 +490,27 @@ fn score(
 fn main() {
     let mut args = env::args().skip(1);
     let Some(benchmark_path) = args.next() else {
-        eprintln!("usage: score_hiddenbench <benchmark.json> <results.json> [--full <full_profile_results.json>]");
+        eprintln!("usage: score_hiddenbench <benchmark.json> <hidden_results_part1.json> [hidden_results_part2.json ...] [--full <full_profile_results.json>]");
         std::process::exit(2);
     };
-    let Some(results_path) = args.next() else {
-        eprintln!("missing results file path");
-        std::process::exit(2);
-    };
-    let mut full_path = None;
     let remaining: Vec<String> = args.collect();
-    if !remaining.is_empty() {
-        if remaining.len() != 2 || remaining[0] != "--full" {
-            eprintln!("optional arguments must be: --full <full_profile_results.json>");
-            std::process::exit(2);
+    let full_index = remaining.iter().position(|argument| argument == "--full");
+    let (hidden_paths, full_path): (Vec<String>, Option<&str>) = match full_index {
+        Some(index) => {
+            if index == 0 || index + 2 != remaining.len() {
+                eprintln!("use one or more hidden result files followed by --full <full_profile_results.json>");
+                std::process::exit(2);
+            }
+            (remaining[..index].to_vec(), Some(remaining[index + 1].as_str()))
         }
-        full_path = Some(remaining[1].as_str());
+        None => (remaining, None),
+    };
+    if hidden_paths.is_empty() {
+        eprintln!("at least one hidden-profile result file is required");
+        std::process::exit(2);
     }
 
-    match score(&benchmark_path, &results_path, full_path) {
+    match score(&benchmark_path, &hidden_paths, full_path) {
         Ok(report) => println!(
             "{}",
             serde_json::to_string_pretty(&report).expect("score report serialization should succeed")
@@ -526,6 +576,57 @@ mod tests {
         assert!((mean(&scores.iter().map(|s| s.post_average).collect::<Vec<_>>()) - 0.75).abs() < 1e-12);
         assert!((mean(&scores.iter().map(|s| s.pre_majority).collect::<Vec<_>>()) - 0.5).abs() < 1e-12);
         assert!((mean(&scores.iter().map(|s| s.post_majority).collect::<Vec<_>>()) - 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn combines_manual_and_generated_hidden_profile_splits() {
+        let results = synthetic_results();
+        let runs = results.get("runs").and_then(Value::as_array).expect("runs array");
+        let first = serde_json::json!({
+            "metadata": {"model":"test-model","profile":"hidden"},
+            "runs": [runs[0].clone()]
+        });
+        let second = serde_json::json!({
+            "metadata": {"model":"test-model","profile":"hidden"},
+            "runs": [runs[1].clone()]
+        });
+        let first_path = std::env::temp_dir().join("hiddenbench-split-a.json");
+        let second_path = std::env::temp_dir().join("hiddenbench-split-b.json");
+        std::fs::write(&first_path, first.to_string()).expect("write first split");
+        std::fs::write(&second_path, second.to_string()).expect("write second split");
+        let paths = vec![
+            first_path.to_string_lossy().to_string(),
+            second_path.to_string_lossy().to_string(),
+        ];
+        let report = score(
+            "research/ig-hidden-info-001/external/hiddenbench/benchmark.json",
+            &paths,
+            None,
+        ).expect("score concatenated hidden splits");
+        let _ = std::fs::remove_file(first_path);
+        let _ = std::fs::remove_file(second_path);
+        assert_eq!(report.run_count, 2);
+        assert_eq!(report.task_count, 2);
+        assert_eq!(report.model.as_deref(), Some("test-model"));
+        assert_eq!(report.profile.as_deref(), Some("hidden"));
+    }
+
+    #[test]
+    fn mixed_model_hidden_splits_are_rejected() {
+        let first = serde_json::json!({"metadata":{"model":"model-a","profile":"hidden"},"runs":[]});
+        let second = serde_json::json!({"metadata":{"model":"model-b","profile":"hidden"},"runs":[]});
+        let first_path = std::env::temp_dir().join("hiddenbench-model-a.json");
+        let second_path = std::env::temp_dir().join("hiddenbench-model-b.json");
+        std::fs::write(&first_path, first.to_string()).expect("write first split");
+        std::fs::write(&second_path, second.to_string()).expect("write second split");
+        let paths = vec![
+            first_path.to_string_lossy().to_string(),
+            second_path.to_string_lossy().to_string(),
+        ];
+        let error = load_multiple_run_records(&paths).expect_err("different models must not combine");
+        let _ = std::fs::remove_file(first_path);
+        let _ = std::fs::remove_file(second_path);
+        assert!(error.contains("different models"));
     }
 
     #[test]
