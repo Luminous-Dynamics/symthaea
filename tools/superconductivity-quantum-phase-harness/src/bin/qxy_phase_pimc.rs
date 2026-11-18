@@ -85,7 +85,10 @@ impl QxyModel {
             || model.get("pair_charge_convention").and_then(Value::as_str)
                 != Some("2e_equals_1")
         {
-            return Err("QXY pilot requires the explicitly pinned Ponticelli source-model conventions".to_owned());
+            return Err(
+                "QXY pilot requires the explicitly pinned Ponticelli source-model conventions"
+                    .to_owned(),
+            );
         }
         if model.get("energy_unit").and_then(Value::as_str) != Some("coupling_energy_units")
             || model.get("temperature_unit").and_then(Value::as_str)
@@ -100,7 +103,9 @@ impl QxyModel {
         if graph.get("spatial_dimension").and_then(Value::as_u64) != Some(2)
             || graph.get("embedding").and_then(Value::as_str) != Some("physical_coordinates")
         {
-            return Err("QXY source pilot requires a two-dimensional physical square lattice".to_owned());
+            return Err(
+                "QXY source pilot requires a two-dimensional physical square lattice".to_owned(),
+            );
         }
         let lengths = graph
             .get("box_lengths")
@@ -118,7 +123,10 @@ impl QxyModel {
             .filter(|value| value.is_finite() && *value > 0.0)
             .ok_or_else(|| "invalid y box length".to_owned())?;
         if (lx - ly).abs() > 1.0e-10 || (lx - lx.round()).abs() > 1.0e-10 || lx < 3.0 {
-            return Err("QXY source pilot requires an equal-integer periodic L x L square with L >= 3".to_owned());
+            return Err(
+                "QXY source pilot requires an equal-integer periodic L x L square with L >= 3"
+                    .to_owned(),
+            );
         }
         let l = lx as usize;
 
@@ -127,7 +135,9 @@ impl QxyModel {
             .and_then(Value::as_array)
             .ok_or_else(|| "periodic_axes must be an array".to_owned())?;
         if axes.len() != 2 || axes[0].as_u64() != Some(0) || axes[1].as_u64() != Some(1) {
-            return Err("QXY source pilot requires periodic boundaries on both spatial axes".to_owned());
+            return Err(
+                "QXY source pilot requires periodic boundaries on both spatial axes".to_owned(),
+            );
         }
 
         let nodes = graph
@@ -237,7 +247,10 @@ impl QxyModel {
                 .ok_or_else(|| format!("edge {id} josephson_energy must be positive"))?;
             if let Some(reference) = t_reference {
                 if (energy - reference).abs() > 1.0e-10 {
-                    return Err("source QXY pilot requires uniform nearest-neighbour Josephson energy t".to_owned());
+                    return Err(
+                        "source QXY pilot requires uniform nearest-neighbour Josephson energy t"
+                            .to_owned(),
+                    );
                 }
             } else {
                 t_reference = Some(energy);
@@ -294,7 +307,10 @@ impl QxyModel {
             || fixture["external_flux"]["mode"].as_str() != Some("zero")
             || fixture["external_flux"]["total_flux_quanta"].as_f64() != Some(0.0)
         {
-            return Err("QXY source pilot is restricted to zero external flux and zero gauge links".to_owned());
+            return Err(
+                "QXY source pilot is restricted to zero external flux and zero gauge links"
+                    .to_owned(),
+            );
         }
         let t = t_reference.ok_or_else(|| "no Josephson bonds supplied".to_owned())?;
 
@@ -302,7 +318,10 @@ impl QxyModel {
             .get("charging")
             .ok_or_else(|| "missing charging parameters".to_owned())?;
         if charging.get("matrix_kind").and_then(Value::as_str) != Some("diagonal_scalar") {
-            return Err("QXY source model requires the compact on-site diagonal_scalar charging term".to_owned());
+            return Err(
+                "QXY source model requires the compact on-site diagonal_scalar charging term"
+                    .to_owned(),
+            );
         }
         let u = charging
             .get("diagonal_value")
@@ -314,9 +333,11 @@ impl QxyModel {
             .and_then(Value::as_array)
             .ok_or_else(|| "offset_charges must be an array".to_owned())?;
         if offsets.len() != spatial_sites
-            || offsets
-                .iter()
-                .any(|value| value.as_f64().is_none_or(|charge| !charge.is_finite() || charge.abs() > 1.0e-12))
+            || offsets.iter().any(|value| {
+                value
+                    .as_f64()
+                    .is_none_or(|charge| !charge.is_finite() || charge.abs() > 1.0e-12)
+            })
         {
             return Err("source QXY pilot requires one zero offset charge per site".to_owned());
         }
@@ -324,7 +345,10 @@ impl QxyModel {
         if fixture["bath"]["mode"].as_str() != Some("none")
             || fixture["bath"]["coupling_strength"].as_f64() != Some(0.0)
         {
-            return Err("Ponticelli source model has no dissipative bath in this reproduction track".to_owned());
+            return Err(
+                "Ponticelli source model has no dissipative bath in this reproduction track"
+                    .to_owned(),
+            );
         }
 
         let simulation = fixture
@@ -335,7 +359,9 @@ impl QxyModel {
             || simulation.get("representation").and_then(Value::as_str)
                 != Some("phase_path_integral")
         {
-            return Err("QXY source pilot requires phase-representation path-integral QMC".to_owned());
+            return Err(
+                "QXY source pilot requires phase-representation path-integral QMC".to_owned(),
+            );
         }
         if simulation.get("temperature_unit").and_then(Value::as_str)
             != Some("coupling_energy_units")
@@ -540,8 +566,8 @@ fn measure(model: &QxyModel, phases: &[f64]) -> Measurement {
 
     let s_s = model.k_spatial * spatial_cosine / model.beta;
     let current = model.t * model.delta_tau * spatial_sine / model.beta;
-    let stiffness =
-        (s_s - model.beta * current * current) / (2.0 * model.t * (model.lattice_linear_size.pow(2) as f64));
+    let stiffness = (s_s - model.beta * current * current)
+        / (2.0 * model.t * (model.lattice_linear_size.pow(2) as f64));
 
     let l = model.lattice_linear_size;
     let mut total_vorticity = 0.0;
