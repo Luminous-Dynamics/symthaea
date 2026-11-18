@@ -58,7 +58,7 @@ The pressure points are not interchangeable. A unit tested only at 150 and 300 k
 
 ### Standard endpoints
 
-Capture the exact outputs required by the selected standard method, including maximum/minimum flow where applicable, spray force, spray coverage, markings and specimen rules. EPA Version 1.1 specifies a 0.56 N minimum spray force at nominal 140 kPa for high-efficiency showerheads and hand showers, and 0.40 N for high-efficiency rain showers. These are standardized test endpoints, not a complete model of every user's comfort or a universal pain/comfort threshold.
+Capture the exact outputs required by the selected standard method, including maximum/minimum flow where applicable, spray force, spray coverage, markings and specimen rules. EPA WaterSense Specification v1.1 specifies a 0.56 N minimum spray force at nominal 140 ± 7 kPa for high-efficiency showerheads and hand showers, and 0.40 N for high-efficiency rain showers. Its spray-coverage criteria require the combined maximum volume collected in the 2- and 4-inch annular rings to be no more than 75% of total collected volume, and the combined minimum volume in the 2-, 4- and 6-inch rings to be at least 25% of total collected volume. Apply the full incorporated ASME/CSA procedure, mounting and specimen rules; do not reproduce only the summary numbers and call it a certification test. These are standardized test endpoints, not a complete model of every user's comfort or a universal pain/comfort threshold.
 
 ### Aqua spatial-map extension
 
@@ -221,7 +221,7 @@ The Aqua helper may validate grid shape and summarize measured values. It must n
 ## 11. Sources and current standard register
 
 - EPA WaterSense showerhead overview: https://www.epa.gov/watersense/showerheads
-- EPA WaterSense Specification for Showerheads v1.1: https://19january2021snapshot.epa.gov/sites/static/files/2018-07/documents/ws-products-specification-showerheads-v1-1.pdf
+- EPA WaterSense Specification for Showerheads v1.1 (flow, spray force and annular-ring coverage criteria): https://19january2021snapshot.epa.gov/sites/static/files/2018-07/documents/ws-products-specification-showerheads-v1-1.pdf
 - ASME A112.18.1/CSA B125.1 listing (2024 edition): https://www.asme.org/codes-standards/find-codes-standards/plumbing-supply-fittings-%28with-10-18-errata%29
 - Shower aerosol modeling paper, Building and Environment (2025): https://doi.org/10.1016/j.buildenv.2025.112825
 - WRC 2025 South African showerhead evidence summary: https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf
