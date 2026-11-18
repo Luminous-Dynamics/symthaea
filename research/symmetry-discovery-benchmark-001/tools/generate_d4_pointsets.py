@@ -17,7 +17,12 @@ FAMILIES = [
     ("C4", ["e", "r90", "r180", "r270"], 0x5EED1000),
     ("C2_R180", ["e", "r180"], 0x5EED2000),
     ("C2_FX", ["e", "fx"], 0x5EED3000),
-    ("C1", ["e"], 0x5EED4000),
+    ("C2_FY", ["e", "fy"], 0x5EED3800),
+    ("C2_FDIAG", ["e", "fdiag"], 0x5EED4000),
+    ("C2_FANTI", ["e", "fanti"], 0x5EED4800),
+    ("V4_AXIS", ["e", "r180", "fx", "fy"], 0x5EED5000),
+    ("V4_DIAG", ["e", "r180", "fdiag", "fanti"], 0x5EED6000),
+    ("C1", ["e"], 0x5EED7000),
 ]
 
 
@@ -156,7 +161,7 @@ def main():
             "hand_authored_and_generated_exact_fixtures_authored_not_yet_checked_by_GitHub_Actions"
         )
         fixture["benchmark_status"]["results"] = (
-            "no external baseline results; 150 generated cases are exact-oracle inputs only"
+            "no external baseline results; 300 generated cases are exact-oracle inputs only"
         )
         FIXTURE.write_text(
             json.dumps(fixture, indent=2, ensure_ascii=False) + "\n",
@@ -172,7 +177,7 @@ def main():
     ]
     if current != generated:
         raise SystemExit("D4_GENERATOR_MISMATCH: regenerate with --write")
-    print("D4_GENERATOR_REPLAY_PASS: 150 cases, 30 per subgroup family")
+    print("D4_GENERATOR_REPLAY_PASS: 300 cases, 30 per subgroup family across all ten D4 subgroups")
 
 
 if __name__ == "__main__":
