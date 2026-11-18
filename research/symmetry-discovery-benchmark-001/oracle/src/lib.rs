@@ -90,7 +90,7 @@ fn multiply(left: Matrix2, right: Matrix2) -> Matrix2 {
 
 impl Manifest {
     fn parse() -> Result<Self, String> {
-        let root: Value = serde_json::from_str(include_str!("../fixtures/v0.1/cases.json"))
+        let root: Value = serde_json::from_str(include_str!("../../fixtures/v0.1/cases.json"))
             .map_err(|error| format!("invalid frozen case manifest JSON: {error}"))?;
         if string_field(&root, "benchmark_id")? != "LUMINOUS-SYMM-QUALIFIED-DISCOVERY-001" {
             return Err("unexpected benchmark_id".to_owned());
@@ -439,16 +439,16 @@ fn transform_polynomial(
                     *coefficient,
                     binomial(*p, i)?,
                     pow(matrix[0][0], i)?,
-                    pow(matrix[0][1], p - i)?,
+                    pow(matrix[0][1], *p - i)?,
                     binomial(*q, j)?,
                     pow(matrix[1][0], j)?,
-                    pow(matrix[1][1], q - j)?,
+                    pow(matrix[1][1], *q - j)?,
                 ];
                 let term = factors.iter().try_fold(1_i128, |acc, factor| {
                     acc.checked_mul(*factor)
                         .ok_or_else(|| "polynomial transform overflow".to_owned())
                 })?;
-                let key = (i + j, p - i + q - j);
+                let key = (i + j, *p - i + *q - j);
                 let entry = transformed.entry(key).or_insert(0_i128);
                 *entry = entry
                     .checked_add(term)
