@@ -61,8 +61,12 @@ pub struct PressureFlowObservation {
     pub market_variant_id: String,
     pub mode_id: String,
     pub geometry_sha256: String,
-    /// Frozen digest of task, inlet water, target pressure, room, mounting and test setup.
+    /// Frozen digest of the exact run, including its pressure target and recorded conditions.
     pub test_context_sha256: String,
+    /// Digest of pressure-invariant service conditions shared across a pressure sweep:
+    /// task, mode, inlet-water/temperature profile, room, mounting, specimen state and
+    /// measurement setup. It deliberately excludes pressure target and pressure result.
+    pub pressure_invariant_context_sha256: String,
     pub protocol_sha256: String,
     pub pressure_setpoint_kpa: f64,
     /// Preregistered maximum deviation from setpoint, in kPa.
@@ -211,6 +215,10 @@ impl PressureFlowObservation {
         for (field, digest) in [
             ("geometry_sha256", self.geometry_sha256.as_str()),
             ("test_context_sha256", self.test_context_sha256.as_str()),
+            (
+                "pressure_invariant_context_sha256",
+                self.pressure_invariant_context_sha256.as_str(),
+            ),
             ("protocol_sha256", self.protocol_sha256.as_str()),
             ("pressure_envelope.evidence_sha256", self.pressure_envelope.evidence_sha256.as_str()),
         ] {
@@ -421,6 +429,7 @@ mod tests {
             mode_id: "RAIN".to_owned(),
             geometry_sha256: digest('a'),
             test_context_sha256: digest('b'),
+            pressure_invariant_context_sha256: digest('f'),
             protocol_sha256: digest('c'),
             pressure_setpoint_kpa: 100.0,
             setpoint_tolerance_kpa: 5.0,
@@ -667,6 +676,7 @@ mod tolerance_tests {
             mode_id: "RAIN".to_owned(),
             geometry_sha256: digest('a'),
             test_context_sha256: digest('b'),
+            pressure_invariant_context_sha256: digest('f'),
             protocol_sha256: digest('c'),
             pressure_setpoint_kpa: 100.0,
             setpoint_tolerance_kpa: 5.0,
@@ -703,6 +713,378 @@ mod tolerance_tests {
         assert_eq!(
             validate_matched_pressure_comparison(&control, &candidate, 0.0),
             Err(PressureRunError::InvalidComparisonTolerance)
+        );
+    }
+}
+
+
+/// Classification of a preregistered minimum flow-retention threshold.
+///
+/// This is a measurement-uncertainty classification, not certification or a task-quality
+/// result. The lower and upper values are conservative bounds from the declared flow
+/// measurement uncertainties, not statistical confidence intervals across specimens.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RetentionThresholdStatus {
+    MeetsOnConservativeMeasurementBound,
+    FailsEvenOnOptimisticMeasurementBound,
+    UnresolvedByMeasurementUncertainty,
+}
+
+/// Errors when comparing a single specimen at two exact pressure points.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PressureRetentionError {
+    InvalidRequiredRetentionFraction,
+    PressurePointsNotStrictlyOrdered,
+    SpecimenMismatch,
+    ProductVariantMismatch,
+    ModeMismatch,
+    GeometryMismatch,
+    PressureInvariantContextMismatch,
+    ProtocolMismatch,
+    PressureEnvelopeMismatch,
+    ProductDeclarationMismatch,
+    InstrumentMismatch,
+    ReferenceFlowMustBePositive,
+    ReferenceFlowUncertaintyDominates,
+    InvalidObservation { side: &'static str },
+    NonFiniteRetentionResult,
+}
+
+impl Display for PressureRetentionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidRequiredRetentionFraction => {
+                write!(f, "required flow-retention fraction must be finite and in (0, 1]")
+            }
+            Self::PressurePointsNotStrictlyOrdered => {
+                write!(f, "low-pressure setpoint must be lower than high-pressure setpoint")
+            }
+            Self::SpecimenMismatch => {
+                write!(f, "pressure-response observations must use the same specimen")
+            }
+            Self::ProductVariantMismatch => {
+                write!(f, "pressure-response observations must use the same exact product variant")
+            }
+            Self::ModeMismatch => {
+                write!(f, "pressure-response observations must use the same fixture mode")
+            }
+            Self::GeometryMismatch => {
+                write!(f, "pressure-response observations must use the same geometry revision")
+            }
+            Self::PressureInvariantContextMismatch => {
+                write!(f, "pressure-invariant service conditions differ across pressure points")
+            }
+            Self::ProtocolMismatch => {
+                write!(f, "pressure-response observations use different protocol revisions")
+            }
+            Self::PressureEnvelopeMismatch => {
+                write!(f, "pressure-response observations use different test-article rating evidence")
+            }
+            Self::ProductDeclarationMismatch => {
+                write!(f, "pressure-response observations use different product pressure declarations")
+            }
+            Self::InstrumentMismatch => {
+                write!(f, "pressure-response observations use different instrument identities")
+            }
+            Self::ReferenceFlowMustBePositive => {
+                write!(f, "high-pressure reference flow must be greater than zero")
+            }
+            Self::ReferenceFlowUncertaintyDominates => {
+                write!(f, "high-pressure flow uncertainty reaches or exceeds the reference flow")
+            }
+            Self::InvalidObservation { side } => {
+                write!(f, "{side} pressure observation failed exact-point validation")
+            }
+            Self::NonFiniteRetentionResult => {
+                write!(f, "flow-retention result is non-finite")
+            }
+        }
+    }
+}
+
+impl Error for PressureRetentionError {}
+
+/// Exact two-point pressure response for the same physical specimen and mode.
+///
+/// No curve fitting, interpolation or extrapolation occurs. Both points must be measured
+/// observations, not requested targets alone.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FlowRetentionComparison {
+    pub low_pressure_setpoint_kpa: f64,
+    pub high_pressure_setpoint_kpa: f64,
+    pub low_pressure_measured_kpa: f64,
+    pub high_pressure_measured_kpa: f64,
+    pub low_pressure_flow_lpm: f64,
+    pub high_pressure_flow_lpm: f64,
+    /// Central measured low/high flow ratio.
+    pub flow_retention_fraction: f64,
+    /// Conservative lower bound: (low flow - uncertainty) / (high flow + uncertainty).
+    pub retention_lower_bound: f64,
+    /// Conservative upper bound: (low flow + uncertainty) / (high flow - uncertainty).
+    pub retention_upper_bound: f64,
+    pub required_retention_fraction: f64,
+    pub threshold_status: RetentionThresholdStatus,
+    /// Kept separate: flow retention cannot establish task completion.
+    pub low_pressure_task_outcome: TaskOutcome,
+    pub high_pressure_task_outcome: TaskOutcome,
+    pub low_pressure_standard_outcome: StandardMethodOutcome,
+    pub high_pressure_standard_outcome: StandardMethodOutcome,
+}
+
+/// Compare exact low- and high-pressure observations from the same specimen.
+///
+/// The invariant context digest must bind every service/test condition that should remain
+/// constant across pressure points, while excluding the pressure setpoint and measured
+/// pressure. Run-specific context digests are allowed to differ because pressure changes.
+/// Flow uncertainty bounds are measurement bounds, not confidence intervals across
+/// independent specimens.
+///
+/// A UK ETL-style 1.5 bar / 3 bar comparison may use a 0.60 required fraction only when
+/// its product category, reference-flow and Unified Water Label method conditions apply.
+/// This helper does not determine ETL eligibility or certification.
+pub fn compare_flow_retention(
+    low_pressure: &PressureFlowObservation,
+    high_pressure: &PressureFlowObservation,
+    required_retention_fraction: f64,
+) -> Result<FlowRetentionComparison, PressureRetentionError> {
+    low_pressure
+        .validate()
+        .map_err(|_| PressureRetentionError::InvalidObservation { side: "low" })?;
+    high_pressure
+        .validate()
+        .map_err(|_| PressureRetentionError::InvalidObservation { side: "high" })?;
+
+    if !required_retention_fraction.is_finite()
+        || required_retention_fraction <= 0.0
+        || required_retention_fraction > 1.0
+    {
+        return Err(PressureRetentionError::InvalidRequiredRetentionFraction);
+    }
+    if low_pressure.pressure_setpoint_kpa >= high_pressure.pressure_setpoint_kpa {
+        return Err(PressureRetentionError::PressurePointsNotStrictlyOrdered);
+    }
+    if low_pressure.specimen_id != high_pressure.specimen_id {
+        return Err(PressureRetentionError::SpecimenMismatch);
+    }
+    if low_pressure.market_variant_id != high_pressure.market_variant_id {
+        return Err(PressureRetentionError::ProductVariantMismatch);
+    }
+    if low_pressure.mode_id != high_pressure.mode_id {
+        return Err(PressureRetentionError::ModeMismatch);
+    }
+    if low_pressure.geometry_sha256 != high_pressure.geometry_sha256 {
+        return Err(PressureRetentionError::GeometryMismatch);
+    }
+    if low_pressure.pressure_invariant_context_sha256
+        != high_pressure.pressure_invariant_context_sha256
+    {
+        return Err(PressureRetentionError::PressureInvariantContextMismatch);
+    }
+    if low_pressure.protocol_sha256 != high_pressure.protocol_sha256 {
+        return Err(PressureRetentionError::ProtocolMismatch);
+    }
+    if low_pressure.pressure_envelope.minimum_kpa != high_pressure.pressure_envelope.minimum_kpa
+        || low_pressure.pressure_envelope.maximum_kpa != high_pressure.pressure_envelope.maximum_kpa
+        || low_pressure.pressure_envelope.evidence_sha256
+            != high_pressure.pressure_envelope.evidence_sha256
+    {
+        return Err(PressureRetentionError::PressureEnvelopeMismatch);
+    }
+    if low_pressure.product_declared_range != high_pressure.product_declared_range {
+        return Err(PressureRetentionError::ProductDeclarationMismatch);
+    }
+    if low_pressure.pressure_instrument_id != high_pressure.pressure_instrument_id
+        || low_pressure.flow_instrument_id != high_pressure.flow_instrument_id
+    {
+        return Err(PressureRetentionError::InstrumentMismatch);
+    }
+    if high_pressure.flow_lpm <= 0.0 {
+        return Err(PressureRetentionError::ReferenceFlowMustBePositive);
+    }
+
+    let high_flow_lower = high_pressure.flow_lpm - high_pressure.flow_uncertainty_lpm;
+    if high_flow_lower <= 0.0 {
+        return Err(PressureRetentionError::ReferenceFlowUncertaintyDominates);
+    }
+
+    let central = low_pressure.flow_lpm / high_pressure.flow_lpm;
+    let lower = (low_pressure.flow_lpm - low_pressure.flow_uncertainty_lpm).max(0.0)
+        / (high_pressure.flow_lpm + high_pressure.flow_uncertainty_lpm);
+    let upper = (low_pressure.flow_lpm + low_pressure.flow_uncertainty_lpm) / high_flow_lower;
+
+    if !central.is_finite() || !lower.is_finite() || !upper.is_finite() || lower > upper {
+        return Err(PressureRetentionError::NonFiniteRetentionResult);
+    }
+
+    let threshold_status = if lower >= required_retention_fraction {
+        RetentionThresholdStatus::MeetsOnConservativeMeasurementBound
+    } else if upper < required_retention_fraction {
+        RetentionThresholdStatus::FailsEvenOnOptimisticMeasurementBound
+    } else {
+        RetentionThresholdStatus::UnresolvedByMeasurementUncertainty
+    };
+
+    Ok(FlowRetentionComparison {
+        low_pressure_setpoint_kpa: low_pressure.pressure_setpoint_kpa,
+        high_pressure_setpoint_kpa: high_pressure.pressure_setpoint_kpa,
+        low_pressure_measured_kpa: low_pressure.dynamic_fitting_inlet_pressure_kpa,
+        high_pressure_measured_kpa: high_pressure.dynamic_fitting_inlet_pressure_kpa,
+        low_pressure_flow_lpm: low_pressure.flow_lpm,
+        high_pressure_flow_lpm: high_pressure.flow_lpm,
+        flow_retention_fraction: central,
+        retention_lower_bound: lower,
+        retention_upper_bound: upper,
+        required_retention_fraction,
+        threshold_status,
+        low_pressure_task_outcome: low_pressure.task_outcome,
+        high_pressure_task_outcome: high_pressure.task_outcome,
+        low_pressure_standard_outcome: low_pressure.standard_method_outcome,
+        high_pressure_standard_outcome: high_pressure.standard_method_outcome,
+    })
+}
+
+#[cfg(test)]
+mod retention_tests {
+    use super::*;
+
+    fn digest(byte: char) -> String {
+        std::iter::repeat_n(byte, 64).collect()
+    }
+
+    fn observation(run_id: &str, pressure_kpa: f64, flow_lpm: f64) -> PressureFlowObservation {
+        PressureFlowObservation {
+            run_id: run_id.to_owned(),
+            specimen_id: "specimen-01".to_owned(),
+            market_variant_id: "exact-market-sku-01".to_owned(),
+            mode_id: "RAIN".to_owned(),
+            geometry_sha256: digest('a'),
+            test_context_sha256: digest(if pressure_kpa < 200.0 { 'b' } else { 'e' }),
+            pressure_invariant_context_sha256: digest('f'),
+            protocol_sha256: digest('c'),
+            pressure_setpoint_kpa: pressure_kpa,
+            setpoint_tolerance_kpa: 5.0,
+            dynamic_fitting_inlet_pressure_kpa: pressure_kpa,
+            dynamic_pressure_uncertainty_kpa: 1.0,
+            static_supply_pressure_kpa: Some(350.0),
+            upstream_residual_pressure_kpa: Some(pressure_kpa + 15.0),
+            flow_lpm,
+            flow_uncertainty_lpm: 0.1,
+            pressure_envelope: QualifiedPressureEnvelope {
+                minimum_kpa: 50.0,
+                maximum_kpa: 550.0,
+                evidence_sha256: digest('d'),
+            },
+            product_declared_range: None,
+            task_outcome: TaskOutcome::NotAssessed,
+            standard_method_outcome: StandardMethodOutcome::NotAssessed,
+            pressure_instrument_id: "pressure-01".to_owned(),
+            flow_instrument_id: "flow-01".to_owned(),
+        }
+    }
+
+    #[test]
+    fn computes_exact_two_point_flow_retention_and_uncertainty_bounds() {
+        let low = observation("run-150", 150.0, 4.0);
+        let high = observation("run-300", 300.0, 5.0);
+        let result = compare_flow_retention(&low, &high, 0.60).expect("valid paired runs");
+
+        assert!((result.flow_retention_fraction - 0.8).abs() < 1e-12);
+        assert!((result.retention_lower_bound - 3.9 / 5.1).abs() < 1e-12);
+        assert!((result.retention_upper_bound - 4.1 / 4.9).abs() < 1e-12);
+        assert_eq!(
+            result.threshold_status,
+            RetentionThresholdStatus::MeetsOnConservativeMeasurementBound
+        );
+    }
+
+    #[test]
+    fn distinguishes_unresolved_measurement_uncertainty_from_pass() {
+        let low = observation("run-150", 150.0, 4.0);
+        let high = observation("run-300", 300.0, 5.0);
+        let result = compare_flow_retention(&low, &high, 0.80).expect("valid paired runs");
+        assert_eq!(
+            result.threshold_status,
+            RetentionThresholdStatus::UnresolvedByMeasurementUncertainty
+        );
+    }
+
+    #[test]
+    fn detects_threshold_failure_even_at_optimistic_bound() {
+        let low = observation("run-150", 150.0, 3.0);
+        let high = observation("run-300", 300.0, 5.0);
+        let result = compare_flow_retention(&low, &high, 0.70).expect("valid paired runs");
+        assert_eq!(
+            result.threshold_status,
+            RetentionThresholdStatus::FailsEvenOnOptimisticMeasurementBound
+        );
+    }
+
+    #[test]
+    fn allows_pressure_specific_run_context_but_requires_shared_service_context() {
+        let low = observation("run-150", 150.0, 4.0);
+        let high = observation("run-300", 300.0, 5.0);
+        assert_ne!(low.test_context_sha256, high.test_context_sha256);
+        assert_eq!(compare_flow_retention(&low, &high, 0.60).map(|_| ()), Ok(()));
+    }
+
+    #[test]
+    fn rejects_different_invariant_service_context() {
+        let low = observation("run-150", 150.0, 4.0);
+        let mut high = observation("run-300", 300.0, 5.0);
+        high.pressure_invariant_context_sha256 = digest('9');
+        assert_eq!(
+            compare_flow_retention(&low, &high, 0.60),
+            Err(PressureRetentionError::PressureInvariantContextMismatch)
+        );
+    }
+
+    #[test]
+    fn rejects_different_specimen_or_mode() {
+        let low = observation("run-150", 150.0, 4.0);
+        let mut high = observation("run-300", 300.0, 5.0);
+        high.specimen_id = "specimen-02".to_owned();
+        assert_eq!(
+            compare_flow_retention(&low, &high, 0.60),
+            Err(PressureRetentionError::SpecimenMismatch)
+        );
+        high.specimen_id = low.specimen_id.clone();
+        high.mode_id = "MASSAGE".to_owned();
+        assert_eq!(
+            compare_flow_retention(&low, &high, 0.60),
+            Err(PressureRetentionError::ModeMismatch)
+        );
+    }
+
+    #[test]
+    fn rejects_non_ordered_pressure_points_and_invalid_threshold() {
+        let low = observation("run-300-a", 300.0, 4.0);
+        let high = observation("run-300-b", 300.0, 5.0);
+        assert_eq!(
+            compare_flow_retention(&low, &high, 0.60),
+            Err(PressureRetentionError::PressurePointsNotStrictlyOrdered)
+        );
+        let low = observation("run-150", 150.0, 4.0);
+        let high = observation("run-300", 300.0, 5.0);
+        assert_eq!(
+            compare_flow_retention(&low, &high, 0.0),
+            Err(PressureRetentionError::InvalidRequiredRetentionFraction)
+        );
+    }
+
+    #[test]
+    fn rejects_zero_reference_flow_and_uncertainty_dominance() {
+        let low = observation("run-150", 150.0, 0.0);
+        let high = observation("run-300", 300.0, 0.0);
+        assert_eq!(
+            compare_flow_retention(&low, &high, 0.60),
+            Err(PressureRetentionError::ReferenceFlowMustBePositive)
+        );
+        let low = observation("run-150", 150.0, 4.0);
+        let mut high = observation("run-300", 300.0, 5.0);
+        high.flow_uncertainty_lpm = 5.0;
+        assert_eq!(
+            compare_flow_retention(&low, &high, 0.60),
+            Err(PressureRetentionError::ReferenceFlowUncertaintyDominates)
         );
     }
 }
