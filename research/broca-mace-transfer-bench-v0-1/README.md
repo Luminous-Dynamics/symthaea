@@ -123,7 +123,7 @@ cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p 
 cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-evaluator --bin mace_generated_stress
 ```
 
-The candidate gate requires unique event IDs, at least two declared source families and at least two distinct nonzero source-root IDs for each action. A comparative choice also requires qualified evidence for both candidate actions; one-sided support is not treated as proof that the unsupported alternative is inferior. Different family labels cannot turn a shared upstream source into independent evidence. Root IDs are candidate-visible claims in this prototype; trusted lineage attestation must come from the source ledger. The runner reports aggregate metrics for all policies and per-family metrics for both exact-scope causal memory and invariant transport. It also reports paired utility lift versus no-memory with a deterministic **cluster-bootstrap 95% interval**, resampling world clusters rather than individual scenarios, and a Session-B / Session-C known-retraction recovery control.
+The candidate gate requires unique event IDs, at least two declared source families and at least two distinct nonzero source-root IDs for each action. MACE v0.5 also requires both action alternatives to have qualified support and checks transport using worst-case effect intervals including candidate-supplied measurement bounds; the bounds remain untrusted until an ingress calibration receipt verifies them. A comparative choice also requires qualified evidence for both candidate actions; one-sided support is not treated as proof that the unsupported alternative is inferior. Different family labels cannot turn a shared upstream source into independent evidence. Root IDs are candidate-visible claims in this prototype; trusted lineage attestation must come from the source ledger. The runner reports aggregate metrics for all policies and per-family metrics for both exact-scope causal memory and invariant transport. It also reports paired utility lift versus no-memory with a deterministic **cluster-bootstrap 95% interval**, resampling world clusters rather than individual scenarios, and a Session-B / Session-C known-retraction recovery control.
 
 This is a generated synthetic stress distribution—not an official MemoryArena/AMA-Bench adapter, learned-policy train/test split, sealed external oracle or real-world causal discovery. Source-family IDs vary to expose correlation/identity failures, but independence is not cryptographically attested. Bootstrap intervals quantify variation over these generated clusters only; they do not establish external validity. Session-C corrections are applied as observed source-state updates before the next decision.
 
@@ -207,7 +207,8 @@ The workspace adds a third package, `broca-mace-ingress`. It maps a raw interact
 
 - the complete raw event is bound to a verified payload digest and receipt;
 - the Mycelix event reports `receipt_attested` authority status, with its canonical event hash and signed authority-receipt digest retained;
-- `valid_at` / `known_at` eligibility is evaluated against receipt-verified event timestamps;
+- the source event's client `occurred_at` is distinguished from the server-observed, signed authority `received_at`; **only `received_at` is used for `known_at` eligibility**;
+- `valid_at` / `known_at` checks run against receipt-verified event and transaction times;
 - prediction precedes dispatch, which precedes outcome observation;
 - source lineage binds nonzero source-family and upstream-root identities, acquisition mode, upstream source ID, source artifact digest, transformation digest and issuer;
 - measurement uncertainty is bound to an exact unit, instrument, method, calibration revision and validity interval;
@@ -215,11 +216,17 @@ The workspace adds a third package, `broca-mace-ingress`. It maps a raw interact
 - the outcome receipt confirms externally reconciled state;
 - retraction state is verified as known at the requested transaction time; unknown retraction status fails closed.
 
-The receipt bundle retains the raw-event payload digest, canonical event hash, signed authority receipt, source lineage, calibration, causal-assessment and outcome digests. Atomic batch ingress is idempotent for repeated event ID + identical payload digest; one event ID with conflicting payload digests rejects the batch.
+The receipt bundle retains the raw-event payload digest, canonical event hash, signed authority receipt, event/receipt timestamps, source lineage, calibration, causal-assessment and outcome digests. Atomic batch ingress is idempotent for repeated event ID + identical payload digest; one event ID with conflicting payload digests rejects the batch.
 
-The `EvidenceVerifier` trait is an integration seam, **not cryptographic verification**. It is shaped around Mycelix's canonical scientific event API, which returns the canonical event hash, signed receipt-time authority evidence and one of the explicit authority statuses. Only `receipt_attested` is admissible. The production adapter must verify exact canonical bytes, Ed25519 event signatures, issuer/key authorization, receipt signatures, event hash binding, registry revision, receipt-chain status, scope and retraction/supersession history.
+The `EvidenceVerifier` trait is an integration seam, **not cryptographic verification**. It is shaped around Mycelix's canonical scientific event API, which returns the canonical event hash, signed receipt-time authority evidence and one of the explicit authority statuses. Only `receipt_attested` is admissible. A client-supplied `occurred_at` value cannot backdate transaction time. The production adapter must verify exact canonical bytes, Ed25519 event signatures, issuer/key authorization, receipt signatures, event hash binding, registry revision, receipt-chain status, scope and retraction/supersession history.
 
 The test verifier is synthetic. These tests do not establish signature security, production bitemporal storage, live Mycelix conductor integration, or the truth of a signed scientific assertion. A valid signature proves authenticity/authority relative to the supplied trust policy; it does not by itself prove causal identification or scientific correctness.
+
+Run:
+
+```bash
+cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-ingress
+```
 
 Run:
 
