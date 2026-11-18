@@ -645,6 +645,118 @@ mod tests {
         assert!(fit_mutated(fixture).is_err());
     }
 
+    fn normal_sample(rng: &mut rand::rngs::StdRng) -> f64 {
+        use rand::Rng;
+        let u1 = rng.gen_range(f64::MIN_POSITIVE..1.0);
+        let u2 = rng.gen_range(0.0..1.0);
+        (-2.0 * u1.ln()).sqrt() * (std::f64::consts::TAU * u2).cos()
+    }
+
+    #[test]
+    fn prior_predictive_simulation_based_calibration_covers_parameters_and_holdout() {
+        use rand::SeedableRng;
+        use rand::rngs::StdRng;
+
+        let (_, fixture) = inputs();
+        let model_target = &fixture["model_target"];
+        let prior_mean = parse_vector2(&model_target["parameter_prior_mean"], "prior_mean").unwrap();
+        let prior_precision = parse_precision(
+            &model_target["parameter_prior_precision"],
+            "prior_precision",
+        )
+        .unwrap();
+        let prior_covariance = prior_precision.inverse().unwrap();
+        let l00 = prior_covariance.a.sqrt();
+        let l10 = prior_covariance.b / l00;
+        let l11 = (prior_covariance.d - l10 * l10).sqrt();
+
+        let calibration_ids: Vec<String> = fixture["split"]["calibration_observation_ids"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().to_owned())
+            .collect();
+        let heldout_id = fixture["split"]["heldout_observation_ids"][0]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let observations = fixture["observations"].as_array().unwrap();
+        let lookup = |id: &str| {
+            observations
+                .iter()
+                .find(|observation| observation["observation_id"] == id)
+                .unwrap()
+        };
+        let calibration_templates: Vec<&Value> =
+            calibration_ids.iter().map(|id| lookup(id)).collect();
+        let heldout_template = lookup(&heldout_id);
+        let heldout_h = observation_operator(heldout_template).unwrap();
+        let heldout_sigma = heldout_template["standard_uncertainty"].as_f64().unwrap();
+
+        let mut rng = StdRng::seed_from_u64(0x5eed_1281);
+        let trials = 512;
+        let mut parameter_coverage = [0_usize; 2];
+        let mut heldout_coverage = 0_usize;
+
+        for _ in 0..trials {
+            let z0 = normal_sample(&mut rng);
+            let z1 = normal_sample(&mut rng);
+            let truth = [
+                prior_mean[0] + l00 * z0,
+                prior_mean[1] + l10 * z0 + l11 * z1,
+            ];
+            let mut calibration_rows = Vec::with_capacity(calibration_templates.len());
+            for template in &calibration_templates {
+                let h = observation_operator(template).unwrap();
+                let sigma = template["standard_uncertainty"].as_f64().unwrap();
+                let observed = h[0] * truth[0] + h[1] * truth[1]
+                    + sigma * normal_sample(&mut rng);
+                calibration_rows.push(CalibrationRow {
+                    h,
+                    observed,
+                    uncertainty: sigma,
+                });
+            }
+            let posterior =
+                conjugate_posterior(prior_mean, prior_precision, &calibration_rows).unwrap();
+
+            let lower0 = posterior.mean[0] - 1.959963984540054 * posterior.covariance.a.sqrt();
+            let upper0 = posterior.mean[0] + 1.959963984540054 * posterior.covariance.a.sqrt();
+            let lower1 = posterior.mean[1] - 1.959963984540054 * posterior.covariance.d.sqrt();
+            let upper1 = posterior.mean[1] + 1.959963984540054 * posterior.covariance.d.sqrt();
+            if (lower0..=upper0).contains(&truth[0]) {
+                parameter_coverage[0] += 1;
+            }
+            if (lower1..=upper1).contains(&truth[1]) {
+                parameter_coverage[1] += 1;
+            }
+
+            let predicted_mean =
+                heldout_h[0] * posterior.mean[0] + heldout_h[1] * posterior.mean[1];
+            let predictive_variance =
+                heldout_sigma * heldout_sigma + posterior.covariance.quadratic(heldout_h);
+            let heldout_observed = heldout_h[0] * truth[0]
+                + heldout_h[1] * truth[1]
+                + heldout_sigma * normal_sample(&mut rng);
+            let half_width = 1.959963984540054 * predictive_variance.sqrt();
+            if (predicted_mean - half_width..=predicted_mean + half_width)
+                .contains(&heldout_observed)
+            {
+                heldout_coverage += 1;
+            }
+        }
+
+        let coverage0 = parameter_coverage[0] as f64 / trials as f64;
+        let coverage1 = parameter_coverage[1] as f64 / trials as f64;
+        let predictive_coverage = heldout_coverage as f64 / trials as f64;
+        for coverage in [coverage0, coverage1, predictive_coverage] {
+            assert!(
+                (0.89..=0.99).contains(&coverage),
+                "95% prior-predictive interval coverage outside tolerance: {coverage}"
+            );
+        }
+    }
+
     #[test]
     fn asymmetric_prior_precision_is_rejected() {
         let (_, mut fixture) = inputs();
