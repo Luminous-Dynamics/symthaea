@@ -1,0 +1,200 @@
+{
+  "schema_version": "0.1.0",
+  "campaign_id": "LIGHTSHELL-METHOD-SYNTHETIC-001",
+  "state": "proposed",
+  "specimens": [
+    {
+      "specimen_id": "SP-UNCOATED",
+      "candidate_id": "A0-R",
+      "construction_class": "woven_or_knit",
+      "seam_geometry": "not_applicable",
+      "thickness_mm": 0.8
+    },
+    {
+      "specimen_id": "SP-COATED",
+      "candidate_id": "C-COATED",
+      "construction_class": "coated_laminated",
+      "seam_geometry": "not_applicable",
+      "thickness_mm": 1.2
+    },
+    {
+      "specimen_id": "SP-SPACER",
+      "candidate_id": "A2-R",
+      "construction_class": "3d_spacer",
+      "seam_geometry": "not_applicable",
+      "thickness_mm": 8
+    },
+    {
+      "specimen_id": "SP-SEAM",
+      "candidate_id": "SEAM-01",
+      "construction_class": "woven_or_knit",
+      "seam_geometry": "straight",
+      "thickness_mm": 1
+    },
+    {
+      "specimen_id": "SP-NONWOVEN",
+      "candidate_id": "NW-01",
+      "construction_class": "nonwoven",
+      "seam_geometry": "not_applicable",
+      "thickness_mm": 2
+    }
+  ],
+  "method_profiles": [
+    {
+      "profile_id": "M-ISO-13935-2-2026",
+      "profile_kind": "international_standard",
+      "method_id": "ISO 13935-2",
+      "edition": "2026",
+      "test_family": "seam_tensile",
+      "metadata_source_ref": "https://www.iso.org/standard/88344.html",
+      "metadata_state": "verified_current_metadata"
+    },
+    {
+      "profile_id": "M-ISO-12947-2-2016",
+      "profile_kind": "international_standard",
+      "method_id": "ISO 12947-2",
+      "edition": "2016",
+      "test_family": "abrasion",
+      "metadata_source_ref": "https://www.iso.org/standard/61058.html",
+      "metadata_state": "verified_current_metadata"
+    },
+    {
+      "profile_id": "M-ISO-5470-2-2021",
+      "profile_kind": "international_standard",
+      "method_id": "ISO 5470-2",
+      "edition": "2021",
+      "test_family": "abrasion",
+      "metadata_source_ref": "https://www.iso.org/standard/77552.html",
+      "metadata_state": "verified_current_metadata"
+    },
+    {
+      "profile_id": "M-ISO-9237-1995",
+      "profile_kind": "international_standard",
+      "method_id": "ISO 9237",
+      "edition": "1995",
+      "test_family": "airflow",
+      "metadata_source_ref": "https://www.iso.org/standard/16869.html",
+      "metadata_state": "verified_current_metadata"
+    },
+    {
+      "profile_id": "M-ISO-6330-2021",
+      "profile_kind": "international_standard",
+      "method_id": "ISO 6330",
+      "edition": "2021",
+      "test_family": "cleaning_retention",
+      "metadata_source_ref": "https://www.iso.org/standard/75934.html",
+      "metadata_state": "verified_current_metadata"
+    }
+  ],
+  "selections": [
+    {
+      "selection_id": "SEL-SEAM",
+      "specimen_id": "SP-SEAM",
+      "profile_id": "M-ISO-13935-2-2026",
+      "test_family": "seam_tensile",
+      "selected_surface": "seam",
+      "fixture_class": "cre_tensile",
+      "fixture_ref": null,
+      "fixture_revision": null,
+      "fixture_validation_state": "pending",
+      "fixture_validation_ref": null,
+      "state": "proposed",
+      "execution_mode": "normative_unmodified",
+      "approved_deviation_ref": null,
+      "internal_method_validation_ref": null,
+      "protocol_ref": null,
+      "acceptance_rule_ref": null,
+      "cleaning_profile": null
+    },
+    {
+      "selection_id": "SEL-UNCOATED-ABRASION",
+      "specimen_id": "SP-UNCOATED",
+      "profile_id": "M-ISO-12947-2-2016",
+      "test_family": "abrasion",
+      "selected_surface": "uncoated_surface",
+      "fixture_class": "martindale_uncoated",
+      "fixture_ref": null,
+      "fixture_revision": null,
+      "fixture_validation_state": "pending",
+      "fixture_validation_ref": null,
+      "state": "proposed",
+      "execution_mode": "normative_unmodified",
+      "approved_deviation_ref": null,
+      "internal_method_validation_ref": null,
+      "protocol_ref": null,
+      "acceptance_rule_ref": null,
+      "cleaning_profile": null
+    },
+    {
+      "selection_id": "SEL-COATED-ABRASION",
+      "specimen_id": "SP-COATED",
+      "profile_id": "M-ISO-5470-2-2021",
+      "test_family": "abrasion",
+      "selected_surface": "coated_surface",
+      "fixture_class": "martindale_coated",
+      "fixture_ref": null,
+      "fixture_revision": null,
+      "fixture_validation_state": "pending",
+      "fixture_validation_ref": null,
+      "state": "proposed",
+      "execution_mode": "normative_unmodified",
+      "approved_deviation_ref": null,
+      "internal_method_validation_ref": null,
+      "protocol_ref": null,
+      "acceptance_rule_ref": null,
+      "cleaning_profile": null
+    },
+    {
+      "selection_id": "SEL-SPACER-AIRFLOW",
+      "specimen_id": "SP-SPACER",
+      "profile_id": "M-ISO-9237-1995",
+      "test_family": "airflow",
+      "selected_surface": "through_thickness",
+      "fixture_class": "spacer_airflow_adapter",
+      "fixture_ref": null,
+      "fixture_revision": null,
+      "fixture_validation_state": "pending",
+      "fixture_validation_ref": null,
+      "state": "proposed",
+      "execution_mode": "normative_unmodified",
+      "approved_deviation_ref": null,
+      "internal_method_validation_ref": null,
+      "protocol_ref": null,
+      "acceptance_rule_ref": null,
+      "cleaning_profile": null
+    },
+    {
+      "selection_id": "SEL-DOMESTIC-WASH",
+      "specimen_id": "SP-UNCOATED",
+      "profile_id": "M-ISO-6330-2021",
+      "test_family": "cleaning_retention",
+      "selected_surface": "whole_article",
+      "fixture_class": "washing_machine",
+      "fixture_ref": null,
+      "fixture_revision": null,
+      "fixture_validation_state": "pending",
+      "fixture_validation_ref": null,
+      "state": "proposed",
+      "execution_mode": "normative_unmodified",
+      "approved_deviation_ref": null,
+      "internal_method_validation_ref": null,
+      "protocol_ref": null,
+      "acceptance_rule_ref": null,
+      "cleaning_profile": {
+        "service_class": "domestic_wash",
+        "machine_type": "A",
+        "detergent_ref": "REF-DETERGENT-01",
+        "wash_procedure_ref": "ISO6330-PROCEDURE-REF-01",
+        "drying_procedure_ref": "ISO6330-DRY-REF-01",
+        "cycles": 5
+      }
+    }
+  ],
+  "evidence_policy": {
+    "standard_edition_is_exact": true,
+    "known_scope_exclusions_fail_closed": true,
+    "spacer_fixture_validation_required": true,
+    "modified_methods_are_not_standard_conformance": true,
+    "internal_methods_are_not_iso_methods": true
+  }
+}
