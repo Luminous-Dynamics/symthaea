@@ -75,7 +75,16 @@
           }
         },
         "test_policy": "M8 and M9 are held out as future campaigns; never tune preprocessing, thresholds, warning interval, persistence or calibration on this test cohort",
-        "split_semantics": "campaign-forward holdout; campaign label Unknown remains in train/validation only"
+        "split_semantics": "campaign-forward holdout; campaign label Unknown remains in train/validation only",
+        "matching_preprocessing_assets": {
+          "temporal_split_stats": "src/tokamark/metadata/temporal_split_signals_stats.yaml",
+          "temporal_outlier_metadata_symbol": "MAST_tools.utils.path_utils.TEMPORAL_SPLIT_OUTLIER_METADATA_FILE",
+          "random_split_stats": "src/tokamark/metadata/random_split_signals_stats.yaml",
+          "random_outlier_metadata_symbol": "MAST_tools.utils.path_utils.RANDOM_SPLIT_OUTLIER_METADATA_FILE",
+          "resolver": "UKAEA-IBM-STFC-Fusion-FMs/tokamind/scripts_mast/mast_utils/tokamark_split.py",
+          "resolver_commit": "d64fbe3826057576f06d3158592917dd2443a960",
+          "policy": "use temporal split-specific normalization statistics and outlier metadata; never combine with random split assets"
+        }
       },
       "tokamark_random_split": {
         "description": "Secondary in-distribution random shot split (80/10/10) for comparability with conventional benchmark practice",
