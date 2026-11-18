@@ -268,7 +268,7 @@ mod tests {
         "cy := (1->Slope) |- cy[1]\n",
         "C_01 := (1->Particle) |- D[posz[1]]/D[t[0]]\n",
         "R_10 := |- C_51 is conserved\n",
-        "R_11 := (1->Particle) |- C_58[1] is zero\n",
+        "R_418 := (1->Particle) |- C_58[1] is zero\n",
         "R_12 := |- candidate_status_unknown\n",
         "[end]\n",
         "[Experiments]\n",
