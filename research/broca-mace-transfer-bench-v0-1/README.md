@@ -31,7 +31,7 @@ This is a stronger compile-time boundary than placing the oracle in another Rust
 
 ## Scenario families
 
-The deterministic corpus includes thirteen two-session cases:
+The deterministic fixed corpus includes fifteen two-session cases:
 
 1. Identified interventional effect transfer.
 2. Confounded observational association decoy.
@@ -46,13 +46,17 @@ The deterministic corpus includes thirteen two-session cases:
 11. Irrelevant-update control.
 12. Under-supported candidate.
 13. Positive control in a shifted regime.
+14. Few-shot invariant-effect transport into a shifted regime.
+15. Mechanism-break negative control after a regime shift.
 
 ## Compared policies
 
 - `no_memory`: fixed conservative fallback.
 - `frequency_only`: aggregate all observed outcomes, ignoring scope and evidence governance.
 - `scope_aware`: restrict to exact regime and objective, but does not qualify source or causal evidence.
-- `causal_qualified`: require exact scope, intervention, pre-registration, reconciled outcome, trusted non-retracted source, confounder control, completed delayed horizon and at least two independent source families.
+- `causal_qualified`: require exact scope, intervention, pre-registration, reconciled outcome, trusted non-retracted source, confounder control, completed delayed horizon, unique event IDs and at least two independent source families.
+- `invariant_transport`: reuse prior-regime effects only with target-regime witnesses, disjoint source families and a fixed 0.12 empirical-invariance tolerance.
+- `active_probe`: try exact-scope and invariant transport first; otherwise emit a typed, bounded environment-interaction request.
 
 The oracle is evaluator-only and is not linked as a dependency into the candidate-policy crate.
 
@@ -66,7 +70,7 @@ The oracle is evaluator-only and is not linked as a dependency into the candidat
 
 ## What v0.1 can and cannot establish
 
-The harness can regression-test whether transparent policy rules reject these specific synthetic failure modes. The causal-qualified policy is deliberately hand-authored against visible fixture structure. A zero-overclaim or high-accuracy result on these thirteen cases is **not** evidence of causal discovery, real-world transfer, general intelligence or SOTA.
+The harness can regression-test whether transparent policy rules reject these specific synthetic failure modes. The causal-qualified policy is deliberately hand-authored against visible fixture structure. A zero-overclaim or high-accuracy result on these fifteen fixed cases is **not** evidence of causal discovery, real-world transfer, general intelligence or SOTA.
 
 It does not yet include:
 - hidden external evaluator custody or sealed labels;

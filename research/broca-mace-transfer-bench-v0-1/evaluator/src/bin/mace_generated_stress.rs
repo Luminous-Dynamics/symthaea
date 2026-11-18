@@ -612,7 +612,7 @@ fn session_c_control() -> Vec<(Policy, Option<Action>, Option<Action>, bool)> {
 fn report(cases: &[Case]) {
     let clusters = cluster_means(Policy::NoMemory, cases).len();
     let families: BTreeSet<&str> = cases.iter().map(|item| item.family).collect();
-    println!("MACE generated-world stress benchmark v0.3");
+    println!("MACE generated-world stress benchmark v0.4");
     println!(
         "clusters={}, scenarios={}, families={}",
         clusters,
