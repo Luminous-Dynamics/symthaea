@@ -162,6 +162,29 @@ The design implication is to compare useful purchased-energy displacement at the
 
 Bouvenot and Beaudet, *Energy and Buildings* (2025), DOI: https://doi.org/10.1016/j.enbuild.2025.115341
 
+### Recirculating-shower frontier — separate product class
+
+Two current commercial examples demonstrate why the benchmark must include complete-system architectures rather than only flow-limited showerheads.
+
+- **KOHLER Anthem EvoCycle:** KOHLER advertises up to 80% water savings in Cycle Mode by mixing 0.5 US gal/min of fresh water with recirculated water when paired with a 2.5 US gal/min showerhead/rainhead. The manufacturer describes a washable fine-mesh filter, continuous fresh-water refresh, a five-minute Rapid Clean using 0.75 US gallons (about 2.84 L) recommended after each shower, and a 15-minute monthly Deep Clean. Its own description limits recirculation to one active shower session; it is not household greywater reuse. These are manufacturer specifications and claims, not independent verification of microbiological safety, task equivalence or all-in lifecycle savings.
+- **Orbital Shower:** Orbital advertises about 20 L for a long shower and up to 90% water savings / 80% energy savings. Its published installation requirements specify incoming water pressure of 2–10 bar and 9 L/min supply flow per hot and cold inlet, plus a declared water-hardness range. These are vendor claims and installation requirements, not a matched test result. The stated pressure envelope is especially relevant when evaluating gravity-fed or low-head South African deployments.
+
+Do not compare a direct-flow head's nominal L/min with a recirculating system's fresh-water input as though the figures represent the same functional unit. The comparator protocol must record, separately, fresh water, recirculated water, filter losses, warm-up, priming, drain/purge, after-session cleaning, periodic deep cleaning, electricity, standby, chemical/consumable use, maintenance and downtime. Recirculating configurations require a separate wet-path / water-quality / biofilm / aerosol qualification; a clean indicator, filter or ozone cycle is not an independent hygiene result.
+
+Manufacturer sources:
+- KOHLER Anthem EvoCycle product and Cycle Mode description: https://www.kohler.com/en/products/showers/anthem-evocycle
+- KOHLER K-33481 technical specification: https://techcomm.kohler.com/techcomm/pdf/K-33481_spec_US-CA_Kohler_en.pdf
+- Orbital Shower product claims: https://www.orbital-systems.com/products/orbital-shower
+- Orbital installation requirements: https://support.orbital-systems.com/en/18295-installation-requirements.html
+
+### Independent consumer-lab benchmark
+
+Consumer Reports' 2026 showerhead testing covers 22 models and reports shower coverage, shower force, water consumption, ease of use and temperature drop. Its public ratings also distinguish manufacturer-claimed from measured flow, illustrating why Aqua should freeze exact SKU and mode and reproduce test outcomes rather than use catalogue flow as measured performance. This is a consumer-lab comparator set, not a substitute for a controlled standard or a South African market census.
+
+Sources:
+- Consumer Reports 2026 lab-tested overview (updated 27 January 2026): https://www.consumerreports.org/home-garden/showerheads/best-showerheads-of-the-year-a7580523069/
+- Consumer Reports showerhead ratings: https://www.consumerreports.org/home-garden/showerheads/c33121/
+
 ### Repairability and disassembly
 
 ISO 20887:2020 gives design-for-disassembly and adaptability principles, but it does not prescribe universal numeric performance levels. EN 45554:2020 provides generic methods for repair, reuse and upgrade of energy-related products; direct applicability to passive plumbing fixtures must not be assumed. Aqua's product-specific serviceability trials remain a separate method unless the responsible standards authority confirms otherwise.
