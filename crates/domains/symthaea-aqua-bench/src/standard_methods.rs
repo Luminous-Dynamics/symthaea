@@ -457,7 +457,10 @@ impl Display for MethodPressureError {
                 write!(f, "boost flow upper bound is not below twice regular flow lower bound")
             }
             Self::BoostDidNotReturnToRegularFlow => {
-                write!(f, "post-close flow is not equal to regular flow within combined measurement uncertainty")
+                write!(
+                    f,
+                    "post-close flow is not equal to regular flow within combined measurement uncertainty"
+                )
             }
         }
     }
