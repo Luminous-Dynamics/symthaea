@@ -92,6 +92,30 @@ Reference:
 
 Do not combine lossless and lossy scores in one leaderboard. If an approximate track is added, report error bounds, task utility, pointwise worst-case error, and reconstruction metrics independently.
 
+### 1.7 Online expert mixing and context adaptation are established directions
+
+Two recent research directions make it important not to claim novelty for "adaptive expert selection" or "change-aware context" in isolation.
+
+Huang, Ma and Michailidis, *Model-Agnostic Online Certificate-Driven Calibration for Time Series Forecasting Under Distribution Shift* (UAI 2026 / PMLR 337), develops an online martingale PAC-Bayesian certificate for temporally dependent, non-stationary forecasting. Its predictor uses a gated residual Bayesian head over a fixed backbone, follows predict-then-update ordering, and falls back to the backbone when the gate is closed. The key lesson for CDL-Bench is that online adaptation should expose uncertainty and abstention/fallback behaviour, and should be evaluated under temporal dependence rather than relying on IID assumptions.
+
+Reference:
+- https://proceedings.mlr.press/v337/huang26b.html
+
+Du and Tang, *Breaking Context Inertia: Adaptive Context Management for Time Series Foundation Models in Non-Stationary Environments* (Neurocomputing, 1 October 2026), addresses stale historical context after distribution shifts in time-series foundation models. Its stated motivation is that old observations can contaminate predictions after a regime change. This overlaps directly with CDL-Bench's proposed fast/slow context memory and change-aware reset policy.
+
+Reference:
+- https://www.sciencedirect.com/science/article/pii/S0925231226015274
+
+WZS (Section 1.4) already describes adaptive segmentation and online compression-algorithm selection in non-stationary streams. Taken together, these works mean:
+- fixed-share Bayesian/online expert mixtures are a baseline family, not a novelty claim;
+- change-point detection, context trimming, recent/global buffers and gated fallbacks must be compared as serious alternatives;
+- the potential contribution has to be a *compression-specific* result: deterministic decoder-synchronous expert updates, exact coded bits under a shared coder, no transmitted expert-choice side channel, full model/state accounting, and controlled interventional evaluation.
+
+The CDL-Bench research branch now includes `ScmExpertMixturePredictor` (fixed-share mixture of typed-field, lag and known-parent experts) and a separate reference report:
+- `docs/research/CDL_EXPERT_MIXTURE_FIXED_SHARE_V1_2026-11-18.md`
+
+Its 40-stream public-development reference simulation shows a very small overall ideal-code-cost improvement versus lag, but a small regression on intervention streams. We therefore treat expert mixing as an adaptation baseline and falsification tool, not as a claimed causal-compression breakthrough. The report clearly separates ideal prequential bits from actual arithmetic-coded frame measurements.
+
 ## 2. Revised benchmark matrix
 
 CDL-Bench should publish three compatible but separate tracks.
