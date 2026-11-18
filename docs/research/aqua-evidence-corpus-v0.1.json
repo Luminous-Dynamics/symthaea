@@ -3283,6 +3283,51 @@
             "Never use the 70°C short-duration limit as a point-of-use user setpoint.",
             "Independent anti-scald and hot-water hygiene requirements remain separate."
           ]
+        },
+        {
+          "claim_id": "en18021.2025.shower-boost-function-clauses",
+          "parameter": "shower_boost_function_scope",
+          "original_value": "EN 18021:2025 contents identify separate boost-function clauses 8.3.2 for shower outlets and 10.3.8 for shower systems. Term 3.5 defines a boost function as a temporary flow increase triggered by deliberate user action and automatically cancelled when flow is interrupted or the action stops. The accessible excerpt exposes tap-specific numerical criteria in 7.3.3.4, but not the full shower-specific acceptance criteria.",
+          "canonical_value": {
+            "kind": "text",
+            "text": "Separate shower-outlet (8.3.2) and shower-system (10.3.8) boost test clauses; deliberate temporary boost with automatic cancellation. Shower-specific numeric requirements require the controlled full standard."
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "PN5 shower outlets under clause 8.3.2; PN10 shower systems under clause 10.3.8",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "EN 18021:2025 terms 3.5, clause 8.3.2 and clause 10.3.8; accessible standard preview contents and definition",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "Full controlled text and numerical acceptance criteria for shower outlet clause 8.3.2",
+              "Full controlled text and numerical acceptance criteria for shower system clause 10.3.8",
+              "Exact specimen-specific manufacturer/laboratory results"
+            ],
+            "notes": "Tap-only clause 7.3.3.4 numeric criteria must not be transferred to shower outlets or shower systems."
+          },
+          "source": {
+            "url": "https://store.uni.com/en/en-18021-2025",
+            "publisher": "UNI — Ente Italiano di Normazione",
+            "source_type": "official_standard_or_programme",
+            "published_on": "2025-07-02",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Confirms separate standard test categories and boost-function definition; no shower-specific acceptance threshold or Aqua/product result is asserted."
+          },
+          "limitations": [
+            "Do not apply tap boost thresholds from EN 18021 clause 7.3.3.4 to shower outlets or systems without reviewing their separate clauses.",
+            "UWL 2023 clause 12.1 is a separate test method with its own requirements.",
+            "A manufacturer boost button or advertised flow does not prove conformity or user-task benefit.",
+            "The controlled standard and exact applicable product category are required before formal testing."
+          ]
         }
       ]
     },
@@ -3685,6 +3730,10 @@
     {
       "date": "2026-11-18",
       "change": "Added ISO 20887:2020 and EN 45554:2020 as context-only standards references for design for disassembly and repairability-method concepts; direct fixture applicability and numeric thresholds remain unclaimed."
+    },
+    {
+      "date": "2026-11-18",
+      "change": "Added EN 18021:2025 separate shower-outlet and shower-system boost-function clauses, preserving the controlled-text limitation and preventing tap-specific thresholds from being transferred."
     }
   ]
 }
