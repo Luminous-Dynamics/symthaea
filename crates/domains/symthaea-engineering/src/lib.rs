@@ -18,6 +18,7 @@ pub mod lightshell_manufacturing_route;
 pub mod lightshell_asbuilt_metrology;
 pub mod lightshell_change_impact;
 pub mod lightshell_installed_system_qual;
+pub mod lightshell_trial_design;
 
 use serde::{Deserialize, Serialize};
 use symthaea_broca::{BrocaConfig, BrocaGenerator, ThoughtChannels};
