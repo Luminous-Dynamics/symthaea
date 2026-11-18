@@ -229,6 +229,19 @@ fn is_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
+fn csv_field<'a>(
+    row: &'a [String],
+    positions: &HashMap<&str, usize>,
+    name: &str,
+) -> Result<&'a str, String> {
+    let index = *positions
+        .get(name)
+        .ok_or_else(|| format!("missing required CSV column {name:?}"))?;
+    row.get(index)
+        .map(String::as_str)
+        .ok_or_else(|| format!("row is missing column {name:?}"))
+}
+
 fn parse_records(input: &str) -> Result<Vec<InputRecord>, String> {
     let mut rows = parse_csv(input)?;
     if rows.is_empty() {
@@ -257,19 +270,6 @@ fn parse_records(input: &str) -> Result<Vec<InputRecord>, String> {
         }
     }
 
-fn csv_field<'a>(
-    row: &'a [String],
-    positions: &HashMap<&str, usize>,
-    name: &str,
-) -> Result<&'a str, String> {
-    let index = *positions
-        .get(name)
-        .ok_or_else(|| format!("missing required CSV column {name:?}"))?;
-    row.get(index)
-        .map(String::as_str)
-        .ok_or_else(|| format!("row is missing column {name:?}"))
-}
-
     let mut records = Vec::with_capacity(rows.len());
     for (offset, row) in rows.iter().enumerate() {
         if row.len() != header.len() {
@@ -285,7 +285,9 @@ fn csv_field<'a>(
         let metric = csv_field(row, &positions, "metric")?.trim().to_string();
         let status = OutcomeStatus::parse(csv_field(row, &positions, "status")?.trim())?;
         let value_text = csv_field(row, &positions, "value")?.trim();
-        let artifact_sha256 = csv_field(row, &positions, "artifact_sha256")?.trim().to_ascii_lowercase();
+        let artifact_sha256 = csv_field(row, &positions, "artifact_sha256")?
+            .trim()
+            .to_ascii_lowercase();
         let note = positions
             .get("note")
             .and_then(|index| row.get(*index))
@@ -463,12 +465,12 @@ fn analyze(
                     if !record.note.is_empty() {
                         notes.push(format!("{}: {}", record.case_id, record.note));
                     }
+                    if !record.artifact_sha256.is_empty() {
+                        artifact_sha256s.push(record.artifact_sha256.clone());
+                    }
                     match record.status {
                         OutcomeStatus::Observed => {
                             observed += 1;
-                            if !record.artifact_sha256.is_empty() {
-                                artifact_sha256s.push(record.artifact_sha256.clone());
-                            }
                             let value = record.value.ok_or_else(|| {
                                 format!("observed row {:?} lost its scalar value", record.case_id)
                             })?;
