@@ -6,6 +6,7 @@ on:
       - "tools/superconductivity-phase-network-harness/**"
       - "data/schemas/superconductivity_phase_network_instance_v0_1.schema.json"
       - "data/research/superconductivity_phase_network_fixture_v0_1.json"
+      - "data/research/superconductivity_phase_network_square_*_fixture_v0_1.json"
       - "research/superconductivity/phase_network/**"
       - ".github/workflows/superconductivity-phase-network.yml"
   workflow_dispatch:
@@ -61,6 +62,15 @@ jobs:
             --out "$RUNNER_TEMP/sc-xy-monte-carlo-smoke.json"
           cat "$RUNNER_TEMP/sc-xy-monte-carlo-smoke.json"
 
+      - name: Run 8x8 synthetic XY Monte Carlo smoke
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-phase-network-harness/Cargo.toml --bin sc_xy_phase_monte_carlo -- \
+            --schema data/schemas/superconductivity_phase_network_instance_v0_1.schema.json \
+            --fixture data/research/superconductivity_phase_network_square_8x8_fixture_v0_1.json \
+            --temperature 0.9 --warmup-sweeps 2 --measurement-sweeps 3 --seed 11 \
+            --out "$RUNNER_TEMP/sc-xy-monte-carlo-8x8-smoke.json"
+          cat "$RUNNER_TEMP/sc-xy-monte-carlo-8x8-smoke.json"
+
       - name: Run Clippy
         run: |
           cargo clippy --locked --manifest-path tools/superconductivity-phase-network-harness/Cargo.toml --bin sc_phase_network_audit -- -D warnings
@@ -75,6 +85,8 @@ jobs:
             echo "cargo=$(cargo --version)"
             sha256sum data/schemas/superconductivity_phase_network_instance_v0_1.schema.json
             sha256sum data/research/superconductivity_phase_network_fixture_v0_1.json
+            sha256sum data/research/superconductivity_phase_network_square_8x8_fixture_v0_1.json
+            sha256sum data/research/superconductivity_phase_network_square_16x16_fixture_v0_1.json
             sha256sum tools/superconductivity-phase-network-harness/Cargo.toml
             sha256sum tools/superconductivity-phase-network-harness/src/main.rs
             sha256sum tools/superconductivity-phase-network-harness/src/bin/xy_phase_monte_carlo.rs
@@ -96,3 +108,4 @@ jobs:
             ${{ runner.temp }}/sc-phase-network-environment.txt
             ${{ runner.temp }}/sc-phase-network-receipt.json
             ${{ runner.temp }}/sc-xy-monte-carlo-smoke.json
+            ${{ runner.temp }}/sc-xy-monte-carlo-8x8-smoke.json
