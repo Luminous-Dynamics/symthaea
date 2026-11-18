@@ -159,7 +159,8 @@
           "track",
           "target_subgroup",
           "expected_subgroup_label",
-          "controls"
+          "controls",
+          "split"
         ],
         "properties": {
           "case_id": {
@@ -275,6 +276,14 @@
                 "string"
               ]
             }
+          },
+          "split": {
+            "enum": [
+              "fixture_sanity",
+              "discovery",
+              "calibration",
+              "final_holdout"
+            ]
           }
         },
         "allOf": [
@@ -317,7 +326,9 @@
         "discovery_split_id",
         "calibration_split_id",
         "final_holdout_split_id",
-        "rule"
+        "rule",
+        "expected_counts_per_split",
+        "generated_cases_per_family_per_split"
       ],
       "properties": {
         "discovery_split_id": {
@@ -335,6 +346,33 @@
         "rule": {
           "type": "string",
           "minLength": 1
+        },
+        "expected_counts_per_split": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fixture_sanity",
+            "discovery",
+            "calibration",
+            "final_holdout"
+          ],
+          "properties": {
+            "fixture_sanity": {
+              "const": 5
+            },
+            "discovery": {
+              "const": 300
+            },
+            "calibration": {
+              "const": 300
+            },
+            "final_holdout": {
+              "const": 300
+            }
+          }
+        },
+        "generated_cases_per_family_per_split": {
+          "const": 30
         }
       }
     },
