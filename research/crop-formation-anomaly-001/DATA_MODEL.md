@@ -102,6 +102,7 @@ A controlled mechanical test on a plant specimen, with raw observations kept dis
 - fixture geometry (support span for three-point bending, cantilever length for a cantilever test) in metres;
 - loading rate in m/s, loading orientation and specimen axis convention;
 - full force-displacement curve, with force in newtons, displacement in metres, and optional time in seconds;
+- measured cross-section model, outer/inner semi-axes, orientation and along-stem location where available; use the elliptical model only when its geometry is supported by the measurement;
 - specimen state: sheath present/removed/not applicable/unknown, moisture mass fraction and method, temperature and collection-to-test interval where known;
 - failure mode (none, stem bend, stem break, root failure, local buckle, other or unknown);
 - derived flexural rigidity and peak moment, explicitly marked as derived values with the formula/protocol version;
