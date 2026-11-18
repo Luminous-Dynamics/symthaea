@@ -1422,24 +1422,20 @@ pub fn design_bounded_noise_probe_set(
 
     for hypothesis_a in 0..problem.hypothesis_ids.len() {
         for hypothesis_b in (hypothesis_a + 1)..problem.hypothesis_ids.len() {
-            let obligation = pair_obligation(
-                &problem.hypothesis_ids,
-                hypothesis_a,
-                hypothesis_b,
-                None,
-            );
+            let obligation =
+                pair_obligation(&problem.hypothesis_ids, hypothesis_a, hypothesis_b, None);
             let mut separating_probes = Vec::new();
             for (probe_index, probe) in problem.probes.iter().enumerate() {
                 if !probe.admissible {
                     continue;
                 }
-                let allowed_a: BTreeSet<u32> = problem.allowed_outcomes_by_hypothesis
-                    [hypothesis_a][probe_index]
+                let allowed_a: BTreeSet<u32> = problem.allowed_outcomes_by_hypothesis[hypothesis_a]
+                    [probe_index]
                     .iter()
                     .copied()
                     .collect();
-                let allowed_b: BTreeSet<u32> = problem.allowed_outcomes_by_hypothesis
-                    [hypothesis_b][probe_index]
+                let allowed_b: BTreeSet<u32> = problem.allowed_outcomes_by_hypothesis[hypothesis_b]
+                    [probe_index]
                     .iter()
                     .copied()
                     .collect();
@@ -1538,12 +1534,8 @@ pub fn design_bounded_interval_probe_set(
 
     for hypothesis_a in 0..problem.hypothesis_ids.len() {
         for hypothesis_b in (hypothesis_a + 1)..problem.hypothesis_ids.len() {
-            let obligation = pair_obligation(
-                &problem.hypothesis_ids,
-                hypothesis_a,
-                hypothesis_b,
-                None,
-            );
+            let obligation =
+                pair_obligation(&problem.hypothesis_ids, hypothesis_a, hypothesis_b, None);
             let separating_probes: Vec<usize> = problem
                 .probes
                 .iter()
@@ -1595,12 +1587,8 @@ pub fn design_shared_bias_probe_set(
 
     for hypothesis_a in 0..problem.hypothesis_ids.len() {
         for hypothesis_b in (hypothesis_a + 1)..problem.hypothesis_ids.len() {
-            let obligation = pair_obligation(
-                &problem.hypothesis_ids,
-                hypothesis_a,
-                hypothesis_b,
-                None,
-            );
+            let obligation =
+                pair_obligation(&problem.hypothesis_ids, hypothesis_a, hypothesis_b, None);
             let separating_probes: Vec<usize> = problem
                 .probes
                 .iter()
@@ -1815,7 +1803,10 @@ mod tests {
     fn bounded_categorical_probe_set_covers_every_resolvable_pair_and_reports_the_frontier() {
         let problem = bounded_fixture();
         let receipt = design_bounded_noise_probe_set(&problem).unwrap();
-        assert_eq!(receipt.selected_probe_ids, vec!["p0".to_owned(), "p1".to_owned()]);
+        assert_eq!(
+            receipt.selected_probe_ids,
+            vec!["p0".to_owned(), "p1".to_owned()]
+        );
         assert_eq!(receipt.selected_cost, 3);
         assert_eq!(receipt.required_obligations.len(), 2);
         assert_eq!(receipt.covered_obligations, receipt.required_obligations);
@@ -1889,8 +1880,16 @@ mod tests {
             ],
         };
         let receipt = design_bounded_interval_probe_set(&problem).unwrap();
-        assert!(receipt.selected_probe_ids.contains(&"p-separate-ab".to_owned()));
-        assert!(receipt.selected_probe_ids.contains(&"p-separate-ac".to_owned()));
+        assert!(
+            receipt
+                .selected_probe_ids
+                .contains(&"p-separate-ab".to_owned())
+        );
+        assert!(
+            receipt
+                .selected_probe_ids
+                .contains(&"p-separate-ac".to_owned())
+        );
         assert_eq!(receipt.required_obligations.len(), 3);
         assert_eq!(receipt.covered_obligations, receipt.required_obligations);
         assert!(receipt.complete_pairwise_separation);
@@ -1920,11 +1919,7 @@ mod tests {
                     admissible: true,
                 },
             ],
-            nominal_predictions_by_hypothesis: vec![
-                vec![0, 0, 0],
-                vec![0, 10, 0],
-                vec![0, 0, 20],
-            ],
+            nominal_predictions_by_hypothesis: vec![vec![0, 0, 0], vec![0, 10, 0], vec![0, 0, 20]],
             global_bias_interval: FixedIntervalV1::new(-100, 100).unwrap(),
         };
         let receipt = design_shared_bias_probe_set(&problem).unwrap();
