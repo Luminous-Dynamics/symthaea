@@ -1,0 +1,502 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/built-environment/HOME_EXPRESSION_DESIGN_PROBLEM_V0.1.schema.json",
+  "title": "Symthaea Home Expression Design Problem v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "problem_id",
+    "maturity",
+    "source_bindings",
+    "input",
+    "compilation",
+    "generation_permissions",
+    "decision_state",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "problem_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "maturity": {
+      "enum": [
+        "SYNTHETIC_NOT_EVALUATED",
+        "RESIDENT_AUTHORIZED_NOT_EVALUATED",
+        "OWNER_REVIEW_REQUIRED"
+      ]
+    },
+    "source_bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sol_atlas_pr",
+        "sol_atlas_pr_head_sha",
+        "catalogue_revision",
+        "catalogue_blob_sha",
+        "grammar_schema_blob_sha",
+        "conformance_corpus_blob_sha",
+        "conformance_corpus_schema_blob_sha"
+      ],
+      "properties": {
+        "sol_atlas_pr": {
+          "type": "string",
+          "format": "uri"
+        },
+        "sol_atlas_pr_head_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "catalogue_revision": {
+          "const": "HOME-EXPRESSION-CATALOG-0.2.0"
+        },
+        "catalogue_blob_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "grammar_schema_blob_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "conformance_corpus_blob_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "conformance_corpus_schema_blob_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grammar_id",
+        "design_revision_ref",
+        "source_fixture_ref",
+        "resident_statement",
+        "context_state",
+        "context_refs",
+        "axis_intent"
+      ],
+      "properties": {
+        "grammar_id": {
+          "type": "string"
+        },
+        "design_revision_ref": {
+          "type": "string"
+        },
+        "source_fixture_ref": {
+          "type": "string"
+        },
+        "resident_statement": {
+          "type": "string",
+          "maxLength": 3000
+        },
+        "context_state": {
+          "enum": [
+            "UNKNOWN",
+            "PARTIAL",
+            "SOURCE_BOUND_NOT_QUALIFIED"
+          ]
+        },
+        "context_refs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "site",
+            "climate",
+            "jurisdiction"
+          ],
+          "properties": {
+            "site": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "climate": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "jurisdiction": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "axis_intent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "spatial_typology",
+            "architectural_expression",
+            "material_tectonic_intent",
+            "environmental_strategy_intent",
+            "experience_programme"
+          ],
+          "properties": {
+            "spatial_typology": {
+              "$ref": "#/$defs/intentAxis"
+            },
+            "material_tectonic_intent": {
+              "$ref": "#/$defs/intentAxis"
+            },
+            "environmental_strategy_intent": {
+              "$ref": "#/$defs/intentAxis"
+            },
+            "architectural_expression": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "state",
+                "entries"
+              ],
+              "properties": {
+                "state": {
+                  "enum": [
+                    "UNDECIDED",
+                    "INTENT_SELECTED",
+                    "CONFLICT_UNRESOLVED"
+                  ]
+                },
+                "entries": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "option_id",
+                      "role",
+                      "resident_selected",
+                      "source_refs"
+                    ],
+                    "properties": {
+                      "option_id": {
+                        "type": "string"
+                      },
+                      "role": {
+                        "enum": [
+                          "PRIMARY",
+                          "SECONDARY",
+                          "ACCENT",
+                          "REFERENCE_ONLY",
+                          "AVOID",
+                          "ACCEPTABLE",
+                          "UNDECIDED"
+                        ]
+                      },
+                      "resident_selected": {
+                        "const": true
+                      },
+                      "blend_weight_pct": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "source_refs": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uri"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "experience_programme": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "state",
+                "entries"
+              ],
+              "properties": {
+                "state": {
+                  "enum": [
+                    "UNDECIDED",
+                    "OPTIONAL_IDEAS_ONLY",
+                    "CONFLICT_UNRESOLVED"
+                  ]
+                },
+                "entries": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "option_id",
+                      "preference"
+                    ],
+                    "properties": {
+                      "option_id": {
+                        "type": "string"
+                      },
+                      "preference": {
+                        "enum": [
+                          "PREFERRED",
+                          "CONSIDERED",
+                          "AVOIDED",
+                          "UNDECIDED"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "compilation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compiler_version",
+        "state",
+        "hard_requirements",
+        "authority_constraints",
+        "mapping_state",
+        "mapping_rule_ids",
+        "unresolved_conflicts",
+        "preserved_undecided_axes",
+        "no_inference_rule"
+      ],
+      "properties": {
+        "compiler_version": {
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "INTENT_PARSED_NOT_COMPILED_TO_GEOMETRY",
+            "COMPILED_TO_SYMBOLIC_DESIGN_QUESTION",
+            "READY_FOR_CANDIDATE_GENERATION"
+          ]
+        },
+        "hard_requirements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "requirement_id",
+              "statement",
+              "source_class",
+              "source_ref",
+              "verification_state"
+            ],
+            "properties": {
+              "requirement_id": {
+                "type": "string"
+              },
+              "statement": {
+                "type": "string"
+              },
+              "source_class": {
+                "enum": [
+                  "RESIDENT_NON_NEGOTIABLE",
+                  "JURISDICTIONAL_RULE",
+                  "PROFESSIONAL_REVIEW_REQUIREMENT",
+                  "SYSTEM_INVARIANT"
+                ]
+              },
+              "source_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "verification_state": {
+                "enum": [
+                  "EXPLICIT_UNVERIFIED",
+                  "SOURCE_BOUND_UNREVIEWED",
+                  "OWNER_VALIDATED",
+                  "UNKNOWN"
+                ]
+              }
+            }
+          }
+        },
+        "authority_constraints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "requirement_id",
+              "statement",
+              "source_class",
+              "source_ref",
+              "verification_state"
+            ],
+            "properties": {
+              "requirement_id": {
+                "type": "string"
+              },
+              "statement": {
+                "type": "string"
+              },
+              "source_class": {
+                "enum": [
+                  "RESIDENT_NON_NEGOTIABLE",
+                  "JURISDICTIONAL_RULE",
+                  "PROFESSIONAL_REVIEW_REQUIREMENT",
+                  "SYSTEM_INVARIANT"
+                ]
+              },
+              "source_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "verification_state": {
+                "enum": [
+                  "EXPLICIT_UNVERIFIED",
+                  "SOURCE_BOUND_UNREVIEWED",
+                  "OWNER_VALIDATED",
+                  "UNKNOWN"
+                ]
+              }
+            }
+          }
+        },
+        "mapping_state": {
+          "enum": [
+            "NO_OWNER_REVIEWED_MAPPING",
+            "PARTIAL",
+            "QUALIFIED"
+          ]
+        },
+        "mapping_rule_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "unresolved_conflicts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "preserved_undecided_axes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "SPATIAL_TYPOLOGY",
+              "ARCHITECTURAL_EXPRESSION",
+              "MATERIAL_AND_TECTONIC_INTENT",
+              "ENVIRONMENTAL_STRATEGY_INTENT",
+              "EXPERIENCE_AND_PROGRAMME"
+            ]
+          }
+        },
+        "no_inference_rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "generation_permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "symbolic_candidate_generation",
+        "geometry_generation",
+        "physical_evaluation",
+        "certification"
+      ],
+      "properties": {
+        "symbolic_candidate_generation": {
+          "enum": [
+            "REQUIRES_REVIEWED_MAPPING_RULES",
+            "ALLOWED_WITH_REVIEWED_MAPPINGS",
+            "BLOCKED"
+          ]
+        },
+        "geometry_generation": {
+          "enum": [
+            "BLOCKED_PENDING_SYMTROPY_GEOMETRY_PROVIDER_AND_OWNER_REVIEW",
+            "ALLOWED_WITH_QUALIFIED_GEOMETRY_PROVIDER"
+          ]
+        },
+        "physical_evaluation": {
+          "enum": [
+            "BLOCKED_PENDING_EXACT_REALIZED_GEOMETRY_AND_QUALIFIED_SOLVER_INPUTS",
+            "ALLOWED_WITH_QUALIFIED_SOLVER_INPUTS"
+          ]
+        },
+        "certification": {
+          "const": "PROHIBITED"
+        }
+      }
+    },
+    "decision_state": {
+      "enum": [
+        "NO_RESIDENT_CHOICE_OR_DESIGN_APPROVAL_RECORDED",
+        "PARTIAL_RESIDENT_INTENT_RECORDED"
+      ]
+    },
+    "claim_ceiling": {
+      "const": "INTENT_ONLY_NO_GEOMETRY_COST_PERFORMANCE_CODE_OR_PROFESSIONAL_APPROVAL"
+    }
+  },
+  "$defs": {
+    "intentAxis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "entries"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "UNDECIDED",
+            "INTENT_ONLY_NOT_EVALUATED",
+            "CONFLICT_UNRESOLVED"
+          ]
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "option_id",
+              "preference"
+            ],
+            "properties": {
+              "option_id": {
+                "type": "string"
+              },
+              "preference": {
+                "enum": [
+                  "PREFERRED",
+                  "CONSIDERED",
+                  "AVOIDED",
+                  "UNDECIDED"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
