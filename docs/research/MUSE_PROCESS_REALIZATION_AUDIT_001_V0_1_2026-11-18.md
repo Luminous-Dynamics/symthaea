@@ -76,23 +76,27 @@ In particular, event-count growth is a structural fact, not a listener-experienc
 Twenty-two new tests are present in `process_grammar.rs`:
 
 1. Accept unmodified realizations for all four declared trajectory kinds.
-2. Match hand-frozen expected contour vectors for all four process kinds.
-3. Reject a plan with a false cycle count / contour.
-4. Reject a duration mutation inside a cycle.
-5. Reject a pitch mutation that breaks a repeated cell prefix.
-6. Reject a coherent whole-cell transposition against the plan-carried process cell.
-7. Deserialize a legacy plan without the optional cell field, then refuse source-cell verification with a typed error.
-8. Round-trip the versioned audit report and typed failure through JSON.
-9. Reject a shifted cycle boundary.
-10. Reject a score with a missing melody event.
-11. Exercise a deterministic 4,096-case holdout: four process kinds × 256 seeds per kind × 2, 4, 8 and 16 bars.
-12. Match frozen prefix-linear velocity and section-intensity reference values.
-13. Reject velocity, section-intensity and phrase-start emphasis mutations.
-14. Deserialize a legacy plan without the dynamics profile, then refuse expressive verification.\n15. Reject a source cell containing a zero-duration event.
-16. Reject mutations to the harmony clock pitch and bass-anchor duration.
-17. Reject assigned identities on accompaniment or melody events.
-18. Reject unplanned voice roles.
-19. Reject source cells containing non-positive event duration.\n20. Exercise the 4,096-case generated holdout after all melody, expressive and accompaniment checks.
+2. Match hand-frozen contour vectors for all four process kinds.
+3. Reject false cycle-count/contour declarations.
+4. Reject a note-duration mutation.
+5. Reject a pitch mutation that breaks the source-cell prefix.
+6. Reject coherent whole-cell transposition against the plan-carried source cell.
+7. Deserialize a legacy plan without the source-cell field, then refuse source-cell verification.
+8. Round-trip the serialized report and typed failure through JSON.
+9. Match frozen prefix-linear velocity and section-intensity reference values.
+10. Reject a velocity mutation.
+11. Reject a section-intensity mutation.
+12. Reject incorrect PhraseStart emphasis.
+13. Deserialize a legacy plan without the dynamics profile, then refuse expressive verification.
+14. Reject a harmony-clock pitch mutation.
+15. Reject a bass-anchor duration mutation.
+16. Reject invented accompaniment PartId identity.
+17. Reject invented melody PartId identity.
+18. Reject an unplanned voice role.
+19. Reject a source cell containing a zero-duration event.
+20. Reject a shifted cycle boundary.
+21. Reject a missing melody event.
+22. Exercise a deterministic 4,096-case holdout: four process kinds × 256 seeds per kind × 2, 4, 8 and 16 bars.
 
 Existing process tests remain in place. No test has been compiled or executed in the current environment. Do not describe these tests as passing.
 
@@ -103,7 +107,9 @@ Report separate measurements; do not collapse them into a single music-quality s
 | Dimension | Metric | Qualification target |
 |---|---|---|
 | Deterministic positive fixtures | Exact plan-to-score audit acceptance | 100% |
-| Frozen adversarial fixtures | Invalid score rejection | 100%; zero false semantic accepts |\n| Expressive envelope | Bit-exact note-level velocity/intensity/emphasis profile adherence | 100% for the declared profile; unsupported/legacy profiles explicitly rejected |\n| Accompaniment contract | Harmony-clock and bass-anchor event correctness, role scope and unassigned identity | 100% deterministic fixtures; zero invented part identities accepted |
+| Frozen adversarial fixtures | Invalid score rejection | 100%; zero false semantic accepts |
+| Expressive envelope | Bit-exact note-level velocity/intensity/emphasis profile adherence | 100% for the declared profile; unsupported/legacy profiles explicitly rejected |
+| Accompaniment contract | Harmony-clock and bass-anchor event correctness, role scope and unassigned identity | 100% deterministic fixtures; zero invented part identities accepted |
 | Generated holdout cohort | Exact adherence across trajectory kinds, seeds, and bar counts | 100% for the pinned deterministic generator |
 | Mutation robustness | Detection rate by mutation class, plus false rejection rate | 100% detection on the frozen matrix; report every class separately |
 | Coverage | Accepted examples / all examples; abstentions by reason | Report explicitly; never hide abstentions in accuracy |
@@ -188,7 +194,7 @@ For deterministic structural invariants, the target should be 100% on frozen pos
 
 The verifier now audits the current three-role realization rather than melody alone. Its serialized report records melody, expressive, harmony and bass event counts. It checks the plan-carried process cell, prefix contour, exact note pitches/durations, velocity and section-intensity bit patterns, phrase-start emphasis, harmony clock, bass anchor, and the no-inferred-PartId boundary. Any extra voice role or assigned part ID is rejected. The existing generator behavior is unchanged; this is an audit of its explicit current contract.
 
-Twenty-one new tests are authored in addition to the three pre-existing ProcessAdditive tests. No test is compiled or run in this environment.
+Twenty-two new tests are authored in addition to the three pre-existing ProcessAdditive tests (25 total in the module). No test is compiled or run in this environment.
 
 ## Benchmark governance and rights constraints
 
@@ -263,7 +269,8 @@ Sources:
 
 ## Validation status
 
-- Source authored on a branch based on current `main` at `67939c904adcfafd246848b74cd53c52a2cca244`.
-- Sixteen new Rust unit tests authored, including the 4,096-case deterministic holdout matrix and note-level expressive-envelope mutations.
-- Cargo/rustc/rustfmt execution unavailable in this environment; compilation, formatting and test results are pending.
-- No workflow pass, audio result, human preference result, or SOTA superiority is claimed.
+- Source branch was created from `main` at `67939c904adcfafd246848b74cd53c52a2cca244`; current `main` has since advanced by two documentation commits (a temporary note addition and its reversion). No code change was made directly to `main`; the research note is present only on this PR branch.
+- Twenty-two new Rust unit tests authored (25 total in the module), including the 4,096-case deterministic holdout, note-level expressive-envelope mutations, accompaniment controls, part-identity negative cases and malformed source-cell controls.
+- Cargo/rustc/rustfmt are not available in this environment; compilation, formatting and test results are pending.
+- Exact-head CI, PR Governance, Benchmark Suite and Showroom Integrity workflows report `skipped`, not passed.
+- No workflow pass, compile/test result, audio result, human preference result, or SOTA superiority is claimed.
