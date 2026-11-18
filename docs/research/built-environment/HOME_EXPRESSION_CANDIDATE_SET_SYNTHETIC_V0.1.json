@@ -17,15 +17,10 @@
   "candidate_count": 3,
   "candidates": [
     {
-      "candidate_id": "SYNTH-CONCEPT-COURTYARD-SHADE-001",
+      "candidate_id": "SYNTH-CONCEPT-SHADE-QUESTION-001",
       "candidate_state": "ILLUSTRATIVE_NOT_GENERATED",
-      "interpretation": "Explore a courtyard-led concept with external shading as the leading environmental question.",
+      "interpretation": "Illustrative concept question: investigate external shading. Spatial typology remains UNDECIDED; no courtyard preference is recorded.",
       "source_intents": [
-        {
-          "axis": "spatial_typology",
-          "option_id": "COURTYARD",
-          "preference": "PREFERRED"
-        },
         {
           "axis": "environmental_strategy_intent",
           "option_id": "EXTERNAL_SHADING",
@@ -37,18 +32,16 @@
       "hard_gate_state": "UNKNOWN_NOT_EVALUATED",
       "physical_evaluation_state": "NOT_EVALUATED",
       "pareto_state": "NOT_EVALUATED",
-      "resident_choice_state": "NOT_RECORDED"
+      "resident_choice_state": "NOT_RECORDED",
+      "unresolved_intent_axes": [
+        "SPATIAL_TYPOLOGY"
+      ]
     },
     {
-      "candidate_id": "SYNTH-CONCEPT-COURTYARD-VENTILATION-002",
+      "candidate_id": "SYNTH-CONCEPT-VENTILATION-QUESTION-002",
       "candidate_state": "ILLUSTRATIVE_NOT_GENERATED",
-      "interpretation": "Explore the same resident-stated spatial direction while investigating cross-ventilation; no airflow or climate result is implied.",
+      "interpretation": "Illustrative concept question: investigate cross-ventilation. Spatial typology remains UNDECIDED; no courtyard preference is recorded.",
       "source_intents": [
-        {
-          "axis": "spatial_typology",
-          "option_id": "COURTYARD",
-          "preference": "PREFERRED"
-        },
         {
           "axis": "environmental_strategy_intent",
           "option_id": "CROSS_VENTILATION",
@@ -60,12 +53,15 @@
       "hard_gate_state": "UNKNOWN_NOT_EVALUATED",
       "physical_evaluation_state": "NOT_EVALUATED",
       "pareto_state": "NOT_EVALUATED",
-      "resident_choice_state": "NOT_RECORDED"
+      "resident_choice_state": "NOT_RECORDED",
+      "unresolved_intent_axes": [
+        "SPATIAL_TYPOLOGY"
+      ]
     },
     {
       "candidate_id": "SYNTH-CONCEPT-EXPERIENCE-OPTIONAL-003",
       "candidate_state": "ILLUSTRATIVE_NOT_GENERATED",
-      "interpretation": "Retain the observatory as an optional programme question without assuming area, structure, energy, cost or feasibility.",
+      "interpretation": "Illustrative programme question: retain the observatory as an optional idea without assuming area, structure, energy, cost or feasibility. Spatial typology remains UNDECIDED.",
       "source_intents": [
         {
           "axis": "experience_programme",
@@ -78,7 +74,10 @@
       "hard_gate_state": "UNKNOWN_NOT_EVALUATED",
       "physical_evaluation_state": "NOT_EVALUATED",
       "pareto_state": "NOT_EVALUATED",
-      "resident_choice_state": "NOT_RECORDED"
+      "resident_choice_state": "NOT_RECORDED",
+      "unresolved_intent_axes": [
+        "SPATIAL_TYPOLOGY"
+      ]
     }
   ],
   "claim_ceiling": "CONCEPTUAL_INTENT_DERIVATIVES_ONLY_NO_GEOMETRY_COST_PERFORMANCE_OR_FEASIBILITY"
