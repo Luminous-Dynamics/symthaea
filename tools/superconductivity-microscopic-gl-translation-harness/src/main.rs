@@ -666,6 +666,83 @@ mod tests {
         audit_bundle(&schema, &serde_json::to_vec(&fixture).unwrap())
     }
 
+    fn arxiv_inputs() -> (Vec<u8>, Value) {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let schema = fs::read(
+            root.join("data/schemas/superconductivity_microscopic_gl_translation_v0_1.schema.json"),
+        )
+        .unwrap();
+        let fixture: Value = serde_json::from_slice(
+            &fs::read(root.join("data/research/superconductivity_microscopic_gl_translation_arxiv_2603_05123v2_fixture_v0_1.json"))
+                .unwrap(),
+        )
+        .unwrap();
+        (schema, fixture)
+    }
+
+    #[test]
+    fn arxiv_v2_material_table_audits_without_promoting_calculated_values_to_measurements() {
+        let (schema, fixture) = arxiv_inputs();
+        let receipt = audit_bundle(&schema, &serde_json::to_vec(&fixture).unwrap()).unwrap();
+        assert_eq!(receipt["status"], "pass");
+        assert_eq!(receipt["material_states"].as_array().unwrap().len(), 8);
+        assert_eq!(receipt["observable_count"], 64);
+        assert_eq!(receipt["result_authority_counts"]["calculated"], 64);
+        assert_eq!(receipt["exportable_coefficient_count"], 0);
+        assert_eq!(receipt["coefficient_status_counts"]["not_identifiable"], 3);
+        assert_eq!(receipt["observable_kind_counts"]["lambda_L_from_current_slope"], 8);
+        assert_eq!(receipt["observable_kind_counts"]["lambda_L_from_depairing_peak"], 8);
+        assert_eq!(receipt["observable_kind_counts"]["xi0_microscopic"], 8);
+        assert_eq!(receipt["microscopic_method"]["includes_finite_q_pair_response"], true);
+    }
+
+    #[test]
+    fn arxiv_v2_fixture_preserves_per_material_methods_and_pressure() {
+        let (_, fixture) = arxiv_inputs();
+        let states = fixture["material_states"].as_array().unwrap();
+        let h3s = states.iter().find(|state| state["material_id"] == "H3S").unwrap();
+        let pb = states.iter().find(|state| state["material_id"] == "Pb").unwrap();
+        let nb = states.iter().find(|state| state["material_id"] == "Nb").unwrap();
+        assert_eq!(h3s["pressure"], 200.0);
+        assert_eq!(h3s["calculation_provenance"]["energy_cutoff"], 60.0);
+        assert_eq!(h3s["calculation_provenance"]["q_mesh"], json!([9,9,9]));
+        assert_eq!(pb["calculation_provenance"]["spin_orbit_included"], true);
+        assert_eq!(nb["calculation_provenance"]["k_mesh"], json!([16,16,16]));
+        assert_eq!(nb["calculation_provenance"]["pseudopotential_or_basis_set"], "PSL-PAW");
+    }
+
+    #[test]
+    fn arxiv_v2_source_keeps_both_lambda_estimators_distinct() {
+        let (_, fixture) = arxiv_inputs();
+        let observations = fixture["derived_observables"].as_array().unwrap();
+        let slope = observations.iter().find(|item| item["observable_id"] == "Nb_lambda_slope").unwrap();
+        let peak = observations.iter().find(|item| item["observable_id"] == "Nb_lambda_peak").unwrap();
+        assert_eq!(slope["value"], 34.0);
+        assert_eq!(peak["value"], 40.0);
+        assert_ne!(slope["observable_kind"], peak["observable_kind"]);
+        assert_eq!(slope["result_authority"], "calculated");
+        assert_eq!(peak["result_authority"], "calculated");
+        assert_eq!(
+            slope["isotropy_assumption"],
+            "scalar_paper_reported_directionality_unspecified"
+        );
+        assert_eq!(
+            peak["isotropy_assumption"],
+            "scalar_paper_reported_directionality_unspecified"
+        );
+    }
+
+    #[test]
+    fn arxiv_v2_xi0_remains_separate_from_any_near_tc_gl_length() {
+        let (_, fixture) = arxiv_inputs();
+        let observations = fixture["derived_observables"].as_array().unwrap();
+        let xi = observations.iter().find(|item| item["observable_id"] == "Nb_xi0_finite_q").unwrap();
+        assert_eq!(xi["observable_kind"], "xi0_microscopic");
+        assert_eq!(xi["length_scale_definition"], "microscopic_xi0");
+        assert_eq!(xi["value"], 34.0);
+        assert!(!observations.iter().any(|item| item["observable_kind"] == "xi_GL"));
+    }
+
     #[test]
     fn metadata_only_source_record_passes_without_fabricated_values() {
         let (_, fixture) = inputs();
