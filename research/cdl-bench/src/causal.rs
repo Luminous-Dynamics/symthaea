@@ -539,6 +539,46 @@ mod tests {
     }
 
     #[test]
+    fn e3_heldout_intervention_pairs_preserve_upstream_and_change_descendants() {
+        let (_, held_out) = e3_mechanism_splits();
+        for (world_index, config) in held_out.iter().enumerate() {
+            let seed = 8_000 + world_index as u64;
+            let observational =
+                generate_scm_with_config(128, seed, *config, None).unwrap();
+            let treated = generate_scm_with_config(
+                128,
+                seed,
+                *config,
+                Some(ScmIntervention {
+                    variable: 1,
+                    start_step: 32,
+                    end_step: 96,
+                    value: 20_000,
+                }),
+            )
+            .unwrap();
+
+            for step in 0..128 {
+                assert_eq!(
+                    observational.observations[step][0],
+                    treated.observations[step][0],
+                    "upstream x0 changed in held-out world {world_index}"
+                );
+            }
+            for step in 32..96 {
+                assert_eq!(treated.observations[step][1], 20_000);
+            }
+
+            let x2_changed = (32..96)
+                .any(|step| observational.observations[step][2] != treated.observations[step][2]);
+            let x4_changed = (32..96)
+                .any(|step| observational.observations[step][4] != treated.observations[step][4]);
+            assert!(x2_changed, "x1 intervention did not reach x2 in world {world_index}");
+            assert!(x4_changed, "x1 intervention did not reach x4 in world {world_index}");
+        }
+    }
+
+    #[test]
     fn invalid_mechanism_coefficients_reject() {
         let invalid = ScmMechanismConfig {
             x1_parent_gain: 101,
