@@ -41,9 +41,10 @@ The Aqua adapter only binds the product comparison to those owner outputs. It ca
 - Spray-field summary and matched degradation comparison: 15 unit tests.
 - Service-continuity classifier: 17 unit tests, including exhaustive enumeration of all 57,600 categorical input combinations.
 - Exact-point pressure/flow evidence: 40 unit tests, including one-sided manufacturer pressure-range declarations, uncertainty-aware paired retention and pressure-datum mismatch negative controls.
-- Method-specific UWL / ETL pressure records: 12 unit tests for separate hot/cold inlet channels, asymmetric P1/P2/P3 intervals, faceplate-centre P2, calibration receipts and stabilized-flow admission.
+- Method-specific UWL / ETL pressure and boost-function records: 22 unit tests for separate hot/cold inlet channels, asymmetric P1/P2/P3 intervals, faceplate-centre P2, calibration receipts, stabilized-flow admission, boost reset, Qreg/Qboost/Qmax and labelled regular-flow evidence.
+- Task-phase capability validator: 20 unit tests for exact variant/configuration/method/conditions binding, consent, local hold-to-boost auto-return, duration limits, phase order and rejection of unqualified capabilities.
 
-**102 tests are authored across the five modules.** This is a source inventory only; no exact-head run, rustfmt or Clippy result is claimed until the dedicated Aqua workflow reports it.
+**132 tests are authored across the six modules.** This is a source inventory only; no exact-head run, rustfmt or Clippy result is claimed until the dedicated Aqua workflow reports it.
 
 ## Run
 
@@ -146,7 +147,7 @@ These validators admit the shape and numerical limits of method evidence only. T
 
 ## Task-selective delivery and UWL boost qualification
 
-The `standard_methods::UwlBoostFunctionObservation` record validates the UWL 2023 Clause 12.1 boost sequence at Type 1 P2: regular flow, boosted flow, flow-control close, reopen without boost, then post-close flow. It preserves separate hot/cold inlet pressure channels and flow calibration provenance. The check requires boost reset after closure, a resolved flow increase, a boosted upper measurement bound below twice the regular lower bound, and post-close flow consistent with regular flow within combined declared measurement uncertainty. This is a method-evidence validator, not UWL product conformity.
+The `standard_methods::UwlBoostFunctionObservation` record validates the UWL 2023 Clause 12.1 boost sequence at Type 1 P2: regular flow, boosted flow, flow-control close, reopen without boost, then post-close flow. It preserves separate hot/cold inlet pressure channels, flow calibration provenance and a digest for evidence that Qreg is listed on the scheme label. The check requires boost reset after closure, a resolved flow increase, a boosted upper measurement bound below twice the regular lower bound, and post-close flow consistent with regular flow within combined declared measurement uncertainty. This is a method-evidence validator, not UWL product conformity.
 
 The `task_phase` module validates advisory PREPARE / BASE_DELIVERY / OPTIONAL_BOOST / PAUSE / RINSE / RETURN_TO_READY schedules against exact independently qualified capabilities, market variant, hardware and delivery-condition digests. Boost phases require explicit task consent, a direct local user hold with auto-return qualification, and the capability's locally qualified maximum duration. Manufacturer-declared-only or ambiguous boost modes cannot be selected as qualified task-plan capabilities. The summary contains durations only; Symtropy retains water/energy closure and no AI actuator command is emitted.
 
