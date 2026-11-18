@@ -1081,7 +1081,7 @@ mod tests {
         );
         assert_eq!(
             manifest["online_policy_contract"]["risk_score_contract"]["policy_config_digest_schema"],
-            "luminous.plasma-alarm-policy.v0.2"
+            "luminous.plasma-alarm-policy.v0.3"
         );
         assert_eq!(
             manifest["online_policy_contract"]["event_labels_available_online"],
@@ -1090,6 +1090,17 @@ mod tests {
         assert_eq!(
             manifest["offline_scoring_contract"]["warning_requirement_ns"],
             50_000_000
+        );
+        assert!(
+            manifest["offline_scoring_contract"]["metrics"]
+                .as_array()
+                .expect("metrics array")
+                .iter()
+                .any(|metric| metric == "false_alarms_per_non_disruptive_hour")
+        );
+        assert_eq!(
+            manifest["offline_scoring_contract"]["false_alarm_rate_denominators"]["per_hour"],
+            "sum of non-disruptive shot exposure durations in hours"
         );
         assert_eq!(
             manifest["target_gates"]["all_values_are_research_targets"],
