@@ -69,6 +69,9 @@ pub struct BaselineContext {
     pub mission_profile_ref: String,
     pub environment_stratum_ref: String,
     pub matched_conditions_ref: String,
+    pub incumbent_cover_ref: Option<String>,
+    pub incumbent_session_ref: Option<String>,
+    pub incumbent_cover_digest: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -79,6 +82,7 @@ pub struct SystemGate {
     pub metric_id: String,
     pub unit: String,
     pub comparison_mode: String,
+    pub comparison_control: Option<String>,
     pub lower_limit: Option<f64>,
     pub upper_limit: Option<f64>,
     pub hard_gate: bool,
@@ -108,7 +112,7 @@ pub struct SystemRun {
     pub tool_payload_digest: String,
     pub environment_stratum_ref: String,
     pub matched_conditions_ref: String,
-    pub installed_garment_digest: Option<String>,
+    pub cover_digest: Option<String>,
     pub pose_ref: Option<String>,
     pub joint_state_ref: Option<String>,
     pub measured_value: f64,
@@ -275,9 +279,28 @@ impl InstalledSystemManifest {
                 hard_gate_count += 1;
             }
             let paired_mode = gate.comparison_mode != "absolute_interval";
-            if paired_mode && self.baseline_context.baseline_session_ref.trim().is_empty() {
+            if paired_mode && gate.comparison_control.is_none() {
+                push(&mut findings, "paired_gate_control_missing", &path,
+                    "Paired delta gates must name the exact control condition: uncovered baseline or incumbent cover.");
+            }
+            if paired_mode && gate.comparison_control.as_deref() == Some("baseline_uncovered")
+                && self.baseline_context.baseline_session_ref.trim().is_empty()
+            {
                 push(&mut findings, "paired_gate_without_baseline_session", &path,
-                    "Paired delta gates require an exact baseline session reference.");
+                    "Uncovered-baseline comparison requires an exact baseline session reference.");
+            }
+            if paired_mode && gate.comparison_control.as_deref() == Some("incumbent_cover") {
+                if is_blank_option(&self.baseline_context.incumbent_cover_ref)
+                    || is_blank_option(&self.baseline_context.incumbent_session_ref)
+                    || !self.baseline_context.incumbent_cover_digest.as_deref().is_some_and(is_sha256_digest)
+                {
+                    push(&mut findings, "incumbent_comparator_binding_missing", &path,
+                        "Incumbent comparison requires exact product/configuration identity, session and cover digest.");
+                }
+            }
+            if paired_mode && !matches!(gate.comparison_control.as_deref(), Some("baseline_uncovered" | "incumbent_cover")) {
+                push(&mut findings, "unknown_comparison_control", &path,
+                    "Comparison control must be baseline_uncovered or incumbent_cover.");
             }
             if matches!(gate.metric_id.as_str(), "joint_clearance_mm" | "cable_clearance_mm" | "sensor_aperture_clearance_mm")
                 && gate.applicability == "required"
@@ -338,9 +361,9 @@ impl InstalledSystemManifest {
             if gate.applicability == "not_applicable" {
                 continue;
             }
-            if !matches!(run.condition.as_str(), "baseline_uncovered" | "garment_installed") {
+            if !matches!(run.condition.as_str(), "baseline_uncovered" | "incumbent_cover" | "garment_installed") {
                 push(&mut findings, "invalid_run_condition", format!("{path}.condition"),
-                    "Run condition must be baseline_uncovered or garment_installed.");
+                    "Run condition must be baseline_uncovered, incumbent_cover or garment_installed.");
             }
             if run.replicate_index == 0 {
                 push(&mut findings, "zero_replicate_index", format!("{path}.replicate_index"),
@@ -388,15 +411,21 @@ impl InstalledSystemManifest {
             }
             match run.condition.as_str() {
                 "baseline_uncovered" => {
-                    if run.installed_garment_digest.is_some() {
-                        push(&mut findings, "baseline_run_has_garment_digest", format!("{path}.installed_garment_digest"),
-                            "Uncovered baseline run cannot claim an installed garment digest.");
+                    if run.cover_digest.is_some() {
+                        push(&mut findings, "baseline_run_has_cover_digest", format!("{path}.cover_digest"),
+                            "Uncovered baseline run cannot claim a cover digest.");
+                    }
+                }
+                "incumbent_cover" => {
+                    if run.cover_digest.as_deref() != self.baseline_context.incumbent_cover_digest.as_deref() {
+                        push(&mut findings, "incumbent_run_cover_digest_mismatch", format!("{path}.cover_digest"),
+                            "Incumbent-cover run must bind the exact declared comparator cover digest.");
                     }
                 }
                 "garment_installed" => {
-                    if run.installed_garment_digest.as_deref() != Some(self.article.installed_garment_digest.as_str()) {
-                        push(&mut findings, "installed_run_garment_digest_mismatch", format!("{path}.installed_garment_digest"),
-                            "Installed-condition run must bind the exact garment assembly digest.");
+                    if run.cover_digest.as_deref() != Some(self.article.installed_garment_digest.as_str()) {
+                        push(&mut findings, "installed_run_garment_digest_mismatch", format!("{path}.cover_digest"),
+                            "Lightshell-installed run must bind the exact garment assembly digest.");
                     }
                 }
                 _ => {}
@@ -478,12 +507,13 @@ impl InstalledSystemManifest {
         }
 
         for ((gate_id, _pair_id, _pose_ref, _replicate), group_runs) in &paired_groups {
-            if gates.get(gate_id).is_some_and(|gate| gate.comparison_mode != "absolute_interval") {
-                let baseline_count = group_runs.iter().filter(|run| run.condition == "baseline_uncovered").count();
+            if let Some(gate) = gates.get(gate_id).copied().filter(|gate| gate.comparison_mode != "absolute_interval") {
+                let control_condition = gate.comparison_control.as_deref().unwrap_or("");
+                let control_count = group_runs.iter().filter(|run| run.condition == control_condition).count();
                 let installed_count = group_runs.iter().filter(|run| run.condition == "garment_installed").count();
-                if baseline_count != 1 || installed_count != 1 || group_runs.len() != 2 {
+                if control_count != 1 || installed_count != 1 || group_runs.len() != 2 {
                     push(&mut findings, "paired_group_not_one_to_one", format!("runs.{gate_id}.paired_group_id"),
-                        "Each paired comparison group must contain exactly one uncovered baseline and one garment-installed run for the same replicate/pose.");
+                        "Each paired comparison group must contain exactly one selected control condition and one Lightshell-installed run for the same replicate/pose.");
                 }
             }
         }
@@ -504,7 +534,8 @@ impl InstalledSystemManifest {
             }
             let runs: Vec<&SystemRun> = self.runs.iter().filter(|run| run.gate_id == gate.gate_id).collect();
             let installed: Vec<&SystemRun> = runs.iter().copied().filter(|run| run.condition == "garment_installed").collect();
-            let baseline: Vec<&SystemRun> = runs.iter().copied().filter(|run| run.condition == "baseline_uncovered").collect();
+            let control_condition = gate.comparison_control.as_deref().unwrap_or("baseline_uncovered");
+            let control_runs: Vec<&SystemRun> = runs.iter().copied().filter(|run| run.condition == control_condition).collect();
             let mut pair_bounds: Vec<(f64, f64)> = Vec::new();
             let mut insufficient = false;
             let mut blocked = false;
@@ -516,11 +547,11 @@ impl InstalledSystemManifest {
                     insufficient = true;
                 }
                 if gate.comparison_mode != "absolute_interval" {
-                    if baseline.len() < gate.minimum_replicates as usize {
+                    if control_runs.len() < gate.minimum_replicates as usize {
                         insufficient = true;
                     }
                     for installed_run in &installed {
-                        let match_run = baseline.iter().find(|base| {
+                        let match_run = control_runs.iter().find(|base| {
                             base.paired_group_id == installed_run.paired_group_id
                                 && base.pose_ref == installed_run.pose_ref
                                 && base.replicate_index == installed_run.replicate_index
@@ -754,6 +785,14 @@ fn validate_article(
         push(findings, "physical_baseline_missing", "baseline_context.baseline_session_ref",
             "Measured system qualification requires an exact uncovered baseline session.");
     }
+    if let Some(digest) = baseline.incumbent_cover_digest.as_deref() {
+        if !is_sha256_digest(digest) || is_blank_option(&baseline.incumbent_cover_ref)
+            || is_blank_option(&baseline.incumbent_session_ref)
+        {
+            push(findings, "incumbent_comparator_binding_invalid", "baseline_context.incumbent_cover_digest",
+                "Declared incumbent comparator requires a product reference, session reference and valid cover digest.");
+        }
+    }
 }
 
 fn validate_setup(setup: &TestSetup, state: &str, findings: &mut Vec<Finding>) {
@@ -848,6 +887,7 @@ mod tests {
     fn gate(id: &str, family: &str, metric: &str, unit: &str, mode: &str, lower: Option<f64>, upper: Option<f64>, pose: bool) -> Value {
         json!({
             "gate_id":id,"gate_family":family,"metric_id":metric,"unit":unit,"comparison_mode":mode,
+            "comparison_control":if mode == "absolute_interval" {None} else {Some("baseline_uncovered")},
             "lower_limit":lower,"upper_limit":upper,"hard_gate":true,"applicability":"required",
             "applicability_owner_ref":null,"not_applicable_rationale_ref":null,
             "minimum_replicates":1,"minimum_coverage_fraction":0.95,
@@ -865,7 +905,7 @@ mod tests {
             "firmware_revision":"FIRMWARE-REV-A","robot_configuration_digest":format!("sha256:{}", "a".repeat(64)),
             "tool_payload_digest":"TOOL-PAYLOAD-DIGEST-01","environment_stratum_ref":"ENV-STRATUM-01",
             "matched_conditions_ref":"MATCHED-CONTEXT-01",
-            "installed_garment_digest":if installed {Some(format!("sha256:{}", "b".repeat(64)))} else {None},
+            "cover_digest":if installed {Some(format!("sha256:{}", "b".repeat(64)))} else if condition == "incumbent_cover" {Some(format!("sha256:{}", "f".repeat(64)))} else {None},
             "pose_ref":pose,"joint_state_ref":pose.map(|p|format!("JOINT-STATE-{p}")),
             "measured_value":value,"expanded_uncertainty":uncertainty,"coverage_fraction":0.99,
             "evidence_origin":"physical_measurement","instrument_ref":"INSTRUMENT-01",
@@ -899,7 +939,9 @@ mod tests {
                 "baseline_session_ref":"BASELINE-SESSION-01","robot_serial":"ROBOT-SERIAL-001",
                 "firmware_revision":"FIRMWARE-REV-A","robot_configuration_digest":format!("sha256:{}", "a".repeat(64)),
                 "tool_payload_digest":"TOOL-PAYLOAD-DIGEST-01","mission_profile_ref":"MISSION-PROFILE-REV-A",
-                "environment_stratum_ref":"ENV-STRATUM-01","matched_conditions_ref":"MATCHED-CONTEXT-01"
+                "environment_stratum_ref":"ENV-STRATUM-01","matched_conditions_ref":"MATCHED-CONTEXT-01",
+                "incumbent_cover_ref":"INDUSTRY-COMPARATOR-COVER-01","incumbent_session_ref":"INCUMBENT-SESSION-01",
+                "incumbent_cover_digest":format!("sha256:{}", "f".repeat(64))
             },
             "gates":[
                 gate("GATE-CLEARANCE","articulation_clearance","joint_clearance_mm","mm","absolute_interval",Some(2.0),Some(100.0),true),
