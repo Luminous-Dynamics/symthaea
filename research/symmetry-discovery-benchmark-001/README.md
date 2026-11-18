@@ -175,9 +175,8 @@ For mechanics, align masses, constraints, constitutive/contact models, integrato
 The Rust crate in this directory is composed with `research/symmetry-quotient-001`. It independently reconstructs the D4 matrix multiplication table, derives the square-vertex action, computes exact structural and polynomial stabilizers, and then sends an ordered-pair search task through the quotient compiler.
 
 The executable regression checks:
-- D4 square stabilizer = D4;
-- chiral four-point orbit stabilizer = C4;
-- scaled near-square perturbation stabilizer = identity;
+- all 153 frozen structural fixtures match their exact D4 subgroups: 31 D4, 31 C4, 30 half-turn C2, 30 reflection C2 and 31 C1 cases;
+- the hand-auditable D4 square, chiral C4 orbit and near-symmetry identity control remain separately named seed cases;
 - polynomial `x^4+y^4` stabilizer = D4;
 - polynomial `x^4+y^4+x^3y-xy^3` stabilizer = C4;
 - quotient orbit partition agrees exactly with an independently reconstructed exhaustive oracle;
