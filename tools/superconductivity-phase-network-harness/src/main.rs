@@ -31,6 +31,103 @@ fn close_enough(actual: f64, expected: f64) -> bool {
     (actual - expected).abs() <= 1.0e-10 * scale
 }
 
+fn weighted_laplacian_algebraic_connectivity(
+    node_count: usize,
+    edges: &[Value],
+    node_ids: &HashMap<String, usize>,
+) -> Result<f64, String> {
+    if node_count < 2 {
+        return Err("algebraic connectivity requires at least two nodes".to_owned());
+    }
+    let mut laplacian = vec![vec![0.0_f64; node_count]; node_count];
+    for edge in edges {
+        let source_id = edge
+            .get("source")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "edge missing source for Laplacian".to_owned())?;
+        let target_id = edge
+            .get("target")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "edge missing target for Laplacian".to_owned())?;
+        let source = *node_ids
+            .get(source_id)
+            .ok_or_else(|| format!("unresolved Laplacian source {source_id}"))?;
+        let target = *node_ids
+            .get(target_id)
+            .ok_or_else(|| format!("unresolved Laplacian target {target_id}"))?;
+        let weight = edge
+            .get("coupling_energy")
+            .and_then(Value::as_f64)
+            .filter(|weight| weight.is_finite() && *weight > 0.0)
+            .ok_or_else(|| "Laplacian edge weight must be positive and finite".to_owned())?;
+        if source == target {
+            return Err("Laplacian does not admit self-loops".to_owned());
+        }
+        laplacian[source][source] += weight;
+        laplacian[target][target] += weight;
+        laplacian[source][target] -= weight;
+        laplacian[target][source] -= weight;
+    }
+
+    // Cyclic Jacobi diagonalization for this small, explicit research graph.
+    // The returned second eigenvalue is a graph descriptor, not a material observable.
+    let max_sweeps = 64_usize;
+    let tolerance = 1.0e-12_f64;
+    for _ in 0..max_sweeps {
+        let mut max_off_diagonal = 0.0_f64;
+        for p in 0..node_count {
+            for q in (p + 1)..node_count {
+                let apq = laplacian[p][q];
+                max_off_diagonal = max_off_diagonal.max(apq.abs());
+                if apq.abs() <= tolerance {
+                    continue;
+                }
+                let angle = 0.5 * (2.0 * apq).atan2(laplacian[q][q] - laplacian[p][p]);
+                let cosine = angle.cos();
+                let sine = angle.sin();
+                let app = laplacian[p][p];
+                let aqq = laplacian[q][q];
+
+                for k in 0..node_count {
+                    if k == p || k == q {
+                        continue;
+                    }
+                    let akp = laplacian[k][p];
+                    let akq = laplacian[k][q];
+                    let new_akp = cosine * akp - sine * akq;
+                    let new_akq = sine * akp + cosine * akq;
+                    laplacian[k][p] = new_akp;
+                    laplacian[p][k] = new_akp;
+                    laplacian[k][q] = new_akq;
+                    laplacian[q][k] = new_akq;
+                }
+
+                laplacian[p][p] = cosine * cosine * app
+                    - 2.0 * sine * cosine * apq
+                    + sine * sine * aqq;
+                laplacian[q][q] = sine * sine * app
+                    + 2.0 * sine * cosine * apq
+                    + cosine * cosine * aqq;
+                laplacian[p][q] = 0.0;
+                laplacian[q][p] = 0.0;
+            }
+        }
+        if max_off_diagonal <= tolerance {
+            break;
+        }
+    }
+
+    let mut eigenvalues: Vec<f64> = (0..node_count)
+        .map(|index| laplacian[index][index])
+        .collect();
+    eigenvalues.sort_by(f64::total_cmp);
+    let gap = eigenvalues[1];
+    if !gap.is_finite() || gap < -1.0e-9 {
+        return Err("weighted Laplacian diagonalization did not produce a valid spectrum".to_owned());
+    }
+    Ok(gap.max(0.0))
+}
+
 fn validate_instance(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     let schema: Value = serde_json::from_slice(schema_bytes)
         .map_err(|error| format!("schema JSON parse failed: {error}"))?;
@@ -328,6 +425,17 @@ fn validate_instance(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
         return Err("disorder strength must be non-negative".to_owned());
     }
 
+    let node_index: HashMap<String, usize> = nodes
+        .iter()
+        .enumerate()
+        .map(|(index, node)| {
+            let id = text_field(node, "node_id")?;
+            Ok((id.to_owned(), index))
+        })
+        .collect::<Result<_, String>>()?;
+    let weighted_laplacian_gap =
+        weighted_laplacian_algebraic_connectivity(nodes.len(), edges, &node_index)?;
+
     let digest = Sha256::digest(fixture_bytes);
     let input_sha256 = format!("{digest:x}");
     let instance_id = text_field(&fixture, "instance_id")?;
@@ -349,6 +457,10 @@ fn validate_instance(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
             "declared_total": declared_total,
             "calculated_per_node": calculated_per_node,
             "declared_per_node": declared_per_node
+        },
+        "topology_diagnostics": {
+            "weighted_laplacian_algebraic_connectivity": weighted_laplacian_gap,
+            "interpretation": "Graph-only harmonic connectivity descriptor; not superfluid stiffness, Tc, a finite-temperature transition, or a material observable."
         },
         "boundary_conditions": {
             "kind": boundary_kind,
