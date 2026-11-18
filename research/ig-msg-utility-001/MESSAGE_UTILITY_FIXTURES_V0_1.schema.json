@@ -45,8 +45,7 @@
         "scope",
         "freshness",
         "uncertainty",
-        "authorized",
-        "required"
+        "authorized"
       ],
       "properties": {
         "evidence_id": {
@@ -88,9 +87,6 @@
           ]
         },
         "authorized": {
-          "type": "boolean"
-        },
-        "required": {
           "type": "boolean"
         }
       }
