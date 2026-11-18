@@ -449,51 +449,47 @@ const EXPERT_COUNT: usize = 3;
 // Fixed-share hazard: 1/256 of posterior mass is redistributed equally per byte.
 const EXPERT_SHARE_TOTAL_WEIGHT: u32 = EXPERT_MIXTURE_TOTAL_WEIGHT / 256;
 
-fn normalize_expert_cdf(cdf: &ByteCdf) -> [u32; BYTE_SYMBOLS] {
-    let total = cdf[BYTE_SYMBOLS] as u64;
-    let distributable = (1u64 << 15) - BYTE_SYMBOLS as u64;
-    let mut frequencies = [1u32; BYTE_SYMBOLS];
-    let mut remainders = [0u64; BYTE_SYMBOLS];
-    let mut assigned = 0u64;
+fn expert_common_denominator(cdfs: &[ByteCdf; EXPERT_COUNT]) -> u128 {
+    cdfs.iter()
+        .map(|cdf| cdf[BYTE_SYMBOLS] as u128)
+        .product::<u128>()
+}
 
-    for symbol in 0..BYTE_SYMBOLS {
-        let raw = (cdf[symbol + 1] - cdf[symbol]) as u64;
-        let scaled = raw * distributable;
-        let extra = scaled / total;
-        remainders[symbol] = scaled % total;
-        frequencies[symbol] += extra as u32;
-        assigned += extra;
-    }
-
-    let leftover = (distributable - assigned) as usize;
-    let mut order: [usize; BYTE_SYMBOLS] = std::array::from_fn(|i| i);
-    order.sort_unstable_by(|left, right| {
-        remainders[*right]
-            .cmp(&remainders[*left])
-            .then_with(|| left.cmp(right))
-    });
-    for &symbol in order.iter().take(leftover) {
-        frequencies[symbol] += 1;
-    }
-    frequencies
+fn expert_likelihood_numerators(
+    cdfs: &[ByteCdf; EXPERT_COUNT],
+    symbol: u8,
+) -> [u128; EXPERT_COUNT] {
+    let common = expert_common_denominator(cdfs);
+    let totals: [u128; EXPERT_COUNT] =
+        std::array::from_fn(|i| cdfs[i][BYTE_SYMBOLS] as u128);
+    std::array::from_fn(|i| {
+        let width = (cdfs[i][symbol as usize + 1] - cdfs[i][symbol as usize]) as u128;
+        width * (common / totals[i])
+    })
 }
 
 fn make_expert_mixture_cdf(
     weights: &[u32; EXPERT_COUNT],
-    experts: &[[u32; BYTE_SYMBOLS]; EXPERT_COUNT],
+    cdfs: &[ByteCdf; EXPERT_COUNT],
 ) -> ByteCdf {
-    let weight_total = weights.iter().map(|&w| w as u64).sum::<u64>();
-    let target = 1u64 << 15;
-    let distributable = target - BYTE_SYMBOLS as u64;
-    let denominator = weight_total * target;
+    let weight_total = weights.iter().map(|&w| w as u128).sum::<u128>();
+    let common = expert_common_denominator(cdfs);
+    let denominator = weight_total * common;
+    let distributable = (1u128 << 15) - BYTE_SYMBOLS as u128;
+    let totals: [u128; EXPERT_COUNT] =
+        std::array::from_fn(|i| cdfs[i][BYTE_SYMBOLS] as u128);
+
     let mut frequencies = [1u32; BYTE_SYMBOLS];
-    let mut remainders = [0u64; BYTE_SYMBOLS];
-    let mut assigned = 0u64;
+    let mut remainders = [0u128; BYTE_SYMBOLS];
+    let mut assigned = 0u128;
 
     for symbol in 0..BYTE_SYMBOLS {
         let numerator = (0..EXPERT_COUNT)
-            .map(|expert| weights[expert] as u64 * experts[expert][symbol] as u64)
-            .sum::<u64>();
+            .map(|expert| {
+                let width = (cdfs[expert][symbol + 1] - cdfs[expert][symbol]) as u128;
+                weights[expert] as u128 * width * (common / totals[expert])
+            })
+            .sum::<u128>();
         let scaled = numerator * distributable;
         let extra = scaled / denominator;
         remainders[symbol] = scaled % denominator;
@@ -521,19 +517,20 @@ fn make_expert_mixture_cdf(
 
 fn update_expert_weights(
     prior: &[u32; EXPERT_COUNT],
-    likelihoods: &[u32; EXPERT_COUNT],
+    cdfs: &[ByteCdf; EXPERT_COUNT],
+    symbol: u8,
 ) -> [u32; EXPERT_COUNT] {
+    let likelihoods = expert_likelihood_numerators(cdfs, symbol);
     let evidence = (0..EXPERT_COUNT)
-        .map(|i| prior[i] as u128 * likelihoods[i] as u128)
+        .map(|i| prior[i] as u128 * likelihoods[i])
         .sum::<u128>();
-    let distributable =
-        EXPERT_MIXTURE_TOTAL_WEIGHT as u128 - EXPERT_COUNT as u128;
+    let distributable = EXPERT_MIXTURE_TOTAL_WEIGHT as u128 - EXPERT_COUNT as u128;
     let mut posterior = [1u32; EXPERT_COUNT];
     let mut remainders = [0u128; EXPERT_COUNT];
     let mut assigned = 0u128;
 
     for i in 0..EXPERT_COUNT {
-        let scaled = prior[i] as u128 * likelihoods[i] as u128 * distributable;
+        let scaled = prior[i] as u128 * likelihoods[i] * distributable;
         let extra = scaled / evidence;
         remainders[i] = scaled % evidence;
         posterior[i] += extra as u32;
@@ -620,11 +617,11 @@ impl ScmExpertMixturePredictor {
         std::mem::size_of::<Self>()
     }
 
-    fn expert_frequencies(&self) -> [[u32; BYTE_SYMBOLS]; EXPERT_COUNT] {
+    fn expert_cdfs(&self) -> [ByteCdf; EXPERT_COUNT] {
         [
-            normalize_expert_cdf(&self.state.cdf(0)),
-            normalize_expert_cdf(&self.state.cdf(2)),
-            normalize_expert_cdf(&self.state.cdf(1)),
+            self.state.cdf(0),
+            self.state.cdf(2),
+            self.state.cdf(1),
         ]
     }
 }
@@ -641,18 +638,12 @@ impl BytePredictor for ScmExpertMixturePredictor {
     }
 
     fn cumulative_frequency(&self) -> ByteCdf {
-        make_expert_mixture_cdf(&self.weights, &self.expert_frequencies())
+        make_expert_mixture_cdf(&self.weights, &self.expert_cdfs())
     }
 
     fn observe(&mut self, symbol: u8) {
-        let experts = self.expert_frequencies();
-        let likelihoods = [
-            experts[0][symbol as usize],
-            experts[1][symbol as usize],
-            experts[2][symbol as usize],
-        ];
-        self.weights = update_expert_weights(&self.weights, &likelihoods);
-
+        let experts = self.expert_cdfs();
+        self.weights = update_expert_weights(&self.weights, &experts, symbol);
         self.state.observe(symbol);
     }
 }
