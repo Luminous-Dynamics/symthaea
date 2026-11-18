@@ -12,7 +12,8 @@
     "charge_convention": "integer_cooper_pair_number",
     "phase_compactification": "2pi",
     "source_model_id": null,
-    "notes": "Synthetic four-site ring to exercise the input contract only. U_ij and E_J values are arbitrary dimensionless fixture values and are not fitted to a material or to Ponticelli et al."
+    "notes": "Synthetic four-site ring to exercise the input contract only. U_ij and E_J values are arbitrary dimensionless fixture values and are not fitted to a material or to Ponticelli et al.",
+    "pair_charge_convention": "2e_equals_1"
   },
   "graph": {
     "spatial_dimension": 1,
