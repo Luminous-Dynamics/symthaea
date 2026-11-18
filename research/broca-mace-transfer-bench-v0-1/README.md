@@ -31,7 +31,7 @@ This is a stronger compile-time boundary than placing the oracle in another Rust
 
 ## Scenario families
 
-The deterministic fixed corpus includes sixteen two-session cases:
+The deterministic fixed corpus includes seventeen two-session cases:
 
 1. Identified interventional effect transfer.
 2. Confounded observational association decoy.
@@ -111,9 +111,9 @@ Do not pool percentages across these tasks. Reproduce each official protocol sep
 - [#8265](https://github.com/Luminous-Dynamics/symthaea/issues/8265): claim identity versus similarity.
 - [#11816](https://github.com/Luminous-Dynamics/symthaea/issues/11816): evaluator and oracle independence.
 
-## Generated stress tranche (MACE v0.4 research)
+## Generated stress tranche (MACE v0.5 research)
 
-A second evaluator binary adds **256 deterministic clusters × 14 scenario families = 3,840 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, a shared-common-root attack, qualified negative experience, few-shot invariant transport, a mechanism-break negative control, and an unseen-target case that triggers active probing.
+A second evaluator binary adds **256 deterministic clusters × 14 scenario families = 4,096 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, a shared-common-root attack, qualified negative experience, few-shot invariant transport, a mechanism-break negative control, and an unseen-target case that triggers active probing.
 
 Run it independently:
 
@@ -128,7 +128,7 @@ This is a generated synthetic stress distribution—not an official MemoryArena/
 
 ## Invariant transport experiment (MACE v0.4 research)
 
-The candidate crate adds an `invariant_transport` policy alongside exact-scope `causal_qualified`. It may pool prior-regime experience only when the objective matches exactly, the target regime has evidence for both actions, a prior regime has at least two unique qualified events from two source families for each action, source/target families are disjoint, and per-action utility means remain within a fixed 0.12 tolerance.
+The candidate crate adds an `invariant_transport` policy alongside exact-scope `causal_qualified`. It may pool prior-regime experience only when the objective matches exactly, the target regime has evidence for both actions, a prior regime has at least two unique qualified events from two source families for each action, source/target families are disjoint, and the worst-case difference between source and target effect intervals fits within a fixed 0.12 normalized-utility equivalence margin.
 
 The generated suite includes a few-shot invariant positive control and a mechanism-break negative control. Exact-scope policy should abstain on the positive few-shot case; invariant transport may transfer. It must abstain when action effects move beyond the tolerance or source families overlap.
 
@@ -145,3 +145,10 @@ The `active_probe` policy tries exact-scope evidence first, then invariant trans
 A probe has a declared **0.12 normalized utility cost** (120,000 units on a 1,000,000-unit scale; this is not USD). The typed request specifies target scope, both actions, two replicates per action, and a maximum normalized-cost budget. The evaluator rejects wrong-scope, unsupported-action, unsupported-replicate and under-budget requests. Reports include probe requests, successful resolutions and normalized probe cost; utility/regret and cluster-bootstrap comparisons use **net utility after that cost**. A generated positive control has useful prior-regime experience but no target-regime witness, allowing active probing to be compared with abstention/no-memory without granting free information.
 
 This is an environment-simulation result. The evaluator uses hidden scenario utilities to generate observations, but candidate policy code receives only the generated observations and query. The prototype does not yet model physical probe risk, safety constraints, experiment duration or real-world intervention cost.
+
+
+Each experience now carries a claimed absolute measurement-error bound. Invariant transport requires:
+
+`abs(mean_source - mean_target) + source_mean_error_bound + target_mean_error_bound <= 0.12`
+
+This is a conservative deterministic interval-containment check, not a statistical confidence interval. Error bounds are candidate-visible claims in this prototype and need sensor/protocol attestation; future work should add calibrated uncertainty models, preregistered equivalence tests and independent target-regime witnesses.

@@ -59,6 +59,7 @@ fn experience(
         scope,
         action,
         observed_utility,
+        measurement_error_bound: 0.02,
         intervention: true,
         prediction_pre_registered: true,
         outcome_reconciled: true,
@@ -173,6 +174,13 @@ fn cases() -> Vec<Scenario> {
     let mut common_cause = valid_pair(baseline_quality, 160, 0.96, 0.65);
     for item in common_cause.iter_mut().filter(|item| item.action == Action::A) {
         item.source_root_id = 700;
+    }
+
+    let mut wide_intervals = valid_pair(baseline_quality, 170, 0.92, 0.32);
+    wide_intervals.push(experience(174, 304, shifted_quality, Action::A, 0.91));
+    wide_intervals.push(experience(175, 305, shifted_quality, Action::B, 0.33));
+    for item in &mut wide_intervals {
+        item.measurement_error_bound = 0.07;
     }
 
     vec![
@@ -320,6 +328,15 @@ fn cases() -> Vec<Scenario> {
             0.90,
             None,
             true,
+        ),
+        scenario(
+            "invariance_interval_too_wide",
+            wide_intervals,
+            Query { scope: shifted_quality },
+            1.0,
+            0.0,
+            Some(Action::A),
+            false,
         ),
         scenario(
             "shifted_regime_positive_control",

@@ -60,6 +60,7 @@ fn exp(
         scope,
         action,
         observed_utility: utility,
+        measurement_error_bound: 0.02,
         intervention: true,
         prediction_pre_registered: true,
         outcome_reconciled: true,
@@ -134,7 +135,7 @@ impl Rng {
 }
 
 fn generated_worlds(clusters: u64) -> Vec<Case> {
-    let mut cases = Vec::with_capacity(clusters as usize * 15);
+    let mut cases = Vec::with_capacity(clusters as usize * 16);
     let baseline = Scope {
         regime: Regime::Baseline,
         objective: Objective::Quality,
@@ -260,6 +261,41 @@ fn generated_worlds(clusters: u64) -> Vec<Case> {
             shifted,
             0.88,
             0.32,
+            Some(Action::A),
+            false,
+        ));
+
+        let mut wide_intervals = pair(
+            baseline,
+            id + 240,
+            family + 4,
+            0.92,
+            0.32,
+        );
+        wide_intervals.push(exp(
+            id + 244,
+            family + 8,
+            shifted,
+            Action::A,
+            0.91,
+        ));
+        wide_intervals.push(exp(
+            id + 245,
+            family + 9,
+            shifted,
+            Action::B,
+            0.33,
+        ));
+        for item in &mut wide_intervals {
+            item.measurement_error_bound = 0.07;
+        }
+        cases.push(case(
+            cluster,
+            "invariance_interval_too_wide",
+            wide_intervals,
+            shifted,
+            1.0,
+            0.0,
             Some(Action::A),
             false,
         ));
@@ -827,11 +863,23 @@ mod tests {
     }
 
     #[test]
+    fn transport_rejects_point_estimates_with_wide_error_bounds() {
+        let cases = generated_worlds(1);
+        let item = cases
+            .iter()
+            .find(|case| case.family == "invariance_interval_too_wide")
+            .unwrap();
+        let decision = decide(Policy::InvariantTransport, &item.memory, item.query);
+        assert_eq!(decision.action, None);
+        assert!(decision.evidence_ids.is_empty());
+    }
+
+    #[test]
     fn generated_worlds_are_deterministic_and_rotate_source_families() {
         let first = generated_worlds(8);
         let second = generated_worlds(8);
         assert_eq!(format!("{first:?}"), format!("{second:?}"));
-        assert_eq!(first.len(), 120);
+        assert_eq!(first.len(), 128);
         assert_eq!(first[0].cluster, 1);
         assert_eq!(first[8].cluster, 2);
         assert_ne!(
@@ -858,7 +906,7 @@ mod tests {
     fn qualified_policy_has_no_generated_fixture_overclaims_or_invalid_reuse() {
         let cases = generated_worlds(16);
         let score = evaluate(Policy::CausalQualified, &cases);
-        assert_eq!(score.count, 240);
+        assert_eq!(score.count, 256);
         assert_eq!(score.overclaims, 0);
         assert_eq!(score.invalid_refs, 0);
         assert_eq!(score.unsupported_a, 0);

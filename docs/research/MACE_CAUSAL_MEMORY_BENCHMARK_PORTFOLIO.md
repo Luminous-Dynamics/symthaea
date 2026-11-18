@@ -123,8 +123,8 @@ A different source-family string is not proof of independence. The production ga
 
 ## 6. Current MACE implementation status
 
-- **MACE-lite fixed fixtures:** 16 deterministic scenarios and six candidate policies: no-memory, frequency-only, scope-aware, exact-scope causal-qualified, invariant transport, and active probe.
-- **Generated stress suite:** 256 deterministic clusters × 15 scenario families = **3,840** cases. Includes confounding, regime/objective shifts, source retraction, unreconciled tool success, untrusted evidence, incomplete delayed horizons, correlated duplicates, event-ID aliasing, shared-common-root attack, negative experience, invariant few-shot transport, mechanism break, and an unseen-target active-probe case.
+- **MACE-lite fixed fixtures:** 17 deterministic scenarios and six candidate policies: no-memory, frequency-only, scope-aware, exact-scope causal-qualified, invariant transport, and active probe.
+- **Generated stress suite:** 256 deterministic clusters × 16 scenario families = **4,096** cases. Includes confounding, regime/objective shifts, source retraction, unreconciled tool success, untrusted evidence, incomplete delayed horizons, correlated duplicates, event-ID aliasing, shared-common-root attack, error-interval negative control, negative experience, invariant few-shot transport, mechanism break, and an unseen-target active-probe case.
 - **Statistics:** paired cluster-bootstrap utility lift versus no-memory (2,000 resamples); per-family reporting for causal-qualified, invariant transport and active probe; Session-B/Session-C known-retraction control; probe requests/resolutions and net utility after the 0.12 normalized-utility probe cost. The active policy emits a typed, scope-bound request with both actions, a replicate count and maximum normalized-utility budget; the evaluator rejects mismatched-scope, unsupported-action, unsupported-replicate and under-budget requests.
 - **Candidate/evaluator separation:** candidate policy and evaluator are separate Cargo packages; the evaluator source remains public in the same repository, so it is not a sealed independent evaluator.
 - **Verification:** code has been committed to draft PR #12743. Rust compile/tests/rustfmt have not run in the current execution environment (no Cargo/Rust toolchain is installed); GitHub draft checks are skipped. No test pass or SOTA result is claimed.
@@ -146,3 +146,10 @@ A different source-family string is not proof of independence. The production ga
 - Zhou et al., [TimlMemBench](https://aclanthology.org/2026.findings-emnlp.507/), Findings of EMNLP 2026.
 - [Redis Agent Memory benchmark report](https://redis.io/resources/agent-memory-benchmark-report/), 2026-09-21; page updated 2026-11-17.
 - Zhang et al., [A Survey of World Model Benchmarks](https://world-model-benchmarks.github.io/), final manuscript snapshot 2026-11-08.
+
+
+Each experience now carries a claimed absolute measurement-error bound. Invariant transport requires:
+
+`abs(mean_source - mean_target) + source_mean_error_bound + target_mean_error_bound <= 0.12`
+
+This is a conservative deterministic interval-containment check, not a statistical confidence interval. Error bounds are candidate-visible claims in this prototype and need sensor/protocol attestation; future work should add calibrated uncertainty models, preregistered equivalence tests and independent target-regime witnesses.

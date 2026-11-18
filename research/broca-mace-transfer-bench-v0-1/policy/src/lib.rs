@@ -47,6 +47,8 @@ pub struct Experience {
     pub scope: Scope,
     pub action: Action,
     pub observed_utility: f64,
+    /// Claimed absolute measurement-error bound in normalized utility units.
+    pub measurement_error_bound: f64,
     pub intervention: bool,
     pub prediction_pre_registered: bool,
     pub outcome_reconciled: bool,
@@ -199,6 +201,8 @@ pub fn is_qualified(item: &Experience, query: Query) -> bool {
         && item.source_root_id != 0
         && item.observed_utility.is_finite()
         && (0.0..=1.0).contains(&item.observed_utility)
+        && item.measurement_error_bound.is_finite()
+        && (0.0..=1.0).contains(&item.measurement_error_bound)
         && item.intervention
         && item.prediction_pre_registered
         && item.outcome_reconciled
@@ -214,6 +218,7 @@ struct QualifiedGroup {
     source_roots: BTreeSet<u32>,
     source_events: BTreeSet<u32>,
     sum: f64,
+    error_bound_sum: f64,
     count: usize,
     evidence_ids: Vec<u32>,
 }
@@ -226,6 +231,7 @@ impl QualifiedGroup {
         self.source_families.insert(item.source_family);
         self.source_roots.insert(item.source_root_id);
         self.sum += item.observed_utility;
+        self.error_bound_sum += item.measurement_error_bound;
         self.count += 1;
         self.evidence_ids.push(item.event_id);
     }
@@ -239,6 +245,14 @@ impl QualifiedGroup {
             0.0
         } else {
             self.sum / self.count as f64
+        }
+    }
+
+    fn mean_error_bound(&self) -> f64 {
+        if self.count == 0 {
+            0.0
+        } else {
+            self.error_bound_sum / self.count as f64
         }
     }
 
@@ -296,6 +310,8 @@ pub fn is_transfer_qualified(item: &Experience, query: Query) -> bool {
         && item.source_root_id != 0
         && item.observed_utility.is_finite()
         && (0.0..=1.0).contains(&item.observed_utility)
+        && item.measurement_error_bound.is_finite()
+        && (0.0..=1.0).contains(&item.measurement_error_bound)
         && item.intervention
         && item.prediction_pre_registered
         && item.outcome_reconciled
@@ -305,7 +321,7 @@ pub fn is_transfer_qualified(item: &Experience, query: Query) -> bool {
         && item.delayed_horizon_complete
 }
 
-const INVARIANCE_TOLERANCE: f64 = 0.12;
+const INVARIANCE_EQUIVALENCE_MARGIN: f64 = 0.12;
 
 fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
     let mut event_frequency: BTreeMap<u32, usize> = BTreeMap::new();
@@ -347,12 +363,16 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
                 return None;
             }
 
-            if (source.mean() - target.mean()).abs() > INVARIANCE_TOLERANCE {
+            let worst_case_effect_difference = (source.mean() - target.mean()).abs()
+                + source.mean_error_bound()
+                + target.mean_error_bound();
+            if worst_case_effect_difference > INVARIANCE_EQUIVALENCE_MARGIN {
                 return None;
             }
 
             pooled.sum += source.sum;
             pooled.count += source.count;
+            pooled.error_bound_sum += source.error_bound_sum;
             pooled.evidence_ids.extend(source.evidence_ids.iter().copied());
             pooled
                 .source_families
@@ -421,6 +441,7 @@ mod tests {
             scope,
             action,
             observed_utility: utility,
+            measurement_error_bound: 0.02,
             intervention: true,
             prediction_pre_registered: true,
             outcome_reconciled: true,
@@ -698,6 +719,44 @@ mod tests {
             decide(Policy::InvariantTransport, &memory, query).action,
             None
         );
+    }
+
+    #[test]
+    fn invariant_transport_requires_worst_case_error_interval_inside_margin() {
+        let mut memory = vec![
+            transport_case(20, 10, Regime::Baseline, Action::A, 0.92),
+            transport_case(21, 11, Regime::Baseline, Action::A, 0.90),
+            transport_case(22, 20, Regime::Baseline, Action::B, 0.32),
+            transport_case(23, 21, Regime::Baseline, Action::B, 0.34),
+            transport_case(24, 30, Regime::Shifted, Action::A, 0.91),
+            transport_case(25, 31, Regime::Shifted, Action::B, 0.33),
+        ];
+        for item in &mut memory {
+            item.measurement_error_bound = 0.07;
+        }
+        let query = Query {
+            scope: Scope {
+                regime: Regime::Shifted,
+                objective: Objective::Quality,
+            },
+        };
+        assert_eq!(
+            decide(Policy::InvariantTransport, &memory, query).action,
+            None
+        );
+    }
+
+    #[test]
+    fn nonfinite_or_out_of_range_measurement_bounds_are_rejected() {
+        let scope = Scope {
+            regime: Regime::Baseline,
+            objective: Objective::Quality,
+        };
+        let mut item = sample(50, 10, Action::A, 0.9, scope);
+        item.measurement_error_bound = f64::NAN;
+        assert!(!is_qualified(&item, Query { scope }));
+        item.measurement_error_bound = 1.1;
+        assert!(!is_qualified(&item, Query { scope }));
     }
 
     #[test]
