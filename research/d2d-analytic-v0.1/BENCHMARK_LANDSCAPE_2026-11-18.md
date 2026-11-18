@@ -63,7 +63,7 @@ The existing Symtropy manipulator-demo Monte Carlo example is not an acceptable 
 | **RoboWM-Bench (CVPR 2026 Workshop)** | Converts predicted manipulation videos into executable action sequences and validates them in reconstructed simulation / real-to-sim cases | General-purpose scientific discovery or broad sim-to-real qualification | Test whether dreamed trajectories are physically executable, not just plausible |
 | **MIND (2026)** | Long-context scene/memory consistency and action control across 250 videos, viewpoints and action spaces | Physical robot dynamics or verified causal intervention effects | Long-horizon memory and action-space consistency tests |
 | **XEWorld (2026)** | Action-conditioned world-model generalization to held-out robot embodiments | General scientific learning or broad real-robot competence | Held-out embodiment and catastrophic-forgetting tests |
-| **Autonomous Science Bench 0.1** | End-to-end agent performance on six real scientific workflow tasks | Broad scientific intelligence; its initial pilot is small and domain-limited | External research-agent comparator and cost/time reporting reference |
+| **Autonomous Science Bench 0.1** | Budgeted campaign progress, experiment selection and held-out design ranking across six real scientific workflow tasks | Physical counterfactual branch integrity, recurrent episode replay or robotic execution authority | Direct whole-agent comparator for discovery/learning gates, random/BO baselines and all-in cost reporting |
 | **Genie 4 (Google DeepMind, Oct 27 2026)** | Real-time interactive, multimodal world generation and user-directed scene changes | Stable long-session physics, verified numerical state or independent execution truth | Generative scenario/observation proposal baseline, not the physics or evaluator authority |
 
 ### 2.1 Reported comparator figures and caveats
@@ -79,9 +79,27 @@ Every number above is comparator context, not a reproduced Luminous result. Do n
 
 - **Cosmos Policy versioning matters.** NVIDIA's current Cosmos Policy results page reports 98.5% mean LIBERO success and 67.1% RoboCasa success for its displayed configuration. NVIDIA's Cosmos Cookbook separately reports a Predict2.5 configuration at 98.33% LIBERO and 71.1% RoboCasa, compared with its Predict2 entry at 98.5% and 67.1%. Preserve these as distinct published configuration rows; do not silently relabel the 71.1% result as the same model/configuration as the 67.1% page result. Any reproduction must pin the exact checkpoint, training demonstrations, tasks, evaluation code, action interface and seeds.
 - **The world-model/action gap is independently corroborated.** A separate 2026 survey maps 160 embodied-prediction benchmarks and reports that only 11 make an explicit VLA-versus-world-model contrast and only four turn prediction into executed action. This is a different corpus and methodology from the 130-benchmark world-model survey above; the two counts must not be added or treated as one dataset.
-- **Autonomous Science Bench is a direct comparator, not just inspiration.** Its v0.1 leaderboard covers six pilot campaigns, ten model-agent configurations and 180 trials (three trials per campaign/configuration). The top listed GPT-6 Astra + Codex configuration resolves 72.2% of trials at $190.23 and 557 agent-minutes; the authors caution that three trials per task make small leaderboard gaps non-significant, and the hardest campaign is solved in only five of 30 attempts. Its two gates explicitly separate discovery among measured designs from predictive ranking on unmeasured designs. D2D should adopt that discovery/learning separation while adding the physics/action and evidence-assurance dimensions.
+- **Autonomous Science Bench is a direct comparator, not just inspiration.** Its v0.1 leaderboard covers six pilot campaigns, ten model-agent configurations and 180 trials (three trials per campaign/configuration). The top listed GPT-6 Astra + Codex configuration resolves 72.2% of trials at $190.23 and 557 agent-minutes; the authors caution that three trials per task make small leaderboard gaps non-significant, and the hardest campaign is solved in only five of 30 attempts. ASB grades both campaign progress and final outcomes, and its two final gates separately test discovery among measured designs and predictive ranking on unmeasured designs. It compares against random selection, Bayesian optimization and lab reference workflows. Its backend roadmap progresses from replay oracle to digital twin to live lab while keeping the agent interface stable. D2D should adopt these strengths rather than presenting them as novel.
 
 **Competitive interpretation:** we should not try to beat Cosmos on LIBERO/RoboCasa by citing a different small toy simulation. The first credible win is a matched, held-out experiment-design result: better decision quality per total resource cost than random, tuned Bayesian optimization/active learning, and the strongest reproducible model-based baseline—while maintaining calibrated uncertainty and complete branch accounting. Only then should the same frozen method be tested as a policy/world-model component on a named robotics benchmark.
+
+## 2.3 D2D's additional gate: intervention integrity
+
+Adopt ASB's two-gate distinction, then add a third gate that is necessary when imagined futures are used to reason about physical interventions:
+
+1. **Discovery gate:** did the agent select experiments that improve the target decision or discover high-value designs within a fixed budget, relative to random, tuned Bayesian optimization and other matched baselines?
+2. **Learning gate:** after seeing only the measurements it selected, can the agent rank or predict unmeasured designs and held-out conditions? Score this separately from discovery; neither gate can compensate for failure of the other.
+3. **Execution-integrity gate:** did the exact declared intervention execute from the declared initial state and configuration; did the observation come from an independent evaluator; did the replay reproduce the declared public state contract; and were all expected branches accounted for? Missing, duplicated, failed, incomplete, unsupported and resource-bound branches stay visible. No model-prediction score can compensate for a failed execution-integrity gate.
+
+Keep safety/risk constraints as non-compensable guardrails alongside these gates: an experiment that violates a predeclared operating envelope is not rescued by discovery or learning performance.
+
+Use the ASB backend progression for D2D too, but name the evidence level precisely:
+
+- **Replay oracle:** historical or analytic known-answer data, exact repeatability, no new physical outcome.
+- **Digital twin:** a simulator executes interventions with declared model/configuration uncertainty and failure modes; results are simulator-relative.
+- **Live experiment:** instrumented physical measurements, instrument calibration, environmental conditions, real queues/costs/faults and independent adjudication.
+
+Never pool results across these backends into one performance percentage. A replay-oracle pass is not a digital-twin or live-lab pass.
 
 ## 3. The important research gaps
 
@@ -101,6 +119,7 @@ The gap is not that closed-loop world-model evaluation or autonomous experiment 
 6. A fresh, held-out generator family tests transfer.
 7. Protected skills and prior capabilities are retested.
 8. The complete compute, energy, experiment and human-review costs are charged.
+9. Execution integrity is independently qualified, including exact intervention identity, replay scope and complete branch denominators.
 
 D2D should complement, not rename or duplicate, existing world-model benchmarks.
 
@@ -159,14 +178,16 @@ Measure:
 
 ### Layer E — autonomous research and independent replication
 
-Use Autonomous Science Bench as an external whole-agent research-workflow comparator where tasks are compatible; extend D2D to sealed, held-out experiment families.
+Use Autonomous Science Bench as an external whole-agent research-workflow comparator where tasks are compatible; retain its separate discovery and learning gates, then extend D2D to sealed, held-out experiment families and the execution-integrity gate.
 
 Measure:
-- validated discoveries per experiment budget;
+- discovery progress per experiment budget against random, Bayesian optimization and lab/reference baselines;
+- quality of the final model on unmeasured designs;
 - reduction in decision regret;
 - expected versus realized information gain;
 - transfer to a generator family not seen during training;
 - independent fresh-process reproduction;
+- exact experiment/branch accounting and intervention fidelity;
 - complete source, tool, data, model and evaluator lineage.
 
 No single scalar should erase the separate metrics. Publish a Pareto frontier over verified utility, transfer, risk, cost and latency.
@@ -235,7 +256,7 @@ Use distributed-systems resilience as the second domain, where Symtropy can gene
 - [MIND — memory consistency and action control (arXiv:2602.08025)](https://arxiv.org/abs/2602.08025)
 - [XEWorld — held-out robot embodiment generalization (arXiv:2608.05799)](https://arxiv.org/abs/2608.05799)
 - [Autonomous Science Bench 0.1 — leaderboard](https://asb.open-ssi.org/leaderboard)
-- [Autonomous Science Bench — overview, six tasks, scoring gates and pilot caveats](https://asb.open-ssi.org/about)
+- [Autonomous Science Bench — overview, two scoring gates, matched baselines and replay/digital-twin/live-lab roadmap](https://asb.open-ssi.org/about)
 - [NVIDIA Cosmos Cookbook — Predict2.5 vs Predict2 benchmark tables](https://github.com/nvidia-cosmos/cosmos-cookbook/blob/main/docs/recipes/post_training/predict2/cosmos_policy/post_training.md)
 - [Do World Models Make Better Robots? — separate 160-benchmark survey (arXiv:2609.29669)](https://arxiv.org/abs/2609.29669)
 - [Google DeepMind Genie 4 — official announcement and limitations](https://deepmind.google/blog/genie-4-a-new-generation-of-world-simulation/)
