@@ -21,33 +21,38 @@ pub use circle_layout::{
     CircleGrammarFamily, CircleGrammarOutcome, CircleGrammarSpec, CircleLayout,
     CircleLayoutError, CircleRecord, CircleSensitivityConfig, CircleSensitivitySummary,
 };
-pub use crop_flow::{CropFlowDescriptor, CropFlowError, CropFlowSample, describe_crop_flow, describe_crop_flow_about_center};
-pub use event_split::{BenchmarkSample, EventFold, EventFoldPlan, EventSplitError, grouped_event_kfold, validate_event_fold_plan};
-pub use experiment_design::{ExperimentDesignError, expected_information_gain_bits};
+pub use crop_flow::{
+    describe_crop_flow, describe_crop_flow_about_center, CropFlowDescriptor, CropFlowError,
+    CropFlowSample,
+};
 pub use decoder::{
-    BitOrder, DecodeError, DecodeOutcome, DecoderSpec, PayloadEncoding, decode,
-    encode_ascii7, run_tournament,
+    decode, encode_ascii7, run_tournament, BitOrder, DecodeError, DecodeOutcome, DecoderSpec,
+    PayloadEncoding,
 };
-pub use geometry::{
-    Bounds2, GeometryDescriptor, GeometryError, Point2, SymmetryScore, describe,
+pub use event_split::{
+    grouped_event_kfold, validate_event_fold_plan, BenchmarkSample, EventFold, EventFoldPlan,
+    EventSplitError,
 };
+pub use experiment_design::{expected_information_gain_bits, ExperimentDesignError};
+pub use geometry::{describe, Bounds2, GeometryDescriptor, GeometryError, Point2, SymmetryScore};
 pub use grid::{
-    BinaryGrid, GridDecodeOutcome, GridDecoderManifest, GridDecoderSpec, GridError, GridTransform,
-    ManifestError, NullGridResult,
-    TraversalOrder, margin_preserving_shuffle, run_grid_tournament,
-    standard_d4_ascii7_manifest,
+    margin_preserving_shuffle, run_grid_tournament, standard_d4_ascii7_manifest, BinaryGrid,
+    GridDecodeOutcome, GridDecoderManifest, GridDecoderSpec, GridError, GridTransform,
+    ManifestError, NullGridResult, TraversalOrder,
 };
 pub use mechanics::{
     cantilever_base_moment, cantilever_tip_load_flexural_rigidity, curvature_from_moment,
-    outer_fibre_bending_stress_pa, three_point_bend_flexural_rigidity,
-    three_point_bend_peak_moment, flexural_rigidity_from_modulus,
-    BeamProfile, BeamSegment, EllipticalHollowSection, MechanicsError, RootSupport,
-    SectionProperties,
+    flexural_rigidity_from_modulus, outer_fibre_bending_stress_pa,
+    three_point_bend_flexural_rigidity, three_point_bend_peak_moment, BeamProfile, BeamSegment,
+    EllipticalHollowSection, MechanicsError, RootSupport, SectionProperties,
 };
-pub use plant_pose_3d::{Point3, StemPose3DDescriptor, StemPose3DError, StemPoseSample, Vector3, describe_stem_pose_3d, describe_stem_pose_3d_about_center};
+pub use plant_pose_3d::{
+    describe_stem_pose_3d, describe_stem_pose_3d_about_center, Point3, StemPose3DDescriptor,
+    StemPose3DError, StemPoseSample, Vector3,
+};
 pub use statistics::{
-    FamilyWiseMaxResult, binary_entropy, familywise_max_statistic_p_value,
-    upper_tail_max_p_value, wilson_interval,
+    binary_entropy, familywise_max_statistic_p_value, upper_tail_max_p_value, wilson_interval,
+    FamilyWiseMaxResult,
 };
 
 #[cfg(test)]
@@ -100,15 +105,16 @@ mod integrated_tests {
                     .collect()
             })
             .collect();
-        let result = familywise_max_statistic_p_value(
-            &observed_scores,
-            &null_score_matrix,
-        )
-        .expect("complete family-wise null matrix");
+        let result =
+            familywise_max_statistic_p_value(&observed_scores, &null_score_matrix)
+                .expect("complete family-wise null matrix");
 
         assert_eq!(result.family_size, family.specifications().len());
         assert_eq!(result.null_replicate_count, seeds.len());
-        assert_eq!(result.observed_maximum, observed_scores.iter().copied().fold(0.0, f64::max));
+        assert_eq!(
+            result.observed_maximum,
+            observed_scores.iter().copied().fold(0.0, f64::max)
+        );
         assert!(result.adjusted_p_value >= 1.0 / (seeds.len() + 1) as f64);
         assert!(result.adjusted_p_value <= 1.0);
     }
