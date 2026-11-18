@@ -168,6 +168,15 @@ For mechanics, align masses, constraints, constitutive/contact models, integrato
 - Future accepted run: baseline source/version, input and split digests, hardware/software record, raw predictions, verifier receipts, all failures, and scorecard.
 - Never label a target as achieved from fixture unit tests alone.
 
+
+## Machine-readable benchmark scorecards
+
+`schemas/run_scorecard.schema.json` defines the required record for every external comparator execution. It pins the protocol, case manifest, inputs, split and method configuration by SHA-256; records the baseline code revision and hardware/software environment; stores per-case outputs including abstentions, failures and out-of-domain cases; and requires explicit false-promotion, false-elimination, lift and verification accounting.
+
+Sampled metrics must include their interval method, confidence level and sample count. Physical performance reports should include wall time, peak memory, energy when measured, and certificate/verifier overhead. The denominator rule includes all in-scope cases, including abstentions and failures. An unverified hard-prune count is structurally fixed at zero.
+
+The fixture workflow validates this schema itself. It does not fabricate a scorecard or claim that any external baseline has run.
+
 ## Claim boundary
 
 This protocol is a benchmark contract, not evidence that Symthaea currently beats LieFlow, SymFP, COLT 2026 methods, soft-equivariant transformers, JMLR noisy ODT/ASRN, MuJoCo, Chrono, Pinocchio or Drake. Any superiority claim requires matched baseline executions on the frozen corpus.
