@@ -881,10 +881,10 @@ mod tests {
         assert_eq!(format!("{first:?}"), format!("{second:?}"));
         assert_eq!(first.len(), 128);
         assert_eq!(first[0].cluster, 1);
-        assert_eq!(first[8].cluster, 2);
+        assert_eq!(first[16].cluster, 2);
         assert_ne!(
             first[0].memory[0].source_family,
-            first[8].memory[0].source_family
+            first[16].memory[0].source_family
         );
     }
 

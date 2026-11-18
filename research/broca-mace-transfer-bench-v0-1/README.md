@@ -49,6 +49,7 @@ The deterministic fixed corpus includes seventeen two-session cases:
 14. Few-shot invariant-effect transport into a shifted regime.
 15. Mechanism-break negative control after a regime shift.
 16. Common-cause attack: two source-family labels share one upstream root.
+17. Error-interval negative control: point estimates are close but measurement bounds exceed the equivalence margin.
 
 ## Compared policies
 
@@ -113,7 +114,7 @@ Do not pool percentages across these tasks. Reproduce each official protocol sep
 
 ## Generated stress tranche (MACE v0.5 research)
 
-A second evaluator binary adds **256 deterministic clusters × 14 scenario families = 4,096 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, a shared-common-root attack, qualified negative experience, few-shot invariant transport, a mechanism-break negative control, and an unseen-target case that triggers active probing.
+A second evaluator binary adds **256 deterministic clusters × 16 scenario families = 4,096 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, a shared-common-root attack, an error-interval negative control, qualified negative experience, few-shot invariant transport, a mechanism-break negative control, and an unseen-target case that triggers active probing.
 
 Run it independently:
 
@@ -126,13 +127,13 @@ The candidate gate requires unique event IDs, at least two declared source famil
 
 This is a generated synthetic stress distribution—not an official MemoryArena/AMA-Bench adapter, learned-policy train/test split, sealed external oracle or real-world causal discovery. Source-family IDs vary to expose correlation/identity failures, but independence is not cryptographically attested. Bootstrap intervals quantify variation over these generated clusters only; they do not establish external validity. Session-C corrections are applied as observed source-state updates before the next decision.
 
-## Invariant transport experiment (MACE v0.4 research)
+## Invariant transport experiment (MACE v0.5 research)
 
-The candidate crate adds an `invariant_transport` policy alongside exact-scope `causal_qualified`. It may pool prior-regime experience only when the objective matches exactly, the target regime has evidence for both actions, a prior regime has at least two unique qualified events from two source families for each action, source/target families are disjoint, and the worst-case difference between source and target effect intervals fits within a fixed 0.12 normalized-utility equivalence margin.
+The candidate crate adds an `invariant_transport` policy alongside exact-scope `causal_qualified`. It may pool prior-regime experience only when the objective matches exactly, both actions have target-regime witnesses, prior-regime support has distinct source families and upstream roots, and source/target families and roots are disjoint. The worst-case difference between source and target effect intervals must fit within a fixed 0.12 normalized-utility equivalence margin.
 
 The generated suite includes a few-shot invariant positive control and a mechanism-break negative control. Exact-scope policy should abstain on the positive few-shot case; invariant transport may transfer. It must abstain when action effects move beyond the tolerance or source families overlap.
 
-This is a transparent empirical-invariance heuristic, not a general transportability proof. The 0.12 tolerance is an uncalibrated prototype parameter. Future work should use preregistered equivalence margins, uncertainty intervals, explicit causal assumptions and independent target-regime witnesses.
+This is a transparent empirical-invariance heuristic, not a general transportability proof. The 0.12 margin is a preregistered prototype constant, not empirically calibrated. Each observation carries a claimed absolute measurement-error bound; transport requires `abs(mean_source - mean_target) + mean_error_source + mean_error_target <= 0.12`. This is a deterministic worst-case interval-containment condition, not a statistical confidence interval. The bounds and root IDs remain candidate-visible claims and need sensor/protocol and source-ledger attestation.
 
 ## Benchmark portfolio
 

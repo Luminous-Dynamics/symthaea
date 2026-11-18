@@ -87,9 +87,9 @@ A vector similarity hit is a candidate pointer, not permission to apply a memory
 
 ### B. From exact-scope rejection to evidence-tested transportability
 
-Exact-scope matching is safe but can under-generalize. Blind similarity transfer is unsafe. The intermediate capability is to test whether the action-effect relationship remains invariant in the target regime, with target-regime witnesses, disjoint source families, explicit equivalence margins, and uncertainty intervals.
+Exact-scope matching is safe but can under-generalize. Blind similarity transfer is unsafe. The intermediate capability is to test whether the action-effect relationship remains invariant in the target regime, with target-regime witnesses, disjoint source families and upstream roots, and conservative measurement-error intervals.
 
-The current `invariant_transport` policy is only a heuristic prototype. Its fixed 0.12 margin must be replaced by preregistered equivalence tests and confidence intervals before any real deployment claim.
+The current `invariant_transport` policy is only a heuristic prototype. It requires the worst-case difference between source and target effect intervals to fit within a fixed 0.12 normalized-utility margin. This deterministic bound is not a statistical confidence interval; the measurement bounds and source-root IDs require independent attestation. A later version should use preregistered statistical equivalence tests and calibrated uncertainty before any real deployment claim.
 
 ### C. From accuracy to regret, calibration, and governed-use
 
