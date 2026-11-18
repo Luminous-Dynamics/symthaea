@@ -25,6 +25,12 @@ impl Default for EnvelopeBudgetV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ApproximateSymmetryInputV1 {
     pub contract_id: String,
+    pub state_unit_id: String,
+    pub objective_unit_id: String,
+    pub constraint_unit_id: String,
+    pub defect_evidence_id: String,
+    pub lipschitz_evidence_id: String,
+    pub domain_evidence_id: String,
     /// All fixed-point quantities use this positive integer scale.
     pub scale: u128,
     pub initial_state_error: u128,
@@ -60,6 +66,15 @@ impl ApproximateSymmetryInputV1 {
         if self.contract_id.trim().is_empty() {
             return Err(EnvelopeErrorV1::EmptyContractId);
         }
+        if self.state_unit_id.trim().is_empty()
+            || self.objective_unit_id.trim().is_empty()
+            || self.constraint_unit_id.trim().is_empty()
+            || self.defect_evidence_id.trim().is_empty()
+            || self.lipschitz_evidence_id.trim().is_empty()
+            || self.domain_evidence_id.trim().is_empty()
+        {
+            return Err(EnvelopeErrorV1::MissingEvidenceReference);
+        }
         if self.scale == 0 {
             return Err(EnvelopeErrorV1::ZeroScale);
         }
@@ -77,6 +92,12 @@ impl ApproximateSymmetryInputV1 {
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let mut bytes = b"luminous.approx_symmetry_envelope.v1\0".to_vec();
         append_bytes(&mut bytes, self.contract_id.as_bytes());
+        append_bytes(&mut bytes, self.state_unit_id.as_bytes());
+        append_bytes(&mut bytes, self.objective_unit_id.as_bytes());
+        append_bytes(&mut bytes, self.constraint_unit_id.as_bytes());
+        append_bytes(&mut bytes, self.defect_evidence_id.as_bytes());
+        append_bytes(&mut bytes, self.lipschitz_evidence_id.as_bytes());
+        append_bytes(&mut bytes, self.domain_evidence_id.as_bytes());
         for value in [
             self.scale,
             self.initial_state_error,
@@ -116,6 +137,7 @@ fn append_bytes(target: &mut Vec<u8>, value: &[u8]) {
 pub enum EnvelopeErrorV1 {
     EmptyContractId,
     ZeroScale,
+    MissingEvidenceReference,
     HorizonBudgetExceeded { requested: u32, maximum: u32 },
     ArithmeticOverflow,
     ReceiptMismatch,
@@ -324,6 +346,12 @@ mod tests {
     fn fixture() -> ApproximateSymmetryInputV1 {
         ApproximateSymmetryInputV1 {
             contract_id: "discrete-approx-symmetry-three-step-v1".to_owned(),
+            state_unit_id: "metre".to_owned(),
+            objective_unit_id: "joule".to_owned(),
+            constraint_unit_id: "metre-squared".to_owned(),
+            defect_evidence_id: "fixture-defect-bound-v1".to_owned(),
+            lipschitz_evidence_id: "fixture-lipschitz-bound-v1".to_owned(),
+            domain_evidence_id: "fixture-domain-certificate-v1".to_owned(),
             scale: 1_000,
             initial_state_error: 0,
             one_step_equivariance_defect: 2,
@@ -358,6 +386,43 @@ mod tests {
         );
         assert!(receipt.report.epsilon_lift_candidate);
         assert!(!receipt.report.hard_prune_authorized);
+    }
+
+    #[test]
+    fn contractive_map_uses_conservative_fixed_point_rounding() {
+        let mut input = fixture();
+        input.step_lipschitz_scaled = 500;
+        input.one_step_equivariance_defect = 2;
+        input.horizon_steps = 4;
+        input.max_state_error = 4;
+        input.domain_boundary_margin = 4;
+        input.objective_lipschitz_scaled = 0;
+        input.direct_objective_defect = 0;
+        input.max_objective_error = 0;
+        input.objective_gap = Some(1);
+        input.constraint_lipschitz_scaled = 0;
+        input.direct_constraint_defect = 0;
+        input.max_constraint_error = 0;
+        input.constraint_slack = 1;
+        let receipt =
+            qualify_approximate_symmetry(&input, EnvelopeBudgetV1::default()).unwrap();
+        assert_eq!(receipt.report.state_error_bound, 4);
+    }
+
+    #[test]
+    fn missing_unit_or_bound_provenance_fails_closed() {
+        let mut input = fixture();
+        input.state_unit_id.clear();
+        assert_eq!(
+            qualify_approximate_symmetry(&input, EnvelopeBudgetV1::default()),
+            Err(EnvelopeErrorV1::MissingEvidenceReference)
+        );
+        input = fixture();
+        input.defect_evidence_id.clear();
+        assert_eq!(
+            qualify_approximate_symmetry(&input, EnvelopeBudgetV1::default()),
+            Err(EnvelopeErrorV1::MissingEvidenceReference)
+        );
     }
 
     #[test]
