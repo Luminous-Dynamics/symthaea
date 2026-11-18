@@ -551,6 +551,36 @@ mod tests {
     }
 
     #[test]
+    fn frozen_protocol_manifest_forbids_test_threshold_optimization() {
+        let manifest: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../benchmarks/plasma/event-eval-v0.json"
+        ))
+        .expect("event evaluation manifest should parse");
+        assert_eq!(
+            manifest["schema_version"],
+            "luminous.plasma-event-evaluation.v0.1"
+        );
+        assert_eq!(manifest["benchmark_id"], "PLASMA-EVENT-EVAL-001");
+        assert_eq!(manifest["population_and_split_contract"]["test_is_read_only"], true);
+        assert_eq!(
+            manifest["online_policy_contract"]["test_threshold_optimization"],
+            false
+        );
+        assert_eq!(
+            manifest["online_policy_contract"]["event_labels_available_online"],
+            false
+        );
+        assert_eq!(
+            manifest["offline_scoring_contract"]["warning_requirement_ns"],
+            50_000_000
+        );
+        assert_eq!(
+            manifest["target_gates"]["all_values_are_research_targets"],
+            true
+        );
+    }
+
+    #[test]
     fn online_policy_raises_only_after_consecutive_measured_windows() {
         let mut policy = OnlinePlasmaAlarmPolicy::new(config()).expect("valid policy");
         policy.reset_for_shot("shot-1").expect("valid shot");
@@ -730,6 +760,9 @@ mod tests {
         )
         .expect("negative shot");
         let summary = summarize_alarm_evaluations(&[positive, negative]).expect("summary");
+        assert_eq!(summary.policy_id, "fixed-test-policy-v1");
+        assert_eq!(summary.validation_receipt_sha256, "a".repeat(64));
+        assert_eq!(summary.required_warning_ns, 50);
         assert_eq!(summary.disruptive_shots, 1);
         assert_eq!(summary.detected_disruptions, 1);
         assert_eq!(summary.non_disruptive_shots, 1);
