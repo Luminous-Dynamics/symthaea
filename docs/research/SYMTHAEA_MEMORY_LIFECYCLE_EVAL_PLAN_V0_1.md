@@ -169,7 +169,7 @@ A result is not "better than SOTA" merely because it beats one number in one ben
 Until these conditions are met, report implementation, structural checks, synthetic tests, official benchmark runs and independently reproduced results as separate evidence levels.
 
 
-## 9. November 2026 benchmark update: state validity is now a first-class metric
+## 10. November 2026 benchmark update: state validity is now a first-class metric
 
 The earlier LongMemEval-v1 / Redis reference in §3 is a **separate protocol** from LongMemEval-V2. Do not compare their percentages as though they were the same test.
 
