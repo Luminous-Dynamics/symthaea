@@ -20,7 +20,14 @@ struct FixtureSet {
 struct Fixture {
     id: String,
     input: SelectorInput,
+    evaluation_only: EvaluationOnly,
     expected: Expected,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct EvaluationOnly {
+    oracle_architecture_id: String,
+    realized_quality_milli_by_architecture: std::collections::HashMap<String, u16>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -287,6 +294,94 @@ fn select_architecture(input: &SelectorInput) -> Result<Decision, String> {
     ))
 }
 
+#[derive(Debug, Serialize)]
+struct EvaluationSummary {
+    fixture_count: usize,
+    selected_count: usize,
+    single_count: usize,
+    calibrate_count: usize,
+    oracle_matches_when_selected: usize,
+    oracle_match_rate_milli_when_selected: Option<u16>,
+    mean_realized_regret_milli_when_selected: Option<i64>,
+}
+
+fn evaluate_selector(
+    fixtures: &[Fixture],
+    decisions: &[Decision],
+) -> Result<EvaluationSummary, String> {
+    if fixtures.len() != decisions.len() {
+        return Err("fixture and decision counts differ".to_string());
+    }
+
+    let mut selected_count = 0usize;
+    let mut single_count = 0usize;
+    let mut calibrate_count = 0usize;
+    let mut oracle_matches = 0usize;
+    let mut regret_total = 0i64;
+    let mut scored_count = 0usize;
+
+    for (fixture, decision) in fixtures.iter().zip(decisions.iter()) {
+        let oracle = &fixture.evaluation_only.oracle_architecture_id;
+        let realized = &fixture.evaluation_only.realized_quality_milli_by_architecture;
+        let oracle_quality = realized.get(oracle).ok_or_else(|| {
+            format!("fixture {} has no realized quality for its oracle architecture {oracle}", fixture.id)
+        })?;
+        let maximum_quality = realized.values().copied().max().ok_or_else(|| {
+            format!("fixture {} has no evaluator-only realized outcomes", fixture.id)
+        })?;
+        if *oracle_quality != maximum_quality {
+            return Err(format!(
+                "fixture {} oracle architecture {oracle} is not a maximum-quality option",
+                fixture.id
+            ));
+        }
+
+        match decision.decision.as_str() {
+            "CALIBRATE" => {
+                calibrate_count += 1;
+            }
+            "SINGLE" | "SELECT" => {
+                if decision.decision == "SINGLE" {
+                    single_count += 1;
+                } else {
+                    selected_count += 1;
+                }
+
+                let selected = decision.selected_architecture_id.as_ref().ok_or_else(|| {
+                    format!("fixture {} selected an architecture without an ID", fixture.id)
+                })?;
+                let selected_quality = realized.get(selected).ok_or_else(|| {
+                    format!("fixture {} has no realized quality for selected architecture {selected}", fixture.id)
+                })?;
+                if selected == oracle {
+                    oracle_matches += 1;
+                }
+                regret_total += *oracle_quality as i64 - *selected_quality as i64;
+                scored_count += 1;
+            }
+            other => return Err(format!("unknown selector decision {other}")),
+        }
+    }
+
+    Ok(EvaluationSummary {
+        fixture_count: fixtures.len(),
+        selected_count,
+        single_count,
+        calibrate_count,
+        oracle_matches_when_selected: oracle_matches,
+        oracle_match_rate_milli_when_selected: if scored_count == 0 {
+            None
+        } else {
+            Some((oracle_matches * 1_000 / scored_count) as u16)
+        },
+        mean_realized_regret_milli_when_selected: if scored_count == 0 {
+            None
+        } else {
+            Some(regret_total / scored_count as i64)
+        },
+    })
+}
+
 fn expected_matches(actual: &Decision, expected: &Expected) -> bool {
     actual.decision == expected.decision
         && actual.selected_architecture_id == expected.selected_architecture_id
@@ -310,9 +405,7 @@ fn run(path: &str) -> Result<(), String> {
     }
 
     let mut ids = HashSet::new();
-    let mut selected = 0usize;
-    let mut single = 0usize;
-    let mut calibrate = 0usize;
+    let mut decisions = Vec::with_capacity(fixture_set.fixtures.len());
     let mut mismatches = 0usize;
 
     for fixture in &fixture_set.fixtures {
@@ -321,13 +414,6 @@ fn run(path: &str) -> Result<(), String> {
         }
 
         let actual = select_architecture(&fixture.input)?;
-        match actual.decision.as_str() {
-            "SELECT" => selected += 1,
-            "SINGLE" => single += 1,
-            "CALIBRATE" => calibrate += 1,
-            other => return Err(format!("unexpected selector disposition: {other}")),
-        }
-
         if !expected_matches(&actual, &fixture.expected) {
             mismatches += 1;
             eprintln!(
@@ -340,14 +426,23 @@ fn run(path: &str) -> Result<(), String> {
             serde_json::to_string(&actual)
                 .map_err(|error| format!("cannot serialize selector result: {error}"))?
         );
+        decisions.push(actual);
     }
 
+    // The oracle and realized outcomes are consumed only after every selector
+    // decision is complete. They are never passed into select_architecture.
+    let evaluation = evaluate_selector(&fixture_set.fixtures, &decisions)?;
+    println!(
+        "EVALUATION {}",
+        serde_json::to_string(&evaluation)
+            .map_err(|error| format!("cannot serialize evaluator summary: {error}"))?
+    );
     println!(
         "SUMMARY fixtures={} selected={} single={} calibrate={} expectation_mismatches={}",
-        fixture_set.fixtures.len(),
-        selected,
-        single,
-        calibrate,
+        evaluation.fixture_count,
+        evaluation.selected_count,
+        evaluation.single_count,
+        evaluation.calibrate_count,
         mismatches
     );
 
@@ -482,6 +577,49 @@ mod tests {
             .expect("hidden-info fixture");
         let actual = select_architecture(&fixture.input).expect("valid input");
         assert_eq!(actual.selected_architecture_id.as_deref(), Some("targeted_discovery"));
+    }
+
+    #[test]
+    fn evaluator_reports_oracle_regret_without_exposing_oracle_to_selector() {
+        let set = fixtures();
+        let decisions: Vec<Decision> = set.fixtures.iter()
+            .map(|fixture| select_architecture(&fixture.input).expect("valid input"))
+            .collect();
+        let summary = evaluate_selector(&set.fixtures, &decisions)
+            .expect("evaluator-only outcomes are complete");
+        assert_eq!(summary.fixture_count, 12);
+        assert!(summary.calibrate_count > 0);
+        assert!(summary.oracle_matches_when_selected > 0);
+        assert!(summary.mean_realized_regret_milli_when_selected.is_some());
+    }
+
+    #[test]
+    fn calibrate_cases_are_not_misreported_as_zero_regret() {
+        let set = fixtures();
+        let fixture = set.fixtures.iter()
+            .find(|fixture| fixture.id == "CS-005-uncertain-promising-team")
+            .expect("uncertain team fixture");
+        let decision = select_architecture(&fixture.input).expect("valid input");
+        assert_eq!(decision.decision, "CALIBRATE");
+        let summary = evaluate_selector(std::slice::from_ref(fixture), &[decision])
+            .expect("valid evaluator fixture");
+        assert_eq!(summary.calibrate_count, 1);
+        assert_eq!(summary.oracle_matches_when_selected, 0);
+        assert_eq!(summary.mean_realized_regret_milli_when_selected, None);
+    }
+
+    #[test]
+    fn an_incorrect_evaluator_oracle_is_rejected() {
+        let set = fixtures();
+        let mut fixture = set.fixtures.iter()
+            .find(|fixture| fixture.id == "CS-001-targeted-hidden-info")
+            .expect("targeted discovery fixture")
+            .clone();
+        fixture.evaluation_only.oracle_architecture_id = "single".to_string();
+        let decision = select_architecture(&fixture.input).expect("valid input");
+        let error = evaluate_selector(std::slice::from_ref(&fixture), &[decision])
+            .expect_err("oracle must be a maximum-quality option");
+        assert!(error.contains("not a maximum-quality option"));
     }
 
     #[test]
