@@ -1371,7 +1371,23 @@ mod tests {
         );
         assert_eq!(
             manifest["online_policy_contract"]["risk_score_contract"]["policy_config_digest_schema"],
-            "luminous.plasma-alarm-policy.v0.3"
+            "luminous.plasma-alarm-policy.v0.4"
+        );
+        assert_eq!(
+            manifest["online_policy_contract"]["policy_config_digest_schema"],
+            "luminous.plasma-alarm-policy.v0.4"
+        );
+        assert_eq!(
+            manifest["online_policy_contract"]["risk_score_contract"]["exact_model_and_calibration_binding_required"],
+            true
+        );
+        assert_eq!(
+            manifest["online_policy_contract"]["risk_score_contract"]["model_training_split_calibration_uncertainty_must_match_frozen_policy"],
+            true
+        );
+        assert_eq!(
+            manifest["online_policy_contract"]["risk_model_binding_fields"].as_array().map(Vec::len),
+            Some(9)
         );
         assert_eq!(
             manifest["online_policy_contract"]["event_labels_available_online"],
@@ -1532,9 +1548,29 @@ mod tests {
         changed_warning.required_warning_ns += 1;
         assert_ne!(digest, changed_warning.policy_config_sha256());
 
-        let mut changed_validation = original;
+        let mut changed_validation = original.clone();
         changed_validation.validation_receipt_sha256 = "b".repeat(64);
         assert_ne!(digest, changed_validation.policy_config_sha256());
+
+        let mut changed_model_artifact = original.clone();
+        changed_model_artifact.risk_model.model_artifact_sha256 = "f".repeat(64);
+        assert_ne!(digest, changed_model_artifact.policy_config_sha256());
+
+        let mut changed_training_split = original.clone();
+        changed_training_split.risk_model.training_split_sha256 = "e".repeat(64);
+        assert_ne!(digest, changed_training_split.policy_config_sha256());
+
+        let mut changed_calibration = original.clone();
+        changed_calibration.risk_model.calibration_revision = "cal-v2".to_owned();
+        assert_ne!(digest, changed_calibration.policy_config_sha256());
+
+        let mut changed_uncertainty = original.clone();
+        changed_uncertainty.risk_model.uncertainty_method_id = "different-uncertainty-method".to_owned();
+        assert_ne!(digest, changed_uncertainty.policy_config_sha256());
+
+        let mut changed_coverage = original;
+        changed_coverage.risk_model.nominal_coverage = 0.95;
+        assert_ne!(digest, changed_coverage.policy_config_sha256());
     }
 
     #[test]
