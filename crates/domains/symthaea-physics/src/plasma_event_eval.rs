@@ -965,21 +965,50 @@ pub fn summarize_alarm_evaluations(
             }
         }
 
-        if evaluation.disruptive {
-            disruptive_shots += 1;
-            if evaluation.event_detected != evaluation.lead_time_ns.is_some() {
+        for pair in evaluation.alarm_times_ns.windows(2) {
+            if pair[1] <= pair[0] {
                 return Err(PlasmaEventEvalError::new(
-                    "disruptive shot evaluation has inconsistent event metrics",
+                    "stored alarm episode timestamps must be strictly increasing",
                 ));
             }
-            if let Some(lead_time_ns) = evaluation.lead_time_ns {
-                if lead_time_ns < evaluation.required_warning_ns
-                    || lead_time_ns > evaluation.max_warning_ns
-                {
-                    return Err(PlasmaEventEvalError::new(
-                        "detected event lead time lies outside the frozen warning interval",
-                    ));
-                }
+        }
+
+        if evaluation.disruptive {
+            disruptive_shots += 1;
+            let ShotReferenceOutcome::Disruptive { t_cut_ns } = evaluation.outcome else {
+                return Err(PlasmaEventEvalError::new(
+                    "disruptive evaluation outcome metadata is inconsistent",
+                ));
+            };
+            if t_cut_ns != evaluation.exposure_duration_ns
+                || evaluation.alarm_times_ns.iter().any(|time| *time > t_cut_ns)
+            {
+                return Err(PlasmaEventEvalError::new(
+                    "disruptive evaluation exposure or alarm timestamps are inconsistent",
+                ));
+            }
+            let expected_lead_time_ns = evaluation.alarm_times_ns.iter().find_map(|time| {
+                let lead = t_cut_ns.saturating_sub(*time);
+                (lead >= evaluation.required_warning_ns && lead <= evaluation.max_warning_ns)
+                    .then_some(lead)
+            });
+            if evaluation.event_detected != expected_lead_time_ns.is_some()
+                || evaluation.lead_time_ns != expected_lead_time_ns
+            {
+                return Err(PlasmaEventEvalError::new(
+                    "disruptive event detection and lead time do not match the frozen warning-window replay",
+                ));
+            }
+            let expected_false_alarms = evaluation
+                .alarm_times_ns
+                .len()
+                .saturating_sub(usize::from(expected_lead_time_ns.is_some()));
+            if evaluation.false_alarm_events != expected_false_alarms {
+                return Err(PlasmaEventEvalError::new(
+                    "disruptive shot false-alarm count does not match alarm episodes outside the single matched warning",
+                ));
+            }
+            if let Some(lead_time_ns) = expected_lead_time_ns {
                 detected_disruptions += 1;
                 warning_times_ns.push(lead_time_ns);
             }
@@ -989,30 +1018,28 @@ pub fn summarize_alarm_evaluations(
             false_alarm_events = false_alarm_events
                 .checked_add(evaluation.false_alarm_events)
                 .ok_or_else(|| PlasmaEventEvalError::new("false alarm event count overflow"))?;
-            if evaluation.event_detected {
-                let expected_false_alarms = evaluation.alarm_times_ns.len().saturating_sub(1);
-                if evaluation.false_alarm_events != expected_false_alarms {
-                    return Err(PlasmaEventEvalError::new(
-                        "disruptive shot false-alarm count does not match alarm episodes outside the single matched warning",
-                    ));
-                }
-            } else if evaluation.false_alarm_events != evaluation.alarm_times_ns.len() {
-                return Err(PlasmaEventEvalError::new(
-                    "undetected disruptive shot must count every alarm episode as a false alarm",
-                ));
-            }
         } else {
             non_disruptive_shots += 1;
+            let ShotReferenceOutcome::NonDisruptive { observation_end_ns } = evaluation.outcome else {
+                return Err(PlasmaEventEvalError::new(
+                    "non-disruptive evaluation outcome metadata is inconsistent",
+                ));
+            };
+            if observation_end_ns != evaluation.exposure_duration_ns
+                || evaluation.alarm_times_ns.iter().any(|time| *time > observation_end_ns)
+                || evaluation.event_detected
+                || evaluation.lead_time_ns.is_some()
+                || evaluation.false_alarm_events != evaluation.alarm_times_ns.len()
+            {
+                return Err(PlasmaEventEvalError::new(
+                    "non-disruptive shot alarm trace and false-alarm count are inconsistent",
+                ));
+            }
             total_non_disruptive_exposure_ns = total_non_disruptive_exposure_ns
                 .checked_add(u128::from(evaluation.exposure_duration_ns))
                 .ok_or_else(|| {
                     PlasmaEventEvalError::new("non-disruptive exposure duration overflow")
                 })?;
-            if evaluation.event_detected || evaluation.lead_time_ns.is_some() {
-                return Err(PlasmaEventEvalError::new(
-                    "non-disruptive shot cannot be marked as an event detection",
-                ));
-            }
             if evaluation.false_alarm_events > 0 {
                 false_alarm_shots += 1;
             }
@@ -2008,6 +2035,36 @@ mod tests {
         .expect("shot score");
         impossible_exposure.exposure_duration_ns = 50;
         assert!(summarize_alarm_evaluations(&[impossible_exposure]).is_err());
+    }
+
+    #[test]
+    fn cohort_recomputes_exact_warning_match_and_alarm_episode_counts() {
+        let mut forged_lead = score_shot_alarms(
+            "forged-lead",
+            ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
+            &[20],
+            &config(),
+        ).expect("scored shot");
+        forged_lead.lead_time_ns = Some(70);
+        assert!(summarize_alarm_evaluations(&[forged_lead]).is_err());
+
+        let mut forged_alarm_list = score_shot_alarms(
+            "forged-alarm-list",
+            ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
+            &[20],
+            &config(),
+        ).expect("scored shot");
+        forged_alarm_list.alarm_times_ns.push(25);
+        assert!(summarize_alarm_evaluations(&[forged_alarm_list]).is_err());
+
+        let mut forged_negative = score_shot_alarms(
+            "forged-negative",
+            ShotReferenceOutcome::NonDisruptive { observation_end_ns: 100 },
+            &[20],
+            &config(),
+        ).expect("scored negative");
+        forged_negative.false_alarm_events = 0;
+        assert!(summarize_alarm_evaluations(&[forged_negative]).is_err());
     }
 
     #[test]
