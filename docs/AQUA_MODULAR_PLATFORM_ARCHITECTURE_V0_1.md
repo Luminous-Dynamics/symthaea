@@ -175,3 +175,16 @@ AQS-1 is also evaluated under declared water-pressure, water-supply, electrical,
 ## Spray-field design of experiments
 
 The nozzle/manifold geometry work is now governed by a preregistered sequential DOE: comparator and metrology repeatability, manufacturable factor screening, response-surface refinement only after interaction review, robustness challenges, and an independent confirmation holdout. See [AQUA_SPRAY_GEOMETRY_DOE_PROTOCOL_V0_1.md](AQUA_SPRAY_GEOMETRY_DOE_PROTOCOL_V0_1.md) and [#12772](https://github.com/Luminous-Dynamics/symthaea/issues/12772). The first candidates remain passive zoned manifolds and replaceable nozzle cassettes; powered/AI-controlled zones do not precede proof of a passive-field advantage.
+
+
+## Johannesburg deployment boundary — non-municipal and greywater sources
+
+The City of Johannesburg Water Services By-laws 2023 are relevant to any Johannesburg AQS installation that proposes rainwater harvesting, borehole water or greywater reuse. Sections 69–71 set a fitness-for-purpose / alternative-source framework; sections 73–74 provide distinct rules for rainwater and greywater.
+
+- Section 73 requires rainwater-harvesting facilities to be installed by a professionally registered plumber, prohibits rainwater use for drinking or other potable purposes unless it meets applicable drinking-water requirements, prohibits blending harvested rainwater with municipal supply, and requires cross-connection safeguards where both are used indoors. Rainwater-tank overflow is directed to stormwater drainage.
+- Section 74 addresses greywater reuse for uses excluding drinking. Greywater tank installations must meet the stated building requirements; stored greywater must not create a public nuisance and must be filtered and disinfected to a written specification by a water specialist. The by-law directs greywater storage-tank overflow to the sewer.
+- Sections 57 and 59–60 address compliance / demand management, the prohibition of equipment considered wasteful by a designated officer, and unlawful wastage.
+
+These local provisions do not authorize greywater or rainwater for bathing. They reinforce the architecture rule: physically separate non-potable and potable circuits, no blending, no software-controlled crossover, and a source/use-class decision from the competent authority. The exact installation, approvals and applicability must be checked with the City and registered local professionals.
+
+Primary source: [City of Johannesburg Water Services By-laws 2023, Local Authority Notice 980 of 2023](https://joburg.org.za/documents_/Documents/By-Laws/2023/City%20of%20Johannesburg%20Water%20Services%20Bylaws_%202023%20Gazette.pdf).
