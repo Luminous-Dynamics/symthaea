@@ -2,9 +2,10 @@
 //!
 //! These are deliberately simple controls, not learned causal mechanisms:
 //! - ScmFieldPredictor: one adaptive byte histogram per (variable, byte lane).
-//! - ScmParentPredictor: the same histograms conditioned on the declared,
-//!   same-timestep parent bytes in the SCM graph. This is an oracle-topology
-//!   upper-bound control; it is not a learned graph-discovery result.
+//! - ScmParentPredictor: conditions on declared same-timestep parent bytes;
+//!   this is an oracle-topology control, not learned graph discovery.
+//! - ScmLagPredictor: conditions on the same field in the previous timestep.
+//! - ScmHybridPredictor: combines coarse parent context with temporal lag.
 //!
 //! The 33-byte SCM1 header is modeled separately. The five i16 variables then
 //! arrive in topological order, little-endian, two bytes per variable.
@@ -49,6 +50,7 @@ impl StructuredState {
         let context = match conditioning {
             1 => self.parent_context(variable, lane),
             2 => (self.previous_record[variable * BYTE_LANES + lane] >> 6) as usize,
+            3 => self.hybrid_context(variable, lane),
             _ => 0,
         };
         &self.contexts[variable][lane][context]
@@ -70,6 +72,25 @@ impl StructuredState {
             4 => bucket(1) | (bucket(3) << 2), // x4 <- x1, x3
             _ => 0,
         }
+    }
+
+    fn hybrid_context(&self, variable: usize, lane: usize) -> usize {
+        // Reduce the supplied parent context to one bit per parent, then
+        // reserve two additional bits for the previous same-field byte.
+        // This caps the combined context space at 16 bins.
+        let parent_bucket = |parent: usize| -> usize {
+            (self.current_record[parent * BYTE_LANES + lane] >> 7) as usize
+        };
+        let parents = match variable {
+            0 => 0,
+            1 => parent_bucket(0),
+            2 => parent_bucket(0) | (parent_bucket(1) << 1),
+            3 => parent_bucket(2),
+            4 => parent_bucket(1) | (parent_bucket(3) << 1),
+            _ => 0,
+        };
+        let lag = (self.previous_record[variable * BYTE_LANES + lane] >> 6) as usize;
+        (parents << 2) | lag
     }
 
     fn make_cdf(histogram: &[u16; BYTE_SYMBOLS]) -> ByteCdf {
@@ -100,6 +121,7 @@ impl StructuredState {
             let context = match conditioning {
                 1 => self.parent_context(variable, lane),
                 2 => (self.previous_record[variable * BYTE_LANES + lane] >> 6) as usize,
+                3 => self.hybrid_context(variable, lane),
                 _ => 0,
             };
 
@@ -242,6 +264,47 @@ impl BytePredictor for ScmLagPredictor {
     }
 }
 
+/// Combined conditioning control: known same-step parents plus the
+/// previous-timestep value of the target field. It is an oracle-graph model,
+/// not learned causal structure. Parent buckets are reduced to one bit each
+/// so parent and lag context fit within the fixed 16-context table. Model ID 5.
+pub struct ScmHybridPredictor {
+    state: StructuredState,
+}
+
+impl ScmHybridPredictor {
+    pub fn new() -> Self {
+        Self {
+            state: StructuredState::new(),
+        }
+    }
+
+    /// Approximate inline predictor state, excluding allocator/runtime overhead.
+    pub fn state_bytes() -> usize {
+        std::mem::size_of::<Self>()
+    }
+}
+
+impl Default for ScmHybridPredictor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BytePredictor for ScmHybridPredictor {
+    fn model_id(&self) -> u8 {
+        5
+    }
+
+    fn cumulative_frequency(&self) -> ByteCdf {
+        self.state.cdf(3)
+    }
+
+    fn observe(&mut self, symbol: u8) {
+        self.state.observe(symbol, 3);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -318,12 +381,33 @@ mod tests {
     }
 
     #[test]
-    fn field_and_parent_and_lag_predictors_have_distinct_stable_ids() {
+    fn hybrid_predictor_round_trips_observational_and_interventional_scm() {
+        let observational = generate_scm(4096, 31, None).unwrap();
+        let interventional = generate_scm(
+            4096,
+            31,
+            Some(ScmIntervention {
+                variable: 1,
+                start_step: 1024,
+                end_step: 3072,
+                value: 20_000,
+            }),
+        )
+        .unwrap();
+
+        round_trip::<ScmHybridPredictor>(&observational.stream, 5);
+        round_trip::<ScmHybridPredictor>(&interventional.stream, 5);
+    }
+
+    #[test]
+    fn field_parent_lag_and_hybrid_predictors_have_distinct_stable_ids() {
         assert_eq!(ScmFieldPredictor::default().model_id(), 2);
         assert_eq!(ScmParentPredictor::default().model_id(), 3);
         assert_eq!(ScmLagPredictor::default().model_id(), 4);
+        assert_eq!(ScmHybridPredictor::default().model_id(), 5);
         assert!(ScmFieldPredictor::state_bytes() > 0);
         assert!(ScmParentPredictor::state_bytes() > 0);
         assert!(ScmLagPredictor::state_bytes() > 0);
+        assert!(ScmHybridPredictor::state_bytes() > 0);
     }
 }
