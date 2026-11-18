@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-msg-utility-001/MESSAGE_UTILITY_FIXTURES_V0_1.schema.json",
+  "title": "IG-MSG-UTILITY-001 fixture set v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "required_preserved_fields",
+    "fixtures"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "protocol_id": {
+      "const": "IG-MSG-UTILITY-001"
+    },
+    "required_preserved_fields": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/fixture"
+      }
+    }
+  },
+  "$defs": {
+    "evidenceAtom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "root_id",
+        "source_agent_id",
+        "polarity",
+        "scope",
+        "freshness",
+        "uncertainty",
+        "authorized",
+        "required"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "root_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_agent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "polarity": {
+          "enum": [
+            "supports",
+            "opposes",
+            "neutral"
+          ]
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "freshness": {
+          "enum": [
+            "current",
+            "stale",
+            "unknown"
+          ]
+        },
+        "uncertainty": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "unknown"
+          ]
+        },
+        "authorized": {
+          "type": "boolean"
+        },
+        "required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "message_id",
+        "evidence_id",
+        "root_id",
+        "source_agent_id",
+        "polarity",
+        "scope",
+        "freshness",
+        "uncertainty",
+        "authorized",
+        "transformation",
+        "original_digest",
+        "original_tokens",
+        "transmitted_tokens",
+        "preserved_fields",
+        "audit_record_present"
+      ],
+      "properties": {
+        "message_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "root_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_agent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "polarity": {
+          "enum": [
+            "supports",
+            "opposes",
+            "neutral"
+          ]
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "freshness": {
+          "enum": [
+            "current",
+            "stale",
+            "unknown"
+          ]
+        },
+        "uncertainty": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "unknown"
+          ]
+        },
+        "authorized": {
+          "type": "boolean"
+        },
+        "transformation": {
+          "enum": [
+            "original",
+            "compact",
+            "omit"
+          ]
+        },
+        "original_digest": {
+          "type": "string"
+        },
+        "original_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "transmitted_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "preserved_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "audit_record_present": {
+          "type": "boolean"
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "unique_new_root_count",
+        "duplicate_message_count",
+        "retained_message_count",
+        "original_tokens",
+        "transmitted_tokens",
+        "token_savings_milli",
+        "provenance_violations",
+        "required_roots_delivered_count",
+        "required_root_coverage_milli"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "qualified",
+            "reject"
+          ]
+        },
+        "unique_new_root_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duplicate_message_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retained_message_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "original_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "transmitted_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "token_savings_milli": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "provenance_violations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "required_roots_delivered_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "required_root_coverage_milli": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1000
+        }
+      }
+    },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "evidence_catalog",
+        "receiver_known_roots",
+        "required_evidence_roots",
+        "messages",
+        "expected"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_catalog": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/evidenceAtom"
+          }
+        },
+        "receiver_known_roots": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "required_evidence_roots": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/message"
+          }
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        }
+      }
+    }
+  }
+}
