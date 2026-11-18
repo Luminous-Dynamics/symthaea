@@ -206,6 +206,29 @@
         "matched_conditions_ref": {
           "type": "string",
           "minLength": 1
+        },
+        "incumbent_cover_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "incumbent_session_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "incumbent_cover_digest": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-fA-F]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     },
@@ -362,6 +385,19 @@
           "acceptance_rule_ref": {
             "type": "string",
             "minLength": 1
+          },
+          "comparison_control": {
+            "anyOf": [
+              {
+                "enum": [
+                  "baseline_uncovered",
+                  "incumbent_cover"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       }
@@ -415,6 +451,7 @@
           "condition": {
             "enum": [
               "baseline_uncovered",
+              "incumbent_cover",
               "garment_installed"
             ]
           },
@@ -449,17 +486,6 @@
           "matched_conditions_ref": {
             "type": "string",
             "minLength": 1
-          },
-          "installed_garment_digest": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^sha256:[0-9a-fA-F]{64}$"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "pose_ref": {
             "type": [
@@ -524,6 +550,17 @@
           "evidence_ref": {
             "type": "string",
             "minLength": 1
+          },
+          "cover_digest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-fA-F]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       }
