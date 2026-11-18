@@ -9,4 +9,3 @@ description = "Evidence-aware resident-intent and candidate contracts for built-
 serde = { workspace = true }
 serde_json = { workspace = true }
 blake3 = { workspace = true }
-thiserror = { workspace = true }
