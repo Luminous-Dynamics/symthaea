@@ -1,0 +1,422 @@
+{
+  "contract": "SC-DISCOVERY-OOD-BENCHMARK-0.1",
+  "dataset": {
+    "dataset_id": "synthetic-superconductivity-discovery-fixture",
+    "revision": "0.1.0",
+    "data_status": "synthetic_fixture",
+    "description": "Deterministic synthetic records and predictions used only to test software; these are not scientific observations."
+  },
+  "protocol": {
+    "protocol_id": "SC-OOF-LEAKAGE-AND-COVERAGE-0.1",
+    "evaluation_evidence_class": "synthetic_fixture",
+    "reject_random_split": true,
+    "required_group_keys": [
+      "family_id",
+      "prototype_id",
+      "source_id"
+    ]
+  },
+  "models": [
+    {
+      "model_id": "training_mean_baseline",
+      "role": "baseline",
+      "description": "Synthetic training-set mean baseline; hand-authored fixture outputs, not model training."
+    },
+    {
+      "model_id": "mock_selective_predictor",
+      "role": "predictor",
+      "description": "Synthetic mock predictor with one explicit abstention and one illustrative interval; not a fitted model."
+    }
+  ],
+  "records": [
+    {
+      "record_id": "syn-al-tc",
+      "material_id": "syn-Al",
+      "reduced_formula": "Al",
+      "family_id": "elemental",
+      "prototype_id": "fcc",
+      "source_id": "src-elemental-al",
+      "publication_date": "2000-01-01",
+      "evidence_class": "synthetic_fixture",
+      "property": "Tc",
+      "value": 1.2,
+      "unit": "K",
+      "pressure_gpa": 0,
+      "measurement_temperature_k": 0,
+      "field_t": 0,
+      "field_orientation": "not_applicable",
+      "sample_form": "bulk",
+      "tc_criterion": "midpoint",
+      "method": "synthetic demonstration",
+      "specimen_id": "spec-al-01"
+    },
+    {
+      "record_id": "syn-nb-tc",
+      "material_id": "syn-Nb",
+      "reduced_formula": "Nb",
+      "family_id": "elemental",
+      "prototype_id": "bcc",
+      "source_id": "src-elemental-nb",
+      "publication_date": "2001-01-01",
+      "evidence_class": "synthetic_fixture",
+      "property": "Tc",
+      "value": 9.2,
+      "unit": "K",
+      "pressure_gpa": 0,
+      "measurement_temperature_k": 0,
+      "field_t": 0,
+      "field_orientation": "not_applicable",
+      "sample_form": "bulk",
+      "tc_criterion": "midpoint",
+      "method": "synthetic demonstration",
+      "specimen_id": "spec-nb-01"
+    },
+    {
+      "record_id": "syn-mgb2-tc",
+      "material_id": "syn-MgB2",
+      "reduced_formula": "MgB2",
+      "family_id": "boride",
+      "prototype_id": "AlB2-type",
+      "source_id": "src-boride-mgb2",
+      "publication_date": "2001-01-01",
+      "evidence_class": "synthetic_fixture",
+      "property": "Tc",
+      "value": 39,
+      "unit": "K",
+      "pressure_gpa": 0,
+      "measurement_temperature_k": 0,
+      "field_t": 0,
+      "field_orientation": "not_applicable",
+      "sample_form": "bulk",
+      "tc_criterion": "midpoint",
+      "method": "synthetic demonstration",
+      "specimen_id": "spec-mgb2-01"
+    },
+    {
+      "record_id": "syn-ybco-tc",
+      "material_id": "syn-YBCO",
+      "reduced_formula": "YBa2Cu3O7",
+      "family_id": "cuprate",
+      "prototype_id": "layered-perovskite",
+      "source_id": "src-cuprate-ybco",
+      "publication_date": "1987-01-01",
+      "evidence_class": "synthetic_fixture",
+      "property": "Tc",
+      "value": 92,
+      "unit": "K",
+      "pressure_gpa": 0,
+      "measurement_temperature_k": 0,
+      "field_t": 0,
+      "field_orientation": "not_applicable",
+      "sample_form": "bulk",
+      "tc_criterion": "midpoint",
+      "method": "synthetic demonstration",
+      "specimen_id": "spec-ybco-01"
+    },
+    {
+      "record_id": "syn-la1111-tc",
+      "material_id": "syn-LaFeAsO-F",
+      "reduced_formula": "LaFeAsO",
+      "family_id": "iron_pnictide",
+      "prototype_id": "fe-1111",
+      "source_id": "src-pnictide-la1111",
+      "publication_date": "2008-01-01",
+      "evidence_class": "synthetic_fixture",
+      "property": "Tc",
+      "value": 26,
+      "unit": "K",
+      "pressure_gpa": 0,
+      "measurement_temperature_k": 0,
+      "field_t": 0,
+      "field_orientation": "not_applicable",
+      "sample_form": "bulk",
+      "tc_criterion": "midpoint",
+      "method": "synthetic demonstration",
+      "specimen_id": "spec-la1111-01"
+    },
+    {
+      "record_id": "syn-ba122-tc",
+      "material_id": "syn-BaKFe2As2",
+      "reduced_formula": "Ba0.6K0.4Fe2As2",
+      "family_id": "iron_pnictide",
+      "prototype_id": "fe-122",
+      "source_id": "src-pnictide-ba122",
+      "publication_date": "2008-01-01",
+      "evidence_class": "synthetic_fixture",
+      "property": "Tc",
+      "value": 38,
+      "unit": "K",
+      "pressure_gpa": 0,
+      "measurement_temperature_k": 0,
+      "field_t": 0,
+      "field_orientation": "not_applicable",
+      "sample_form": "bulk",
+      "tc_criterion": "midpoint",
+      "method": "synthetic demonstration",
+      "specimen_id": "spec-ba122-01"
+    }
+  ],
+  "splits": [
+    {
+      "split_id": "family-ood-pnictide",
+      "mode": "group_holdout",
+      "property": "Tc",
+      "unit": "K",
+      "group_key": "family_id",
+      "held_out_values": [
+        "iron_pnictide"
+      ],
+      "train_record_ids": [
+        "syn-al-tc",
+        "syn-nb-tc",
+        "syn-mgb2-tc",
+        "syn-ybco-tc"
+      ],
+      "calibration_record_ids": [],
+      "test_record_ids": [
+        "syn-la1111-tc",
+        "syn-ba122-tc"
+      ]
+    },
+    {
+      "split_id": "prototype-ood-fe",
+      "mode": "group_holdout",
+      "property": "Tc",
+      "unit": "K",
+      "group_key": "prototype_id",
+      "held_out_values": [
+        "fe-1111",
+        "fe-122"
+      ],
+      "train_record_ids": [
+        "syn-al-tc",
+        "syn-nb-tc",
+        "syn-mgb2-tc",
+        "syn-ybco-tc"
+      ],
+      "calibration_record_ids": [],
+      "test_record_ids": [
+        "syn-la1111-tc",
+        "syn-ba122-tc"
+      ]
+    },
+    {
+      "split_id": "source-ood-pnictide",
+      "mode": "group_holdout",
+      "property": "Tc",
+      "unit": "K",
+      "group_key": "source_id",
+      "held_out_values": [
+        "src-pnictide-la1111",
+        "src-pnictide-ba122"
+      ],
+      "train_record_ids": [
+        "syn-al-tc",
+        "syn-nb-tc",
+        "syn-mgb2-tc",
+        "syn-ybco-tc"
+      ],
+      "calibration_record_ids": [],
+      "test_record_ids": [
+        "syn-la1111-tc",
+        "syn-ba122-tc"
+      ]
+    },
+    {
+      "split_id": "temporal-after-2005",
+      "mode": "temporal_holdout",
+      "property": "Tc",
+      "unit": "K",
+      "cutoff_date": "2005-01-01",
+      "train_record_ids": [
+        "syn-al-tc",
+        "syn-nb-tc",
+        "syn-mgb2-tc",
+        "syn-ybco-tc"
+      ],
+      "calibration_record_ids": [],
+      "test_record_ids": [
+        "syn-la1111-tc",
+        "syn-ba122-tc"
+      ]
+    }
+  ],
+  "predictions": [
+    {
+      "prediction_id": "family-ood-pnictide-training_mean_baseline-syn-la1111-tc",
+      "split_id": "family-ood-pnictide",
+      "record_id": "syn-la1111-tc",
+      "model_id": "training_mean_baseline",
+      "property": "Tc",
+      "abstained": false,
+      "predicted_value": 35.35,
+      "lower": null,
+      "upper": null
+    },
+    {
+      "prediction_id": "family-ood-pnictide-training_mean_baseline-syn-ba122-tc",
+      "split_id": "family-ood-pnictide",
+      "record_id": "syn-ba122-tc",
+      "model_id": "training_mean_baseline",
+      "property": "Tc",
+      "abstained": false,
+      "predicted_value": 35.35,
+      "lower": null,
+      "upper": null
+    },
+    {
+      "prediction_id": "family-ood-pnictide-mock_selective_predictor-syn-la1111-tc",
+      "split_id": "family-ood-pnictide",
+      "record_id": "syn-la1111-tc",
+      "model_id": "mock_selective_predictor",
+      "property": "Tc",
+      "abstained": false,
+      "predicted_value": 26.4,
+      "lower": 22,
+      "upper": 31
+    },
+    {
+      "prediction_id": "family-ood-pnictide-mock_selective_predictor-syn-ba122-tc",
+      "split_id": "family-ood-pnictide",
+      "record_id": "syn-ba122-tc",
+      "model_id": "mock_selective_predictor",
+      "property": "Tc",
+      "abstained": true,
+      "predicted_value": null,
+      "lower": null,
+      "upper": null
+    },
+    {
+      "prediction_id": "prototype-ood-fe-training_mean_baseline-syn-la1111-tc",
+      "split_id": "prototype-ood-fe",
+      "record_id": "syn-la1111-tc",
+      "model_id": "training_mean_baseline",
+      "property": "Tc",
+      "abstained": false,
+      "predicted_value": 35.35,
+      "lower": null,
+      "upper": null
+    },
+    {
+      "prediction_id": "prototype-ood-fe-training_mean_baseline-syn-ba122-tc",
+      "split_id": "prototype-ood-fe",
+      "record_id": "syn-ba122-tc",
+      "model_id": "training_mean_baseline",
+      "property": "Tc",
+      "abstained": false,
+      "predicted_value": 35.35,
+      "lower": null,
+      "upper": null
+    },
+    {
+      "prediction_id": "prototype-ood-fe-mock_selective_predictor-syn-la1111-tc",
+      "split_id": "prototype-ood-fe",
+      "record_id": "syn-la1111-tc",
+      "model_id": "mock_selective_predictor",
+      "property": "Tc",
+      "abstained": false,
+      "predicted_value": 26.4,
+      "lower": 22,
+      "upper": 31
+    },
+    {
+      "prediction_id": "prototype-ood-fe-mock_selective_predictor-syn-ba122-tc",
+      "split_id": "prototype-ood-fe",
+      "record_id": "syn-ba122-tc",
+      "model_id": "mock_selective_predictor",
+      "property": "Tc",
+      "abstained": true,
+      "predicted_value": null,
+      "lower": null,
+      "upper": null
+    },
+    {
+      "prediction_id": "source-ood-pnictide-training_mean_baseline-syn-la1111-tc",
+      "split_id": "source-ood-pnictide",
+      "record_id": "syn-la1111-tc",
+      "model_id": "training_mean_baseline",
+      "property": "Tc",
+      "abstained": false,
+      "predicted_value": 35.35,
+      "lower": null,
+      "upper": null
+    },
+    {
+      "prediction_id": "source-ood-pnictide-training_mean_baseline-syn-ba122-tc",
+      "split_id": "source-ood-pnictide",
+      "record_id": "syn-ba122-tc",
+      "model_id": "training_mean_baseline",
+      "property": "Tc",
+      "abstained": false,
+      "predicted_value": 35.35,
+      "lower": null,
+      "upper": null
+    },
+    {
+      "prediction_id": "source-ood-pnictide-mock_selective_predictor-syn-la1111-tc",
+      "split_id": "source-ood-pnictide",
+      "record_id": "syn-la1111-tc",
+      "model_id": "mock_selective_predictor",
+      "property": "Tc",
+      "abstained": false,
+      "predicted_value": 26.4,
+      "lower": 22,
+      "upper": 31
+    },
+    {
+      "prediction_id": "source-ood-pnictide-mock_selective_predictor-syn-ba122-tc",
+      "split_id": "source-ood-pnictide",
+      "record_id": "syn-ba122-tc",
+      "model_id": "mock_selective_predictor",
+      "property": "Tc",
+      "abstained": true,
+      "predicted_value": null,
+      "lower": null,
+      "upper": null
+    },
+    {
+      "prediction_id": "temporal-after-2005-training_mean_baseline-syn-la1111-tc",
+      "split_id": "temporal-after-2005",
+      "record_id": "syn-la1111-tc",
+      "model_id": "training_mean_baseline",
+      "property": "Tc",
+      "abstained": false,
+      "predicted_value": 35.35,
+      "lower": null,
+      "upper": null
+    },
+    {
+      "prediction_id": "temporal-after-2005-training_mean_baseline-syn-ba122-tc",
+      "split_id": "temporal-after-2005",
+      "record_id": "syn-ba122-tc",
+      "model_id": "training_mean_baseline",
+      "property": "Tc",
+      "abstained": false,
+      "predicted_value": 35.35,
+      "lower": null,
+      "upper": null
+    },
+    {
+      "prediction_id": "temporal-after-2005-mock_selective_predictor-syn-la1111-tc",
+      "split_id": "temporal-after-2005",
+      "record_id": "syn-la1111-tc",
+      "model_id": "mock_selective_predictor",
+      "property": "Tc",
+      "abstained": false,
+      "predicted_value": 26.4,
+      "lower": 22,
+      "upper": 31
+    },
+    {
+      "prediction_id": "temporal-after-2005-mock_selective_predictor-syn-ba122-tc",
+      "split_id": "temporal-after-2005",
+      "record_id": "syn-ba122-tc",
+      "model_id": "mock_selective_predictor",
+      "property": "Tc",
+      "abstained": true,
+      "predicted_value": null,
+      "lower": null,
+      "upper": null
+    }
+  ]
+}
