@@ -277,40 +277,72 @@ fn validate_instance(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
     if required_text(charging, "energy_unit")? != "coupling_energy_units" {
         return Err("charging matrix energy unit mismatch".to_owned());
     }
-    let matrix_values = charging
-        .get("matrix_u_ij")
-        .and_then(Value::as_array)
-        .ok_or_else(|| "charging.matrix_u_ij must be an array".to_owned())?;
-    if matrix_values.len() != nodes.len() {
-        return Err("charging matrix row count must match node count".to_owned());
-    }
-    let mut matrix = Vec::with_capacity(nodes.len());
-    for (row_index, row) in matrix_values.iter().enumerate() {
-        let values = row
-            .as_array()
-            .ok_or_else(|| format!("charging matrix row {row_index} must be an array"))?;
-        if values.len() != nodes.len() {
-            return Err(format!(
-                "charging matrix row {row_index} length must match node count"
-            ));
-        }
-        let mut parsed = Vec::with_capacity(nodes.len());
-        for value in values {
-            parsed.push(finite_number(value, "charging matrix entry")?);
-        }
-        matrix.push(parsed);
-    }
-    validate_positive_definite_matrix(&matrix)?;
-
     let matrix_kind = required_text(charging, "matrix_kind")?;
-    if matrix_kind == "diagonal_positive" {
-        for i in 0..matrix.len() {
-            for j in 0..matrix.len() {
-                if i != j && matrix[i][j].abs() > 1.0e-12 {
-                    return Err("diagonal_positive charging matrix contains an off-diagonal term".to_owned());
-                }
+    let matrix_dimension = nodes.len();
+    match matrix_kind {
+        "diagonal_scalar" => {
+            let diagonal_value = finite_number(
+                charging
+                    .get("diagonal_value")
+                    .ok_or_else(|| "diagonal_scalar charging requires diagonal_value".to_owned())?,
+                "diagonal_value",
+            )?;
+            if diagonal_value <= 0.0 {
+                return Err("diagonal_scalar charging energy must be positive".to_owned());
+            }
+            if charging.get("matrix_u_ij").is_some() {
+                return Err(
+                    "diagonal_scalar charging must not expand a scalar into a dense matrix"
+                        .to_owned(),
+                );
             }
         }
+        "diagonal_positive" | "dense_symmetric_positive_definite" => {
+            let matrix_values = charging
+                .get("matrix_u_ij")
+                .and_then(Value::as_array)
+                .ok_or_else(|| "charging.matrix_u_ij must be an array".to_owned())?;
+            if matrix_values.len() != nodes.len() {
+                return Err("charging matrix row count must match node count".to_owned());
+            }
+            let mut matrix = Vec::with_capacity(nodes.len());
+            for (row_index, row) in matrix_values.iter().enumerate() {
+                let values = row
+                    .as_array()
+                    .ok_or_else(|| format!("charging matrix row {row_index} must be an array"))?;
+                if values.len() != nodes.len() {
+                    return Err(format!(
+                        "charging matrix row {row_index} length must match node count"
+                    ));
+                }
+                let mut parsed = Vec::with_capacity(nodes.len());
+                for value in values {
+                    parsed.push(finite_number(value, "charging matrix entry")?);
+                }
+                matrix.push(parsed);
+            }
+            validate_positive_definite_matrix(&matrix)?;
+
+            if matrix_kind == "diagonal_positive" {
+                for i in 0..matrix.len() {
+                    for j in 0..matrix.len() {
+                        if i != j && matrix[i][j].abs() > 1.0e-12 {
+                            return Err(
+                                "diagonal_positive charging matrix contains an off-diagonal term"
+                                    .to_owned(),
+                            );
+                        }
+                    }
+                }
+            }
+            if charging.get("diagonal_value").is_some() {
+                return Err(
+                    "matrix charging representations must not also declare diagonal_value"
+                        .to_owned(),
+                );
+            }
+        }
+        other => return Err(format!("unsupported charging matrix kind {other}")),
     }
 
     let offset_charges = charging
@@ -502,7 +534,8 @@ fn validate_instance(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
         "node_count": nodes.len(),
         "edge_count": edges.len(),
         "spatial_dimension": dimension,
-        "charging_matrix_dimension": matrix.len(),
+        "charging_matrix_dimension": matrix_dimension,
+        "charging_matrix_representation": matrix_kind,
         "josephson_energy_sum": total_josephson_energy,
         "temperature": temperature,
         "temperature_unit": "coupling_energy_units",
@@ -719,6 +752,26 @@ mod tests {
     fn pair_charge_normalization_must_be_explicit() {
         let (_, mut fixture) = inputs();
         fixture["model"]["pair_charge_convention"] = json!("electron_charge_equals_1");
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn compact_scalar_on_site_charging_does_not_require_dense_matrix() {
+        let (_, mut fixture) = inputs();
+        fixture["charging"]["matrix_kind"] = json!("diagonal_scalar");
+        fixture["charging"]["diagonal_value"] = json!(4.0);
+        fixture["charging"].as_object_mut().unwrap().remove("matrix_u_ij");
+        let receipt = audit_mutated(fixture).unwrap();
+        assert_eq!(receipt["charging_matrix_dimension"], 4);
+        assert_eq!(receipt["charging_matrix_representation"], "diagonal_scalar");
+    }
+
+    #[test]
+    fn compact_scalar_on_site_charging_must_be_positive() {
+        let (_, mut fixture) = inputs();
+        fixture["charging"]["matrix_kind"] = json!("diagonal_scalar");
+        fixture["charging"]["diagonal_value"] = json!(0.0);
+        fixture["charging"].as_object_mut().unwrap().remove("matrix_u_ij");
         assert!(audit_mutated(fixture).is_err());
     }
 
