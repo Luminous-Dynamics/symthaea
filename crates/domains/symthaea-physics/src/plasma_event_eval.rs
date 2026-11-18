@@ -10,6 +10,7 @@
 use crate::plasma_observability::{
     BlockedChannel, DecisionChannelRequirement, DecisionInputGate, PlasmaObservationFrame,
 };
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -95,6 +96,29 @@ impl AlarmPolicyConfig {
             ));
         }
         Ok(())
+    }
+
+    /// SHA-256 over the exact policy ID, validation receipt, thresholds,
+    /// persistence settings and warning interval. Threshold floats are
+    /// represented by their IEEE-754 bit patterns for canonical identity.
+    pub fn policy_config_sha256(&self) -> String {
+        let canonical = format!(
+            "luminous.plasma-alarm-policy.v0.1\\n{}\\n{}\\n{:016x}\\n{:016x}\\n{}\\n{}\\n{}",
+            self.policy_id,
+            self.validation_receipt_sha256,
+            self.trigger_threshold.to_bits(),
+            self.clear_threshold.to_bits(),
+            self.trigger_persistence_windows,
+            self.clear_persistence_windows,
+            self.required_warning_ns,
+        );
+        let digest = Sha256::digest(canonical.as_bytes());
+        let mut encoded = String::with_capacity(64);
+        for byte in digest {
+            use std::fmt::Write as _;
+            let _ = write!(&mut encoded, "{byte:02x}");
+        }
+        encoded
     }
 }
 
@@ -352,6 +376,7 @@ pub struct ShotAlarmEvaluation {
     pub shot_id: String,
     pub policy_id: String,
     pub validation_receipt_sha256: String,
+    pub policy_config_sha256: String,
     pub required_warning_ns: u64,
     pub disruptive: bool,
     pub event_detected: bool,
@@ -396,6 +421,7 @@ pub fn score_shot_alarms(
                 shot_id: shot_id.to_owned(),
                 policy_id: policy.policy_id.clone(),
                 validation_receipt_sha256: policy.validation_receipt_sha256.clone(),
+                policy_config_sha256: policy.policy_config_sha256(),
                 required_warning_ns: policy.required_warning_ns,
                 disruptive: true,
                 event_detected: lead_time_ns.is_some(),
@@ -418,6 +444,7 @@ pub fn score_shot_alarms(
                 shot_id: shot_id.to_owned(),
                 policy_id: policy.policy_id.clone(),
                 validation_receipt_sha256: policy.validation_receipt_sha256.clone(),
+                policy_config_sha256: policy.policy_config_sha256(),
                 required_warning_ns: policy.required_warning_ns,
                 disruptive: false,
                 event_detected: false,
@@ -432,6 +459,7 @@ pub fn score_shot_alarms(
 pub struct AlarmEvaluationSummary {
     pub policy_id: String,
     pub validation_receipt_sha256: String,
+    pub policy_config_sha256: String,
     pub required_warning_ns: u64,
     pub shot_count: usize,
     pub disruptive_shots: usize,
@@ -447,9 +475,37 @@ pub struct AlarmEvaluationSummary {
     /// None when there are no non-disruptive shots.
     pub false_alarms_per_non_disruptive_shot: Option<f64>,
     pub mean_warning_time_ns: Option<f64>,
+    pub event_tpr_wilson_95: Option<RateConfidenceInterval>,
+    pub false_alarm_shot_rate_wilson_95: Option<RateConfidenceInterval>,
     pub warning_time_p05_ns: Option<u64>,
     pub warning_time_p10_ns: Option<u64>,
     pub warning_time_p50_ns: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RateConfidenceInterval {
+    pub lower: f64,
+    pub upper: f64,
+}
+
+/// Wilson score interval for a binomial per-shot rate. Returns None for an
+/// empty denominator cohort rather than inventing a zero rate or interval.
+fn wilson_interval(successes: usize, trials: usize) -> Option<RateConfidenceInterval> {
+    if trials == 0 || successes > trials {
+        return None;
+    }
+    let z = 1.959_963_984_540_054_f64;
+    let n = trials as f64;
+    let p = successes as f64 / n;
+    let z2 = z * z;
+    let denominator = 1.0 + z2 / n;
+    let center = (p + z2 / (2.0 * n)) / denominator;
+    let half_width =
+        z * ((p * (1.0 - p) / n) + (z2 / (4.0 * n * n))).sqrt() / denominator;
+    Some(RateConfidenceInterval {
+        lower: (center - half_width).max(0.0),
+        upper: (center + half_width).min(1.0),
+    })
 }
 
 fn nearest_rank_quantile(sorted_values: &[u64], quantile: f64) -> Option<u64> {
@@ -474,6 +530,7 @@ pub fn summarize_alarm_evaluations(
     let mut shot_ids = BTreeSet::new();
     let mut policy_id: Option<String> = None;
     let mut validation_receipt_sha256: Option<String> = None;
+    let mut policy_config_sha256: Option<String> = None;
     let mut required_warning_ns: Option<u64> = None;
     let mut disruptive_shots = 0usize;
     let mut non_disruptive_shots = 0usize;
@@ -488,19 +545,26 @@ pub fn summarize_alarm_evaluations(
                 "shot IDs must be non-empty and unique in one evaluation cohort",
             ));
         }
-        match (&policy_id, &validation_receipt_sha256, required_warning_ns) {
-            (None, None, None) => {
+        match (
+            &policy_id,
+            &validation_receipt_sha256,
+            &policy_config_sha256,
+            required_warning_ns,
+        ) {
+            (None, None, None, None) => {
                 policy_id = Some(evaluation.policy_id.clone());
                 validation_receipt_sha256 = Some(evaluation.validation_receipt_sha256.clone());
+                policy_config_sha256 = Some(evaluation.policy_config_sha256.clone());
                 required_warning_ns = Some(evaluation.required_warning_ns);
             }
-            (Some(id), Some(digest), Some(warning))
+            (Some(id), Some(receipt), Some(config), Some(warning))
                 if id == &evaluation.policy_id
-                    && digest == &evaluation.validation_receipt_sha256
+                    && receipt == &evaluation.validation_receipt_sha256
+                    && config == &evaluation.policy_config_sha256
                     && warning == evaluation.required_warning_ns => {}
             _ => {
                 return Err(PlasmaEventEvalError::new(
-                    "one summary cannot mix alarm policy identities or warning requirements",
+                    "one summary cannot mix alarm policy identities, config digests or warning requirements",
                 ));
             }
         }
@@ -547,6 +611,7 @@ pub fn summarize_alarm_evaluations(
     Ok(AlarmEvaluationSummary {
         policy_id: policy_id.unwrap_or_default(),
         validation_receipt_sha256: validation_receipt_sha256.unwrap_or_default(),
+        policy_config_sha256: policy_config_sha256.unwrap_or_default(),
         required_warning_ns: required_warning_ns.unwrap_or_default(),
         shot_count: evaluations.len(),
         disruptive_shots,
@@ -557,8 +622,13 @@ pub fn summarize_alarm_evaluations(
         false_alarm_events,
         event_tpr: (disruptive_shots > 0)
             .then_some(detected_disruptions as f64 / disruptive_shots as f64),
+        event_tpr_wilson_95: wilson_interval(detected_disruptions, disruptive_shots),
         false_alarm_shot_rate: (non_disruptive_shots > 0)
             .then_some(false_alarm_shots as f64 / non_disruptive_shots as f64),
+        false_alarm_shot_rate_wilson_95: wilson_interval(
+            false_alarm_shots,
+            non_disruptive_shots,
+        ),
         false_alarms_per_non_disruptive_shot: (non_disruptive_shots > 0)
             .then_some(false_alarm_events as f64 / non_disruptive_shots as f64),
         mean_warning_time_ns,
