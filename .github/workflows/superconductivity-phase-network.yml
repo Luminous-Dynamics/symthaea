@@ -49,8 +49,22 @@ jobs:
             --out "$RUNNER_TEMP/sc-phase-network-receipt.json"
           cat "$RUNNER_TEMP/sc-phase-network-receipt.json"
 
+      - name: Test XY Wolff Monte Carlo pilot and negative controls
+        run: cargo test --locked --manifest-path tools/superconductivity-phase-network-harness/Cargo.toml --bin sc_xy_phase_monte_carlo
+
+      - name: Run small synthetic XY Monte Carlo pilot
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-phase-network-harness/Cargo.toml --bin sc_xy_phase_monte_carlo -- \
+            --schema data/schemas/superconductivity_phase_network_instance_v0_1.schema.json \
+            --fixture data/research/superconductivity_phase_network_fixture_v0_1.json \
+            --temperature 1.0 --warmup-sweeps 3 --measurement-sweeps 5 --seed 7 \
+            --out "$RUNNER_TEMP/sc-xy-monte-carlo-smoke.json"
+          cat "$RUNNER_TEMP/sc-xy-monte-carlo-smoke.json"
+
       - name: Run Clippy
-        run: cargo clippy --locked --manifest-path tools/superconductivity-phase-network-harness/Cargo.toml --bin sc_phase_network_audit -- -D warnings
+        run: |
+          cargo clippy --locked --manifest-path tools/superconductivity-phase-network-harness/Cargo.toml --bin sc_phase_network_audit -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-phase-network-harness/Cargo.toml --bin sc_xy_phase_monte_carlo -- -D warnings
 
       - name: Record exact-run identity
         if: always()
@@ -63,6 +77,7 @@ jobs:
             sha256sum data/research/superconductivity_phase_network_fixture_v0_1.json
             sha256sum tools/superconductivity-phase-network-harness/Cargo.toml
             sha256sum tools/superconductivity-phase-network-harness/src/main.rs
+            sha256sum tools/superconductivity-phase-network-harness/src/bin/xy_phase_monte_carlo.rs
             if [ -f tools/superconductivity-phase-network-harness/Cargo.lock ]; then
               sha256sum tools/superconductivity-phase-network-harness/Cargo.lock
             else
@@ -80,3 +95,4 @@ jobs:
             tools/superconductivity-phase-network-harness/Cargo.lock
             ${{ runner.temp }}/sc-phase-network-environment.txt
             ${{ runner.temp }}/sc-phase-network-receipt.json
+            ${{ runner.temp }}/sc-xy-monte-carlo-smoke.json
