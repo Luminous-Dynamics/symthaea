@@ -9,6 +9,7 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+pub mod pressure_curve;
 pub mod service_continuity;
 pub mod spray_field;
 
