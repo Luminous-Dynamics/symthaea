@@ -71,3 +71,48 @@ The hand-auditable D4 ordered-pair fixture now distinguishes:
 This is not permission to reuse a C4 certificate in the isotropic or asymmetric context. The caller must present the certificate whose exact context ID matches the active environment. A missing or unknown context should abstain rather than inherit another environment's pruning permission.
 
 The common-intersection compiler remains available and returns C1 for the same three-environment family. The contextual atlas demonstrates the more useful alternative: **preserve the maximal exact symmetry locally, while binding pruning authority to the operating context**. Both approaches are exact finite-group constructions; neither accepts soft/spectral proposals as proof.
+
+
+## Error-budgeted additive quotient (separate authority, v0.4 research increment)
+
+The exact quotient above remains unchanged. A new, separately typed API explores a useful middle ground between exact invariance and no quotient: the finite action must preserve **every non-objective task semantic exactly**, while the scalar integer objective may vary by a declared additive amount.
+
+For every group element and candidate, the compiler checks:
+- identical domain membership, admissibility, feasibility, constraint signature, boundary-condition identity and output-equivalence identity;
+- objective deviation from the deterministic canonical representative of the orbit no greater than the caller's declared tolerance.
+
+The certificate reports the **actual maximum orbit-to-representative deviation** (\varepsilon_*), not merely the requested tolerance (\varepsilon). It binds the objective unit/scale, optimization sense, tolerance, action and all orbit/member/inverse witnesses.
+
+If every orbit member is within \(\varepsilon_*\) of its feasible representative, selecting the best feasible representative yields:
+- minimization: (0 \le f(\hat x)-f(x^*) \le \varepsilon_*\);
+- maximization: (0 \le f(x^*)-f(\hat x) \le \varepsilon_*\).
+
+This follows by comparing the chosen representative with the representative of the globally optimal candidate's orbit. It is an **additive optimality-gap guarantee**, not exact equivalence.
+
+The new authority type `ApproximatePruningAuthorityV1` is intentionally distinct from `PruningAuthorityV1::ExactFiniteGroupAndExactTaskSemanticPreservation`. Exact quotient verification and approximate quotient verification are separate functions and certificate types; neither accepts the other's authority.
+
+### Frozen C2 regression
+
+Two two-candidate orbits have objective values:
+- orbit A: canonical A0 = 10, member A1 = 8;
+- orbit B: canonical B0 = 20, member B1 = 22.
+
+With minimization and tolerance 2, both orbits qualify. Searching representatives chooses A0 at 10, while exhaustive search chooses A1 at 8. The actual regret is exactly 2, and the replayed certificate reports (\varepsilon_*=2). Reducing tolerance to 1 blocks the quotient with a concrete objective-deviation witness.
+
+The maximization counterpart returns B0 at 20 against exhaustive optimum B1 at 22, again with gap 2.
+
+### Hard negative controls
+
+Approximate objective tolerance never excuses changes to feasibility, admissibility, search-domain membership, constraints, boundaries or output interpretation. A one-field semantic mismatch blocks the whole action, even when the objective tolerance is arbitrarily large. Objective unit, optimization sense, declared tolerance, orbit deviations, and returned search result are all replay-bound.
+
+### Reproduction
+
+    cargo fmt --manifest-path research/symmetry-quotient-001/Cargo.toml --all -- --check
+    cargo test --locked --manifest-path research/symmetry-quotient-001/Cargo.toml
+    cargo clippy --locked --manifest-path research/symmetry-quotient-001/Cargo.toml --all-targets -- -D warnings
+
+The source tests include minimization, maximization, exact epsilon-zero parity, over-tolerance rejection, hard-semantic negative controls, forged certificate rejection and budget failure. The exact-head Rust 1.96 workflow remains the qualification authority.
+
+### Claim boundary
+
+Finite groups, finite candidate universes and signed-integer objectives only. This does not authorize approximate feasibility, continuous-group quotienting, stochastic/posterior guarantees, physical symmetry, or general approximate optimization. It does not claim a general new symmetry-handling algorithm. It adds a finite, replayable additive-regret certificate around the existing exact action/orbit machinery.
