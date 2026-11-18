@@ -63,7 +63,7 @@ def generate_cases(base_fixture):
     elements = base_fixture["ambient_group"]["elements"]
     by_id = {element["id"]: element for element in elements}
     hand_authored = [
-        case
+        {**case, "split": case.get("split", "fixture_sanity")}
         for case in base_fixture["cases"]
         if not case["case_id"].startswith("GENERATED-")
     ]
@@ -77,7 +77,7 @@ def generate_cases(base_fixture):
     for subgroup_label, subgroup_ids, base_seed in FAMILIES:
         matrices = [by_id[element_id]["matrix"] for element_id in subgroup_ids]
         target = set(subgroup_ids)
-        for index in range(30):
+        for index in range(90):
             accepted = None
             for attempt in range(1000):
                 seed = (base_seed + index * 7919 + attempt * 104729) & MASK
@@ -109,11 +109,20 @@ def generate_cases(base_fixture):
                 )
             seed, points, key = accepted
             seen.add(key)
+            split_rank = (index * 37) % 90
+            split = (
+                "discovery"
+                if split_rank < 30
+                else "calibration"
+                if split_rank < 60
+                else "final_holdout"
+            )
             generated.append(
                 {
                     "case_id": (
                         f"GENERATED-{subgroup_label}-{index + 1:02d}"
                     ),
+                    "split": split,
                     "track": "exact_finite_structural_stabilizer",
                     "geometry": {
                         "dimension": 2,
@@ -177,7 +186,7 @@ def main():
     ]
     if current != generated:
         raise SystemExit("D4_GENERATOR_MISMATCH: regenerate with --write")
-    print("D4_GENERATOR_REPLAY_PASS: 300 cases, 30 per subgroup family across all ten D4 subgroups")
+    print("D4_GENERATOR_REPLAY_PASS: 900 cases, 90 per subgroup family, 30 per split per family")
 
 
 if __name__ == "__main__":
