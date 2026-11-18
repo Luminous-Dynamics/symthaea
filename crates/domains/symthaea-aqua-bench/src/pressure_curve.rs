@@ -591,6 +591,55 @@ mod tests {
     }
 
     #[test]
+    fn minimum_only_product_declaration_is_not_promoted_to_full_range() {
+        let mut run = observation("run-01", "hansgrohe-activera", 100.0);
+        run.product_declared_range = Some(DeclaredProductPressureRange {
+            minimum_kpa: Some(50.0),
+            maximum_kpa: None,
+            source_sha256: digest('e'),
+        });
+
+        assert_eq!(run.validate(), Ok(()));
+        assert_eq!(
+            run.product_pressure_range_status(),
+            ProductPressureRangeStatus::MeetsDeclaredMinimumOnly
+        );
+    }
+
+    #[test]
+    fn maximum_only_product_declaration_remains_one_sided() {
+        let mut run = observation("run-01", "test-fixture", 100.0);
+        run.product_declared_range = Some(DeclaredProductPressureRange {
+            minimum_kpa: None,
+            maximum_kpa: Some(150.0),
+            source_sha256: digest('e'),
+        });
+
+        assert_eq!(run.validate(), Ok(()));
+        assert_eq!(
+            run.product_pressure_range_status(),
+            ProductPressureRangeStatus::MeetsDeclaredMaximumOnly
+        );
+    }
+
+    #[test]
+    fn rejects_product_range_with_no_declared_bound() {
+        let mut run = observation("run-01", "test-fixture", 100.0);
+        run.product_declared_range = Some(DeclaredProductPressureRange {
+            minimum_kpa: None,
+            maximum_kpa: None,
+            source_sha256: digest('e'),
+        });
+
+        assert_eq!(
+            run.validate(),
+            Err(PressureRunError::InvalidRange {
+                field: "product_declared"
+            })
+        );
+    }
+
+    #[test]
     fn rejects_negative_or_non_finite_flow() {
         let mut run = observation("run-01", "aqua-article", 100.0);
         run.flow_lpm = -0.1;
