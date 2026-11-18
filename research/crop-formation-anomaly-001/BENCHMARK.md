@@ -95,7 +95,29 @@ A null must preserve the nuisance structure relevant to the question. Uniform ra
 - Do not count an analyst-designed codebook as evidence of a pre-existing code.
 - Treat Chilbolton and Crabwood as contested challenge cases. They are not positive labels merely because an interpretation has been published.
 
-### Track D — open-world anomaly detection and scientific reasoning
+### Track D — crop-flow orientation-field descriptors
+
+Use measurements of stem/crop-flow directions at known positions; do not infer stem direction from an uncalibrated overhead outline.
+
+Synthetic controls should include:
+- uniform flow, radial flow, tangential/vortex-like flow, opposing sectors and smoothly varying fields;
+- multimodal directions with a zero/undefined circular mean;
+- missing samples, clustered sampling, position duplicates, measurement weights and angle-wrap perturbations;
+- field-coordinate rotation/reflection and known angular measurement noise.
+
+Measure:
+- circular mean direction error using wrapped angular difference;
+- resultant-length and direction-entropy error;
+- nearest-neighbour directional-alignment error;
+- bend-magnitude mean/variance error;
+- robustness to missingness, uneven sampling, spatial clustering and quality weights;
+- abstention when there is no stable global direction.
+
+The first Rust implementation supplies descriptive summaries only. It is not an interpolated vector-field estimator, does not estimate vorticity/divergence, and does not attribute a flow field to any mechanism.
+
+**Synthetic target:** exact recovery within numerical tolerance for noiseless analytic fields; for noisy cases, publish error/coverage curves against the declared noise level. Do not choose a universal real-world degree threshold before instrument and sampling uncertainty are characterized.
+
+### Track E — open-world anomaly detection and scientific reasoning
 
 Metrics:
 - AUROC and AUPRC on carefully adjudicated synthetic and real controls;
@@ -112,7 +134,7 @@ Metrics:
 
 Reuse the existing research/falsification-power-reference where its declared assumptions fit. Do not use its known-variance Gaussian power result as a substitute for hierarchical, spatially correlated, sequential or blinded field-study power analysis.
 
-### Track E — physical mechanism discrimination
+### Track F — physical mechanism discrimination
 
 Compare explicit predictions from:
 - human mechanical flattening;
@@ -131,7 +153,7 @@ Metrics:
 
 A visually similar simulated output is not a mechanism validation. A proposed mechanism must survive conservation and feasibility checks, predict more than the observed outline, and be vulnerable to a predeclared falsification test.
 
-### Track F — plant response and biological replication
+### Track G — plant response and biological replication
 
 Use a randomized, blinded, multi-condition field protocol. The basic sampling design should include:
 - within-formation positions sampled on a fixed spatial grid;
