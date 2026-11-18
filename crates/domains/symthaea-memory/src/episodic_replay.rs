@@ -197,8 +197,6 @@ impl Episode {
             dopamine_at_encoding: None,
             bath_state_at_encoding: None,
             semantic_embedding: None,
-            graduation_provenance: None,
-            consolidation_priority_bonus: 0.0,
         }
     }
 
