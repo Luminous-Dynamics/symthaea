@@ -875,6 +875,29 @@ pub fn evaluate_observation_frame(
                 rule.channel_id, channel.diagnostic_system_id, rule.diagnostic_system_id
             )));
         }
+        let model_sensor = model
+            .sensors
+            .iter()
+            .find(|candidate| candidate.sensor_id == rule.sensor_id)
+            .ok_or_else(|| DiagnosticPortfolioError::new("validated portfolio sensor disappeared"))?;
+        let declared_categories: BTreeSet<&str> = model_sensor
+            .observations
+            .iter()
+            .filter_map(|item| match &item.observation {
+                SensorObservation::Known(value) => Some(value.as_str()),
+                SensorObservation::Unknown => None,
+            })
+            .collect();
+        if rule
+            .bands
+            .iter()
+            .any(|band| !declared_categories.contains(band.category.as_str()))
+        {
+            return Err(DiagnosticPortfolioError::new(format!(
+                "category rule for sensor {} contains a label absent from the declared world signatures",
+                rule.sensor_id
+            )));
+        }
 
         let gate = frame
             .evaluate_decision_requirements(std::slice::from_ref(&rule.requirement))
