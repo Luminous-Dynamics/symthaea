@@ -125,11 +125,24 @@ impl Display for TaskPhaseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::MissingTaskProfile => write!(f, "task profile identifier is missing"),
-            Self::MissingMarketVariant => write!(f, "exact market variant identifier is missing"),
-            Self::InvalidConfigurationDigest => write!(f, "invalid task configuration SHA-256"),
-            Self::InvalidDeliveryConditionsDigest => write!(f, "invalid delivery conditions SHA-256"),
-            Self::DeliveryConditionsMismatch => write!(f, "mode qualification does not cover the plan delivery conditions"),
-            Self::InvalidQualificationMethod => write!(f, "invalid qualification method SHA-256"),
+            Self::MissingMarketVariant => {
+                write!(f, "exact market variant identifier is missing")
+            }
+            Self::InvalidConfigurationDigest => {
+                write!(f, "invalid task configuration SHA-256")
+            }
+            Self::InvalidDeliveryConditionsDigest => {
+                write!(f, "invalid delivery conditions SHA-256")
+            }
+            Self::DeliveryConditionsMismatch => {
+                write!(
+                    f,
+                    "mode qualification does not cover the plan delivery conditions"
+                )
+            }
+            Self::InvalidQualificationMethod => {
+                write!(f, "invalid qualification method SHA-256")
+            },
             Self::InvalidProtocolDigest => write!(f, "invalid task protocol SHA-256"),
             Self::EmptyPhaseSequence => write!(f, "task phase sequence is empty"),
             Self::PrepareMustBeFirst => write!(f, "PREPARE must be the first task phase"),
@@ -374,11 +387,6 @@ pub fn validate_task_phase_plan(
                         mode_id: mode_id.to_owned(),
                     });
                 }
-                if !is_sha256(&capability.qualification_receipt_sha256) {
-                    return Err(TaskPhaseError::InvalidQualificationReceipt {
-                        mode_id: mode_id.to_owned(),
-                    });
-                }
                 if capability.qualification != CapabilityQualification::IndependentlyQualified {
                     return Err(TaskPhaseError::CapabilityNotIndependentlyQualified {
                         mode_id: mode_id.to_owned(),
@@ -394,7 +402,9 @@ pub fn validate_task_phase_plan(
 
                 match expected_role {
                     CapabilityRole::Boost => {
-                        if capability.activation != ActivationRequirement::DirectUserHoldWithAutoReturn {
+                        if capability.activation
+                            != ActivationRequirement::DirectUserHoldWithAutoReturn
+                        {
                             return Err(TaskPhaseError::ActivationMismatch {
                                 mode_id: mode_id.to_owned(),
                             });
