@@ -42,13 +42,23 @@ mod gated_run {
         // 0. Recall Design Wisdom
         let goal_hv = symthaea_sim_bridge::embed_text(goal, 16384);
         manager.last_goal_hv = Some(goal_hv.clone());
-        let wisdom = manager.recall_wisdom(&goal_hv);
+        let wisdom = manager.recall_wisdom_with_provenance(&goal_hv);
         if wisdom.is_empty() {
             println!("🧠 Step 0: No prior wisdom found. Initializing first principles.");
         } else {
             println!("🧠 Step 0: Recalled {} items of past wisdom:", wisdom.len());
             for item in &wisdom {
-                println!("   - {}", item);
+                let lineage = match &item.graduation_provenance {
+                    Some(source) => format!(
+                        "source={:?}; producer_verification_claim={} (not an independent receipt)",
+                        source.source, source.verification_claimed
+                    ),
+                    None => "source=unknown; provenance=absent".to_owned(),
+                };
+                println!(
+                    "   - (Semantic sim={:.2}; {}) {}",
+                    item.similarity, lineage, item.category
+                );
             }
         }
 
