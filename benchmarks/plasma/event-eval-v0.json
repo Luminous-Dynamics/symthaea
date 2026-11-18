@@ -341,7 +341,7 @@
     "claiming_observability_from_evidence_provenance_alone"
   ],
   "evaluation_receipt_contract": {
-    "schema_version": "luminous.plasma-event-evaluation-receipt.v0.2",
+    "schema_version": "luminous.plasma-event-evaluation-receipt.v0.3",
     "contains": [
       "repository_commit",
       "dataset_revision",
@@ -364,14 +364,18 @@
       "score_max",
       "policy_model_id",
       "policy_model_revision",
-      "policy_model_artifact_sha256"
+      "policy_model_artifact_sha256",
+      "shot_cluster_bootstrap_plan",
+      "false_alarms_per_non_disruptive_hour_bootstrap_95"
     ],
     "verify_recomputes_per_shot_scores": true,
     "verify_recomputes_cohort_summary": true,
     "outer_sha256_is_content_identity_not_authentication": true,
     "verify_recomputes_warning_window_matches": true,
     "verify_recomputes_alarm_episode_partitions": true,
-    "verify_recomputes_policy_model_identity": true
+    "verify_recomputes_policy_model_identity": true,
+    "verify_recomputes_shot_cluster_bootstrap_interval": true,
+    "bootstrap_interval_policy": "when supplied, the receipt stores the deterministic shot-cluster plan and recomputes its exposure-normalized false-alarm interval from the exact ordered per-shot alarm records"
   },
   "reference_benchmarks": {
     "published_toka_mark_robustness": {
@@ -520,7 +524,7 @@
     },
     "shot_level_event_metrics": {
       "method": "Wilson score intervals for event TPR and false-alarm shot rate",
-      "false_alarm_per_hour": "report with the exposure denominator and a shot-cluster bootstrap interval when multiple negative shots are available"
+      "false_alarm_per_hour": "report point rate with negative-shot exposure; when at least 95% of the frozen shot-cluster bootstrap replicates have non-zero negative exposure, attach a recomputed 95% percentile interval; otherwise report interval as undefined"
     },
     "plan_requirements": [
       "bind plan to exact dataset revision ID",
