@@ -210,6 +210,10 @@ impl AsBuiltInspectionManifest {
             push(&mut findings, "empty_feature_catalog", "feature_catalog",
                 "As-built inspection must declare its nominal feature scope.");
         }
+        if !self.feature_catalog.iter().any(|feature| feature.mandatory) {
+            push(&mut findings, "no_mandatory_asbuilt_features", "feature_catalog",
+                "At least one mandatory nominal feature is required for an as-built conformance decision.");
+        }
         for (index, feature) in self.feature_catalog.iter().enumerate() {
             let path = format!("feature_catalog[{index}]");
             if is_blank(&feature.feature_ref) || is_blank(&feature.nominal_geometry_ref)
@@ -557,6 +561,13 @@ fn validate_session(
         push(findings, "independent_holdout_datums_missing", "measurement_session.holdout_datum_refs",
             "Registration requires at least one independent hold-out datum not used to compute the transform.");
     }
+    let mut holdout_ids = HashSet::new();
+    for datum in &session.holdout_datum_refs {
+        if is_blank(datum) || !holdout_ids.insert(datum.as_str()) {
+            push(findings, "duplicate_or_blank_holdout_datum", "measurement_session.holdout_datum_refs",
+                "Hold-out datum identities must be non-empty and unique.");
+        }
+    }
     if session.excluded_roi_feature_refs.is_empty() {
         push(findings, "registration_roi_exclusion_missing", "measurement_session.excluded_roi_feature_refs",
             "Registration must explicitly exclude inspected feature ROIs from the alignment fit.");
@@ -594,12 +605,32 @@ fn validate_session(
                 "Occluded or missing regions require an explicit disposition; interpolation cannot silently create a pass.");
         }
     }
+    let mut excluded_ids = HashSet::new();
+    for feature_ref in &session.excluded_roi_feature_refs {
+        if !features.contains_key(feature_ref.as_str()) {
+            push(findings, "registration_excludes_unknown_feature", "measurement_session.excluded_roi_feature_refs",
+                format!("Registration exclusion references unknown feature {feature_ref}."));
+        }
+        if !excluded_ids.insert(feature_ref.as_str()) {
+            push(findings, "duplicate_registration_exclusion", "measurement_session.excluded_roi_feature_refs",
+                "Registration ROI exclusions must be unique.");
+        }
+        if session.holdout_datum_refs.iter().any(|datum| datum == feature_ref) {
+            push(findings, "holdout_datum_overlaps_test_roi", "measurement_session.holdout_datum_refs",
+                "Independent hold-out datums cannot be one of the inspected feature ROIs.");
+        }
+    }
     for observation in observations {
         if !session.excluded_roi_feature_refs.iter().any(|feature_ref| feature_ref == &observation.feature_ref) {
             push(findings, "test_roi_not_excluded_from_registration", "measurement_session.excluded_roi_feature_refs",
                 format!("Inspected feature {} is not explicitly excluded from registration fitting.", observation.feature_ref));
         }
-        if !features.contains_key(observation.feature_ref.as_str()) {
+        if let Some(feature) = features.get(observation.feature_ref.as_str()) {
+            if session.coverage_fraction < feature.minimum_coverage_fraction {
+                push(findings, "session_coverage_below_feature_requirement", "measurement_session.coverage_fraction",
+                    "Session-wide coverage is below this feature's minimum coverage requirement.");
+            }
+        } else {
             push(findings, "session_observation_unknown_feature", "observations.feature_ref",
                 "Measurement feature is not part of the nominal feature catalog.");
         }
@@ -766,6 +797,34 @@ mod tests {
         assert!(report.is_valid(), "{:?}", report.findings);
         assert_eq!(report.pass_count, 2);
         assert!(report.can_accept_as_built());
+    }
+
+    #[test]
+    fn asbuilt_decision_requires_at_least_one_mandatory_feature() {
+        let mut manifest = base_manifest();
+        for feature in manifest["feature_catalog"].as_array_mut().unwrap() {
+            feature["mandatory"] = json!(false);
+        }
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "no_mandatory_asbuilt_features"));
+    }
+
+    #[test]
+    fn independent_holdout_datum_cannot_be_an_inspected_roi() {
+        let mut manifest = base_manifest();
+        make_measured(&mut manifest);
+        manifest["measurement_session"]["holdout_datum_refs"] = json!(["forearm_panel"]);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "holdout_datum_overlaps_test_roi"));
+    }
+
+    #[test]
+    fn session_wide_coverage_must_meet_each_feature_requirement() {
+        let mut manifest = base_manifest();
+        make_measured(&mut manifest);
+        manifest["measurement_session"]["coverage_fraction"] = json!(0.90);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "session_coverage_below_feature_requirement"));
     }
 
     #[test]
