@@ -108,7 +108,9 @@ pub enum PressureRunError {
 impl Display for PressureRunError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::MissingField { field } => write!(f, "missing required pressure-run field: {field}"),
+            Self::MissingField { field } => {
+                write!(f, "missing required pressure-run field: {field}")
+            }
             Self::InvalidDigest { field } => write!(f, "invalid SHA-256 digest for: {field}"),
             Self::InvalidRange { field } => write!(f, "invalid qualified pressure range: {field}"),
             Self::InvalidSetpoint => write!(f, "pressure setpoint must be finite and positive"),
@@ -119,7 +121,10 @@ impl Display for PressureRunError {
                 write!(f, "measured pressure uncertainty interval exceeds qualified test envelope")
             }
             Self::PressureMissesSetpointTolerance => {
-                write!(f, "measured pressure plus uncertainty misses preregistered setpoint tolerance")
+                write!(
+                    f,
+                    "measured pressure plus uncertainty misses preregistered setpoint tolerance"
+                )
             }
             Self::InvalidPressureUncertainty => {
                 write!(f, "pressure uncertainty must be finite and non-negative")
@@ -142,7 +147,10 @@ impl Display for PressureRunError {
                 write!(f, "matched pressure runs use different setpoint tolerances")
             }
             Self::PressureSeparationTooLarge => {
-                write!(f, "measured dynamic pressure separation exceeds the preregistered comparison tolerance")
+                write!(
+                    f,
+                    "measured dynamic pressure separation exceeds the preregistered comparison tolerance"
+                )
             }
         }
     }
@@ -314,8 +322,16 @@ pub fn validate_matched_pressure_comparison(
     }
 
     for (field, left, right) in [
-        ("test_context_sha256", control.test_context_sha256.as_str(), candidate.test_context_sha256.as_str()),
-        ("protocol_sha256", control.protocol_sha256.as_str(), candidate.protocol_sha256.as_str()),
+        (
+            "test_context_sha256",
+            control.test_context_sha256.as_str(),
+            candidate.test_context_sha256.as_str(),
+        ),
+        (
+            "protocol_sha256",
+            control.protocol_sha256.as_str(),
+            candidate.protocol_sha256.as_str(),
+        ),
     ] {
         if left != right {
             return Err(PressureRunError::ContextMismatch { field });
