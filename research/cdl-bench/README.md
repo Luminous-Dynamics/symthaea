@@ -19,8 +19,9 @@ dependencies.
 - E3 factorized SCM mechanism configurations with held-out combinations assembled from individually seen mechanism components; hidden configs remain evaluator-side.
 - CLI file encode/decode and an E0 length comparison against installed
   Zstandard, Brotli, XZ and gzip commands.
-- SCM-specific typed-field and oracle-parent-conditioned byte predictors,
-  exercised through the same arithmetic coder and exact decoder path.
+- SCM-specific typed-field, temporal-lag, oracle-parent, hybrid and
+  shuffled-parent byte predictors, exercised through the same arithmetic coder
+  and exact decoder path.
 
 ## Run
 
@@ -87,10 +88,11 @@ headline compression ratio.
 - A paired trace with `do(x1=20000)` active on the middle half of the stream.
 
 The command checks exact codec round-trips and reports framed lengths for
-the order-0/order-1, typed-field, temporal-lag, parent-oracle and hybrid models,
-plus Zstandard when installed. The parent and hybrid models receive the correct
-SCM graph by construction; they are topology-aware coding controls, not
-learned causal predictors. The finite-state latent labels remain evaluator-side;
+the order-0/order-1, typed-field, temporal-lag, parent-oracle, hybrid and
+shuffled-parent models, plus Zstandard when installed. The parent and hybrid
+models receive the correct SCM graph by construction; they are topology-aware
+coding controls, not learned causal predictors. The shuffled-parent model is a
+topology negative control. The finite-state latent labels remain evaluator-side;
 the serialized SCM stream includes the intervention manifest and observed i16
 values. No causal-transfer result is implied.
 
@@ -151,9 +153,9 @@ SCM1 stream, including observational, interventional, training and held-out E3
 traces. Both use the same arithmetic coder and 32-byte CDL frame as the built-in
 order-0/order-1 arms:
 
-- `field_frame`: separate adaptive byte histograms for each of the five
-  variables and each of their two little-endian byte lanes. This tests typed
-  channel identity against one undifferentiated byte stream.
+- `field_frame`: separate adaptive base histograms for each variable and
+  byte lane. This tests typed channel identity against one flattened byte
+  stream.
 - `lag_frame`: conditions each variable/lane on the previous timestep's
   reconstructed full i16 value for that same variable. This is a noncausal
   temporal baseline with no cross-variable graph.
@@ -162,13 +164,25 @@ order-0/order-1 arms:
   graph.
 - `hybrid_frame`: combines one-bit parent-sign context with the previous
   timestep's four-bin same-variable context.
+- `shuffled_parent_frame`: preserves the context arity while deliberately
+  misassigning downstream parent identities. This is a topology negative
+  control, not a valid causal graph.
+
+For parent, lag, hybrid and shuffled-parent arms, the predictor adds the
+field/lane base frequencies to the selected conditional-context frequencies
+when forming its integer CDF. Both histograms are updated after each decoded
+symbol. This simple additive interpolation gives every context a shared
+field-level backoff distribution rather than making a cold context predict
+from a sparse local histogram alone. The typed-field arm uses only the
+base histogram.
 
 The parent and hybrid predictors are **oracle-topology controls**. The graph is
 supplied in their implementation; this is not graph discovery, causal
 mechanism learning, intervention generalization, or a Symthaea HDC/CfC result.
 The conditional histograms are adaptive and decoder-synchronous, but the
 conditioning structure is known in advance. The lag arm is deliberately a
-strong noncausal comparator.
+strong noncausal comparator. The shuffled-parent arm tests whether a result is
+specific to the correct variable identities.
 
 The two predictors include a separate header histogram and reset to a
 deterministic empty state for each stream. Their inline state sizes are printed
