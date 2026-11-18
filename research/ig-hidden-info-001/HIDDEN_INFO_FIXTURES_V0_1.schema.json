@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-hidden-info-001/HIDDEN_INFO_FIXTURES_V0_1.schema.json",
+  "title": "IG-HIDDEN-INFO-001 fixture set v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "fixtures"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "protocol_id": {
+      "const": "IG-HIDDEN-INFO-001"
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/scenario"
+      }
+    }
+  },
+  "$defs": {
+    "evidenceAtom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atom_id",
+        "decisive"
+      ],
+      "properties": {
+        "atom_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decisive": {
+          "type": "boolean"
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agent_id",
+        "initial_evidence_atoms"
+      ],
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "initial_evidence_atoms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "from_agent_id",
+        "to_agent_id",
+        "evidence_atom_id",
+        "delivered"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "from_agent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to_agent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_atom_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "delivered": {
+          "type": "boolean"
+        }
+      }
+    },
+    "finalRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "cited_evidence_atoms",
+        "answer_correct"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "complete",
+            "abstain",
+            "indeterminate"
+          ]
+        },
+        "cited_evidence_atoms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "answer_correct": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "decision_coverage_milli",
+        "cited_decisive_milli",
+        "provenance_violations",
+        "duplicate_delivery_events"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "qualified",
+            "incomplete",
+            "reject"
+          ]
+        },
+        "decision_coverage_milli": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "cited_decisive_milli": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "provenance_violations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duplicate_delivery_events": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "evidence_catalog",
+        "required_decisive_atoms",
+        "agents",
+        "decision_agent_id",
+        "deliveries",
+        "final",
+        "expected"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_catalog": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/evidenceAtom"
+          }
+        },
+        "required_decisive_atoms": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "agents": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/agent"
+          }
+        },
+        "decision_agent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "deliveries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/delivery"
+          }
+        },
+        "final": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/finalRecord"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        }
+      }
+    }
+  }
+}
