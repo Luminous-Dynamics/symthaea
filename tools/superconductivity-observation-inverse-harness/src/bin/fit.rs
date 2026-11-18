@@ -653,7 +653,7 @@ mod tests {
     }
 
     #[test]
-    fn prior_predictive_simulation_based_calibration_covers_parameters_and_holdout() {
+    fn prior_predictive_sbc_rank_histograms_and_interval_coverage() {
         use rand::SeedableRng;
         use rand::rngs::StdRng;
 
@@ -695,6 +695,9 @@ mod tests {
 
         let mut rng = StdRng::seed_from_u64(0x5eed_1281);
         let trials = 512;
+        let posterior_draw_count = 128;
+        let rank_bin_count = 10;
+        let mut rank_histograms = [vec![0_usize; 10], vec![0_usize; 10]];
         let mut parameter_coverage = [0_usize; 2];
         let mut heldout_coverage = 0_usize;
 
@@ -719,6 +722,35 @@ mod tests {
             }
             let posterior =
                 conjugate_posterior(prior_mean, prior_precision, &calibration_rows).unwrap();
+
+            let posterior_l00 = posterior.covariance.a.sqrt();
+            let posterior_l10 = posterior.covariance.b / posterior_l00;
+            let posterior_l11 =
+                (posterior.covariance.d - posterior_l10 * posterior_l10).sqrt();
+            let mut rank0 = 0_usize;
+            let mut rank1 = 0_usize;
+            for _ in 0..posterior_draw_count {
+                let draw_z0 = normal_sample(&mut rng);
+                let draw_z1 = normal_sample(&mut rng);
+                let draw = [
+                    posterior.mean[0] + posterior_l00 * draw_z0,
+                    posterior.mean[1] + posterior_l10 * draw_z0 + posterior_l11 * draw_z1,
+                ];
+                if draw[0] < truth[0] {
+                    rank0 += 1;
+                }
+                if draw[1] < truth[1] {
+                    rank1 += 1;
+                }
+            }
+            let bin0 = ((rank0 as f64 / (posterior_draw_count + 1) as f64)
+                * rank_bin_count as f64)
+                .floor() as usize;
+            let bin1 = ((rank1 as f64 / (posterior_draw_count + 1) as f64)
+                * rank_bin_count as f64)
+                .floor() as usize;
+            rank_histograms[0][bin0.min(rank_bin_count - 1)] += 1;
+            rank_histograms[1][bin1.min(rank_bin_count - 1)] += 1;
 
             let lower0 = posterior.mean[0] - 1.959963984540054 * posterior.covariance.a.sqrt();
             let upper0 = posterior.mean[0] + 1.959963984540054 * posterior.covariance.a.sqrt();
@@ -754,6 +786,22 @@ mod tests {
                 (0.89..=0.99).contains(&coverage),
                 "95% prior-predictive interval coverage outside tolerance: {coverage}"
             );
+        }
+
+        for (parameter_index, histogram) in rank_histograms.iter().enumerate() {
+            let expected = trials as f64 / rank_bin_count as f64;
+            let chi_squared = histogram
+                .iter()
+                .map(|count| {
+                    let difference = *count as f64 - expected;
+                    difference * difference / expected
+                })
+                .sum::<f64>();
+            assert!(
+                chi_squared < 25.0,
+                "SBC rank histogram {parameter_index} deviates from uniformity: chi2={chi_squared}, bins={histogram:?}"
+            );
+            assert!(histogram.iter().all(|count| (25..=80).contains(count)));
         }
     }
 
