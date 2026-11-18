@@ -351,7 +351,7 @@ impl CatalogueVocabulary {
 }
 
 fn git_blob_sha1(bytes: &[u8]) -> String {
-    let header = format!("blob {}\\0", bytes.len());
+    let header = format!("blob {}\0", bytes.len());
     let mut hasher = Sha1::new();
     hasher.update(header.as_bytes());
     hasher.update(bytes);
@@ -1234,7 +1234,7 @@ mod tests {
 
     #[test]
     fn git_blob_digest_matches_git_object_format() {
-        assert_eq!(git_blob_sha1(b"test\\n"), "9daeafb9864cf43055ae93beb0afd6c7d144bfa4");
+        assert_eq!(git_blob_sha1(b"test\n"), "9daeafb9864cf43055ae93beb0afd6c7d144bfa4");
     }
 
     #[test]
