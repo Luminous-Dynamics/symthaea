@@ -122,12 +122,13 @@ A method-specific test record must additionally bind:
 - inlet channel identities and independently measured pressure trace for each inlet where required;
 - faceplate-centre pressure channel where ETL flow procedure requires P2 at that datum;
 - point-of-discharge pressure channel where the adopted EN method defines it;
+- the separate channel receipt/calibration identity for each required pressure and flow measurement;
 - static pressure and dynamic pressure channels as distinct observations;
 - test water temperatures, outlet temperature and ambient conditions;
 - specimen count, conditioning, mounting, orientation, stabilization and test sequence;
 - calibration, uncertainty, sample result and exclusions.
 
-Aqua's spatial deposition map is supplementary diagnostic evidence. It does not replace UWL, WaterSense or EN spray-coverage / functional performance methods.
+The generic pressure_curve module has 40 authored tests; standard_methods has 12 authored tests covering UWL inlet-channel and ETL faceplate-centre P2 admission. These are not current-head execution passes. Aqua's spatial deposition map is supplementary diagnostic evidence. It does not replace UWL, WaterSense or EN spray-coverage / functional performance methods.
 
 ## 6. Claim ceiling
 
