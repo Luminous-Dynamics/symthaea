@@ -1,0 +1,283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-integration-001/INTEGRATION_FIXTURES_V0_1.schema.json",
+  "title": "IG-INTEGRATION-001 fixture set v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "fixtures"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "protocol_id": {
+      "const": "IG-INTEGRATION-001"
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/fixture"
+      }
+    }
+  },
+  "$defs": {
+    "evidenceAtom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "source_agent_id",
+        "candidate_id",
+        "attribute_id",
+        "polarity",
+        "gold_contribution"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_agent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attribute_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "polarity": {
+          "enum": [
+            "supports",
+            "opposes",
+            "neutral"
+          ]
+        },
+        "gold_contribution": {
+          "type": "integer"
+        }
+      }
+    },
+    "matrixRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "source_agent_id",
+        "candidate_id",
+        "attribute_id",
+        "polarity",
+        "contribution"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_agent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attribute_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "polarity": {
+          "enum": [
+            "supports",
+            "opposes",
+            "neutral"
+          ]
+        },
+        "contribution": {
+          "type": "integer"
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "surface_coverage_milli",
+        "decisive_surface_coverage_milli",
+        "matrix_recall_milli",
+        "source_accuracy_milli",
+        "candidate_mapping_accuracy_milli",
+        "attribute_mapping_accuracy_milli",
+        "polarity_accuracy_milli",
+        "contribution_exact_milli",
+        "duplicate_matrix_rows",
+        "provenance_violations",
+        "matrix_decision_consistent",
+        "decision_correct"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "qualified",
+            "reject"
+          ]
+        },
+        "surface_coverage_milli": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "decisive_surface_coverage_milli": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "matrix_recall_milli": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "source_accuracy_milli": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "candidate_mapping_accuracy_milli": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "attribute_mapping_accuracy_milli": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "polarity_accuracy_milli": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "contribution_exact_milli": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "duplicate_matrix_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "provenance_violations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "matrix_decision_consistent": {
+          "type": "boolean"
+        },
+        "decision_correct": {
+          "type": "boolean"
+        }
+      }
+    },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "candidate_ids",
+        "evidence_catalog",
+        "surfaced_evidence_ids",
+        "required_decisive_evidence_ids",
+        "matrix",
+        "selected_candidate_id",
+        "gold_choice_id",
+        "expected"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_ids": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "evidence_catalog": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/evidenceAtom"
+          }
+        },
+        "surfaced_evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "required_decisive_evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "matrix": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/matrixRow"
+          }
+        },
+        "selected_candidate_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "gold_choice_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        }
+      }
+    }
+  }
+}
