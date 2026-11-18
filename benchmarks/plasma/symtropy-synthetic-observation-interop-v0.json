@@ -1,0 +1,211 @@
+{
+  "fixture_kind": "wire_compatibility_contract_not_a_captured_measurement_run",
+  "producer_repository": "Luminous-Dynamics/symtropy",
+  "producer_pull_request": 5905,
+  "producer_commit": "70317a32958491acd8e0416639014d32e1f36b2c",
+  "export_schema": "luminous.plasma-synthetic-observation-export.v0.1",
+  "observation_frame_schema": "luminous.plasma-observation-frame.v0.1",
+  "evidence_class": "SYNTHETIC_WAVEFORM_FAULT_REPLAY",
+  "physical_measurements": false,
+  "claim_ceiling": "DETERMINISTIC_SYNTHETIC_TRANSFORM_ONLY_NO_PHYSICAL_DIAGNOSTIC_OR_FAILURE_RATE_CLAIM",
+  "frame_fixture_cases": [
+    {
+      "case_id": "synthetic-nominal",
+      "expected_status": "synthetic",
+      "replay_metadata": {
+        "sample_index": 0,
+        "sample_state": "synthetic_nominal",
+        "source_sample_index": 0,
+        "active_fault_id": null,
+        "sample_time_ns": 1000
+      },
+      "observation_frame": {
+        "schema_version": "luminous.plasma-observation-frame.v0.1",
+        "shot_id": "synthetic-shot:interop-fixture",
+        "frame_id": "synthetic:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:density:0",
+        "clock_domain": "synthetic-waveform-relative-ns",
+        "frame_time_ns": 1000,
+        "expected_channel_ids": [
+          "density"
+        ],
+        "channels": [
+          {
+            "channel_id": "density",
+            "diagnostic_system_id": "symtropy.synthetic-waveform-replay",
+            "disposition": {
+              "status": "synthetic",
+              "value": 0.1,
+              "units": "10^20 m^-3",
+              "model_id": "symtropy-plasma-waveform-fault-replay",
+              "model_revision": "0.1.0",
+              "input_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "degraded-transformed-sample",
+      "expected_status": "synthetic",
+      "replay_metadata": {
+        "sample_index": 1,
+        "sample_state": "degraded",
+        "source_sample_index": 1,
+        "active_fault_id": "bias-offset",
+        "sample_time_ns": 1100
+      },
+      "observation_frame": {
+        "schema_version": "luminous.plasma-observation-frame.v0.1",
+        "shot_id": "synthetic-shot:interop-fixture",
+        "frame_id": "synthetic:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:density:1",
+        "clock_domain": "synthetic-waveform-relative-ns",
+        "frame_time_ns": 1100,
+        "expected_channel_ids": [
+          "density"
+        ],
+        "channels": [
+          {
+            "channel_id": "density",
+            "diagnostic_system_id": "symtropy.synthetic-waveform-replay",
+            "disposition": {
+              "status": "synthetic",
+              "value": 0.35,
+              "units": "10^20 m^-3",
+              "model_id": "symtropy-plasma-waveform-fault-replay",
+              "model_revision": "0.1.0",
+              "input_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "delayed-with-prior-source",
+      "expected_status": "synthetic",
+      "replay_metadata": {
+        "sample_index": 2,
+        "sample_state": "delayed",
+        "source_sample_index": 1,
+        "active_fault_id": "delay-one-sample",
+        "sample_time_ns": 1200
+      },
+      "observation_frame": {
+        "schema_version": "luminous.plasma-observation-frame.v0.1",
+        "shot_id": "synthetic-shot:interop-fixture",
+        "frame_id": "synthetic:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:density:2",
+        "clock_domain": "synthetic-waveform-relative-ns",
+        "frame_time_ns": 1200,
+        "expected_channel_ids": [
+          "density"
+        ],
+        "channels": [
+          {
+            "channel_id": "density",
+            "diagnostic_system_id": "symtropy.synthetic-waveform-replay",
+            "disposition": {
+              "status": "synthetic",
+              "value": 0.2,
+              "units": "10^20 m^-3",
+              "model_id": "symtropy-plasma-waveform-fault-replay",
+              "model_revision": "0.1.0",
+              "input_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "leading-delay-without-prior-source",
+      "expected_status": "unavailable",
+      "replay_metadata": {
+        "sample_index": 0,
+        "sample_state": "delayed",
+        "source_sample_index": null,
+        "active_fault_id": "leading-delay",
+        "sample_time_ns": 1300
+      },
+      "observation_frame": {
+        "schema_version": "luminous.plasma-observation-frame.v0.1",
+        "shot_id": "synthetic-shot:interop-fixture-leading-delay",
+        "frame_id": "synthetic:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc:density:0",
+        "clock_domain": "synthetic-waveform-relative-ns",
+        "frame_time_ns": 1300,
+        "expected_channel_ids": [
+          "density"
+        ],
+        "channels": [
+          {
+            "channel_id": "density",
+            "diagnostic_system_id": "symtropy.synthetic-waveform-replay",
+            "disposition": {
+              "status": "unavailable",
+              "reason": "synthetic delay fault leading-delay has no earlier source sample"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "dropout",
+      "expected_status": "unavailable",
+      "replay_metadata": {
+        "sample_index": 3,
+        "sample_state": "unavailable",
+        "source_sample_index": null,
+        "active_fault_id": "dropout",
+        "sample_time_ns": 1400
+      },
+      "observation_frame": {
+        "schema_version": "luminous.plasma-observation-frame.v0.1",
+        "shot_id": "synthetic-shot:interop-fixture",
+        "frame_id": "synthetic:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:density:3",
+        "clock_domain": "synthetic-waveform-relative-ns",
+        "frame_time_ns": 1400,
+        "expected_channel_ids": [
+          "density"
+        ],
+        "channels": [
+          {
+            "channel_id": "density",
+            "diagnostic_system_id": "symtropy.synthetic-waveform-replay",
+            "disposition": {
+              "status": "unavailable",
+              "reason": "synthetic fault dropout made the sample unavailable"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "integrity-failure",
+      "expected_status": "invalid",
+      "replay_metadata": {
+        "sample_index": 4,
+        "sample_state": "invalid",
+        "source_sample_index": null,
+        "active_fault_id": "integrity-checksum",
+        "sample_time_ns": 1500
+      },
+      "observation_frame": {
+        "schema_version": "luminous.plasma-observation-frame.v0.1",
+        "shot_id": "synthetic-shot:interop-fixture",
+        "frame_id": "synthetic:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:density:4",
+        "clock_domain": "synthetic-waveform-relative-ns",
+        "frame_time_ns": 1500,
+        "expected_channel_ids": [
+          "density"
+        ],
+        "channels": [
+          {
+            "channel_id": "density",
+            "diagnostic_system_id": "symtropy.synthetic-waveform-replay",
+            "disposition": {
+              "status": "invalid",
+              "reason": "synthetic fault integrity-checksum invalidated the sample"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
