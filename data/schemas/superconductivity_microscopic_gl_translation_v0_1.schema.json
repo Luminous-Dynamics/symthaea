@@ -131,7 +131,8 @@
           "strain",
           "field_magnitude",
           "field_unit",
-          "field_orientation"
+          "field_orientation",
+          "calculation_provenance"
         ],
         "properties": {
           "state_id": {
@@ -220,6 +221,104 @@
           "field_orientation": {
             "type": "string",
             "minLength": 1
+          },
+          "calculation_provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "calculation_family",
+              "code_name",
+              "code_version",
+              "exchange_correlation_method",
+              "pseudopotential_or_basis_set",
+              "k_mesh",
+              "q_mesh",
+              "energy_cutoff",
+              "energy_cutoff_unit",
+              "phonon_treatment",
+              "spin_orbit_included",
+              "provenance_note"
+            ],
+            "properties": {
+              "calculation_family": {
+                "enum": [
+                  "scdft",
+                  "eliashberg",
+                  "dfpt_epc",
+                  "dft",
+                  "dft_dmft",
+                  "hubbard_cluster",
+                  "qmc",
+                  "functional_rg",
+                  "phenomenological",
+                  "experimental",
+                  "other"
+                ]
+              },
+              "code_name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "code_version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "exchange_correlation_method": {
+                "type": "string",
+                "minLength": 1
+              },
+              "pseudopotential_or_basis_set": {
+                "type": "string",
+                "minLength": 1
+              },
+              "k_mesh": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "q_mesh": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "energy_cutoff": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "energy_cutoff_unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "phonon_treatment": {
+                "type": "string",
+                "minLength": 1
+              },
+              "spin_orbit_included": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "provenance_note": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
           }
         }
       }
