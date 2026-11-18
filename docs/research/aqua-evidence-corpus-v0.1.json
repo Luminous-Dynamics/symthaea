@@ -2691,6 +2691,418 @@
           ]
         }
       ]
+    },
+    {
+      "entry_id": "shower-dwhr-fouling-study-2025",
+      "subject": {
+        "type": "research_study",
+        "id": "bouvenot-beaudet.dwhR.fouling-2025",
+        "name": "In situ experimental and theoretical studies of the performance and the fouling impact of shower greywater heat recovery systems",
+        "manufacturer": null,
+        "sku": null,
+        "market": "14-month in-situ commercial shower DWHR study",
+        "revision": "Energy and Buildings 331 (2025), 115341"
+      },
+      "claims": [
+        {
+          "claim_id": "dhwr.2025.field-duration",
+          "parameter": "field_study_duration",
+          "original_value": "14 months of in-situ operation",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 14,
+            "unit": "months"
+          },
+          "evidence_class": "peer_reviewed_study_result",
+          "result_class": "measured",
+          "conditions": {
+            "mode": "Study-specific shower DWHR configuration",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": "Domestic hot-water / shower service",
+            "method": "Study-specific in-situ measurement and/or validated model",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "full rig and site conditions must be taken from the paper",
+              "not transferable to another climate, topology or exchanger"
+            ],
+            "notes": "The article highlights a 14-month in-situ study."
+          },
+          "source": {
+            "url": "https://doi.org/10.1016/j.enbuild.2025.115341",
+            "publisher": "Bouvenot and Beaudet, Energy and Buildings",
+            "source_type": "peer_reviewed_article",
+            "published_on": "2025-03-15",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee."
+          },
+          "limitations": [
+            "Do not transfer the numerical result to an Aqua design without matched whole-system testing.",
+            "Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary."
+          ]
+        },
+        {
+          "claim_id": "dhwr.2025.overall-exchanger-efficiency",
+          "parameter": "overall_heat_exchanger_efficiency",
+          "original_value": "66% overall exchanger efficiency after fouling and unsteady effects",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 66,
+            "unit": "%"
+          },
+          "evidence_class": "peer_reviewed_study_result",
+          "result_class": "measured",
+          "conditions": {
+            "mode": "Study-specific shower DWHR configuration",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": "Domestic hot-water / shower service",
+            "method": "Study-specific in-situ measurement and/or validated model",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "full rig and site conditions must be taken from the paper",
+              "not transferable to another climate, topology or exchanger"
+            ],
+            "notes": "Study-specific overall exchanger efficiency including fouling and unsteady effects."
+          },
+          "source": {
+            "url": "https://doi.org/10.1016/j.enbuild.2025.115341",
+            "publisher": "Bouvenot and Beaudet, Energy and Buildings",
+            "source_type": "peer_reviewed_article",
+            "published_on": "2025-03-15",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee."
+          },
+          "limitations": [
+            "Do not transfer the numerical result to an Aqua design without matched whole-system testing.",
+            "Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary."
+          ]
+        },
+        {
+          "claim_id": "dhwr.2025.fouling-reduction",
+          "parameter": "fouling_nominal_efficiency_reduction",
+          "original_value": "Fouling reduced nominal exchanger efficiency by 8%",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 8,
+            "unit": "%"
+          },
+          "evidence_class": "peer_reviewed_study_result",
+          "result_class": "measured",
+          "conditions": {
+            "mode": "Study-specific shower DWHR configuration",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": "Domestic hot-water / shower service",
+            "method": "Study-specific in-situ measurement and/or validated model",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "full rig and site conditions must be taken from the paper",
+              "not transferable to another climate, topology or exchanger"
+            ],
+            "notes": "The paper reports a fouling-related reduction in nominal exchanger efficiency."
+          },
+          "source": {
+            "url": "https://doi.org/10.1016/j.enbuild.2025.115341",
+            "publisher": "Bouvenot and Beaudet, Energy and Buildings",
+            "source_type": "peer_reviewed_article",
+            "published_on": "2025-03-15",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee."
+          },
+          "limitations": [
+            "Do not transfer the numerical result to an Aqua design without matched whole-system testing.",
+            "Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary."
+          ]
+        },
+        {
+          "claim_id": "dhwr.2025.overall-system-efficiency",
+          "parameter": "overall_dhwr_system_efficiency",
+          "original_value": "52% overall system efficiency including showerhead-to-drain heat losses",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 52,
+            "unit": "%"
+          },
+          "evidence_class": "peer_reviewed_study_result",
+          "result_class": "measured",
+          "conditions": {
+            "mode": "Study-specific shower DWHR configuration",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": "Domestic hot-water / shower service",
+            "method": "Study-specific in-situ measurement and/or validated model",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "full rig and site conditions must be taken from the paper",
+              "not transferable to another climate, topology or exchanger"
+            ],
+            "notes": "Study-specific system efficiency includes heat losses from showerhead to drain."
+          },
+          "source": {
+            "url": "https://doi.org/10.1016/j.enbuild.2025.115341",
+            "publisher": "Bouvenot and Beaudet, Energy and Buildings",
+            "source_type": "peer_reviewed_article",
+            "published_on": "2025-03-15",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee."
+          },
+          "limitations": [
+            "Do not transfer the numerical result to an Aqua design without matched whole-system testing.",
+            "Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary."
+          ]
+        }
+      ]
+    },
+    {
+      "entry_id": "shower-dhwr-system-coupling-study-2026",
+      "subject": {
+        "type": "research_study",
+        "id": "bouvenot-beaudet.dwhR-coupling-2026",
+        "name": "Optimal coupling of shower drain water heat recovery systems with domestic electrical and heat pump storage water heaters",
+        "manufacturer": null,
+        "sku": null,
+        "market": "Study-specific domestic hot-water systems",
+        "revision": "Energy and Buildings 368 (2026), 117761; published 1 October 2026"
+      },
+      "claims": [
+        {
+          "claim_id": "dhwr.2026.global-cop-experimental",
+          "parameter": "global_dhw_cop",
+          "original_value": "Global DHW COP up to 6.3 experimentally",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 6.3,
+            "unit": "COP"
+          },
+          "evidence_class": "peer_reviewed_study_result",
+          "result_class": "measured",
+          "conditions": {
+            "mode": "Study-specific shower DWHR configuration",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": "Domestic hot-water / shower service",
+            "method": "Study-specific in-situ measurement and/or validated model",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "full rig and site conditions must be taken from the paper",
+              "not transferable to another climate, topology or exchanger"
+            ],
+            "notes": "Study-reported experimental best-case global DHW COP; configuration and boundary are paper-specific."
+          },
+          "source": {
+            "url": "https://doi.org/10.1016/j.enbuild.2026.117761",
+            "publisher": "Bouvenot and Beaudet, Energy and Buildings",
+            "source_type": "peer_reviewed_article",
+            "published_on": "2026-10-01",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee."
+          },
+          "limitations": [
+            "Do not transfer the numerical result to an Aqua design without matched whole-system testing.",
+            "Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary."
+          ]
+        },
+        {
+          "claim_id": "dhwr.2026.global-cop-simulation",
+          "parameter": "global_dhw_cop",
+          "original_value": "Global DHW COP up to 8.0 in simulation",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 8,
+            "unit": "COP"
+          },
+          "evidence_class": "peer_reviewed_study_result",
+          "result_class": "modelled",
+          "conditions": {
+            "mode": "Study-specific shower DWHR configuration",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": "Domestic hot-water / shower service",
+            "method": "Study-specific in-situ measurement and/or validated model",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "full rig and site conditions must be taken from the paper",
+              "not transferable to another climate, topology or exchanger"
+            ],
+            "notes": "Study-reported simulated result, not a measured field result."
+          },
+          "source": {
+            "url": "https://doi.org/10.1016/j.enbuild.2026.117761",
+            "publisher": "Bouvenot and Beaudet, Energy and Buildings",
+            "source_type": "peer_reviewed_article",
+            "published_on": "2026-10-01",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee."
+          },
+          "limitations": [
+            "Do not transfer the numerical result to an Aqua design without matched whole-system testing.",
+            "Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary."
+          ]
+        },
+        {
+          "claim_id": "dhwr.2026.heat-pump-cop-penalty",
+          "parameter": "heat_pump_cop_reduction",
+          "original_value": "Heat-pump COP reduction around 15–20% in some DWHR configurations",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 15,
+            "unit": "%"
+          },
+          "evidence_class": "peer_reviewed_study_result",
+          "result_class": "measured",
+          "conditions": {
+            "mode": "Study-specific shower DWHR configuration",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": "Domestic hot-water / shower service",
+            "method": "Study-specific in-situ measurement and/or validated model",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "full rig and site conditions must be taken from the paper",
+              "not transferable to another climate, topology or exchanger"
+            ],
+            "notes": "15% is the lower endpoint of a reported 15–20% effect in some configurations, not a universal penalty."
+          },
+          "source": {
+            "url": "https://doi.org/10.1016/j.enbuild.2026.117761",
+            "publisher": "Bouvenot and Beaudet, Energy and Buildings",
+            "source_type": "peer_reviewed_article",
+            "published_on": "2026-10-01",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee."
+          },
+          "limitations": [
+            "Do not transfer the numerical result to an Aqua design without matched whole-system testing.",
+            "Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary."
+          ]
+        },
+        {
+          "claim_id": "dhwr.2026.best-coupling-topology",
+          "parameter": "preferred_dhwr_coupling_topology",
+          "original_value": "Unbalanced DWHR connected to the shower mixer performed best in the tested overall system configurations.",
+          "canonical_value": {
+            "kind": "text",
+            "text": "Unbalanced DWHR connected to the shower mixer performed best in the tested overall system configurations."
+          },
+          "evidence_class": "peer_reviewed_study_result",
+          "result_class": "measured",
+          "conditions": {
+            "mode": "Study-specific heat-pump/storage and DWHR topologies",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": "Shower DHW service",
+            "method": "Study-specific validated numerical/experimental model",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "not transferable without matched topology/system testing"
+            ],
+            "notes": "The best overall system topology was not necessarily the topology with the highest component recovery efficiency."
+          },
+          "source": {
+            "url": "https://doi.org/10.1016/j.enbuild.2026.117761",
+            "publisher": "Bouvenot and Beaudet, Energy and Buildings",
+            "source_type": "peer_reviewed_article",
+            "published_on": "2026-10-01",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Study-specific whole-system topology finding; not a universal ranking or Aqua result."
+          },
+          "limitations": [
+            "Do not assume mixer-side DWHR always wins; receiver, storage, standby and dynamic losses matter."
+          ]
+        },
+        {
+          "claim_id": "dhwr.2026.model-validation",
+          "parameter": "model_validation_cv_rmse",
+          "original_value": "Validated model cv(RMSE) below 7% against in-situ data",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 7,
+            "unit": "%"
+          },
+          "evidence_class": "peer_reviewed_study_result",
+          "result_class": "measured",
+          "conditions": {
+            "mode": "Study-specific shower DWHR configuration",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": "Domestic hot-water / shower service",
+            "method": "Study-specific in-situ measurement and/or validated model",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "full rig and site conditions must be taken from the paper",
+              "not transferable to another climate, topology or exchanger"
+            ],
+            "notes": "Study-reported model validation result; not Aqua model accuracy."
+          },
+          "source": {
+            "url": "https://doi.org/10.1016/j.enbuild.2026.117761",
+            "publisher": "Bouvenot and Beaudet, Energy and Buildings",
+            "source_type": "peer_reviewed_article",
+            "published_on": "2026-10-01",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee."
+          },
+          "limitations": [
+            "Do not transfer the numerical result to an Aqua design without matched whole-system testing.",
+            "Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary."
+          ]
+        }
+      ]
     }
   ],
   "change_log": [
@@ -2701,6 +3113,10 @@
     {
       "date": "2026-11-18",
       "change": "Added current UK ETL electric-shower 4.5 / 9 / 10.6 L/min pathways conditional on power modulation, wastewater heat recovery and user-behaviour features."
+    },
+    {
+      "date": "2026-11-18",
+      "change": "Added 2025 DWHR fouling/system efficiency and October 2026 whole-system heat-pump/DWHR coupling evidence."
     }
   ]
 }
