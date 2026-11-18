@@ -14,6 +14,7 @@ pub mod lightshell_method_applicability;
 pub mod lightshell_mission_profile;
 pub mod lightshell_robust_downselect;
 pub mod lightshell_pattern_topology;
+pub mod lightshell_manufacturing_route;
 
 use serde::{Deserialize, Serialize};
 use symthaea_broca::{BrocaConfig, BrocaGenerator, ThoughtChannels};
