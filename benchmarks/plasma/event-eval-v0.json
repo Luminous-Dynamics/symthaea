@@ -145,7 +145,9 @@
       "clear_persistence_windows",
       "required_warning_ns",
       "risk_model_binding",
-      "max_warning_ns"
+      "max_warning_ns",
+      "score_min",
+      "score_max"
     ],
     "policy_config_sha256": "computed from exact policy ID, score scale ID, validation receipt, threshold bit patterns, persistence counts and required warning interval",
     "risk_score_contract": {
@@ -169,7 +171,8 @@
         "nominal_coverage",
         "estimate",
         "lower_bound",
-        "upper_bound"
+        "upper_bound",
+        "score_scale_id"
       ],
       "exact_input_frame_sha256_required": true,
       "model_artifact_sha256_required": true,
@@ -190,13 +193,14 @@
       },
       "interval_coverage_claim": "nominal method metadata only; empirical coverage must be reported on held-out data",
       "evidence_digest": "SHA-256 content identity only; not source/model/calibration authenticity proof",
-      "threshold_scale_identity": "risk evidence score_scale_id must exactly match frozen policy score_scale_id",
-      "policy_config_digest_schema": "luminous.plasma-alarm-policy.v0.4",
+      "threshold_scale_identity": "risk evidence score_scale_id must exactly match frozen policy score_scale_id; all values must fall within frozen inclusive score_min/score_max",
+      "policy_config_digest_schema": "luminous.plasma-alarm-policy.v0.6",
       "exact_model_and_calibration_binding_required": true,
-      "model_training_split_calibration_uncertainty_must_match_frozen_policy": true
+      "model_training_split_calibration_uncertainty_must_match_frozen_policy": true,
+      "score_domain_policy": "risk evidence lower_bound and upper_bound must both be inside frozen policy [score_min, score_max]; policy thresholds must also lie in that closed interval"
     },
-    "policy_config_digest_schema": "luminous.plasma-alarm-policy.v0.5",
-    "policy_config_digest_encoding": "length-prefixed UTF-8 fields plus exact IEEE-754 threshold bit patterns; delimiter characters in IDs cannot create ambiguous field boundaries; includes exact model artifact, training split, calibration identity/receipt, uncertainty method and nominal coverage; includes maximum allowed warning lead time",
+    "policy_config_digest_schema": "luminous.plasma-alarm-policy.v0.6",
+    "policy_config_digest_encoding": "length-prefixed UTF-8 fields plus exact IEEE-754 threshold bit patterns; delimiter characters in IDs cannot create ambiguous field boundaries; includes exact model artifact, training split, calibration identity/receipt, uncertainty method and nominal coverage; includes maximum allowed warning lead time; includes inclusive numeric score_min and score_max using exact IEEE-754 bit patterns",
     "risk_model_binding_fields": [
       "model_id",
       "model_revision",
@@ -224,6 +228,12 @@
         "alarm_transition_times"
       ],
       "paper_comparison_note": "GenToka uses one conditional pass to generate a complete output window; this benchmark's rolling mode is repeated causal inference at successive cuts, not a claim that the published model itself is autoregressive"
+    },
+    "score_domain": {
+      "minimum": 0,
+      "maximum": 1,
+      "inclusive": true,
+      "semantics": "all trigger/clear thresholds, point estimates and uncertainty bounds must lie inside this declared closed interval"
     }
   },
   "offline_scoring_contract": {
@@ -348,13 +358,20 @@
       "recomputed_cohort_summary",
       "maximum_warning_horizon_ns",
       "false_alarm_events_on_disruptive_shots",
-      "false_alarm_events_on_non_disruptive_shots"
+      "false_alarm_events_on_non_disruptive_shots",
+      "score_scale_id",
+      "score_min",
+      "score_max",
+      "policy_model_id",
+      "policy_model_revision",
+      "policy_model_artifact_sha256"
     ],
     "verify_recomputes_per_shot_scores": true,
     "verify_recomputes_cohort_summary": true,
     "outer_sha256_is_content_identity_not_authentication": true,
     "verify_recomputes_warning_window_matches": true,
-    "verify_recomputes_alarm_episode_partitions": true
+    "verify_recomputes_alarm_episode_partitions": true,
+    "verify_recomputes_policy_model_identity": true
   },
   "reference_benchmarks": {
     "published_toka_mark_robustness": {
