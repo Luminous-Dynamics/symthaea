@@ -261,14 +261,12 @@ fn load_multiple_run_records(
         let profile = require_single_identity(result_profile_name(&results), "profile", path)?
             .ok_or_else(|| format!("result file has no profile identity: {path}"))?;
 
-        if let Some(profile) = &Some(profile.clone()) {
-            if profile != "legacy" && profile != expected_profile {
-                return Err(format!(
-                    "expected {expected_profile} profile input, found {profile} ({path})"
-                ));
-            }
-            observed_profiles.insert(profile.clone());
+        if profile != "legacy" && profile != expected_profile {
+            return Err(format!(
+                "expected {expected_profile} profile input, found {profile} ({path})"
+            ));
         }
+        observed_profiles.insert(profile.clone());
 
         if let Some(expected) = &expected_model {
             if expected != &model {
@@ -752,6 +750,96 @@ mod tests {
         let _ = std::fs::remove_file(first_path);
         let _ = std::fs::remove_file(second_path);
         assert!(error.contains("different models"));
+    }
+
+    #[test]
+    fn legacy_conditions_extract_model_and_legacy_profile() {
+        let legacy = serde_json::json!({
+            "conditions": [{
+                "condition_id": "condition-1",
+                "model": "test-model",
+                "percentage_special": 1.0,
+                "runs": [{"task_id": 1, "scenario": "evacuation_west_city"}]
+            }]
+        });
+        assert_eq!(result_model_name(&legacy).as_deref(), Some("test-model"));
+        assert_eq!(result_profile_name(&legacy).as_deref(), Some("legacy"));
+    }
+
+    #[test]
+    fn legacy_condition_files_combine_when_model_identity_matches() {
+        let first = serde_json::json!({
+            "conditions": [{
+                "condition_id": "condition-a",
+                "model": "test-model",
+                "percentage_special": 1.0,
+                "runs": [{"task_id": 1, "scenario": "evacuation_west_city"}]
+            }]
+        });
+        let second = serde_json::json!({
+            "conditions": [{
+                "condition_id": "condition-b",
+                "model": "test-model",
+                "percentage_special": 1.0,
+                "runs": [{"task_id": 2, "scenario": "evacuation_north_hill"}]
+            }]
+        });
+        let first_path = std::env::temp_dir().join("hiddenbench-legacy-a.json");
+        let second_path = std::env::temp_dir().join("hiddenbench-legacy-b.json");
+        std::fs::write(&first_path, first.to_string()).expect("write first legacy split");
+        std::fs::write(&second_path, second.to_string()).expect("write second legacy split");
+        let paths = vec![
+            first_path.to_string_lossy().to_string(),
+            second_path.to_string_lossy().to_string(),
+        ];
+        let (metadata, runs) = load_multiple_run_records(&paths, "hidden")
+            .expect("same-model legacy hidden files combine");
+        let _ = std::fs::remove_file(first_path);
+        let _ = std::fs::remove_file(second_path);
+        assert_eq!(runs.len(), 2);
+        assert_eq!(result_model_name(&metadata).as_deref(), Some("test-model"));
+        assert_eq!(result_profile_name(&metadata).as_deref(), Some("hidden"));
+    }
+
+    #[test]
+    fn legacy_condition_files_with_different_models_are_rejected() {
+        let first = serde_json::json!({
+            "conditions": [{
+                "condition_id": "condition-a",
+                "model": "model-a",
+                "percentage_special": 1.0,
+                "runs": [{"task_id": 1}]
+            }]
+        });
+        let second = serde_json::json!({
+            "conditions": [{
+                "condition_id": "condition-b",
+                "model": "model-b",
+                "percentage_special": 1.0,
+                "runs": [{"task_id": 2}]
+            }]
+        });
+        let first_path = std::env::temp_dir().join("hiddenbench-legacy-model-a.json");
+        let second_path = std::env::temp_dir().join("hiddenbench-legacy-model-b.json");
+        std::fs::write(&first_path, first.to_string()).expect("write first legacy file");
+        std::fs::write(&second_path, second.to_string()).expect("write second legacy file");
+        let paths = vec![
+            first_path.to_string_lossy().to_string(),
+            second_path.to_string_lossy().to_string(),
+        ];
+        let error = load_multiple_run_records(&paths, "hidden")
+            .expect_err("different legacy model identities must not combine");
+        let _ = std::fs::remove_file(first_path);
+        let _ = std::fs::remove_file(second_path);
+        assert!(error.contains("different models"));
+    }
+
+    #[test]
+    fn vote_strings_are_compared_without_normalization() {
+        let run = serde_json::json!({"votes":[{"vote":"A "},{"vote":"A"}]});
+        let votes = vote_values(&run, "votes");
+        assert_eq!(votes, vec!["A ", "A"]);
+        assert_eq!(individual_accuracy(&votes, "A"), 0.5);
     }
 
     #[test]
