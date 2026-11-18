@@ -2,7 +2,7 @@
 
 **Snapshot:** 2026-11-18  
 **Entries:** 15  
-**Claims:** 75
+**Claims:** 77
 
 > Source-classified evidence register. Manufacturer declarations, standards/programme criteria, local installation references, independent market samples and peer-reviewed results are kept distinct. Values marked unknown have not been inferred. This corpus is not a product certification or evidence of Aqua performance.
 
@@ -512,6 +512,8 @@
 | `uwl.2023.type1.p2` | uwl_dynamic_pressure_point | Type 1 P2 = 300 kPa +20/-0 kPa, applied dynamically to each inlet. | standard_or_programme_criterion | declared | mode=Type 1 supply system; P2 reference pressure point; method=UWL Taps & Showers Technical Criteria January 2023, section 4.2 Table 1; datum=each inlet separately; unknown: full product-category-specific sequence in UWL procedure; ETL flow-rate procedure additionally requires P2 at the centre of the shower faceplate. | context_only: Method-specific dynamic inlet pressure; ETL also declares a faceplate-centre P2 requirement for maximum-flow testing. | [Unified Water Label Association](https://uwla.eu/wp-content/uploads/2023/05/TAPS-Showers-Technical-2023.pdf); official_standard_or_programme; 2023-01-01 |
 | `uwl.2023.type2.p3` | uwl_dynamic_pressure_point | Type 2 P3 = 10 kPa +2/-0 kPa, applied dynamically to each inlet. | standard_or_programme_criterion | declared | mode=Type 2 installation system; P3 low-pressure point; method=UWL Taps & Showers Technical Criteria January 2023, section 4.2 Table 1; datum=each inlet separately; unknown: full product-category-specific sequence in UWL procedure; Aqua's 50/75/100 kPa exploratory points do not cover this P3 test point. | context_only: Type 2 low-pressure method point, not a generic Aqua building supply condition. | [Unified Water Label Association](https://uwla.eu/wp-content/uploads/2023/05/TAPS-Showers-Technical-2023.pdf); official_standard_or_programme; 2023-01-01 |
 | `uwl.2023.calibration` | test_instrument_calibration_requirement | UWL requires measurement equipment to be calibrated to international or national standards. | standard_or_programme_criterion | declared | mode=UWL tap and shower test procedures; method=UWL Taps & Showers Technical Criteria January 2023, section 4.1; unknown: scheme-specific conformity evidence for an individual laboratory; Mycelix remains Aqua's evidence owner for instrument identity, calibration and uncertainty. | context_only: Test-method quality requirement, not product-performance evidence. | [Unified Water Label Association](https://uwla.eu/wp-content/uploads/2023/05/TAPS-Showers-Technical-2023.pdf); official_standard_or_programme; 2023-01-01 |
+| `uwl.2023.boost.definition` | boost_function_definition | Temporary flow increase for a specific user action; automatically cancelled when the flow control is closed. | standard_or_programme_criterion | declared | mode=UWL Taps & Showers boost-function feature; task=Specific user action; method=UWL Taps & Showers Technical Criteria January 2023, definition 3.12; unknown: product-specific boost-control mechanism, product-specific maximum boost duration; This is a feature definition, not proof that an exact model passes clause 12.1. | context_only: Common method vocabulary for classifying temporary boost; a manufacturer's boost button is not automatically a verified UWL result. | [Unified Water Label Association](https://uwla.eu/wp-content/uploads/2023/05/TAPS-Showers-Technical-2023.pdf); official_standard_or_programme; 2023-01-01 |
+| `uwl.2023.boost.criteria` | boost_function_criteria | UWL 12.1 requires automatic return to regular flow after flow-control shutoff; Qmax = Qreg; Qboost < 2 × Qreg; regular flow Qreg must be labelled. | standard_or_programme_criterion | declared | mode=UWL Type 1 boost-function test; pressure=300 kPa; task=Regular / boosted / post-close flow sequence; method=UWL Taps & Showers Technical Criteria January 2023, sections 4.2 Table 1 and 12.1; datum=P2 dynamic pressure applied to each inlet separately; 300 kPa +20/-0 kPa; unknown: absolute L/min equality tolerance for Qmax = Qreg is not specified in clause 12.1, exact laboratory uncertainty decision rule; Aqua preserves measurement uncertainty and requires Qmax/Qreg agreement within combined declared measurement uncertainty; this is a software screening rule, not a substitute for scheme interpretation. | eligible_as_matched_test_reference: Method-specific boost test at the UWL P2 datum; use the complete controlled method and exact product configuration. | [Unified Water Label Association](https://uwla.eu/wp-content/uploads/2023/05/TAPS-Showers-Technical-2023.pdf); official_standard_or_programme; 2023-01-01 |
 
 **Limitations — `uwl.2023.type1.p1`:**
 - Each required inlet must be independently supplied and measured.
@@ -527,6 +529,13 @@
 
 **Limitations — `uwl.2023.calibration`:**
 - Calibration status alone does not establish method applicability, measurement uncertainty or product compliance.
+
+**Limitations — `uwl.2023.boost.definition`:**
+- This does not establish task quality, energy savings or ETL user-behaviour-feature eligibility.
+
+**Limitations — `uwl.2023.boost.criteria`:**
+- Do not compare nominal manufacturer mode declarations as a UWL result.
+- The numeric method check does not assess task-quality, comfort, aerosol, safety or energy outcome.
 
 ---
 
