@@ -8,10 +8,18 @@
     "robustness_repository": "https://github.com/Neerav-Gupta/tokamark-robustness",
     "robustness_reference_commit": "a51d392c34567601c802edac0a614c179683566c",
     "robustness_paper": "https://arxiv.org/abs/2607.11915",
-    "baseline_commit_pinned": true
+    "baseline_commit_pinned": true,
+    "gen_toka_paper": "https://arxiv.org/abs/2611.08153",
+    "gen_toka_arxiv_version": "v1, 2026-11-05",
+    "tokamind_repository": "https://github.com/UKAEA-IBM-STFC-Fusion-FMs/tokamind",
+    "tokamind_repository_commit": "d64fbe3826057576f06d3158592917dd2443a960",
+    "tokamark_repository": "https://github.com/UKAEA-IBM-STFC-Fusion-FMs/tokamark",
+    "tokamark_repository_commit": "146b0a0f87380bb16817f2e8758e84ce79ed45d0",
+    "tokamark_cnn_baseline_repository": "https://github.com/UKAEA-IBM-STFC-Fusion-FMs/tokamark_baseline",
+    "tokamark_cnn_baseline_repository_commit": "1e7c489653716a60ffe0b4c2a6a2e51883228695"
   },
   "population_and_split_contract": {
-    "primary_split": "official shot-disjoint TokaMark split",
+    "primary_split": "exact frozen shot IDs from each published baseline for reproduction; do not regenerate or mix split strategies",
     "all_transforms_fit_on": [
       "train",
       "validation"
@@ -21,7 +29,33 @@
     "imputation_and_scaling_fit_on": "train",
     "test_is_read_only": true,
     "include_positive_and_negative_shots": true,
-    "if_negative_shots_unavailable": "report false-alarm rates as undefined; do not substitute zero"
+    "if_negative_shots_unavailable": "report false-alarm rates as undefined; do not substitute zero",
+    "split_tracks": {
+      "published_robustness_reproduction": {
+        "description": "Reproduce the pinned Neerav-Gupta TokaMark robustness repository against its exact saved test cohort and saved model/data artifacts",
+        "repository_commit": "a51d392c34567601c802edac0a614c179683566c",
+        "do_not_regenerate_shot_ids": true,
+        "test_read_only": true
+      },
+      "tokamind_gentoka_group6_reproduction": {
+        "description": "Reproduce the paper-defined shared Group-6 held-out cohort, window grid, nested input schemas, Soft-TTD labels and validation-selected common threshold",
+        "paper": "arXiv:2611.08153v1",
+        "test_read_only": true
+      },
+      "tokamark_temporal_transfer": {
+        "description": "Supplementary campaign-shift evaluation using TokaMark temporal split; the two most recent campaigns are held out as test",
+        "source": "TokaMind official data-split documentation",
+        "repository_commit": "d64fbe3826057576f06d3158592917dd2443a960",
+        "use_for_primary_temporal_generalization": true,
+        "do_not_mix_with_random_or_paper_cohort": true
+      },
+      "tokamark_random_split": {
+        "description": "Secondary in-distribution random shot split (80/10/10) for comparability with conventional benchmark practice",
+        "source": "TokaMind official data-split documentation",
+        "use_as_secondary_only": true,
+        "do_not_mix_with_temporal_or_paper_cohort": true
+      }
+    }
   },
   "online_policy_contract": {
     "input_fields": [
@@ -174,13 +208,14 @@
     "synthetic_reconstruction_vs_direct_measurement"
   ],
   "baseline_matrix": [
-    "published_XGBoost",
-    "published_LSTM",
-    "published_Transformer",
-    "TokaMark_CNN",
-    "TokaMind_when_artifacts_and_license_allow",
-    "GenToka_when_artifacts_and_license_allow",
-    "simple_persistence_and_last_value"
+    "published_XGBoost_on_pinned_task_4-4_split",
+    "published_LSTM_on_pinned_task_4-4_split",
+    "published_Transformer_on_pinned_task_4-4_split",
+    "TokaMark_CNN_on_pinned_task_4-4_and_GenToka_Group6_cohort",
+    "TokaMind_Group6_tasks_6-1_6-3_when_artifacts_and_license_allow",
+    "GenToka_Group6_tasks_6-1_6-3_when_artifacts_and_license_allow",
+    "simple_persistence_and_last_value",
+    "Symthaea_HDC_CfC_candidate_on_identical_inputs_and_splits"
   ],
   "target_gates": {
     "reproduce_published_protocol_before_claiming_improvement": true,
@@ -243,5 +278,92 @@
     "verify_recomputes_per_shot_scores": true,
     "verify_recomputes_cohort_summary": true,
     "outer_sha256_is_content_identity_not_authentication": true
+  },
+  "reference_benchmarks": {
+    "published_toka_mark_robustness": {
+      "status": "paper_and_repository_reported; not independently reproduced by Symthaea",
+      "task": "task_4-4",
+      "model_metrics": {
+        "xgboost": {
+          "clean_nrmse": 0.4940847,
+          "robustness_score": 0.8413,
+          "clean_shot_tpr": 0.4
+        },
+        "lstm": {
+          "clean_nrmse": 0.4960356,
+          "robustness_score": 0.808,
+          "clean_shot_tpr": 0.52
+        },
+        "transformer": {
+          "clean_nrmse": 0.4698883,
+          "robustness_score": 0.7651,
+          "clean_shot_tpr": 0.48
+        },
+        "tokamark_cnn": {
+          "clean_nrmse": 0.5279296,
+          "robustness_score": 0.7639,
+          "clean_shot_tpr": 0.6
+        }
+      },
+      "published_alarm_evaluation": {
+        "disruptive_test_shots": 50,
+        "non_disruptive_test_shots": 0,
+        "false_alarm_rate": "undefined_not_computable",
+        "mean_warning_time_ms_range": [
+          12,
+          15
+        ],
+        "threshold_selected_on_test": true,
+        "full_shot_prediction_mean_used": true
+      },
+      "source": "Neerav-Gupta/tokamark-robustness README and pinned compute_alarm_metrics.py"
+    },
+    "gen_toka_group6": {
+      "status": "paper_reported_results; no public GenToka repository or checkpoint was located in the current search; exact reproduction is blocked on artifact availability",
+      "paper": "arXiv:2611.08153v1",
+      "test_shots": 933,
+      "test_windows": 39967,
+      "history_duration_ns": 100000000,
+      "cut_grid_ns": 10000000,
+      "soft_ttd_positive_target_threshold": 0.5,
+      "common_f1_threshold": 0.4,
+      "common_f1_threshold_selected_on": "validation_only",
+      "nested_task_schemas": {
+        "6-1": {
+          "signals": 9,
+          "tokamind_auroc": 0.9281,
+          "tokamind_f1": 0.6029,
+          "gentoka_auroc": 0.9213,
+          "gentoka_f1": 0.6297
+        },
+        "6-2": {
+          "signals": 5,
+          "tokamind_auroc": 0.9242,
+          "tokamind_f1": 0.5923,
+          "gentoka_auroc": 0.9111,
+          "gentoka_f1": 0.6206
+        },
+        "6-3": {
+          "signals": 1,
+          "signal": "summary-ip",
+          "tokamind_auroc": 0.8683,
+          "tokamind_f1": 0.3891,
+          "gentoka_auroc": 0.8824,
+          "gentoka_f1": 0.4674
+        }
+      },
+      "macro_average": {
+        "tokamind_auroc": 0.9069,
+        "gentoka_auroc": 0.9049,
+        "tokamind_f1": 0.5281,
+        "gentoka_f1": 0.5726,
+        "gentoka_f1_relative_improvement": 0.084
+      },
+      "comparison_notes": [
+        "GenToka improves F1 on all three nested input schemas but has slightly lower macro AUROC than TokaMind",
+        "F1 uses a validation-selected common threshold of 0.4 and Soft-TTD windows with target >= 0.5 are positive",
+        "Window-level F1/AUROC are not interchangeable with shot-level event TPR, false alarms per hour or warning-time distributions"
+      ]
+    }
   }
 }
