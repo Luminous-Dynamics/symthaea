@@ -76,6 +76,8 @@ DF(s)As-AF(s)=0,
 
 as a polynomial identity for integer \(m\), rational \(k\). This is a **vector-field equivariance** claim. It is not inferred from a low sampled residual and does not automatically qualify a particular integrator's discrete step map.
 
+This standalone algebraic check is not a task-preserving quotient certificate. Symthaea #11616 owns full search-semantics qualification, orbit certificates and lifting. Its current executable finite-group slice (#11653) does not yet support this continuous SO(2) action. Therefore this radial case may be used to verify the mathematical dynamics, but arms D–F may not hard-prune with a continuous quotient until that owner independently qualifies the continuous action and complete task semantics.
+
 ## 4. Invariant coordinates and reduced dynamics
 
 Use the following SO(2)-invariant quantities:
@@ -231,7 +233,7 @@ The exact development oracle should independently verify:
 7. Correct classification of the near-symmetry and measurement-map controls.
 8. Quotient/lift round-trip semantics on generic and singular strata.
 
-Symtropy should subsequently check analytic trajectories, numerical convergence and discrete-step equivariance for the selected integrator. A continuous-time proof must not be reused as a discrete-time proof.
+Symtropy should subsequently check analytic trajectories, numerical convergence and discrete-step equivariance for the selected integrator. A continuous-time proof must not be reused as a discrete-time proof. Task-level pruning must separately pass #11616's objective, feasible-domain, boundary/initial-condition, measurement/output and lift obligations.
 
 ## 9. Expected outcome and claim ceiling
 
