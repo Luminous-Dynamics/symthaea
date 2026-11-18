@@ -191,6 +191,14 @@ The exact fixture oracle is still a synthetic benchmark, not a performance resul
 
 
 
+
+
+## D4 conjugacy covariance and unordered-set invariance
+
+The Rust oracle now runs every one of the 153 frozen structural cases through all eight D4 coordinate orientations. For each (g\in D4), it checks that the transformed point set has stabilizer (gHg^{-1}), where (H) is the original exact stabilizer. It also reverses the point ordering and confirms the unordered-set stabilizer is unchanged.
+
+An independent arithmetic replay over the JSON fixture checked **1,224 conjugacy cases with zero mismatches**, plus all 153 point-order controls. This is an independent fixture sanity check; the exact-head Rust workflow remains the implementation qualification gate.
+
 ## Context-indexed symmetry atlas oracle
 
 The Rust integration suite also uses one shared 16-candidate ordered-pair universe under three distinct task contexts. The exact local task-preserving subgroups are:
