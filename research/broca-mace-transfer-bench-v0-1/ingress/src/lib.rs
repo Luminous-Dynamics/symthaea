@@ -7,6 +7,8 @@
 //! EvidenceVerifier must delegate to Mycelix source-ledger, calibration and
 //! outcome-reconciliation receipts. Agent-authored labels are not trust anchors.
 
+use std::collections::BTreeMap;
+
 use broca_mace_policy::{Action, Experience, Scope};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -19,9 +21,15 @@ pub struct AsKnownQuery {
 #[derive(Clone, Debug)]
 pub struct RawInteractionV1 {
     pub event_id: u32,
+    pub session_id: String,
+    pub task_id: String,
+    /// SHA-256 digest of the canonical immutable event payload.
+    pub payload_sha256: String,
+    pub raw_event_receipt_id: String,
     pub scope: Scope,
     pub action: Action,
     pub observed_utility: f64,
+    pub utility_unit: String,
     pub valid_from_ms: i64,
     pub valid_until_ms: Option<i64>,
     pub recorded_at_ms: i64,
@@ -41,9 +49,26 @@ pub struct VerifiedLineage {
     pub receipt_digest: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifiedRawEvent {
+    pub event_id: u32,
+    pub session_id: String,
+    pub task_id: String,
+    pub payload_sha256: String,
+    pub valid_from_ms: i64,
+    pub valid_until_ms: Option<i64>,
+    pub recorded_at_ms: i64,
+    pub receipt_digest: String,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct VerifiedMeasurement {
     pub absolute_error_bound: f64,
+    pub unit: String,
+    pub method_id: String,
+    pub calibration_revision: String,
+    pub valid_from_ms: i64,
+    pub valid_until_ms: Option<i64>,
     pub calibration_digest: String,
 }
 
@@ -65,6 +90,15 @@ pub struct VerifiedOutcome {
 /// Production implementations must verify issuer, signatures, scope,
 /// content digests, valid/transaction time, revocation and calibration range.
 pub trait EvidenceVerifier {
+    /// Verify the receipt over the complete canonical raw event, not caller-
+    /// supplied time fields or selected metadata alone.
+    fn verify_raw_event(
+        &self,
+        receipt_id: &str,
+        raw: &RawInteractionV1,
+        known_at_ms: i64,
+    ) -> Option<VerifiedRawEvent>;
+
     fn verify_lineage(
         &self,
         receipt_id: &str,
@@ -76,6 +110,7 @@ pub trait EvidenceVerifier {
     fn verify_measurement(
         &self,
         receipt_id: &str,
+        expected_unit: &str,
         scope: Scope,
         observed_at_ms: i64,
         known_at_ms: i64,
@@ -97,13 +132,19 @@ pub trait EvidenceVerifier {
         known_at_ms: i64,
     ) -> Option<VerifiedOutcome>;
 
-    fn is_retracted_as_of(&self, event_id: u32, known_at_ms: i64) -> bool;
+    /// None means retraction state could not be verified and must fail closed.
+    fn is_retracted_as_of(&self, event_id: u32, known_at_ms: i64) -> Option<bool>;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EvidenceReceiptBundle {
+    pub raw_event_digest: String,
+    pub raw_event_receipt_digest: String,
     pub lineage_digest: String,
     pub calibration_digest: String,
+    pub measurement_unit: String,
+    pub calibration_method_id: String,
+    pub calibration_revision: String,
     pub causal_assessment_digest: String,
     pub outcome_digest: String,
 }
@@ -118,6 +159,10 @@ pub struct IngestedExperience {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum IngestReject {
     MalformedValidInterval,
+    InvalidPayloadDigest,
+    UnverifiedRawEvent,
+    RawEventReceiptMismatch,
+    RetractionStatusUnknown,
     NotValidAtRequestedTime,
     RecordedAfterKnownAt,
     OutcomeNotKnownAtRequestedTime,
@@ -143,15 +188,35 @@ pub fn ingest_as_known(
     query: AsKnownQuery,
     verifier: &impl EvidenceVerifier,
 ) -> Result<IngestedExperience, IngestReject> {
-    if raw.valid_until_ms.is_some_and(|end| end <= raw.valid_from_ms) {
+    if raw.payload_sha256.len() != 64
+        || !raw.payload_sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err(IngestReject::InvalidPayloadDigest);
+    }
+
+    let event = verifier
+        .verify_raw_event(&raw.raw_event_receipt_id, raw, query.known_at_ms)
+        .ok_or(IngestReject::UnverifiedRawEvent)?;
+    if event.event_id != raw.event_id
+        || event.session_id != raw.session_id
+        || event.task_id != raw.task_id
+        || event.payload_sha256 != raw.payload_sha256
+        || event.valid_from_ms != raw.valid_from_ms
+        || event.valid_until_ms != raw.valid_until_ms
+        || event.recorded_at_ms != raw.recorded_at_ms
+        || event.receipt_digest.is_empty()
+    {
+        return Err(IngestReject::RawEventReceiptMismatch);
+    }
+    if event.valid_until_ms.is_some_and(|end| end <= event.valid_from_ms) {
         return Err(IngestReject::MalformedValidInterval);
     }
-    if raw.valid_from_ms > query.valid_at_ms
-        || raw.valid_until_ms.is_some_and(|end| query.valid_at_ms >= end)
+    if event.valid_from_ms > query.valid_at_ms
+        || event.valid_until_ms.is_some_and(|end| query.valid_at_ms >= end)
     {
         return Err(IngestReject::NotValidAtRequestedTime);
     }
-    if raw.recorded_at_ms > query.known_at_ms {
+    if event.recorded_at_ms > query.known_at_ms {
         return Err(IngestReject::RecordedAfterKnownAt);
     }
     if raw.outcome_observed_at_ms > query.known_at_ms {
@@ -170,7 +235,10 @@ pub fn ingest_as_known(
     if dispatch >= raw.outcome_observed_at_ms {
         return Err(IngestReject::DispatchNotBeforeOutcome);
     }
-    if verifier.is_retracted_as_of(raw.event_id, query.known_at_ms) {
+    let retracted = verifier
+        .is_retracted_as_of(raw.event_id, query.known_at_ms)
+        .ok_or(IngestReject::RetractionStatusUnknown)?;
+    if retracted {
         return Err(IngestReject::RetractedAsKnown);
     }
     if !raw.observed_utility.is_finite() || !(0.0..=1.0).contains(&raw.observed_utility) {
@@ -192,6 +260,7 @@ pub fn ingest_as_known(
     let measurement = verifier
         .verify_measurement(
             &raw.calibration_receipt_id,
+            &raw.utility_unit,
             raw.scope,
             raw.outcome_observed_at_ms,
             query.known_at_ms,
@@ -199,6 +268,13 @@ pub fn ingest_as_known(
         .ok_or(IngestReject::UnverifiedCalibration)?;
     if !measurement.absolute_error_bound.is_finite()
         || !(0.0..=1.0).contains(&measurement.absolute_error_bound)
+        || measurement.unit != raw.utility_unit
+        || measurement.method_id.is_empty()
+        || measurement.calibration_revision.is_empty()
+        || measurement.valid_from_ms > raw.outcome_observed_at_ms
+        || measurement
+            .valid_until_ms
+            .is_some_and(|end| raw.outcome_observed_at_ms >= end)
     {
         return Err(IngestReject::InvalidMeasurementBound);
     }
@@ -242,11 +318,61 @@ pub fn ingest_as_known(
         },
         as_known: query,
         receipts: EvidenceReceiptBundle {
+            raw_event_digest: event.payload_sha256,
+            raw_event_receipt_digest: event.receipt_digest,
             lineage_digest: lineage.receipt_digest,
             calibration_digest: measurement.calibration_digest,
+            measurement_unit: measurement.unit,
+            calibration_method_id: measurement.method_id,
+            calibration_revision: measurement.calibration_revision,
             causal_assessment_digest: causal.assessment_digest,
             outcome_digest: outcome.outcome_digest,
         },
+    })
+}
+
+#[derive(Clone, Debug)]
+pub struct IngestBatch {
+    pub admitted: Vec<IngestedExperience>,
+    pub duplicate_event_ids: Vec<u32>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum IngestBatchReject {
+    ConflictingPayloadForEvent(u32),
+    EventRejected(u32, IngestReject),
+}
+
+/// Atomic as-known batch ingress. Same event ID + digest is idempotent;
+/// one event ID with different payload digests rejects the entire batch.
+pub fn ingest_batch_as_known(
+    raw_events: &[RawInteractionV1],
+    query: AsKnownQuery,
+    verifier: &impl EvidenceVerifier,
+) -> Result<IngestBatch, IngestBatchReject> {
+    let mut digests = BTreeMap::<u32, &str>::new();
+    let mut duplicate_event_ids = Vec::new();
+    let mut admitted = Vec::new();
+
+    for raw in raw_events {
+        if let Some(existing) = digests.get(&raw.event_id) {
+            if *existing != raw.payload_sha256.as_str() {
+                return Err(IngestBatchReject::ConflictingPayloadForEvent(
+                    raw.event_id,
+                ));
+            }
+            duplicate_event_ids.push(raw.event_id);
+            continue;
+        }
+        digests.insert(raw.event_id, raw.payload_sha256.as_str());
+        let ingested = ingest_as_known(raw, query, verifier)
+            .map_err(|reason| IngestBatchReject::EventRejected(raw.event_id, reason))?;
+        admitted.push(ingested);
+    }
+
+    Ok(IngestBatch {
+        admitted,
+        duplicate_event_ids,
     })
 }
 
@@ -266,6 +392,9 @@ mod tests {
         retracted_at_ms: Option<i64>,
         lineage_valid: bool,
         calibration_valid: bool,
+        raw_event_valid: bool,
+        raw_event_mismatch: bool,
+        retraction_status_known: bool,
     }
 
     impl Default for TestVerifier {
@@ -280,11 +409,39 @@ mod tests {
                 retracted_at_ms: None,
                 lineage_valid: true,
                 calibration_valid: true,
+                raw_event_valid: true,
+                raw_event_mismatch: false,
+                retraction_status_known: true,
             }
         }
     }
 
     impl EvidenceVerifier for TestVerifier {
+        fn verify_raw_event(
+            &self,
+            _receipt_id: &str,
+            raw: &RawInteractionV1,
+            _known_at_ms: i64,
+        ) -> Option<VerifiedRawEvent> {
+            if !self.raw_event_valid {
+                return None;
+            }
+            Some(VerifiedRawEvent {
+                event_id: raw.event_id,
+                session_id: raw.session_id.clone(),
+                task_id: raw.task_id.clone(),
+                payload_sha256: if self.raw_event_mismatch {
+                    "b".repeat(64)
+                } else {
+                    raw.payload_sha256.clone()
+                },
+                valid_from_ms: raw.valid_from_ms,
+                valid_until_ms: raw.valid_until_ms,
+                recorded_at_ms: raw.recorded_at_ms,
+                receipt_digest: "raw-event-receipt-digest".into(),
+            })
+        }
+
         fn verify_lineage(
             &self,
             _receipt_id: &str,
@@ -302,12 +459,18 @@ mod tests {
         fn verify_measurement(
             &self,
             _receipt_id: &str,
+            expected_unit: &str,
             _scope: Scope,
             _observed_at_ms: i64,
             _known_at_ms: i64,
         ) -> Option<VerifiedMeasurement> {
             self.calibration_valid.then(|| VerifiedMeasurement {
                 absolute_error_bound: self.error_bound,
+                unit: expected_unit.into(),
+                method_id: "utility-method-v1".into(),
+                calibration_revision: "calibration-rev-1".into(),
+                valid_from_ms: 100,
+                valid_until_ms: Some(300),
                 calibration_digest: "calibration-digest".into(),
             })
         }
@@ -341,9 +504,15 @@ mod tests {
             })
         }
 
-        fn is_retracted_as_of(&self, _event_id: u32, known_at_ms: i64) -> bool {
-            self.retracted_at_ms
-                .is_some_and(|at| at <= known_at_ms)
+        fn is_retracted_as_of(
+            &self,
+            _event_id: u32,
+            known_at_ms: i64,
+        ) -> Option<bool> {
+            self.retraction_status_known.then(|| {
+                self.retracted_at_ms
+                    .is_some_and(|at| at <= known_at_ms)
+            })
         }
     }
 
@@ -357,9 +526,14 @@ mod tests {
     fn raw() -> RawInteractionV1 {
         RawInteractionV1 {
             event_id: 42,
+            session_id: "session-a".into(),
+            task_id: "task-a".into(),
+            payload_sha256: "a".repeat(64),
+            raw_event_receipt_id: "raw-event-1".into(),
             scope: scope(),
             action: Action::A,
             observed_utility: 0.87,
+            utility_unit: "normalized_utility".into(),
             valid_from_ms: 100,
             valid_until_ms: Some(300),
             recorded_at_ms: 220,
@@ -378,6 +552,92 @@ mod tests {
     }
 
     #[test]
+    fn missing_or_mismatched_raw_event_receipt_is_rejected() {
+        let missing = TestVerifier {
+            raw_event_valid: false,
+            ..TestVerifier::default()
+        };
+        assert!(matches!(
+            ingest_as_known(&raw(), query(180, 250), &missing),
+            Err(IngestReject::UnverifiedRawEvent)
+        ));
+        let mismatch = TestVerifier {
+            raw_event_mismatch: true,
+            ..TestVerifier::default()
+        };
+        assert!(matches!(
+            ingest_as_known(&raw(), query(180, 250), &mismatch),
+            Err(IngestReject::RawEventReceiptMismatch)
+        ));
+        let mut malformed = raw();
+        malformed.payload_sha256 = "bad".into();
+        assert!(matches!(
+            ingest_as_known(&malformed, query(180, 250), &TestVerifier::default()),
+            Err(IngestReject::InvalidPayloadDigest)
+        ));
+    }
+
+    #[test]
+    fn unknown_retraction_status_fails_closed() {
+        let verifier = TestVerifier {
+            retraction_status_known: false,
+            ..TestVerifier::default()
+        };
+        assert!(matches!(
+            ingest_as_known(&raw(), query(180, 250), &verifier),
+            Err(IngestReject::RetractionStatusUnknown)
+        ));
+    }
+
+    #[test]
+    fn calibration_unit_and_validity_interval_are_enforced() {
+        let mut wrong_unit = raw();
+        wrong_unit.utility_unit = "dollars".into();
+        assert!(matches!(
+            ingest_as_known(&wrong_unit, query(180, 250), &TestVerifier::default()),
+            Err(IngestReject::InvalidMeasurementBound)
+        ));
+        let mut after_validity = raw();
+        after_validity.outcome_observed_at_ms = 350;
+        after_validity.recorded_at_ms = 360;
+        assert!(matches!(
+            ingest_as_known(
+                &after_validity,
+                query(180, 400),
+                &TestVerifier::default()
+            ),
+            Err(IngestReject::InvalidMeasurementBound)
+        ));
+    }
+
+    #[test]
+    fn batch_duplicate_delivery_is_idempotent() {
+        let batch = ingest_batch_as_known(
+            &[raw(), raw()],
+            query(180, 250),
+            &TestVerifier::default(),
+        )
+        .expect("identical duplicate deliveries are idempotent");
+        assert_eq!(batch.admitted.len(), 1);
+        assert_eq!(batch.duplicate_event_ids, vec![42]);
+    }
+
+    #[test]
+    fn batch_event_id_with_conflicting_payload_is_rejected_atomically() {
+        let mut conflicting = raw();
+        conflicting.payload_sha256 = "b".repeat(64);
+        assert_eq!(
+            ingest_batch_as_known(
+                &[raw(), conflicting],
+                query(180, 250),
+                &TestVerifier::default(),
+            )
+            .err(),
+            Some(IngestBatchReject::ConflictingPayloadForEvent(42))
+        );
+    }
+
+    #[test]
     fn verified_raw_interaction_becomes_receipted_experience() {
         let admitted = ingest_as_known(&raw(), query(180, 250), &TestVerifier::default())
             .expect("valid evidence should be admitted");
@@ -386,6 +646,11 @@ mod tests {
         assert_eq!(admitted.experience.measurement_error_bound, 0.02);
         assert_eq!(admitted.as_known, query(180, 250));
         assert_eq!(admitted.receipts.lineage_digest, "lineage-digest");
+        assert_eq!(admitted.receipts.raw_event_digest, raw().payload_sha256);
+        assert_eq!(
+            admitted.receipts.calibration_revision,
+            "calibration-rev-1"
+        );
     }
 
     #[test]
