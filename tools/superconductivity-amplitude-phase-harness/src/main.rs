@@ -522,6 +522,12 @@ impl GlModel {
             "edge_count": self.edges.len(),
             "box_lengths": self.box_lengths,
             "periodic_axis_count": self.periodic_axes.len(),
+            "edge_length_sum": self.edges.iter().map(|edge| edge.length).sum::<f64>(),
+            "periodic_image_edge_count": self
+                .edges
+                .iter()
+                .filter(|edge| edge.image_shift.iter().any(|shift| *shift != 0))
+                .count(),
             "temperature": self.temperature,
             "temperature_unit": "dimensionless_GL_temperature",
             "external_flux_quanta": self.external_flux_quanta,
