@@ -82,5 +82,46 @@
       "observer_blinding_id": null,
       "raw_measurement_url": null
     }
+  ],
+  "stem_mechanical_samples": [
+    {
+      "sample_id": "SMS-synthetic-001",
+      "parent_specimen_id": "SPEC-synthetic-beam-001",
+      "test_type": "three_point_bending",
+      "protocol_id": "synthetic-three-point-bend-v1",
+      "support_span_m": 0.1,
+      "cantilever_length_m": null,
+      "loading_rate_m_s": 0.001,
+      "force_displacement_curve": [
+        {
+          "force_n": 0,
+          "displacement_m": 0,
+          "time_s": 0
+        },
+        {
+          "force_n": 5,
+          "displacement_m": 0.005,
+          "time_s": 5
+        },
+        {
+          "force_n": 10,
+          "displacement_m": 0.01,
+          "time_s": 10
+        }
+      ],
+      "derived_flexural_rigidity_nm2": 0.020833333333333332,
+      "derived_peak_moment_nm": 0.25,
+      "moisture_mass_fraction": null,
+      "moisture_method": null,
+      "temperature_c": null,
+      "sheath_state": "not_applicable",
+      "failure_mode": "none",
+      "loading_axis_reference": "synthetic transverse axis perpendicular to specimen longitudinal axis",
+      "method": "synthetic known-answer three-point bend example; idealized linear force-displacement segment",
+      "instrument_or_calibration": "none; generated synthetic observation",
+      "observed_at": null,
+      "observer_blinding_id": null,
+      "raw_measurement_url": null
+    }
   ]
 }
