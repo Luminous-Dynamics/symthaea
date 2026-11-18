@@ -80,13 +80,13 @@ pub use plasma_hdc_encoder::{
 };
 
 pub use plasma_event_eval::{
-    AlarmAbstentionReason, AlarmEvaluationSummary, AlarmPolicyConfig, AlarmPolicyUpdate,
-    ExposureBootstrapInterval, OnlinePlasmaAlarmPolicy, PlasmaEventEvalError,
-    PlasmaEventEvaluationReceipt, PlasmaEventEvaluationReceiptBody, RateConfidenceInterval,
-    RiskModelBinding, RiskScoreEvidence, ShotAlarmEvaluation, ShotReferenceOutcome,
-    PLASMA_EVENT_EVALUATION_RECEIPT_SCHEMA, PLASMA_RISK_SCORE_EVIDENCE_SCHEMA,
-    bootstrap_false_alarms_per_non_disruptive_hour, observation_frame_sha256,
-    score_shot_alarms, summarize_alarm_evaluations,
+    AlarmAbstentionReason, AlarmEpisodeTrace, AlarmEvaluationSummary, AlarmPolicyConfig,
+    AlarmPolicyUpdate, ExposureBootstrapInterval, OnlinePlasmaAlarmPolicy,
+    PlasmaEventEvalError, PlasmaEventEvaluationReceipt, PlasmaEventEvaluationReceiptBody,
+    RateConfidenceInterval, RiskModelBinding, RiskScoreEvidence, ShotAlarmEvaluation,
+    ShotReferenceOutcome, PLASMA_EVENT_EVALUATION_RECEIPT_SCHEMA,
+    PLASMA_RISK_SCORE_EVIDENCE_SCHEMA, bootstrap_false_alarms_per_non_disruptive_hour,
+    observation_frame_sha256, score_shot_alarms, summarize_alarm_evaluations,
 };
 
 pub use plasma_control::{
