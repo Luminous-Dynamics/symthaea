@@ -259,6 +259,7 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
                 action: Some(action),
                 causal_claim: (difference >= 0.05).then_some(action),
                 evidence_ids,
+                requires_probe: false,
             }
         }
     }
