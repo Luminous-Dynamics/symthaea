@@ -127,7 +127,7 @@ fn decimal_scaled(value: &Value, scale: i128, context: &str) -> Result<i128, Str
         .as_number()
         .ok_or_else(|| format!("{context} must be a JSON number"))?;
     let text = number.to_string();
-    let (mantissa, exponent) = match text.find(['e', 'E']) {
+    let (mantissa, exponent) = match text.find(|character| character == 'e' || character == 'E') {
         Some(index) => {
             let exponent = text[index + 1..]
                 .parse::<i32>()
@@ -138,7 +138,7 @@ fn decimal_scaled(value: &Value, scale: i128, context: &str) -> Result<i128, Str
     };
 
     let negative = mantissa.starts_with('-');
-    let unsigned = mantissa.trim_start_matches(['-', '+']);
+    let unsigned = mantissa.trim_start_matches(|character| character == '-' || character == '+');
     let (whole, fractional) = match unsigned.split_once('.') {
         Some((whole, fractional)) => (whole, fractional),
         None => (unsigned, ""),
