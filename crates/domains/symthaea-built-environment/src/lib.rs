@@ -2517,6 +2517,25 @@ mod tests {
     }
 
     #[test]
+    fn exact_hypervolume_supports_five_objectives_for_floorplan_benchmarks() {
+        let evaluation = OracleEvaluation {
+            candidate_id:"five-objective".to_owned(),
+            gate_state:GateState::Pass,
+            objectives:vec![
+                OracleObjective {objective_id:"space".to_owned(),direction:ObjectiveDirection::Minimize,value:1.0},
+                OracleObjective {objective_id:"circulation".to_owned(),direction:ObjectiveDirection::Minimize,value:2.0},
+                OracleObjective {objective_id:"daylight".to_owned(),direction:ObjectiveDirection::Maximize,value:5.0},
+                OracleObjective {objective_id:"privacy".to_owned(),direction:ObjectiveDirection::Maximize,value:6.0},
+                OracleObjective {objective_id:"carbon".to_owned(),direction:ObjectiveDirection::Minimize,value:5.0},
+            ],
+        };
+        assert_eq!(
+            exact_hypervolume(&[evaluation], &[3.0,4.0,3.0,4.0,7.0]).unwrap(),
+            32.0
+        );
+    }
+
+    #[test]
     fn exact_hypervolume_rejects_bad_reference_points_and_dimensions() {
         let evaluation = OracleEvaluation {
             candidate_id:"single".to_owned(),
