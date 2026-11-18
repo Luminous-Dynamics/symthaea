@@ -246,3 +246,12 @@ Source: https://doi.org/10.1016/j.buildenv.2025.112825
 The 50 / 75 / 100 kPa points are added because the SANS 10252-1:2018 Edition 3.2 Table 3 lists a 50–100 kPa design flow pressure for its water-saving showerhead row. This is a reason to test low-head behavior, not evidence that commercial heads are required or guaranteed to deliver a satisfactory bath at every value. Define actual task success, standard endpoints, flow and uncertainty at each point. Compare the exact Hansgrohe Activera 28087000 (manufacturer-declared 0.5 bar minimum) and Brondell Nebia Corre (manufacturer-declared 20–80 psi range) at matched dynamic pressure points where the component ratings and method allow.
 
 The exact South African pressure datum must be dynamic pressure measured at the fitting inlet under flow. Record static pressure, upstream residual pressure and dynamic pressure separately. If a second fixture is drawing simultaneously, record that condition as a separate concurrent-demand block rather than mixing it with single-fixture results.
+
+
+## 14. Spray geometry is also a thermal-service variable
+
+A 2024 study of five showerheads and 18 spray patterns reported that pressure, nozzle-area ratio and resistance factor significantly affected the spray-to-skin heat-transfer coefficient; it reported potential energy savings up to 20% at similar thermal sensation under its tested conditions. This is adjacent laboratory evidence, not a transferable Aqua result.
+
+Aqua's spray-field experiment should therefore preserve separate water-distribution and thermal observations. At minimum capture inlet, outlet and bather-plane water temperatures, room conditions, pressure and flow. Add a spray-to-skin heat-transfer coefficient only if the measurement method and thermal boundary are independently validated. Any later claim of reduced heater energy at equivalent thermal sensation requires a matched whole-service energy balance and an independently qualified human-factors endpoint.
+
+Source: Zhang, Mui and Wong, Water (2024), 16(7), 928: https://www.mdpi.com/2073-4441/16/7/928
