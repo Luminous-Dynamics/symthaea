@@ -169,6 +169,19 @@ For mechanics, align masses, constraints, constitutive/contact models, integrato
 - Never label a target as achieved from fixture unit tests alone.
 
 
+
+## External proposal-adapter API
+
+The Rust oracle exposes the following reusable surface:
+
+- `Manifest::parse` and `verify_group_axioms` load and qualify the frozen ambient D4 group.
+- `case_ids_for_split_track(split, track)` returns the complete sorted case-ID denominator for a baseline adapter. Discovery, calibration and final holdout are separate calls; the test asserts 300 structural cases per split and pairwise disjoint IDs.
+- `case_by_id(case_id)` returns the frozen input record.
+- `audit_proposed_subgroup(case, proposal_ids)` returns per-element exact/estimated status, group-axiom violations, true positives, false promotions, missed symmetries, true negatives and an exact witness for every element.
+- `verify_proposal_audit(case, receipt)` independently recomputes the complete result and rejects edited witnesses or counts.
+
+The expected integration pattern is: fit/threshold a method using discovery and calibration only; freeze its source revision, configuration and threshold; emit one proposal or explicit abstention for every final-holdout ID; submit those proposals to the independent oracle; then validate the run scorecard against the same manifest and split digests. The oracle does not fit, tune or select the external method.
+
 ## Machine-readable benchmark scorecards
 
 `schemas/run_scorecard.schema.json` defines the required record for every external comparator execution. It pins the protocol, case manifest, inputs, split and method configuration by SHA-256; records the baseline code revision and hardware/software environment; stores per-case outputs including abstentions, failures and out-of-domain cases; and requires explicit false-promotion, false-elimination, lift and verification accounting.
