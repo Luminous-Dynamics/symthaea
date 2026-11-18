@@ -329,7 +329,7 @@ mod tests {
         let (schema, manifest) = inputs();
         let receipt = audit_manifest(&schema, &manifest, None).unwrap();
         assert_eq!(receipt["status"], "pass");
-        assert_eq!(receipt["file_count"], 26);
+        assert_eq!(receipt["file_count"], 31);
         assert_eq!(receipt["execution_status"], "not_executed");
         assert_eq!(
             receipt["local_git_blob_verification"],
@@ -402,8 +402,8 @@ mod tests {
     fn manifest_rejects_cross_case_tc_output_binding() {
         let (schema, bytes) = inputs();
         let mut manifest: Value = serde_json::from_slice(&bytes).unwrap();
-        manifest["cases"][0]["tc_output_blob_sha"] =
-            manifest["cases"][1]["tc_output_blob_sha"].clone();
+        let other_sha = manifest["cases"][1]["tc_output_blob_sha"].clone();
+        manifest["cases"][0]["tc_output_blob_sha"] = other_sha;
         assert!(audit_manifest(&schema, &serde_json::to_vec(&manifest).unwrap(), None).is_err());
     }
 }
