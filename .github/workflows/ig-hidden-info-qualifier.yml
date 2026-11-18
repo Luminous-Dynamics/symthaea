@@ -35,6 +35,10 @@ jobs:
         run: cargo fmt --manifest-path research/ig-hidden-info-001/qualifier/Cargo.toml --check
       - name: Unit and negative-control tests
         run: cargo test --manifest-path research/ig-hidden-info-001/qualifier/Cargo.toml
+      - name: Validate pinned upstream HiddenBench corpus
+        run: |
+          cargo run --manifest-path research/ig-hidden-info-001/qualifier/Cargo.toml --bin validate_hiddenbench -- \
+            research/ig-hidden-info-001/external/hiddenbench/benchmark.json
       - name: Qualify evidence-flow fixtures
         run: |
           cargo run --manifest-path research/ig-hidden-info-001/qualifier/Cargo.toml -- \
