@@ -55,6 +55,8 @@ pub enum BoundedError {
     TruncatedVarint,
     VarintOverflow,
     NonCanonicalVarint,
+    InvalidTolerance(u16),
+    NumericOverflow,
 }
 
 impl fmt::Display for BoundedError {
@@ -76,6 +78,8 @@ impl fmt::Display for BoundedError {
             Self::TruncatedVarint => write!(f, "truncated bounded-error residual varint"),
             Self::VarintOverflow => write!(f, "bounded-error residual varint exceeds u64"),
             Self::NonCanonicalVarint => write!(f, "non-canonical bounded-error residual varint"),
+            Self::InvalidTolerance(v) => write!(f, "bounded-error tolerance {v} exceeds the supported i16 range"),
+            Self::NumericOverflow => write!(f, "bounded-error residual reconstruction overflowed i64"),
         }
     }
 }
@@ -147,8 +151,12 @@ fn nearest_integer_quotient(residual: i64, step: i64) -> i64 {
     }
 }
 
-fn reconstruct(prediction: i64, index: i64, step: i64) -> i16 {
-    (prediction + index * step).clamp(i16::MIN as i64, i16::MAX as i64) as i16
+fn reconstruct(prediction: i64, index: i64, step: i64) -> Result<i16, BoundedError> {
+    let residual = index.checked_mul(step).ok_or(BoundedError::NumericOverflow)?;
+    let value = prediction
+        .checked_add(residual)
+        .ok_or(BoundedError::NumericOverflow)?;
+    Ok(value.clamp(i16::MIN as i64, i16::MAX as i64) as i16)
 }
 
 /// Encode an i16 sequence with a strict per-sample absolute-error tolerance.
@@ -161,6 +169,9 @@ pub fn compress_bounded_i16(
     predictor: BoundedPredictor,
     model: ModelKind,
 ) -> Result<Vec<u8>, BoundedError> {
+    if tolerance > i16::MAX as u16 {
+        return Err(BoundedError::InvalidTolerance(tolerance));
+    }
     let step = 2 * tolerance as i64 + 1;
     let capacity = values
         .len()
@@ -172,7 +183,7 @@ pub fn compress_bounded_i16(
     for &value in values {
         let prediction = predict(&reconstructed, predictor);
         let index = nearest_integer_quotient(value as i64 - prediction, step);
-        let decoded = reconstruct(prediction, index, step);
+        let decoded = reconstruct(prediction, index, step)?;
         let error = (value as i32 - decoded as i32).unsigned_abs();
         if error > tolerance as u32 {
             return Err(BoundedError::LengthMismatch);
@@ -234,6 +245,9 @@ pub fn decompress_bounded_i16(
         return Err(BoundedError::UnsupportedModel(model_id));
     }
     let tolerance = u16::from_le_bytes([frame[8], frame[9]]);
+    if tolerance > i16::MAX as u16 {
+        return Err(BoundedError::InvalidTolerance(tolerance));
+    }
     let flags = u16::from_le_bytes([frame[10], frame[11]]);
     if flags != 0 {
         return Err(BoundedError::UnsupportedFlags(flags));
@@ -293,7 +307,7 @@ pub fn decompress_bounded_i16(
     for _ in 0..count {
         let index = zigzag_decode(read_varint(&indices, &mut cursor)?);
         let prediction = predict(&values, predictor);
-        values.push(reconstruct(prediction, index, step));
+        values.push(reconstruct(prediction, index, step)?);
     }
     if cursor != indices.len() {
         return Err(BoundedError::LengthMismatch);
@@ -404,6 +418,28 @@ mod tests {
                 assert!(decompress_bounded_i16(&mutated, 1024).is_err());
             }
         }
+    }
+
+    #[test]
+    fn unsupported_tolerance_and_reconstruction_overflow_reject() {
+        assert_eq!(
+            compress_bounded_i16(
+                &[0, 1],
+                u16::MAX,
+                BoundedPredictor::Previous,
+                ModelKind::Order0
+            )
+            .unwrap_err(),
+            BoundedError::InvalidTolerance(u16::MAX)
+        );
+        assert_eq!(
+            reconstruct(0, i64::MAX, 3),
+            Err(BoundedError::NumericOverflow)
+        );
+        assert_eq!(
+            reconstruct(-2, i64::MIN, 1),
+            Err(BoundedError::NumericOverflow)
+        );
     }
 
     #[test]
