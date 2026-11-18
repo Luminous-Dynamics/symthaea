@@ -126,15 +126,33 @@ The Rust evaluator:
 - checks that simultaneous component-basis permutation and tensor permutation preserve physical energy;
 - records exact schema and fixture SHA-256 hashes.
 
-## Explicitly not implemented
+## Implemented thermal pilot and remaining qualification gaps
 
-- finite-Q PDW real-space phase factors, wave-vector stars, commensurability or symmetry-derived coupling selection;
-- thermal sampling, free-energy minimization, phase diagrams or defect energetics;
-- current response, helicity-modulus/stiffness tensor or stability eigenvalues;
-- Leggett/relative-phase dynamics, time-reversal symmetry classification or conductivity;
-- microscopic derivation/calibration of the coefficients from a material or ab initio calculation.
+A separate `--monte-carlo` path now runs finite-size single-component-site Metropolis proposals over the full multicomponent lattice field. Each proposal changes one complex component at one site and uses an exact local energy difference comprising the changed site's quadratic/quartic/phase-lock/secondary-order terms and every incident intercomponent gradient link. A regression test compares this local \(\Delta F\) against full-lattice recomputation for every site/component in nonuniform fields and nonzero gauge links.
 
-The input declares that a physically labelled superconducting state must have a positive-semidefinite superfluid-stiffness tensor and that a negative eigenvalue is a hard failure. The present static configuration auditor **does not evaluate that stiffness**; its receipt says `not_evaluated_by_static_configuration_auditor`. It must not be interpreted as passing the physical stability gate.
+The sampler supports deterministic multi-chain seeds and records per-chain:
+- acceptance / invalid proposal counts, initial/final energy and raw measured configurations;
+- component-resolved mean \(|\psi_a|\) and \(|\psi_a|^2\);
+- relative-phase-lock cosine statistics;
+- quadratic, quartic, gradient and total energy;
+- heat-capacity fluctuation point estimate;
+- twist-current means, diamagnetic tensor, current covariance and a thermal helicity-modulus point-estimate tensor;
+- the minimum eigenvalue of the symmetric stiffness point-estimate tensor and an explicit gate status.
+
+The stiffness status is deliberately conservative:
+- a negative point-estimate eigenvalue means a stable-superconductor claim is not permitted for that pilot result pending uncertainty/convergence;
+- a nonnegative point estimate remains explicitly uncertainty-unresolved.
+
+The current CI smoke uses two chains, two warmup sweeps and four measurement sweeps. This is a software plumbing test only. The sampler currently uses a full energy recomputation at every measurement but local \(\Delta F\) for each proposal. It does not yet implement blocked jackknife uncertainties for the helicity modulus, chain convergence/thermalization criteria, replica exchange, HMC, or finite-size scaling.
+
+Still not implemented or scientifically qualified:
+- finite-Q PDW real-space phase factors, wave-vector stars, commensurability and symmetry-derived coupling selection;
+- free-energy minimization and phase diagrams;
+- thermodynamic-limit defect energetics and constrained-vortex thermodynamic integration;
+- Leggett / relative-phase dynamics, time-reversal symmetry classification and conductivity;
+- microscopic derivation/calibration of coefficients from a material or ab initio calculation.
+
+The input declares that a physically labelled superconducting state must have a positive-semidefinite superfluid-stiffness tensor and that a negative eigenvalue is a hard stability gate. The thermal pilot computes only a short-chain point estimate; it is not yet a convergence-qualified stability verdict and must not be interpreted as passing the physical gate.
 
 Finite-Q components are accepted by the schema for provenance and future work, but the initial evaluator rejects nonzero \(\mathbf Q\). The next PDW implementation must define the lattice convention for \(e^{i\mathbf Q\cdot\mathbf r}\), component translation/symmetry transformations, common-gauge-covariant gradients, and allowed couplings before calculating PDW free energies or stiffness.
 
@@ -190,3 +208,23 @@ For the current axis-aligned unit-edge lattice, off-diagonal spatial twist-curva
 The current branch is a static single-configuration evaluator: it has no thermal sampler, no temperature, and does not evaluate that covariance. The stiffness-positivity gate therefore remains `not_evaluated_by_static_configuration_auditor`. It must not be counted as a physically stable superconducting state or as a reproduction of PDW stability results.
 
 The zero-momentum evaluator also rejects a component labelled `pdw_plus_q` or `pdw_minus_q` with zero momentum, and rejects all nonzero-momentum components. This keeps the role metadata honest until the finite-Q lattice phase factors, translation-symmetry operations, and symmetry-allowed couplings have a separate executable contract.
+
+
+### Thermal sampler and local update correctness
+
+The random-walk proposal is symmetric in the complex plane:
+\[
+\psi_{ia}'=\psi_{ia}+\delta_x+i\delta_y,
+\qquad
+\delta_x,\delta_y\sim U[-s,s],
+\]
+with acceptance \(\min(1,e^{-\Delta F/T})\). Only one component at one site is changed per proposal, but all quadratic, quartic, phase-locking, secondary-order and incident intercomponent gradient terms are included in \(\Delta F\).
+
+The full-lattice energy is recomputed at every measurement and replaces the incrementally accumulated energy, limiting floating-point drift. The exact local-update regression test compares each site/component proposal's incremental \(\Delta F\) with the full energy difference for all fixture sites/components under nonuniform complex fields and nonzero link phases.
+
+The thermal twist estimator is
+\[
+\Upsilon_{\mu\nu}=\langle D_{\mu\nu}\rangle-
+\operatorname{Cov}(J_\mu,J_\nu)/T.
+\]
+It is reported as a finite-chain point estimate. The pilot does not yet report blocked jackknife/bootstrap uncertainty for the tensor/eigenvalues. Autocorrelation and multi-size scaling therefore remain required before a negative or positive point estimate can be used as a material-stability statement.
