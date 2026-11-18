@@ -743,7 +743,9 @@ pub(super) fn run(
 
 #[cfg(test)]
 mod tests {
-    use super::{run, IntertwinedModel, SamplingOverrides};
+    use super::{
+        relative_phase_lock_sines, run, Complex, IntertwinedModel, SamplingOverrides,
+    };
     use serde_json::Value;
     use std::fs;
     use std::path::PathBuf;
