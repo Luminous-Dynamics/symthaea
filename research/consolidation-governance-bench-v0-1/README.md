@@ -1,4 +1,4 @@
-# Symthaea Consolidation Governance Bench v0.1
+# Symthaea Consolidation Governance Bench v0.2 (receipt-proposal experiment)
 
 **Status:** Exploratory deterministic synthetic harness. Not a production memory controller, not a public benchmark score, and not evidence of real-world transfer.
 
@@ -101,3 +101,7 @@ Next steps should be owned by #9139 and its related work: grow source-held-out s
 - [#11816](https://github.com/Luminous-Dynamics/symthaea/issues/11816): benchmark oracle independence.
 
 Do not add a competing memory store, evidence graph, receipt schema, policy engine, or global truth score.
+
+## v0.2 source-bound receipt proposal
+
+The candidate decision now produces a source-bound receipt proposal. The evaluator checks exact source-event and payload-digest binding, unique event IDs, source-family/root independence, action/disposition equality and promotion support. The proposal is not a signed or cryptographically verified receipt; a production adapter must attach a real policy digest, provenance receipts and independent verifier/signature. A frequency-only promotion over common-root echoes is deliberately rejected by this receipt validator.

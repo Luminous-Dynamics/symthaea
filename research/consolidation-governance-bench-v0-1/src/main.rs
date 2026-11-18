@@ -69,8 +69,525 @@ impl Action {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct SourceEventEvidence {
+    event_id: u32,
+    payload_digest: &'static str,
+    source_family_id: u16,
+    upstream_root_id: u32,
+    independently_observed_success: bool,
+    outcome_verified: bool,
+    source_trusted: bool,
+    source_retracted: bool,
+    scope_matches: bool,
+    prediction_pre_registered: bool,
+}
+
+const fn source_event(
+    event_id: u32,
+    payload_digest: &'static str,
+    source_family_id: u16,
+    upstream_root_id: u32,
+    independently_observed_success: bool,
+    outcome_verified: bool,
+    source_trusted: bool,
+    source_retracted: bool,
+    scope_matches: bool,
+    prediction_pre_registered: bool,
+) -> SourceEventEvidence {
+    SourceEventEvidence {
+        event_id,
+        payload_digest,
+        source_family_id,
+        upstream_root_id,
+        independently_observed_success,
+        outcome_verified,
+        source_trusted,
+        source_retracted,
+        scope_matches,
+        prediction_pre_registered,
+    }
+}
+
 // This is the only input a candidate policy receives. It deliberately excludes
 // evaluator-only outcomes, answer keys, future transfer results, and oracle actions.
+const SOURCES_INDEPENDENT_TRANSFER: &[SourceEventEvidence] = &[
+    source_event(
+        1000,
+        "00000000000000000000000000000000000000000000000000000000000003e8",
+        20,
+        1900,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1001,
+        "00000000000000000000000000000000000000000000000000000000000003e9",
+        21,
+        1901,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1002,
+        "00000000000000000000000000000000000000000000000000000000000003ea",
+        22,
+        1902,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+];
+
+const SOURCES_CORRELATED_DUPLICATES: &[SourceEventEvidence] = &[
+    source_event(
+        1003,
+        "00000000000000000000000000000000000000000000000000000000000003eb",
+        5,
+        900,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1004,
+        "00000000000000000000000000000000000000000000000000000000000003ec",
+        5,
+        900,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1005,
+        "00000000000000000000000000000000000000000000000000000000000003ed",
+        5,
+        900,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1006,
+        "00000000000000000000000000000000000000000000000000000000000003ee",
+        5,
+        900,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1007,
+        "00000000000000000000000000000000000000000000000000000000000003ef",
+        5,
+        900,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1008,
+        "00000000000000000000000000000000000000000000000000000000000003f0",
+        5,
+        900,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1009,
+        "00000000000000000000000000000000000000000000000000000000000003f1",
+        5,
+        900,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1010,
+        "00000000000000000000000000000000000000000000000000000000000003f2",
+        5,
+        900,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+];
+
+const SOURCES_POISONED: &[SourceEventEvidence] = &[
+    source_event(
+        1011,
+        "00000000000000000000000000000000000000000000000000000000000003f3",
+        20,
+        1900,
+        true,
+        true,
+        false,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1012,
+        "00000000000000000000000000000000000000000000000000000000000003f4",
+        21,
+        1901,
+        true,
+        true,
+        false,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1013,
+        "00000000000000000000000000000000000000000000000000000000000003f5",
+        22,
+        1902,
+        true,
+        true,
+        false,
+        false,
+        true,
+        true,
+    ),
+];
+
+const SOURCES_DOMAIN_SHIFT: &[SourceEventEvidence] = &[
+    source_event(
+        1014,
+        "00000000000000000000000000000000000000000000000000000000000003f6",
+        20,
+        1900,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+    ),
+    source_event(
+        1015,
+        "00000000000000000000000000000000000000000000000000000000000003f7",
+        21,
+        1901,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+    ),
+    source_event(
+        1016,
+        "00000000000000000000000000000000000000000000000000000000000003f8",
+        22,
+        1902,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+    ),
+    source_event(
+        1017,
+        "00000000000000000000000000000000000000000000000000000000000003f9",
+        23,
+        1903,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+    ),
+    source_event(
+        1018,
+        "00000000000000000000000000000000000000000000000000000000000003fa",
+        24,
+        1904,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+    ),
+];
+
+const SOURCES_RARE_SAFETY: &[SourceEventEvidence] = &[
+    source_event(
+        1019,
+        "00000000000000000000000000000000000000000000000000000000000003fb",
+        20,
+        1900,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1020,
+        "00000000000000000000000000000000000000000000000000000000000003fc",
+        21,
+        1901,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1021,
+        "00000000000000000000000000000000000000000000000000000000000003fd",
+        22,
+        1902,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1022,
+        "00000000000000000000000000000000000000000000000000000000000003fe",
+        23,
+        1903,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+];
+
+const SOURCES_RETRACTED: &[SourceEventEvidence] = &[
+    source_event(
+        1023,
+        "00000000000000000000000000000000000000000000000000000000000003ff",
+        20,
+        1900,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+    ),
+    source_event(
+        1024,
+        "0000000000000000000000000000000000000000000000000000000000000400",
+        21,
+        1901,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+    ),
+    source_event(
+        1025,
+        "0000000000000000000000000000000000000000000000000000000000000401",
+        22,
+        1902,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+    ),
+];
+
+const SOURCES_PRIVACY_ERASURE: &[SourceEventEvidence] = &[
+    source_event(
+        1026,
+        "0000000000000000000000000000000000000000000000000000000000000402",
+        20,
+        1900,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+];
+
+const SOURCES_UNDER_SUPPORTED: &[SourceEventEvidence] = &[
+    source_event(
+        1027,
+        "0000000000000000000000000000000000000000000000000000000000000403",
+        20,
+        1900,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1028,
+        "0000000000000000000000000000000000000000000000000000000000000404",
+        21,
+        1901,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+];
+
+const SOURCES_SAFE_COMPRESSION: &[SourceEventEvidence] = &[
+    source_event(
+        1029,
+        "0000000000000000000000000000000000000000000000000000000000000405",
+        20,
+        1900,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1030,
+        "0000000000000000000000000000000000000000000000000000000000000406",
+        21,
+        1901,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+];
+
+const SOURCES_INDEPENDENT_RULE: &[SourceEventEvidence] = &[
+    source_event(
+        1031,
+        "0000000000000000000000000000000000000000000000000000000000000407",
+        20,
+        1900,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1032,
+        "0000000000000000000000000000000000000000000000000000000000000408",
+        21,
+        1901,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1033,
+        "0000000000000000000000000000000000000000000000000000000000000409",
+        22,
+        1902,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1034,
+        "000000000000000000000000000000000000000000000000000000000000040a",
+        23,
+        1903,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+    source_event(
+        1035,
+        "000000000000000000000000000000000000000000000000000000000000040b",
+        24,
+        1904,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+];
+
+const SOURCES_NON_LOAD_BEARING: &[SourceEventEvidence] = &[
+    source_event(
+        1036,
+        "000000000000000000000000000000000000000000000000000000000000040c",
+        20,
+        1900,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+    ),
+];
+
 #[derive(Clone, Copy, Debug)]
 struct Observation {
     episode_count: u32,
@@ -85,6 +602,7 @@ struct Observation {
     privacy_erasure_requested: bool,
     compressible: bool,
     non_load_bearing: bool,
+    source_events: &'static [SourceEventEvidence],
 }
 
 // Evaluator-only truth. No candidate policy accepts this type.
@@ -139,6 +657,55 @@ impl Policy {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+struct QualifiedSourceSupport {
+    event_ids: BTreeSet<u32>,
+    source_families: BTreeSet<u16>,
+    upstream_roots: BTreeSet<u32>,
+    successful_events: u32,
+    invalid_entries: u32,
+    retracted_events: u32,
+}
+
+fn valid_fixture_digest(digest: &str) -> bool {
+    digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn qualified_source_support(observation: &Observation) -> QualifiedSourceSupport {
+    let mut support = QualifiedSourceSupport::default();
+    for event in observation.source_events {
+        if event.event_id == 0
+            || event.source_family_id == 0
+            || event.upstream_root_id == 0
+            || !valid_fixture_digest(event.payload_digest)
+        {
+            support.invalid_entries += 1;
+            continue;
+        }
+        if !support.event_ids.insert(event.event_id) {
+            support.invalid_entries += 1;
+            continue;
+        }
+        if event.source_retracted {
+            support.retracted_events += 1;
+            continue;
+        }
+        if !event.source_trusted
+            || !event.outcome_verified
+            || !event.scope_matches
+            || !event.prediction_pre_registered
+        {
+            continue;
+        }
+        support.source_families.insert(event.source_family_id);
+        support.upstream_roots.insert(event.upstream_root_id);
+        if event.independently_observed_success {
+            support.successful_events += 1;
+        }
+    }
+    support
+}
+
 // Policies receive observations only. This function cannot inspect OracleTruth.
 fn decide(policy: Policy, observation: &Observation) -> Action {
     match policy {
@@ -165,12 +732,14 @@ fn decide(policy: Policy, observation: &Observation) -> Action {
             }
         }
         Policy::Governed => {
+            let support = qualified_source_support(observation);
             if observation.privacy_erasure_requested {
                 Action::EraseForPrivacy
-            } else if observation.source_retracted {
+            } else if observation.source_retracted || support.retracted_events > 0 {
                 Action::Supersede
             } else if observation.contradiction_count > 0
                 || observation.unverified_source_count > 0
+                || support.invalid_entries > 0
             {
                 Action::Quarantine
             } else if observation.rare_safety_detail {
@@ -179,13 +748,15 @@ fn decide(policy: Policy, observation: &Observation) -> Action {
                 Action::ForgetFromActiveIndex
             } else if !observation.scope_matches {
                 Action::RetainProvisional
-            } else if observation.independent_source_families >= 5
-                && observation.independently_observed_successes >= 5
+            } else if support.source_families.len() >= 5
+                && support.upstream_roots.len() >= 5
+                && support.successful_events >= 5
                 && observation.prediction_pre_registered
             {
                 Action::PromoteToRule
-            } else if observation.independent_source_families >= 3
-                && observation.independently_observed_successes >= 3
+            } else if support.source_families.len() >= 3
+                && support.upstream_roots.len() >= 3
+                && support.successful_events >= 3
                 && observation.prediction_pre_registered
             {
                 Action::PromoteToProcedure
@@ -196,6 +767,99 @@ fn decide(policy: Policy, observation: &Observation) -> Action {
             }
         }
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct SourceEventBinding {
+    event_id: u32,
+    payload_digest: &'static str,
+    source_family_id: u16,
+    upstream_root_id: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ConsolidationReceiptProposal {
+    schema_version: u16,
+    decision_id: String,
+    policy_id: &'static str,
+    policy_version: &'static str,
+    disposition: Action,
+    source_events: Vec<SourceEventBinding>,
+}
+
+fn propose_consolidation_receipt(
+    policy: Policy,
+    scenario_id: &'static str,
+    observation: &Observation,
+) -> ConsolidationReceiptProposal {
+    let disposition = decide(policy, observation);
+    let source_events = observation
+        .source_events
+        .iter()
+        .map(|event| SourceEventBinding {
+            event_id: event.event_id,
+            payload_digest: event.payload_digest,
+            source_family_id: event.source_family_id,
+            upstream_root_id: event.upstream_root_id,
+        })
+        .collect();
+    ConsolidationReceiptProposal {
+        schema_version: 1,
+        decision_id: format!("{scenario_id}:{}:{}", policy.name(), disposition.name()),
+        policy_id: policy.name(),
+        policy_version: "consolidation-governance-v0.2",
+        disposition,
+        source_events,
+    }
+}
+
+// Evaluator-side structural check. This validates binding/completeness, not authenticity;
+// production still requires a separately operated Mycelix verifier/signature.
+fn validate_receipt_proposal(
+    receipt: &ConsolidationReceiptProposal,
+    policy: Policy,
+    scenario: &Scenario,
+) -> Result<(), &'static str> {
+    if receipt.schema_version != 1 || receipt.decision_id.is_empty() {
+        return Err("invalid receipt envelope");
+    }
+    if receipt.policy_id != policy.name()
+        || receipt.disposition != decide(policy, &scenario.observation)
+    {
+        return Err("receipt policy/disposition mismatch");
+    }
+    if receipt.source_events.len() != scenario.observation.source_events.len() {
+        return Err("source-event binding count mismatch");
+    }
+    for (binding, source) in receipt
+        .source_events
+        .iter()
+        .zip(scenario.observation.source_events)
+    {
+        if binding.event_id != source.event_id
+            || binding.payload_digest != source.payload_digest
+            || binding.source_family_id != source.source_family_id
+            || binding.upstream_root_id != source.upstream_root_id
+        {
+            return Err("source-event binding mismatch");
+        }
+    }
+    let event_ids: BTreeSet<u32> = receipt.source_events.iter().map(|item| item.event_id).collect();
+    if event_ids.len() != receipt.source_events.len() {
+        return Err("duplicate source event ID");
+    }
+    if receipt.disposition.is_promotion() {
+        let support = qualified_source_support(&scenario.observation);
+        if support.invalid_entries > 0
+            || support.source_families.len() < 3
+            || support.upstream_roots.len() < 3
+            || support.successful_events < 3
+            || support.retracted_events > 0
+        {
+            return Err("promotion lacks independent verified source support");
+        }
+    }
+    Ok(())
 }
 
 // The evaluator owns the utility function. It is not visible to candidate policies.
@@ -311,6 +975,7 @@ fn scenarios() -> Vec<Scenario> {
         Scenario {
             name: "independent_transfer_support",
             observation: Observation {
+                source_events: SOURCES_INDEPENDENT_TRANSFER,
                 episode_count: 3,
                 independent_source_families: 3,
                 independently_observed_successes: 3,
@@ -341,6 +1006,7 @@ fn scenarios() -> Vec<Scenario> {
         Scenario {
             name: "correlated_duplicate_echo",
             observation: Observation {
+                source_events: SOURCES_CORRELATED_DUPLICATES,
                 episode_count: 8,
                 independent_source_families: 1,
                 independently_observed_successes: 8,
@@ -371,6 +1037,7 @@ fn scenarios() -> Vec<Scenario> {
         Scenario {
             name: "poisoned_contradictory_episode",
             observation: Observation {
+                source_events: SOURCES_POISONED,
                 episode_count: 3,
                 independent_source_families: 3,
                 independently_observed_successes: 3,
@@ -401,6 +1068,7 @@ fn scenarios() -> Vec<Scenario> {
         Scenario {
             name: "domain_shift",
             observation: Observation {
+                source_events: SOURCES_DOMAIN_SHIFT,
                 episode_count: 5,
                 independent_source_families: 5,
                 independently_observed_successes: 5,
@@ -431,6 +1099,7 @@ fn scenarios() -> Vec<Scenario> {
         Scenario {
             name: "rare_safety_critical_gotcha",
             observation: Observation {
+                source_events: SOURCES_RARE_SAFETY,
                 episode_count: 5,
                 independent_source_families: 4,
                 independently_observed_successes: 4,
@@ -461,6 +1130,7 @@ fn scenarios() -> Vec<Scenario> {
         Scenario {
             name: "source_retracted",
             observation: Observation {
+                source_events: SOURCES_RETRACTED,
                 episode_count: 4,
                 independent_source_families: 3,
                 independently_observed_successes: 4,
@@ -491,6 +1161,7 @@ fn scenarios() -> Vec<Scenario> {
         Scenario {
             name: "privacy_erasure",
             observation: Observation {
+                source_events: SOURCES_PRIVACY_ERASURE,
                 episode_count: 2,
                 independent_source_families: 1,
                 independently_observed_successes: 0,
@@ -521,6 +1192,7 @@ fn scenarios() -> Vec<Scenario> {
         Scenario {
             name: "under_supported_candidate",
             observation: Observation {
+                source_events: SOURCES_UNDER_SUPPORTED,
                 episode_count: 2,
                 independent_source_families: 2,
                 independently_observed_successes: 2,
@@ -551,6 +1223,7 @@ fn scenarios() -> Vec<Scenario> {
         Scenario {
             name: "safe_compression",
             observation: Observation {
+                source_events: SOURCES_SAFE_COMPRESSION,
                 episode_count: 4,
                 independent_source_families: 2,
                 independently_observed_successes: 2,
@@ -581,6 +1254,7 @@ fn scenarios() -> Vec<Scenario> {
         Scenario {
             name: "independent_rule_support",
             observation: Observation {
+                source_events: SOURCES_INDEPENDENT_RULE,
                 episode_count: 6,
                 independent_source_families: 5,
                 independently_observed_successes: 5,
@@ -611,6 +1285,7 @@ fn scenarios() -> Vec<Scenario> {
         Scenario {
             name: "non_load_bearing_active_item",
             observation: Observation {
+                source_events: SOURCES_NON_LOAD_BEARING,
                 episode_count: 1,
                 independent_source_families: 1,
                 independently_observed_successes: 0,
@@ -652,6 +1327,9 @@ struct Metrics {
     rare_detail_losses: u32,
     stale_reuse: u32,
     privacy_erasure_misses: u32,
+    promotion_receipt_proposals: u32,
+    accepted_promotion_receipts: u32,
+    rejected_promotion_receipts: u32,
     decisions: u32,
 }
 
@@ -660,6 +1338,7 @@ fn evaluate(policy: Policy, cases: &[Scenario]) -> Metrics {
 
     for case in cases {
         let selected = decide(policy, &case.observation);
+        let receipt = propose_consolidation_receipt(policy, case.name, &case.observation);
         let oracle = oracle_action(&case.truth);
         let selected_utility = utility(selected, &case.truth);
         let oracle_utility = utility(oracle, &case.truth);
@@ -669,6 +1348,15 @@ fn evaluate(policy: Policy, cases: &[Scenario]) -> Metrics {
         metrics.total_regret += oracle_utility - selected_utility;
         metrics.total_utility += selected_utility;
         metrics.total_storage_units += selected.storage_units();
+
+        if selected.is_promotion() {
+            metrics.promotion_receipt_proposals += 1;
+            if validate_receipt_proposal(&receipt, policy, case).is_ok() {
+                metrics.accepted_promotion_receipts += 1;
+            } else {
+                metrics.rejected_promotion_receipts += 1;
+            }
+        }
 
         if selected.is_promotion()
             && (!case.truth.transferable
@@ -712,7 +1400,8 @@ fn print_report(cases: &[Scenario]) {
         concat!(
             "policy,oracle_exact_pct,mean_utility,mean_regret,storage_units_total,",
             "harmful_promotions,poison_escapes,rare_detail_losses,stale_reuse,",
-            "privacy_erasure_misses"
+            "privacy_erasure_misses,promotion_receipt_proposals,",
+            "accepted_promotion_receipts,rejected_promotion_receipts"
         )
     );
 
@@ -724,7 +1413,7 @@ fn print_report(cases: &[Scenario]) {
         let mean_regret = metrics.total_regret as f64 / count;
 
         println!(
-            "{},{:.1},{:.2},{:.2},{},{},{},{},{},{}",
+            "{},{:.1},{:.2},{:.2},{},{},{},{},{},{},{},{},{}",
             policy.name(),
             exact_pct,
             mean_utility,
@@ -734,7 +1423,10 @@ fn print_report(cases: &[Scenario]) {
             metrics.poisoned_case_escapes,
             metrics.rare_detail_losses,
             metrics.stale_reuse,
-            metrics.privacy_erasure_misses
+            metrics.privacy_erasure_misses,
+            metrics.promotion_receipt_proposals,
+            metrics.accepted_promotion_receipts,
+            metrics.rejected_promotion_receipts
         );
     }
 
@@ -877,6 +1569,81 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn governed_transfer_promotion_emits_exact_source_bound_receipt() {
+        let case = scenarios()
+            .into_iter()
+            .find(|case| case.name == "independent_transfer_support")
+            .expect("transfer fixture exists");
+        let receipt = propose_consolidation_receipt(
+            Policy::Governed,
+            case.name,
+            &case.observation,
+        );
+
+        assert_eq!(receipt.disposition, Action::PromoteToProcedure);
+        assert_eq!(receipt.source_events.len(), 3);
+        assert!(validate_receipt_proposal(&receipt, Policy::Governed, &case).is_ok());
+    }
+
+    #[test]
+    fn frequency_promotion_proposal_is_rejected_for_common_root_duplicates() {
+        let case = scenarios()
+            .into_iter()
+            .find(|case| case.name == "correlated_duplicate_echo")
+            .expect("correlated fixture exists");
+        let receipt = propose_consolidation_receipt(
+            Policy::FrequencyOnly,
+            case.name,
+            &case.observation,
+        );
+
+        assert_eq!(receipt.disposition, Action::PromoteToProcedure);
+        assert_eq!(receipt.source_events.len(), 8);
+        assert!(validate_receipt_proposal(&receipt, Policy::FrequencyOnly, &case).is_err());
+    }
+
+    #[test]
+    fn source_event_or_payload_digest_tampering_invalidates_receipt() {
+        let case = scenarios()
+            .into_iter()
+            .find(|case| case.name == "independent_transfer_support")
+            .expect("transfer fixture exists");
+        let mut receipt = propose_consolidation_receipt(
+            Policy::Governed,
+            case.name,
+            &case.observation,
+        );
+        receipt.source_events[0].payload_digest = "tampered-digest";
+        assert!(validate_receipt_proposal(&receipt, Policy::Governed, &case).is_err());
+
+        let mut receipt = propose_consolidation_receipt(
+            Policy::Governed,
+            case.name,
+            &case.observation,
+        );
+        receipt.source_events[0].event_id += 1000;
+        assert!(validate_receipt_proposal(&receipt, Policy::Governed, &case).is_err());
+    }
+
+    #[test]
+    fn invalid_source_digest_and_duplicate_event_cannot_support_promotion() {
+        let mut case = scenarios()
+            .into_iter()
+            .find(|case| case.name == "independent_transfer_support")
+            .expect("transfer fixture exists");
+        let mut sources = case.observation.source_events.to_vec();
+        sources[0].payload_digest = "not-a-64-character-fixture-digest";
+        sources[1].event_id = sources[0].event_id;
+        case.observation.source_events = Box::leak(sources.into_boxed_slice());
+        let receipt = propose_consolidation_receipt(
+            Policy::Governed,
+            case.name,
+            &case.observation,
+        );
+        assert!(validate_receipt_proposal(&receipt, Policy::Governed, &case).is_err());
+    }
 
     #[test]
     fn governed_policy_uses_observed_scope_and_source_metadata() {
