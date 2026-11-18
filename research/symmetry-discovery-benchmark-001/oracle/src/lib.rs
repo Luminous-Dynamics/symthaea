@@ -1145,7 +1145,7 @@ mod tests {
             assert!(decision.proposed);
             assert!(!decision.exact);
             assert!(matches!(
-                decision.witness,
+                &decision.witness,
                 StabilizerWitnessV1::MovedPoint { .. }
             ));
         }
@@ -1173,7 +1173,7 @@ mod tests {
             assert!(!decision.proposed);
             assert!(decision.exact);
             assert!(matches!(
-                decision.witness,
+                &decision.witness,
                 StabilizerWitnessV1::PointPermutation { .. }
             ));
         }
@@ -1225,9 +1225,12 @@ mod tests {
             panic!("false promotion must carry a moved-point counterexample");
         }
         assert!(oracle.verify_proposal_audit(chiral, &forged).is_err());
-        assert!(oracle.audit_proposed_subgroup(chiral, &d4[..7]).is_ok());
-    }
-
+        let incomplete_d4 = oracle.audit_proposed_subgroup(chiral, &d4[..7]).unwrap();
+        assert!(!incomplete_d4.group_axioms_satisfied);
+        assert_eq!(
+            oracle.audit_proposed_subgroup(chiral, &["not-an-element".to_owned()]),
+            Err("proposal references unknown D4 element not-an-element".to_owned())
+        );
     }
 
     #[test]
