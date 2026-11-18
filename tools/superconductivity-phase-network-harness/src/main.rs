@@ -501,7 +501,8 @@ mod tests {
     #[test]
     fn self_loop_fails_closed() {
         let (_, mut fixture) = inputs();
-        fixture["graph"]["edges"][0]["target"] = fixture["graph"]["edges"][0]["source"].clone();
+        let source = fixture["graph"]["edges"][0]["source"].clone();
+        fixture["graph"]["edges"][0]["target"] = source;
         assert!(audit_mutated(fixture).is_err());
     }
 
