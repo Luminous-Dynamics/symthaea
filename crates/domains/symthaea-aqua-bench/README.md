@@ -35,6 +35,15 @@ Device configuration and cleaning protocol are allowed to differ between compara
 
 The Aqua adapter only binds the product comparison to those owner outputs. It cannot validate or replace them.
 
+## Authored test inventory
+
+- Matched-run evidence adapter: 18 unit tests.
+- Spray-field summary and matched degradation comparison: 15 unit tests.
+- Service-continuity classifier: 17 unit tests, including exhaustive enumeration of all 57,600 categorical input combinations.
+- Exact-point pressure/flow evidence: 20 unit tests, including one-sided manufacturer pressure-range declarations.
+
+**70 tests are authored across the four modules.** This is a source inventory only; no exact-head run, rustfmt or Clippy result is claimed until the dedicated Aqua workflow reports it.
+
 ## Run
 
 ```sh
