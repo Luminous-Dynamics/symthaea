@@ -190,9 +190,13 @@ FEEDIT M3/M4 elements may be used as generator-specific synthetic controls, but 
 
 The Rust helper `familywise_max_statistic_p_value` rejects unequal family widths and computes the empirical p-value using the maximum of the entire family per null replicate. It does not make an invalid null exchangeable. The current 2×2 switch null is not qualified for inferential use.
 
-### Track F — crop-flow/plant mechanics
+### Track F — crop-flow, 3D pose and measured mechanics
 
-Use the [field protocol](FIELD_PROTOCOL.md) and separate upright, mechanical-lodging and naturally lodged controls. Compare ground-level stem orientation, 3D/LiDAR, RGB texture direction and crop-flow descriptors. Calibrate posture proxies against mechanical measurements rather than inferring flexural rigidity or breaking moment from images.
+Use the [field protocol](FIELD_PROTOCOL.md) and separate upright, mechanical-lodging and naturally lodged controls. Compare ground-level stem orientation, 3D/LiDAR, RGB texture direction and crop-flow descriptors. Calibrate posture proxies against raw force-displacement tests rather than inferring flexural rigidity or breaking moment from images. The schema now records specimen-level mechanical tests and raw curves; the lab includes idealized first-order beam reference equations only.
+
+### Track G — controlled mechanism discrimination
+
+Use [MECHANISM_BENCHMARK.md](MECHANISM_BENCHMARK.md) to define mechanism-specific predictions before collection. Split by independent plot/event and acquisition session; do not split stems from the same manipulated plot across train and test. First test blinded, controlled reference plots, then move to site/event holdout. Report mechanism confusion matrices, proper predictive scores, calibration, selective risk, abstention and event-clustered intervals. A model must predict held-out intervention outcomes or independent observations, not only reproduce the final footprint.
 
 ## 6. Split strategy and reporting
 
