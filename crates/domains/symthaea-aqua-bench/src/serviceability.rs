@@ -293,11 +293,11 @@ pub struct ServiceabilityCohortSummary {
     pub observation_count: usize,
     pub routine_job_count: usize,
     pub routine_non_destructive_qualified_count: usize,
-    pub routine_non_destructive_qualified_fraction: f64,
+    pub routine_non_destructive_qualified_fraction: Option<f64>,
     pub routine_unknown_access_count: usize,
     pub routine_destructive_access_count: usize,
     pub qualified_return_count: usize,
-    pub first_pass_function_success_count: usize,
+    pub post_repair_function_pass_count: usize,
     pub unique_tool_count: usize,
     pub median_technician_minutes: f64,
     pub median_downtime_minutes: f64,
@@ -370,9 +370,9 @@ pub fn summarize_serviceability_cohort(
     };
 
     let routine_non_destructive_qualified_fraction = if routine_job_count == 0 {
-        0.0
+        None
     } else {
-        routine_non_destructive_qualified_count as f64 / routine_job_count as f64
+        Some(routine_non_destructive_qualified_count as f64 / routine_job_count as f64)
     };
 
     Ok(ServiceabilityCohortSummary {
@@ -383,7 +383,7 @@ pub fn summarize_serviceability_cohort(
         routine_unknown_access_count,
         routine_destructive_access_count,
         qualified_return_count,
-        first_pass_function_success_count,
+        post_repair_function_pass_count,
         unique_tool_count: tools.len(),
         median_technician_minutes: median(&technician_times),
         median_downtime_minutes: median(&downtime_times),
@@ -624,6 +624,15 @@ mod tests {
             record.validate(),
             Err(ServiceabilityError::InvalidDigest { field: "hardware_configuration_sha256" })
         );
+    }
+
+    #[test]
+    fn cohort_reports_no_fraction_when_no_routine_jobs_exist() {
+        let mut non_routine = observation("run-01", ServiceAccessOutcome::NotRepairable);
+        non_routine.routine_job = false;
+        let summary = summarize_serviceability_cohort(&[non_routine]).expect("cohort");
+        assert_eq!(summary.routine_job_count, 0);
+        assert_eq!(summary.routine_non_destructive_qualified_fraction, None);
     }
 
     #[test]
