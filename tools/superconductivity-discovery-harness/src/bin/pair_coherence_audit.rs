@@ -14,7 +14,11 @@ fn nonempty_text<'a>(value: &'a Value, field: &str) -> Result<&'a str, String> {
         .ok_or_else(|| format!("missing or empty string field {field}"))
 }
 
-fn validate_document(schema_bytes: &[u8], document_bytes: &[u8], label: &str) -> Result<Value, String> {
+fn validate_document(
+    schema_bytes: &[u8],
+    document_bytes: &[u8],
+    label: &str,
+) -> Result<Value, String> {
     let schema: Value = serde_json::from_slice(schema_bytes)
         .map_err(|error| format!("{label} schema JSON parse failed: {error}"))?;
     let document: Value = serde_json::from_slice(document_bytes)
@@ -23,8 +27,8 @@ fn validate_document(schema_bytes: &[u8], document_bytes: &[u8], label: &str) ->
     if schema.get("$schema").and_then(Value::as_str) != Some(DIALECT) {
         return Err(format!("{label} schema must declare {DIALECT}"));
     }
-    let validator =
-        validator_for(&schema).map_err(|error| format!("{label} schema compile failed: {error}"))?;
+    let validator = validator_for(&schema)
+        .map_err(|error| format!("{label} schema compile failed: {error}"))?;
     for error in validator.iter_errors(&document) {
         return Err(format!(
             "{label} schema validation failed: {} at {}",
@@ -97,7 +101,9 @@ fn validate_comparison(
             .and_then(Value::as_str)
             .ok_or_else(|| format!("{id}: missing source.source_id"))?;
         if !source_set.contains(source_id) {
-            return Err(format!("{id}: source {source_id} is not declared by fixture"));
+            return Err(format!(
+                "{id}: source {source_id} is not declared by fixture"
+            ));
         }
         if event_map.insert(id.to_owned(), event).is_some() {
             return Err(format!("duplicate observation ID: {id}"));
@@ -108,15 +114,17 @@ fn validate_comparison(
     let pairing_id = nonempty_text(&comparison, "pairing_observation_id")?;
     let coherence_id = nonempty_text(&comparison, "coherence_observation_id")?;
     if pairing_id == coherence_id {
-        return Err(format!("{comparison_id}: pairing and coherence IDs must be distinct"));
+        return Err(format!(
+            "{comparison_id}: pairing and coherence IDs must be distinct"
+        ));
     }
 
     let pairing = event_map
         .get(pairing_id)
         .ok_or_else(|| format!("{comparison_id}: pairing event {pairing_id} does not resolve"))?;
-    let coherence = event_map
-        .get(coherence_id)
-        .ok_or_else(|| format!("{comparison_id}: coherence event {coherence_id} does not resolve"))?;
+    let coherence = event_map.get(coherence_id).ok_or_else(|| {
+        format!("{comparison_id}: coherence event {coherence_id} does not resolve")
+    })?;
 
     for (label, event, accepted_properties, accepted_scopes) in [
         (
@@ -210,7 +218,9 @@ fn validate_comparison(
             .pointer("/sample/identity_status")
             .and_then(Value::as_str);
         if observed_material != Some(material_id) {
-            return Err(format!("{comparison_id}: {label} event material identity does not match"));
+            return Err(format!(
+                "{comparison_id}: {label} event material identity does not match"
+            ));
         }
         if observed_sample != Some(sample_id) || observed_batch != Some(batch_id) {
             return Err(format!(
@@ -218,7 +228,9 @@ fn validate_comparison(
             ));
         }
         if observed_state != Some(state_id) {
-            return Err(format!("{comparison_id}: {label} event material state does not match"));
+            return Err(format!(
+                "{comparison_id}: {label} event material state does not match"
+            ));
         }
         if sample_status != Some("matched_specimen") {
             return Err(format!(
@@ -238,9 +250,9 @@ fn validate_comparison(
             ("doping_state", "/conditions/doping_state"),
             ("strain_state", "/conditions/strain_state"),
         ] {
-            let expected = fixed_conditions
-                .get(fixture_field)
-                .ok_or_else(|| format!("{comparison_id}: fixed_conditions missing {fixture_field}"))?;
+            let expected = fixed_conditions.get(fixture_field).ok_or_else(|| {
+                format!("{comparison_id}: fixed_conditions missing {fixture_field}")
+            })?;
             let actual = event
                 .pointer(event_path)
                 .ok_or_else(|| format!("{comparison_id}/{label}: event missing {event_path}"))?;
@@ -258,10 +270,22 @@ fn validate_comparison(
         }
     }
 
-    let pairing_value = pairing.pointer("/assertion/value").and_then(Value::as_f64).unwrap();
-    let pairing_unit = pairing.pointer("/assertion/unit").and_then(Value::as_str).unwrap();
-    let coherence_value = coherence.pointer("/assertion/value").and_then(Value::as_f64).unwrap();
-    let coherence_unit = coherence.pointer("/assertion/unit").and_then(Value::as_str).unwrap();
+    let pairing_value = pairing
+        .pointer("/assertion/value")
+        .and_then(Value::as_f64)
+        .unwrap();
+    let pairing_unit = pairing
+        .pointer("/assertion/unit")
+        .and_then(Value::as_str)
+        .unwrap();
+    let coherence_value = coherence
+        .pointer("/assertion/value")
+        .and_then(Value::as_f64)
+        .unwrap();
+    let coherence_unit = coherence
+        .pointer("/assertion/unit")
+        .and_then(Value::as_str)
+        .unwrap();
 
     Ok(json!({
         "status": "pass",
@@ -323,7 +347,11 @@ fn main() {
     let mut index = 1;
     while index < args.len() {
         match args[index].as_str() {
-            "--comparison-schema" | "--comparison" | "--observation-schema" | "--observations" | "--out" => {
+            "--comparison-schema"
+            | "--comparison"
+            | "--observation-schema"
+            | "--observations"
+            | "--out" => {
                 if index + 1 >= args.len() {
                     usage(&args[0]);
                     process::exit(2);
@@ -350,9 +378,17 @@ fn main() {
             }
         }
     }
-    let (Some(comparison_schema_path),Some(comparison_path),Some(observation_schema_path),Some(observation_fixture_path)) =
-        (comparison_schema_path,comparison_path,observation_schema_path,observation_fixture_path)
-    else {
+    let (
+        Some(comparison_schema_path),
+        Some(comparison_path),
+        Some(observation_schema_path),
+        Some(observation_fixture_path),
+    ) = (
+        comparison_schema_path,
+        comparison_path,
+        observation_schema_path,
+        observation_fixture_path,
+    ) else {
         usage(&args[0]);
         process::exit(2);
     };
@@ -387,19 +423,26 @@ mod tests {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
         let comparison_schema = fs::read(
             root.join("data/schemas/superconductivity_pair_coherence_comparison_v0_1.schema.json"),
-        ).expect("comparison schema must be readable");
+        )
+        .expect("comparison schema must be readable");
         let comparison = fs::read(
             root.join("tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"),
         ).expect("comparison fixture must be readable");
         let observation_schema = fs::read(
             root.join("data/schemas/superconductivity_observation_event_v0_1.schema.json"),
-        ).expect("observation schema must be readable");
+        )
+        .expect("observation schema must be readable");
         let observations: Value = serde_json::from_slice(
             &fs::read(
                 root.join("tools/superconductivity-discovery-harness/fixtures/observation_events_smoke_v0_1.json"),
             ).expect("observation fixture must be readable"),
         ).expect("observation fixture must parse");
-        (comparison_schema, comparison, observation_schema, observations)
+        (
+            comparison_schema,
+            comparison,
+            observation_schema,
+            observations,
+        )
     }
 
     fn audit_mutated(comparison: Value, observations: Value) -> Result<Value, String> {
@@ -425,10 +468,14 @@ mod tests {
             &comparison,
             &observation_schema,
             &serde_json::to_vec(&observations).unwrap(),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(receipt["status"], "pass");
         assert_eq!(receipt["observations"]["pairing"]["unit"], "meV");
-        assert_eq!(receipt["observations"]["coherence"]["property_code"], "superfluid_stiffness");
+        assert_eq!(
+            receipt["observations"]["coherence"]["property_code"],
+            "superfluid_stiffness"
+        );
     }
 
     #[test]
