@@ -611,7 +611,7 @@
     {
       "id": "CS-011-uncertain-low-potential-skips-calibration",
       "input": {
-        "task_id": "CS-011-uncertain-low-potential-skip",
+        "task_id": "CS-011-uncertain-low-potential-skips-calibration",
         "task_decomposability": "low",
         "sequential_coupling": "high",
         "latent_information_asymmetry": "low",
