@@ -260,6 +260,134 @@ fn mean(values: &[f64]) -> f64 {
     values.iter().sum::<f64>() / values.len() as f64
 }
 
+fn helicity_tensor_from_samples(
+    current_series: &[Vec<f64>],
+    diamagnetic_series: &[Vec<Vec<f64>>],
+    temperature: f64,
+    excluded_block: Option<(usize, usize)>,
+) -> Result<Vec<Vec<f64>>, String> {
+    let dimension = current_series.len();
+    if dimension == 0 || diamagnetic_series.len() != dimension {
+        return Err("helicity series dimensions are inconsistent".to_owned());
+    }
+    let sample_count = current_series[0].len();
+    if sample_count < 2
+        || current_series.iter().any(|series| series.len() != sample_count)
+        || diamagnetic_series.iter().any(|row| {
+            row.len() != dimension
+                || row.iter().any(|series| series.len() != sample_count)
+        })
+    {
+        return Err("helicity series have inconsistent or insufficient sample counts".to_owned());
+    }
+    let included: Vec<usize> = (0..sample_count)
+        .filter(|index| {
+            excluded_block.is_none_or(|(start, end)| *index < start || *index >= end)
+        })
+        .collect();
+    if included.len() < 2 {
+        return Err("helicity jackknife left fewer than two observations".to_owned());
+    }
+
+    let current_means: Vec<f64> = current_series
+        .iter()
+        .map(|series| {
+            included.iter().map(|index| series[*index]).sum::<f64>()
+                / included.len() as f64
+        })
+        .collect();
+    let mut tensor = vec![vec![0.0; dimension]; dimension];
+    for alpha in 0..dimension {
+        for beta in 0..dimension {
+            let diamagnetic_mean = included
+                .iter()
+                .map(|index| diamagnetic_series[alpha][beta][*index])
+                .sum::<f64>()
+                / included.len() as f64;
+            let current_product_mean = included
+                .iter()
+                .map(|index| current_series[alpha][*index] * current_series[beta][*index])
+                .sum::<f64>()
+                / included.len() as f64;
+            let covariance =
+                current_product_mean - current_means[alpha] * current_means[beta];
+            tensor[alpha][beta] = diamagnetic_mean - covariance / temperature;
+        }
+    }
+    if tensor.iter().flatten().any(|value| !value.is_finite()) {
+        return Err("helicity tensor contains non-finite entries".to_owned());
+    }
+    Ok(tensor)
+}
+
+fn block_jackknife_helicity(
+    current_series: &[Vec<f64>],
+    diamagnetic_series: &[Vec<Vec<f64>>],
+    temperature: f64,
+) -> Result<(Vec<Vec<f64>>, Option<Vec<Vec<f64>>>, Option<f64>), String> {
+    let point_estimate =
+        helicity_tensor_from_samples(current_series, diamagnetic_series, temperature, None)?;
+    let sample_count = current_series[0].len();
+    if sample_count < 20 {
+        return Ok((point_estimate, None, None));
+    }
+
+    let block_count = 10_usize.min(sample_count / 4);
+    if block_count < 4 {
+        return Ok((point_estimate, None, None));
+    }
+    let mut leave_block_out = Vec::with_capacity(block_count);
+    let mut leave_block_minimum_eigenvalues = Vec::with_capacity(block_count);
+    for block in 0..block_count {
+        let start = block * sample_count / block_count;
+        let end = (block + 1) * sample_count / block_count;
+        let estimate = helicity_tensor_from_samples(
+            current_series,
+            diamagnetic_series,
+            temperature,
+            Some((start, end)),
+        )?;
+        let minimum = super::minimum_symmetric_eigenvalue(&estimate)?;
+        leave_block_minimum_eigenvalues.push(minimum);
+        leave_block_out.push(estimate);
+    }
+
+    let dimension = point_estimate.len();
+    let mut jackknife_mean = vec![vec![0.0; dimension]; dimension];
+    for estimate in &leave_block_out {
+        for alpha in 0..dimension {
+            for beta in 0..dimension {
+                jackknife_mean[alpha][beta] += estimate[alpha][beta] / block_count as f64;
+            }
+        }
+    }
+    let factor = (block_count - 1) as f64 / block_count as f64;
+    let mut standard_error = vec![vec![0.0; dimension]; dimension];
+    for alpha in 0..dimension {
+        for beta in 0..dimension {
+            let sum_squared = leave_block_out
+                .iter()
+                .map(|estimate| (estimate[alpha][beta] - jackknife_mean[alpha][beta]).powi(2))
+                .sum::<f64>();
+            standard_error[alpha][beta] = (factor * sum_squared).sqrt();
+        }
+    }
+
+    let eigenvalue_mean =
+        leave_block_minimum_eigenvalues.iter().sum::<f64>() / block_count as f64;
+    let eigenvalue_variance = factor
+        * leave_block_minimum_eigenvalues
+            .iter()
+            .map(|value| (value - eigenvalue_mean).powi(2))
+            .sum::<f64>();
+    let eigenvalue_standard_error = eigenvalue_variance.sqrt();
+    Ok((
+        point_estimate,
+        Some(standard_error),
+        Some(eigenvalue_standard_error),
+    ))
+}
+
 fn run_chain(
     model: &IntertwinedModel,
     temperature: f64,
@@ -394,10 +522,11 @@ fn run_chain(
         }));
     }
 
+    let (helicity_modulus, helicity_jackknife_se, minimum_eigenvalue_jackknife_se) =
+        block_jackknife_helicity(&current_series, &diamagnetic_series, temperature)?;
     let current_means: Vec<f64> = current_series.iter().map(|series| mean(series)).collect();
     let mut diamagnetic_mean = vec![vec![0.0; dimension]; dimension];
     let mut current_covariance = vec![vec![0.0; dimension]; dimension];
-    let mut helicity_modulus = vec![vec![0.0; dimension]; dimension];
     for alpha in 0..dimension {
         for beta in 0..dimension {
             diamagnetic_mean[alpha][beta] = mean(&diamagnetic_series[alpha][beta]);
@@ -409,18 +538,25 @@ fn run_chain(
                 / config.measurement_sweeps as f64;
             current_covariance[alpha][beta] =
                 product_mean - current_means[alpha] * current_means[beta];
-            helicity_modulus[alpha][beta] =
-                diamagnetic_mean[alpha][beta] - current_covariance[alpha][beta] / temperature;
         }
     }
     let min_stiffness_eigenvalue =
         super::minimum_symmetric_eigenvalue(&helicity_modulus)?;
-    let stiffness_status = if min_stiffness_eigenvalue
-        < -model.stiffness_tolerance
-    {
-        "negative_point_estimate_stable_claim_not_permitted_pending_uncertainty"
-    } else {
-        "nonnegative_point_estimate_uncertainty_unresolved"
+    let stiffness_status = match minimum_eigenvalue_jackknife_se {
+        None => "insufficient_samples_for_stiffness_jackknife",
+        Some(standard_error)
+            if min_stiffness_eigenvalue + 1.96 * standard_error
+                < -model.stiffness_tolerance =>
+        {
+            "negative_stiffness_approx95_jackknife_interval_stable_claim_rejected"
+        }
+        Some(standard_error)
+            if min_stiffness_eigenvalue - 1.96 * standard_error
+                > model.stiffness_tolerance =>
+        {
+            "positive_stiffness_approx95_jackknife_interval_within_sample_only"
+        }
+        Some(_) => "stiffness_approx95_jackknife_interval_includes_zero_unresolved",
     };
 
     let energy_variance = population_variance(&energy_series);
@@ -497,11 +633,16 @@ fn run_chain(
             "mean_diamagnetic_tensor": diamagnetic_mean,
             "current_covariance": current_covariance,
             "thermal_helicity_modulus_tensor": helicity_modulus,
-            "formula": "Upsilon_mu_nu=<D_mu_nu>-Cov(J_mu,J_nu)/T",
+            "thermal_helicity_modulus_jackknife_standard_error": helicity_jackknife_se,
             "minimum_stiffness_eigenvalue": min_stiffness_eigenvalue,
+            "minimum_stiffness_eigenvalue_jackknife_standard_error": minimum_eigenvalue_jackknife_se,
+            "approximate_95_percent_minimum_eigenvalue_interval": minimum_eigenvalue_jackknife_se.map(|se| [
+                min_stiffness_eigenvalue - 1.96 * se,
+                min_stiffness_eigenvalue + 1.96 * se
+            ]),
             "stiffness_positivity_gate": stiffness_status,
             "stiffness_tolerance": model.stiffness_tolerance,
-            "warning": "Short pilot chain: the point estimate is not a convergence-qualified stiffness or phase-stability result."
+            "warning": "Block jackknife quantifies finite-chain resampling variability only; it does not establish thermalization, autocorrelation adequacy, finite-size convergence or material stability."
         },
         "raw_measurements": raw_measurements,
         "claim_ceiling": "Finite-size synthetic multicomponent GL Metropolis pilot only; no equilibration, thermodynamic-limit phase classification, material Tc, or experimental result is established."
@@ -677,6 +818,62 @@ mod tests {
             .map(|chain| chain["chain_seed"].as_u64().unwrap())
             .collect();
         assert_eq!(seeds, vec![1000, 1001, 1002]);
+    }
+
+    #[test]
+    fn short_chains_do_not_emit_invented_stiffness_uncertainty() {
+        let (model, fixture, temperature) = inputs();
+        let output = run(
+            &model,
+            temperature,
+            &fixture,
+            SamplingOverrides {
+                warmup_sweeps: Some(1),
+                measurement_sweeps: Some(4),
+                independent_chains: Some(1),
+                ..SamplingOverrides::default()
+            },
+        )
+        .unwrap();
+        let chain = &output["chain_receipts"][0];
+        assert_eq!(
+            chain["twist_response"]["minimum_stiffness_eigenvalue_jackknife_standard_error"],
+            Value::Null
+        );
+        assert_eq!(
+            chain["twist_response"]["stiffness_positivity_gate"],
+            "insufficient_samples_for_stiffness_jackknife"
+        );
+    }
+
+    #[test]
+    fn longer_chains_emit_finite_block_jackknife_stiffness_uncertainty() {
+        let (model, fixture, temperature) = inputs();
+        let output = run(
+            &model,
+            temperature,
+            &fixture,
+            SamplingOverrides {
+                warmup_sweeps: Some(1),
+                measurement_sweeps: Some(40),
+                independent_chains: Some(1),
+                random_seed: Some(90),
+                ..SamplingOverrides::default()
+            },
+        )
+        .unwrap();
+        let chain = &output["chain_receipts"][0];
+        let standard_error = chain["twist_response"]
+            ["minimum_stiffness_eigenvalue_jackknife_standard_error"]
+            .as_f64()
+            .unwrap();
+        assert!(standard_error.is_finite() && standard_error >= 0.0);
+        let interval = chain["twist_response"]
+            ["approximate_95_percent_minimum_eigenvalue_interval"]
+            .as_array()
+            .unwrap();
+        assert_eq!(interval.len(), 2);
+        assert!(interval.iter().all(|value| value.as_f64().is_some()));
     }
 
     #[test]
