@@ -459,7 +459,9 @@
               "Hc",
               "finite_q_pair_susceptibility",
               "pairing_gap",
-              "other"
+              "other",
+              "quadratic_pair_susceptibility",
+              "quartic_free_energy_response"
             ]
           },
           "value_kind": {
@@ -548,7 +550,8 @@
           "supporting_observable_ids",
           "uncertainty_or_covariance",
           "model_family",
-          "non_identifiability_reason"
+          "non_identifiability_reason",
+          "state_id"
         ],
         "properties": {
           "coefficient_id": {
@@ -635,6 +638,10 @@
           },
           "non_identifiability_reason": {
             "type": "string"
+          },
+          "state_id": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
