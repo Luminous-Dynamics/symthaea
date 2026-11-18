@@ -985,6 +985,28 @@ pub fn exact_pareto_front(evaluations: &[OracleEvaluation]) -> Result<Vec<String
         if evaluation.candidate_id.trim().is_empty() || !ids.insert(evaluation.candidate_id.clone()) {
             return Err("candidate IDs must be non-empty and unique".to_owned());
         }
+        if evaluation.gate_state == GateState::Pass
+            && (evaluation.objectives.is_empty()
+                || evaluation.objectives.iter().any(|objective| {
+                    objective.objective_id.trim().is_empty() || !objective.value.is_finite()
+                }))
+        {
+            return Err(format!(
+                "candidate {} is marked PASS but has an empty or non-finite objective vector",
+                evaluation.candidate_id
+            ));
+        }
+        if evaluation.gate_state == GateState::Pass {
+            let mut objective_ids = BTreeSet::new();
+            if evaluation.objectives.iter().any(|objective| {
+                !objective_ids.insert(objective.objective_id.clone())
+            }) {
+                return Err(format!(
+                    "candidate {} has duplicate objective identifiers",
+                    evaluation.candidate_id
+                ));
+            }
+        }
     }
     let eligible: Vec<&OracleEvaluation> = evaluations
         .iter()
@@ -1208,6 +1230,22 @@ mod tests {
             make("unknown",GateState::Unknown,0.5,0.5),
         ];
         assert_eq!(exact_pareto_front(&evaluations).unwrap(), vec!["a".to_owned(),"b".to_owned(),"c".to_owned()]);
+    }
+
+    #[test]
+    fn exact_oracle_rejects_pass_receipt_with_non_finite_objective() {
+        let malformed = OracleEvaluation {
+            candidate_id:"bad-pass".to_owned(),
+            gate_state:GateState::Pass,
+            objectives:vec![
+                OracleObjective {
+                    objective_id:"energy".to_owned(),
+                    direction:ObjectiveDirection::Minimize,
+                    value:f64::NAN,
+                }
+            ],
+        };
+        assert!(exact_pareto_front(&[malformed]).is_err());
     }
 
     #[test]
