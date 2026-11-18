@@ -16,9 +16,7 @@ use std::env;
 use std::fs;
 use std::process::ExitCode;
 
-use symmetry_discovery_benchmark_oracle::{
-    Manifest, StabilizerWitnessV1, SubgroupProposalAuditV1,
-};
+use symmetry_discovery_benchmark_oracle::{Manifest, SubgroupProposalAuditV1};
 
 const BENCHMARK_ID: &str = "LUMINOUS-SYMM-QUALIFIED-DISCOVERY-001";
 
@@ -253,7 +251,7 @@ fn run(submission: SubmissionV1) -> Result<AuditReportV1, String> {
                 let mut proposed = prediction.proposed_elements.clone();
                 proposed.sort();
                 let exact_subgroup_match = proposed == exact_stabilizer;
-                exact_subgroup_matches += usize::from(exact_subgroup_match);
+                exact_subgroup_matches += if exact_subgroup_match { 1 } else { 0 };
                 cases.push(CaseAuditV1 {
                     case_id: case_id.clone(),
                     disposition: DispositionV1::Predicted,
