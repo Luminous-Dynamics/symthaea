@@ -1893,6 +1893,14 @@ mod tests {
             manifest["evaluation_receipt_contract"]["verify_recomputes_alarm_episode_partitions"],
             true
         );
+        assert_eq!(
+            manifest["evaluation_receipt_contract"]["verify_recomputes_shot_cluster_bootstrap_interval"],
+            true
+        );
+        assert_eq!(
+            manifest["evaluation_receipt_contract"]["schema_version"],
+            PLASMA_EVENT_EVALUATION_RECEIPT_SCHEMA
+        );
         assert!(
             manifest["evaluation_receipt_contract"]["contains"]
                 .as_array()
