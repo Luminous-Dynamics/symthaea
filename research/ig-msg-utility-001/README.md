@@ -39,6 +39,13 @@ cargo run --manifest-path research/ig-msg-utility-001/Cargo.toml -- \
   research/ig-msg-utility-001/MESSAGE_UTILITY_FIXTURES_V0_1.json
 ```
 
+## Validation status
+
+- The 20 frozen synthetic fixture expectations were independently cross-checked against the stated structural scoring semantics: **20/20 match**.
+- The standalone Cargo manifest includes its own `[workspace]` boundary so Cargo does not accidentally load the parent repository workspace.
+- Native Rust compilation, formatting, tests and Clippy have not yet run on this branch; the exact-head workflow is configured to perform them. No CI pass is claimed.
+- No LLM message-pruning, summarization or provider calls have been run. The fixture results are not MessageSieve comparisons.
+
 ## Claim ceiling
 
 A passing fixture establishes only the synthetic structural contract. It does not demonstrate real-model token savings, non-inferior task accuracy, privacy guarantees, semantic equivalence of generated summaries, or superiority to MessageSieve. Those require matched-backbone, matched-budget model experiments, held-out task families and independent scoring.
