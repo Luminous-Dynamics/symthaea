@@ -40,7 +40,8 @@
         "catalogue_blob_sha",
         "grammar_schema_blob_sha",
         "conformance_corpus_blob_sha",
-        "conformance_corpus_schema_blob_sha"
+        "conformance_corpus_schema_blob_sha",
+        "catalogue_schema_blob_sha"
       ],
       "properties": {
         "sol_atlas_pr": {
@@ -67,6 +68,10 @@
           "pattern": "^[0-9a-f]{40}$"
         },
         "conformance_corpus_schema_blob_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "catalogue_schema_blob_sha": {
           "type": "string",
           "pattern": "^[0-9a-f]{40}$"
         }
