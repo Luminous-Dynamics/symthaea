@@ -496,9 +496,9 @@ pub struct PerformedVoice {
 }
 
 /// Current version of the composition-side Listen bundle.
-pub const LISTEN_COMPOSITION_BUNDLE_VERSION: u32 = 2;
+pub const LISTEN_COMPOSITION_BUNDLE_VERSION: u32 = 3;
 /// Current version of the rendered-performance bundle.
-pub const LISTEN_PERFORMANCE_BUNDLE_VERSION: u32 = 1;
+pub const LISTEN_PERFORMANCE_BUNDLE_VERSION: u32 = 2;
 /// Current version of the provenance bundle.
 pub const PIECE_PROVENANCE_BUNDLE_VERSION: u32 = 1;
 /// Current version of the Analyst verification bundle.
@@ -644,6 +644,10 @@ pub struct PhraseRegion {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SymbolicNoteEvent {
     pub id: String,
+    /// Generator-authored persistent musical line identity. None means the
+    /// source Score did not provide a real PartId; consumers must not infer it.
+    #[serde(default)]
+    pub part_id: Option<u16>,
     pub midi: u8,
     pub pitch_name: String,
     pub onset: MusicalTime,
@@ -803,6 +807,12 @@ pub struct PerformanceVoiceSummary {
     pub id: String,
     pub name: String,
     pub instrument: String,
+    /// Set only when this realized voice maps to exactly one source PartId.
+    /// Role-aggregated and renderer-added voices leave it absent.
+    #[serde(default)]
+    pub part_id: Option<u16>,
+    #[serde(default)]
+    pub voice_role: Option<String>,
     pub note_count: usize,
 }
 
@@ -814,6 +824,9 @@ pub struct PerformedNoteEvent {
     pub id: String,
     pub voice_id: String,
     pub source_note_id: Option<String>,
+    /// Exact source PartId only when source_note_id is safely mapped.
+    #[serde(default)]
+    pub part_id: Option<u16>,
     pub start_seconds: f64,
     pub duration_seconds: f64,
     pub frequency_hz: f64,
@@ -2370,6 +2383,93 @@ mod vocal_schema_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn listen_part_identity_round_trips_through_symbolic_and_performed_events() {
+        let symbolic = SymbolicNoteEvent {
+            id: "score-part-42-0".into(),
+            part_id: Some(42),
+            midi: 60,
+            pitch_name: "C4".into(),
+            onset: MusicalTime { tick: 0, beats: 0.0, seconds: 0.0 },
+            duration_ticks: 480,
+            duration_beats: 1.0,
+            duration_seconds: 0.5,
+            velocity: 0.7,
+            voice_role: "Melody".into(),
+            emphasis: "normal".into(),
+            section_intensity: 1.0,
+        };
+        let encoded = serde_json::to_vec(&symbolic).unwrap();
+        let decoded: SymbolicNoteEvent = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(decoded.part_id, Some(42));
+
+        let performed = PerformedNoteEvent {
+            id: "performance-0-0".into(),
+            voice_id: "melody".into(),
+            source_note_id: Some("score-part-42-0".into()),
+            part_id: Some(42),
+            start_seconds: 0.0,
+            duration_seconds: 0.5,
+            frequency_hz: 261.6,
+            velocity: 0.7,
+            onset_deviation_seconds: Some(0.0),
+            duration_deviation_seconds: Some(0.0),
+        };
+        let encoded = serde_json::to_vec(&performed).unwrap();
+        let decoded: PerformedNoteEvent = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(decoded.part_id, Some(42));
+        assert_eq!(decoded.source_note_id.as_deref(), Some("score-part-42-0"));
+    }
+
+    #[test]
+    fn older_listen_note_payloads_deserialize_without_part_identity() {
+        let symbolic = serde_json::json!({
+            "id": "score-melody-0",
+            "midi": 60,
+            "pitch_name": "C4",
+            "onset": {"tick": 0, "beats": 0.0, "seconds": 0.0},
+            "duration_ticks": 480,
+            "duration_beats": 1.0,
+            "duration_seconds": 0.5,
+            "velocity": 0.7,
+            "voice_role": "Melody",
+            "emphasis": "normal",
+            "section_intensity": 1.0
+        });
+        let note: SymbolicNoteEvent = serde_json::from_value(symbolic).unwrap();
+        assert_eq!(note.part_id, None);
+
+        let voice = serde_json::json!({
+            "id": "melody",
+            "name": "Melody",
+            "instrument": "piano",
+            "note_count": 1
+        });
+        let summary: PerformanceVoiceSummary = serde_json::from_value(voice).unwrap();
+        assert_eq!(summary.part_id, None);
+        assert_eq!(summary.voice_role, None);
+
+        let performed = serde_json::json!({
+            "id": "performance-0-0",
+            "voice_id": "melody",
+            "source_note_id": "score-melody-0",
+            "start_seconds": 0.0,
+            "duration_seconds": 0.5,
+            "frequency_hz": 261.6,
+            "velocity": 0.7,
+            "onset_deviation_seconds": 0.0,
+            "duration_deviation_seconds": 0.0
+        });
+        let event: PerformedNoteEvent = serde_json::from_value(performed).unwrap();
+        assert_eq!(event.part_id, None);
+    }
+
+    #[test]
+    fn listen_bundle_versions_advance_for_part_identity_fields() {
+        assert_eq!(LISTEN_COMPOSITION_BUNDLE_VERSION, 3);
+        assert_eq!(LISTEN_PERFORMANCE_BUNDLE_VERSION, 2);
+    }
 
     #[test]
     fn compose_request_round_trips() {
