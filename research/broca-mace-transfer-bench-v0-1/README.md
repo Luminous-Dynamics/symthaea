@@ -203,7 +203,7 @@ Likewise, `measurement_error_bound` is currently a candidate-visible claim. A pr
 
 ## Raw-native Session-A ingress boundary (research-only)
 
-The workspace adds a third package, `broca-mace-ingress`. Its 25 deterministic mock-verifier tests exercise receipt-gated single-event admission, bitemporal replay, authority status, lifecycle/retraction, calibration, lineage, outcome reconciliation, batch idempotency and the consolidation evidence-pack projection.
+The workspace adds a third package, `broca-mace-ingress`. Its 27 deterministic mock-verifier tests exercise receipt-gated single-event admission, bitemporal replay, authority status, lifecycle/retraction, calibration, lineage, outcome reconciliation, batch idempotency and the consolidation evidence-pack projection.
 
 The adapter maps a raw interaction envelope into candidate-visible `Experience` only after:
 
@@ -215,13 +215,13 @@ The adapter maps a raw interaction envelope into candidate-visible `Experience` 
 - causal-assessment and externally reconciled outcome receipts are present;
 - lifecycle is `Active` as known at the query time; `Retracted`, `Superseded(successor)` and unknown states fail closed.
 
-Duplicate batch deliveries are re-verified. The same event ID is idempotent only when both payload digest and complete verified receipt bundle match; conflicting payload or receipt bundles reject the batch.
+Duplicate batch deliveries are re-verified. The same event ID is idempotent only when both payload digest and complete verified receipt bundle match; conflicting payload or receipt bundles reject the batch. Within a batch, one canonical upstream source ID cannot be assigned multiple provenance roots, preventing source-lineage splitting.
 
 ### Ingress-to-consolidation handoff
 
 The ingress-issued `IngestedExperience` and `IngestBatch` types expose read-only accessors, so callers cannot construct an admitted result by setting their own trust booleans. Receipt authenticity and source trust are separate: `TrustedForScope`, `Untrusted` and `Unknown` come from a versioned trust-policy receipt. Validly signed but untrusted/unknown sources remain preserved as non-qualified evidence; they cannot count toward causal support. `build_consolidation_evidence_pack` creates a deterministic, sorted `ConsolidationEvidencePackV1` from selected admitted IDs. It preserves event/session/task identity, scope/action, outcomes, measurement bounds and full receipt bundles, while deriving distinct source-family and upstream-root counts from verifier-returned lineage **only for sources trusted under the identified policy**. The pack separately counts trusted, untrusted and unknown-trust events so a downstream consolidation policy can quarantine rather than silently inflate support.
 
-This is an **input contract**, not a consolidation decision. The pack contains no proposed promotion action, oracle label or authorization grant. The separate governed consolidation policy in #12731 does not yet consume this pack; a consumer adapter and end-to-end Session-A → consolidation → Session-B → Session-C run remain pending.
+This is an **input contract**, not a consolidation decision. The pack contains no proposed promotion action, oracle label or authorization grant. The raw-ingress tests now exercise Session-A interactions → evidence pack → Session-B causal decision → Session-C bitemporal retraction and memory rebuild. The separate governed consolidation policy in #12731 still does not consume this pack; its promotion/retention consumer adapter remains pending.
 
 ### Trust boundary
 

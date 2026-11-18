@@ -194,6 +194,8 @@ pub struct EvidenceReceiptBundle {
     pub event_occurred_at_ms: i64,
     pub authority_received_at_ms: i64,
     pub lineage_digest: String,
+    pub source_family: u16,
+    pub source_root_id: u32,
     pub source_acquisition_mode: String,
     pub upstream_source_id: String,
     pub source_artifact_digest: String,
@@ -440,6 +442,8 @@ pub fn ingest_as_known(
             event_occurred_at_ms: event.occurred_at_ms,
             authority_received_at_ms: event.received_at_ms,
             lineage_digest: lineage.receipt_digest,
+            source_family: lineage.source_family,
+            source_root_id: lineage.source_root_id,
             source_acquisition_mode: lineage.acquisition_mode,
             upstream_source_id: lineage.upstream_source_id,
             source_artifact_digest: lineage.source_artifact_digest,
@@ -704,6 +708,7 @@ pub fn build_consolidation_evidence_pack(
 pub enum IngestBatchReject {
     ConflictingPayloadForEvent(u32),
     ConflictingReceiptForEvent(u32),
+    ConflictingRootForUpstreamSource(u32),
     EventRejected(u32, IngestReject),
 }
 
@@ -716,6 +721,7 @@ pub fn ingest_batch_as_known(
 ) -> Result<IngestBatch, IngestBatchReject> {
     let mut digests = BTreeMap::<u32, &str>::new();
     let mut receipt_bundles = BTreeMap::<u32, EvidenceReceiptBundle>::new();
+    let mut root_by_upstream_id = BTreeMap::<String, u32>::new();
     let mut duplicate_event_ids = Vec::new();
     let mut admitted = Vec::new();
 
@@ -734,6 +740,18 @@ pub fn ingest_batch_as_known(
             duplicate_event_ids.push(raw.event_id);
             continue;
         }
+        if root_by_upstream_id
+            .get(&ingested.receipts.upstream_source_id)
+            .is_some_and(|root| *root != ingested.receipts.source_root_id)
+        {
+            return Err(IngestBatchReject::ConflictingRootForUpstreamSource(
+                raw.event_id,
+            ));
+        }
+        root_by_upstream_id.insert(
+            ingested.receipts.upstream_source_id.clone(),
+            ingested.receipts.source_root_id,
+        );
         digests.insert(raw.event_id, raw.payload_sha256.as_str());
         receipt_bundles.insert(raw.event_id, ingested.receipts.clone());
         admitted.push(ingested);
@@ -774,6 +792,8 @@ mod tests {
         untrusted_event_id: Option<u32>,
         unknown_trust_event_id: Option<u32>,
         trust_policy_digest_valid: bool,
+        vary_root_without_source_id: bool,
+        lifecycle_event_id: Option<u32>,
     }
 
     impl Default for TestVerifier {
@@ -800,6 +820,8 @@ mod tests {
                 untrusted_event_id: None,
                 unknown_trust_event_id: None,
                 trust_policy_digest_valid: true,
+                vary_root_without_source_id: false,
+                lifecycle_event_id: None,
             }
         }
     }
@@ -851,7 +873,9 @@ mod tests {
                 } else {
                     self.family_id
                 },
-                source_root_id: if self.vary_lineage_by_event {
+                source_root_id: if self.vary_root_without_source_id {
+                    2_000 + event_id
+                } else if self.vary_lineage_by_event {
                     1_000 + event_id
                 } else {
                     self.root_id
@@ -869,7 +893,11 @@ mod tests {
                     "invalid".into()
                 },
                 acquisition_mode: "api".into(),
-                upstream_source_id: "bis:dataflow:private-credit".into(),
+                upstream_source_id: if self.vary_lineage_by_event {
+                    format!("synthetic:independent-source:{event_id}")
+                } else {
+                    "bis:dataflow:private-credit".into()
+                },
                 source_artifact_digest: "e".repeat(64),
                 transformation_digest: "f".repeat(64),
                 issuer_id: "did:key:source-ledger".into(),
@@ -928,16 +956,23 @@ mod tests {
 
         fn lifecycle_status_as_of(
             &self,
-            _event_id: u32,
+            event_id: u32,
             known_at_ms: i64,
         ) -> Option<SourceLifecycleStatus> {
             if !self.retraction_status_known {
                 return None;
             }
-            if self.retracted_at_ms.is_some_and(|at| at <= known_at_ms) {
+            let applies_to_event = self
+                .lifecycle_event_id
+                .map_or(true, |target| target == event_id);
+            if applies_to_event
+                && self.retracted_at_ms.is_some_and(|at| at <= known_at_ms)
+            {
                 return Some(SourceLifecycleStatus::Retracted);
             }
-            if self.superseded_at_ms.is_some_and(|at| at <= known_at_ms) {
+            if applies_to_event
+                && self.superseded_at_ms.is_some_and(|at| at <= known_at_ms)
+            {
                 return Some(SourceLifecycleStatus::Superseded {
                     successor_event_id: self.successor_event_id,
                 });
@@ -1181,6 +1216,101 @@ mod tests {
             pack.events()[1].receipts().source_artifact_digest,
             "e".repeat(64)
         );
+    }
+
+    #[test]
+    fn one_upstream_identifier_cannot_be_split_into_multiple_provenance_roots() {
+        let mut second = raw();
+        second.event_id = 43;
+        second.session_id = "session-a".into();
+        second.task_id = "task-a-second".into();
+        second.payload_sha256 = "f".repeat(64);
+        second.raw_event_receipt_id = "raw-event-2".into();
+        let verifier = TestVerifier {
+            vary_root_without_source_id: true,
+            ..TestVerifier::default()
+        };
+
+        assert_eq!(
+            ingest_batch_as_known(&[raw(), second], query(180, 250), &verifier).err(),
+            Some(IngestBatchReject::ConflictingRootForUpstreamSource(43))
+        );
+    }
+
+    #[test]
+    fn raw_session_a_ingress_session_b_decision_and_session_c_retraction_chain() {
+        use broca_mace_policy::{decide, Policy};
+
+        let mut raw_events = Vec::new();
+        for (event_id, action, utility) in [
+            (100, Action::A, 0.91),
+            (101, Action::A, 0.89),
+            (102, Action::B, 0.42),
+            (103, Action::B, 0.40),
+        ] {
+            let mut event = raw();
+            event.event_id = event_id;
+            event.session_id = "session-a".into();
+            event.task_id = format!("task-{event_id}");
+            event.payload_sha256 = format!("{event_id:064x}");
+            event.raw_event_receipt_id = format!("raw-{event_id}");
+            event.lineage_receipt_id = format!("lineage-{event_id}");
+            event.calibration_receipt_id = format!("calibration-{event_id}");
+            event.causal_assessment_receipt_id = format!("causal-{event_id}");
+            event.outcome_receipt_id = format!("outcome-{event_id}");
+            event.action = action;
+            event.observed_utility = utility;
+            raw_events.push(event);
+        }
+
+        let session_a_verifier = varied_lineage_verifier();
+        let batch_a = ingest_batch_as_known(
+            &raw_events,
+            query(180, 250),
+            &session_a_verifier,
+        )
+        .expect("Session A raw events should be admitted");
+        let pack =
+            build_consolidation_evidence_pack(&batch_a, &[100, 101, 102, 103])
+                .expect("consolidation pack should preserve all four receipts");
+        assert_eq!(pack.trusted_event_count(), 4);
+        assert_eq!(pack.source_root_count(), 4);
+
+        let memory_b: Vec<Experience> = batch_a
+            .admitted()
+            .iter()
+            .map(|item| *item.experience())
+            .collect();
+        let query_b = Query { scope: scope() };
+        let decision_b = decide(Policy::CausalQualified, &memory_b, query_b);
+        assert_eq!(decision_b.action, Some(Action::A));
+
+        let session_c_verifier = TestVerifier {
+            vary_lineage_by_event: true,
+            retracted_at_ms: Some(260),
+            lifecycle_event_id: Some(100),
+            ..TestVerifier::default()
+        };
+        let batch_c = ingest_batch_as_known(
+            &raw_events[1..],
+            query(180, 270),
+            &session_c_verifier,
+        )
+        .expect("non-retracted Session A records remain eligible");
+        let memory_c: Vec<Experience> = batch_c
+            .admitted()
+            .iter()
+            .map(|item| *item.experience())
+            .collect();
+
+        assert!(!memory_c.iter().any(|item| item.event_id == 100));
+        assert_eq!(
+            decide(Policy::CausalQualified, &memory_c, query_b).action,
+            None
+        );
+        assert!(decide(Policy::ActiveProbe, &memory_c, query_b)
+            .probe
+            .is_some());
     }
 
     #[test]
