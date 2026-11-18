@@ -628,6 +628,11 @@ pub struct ShotAlarmEvaluation {
 
 /// Scores timestamps already emitted by the online policy. Event references
 /// are used only here, after the online alarm trace has been recorded.
+///
+/// `alarm_times_ns` must contain one timestamp per transition into `Raised`,
+/// not every subsequent `Active` window. Each timestamp therefore represents
+/// the start of a distinct alarm episode; non-disruptive episodes count as
+/// false-alarm events and are normalized by observed negative-shot exposure.
 pub fn score_shot_alarms(
     shot_id: &str,
     outcome: ShotReferenceOutcome,
