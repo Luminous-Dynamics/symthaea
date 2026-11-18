@@ -54,10 +54,11 @@ pub mod plasma_control;
 pub mod plasma_event_eval;
 pub mod plasma_cluster_bootstrap;
 pub use plasma_cluster_bootstrap::{
-    build_shot_cluster_bootstrap_plan, shot_cluster_bootstrap_indices,
-    verify_shot_cluster_bootstrap_plan, ShotClusterBootstrapError,
-    ShotClusterBootstrapPlan, ShotClusterBootstrapPlanBody,
-    SHOT_CLUSTER_BOOTSTRAP_RNG_ALGORITHM, SHOT_CLUSTER_BOOTSTRAP_SCHEMA,
+    build_shot_cluster_bootstrap_plan, paired_shot_cluster_bootstrap,
+    shot_cluster_bootstrap_indices, verify_shot_cluster_bootstrap_plan,
+    PairedMetricBootstrapInterval, ShotClusterBootstrapError, ShotClusterBootstrapPlan,
+    ShotClusterBootstrapPlanBody, SHOT_CLUSTER_BOOTSTRAP_RNG_ALGORITHM,
+    SHOT_CLUSTER_BOOTSTRAP_SCHEMA,
 };
 pub mod plasma_hdc_encoder;
 pub mod threat;
