@@ -203,42 +203,36 @@ Likewise, `measurement_error_bound` is currently a candidate-visible claim. A pr
 
 ## Raw-native Session-A ingress boundary (research-only)
 
-The workspace adds a third package, `broca-mace-ingress`. It maps a raw interaction envelope into a candidate-visible `Experience` only after:
+The workspace adds a third package, `broca-mace-ingress`. Its 22 deterministic mock-verifier tests exercise receipt-gated single-event admission, bitemporal replay, authority status, lifecycle/retraction, calibration, lineage, outcome reconciliation, batch idempotency and the consolidation evidence-pack projection.
 
-- the complete raw event is bound to a verified payload digest and receipt;
-- the Mycelix event reports `receipt_attested` authority status, with its canonical event hash and signed authority-receipt digest retained;
-- the source event's client `occurred_at` is distinguished from the server-observed, signed authority `received_at`; **only `received_at` is used for `known_at` eligibility**;
-- `valid_at` / `known_at` checks run against receipt-verified event and transaction times;
-- prediction precedes dispatch, which precedes outcome observation;
-- source lineage binds nonzero source-family and upstream-root identities, acquisition mode, upstream source ID, source artifact digest, transformation digest and issuer;
-- measurement uncertainty is bound to an exact unit, instrument, method, calibration revision and validity interval;
-- causal assessment classifies intervention, preregistration, confounder control and delayed-horizon status;
-- the outcome receipt confirms externally reconciled state;
-- retraction state is verified as known at the requested transaction time; unknown retraction status fails closed.
+The adapter maps a raw interaction envelope into candidate-visible `Experience` only after:
 
-The receipt bundle retains the raw-event payload digest, canonical event hash, signed authority receipt, event/receipt timestamps, source lineage, calibration, causal-assessment and outcome digests. Atomic batch ingress is idempotent for repeated event ID + identical payload digest; one event ID with conflicting payload digests rejects the batch.
+- complete payload digest and canonical event identity are bound to a verifier-returned raw-event receipt;
+- Mycelix-style authority status is `receipt_attested`, with canonical event hash and signed authority-receipt digest retained;
+- client/source `occurred_at` is kept distinct from server-signed `received_at`; only `received_at` may satisfy `known_at`;
+- source lineage binds source-family/root IDs, acquisition mode, upstream ID, artifact digest, transformation digest and issuer;
+- measurement error binds to unit, instrument, method, calibration revision and validity interval;
+- causal-assessment and externally reconciled outcome receipts are present;
+- lifecycle is `Active` as known at the query time; `Retracted`, `Superseded(successor)` and unknown states fail closed.
 
-The `EvidenceVerifier` trait is an integration seam, **not cryptographic verification**. It is shaped around Mycelix's canonical scientific event API, which returns the canonical event hash, signed receipt-time authority evidence and one of the explicit authority statuses. Only `receipt_attested` is admissible. A client-supplied `occurred_at` value cannot backdate transaction time. The production adapter must verify exact canonical bytes, Ed25519 event signatures, issuer/key authorization, receipt signatures, event hash binding, registry revision, receipt-chain status, scope and retraction/supersession history.
+Duplicate batch deliveries are re-verified. The same event ID is idempotent only when both payload digest and complete verified receipt bundle match; conflicting payload or receipt bundles reject the batch.
 
-The test verifier is synthetic. These tests do not establish signature security, production bitemporal storage, live Mycelix conductor integration, or the truth of a signed scientific assertion. A valid signature proves authenticity/authority relative to the supplied trust policy; it does not by itself prove causal identification or scientific correctness.
+### Ingress-to-consolidation handoff
 
-Run:
+The ingress-issued `IngestedExperience` and `IngestBatch` types expose read-only accessors, so callers cannot construct an admitted result by setting their own trust booleans. `build_consolidation_evidence_pack` creates a deterministic, sorted `ConsolidationEvidencePackV1` from selected admitted IDs. It preserves event/session/task identity, scope/action, outcomes, measurement bounds and full receipt bundles, while deriving distinct source-family and upstream-root counts from verifier-returned lineage.
 
-```bash
-cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-ingress
-```
+This is an **input contract**, not a consolidation decision. The pack contains no proposed promotion action, oracle label or authorization grant. The separate governed consolidation policy in #12731 does not yet consume this pack; a consumer adapter and end-to-end Session-A → consolidation → Session-B → Session-C run remain pending.
 
-Run:
+### Trust boundary
 
-```bash
-cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-ingress
-```
+The `EvidenceVerifier` trait is an integration seam, **not cryptographic verification**. The production implementation must validate Mycelix canonical bytes, Ed25519 event signatures, issuer/key authorization, signed authority receipts, event-hash binding, registry revision, receipt-chain status, source lineage, calibration, outcome and lifecycle history. A valid signature establishes authenticity/authority relative to the trust policy; it does not establish causal identification or scientific truth.
 
-Run:
+Run the ingress checks:
 
 ```bash
 cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-ingress
 ```
+
 
 ## Additional evaluation targets
 
