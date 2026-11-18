@@ -448,7 +448,7 @@
   "synthetic_replay_interop": {
     "producer_repository": "Luminous-Dynamics/symtropy",
     "producer_pull_request": 5905,
-    "producer_commit": "b9135a78d59a341d49c9fe6d230ec6111831bb53",
+    "producer_commit": "70317a32958491acd8e0416639014d32e1f36b2c",
     "producer_schema": "luminous.plasma-synthetic-observation-export.v0.1",
     "waveform_receipt_schema": "luminous.plasma-synthetic-waveform.v0.1",
     "observation_frame_schema": "luminous.plasma-observation-frame.v0.1",
@@ -482,6 +482,8 @@
     ],
     "downstream_rule": "synthetic replay observations must abstain at a direct-measurement decision gate; they may be used only in explicitly synthetic robustness/research paths",
     "claim_ceiling": "synthetic perturbation and evidence-state mapping only; no physical measurement, diagnostic accuracy, instrument failure-rate, observability, or safety claim",
-    "hashes_are_authentication": false
+    "hashes_are_authentication": false,
+    "frame_shot_id_namespace": "synthetic-shot:<scenario_id>",
+    "synthetic_identifiers_must_not_equal_physical_discharge_ids": true
   }
 }
