@@ -7,6 +7,9 @@
 //! This module does not calibrate physical probabilities, select thresholds
 //! from a test set, or authorize machine actions.
 
+use crate::plasma_observability::{
+    BlockedChannel, DecisionChannelRequirement, DecisionInputGate, PlasmaObservationFrame,
+};
 use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -95,27 +98,14 @@ impl AlarmPolicyConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AlarmAbstentionReason {
-    Synthetic,
-    Unavailable,
-    Invalid,
-    Delayed,
-    Degraded,
+    EvidenceGateBlocked(Vec<BlockedChannel>),
 }
 
-fn abstention_reason(quality: AlarmEvidenceQuality) -> Option<AlarmAbstentionReason> {
-    match quality {
-        AlarmEvidenceQuality::DirectMeasured => None,
-        AlarmEvidenceQuality::Synthetic => Some(AlarmAbstentionReason::Synthetic),
-        AlarmEvidenceQuality::Unavailable => Some(AlarmAbstentionReason::Unavailable),
-        AlarmEvidenceQuality::Invalid => Some(AlarmAbstentionReason::Invalid),
-        AlarmEvidenceQuality::Delayed => Some(AlarmAbstentionReason::Delayed),
-        AlarmEvidenceQuality::Degraded => Some(AlarmAbstentionReason::Degraded),
-    }
-}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AlarmPolicyUpdate {
     BelowThreshold {
         at_ns: u64,
@@ -196,31 +186,88 @@ impl OnlinePlasmaAlarmPolicy {
         &self.config
     }
 
-    /// Processes exactly one observation in time order.
+    /// Public online entry point: only the measurement-evidence gate can
+    /// qualify a frame for a risk score. A blocked frame cannot carry a score.
     ///
-    /// Non-direct evidence causes abstention and breaks persistence continuity.
-    /// An active alarm remains active across abstention: missing evidence cannot
-    /// silently clear an existing alert.
-    pub fn update(
+    /// Event labels and disruption times are absent from this interface. They
+    /// enter only through the separate post-hoc scorer.
+    pub fn update_from_frame(
         &mut self,
-        observation: &AlarmObservation,
+        frame: &PlasmaObservationFrame,
+        requirements: &[DecisionChannelRequirement],
+        risk_score: Option<f64>,
     ) -> Result<AlarmPolicyUpdate, PlasmaEventEvalError> {
+        let gate = frame
+            .evaluate_decision_requirements(requirements)
+            .map_err(|error| PlasmaEventEvalError::new(error.message))?;
+        match gate {
+            DecisionInputGate::MeasuredInputsAvailable(inputs) => {
+                let score = risk_score.ok_or_else(|| {
+                    PlasmaEventEvalError::new(
+                        "a qualified measured frame requires a finite risk score",
+                    )
+                })?;
+                let observation = AlarmObservation {
+                    shot_id: inputs.shot_id().to_owned(),
+                    window_end_ns: inputs.frame_time_ns(),
+                    risk_score: Some(score),
+                    evidence_quality: AlarmEvidenceQuality::DirectMeasured,
+                };
+                self.update(&observation)
+            }
+            DecisionInputGate::Abstain {
+                frame_id: _,
+                blocked_channels,
+            } => {
+                if risk_score.is_some() {
+                    return Err(PlasmaEventEvalError::new(
+                        "a blocked evidence frame must not carry an alarm risk score",
+                    ));
+                }
+                self.validate_timeline(&frame.shot_id, frame.frame_time_ns)?;
+                self.last_window_end_ns = Some(frame.frame_time_ns);
+                self.high_run = 0;
+                self.low_run = 0;
+                Ok(AlarmPolicyUpdate::Abstained {
+                    at_ns: frame.frame_time_ns,
+                    reason: AlarmAbstentionReason::EvidenceGateBlocked(blocked_channels),
+                    alert_remains_active: self.active,
+                })
+            }
+        }
+    }
+
+    fn validate_timeline(
+        &self,
+        shot_id: &str,
+        window_end_ns: u64,
+    ) -> Result<(), PlasmaEventEvalError> {
         let current_shot = self
             .shot_id
             .as_deref()
             .ok_or_else(|| PlasmaEventEvalError::new("reset_for_shot must be called first"))?;
-        if observation.shot_id != current_shot {
+        if shot_id != current_shot {
             return Err(PlasmaEventEvalError::new(
                 "observation shot_id does not match the active discharge",
             ));
         }
         if let Some(previous) = self.last_window_end_ns
-            && observation.window_end_ns <= previous
+            && window_end_ns <= previous
         {
             return Err(PlasmaEventEvalError::new(
                 "window_end_ns must be strictly increasing",
             ));
         }
+        Ok(())
+    }
+
+    /// Internal state-machine step. It is deliberately not public: all public
+    /// inputs must first pass update_from_frame and its measurement gate.
+    fn update(
+        &mut self,
+        observation: &AlarmObservation,
+    ) -> Result<AlarmPolicyUpdate, PlasmaEventEvalError> {
+        self.validate_timeline(&observation.shot_id, observation.window_end_ns)?;
 
         match (observation.evidence_quality, observation.risk_score) {
             (AlarmEvidenceQuality::DirectMeasured, Some(score)) if score.is_finite() => {}
@@ -239,14 +286,10 @@ impl OnlinePlasmaAlarmPolicy {
 
         self.last_window_end_ns = Some(observation.window_end_ns);
 
-        if let Some(reason) = abstention_reason(observation.evidence_quality) {
-            self.high_run = 0;
-            self.low_run = 0;
-            return Ok(AlarmPolicyUpdate::Abstained {
-                at_ns: observation.window_end_ns,
-                reason,
-                alert_remains_active: self.active,
-            });
+        if observation.evidence_quality != AlarmEvidenceQuality::DirectMeasured {
+            return Err(PlasmaEventEvalError::new(
+                "internal alarm state machine accepts only gate-qualified measured input",
+            ));
         }
 
         let score = observation
