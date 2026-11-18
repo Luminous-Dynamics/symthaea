@@ -6,6 +6,7 @@
 pub mod circle_layout;
 pub mod crop_flow;
 pub mod decoder;
+pub mod experiment_design;
 pub mod event_split;
 pub mod geometry;
 pub mod grid;
@@ -22,6 +23,7 @@ pub use circle_layout::{
 };
 pub use crop_flow::{CropFlowDescriptor, CropFlowError, CropFlowSample, describe_crop_flow, describe_crop_flow_about_center};
 pub use event_split::{BenchmarkSample, EventFold, EventFoldPlan, EventSplitError, grouped_event_kfold, validate_event_fold_plan};
+pub use experiment_design::{ExperimentDesignError, expected_information_gain_bits};
 pub use decoder::{
     BitOrder, DecodeError, DecodeOutcome, DecoderSpec, PayloadEncoding, decode,
     encode_ascii7, run_tournament,
