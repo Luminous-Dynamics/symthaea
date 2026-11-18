@@ -21,7 +21,8 @@
     "case_results",
     "metrics",
     "verification",
-    "raw_artifacts"
+    "raw_artifacts",
+    "resources"
   ],
   "properties": {
     "schema_version": {
