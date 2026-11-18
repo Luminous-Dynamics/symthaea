@@ -1,0 +1,19 @@
+[package]
+name = "superconductivity-capability-experiment-planning"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Synthetic capability-gated experiment planning oracle and baselines"
+
+[workspace]
+resolver = "2"
+
+[dependencies]
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
+jsonschema = { version = "=0.59.0", default-features = false }
+
+[[bin]]
+name = "sc_capability_plan_audit"
+path = "src/main.rs"
