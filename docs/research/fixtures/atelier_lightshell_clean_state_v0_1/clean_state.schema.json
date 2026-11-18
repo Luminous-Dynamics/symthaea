@@ -75,12 +75,18 @@
     "zone": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["zone_ref", "panel_ref", "material_lot_ref", "construction_ref"],
+      "required": ["zone_ref", "panel_ref", "material_lot_ref", "construction_ref", "cleanability_sample_location_refs"],
       "properties": {
         "zone_ref": { "type": "string", "minLength": 1 },
         "panel_ref": { "type": "string", "minLength": 1 },
         "material_lot_ref": { "type": "string", "minLength": 1 },
-        "construction_ref": { "type": "string", "minLength": 1 }
+        "construction_ref": { "type": "string", "minLength": 1 },
+        "cleanability_sample_location_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
       }
     },
     "application": {
@@ -153,7 +159,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "gate_id", "zone_ref", "metric_family", "comparison_mode", "unit",
+        "gate_id", "zone_ref", "required_sample_location_refs", "metric_family", "comparison_mode", "unit",
         "acceptance_limit", "hard_gate", "applicability", "applicability_owner_ref",
         "not_applicable_rationale_ref", "minimum_replicates_per_cycle",
         "method_selection_ref", "method_applicability_ref", "acceptance_rule_ref",
@@ -162,6 +168,12 @@
       "properties": {
         "gate_id": { "type": "string", "minLength": 1 },
         "zone_ref": { "type": "string", "minLength": 1 },
+        "required_sample_location_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
         "metric_family": {
           "enum": ["soil_residue", "cleaner_residue", "textile_property", "coating_integrity", "seam_integrity", "attachment_integrity", "sensor_function"]
         },
@@ -226,10 +238,11 @@
     "observation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["gate_id", "zone_ref", "replicate_index", "before", "after"],
+      "required": ["gate_id", "zone_ref", "sample_location_ref", "replicate_index", "before", "after"],
       "properties": {
         "gate_id": { "type": "string", "minLength": 1 },
         "zone_ref": { "type": "string", "minLength": 1 },
+        "sample_location_ref": { "type": "string", "minLength": 1 },
         "replicate_index": { "type": "integer", "minimum": 0 },
         "before": {
           "oneOf": [
