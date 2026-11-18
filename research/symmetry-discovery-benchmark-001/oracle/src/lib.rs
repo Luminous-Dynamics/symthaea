@@ -424,8 +424,8 @@ impl Manifest {
             ("C2_FDIAG".to_owned(), 30_usize),
             ("C2_FANTI".to_owned(), 30_usize),
             ("C2_R180".to_owned(), 30_usize),
-            ("C4".to_owned(), 31_usize),
-            ("D4".to_owned(), 31_usize),
+            ("C4".to_owned(), 32_usize),
+            ("D4".to_owned(), 32_usize),
             ("V4_AXIS".to_owned(), 30_usize),
             ("V4_DIAG".to_owned(), 30_usize),
         ]);
@@ -512,6 +512,22 @@ mod tests {
             .validate_all_cases()
             .expect("all frozen labels must agree with exact integer oracle");
         assert_eq!(counts.0, 303);
+    }
+
+    #[test]
+    fn all_ten_distinct_d4_subgroups_are_present_in_the_corpus() {
+        let manifest = manifest();
+        let cases = field(&manifest.root, "cases").unwrap().as_array().unwrap();
+        let mut labels = BTreeSet::new();
+        let mut subgroups = BTreeSet::new();
+        for case in cases {
+            let declared = manifest.declared_subgroup(case).unwrap();
+            let label = string_field(case, "expected_subgroup_label").unwrap();
+            labels.insert(label);
+            subgroups.insert(declared);
+        }
+        assert_eq!(labels.len(), 10);
+        assert_eq!(subgroups.len(), 10);
     }
 
     #[test]
