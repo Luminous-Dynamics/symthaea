@@ -204,3 +204,14 @@ The standard specifies laboratory type tests, not production QC. Full formal cla
 UWL 2023 pressure points are dynamic pressures applied to each inlet: P1 150 kPa +10/-0, P2 300 kPa +20/-0 (Type 1), and P3 10 kPa +2/-0 (Type 2). ETL's maximum-flow procedure additionally requires P2 at the faceplate centre. These are not interchangeable with a generic terminal fitting inlet or EN point-of-discharge reading. Aqua's current single-channel pressure_curve record supports only TerminalFittingInlet or PointOfDischarge and explicitly does not claim to reproduce the full UWL/ETL apparatus.
 
 The current generic paired 150/300 kPa flow-retention calculation is valid only when the same specimen, mode, method, protocol and pressure datum are used at both points. It is an engineering comparison, not proof of UWL/ETL conformity. UWL also includes P3=10 kPa for Type 2; Aqua's 50/75/100 kPa research points do not cover that method point.
+
+
+## 14. Executable method-specific pressure-channel records
+
+The generic pressure_curve record supports a single dynamic pressure channel with an explicit TerminalFittingInlet or PointOfDischarge datum. It rejects comparisons where the datum differs.
+
+The separate standard_methods module now provides two additional evidence shapes:
+- UwlPressureRun keeps hot- and cold-inlet dynamic pressure observations as separate channels for P1 (150–160 kPa), P2 (300–320 kPa) and P3 (10–12 kPa). Each inlet has its own instrument identity, calibration-receipt digest and uncertainty interval.
+- EtlFaceplateFlowObservation keeps the P2 faceplate-centre pressure channel distinct from the ordinary inlet channel and requires stabilized-flow and calibration/stabilization receipts.
+
+The asymmetric intervals reflect the UWL published +upper/-0 tolerances and are not symmetric plus/minus tolerances. These records validate data identity and numeric channel admission only; they do not execute the full standard procedure or prove ETL/UWL conformity. The module currently has 12 authored tests, not a claimed execution pass.
