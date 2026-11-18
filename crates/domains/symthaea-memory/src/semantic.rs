@@ -266,7 +266,7 @@ impl SemanticMemory {
             .iter()
             .map(|value| (*value as f64) * (*value as f64))
             .sum::<f64>();
-        if !norm_squared.is_finite() || norm_squared <= f64::EPSILON {
+        if !norm_squared.is_finite() || norm_squared <= 1.0e-20 {
             return Err(SemanticMemoryInputError::ZeroNormVector);
         }
         if let Some(expected) = expected_dimension {
@@ -757,9 +757,11 @@ impl SemanticMemory {
 
     /// Set the similarity threshold for retrieval
     pub fn set_similarity_threshold(&mut self, threshold: f32) {
-        // Preserve the previous valid threshold when a compatibility caller
-        // supplies NaN, infinity or an out-of-domain configuration value.
-        let _ = self.try_set_similarity_threshold(threshold);
+        // Preserve the historical clamping behavior for finite values while
+        // refusing NaN or infinity without poisoning the active configuration.
+        if threshold.is_finite() {
+            self.similarity_threshold = threshold.clamp(0.0, 1.0);
+        }
     }
 
     /// Set a validated similarity threshold, returning an error without
@@ -1160,6 +1162,8 @@ mod tests {
         );
         mem.set_similarity_threshold(f32::INFINITY);
         assert_eq!(mem.similarity_threshold(), 0.6);
+        mem.set_similarity_threshold(1.5);
+        assert_eq!(mem.similarity_threshold(), 1.0);
         assert!(matches!(
             SemanticMemory::try_with_threshold(4, f32::NAN),
             Err(SemanticMemoryInputError::InvalidSimilarityThreshold)
