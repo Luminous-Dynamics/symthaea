@@ -9,6 +9,7 @@ pub mod decoder;
 pub mod event_split;
 pub mod geometry;
 pub mod grid;
+pub mod plant_pose_3d;
 pub mod statistics;
 
 pub use circle_layout::{
@@ -27,6 +28,7 @@ pub use decoder::{
 pub use geometry::{
     Bounds2, GeometryDescriptor, GeometryError, Point2, SymmetryScore, describe,
 };
+pub use plant_pose_3d::{Point3, StemPose3DDescriptor, StemPose3DError, StemPoseSample, Vector3, describe_stem_pose_3d, describe_stem_pose_3d_about_center};
 pub use grid::{
     BinaryGrid, GridDecodeOutcome, GridDecoderManifest, GridDecoderSpec, GridError, GridTransform,
     ManifestError, NullGridResult,
