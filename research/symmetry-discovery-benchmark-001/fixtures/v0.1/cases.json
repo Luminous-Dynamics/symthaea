@@ -5489,11 +5489,915 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-01",
+      "case_id": "GENERATED-C2_FY-01",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
         "points": [
+          [
+            -42,
+            -43
+          ],
+          [
+            42,
+            -43
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592604672,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-02",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -6,
+            -29
+          ],
+          [
+            6,
+            -29
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592612591,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-03",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -20,
+            38
+          ],
+          [
+            20,
+            38
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592620510,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-04",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -12,
+            21
+          ],
+          [
+            12,
+            21
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592628429,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-05",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -12,
+            -50
+          ],
+          [
+            12,
+            -50
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592636348,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-06",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -48,
+            -7
+          ],
+          [
+            48,
+            -7
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592644267,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-07",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -34,
+            -10
+          ],
+          [
+            34,
+            -10
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592652186,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-08",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -33,
+            -30
+          ],
+          [
+            33,
+            -30
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592660105,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-09",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -21,
+            37
+          ],
+          [
+            21,
+            37
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592668024,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-10",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -17,
+            8
+          ],
+          [
+            17,
+            8
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592675943,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-11",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -50,
+            -7
+          ],
+          [
+            50,
+            -7
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592683862,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-12",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -16,
+            21
+          ],
+          [
+            16,
+            21
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592691781,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-13",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -24,
+            -41
+          ],
+          [
+            24,
+            -41
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592699700,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-14",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -16,
+            6
+          ],
+          [
+            16,
+            6
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592707619,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-15",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -13,
+            22
+          ],
+          [
+            13,
+            22
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592715538,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-16",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -43,
+            29
+          ],
+          [
+            43,
+            29
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592723457,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-17",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -38,
+            -49
+          ],
+          [
+            38,
+            -49
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592731376,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-18",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -47,
+            44
+          ],
+          [
+            47,
+            44
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592739295,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-19",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -11,
+            -30
+          ],
+          [
+            11,
+            -30
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592747214,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-20",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -44,
+            37
+          ],
+          [
+            44,
+            37
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592755133,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-21",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -6,
+            21
+          ],
+          [
+            6,
+            21
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592763052,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-22",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -14,
+            -30
+          ],
+          [
+            14,
+            -30
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592875700,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-23",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -43,
+            -49
+          ],
+          [
+            43,
+            -49
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592778890,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-24",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -27,
+            20
+          ],
+          [
+            27,
+            20
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592786809,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-25",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -6,
+            -18
+          ],
+          [
+            6,
+            -18
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592794728,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-26",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -39,
+            -43
+          ],
+          [
+            39,
+            -43
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592802647,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-27",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -30,
+            5
+          ],
+          [
+            30,
+            5
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592810566,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-28",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -40,
+            28
+          ],
+          [
+            40,
+            28
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592818485,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-29",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -13,
+            24
+          ],
+          [
+            13,
+            24
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592826404,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FY-30",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -18,
+            -9
+          ],
+          [
+            18,
+            -9
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fy"
+      ],
+      "expected_subgroup_label": "C2_FY",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592834323,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-01",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -10,
+            36
+          ],
           [
             36,
             -10
@@ -5502,9 +6406,10 @@
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5514,7 +6419,7 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-02",
+      "case_id": "GENERATED-C2_FDIAG-02",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
@@ -5522,14 +6427,19 @@
           [
             -48,
             41
+          ],
+          [
+            41,
+            -48
           ]
         ],
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5539,11 +6449,15 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-03",
+      "case_id": "GENERATED-C2_FDIAG-03",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
         "points": [
+          [
+            17,
+            39
+          ],
           [
             39,
             17
@@ -5552,9 +6466,10 @@
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5564,11 +6479,15 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-04",
+      "case_id": "GENERATED-C2_FDIAG-04",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
         "points": [
+          [
+            -16,
+            -11
+          ],
           [
             -11,
             -16
@@ -5577,9 +6496,10 @@
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5589,11 +6509,15 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-05",
+      "case_id": "GENERATED-C2_FDIAG-05",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
         "points": [
+          [
+            -45,
+            2
+          ],
           [
             2,
             -45
@@ -5602,9 +6526,10 @@
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5614,11 +6539,15 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-06",
+      "case_id": "GENERATED-C2_FDIAG-06",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
         "points": [
+          [
+            -28,
+            20
+          ],
           [
             20,
             -28
@@ -5627,9 +6556,10 @@
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5639,11 +6569,15 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-07",
+      "case_id": "GENERATED-C2_FDIAG-07",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
         "points": [
+          [
+            -17,
+            1
+          ],
           [
             1,
             -17
@@ -5652,9 +6586,10 @@
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5664,11 +6599,15 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-08",
+      "case_id": "GENERATED-C2_FDIAG-08",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
         "points": [
+          [
+            -25,
+            18
+          ],
           [
             18,
             -25
@@ -5677,9 +6616,10 @@
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5689,7 +6629,7 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-09",
+      "case_id": "GENERATED-C2_FDIAG-09",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
@@ -5697,14 +6637,19 @@
           [
             -1,
             32
+          ],
+          [
+            32,
+            -1
           ]
         ],
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5714,11 +6659,15 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-10",
+      "case_id": "GENERATED-C2_FDIAG-10",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
         "points": [
+          [
+            26,
+            42
+          ],
           [
             42,
             26
@@ -5727,9 +6676,10 @@
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5739,7 +6689,7 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-11",
+      "case_id": "GENERATED-C2_FDIAG-11",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
@@ -5747,14 +6697,19 @@
           [
             -37,
             48
+          ],
+          [
+            48,
+            -37
           ]
         ],
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5764,11 +6719,15 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-12",
+      "case_id": "GENERATED-C2_FDIAG-12",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
         "points": [
+          [
+            -38,
+            -24
+          ],
           [
             -24,
             -38
@@ -5777,9 +6736,10 @@
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5789,7 +6749,7 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-13",
+      "case_id": "GENERATED-C2_FDIAG-13",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
@@ -5797,14 +6757,19 @@
           [
             -26,
             2
+          ],
+          [
+            2,
+            -26
           ]
         ],
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5814,7 +6779,7 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-14",
+      "case_id": "GENERATED-C2_FDIAG-14",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
@@ -5822,14 +6787,19 @@
           [
             -46,
             1
+          ],
+          [
+            1,
+            -46
           ]
         ],
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5839,11 +6809,15 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-15",
+      "case_id": "GENERATED-C2_FDIAG-15",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
         "points": [
+          [
+            -21,
+            17
+          ],
           [
             17,
             -21
@@ -5852,9 +6826,10 @@
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5864,11 +6839,15 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-16",
+      "case_id": "GENERATED-C2_FDIAG-16",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
         "points": [
+          [
+            5,
+            23
+          ],
           [
             23,
             5
@@ -5877,9 +6856,10 @@
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5889,7 +6869,7 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-17",
+      "case_id": "GENERATED-C2_FDIAG-17",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
@@ -5897,14 +6877,19 @@
           [
             -48,
             -3
+          ],
+          [
+            -3,
+            -48
           ]
         ],
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5914,7 +6899,7 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-18",
+      "case_id": "GENERATED-C2_FDIAG-18",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
@@ -5922,14 +6907,19 @@
           [
             16,
             17
+          ],
+          [
+            17,
+            16
           ]
         ],
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5939,7 +6929,7 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-19",
+      "case_id": "GENERATED-C2_FDIAG-19",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
@@ -5947,14 +6937,19 @@
           [
             -42,
             40
+          ],
+          [
+            40,
+            -42
           ]
         ],
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5964,7 +6959,7 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-20",
+      "case_id": "GENERATED-C2_FDIAG-20",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
@@ -5972,14 +6967,19 @@
           [
             -19,
             -9
+          ],
+          [
+            -9,
+            -19
           ]
         ],
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -5989,11 +6989,15 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-21",
+      "case_id": "GENERATED-C2_FDIAG-21",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
         "points": [
+          [
+            -32,
+            19
+          ],
           [
             19,
             -32
@@ -6002,9 +7006,10 @@
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -6014,7 +7019,7 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-22",
+      "case_id": "GENERATED-C2_FDIAG-22",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
@@ -6022,14 +7027,19 @@
           [
             -22,
             44
+          ],
+          [
+            44,
+            -22
           ]
         ],
         "point_order_semantics": "unordered set"
       },
       "target_subgroup": [
-        "e"
+        "e",
+        "fdiag"
       ],
-      "expected_subgroup_label": "C1",
+      "expected_subgroup_label": "C2_FDIAG",
       "controls": {
         "is_exact": true,
         "generated": true,
@@ -6039,13 +7049,3553 @@
       }
     },
     {
-      "case_id": "GENERATED-C1-23",
+      "case_id": "GENERATED-C2_FDIAG-23",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
         "points": [
           [
+            -13,
+            21
+          ],
+          [
             21,
+            -13
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fdiag"
+      ],
+      "expected_subgroup_label": "C2_FDIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592780938,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-24",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -41,
+            11
+          ],
+          [
+            11,
+            -41
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fdiag"
+      ],
+      "expected_subgroup_label": "C2_FDIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592788857,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-25",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -34,
+            -21
+          ],
+          [
+            -21,
+            -34
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fdiag"
+      ],
+      "expected_subgroup_label": "C2_FDIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592796776,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-26",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            19,
+            41
+          ],
+          [
+            41,
+            19
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fdiag"
+      ],
+      "expected_subgroup_label": "C2_FDIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592804695,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-27",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            18,
+            49
+          ],
+          [
+            49,
+            18
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fdiag"
+      ],
+      "expected_subgroup_label": "C2_FDIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592812614,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-28",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -22,
+            36
+          ],
+          [
+            36,
+            -22
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fdiag"
+      ],
+      "expected_subgroup_label": "C2_FDIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592820533,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-29",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -4,
+            12
+          ],
+          [
+            12,
+            -4
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fdiag"
+      ],
+      "expected_subgroup_label": "C2_FDIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592828452,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-30",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -33,
+            31
+          ],
+          [
+            31,
+            -33
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fdiag"
+      ],
+      "expected_subgroup_label": "C2_FDIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592836371,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-01",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            5,
+            -45
+          ],
+          [
+            45,
+            -5
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592608768,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-02",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            13,
+            -28
+          ],
+          [
+            28,
+            -13
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592616687,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-03",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -3,
+            -34
+          ],
+          [
+            34,
+            3
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592624606,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-04",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -9,
+            -43
+          ],
+          [
+            43,
+            9
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592632525,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-05",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -26,
+            -48
+          ],
+          [
+            48,
+            26
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592640444,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-06",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -29,
+            23
+          ],
+          [
+            -23,
+            29
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592648363,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-07",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -5,
+            -32
+          ],
+          [
+            32,
+            5
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592656282,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-08",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -12,
+            -47
+          ],
+          [
+            47,
+            12
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592664201,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-09",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            42,
+            -49
+          ],
+          [
+            49,
+            -42
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592672120,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-10",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            18,
+            -29
+          ],
+          [
+            29,
+            -18
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592680039,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-11",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -29,
+            15
+          ],
+          [
+            -15,
+            29
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592687958,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-12",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -28,
+            -17
+          ],
+          [
+            17,
+            28
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592695877,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-13",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -42,
+            5
+          ],
+          [
+            -5,
+            42
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592703796,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-14",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -15,
+            -18
+          ],
+          [
+            18,
+            15
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592711715,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-15",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            30,
+            -48
+          ],
+          [
+            48,
+            -30
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592719634,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-16",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            3,
+            -44
+          ],
+          [
+            44,
+            -3
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592727553,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-17",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            1,
+            -39
+          ],
+          [
+            39,
+            -1
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592735472,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-18",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -37,
+            7
+          ],
+          [
+            -7,
+            37
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592743391,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-19",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -31,
+            18
+          ],
+          [
+            -18,
+            31
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592751310,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-20",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -27,
+            -32
+          ],
+          [
+            32,
+            27
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592759229,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-21",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -37,
+            26
+          ],
+          [
+            -26,
+            37
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592767148,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-22",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -30,
+            -17
+          ],
+          [
+            17,
+            30
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592775067,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-23",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            23,
+            -36
+          ],
+          [
+            36,
+            -23
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592782986,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-24",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -44,
+            -18
+          ],
+          [
+            18,
+            44
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592790905,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-25",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -37,
+            -43
+          ],
+          [
+            43,
+            37
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592798824,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-26",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -5,
+            -43
+          ],
+          [
+            43,
+            5
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592806743,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-27",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -26,
+            6
+          ],
+          [
+            -6,
+            26
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592814662,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-28",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -13,
+            -34
+          ],
+          [
+            34,
+            13
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592822581,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-29",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -48,
+            37
+          ],
+          [
+            -37,
+            48
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592830500,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-30",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -31,
+            28
+          ],
+          [
+            -28,
+            31
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "fanti"
+      ],
+      "expected_subgroup_label": "C2_FANTI",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592838419,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-01",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -30,
+            -13
+          ],
+          [
+            -30,
+            13
+          ],
+          [
+            30,
+            -13
+          ],
+          [
+            30,
+            13
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592610816,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-02",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -18,
+            -44
+          ],
+          [
+            -18,
+            44
+          ],
+          [
+            18,
+            -44
+          ],
+          [
+            18,
+            44
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592618735,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-03",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -22,
+            -20
+          ],
+          [
+            -22,
+            20
+          ],
+          [
+            22,
+            -20
+          ],
+          [
+            22,
+            20
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592626654,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-04",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -21,
+            -25
+          ],
+          [
+            -21,
+            25
+          ],
+          [
+            21,
+            -25
+          ],
+          [
+            21,
+            25
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592634573,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-05",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -28,
+            -37
+          ],
+          [
+            -28,
+            37
+          ],
+          [
+            28,
+            -37
+          ],
+          [
+            28,
+            37
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592642492,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-06",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -50,
+            -44
+          ],
+          [
+            -50,
+            44
+          ],
+          [
+            50,
+            -44
+          ],
+          [
+            50,
+            44
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592650411,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-07",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -4,
+            -37
+          ],
+          [
+            -4,
+            37
+          ],
+          [
+            4,
+            -37
+          ],
+          [
+            4,
+            37
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592763059,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-08",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -28,
+            -40
+          ],
+          [
+            -28,
+            40
+          ],
+          [
+            28,
+            -40
+          ],
+          [
+            28,
+            40
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592666249,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-09",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -13,
+            -17
+          ],
+          [
+            -13,
+            17
+          ],
+          [
+            13,
+            -17
+          ],
+          [
+            13,
+            17
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592674168,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-10",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -29,
+            -7
+          ],
+          [
+            -29,
+            7
+          ],
+          [
+            29,
+            -7
+          ],
+          [
+            29,
+            7
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592682087,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-11",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -29,
+            -40
+          ],
+          [
+            -29,
+            40
+          ],
+          [
+            29,
+            -40
+          ],
+          [
+            29,
+            40
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592794735,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-12",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -6,
+            -19
+          ],
+          [
+            -6,
+            19
+          ],
+          [
+            6,
+            -19
+          ],
+          [
+            6,
+            19
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592697925,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-13",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -10,
+            -45
+          ],
+          [
+            -10,
+            45
+          ],
+          [
+            10,
+            -45
+          ],
+          [
+            10,
+            45
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592705844,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-14",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -30,
+            -45
+          ],
+          [
+            -30,
+            45
+          ],
+          [
+            30,
+            -45
+          ],
+          [
+            30,
+            45
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592713763,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-15",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -7,
+            -32
+          ],
+          [
+            -7,
+            32
+          ],
+          [
+            7,
+            -32
+          ],
+          [
+            7,
+            32
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592721682,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-16",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -15,
+            -14
+          ],
+          [
+            -15,
+            14
+          ],
+          [
+            15,
+            -14
+          ],
+          [
+            15,
+            14
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592729601,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-17",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -20,
+            -17
+          ],
+          [
+            -20,
+            17
+          ],
+          [
+            20,
+            -17
+          ],
+          [
+            20,
+            17
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592737520,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-18",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -22,
+            -44
+          ],
+          [
+            -22,
+            44
+          ],
+          [
+            22,
+            -44
+          ],
+          [
+            22,
+            44
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592745439,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-19",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -16,
+            -40
+          ],
+          [
+            -16,
+            40
+          ],
+          [
+            16,
+            -40
+          ],
+          [
+            16,
+            40
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592858087,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-20",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -13,
+            -47
+          ],
+          [
+            -13,
+            47
+          ],
+          [
+            13,
+            -47
+          ],
+          [
+            13,
+            47
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592761277,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-21",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -12,
+            -8
+          ],
+          [
+            -12,
+            8
+          ],
+          [
+            12,
+            -8
+          ],
+          [
+            12,
+            8
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592769196,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-22",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -16,
+            -4
+          ],
+          [
+            -16,
+            4
+          ],
+          [
+            16,
+            -4
+          ],
+          [
+            16,
+            4
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592777115,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-23",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -10,
+            -24
+          ],
+          [
+            -10,
+            24
+          ],
+          [
+            10,
+            -24
+          ],
+          [
+            10,
+            24
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592785034,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-24",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -32,
+            -11
+          ],
+          [
+            -32,
+            11
+          ],
+          [
+            32,
+            -11
+          ],
+          [
+            32,
+            11
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592792953,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-25",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -42,
+            -41
+          ],
+          [
+            -42,
+            41
+          ],
+          [
+            42,
+            -41
+          ],
+          [
+            42,
+            41
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592800872,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-26",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -16,
+            -27
+          ],
+          [
+            -16,
+            27
+          ],
+          [
+            16,
+            -27
+          ],
+          [
+            16,
+            27
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592808791,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-27",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -17,
+            -37
+          ],
+          [
+            -17,
+            37
+          ],
+          [
+            17,
+            -37
+          ],
+          [
+            17,
+            37
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592816710,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-28",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -1,
+            -33
+          ],
+          [
+            -1,
+            33
+          ],
+          [
+            1,
+            -33
+          ],
+          [
+            1,
+            33
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592824629,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-29",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -11,
+            -48
+          ],
+          [
+            -11,
+            48
+          ],
+          [
+            11,
+            -48
+          ],
+          [
+            11,
+            48
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592832548,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-30",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -33,
+            -18
+          ],
+          [
+            -33,
+            18
+          ],
+          [
+            33,
+            -18
+          ],
+          [
+            33,
+            18
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "expected_subgroup_label": "V4_AXIS",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592840467,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-01",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -34,
+            -1
+          ],
+          [
+            -1,
+            -34
+          ],
+          [
+            1,
+            34
+          ],
+          [
+            34,
+            1
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592614912,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-02",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -37,
+            -1
+          ],
+          [
+            -1,
+            -37
+          ],
+          [
+            1,
+            37
+          ],
+          [
+            37,
+            1
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592622831,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-03",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -10,
+            5
+          ],
+          [
+            -5,
+            10
+          ],
+          [
+            5,
+            -10
+          ],
+          [
+            10,
+            -5
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592630750,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-04",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -34,
+            16
+          ],
+          [
+            -16,
+            34
+          ],
+          [
+            16,
+            -34
+          ],
+          [
+            34,
+            -16
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592638669,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-05",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -40,
+            -36
+          ],
+          [
+            -36,
+            -40
+          ],
+          [
+            36,
+            40
+          ],
+          [
+            40,
+            36
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592646588,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-06",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -27,
+            -4
+          ],
+          [
+            -4,
+            -27
+          ],
+          [
+            4,
+            27
+          ],
+          [
+            27,
+            4
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592654507,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-07",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -42,
+            -9
+          ],
+          [
+            -9,
+            -42
+          ],
+          [
+            9,
+            42
+          ],
+          [
+            42,
+            9
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592662426,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-08",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -38,
+            14
+          ],
+          [
+            -14,
+            38
+          ],
+          [
+            14,
+            -38
+          ],
+          [
+            38,
+            -14
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592670345,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-09",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -48,
+            39
+          ],
+          [
+            -39,
+            48
+          ],
+          [
+            39,
+            -48
+          ],
+          [
+            48,
+            -39
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592678264,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-10",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -39,
+            5
+          ],
+          [
+            -5,
+            39
+          ],
+          [
+            5,
+            -39
+          ],
+          [
+            39,
+            -5
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592686183,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-11",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -47,
+            -9
+          ],
+          [
+            -9,
+            -47
+          ],
+          [
+            9,
+            47
+          ],
+          [
+            47,
+            9
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592694102,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-12",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -25,
+            -4
+          ],
+          [
+            -4,
+            -25
+          ],
+          [
+            4,
+            25
+          ],
+          [
+            25,
+            4
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592702021,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-13",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -43,
+            10
+          ],
+          [
+            -10,
+            43
+          ],
+          [
+            10,
+            -43
+          ],
+          [
+            43,
+            -10
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592709940,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-14",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -20,
+            -8
+          ],
+          [
+            -8,
+            -20
+          ],
+          [
+            8,
+            20
+          ],
+          [
+            20,
+            8
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592717859,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-15",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -22,
+            15
+          ],
+          [
+            -15,
+            22
+          ],
+          [
+            15,
+            -22
+          ],
+          [
+            22,
+            -15
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592725778,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-16",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -43,
+            -27
+          ],
+          [
+            -27,
+            -43
+          ],
+          [
+            27,
+            43
+          ],
+          [
+            43,
+            27
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592733697,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-17",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -48,
+            -45
+          ],
+          [
+            -45,
+            -48
+          ],
+          [
+            45,
+            48
+          ],
+          [
+            48,
+            45
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592741616,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-18",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -8,
+            4
+          ],
+          [
+            -4,
+            8
+          ],
+          [
+            4,
+            -8
+          ],
+          [
+            8,
+            -4
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592749535,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-19",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -11,
+            -9
+          ],
+          [
+            -9,
+            -11
+          ],
+          [
+            9,
+            11
+          ],
+          [
+            11,
+            9
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592757454,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-20",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -11,
+            7
+          ],
+          [
+            -7,
+            11
+          ],
+          [
+            7,
+            -11
+          ],
+          [
+            11,
+            -7
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592765373,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-21",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -39,
+            38
+          ],
+          [
+            -38,
+            39
+          ],
+          [
+            38,
+            -39
+          ],
+          [
+            39,
+            -38
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592773292,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-22",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -42,
+            41
+          ],
+          [
+            -41,
+            42
+          ],
+          [
+            41,
+            -42
+          ],
+          [
+            42,
+            -41
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592781211,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-23",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -48,
+            -43
+          ],
+          [
+            -43,
+            -48
+          ],
+          [
+            43,
+            48
+          ],
+          [
+            48,
+            43
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592789130,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-24",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -17,
+            -8
+          ],
+          [
+            -8,
+            -17
+          ],
+          [
+            8,
+            17
+          ],
+          [
+            17,
+            8
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592797049,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-25",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -38,
+            -21
+          ],
+          [
+            -21,
+            -38
+          ],
+          [
+            21,
+            38
+          ],
+          [
+            38,
+            21
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592804968,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-26",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -43,
+            -10
+          ],
+          [
+            -10,
+            -43
+          ],
+          [
+            10,
+            43
+          ],
+          [
+            43,
+            10
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592812887,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-27",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -31,
+            5
+          ],
+          [
+            -5,
+            31
+          ],
+          [
+            5,
+            -31
+          ],
+          [
+            31,
+            -5
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592820806,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-28",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -41,
+            -13
+          ],
+          [
+            -13,
+            -41
+          ],
+          [
+            13,
+            41
+          ],
+          [
+            41,
+            13
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592828725,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-29",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -2,
+            -1
+          ],
+          [
+            -1,
+            -2
+          ],
+          [
+            1,
+            2
+          ],
+          [
+            2,
+            1
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592836644,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-30",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -42,
+            39
+          ],
+          [
+            -39,
+            42
+          ],
+          [
+            39,
+            -42
+          ],
+          [
+            42,
+            -39
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "V4_DIAG",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592844563,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-01",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            47,
             -13
           ]
         ],
@@ -6059,19 +10609,19 @@
         "is_exact": true,
         "generated": true,
         "generator_version": "xorshift32-orbit-v1",
-        "seed": 1592780938,
+        "seed": 1592619008,
         "construction": "single generic rational vector orbit under the target D4 subgroup"
       }
     },
     {
-      "case_id": "GENERATED-C1-24",
+      "case_id": "GENERATED-C1-02",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
         "points": [
           [
-            -41,
-            11
+            29,
+            16
           ]
         ],
         "point_order_semantics": "unordered set"
@@ -6084,19 +10634,19 @@
         "is_exact": true,
         "generated": true,
         "generator_version": "xorshift32-orbit-v1",
-        "seed": 1592788857,
+        "seed": 1592626927,
         "construction": "single generic rational vector orbit under the target D4 subgroup"
       }
     },
     {
-      "case_id": "GENERATED-C1-25",
+      "case_id": "GENERATED-C1-03",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
         "points": [
           [
-            -34,
-            -21
+            -42,
+            -38
           ]
         ],
         "point_order_semantics": "unordered set"
@@ -6109,19 +10659,19 @@
         "is_exact": true,
         "generated": true,
         "generator_version": "xorshift32-orbit-v1",
-        "seed": 1592796776,
+        "seed": 1592634846,
         "construction": "single generic rational vector orbit under the target D4 subgroup"
       }
     },
     {
-      "case_id": "GENERATED-C1-26",
+      "case_id": "GENERATED-C1-04",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
         "points": [
           [
-            19,
-            41
+            -50,
+            22
           ]
         ],
         "point_order_semantics": "unordered set"
@@ -6134,19 +10684,19 @@
         "is_exact": true,
         "generated": true,
         "generator_version": "xorshift32-orbit-v1",
-        "seed": 1592804695,
+        "seed": 1592642765,
         "construction": "single generic rational vector orbit under the target D4 subgroup"
       }
     },
     {
-      "case_id": "GENERATED-C1-27",
+      "case_id": "GENERATED-C1-05",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
         "points": [
           [
-            18,
-            49
+            42,
+            -17
           ]
         ],
         "point_order_semantics": "unordered set"
@@ -6159,18 +10709,93 @@
         "is_exact": true,
         "generated": true,
         "generator_version": "xorshift32-orbit-v1",
-        "seed": 1592812614,
+        "seed": 1592650684,
         "construction": "single generic rational vector orbit under the target D4 subgroup"
       }
     },
     {
-      "case_id": "GENERATED-C1-28",
+      "case_id": "GENERATED-C1-06",
       "track": "exact_finite_structural_stabilizer",
       "geometry": {
         "dimension": 2,
         "points": [
           [
-            36,
+            7,
+            37
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592658603,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-07",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            33,
+            43
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592666522,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-08",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            15,
+            7
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592674441,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-09",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -25,
             -22
           ]
         ],
@@ -6184,7 +10809,482 @@
         "is_exact": true,
         "generated": true,
         "generator_version": "xorshift32-orbit-v1",
-        "seed": 1592820533,
+        "seed": 1592682360,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-10",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -14,
+            44
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592690279,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-11",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            41,
+            34
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592698198,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-12",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -42,
+            25
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592706117,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-13",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -22,
+            -34
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592714036,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-14",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -6,
+            -29
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592721955,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-15",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -32,
+            36
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592729874,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-16",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            2,
+            12
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592737793,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-17",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -47,
+            -2
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592745712,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-18",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            24,
+            37
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592753631,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-19",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -44,
+            33
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592761550,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-20",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            35,
+            34
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592769469,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-21",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            10,
+            33
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592777388,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-22",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -14,
+            -18
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592785307,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-23",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            49,
+            28
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592793226,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-24",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            34,
+            -19
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592801145,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-25",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            35,
+            -50
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592809064,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-26",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            -47,
+            40
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592816983,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-27",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            16,
+            48
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592824902,
+        "construction": "single generic rational vector orbit under the target D4 subgroup"
+      }
+    },
+    {
+      "case_id": "GENERATED-C1-28",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            3,
+            -48
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": true,
+        "generated": true,
+        "generator_version": "xorshift32-orbit-v1",
+        "seed": 1592832821,
         "construction": "single generic rational vector orbit under the target D4 subgroup"
       }
     },
@@ -6195,8 +11295,8 @@
         "dimension": 2,
         "points": [
           [
-            12,
-            -4
+            22,
+            -9
           ]
         ],
         "point_order_semantics": "unordered set"
@@ -6209,7 +11309,7 @@
         "is_exact": true,
         "generated": true,
         "generator_version": "xorshift32-orbit-v1",
-        "seed": 1592828452,
+        "seed": 1592840740,
         "construction": "single generic rational vector orbit under the target D4 subgroup"
       }
     },
@@ -6220,8 +11320,8 @@
         "dimension": 2,
         "points": [
           [
-            -33,
-            31
+            2,
+            1
           ]
         ],
         "point_order_semantics": "unordered set"
@@ -6234,7 +11334,7 @@
         "is_exact": true,
         "generated": true,
         "generator_version": "xorshift32-orbit-v1",
-        "seed": 1592836371,
+        "seed": 1592848659,
         "construction": "single generic rational vector orbit under the target D4 subgroup"
       }
     }
@@ -6246,9 +11346,9 @@
     "rule": "replace pending generator IDs with deterministic split digests before any benchmark run; never use final holdout for threshold or model selection"
   },
   "benchmark_status": {
-    "fixture_validation": "hand-authored_and_generated_exact_fixtures_authored_not_yet_checked_by_GitHub_Actions",
+    "fixture_validation": "all_ten_d4_subgroup_families_authored_not_yet_checked_by_github_actions",
     "external_baseline_runs": "not_started",
-    "results": "no external baseline results; 150 generated cases are exact-oracle inputs only",
+    "results": "no external baseline results; 300 generated point-set cases are exact-oracle inputs only",
     "claim_boundary": "synthetic exact fixture definitions are not benchmark results"
   }
 }
