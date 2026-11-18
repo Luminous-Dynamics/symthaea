@@ -32,7 +32,7 @@ fn require_digest(field: &'static str, value: &str) -> Result<(), ServiceQualifi
 pub enum QualificationDomain {
     MeasurementValidity,
     TaskCompletionAndComfort,
-    StandardizedSprayPerformance,
+    FixtureMethodPerformance,
     ThermalStability,
     WaterQuality,
     HygieneAndExposure,
@@ -64,7 +64,7 @@ impl QualificationDomain {
         match self {
             Self::MeasurementValidity => QualificationAuthority::MycelixMetrology,
             Self::TaskCompletionAndComfort => QualificationAuthority::IndependentTaskAssessor,
-            Self::StandardizedSprayPerformance | Self::ThermalStability => {
+            Self::FixtureMethodPerformance | Self::ThermalStability => {
                 QualificationAuthority::IndependentTestLaboratory
             }
             Self::WaterQuality => QualificationAuthority::MycelixWaterQuality,
@@ -103,7 +103,7 @@ pub enum QualificationClaim {
 const FUNCTIONAL_DOMAINS: &[QualificationDomain] = &[
     QualificationDomain::MeasurementValidity,
     QualificationDomain::TaskCompletionAndComfort,
-    QualificationDomain::StandardizedSprayPerformance,
+    QualificationDomain::FixtureMethodPerformance,
     QualificationDomain::ThermalStability,
     QualificationDomain::WaterQuality,
     QualificationDomain::HygieneAndExposure,
@@ -113,7 +113,7 @@ const FUNCTIONAL_DOMAINS: &[QualificationDomain] = &[
 const ACCESSIBLE_DOMAINS: &[QualificationDomain] = &[
     QualificationDomain::MeasurementValidity,
     QualificationDomain::TaskCompletionAndComfort,
-    QualificationDomain::StandardizedSprayPerformance,
+    QualificationDomain::FixtureMethodPerformance,
     QualificationDomain::ThermalStability,
     QualificationDomain::WaterQuality,
     QualificationDomain::HygieneAndExposure,
@@ -124,7 +124,7 @@ const ACCESSIBLE_DOMAINS: &[QualificationDomain] = &[
 const WATER_EFFICIENCY_DOMAINS: &[QualificationDomain] = &[
     QualificationDomain::MeasurementValidity,
     QualificationDomain::TaskCompletionAndComfort,
-    QualificationDomain::StandardizedSprayPerformance,
+    QualificationDomain::FixtureMethodPerformance,
     QualificationDomain::ThermalStability,
     QualificationDomain::WaterQuality,
     QualificationDomain::HygieneAndExposure,
@@ -135,7 +135,7 @@ const WATER_EFFICIENCY_DOMAINS: &[QualificationDomain] = &[
 const WATER_AND_ENERGY_DOMAINS: &[QualificationDomain] = &[
     QualificationDomain::MeasurementValidity,
     QualificationDomain::TaskCompletionAndComfort,
-    QualificationDomain::StandardizedSprayPerformance,
+    QualificationDomain::FixtureMethodPerformance,
     QualificationDomain::ThermalStability,
     QualificationDomain::WaterQuality,
     QualificationDomain::HygieneAndExposure,
@@ -147,7 +147,7 @@ const WATER_AND_ENERGY_DOMAINS: &[QualificationDomain] = &[
 const LIFECYCLE_DOMAINS: &[QualificationDomain] = &[
     QualificationDomain::MeasurementValidity,
     QualificationDomain::TaskCompletionAndComfort,
-    QualificationDomain::StandardizedSprayPerformance,
+    QualificationDomain::FixtureMethodPerformance,
     QualificationDomain::ThermalStability,
     QualificationDomain::WaterQuality,
     QualificationDomain::HygieneAndExposure,
@@ -162,7 +162,7 @@ const LIFECYCLE_DOMAINS: &[QualificationDomain] = &[
 const RESILIENT_DOMAINS: &[QualificationDomain] = &[
     QualificationDomain::MeasurementValidity,
     QualificationDomain::TaskCompletionAndComfort,
-    QualificationDomain::StandardizedSprayPerformance,
+    QualificationDomain::FixtureMethodPerformance,
     QualificationDomain::ThermalStability,
     QualificationDomain::WaterQuality,
     QualificationDomain::HygieneAndExposure,
@@ -173,7 +173,7 @@ const RESILIENT_DOMAINS: &[QualificationDomain] = &[
 const FULL_PLATFORM_DOMAINS: &[QualificationDomain] = &[
     QualificationDomain::MeasurementValidity,
     QualificationDomain::TaskCompletionAndComfort,
-    QualificationDomain::StandardizedSprayPerformance,
+    QualificationDomain::FixtureMethodPerformance,
     QualificationDomain::ThermalStability,
     QualificationDomain::WaterQuality,
     QualificationDomain::HygieneAndExposure,
@@ -200,25 +200,69 @@ impl QualificationClaim {
     }
 }
 
-/// Claim identity and the frozen test context against which every receipt is bound.
+/// One frozen specialist method and its method-specific conditions within a service trial.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QualificationMethodBinding {
+    pub domain: QualificationDomain,
+    pub method_sha256: String,
+    pub conditions_sha256: String,
+}
+
+/// Claim identity and the frozen trial context against which every receipt is bound.
+/// Each domain may use a different specialist method and method-specific conditions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServiceQualificationProfile {
     pub profile_id: String,
     pub claim: QualificationClaim,
     pub protocol_sha256: String,
     pub conditions_sha256: String,
+    pub method_bindings: Vec<QualificationMethodBinding>,
 }
 
 impl ServiceQualificationProfile {
+    fn method_binding(&self, domain: QualificationDomain) -> Option<&QualificationMethodBinding> {
+        self.method_bindings
+            .iter()
+            .find(|binding| binding.domain == domain)
+    }
+
     pub fn validate(&self) -> Result<(), ServiceQualificationError> {
         require_text("profile_id", &self.profile_id)?;
         require_digest("profile.protocol_sha256", &self.protocol_sha256)?;
         require_digest("profile.conditions_sha256", &self.conditions_sha256)?;
 
-        let mut domains = HashSet::with_capacity(self.claim.required_domains().len());
-        for domain in self.claim.required_domains() {
+        let required = self.claim.required_domains();
+        let mut domains = HashSet::with_capacity(required.len());
+        for domain in required {
             if !domains.insert(*domain) {
                 return Err(ServiceQualificationError::DuplicateRequiredDomain {
+                    domain: *domain,
+                });
+            }
+        }
+
+        let mut bound = HashSet::with_capacity(required.len());
+        for binding in &self.method_bindings {
+            if !required.contains(&binding.domain) {
+                return Err(ServiceQualificationError::UnexpectedMethodBinding {
+                    domain: binding.domain,
+                });
+            }
+            if !bound.insert(binding.domain) {
+                return Err(ServiceQualificationError::DuplicateMethodBinding {
+                    domain: binding.domain,
+                });
+            }
+            require_digest("method_binding.method_sha256", &binding.method_sha256)?;
+            require_digest(
+                "method_binding.conditions_sha256",
+                &binding.conditions_sha256,
+            )?;
+        }
+
+        for domain in required {
+            if !bound.contains(domain) {
+                return Err(ServiceQualificationError::MissingMethodBinding {
                     domain: *domain,
                 });
             }
@@ -234,7 +278,8 @@ pub struct QualificationEvidenceRef {
     pub record_id: String,
     pub evidence_sha256: String,
     pub method_sha256: String,
-    pub conditions_sha256: String,
+    pub method_conditions_sha256: String,
+    pub trial_conditions_sha256: String,
 }
 
 impl QualificationEvidenceRef {
@@ -246,7 +291,14 @@ impl QualificationEvidenceRef {
         require_text("assessment.record_id", &self.record_id)?;
         require_digest("assessment.evidence_sha256", &self.evidence_sha256)?;
         require_digest("assessment.method_sha256", &self.method_sha256)?;
-        require_digest("assessment.conditions_sha256", &self.conditions_sha256)?;
+        require_digest(
+            "assessment.method_conditions_sha256",
+            &self.method_conditions_sha256,
+        )?;
+        require_digest(
+            "assessment.trial_conditions_sha256",
+            &self.trial_conditions_sha256,
+        )?;
 
         let expected = domain.expected_authority();
         if self.authority != expected {
@@ -256,11 +308,17 @@ impl QualificationEvidenceRef {
                 actual: self.authority,
             });
         }
-        if self.method_sha256 != profile.protocol_sha256 {
+        let binding = profile
+            .method_binding(domain)
+            .ok_or(ServiceQualificationError::MissingMethodBinding { domain })?;
+        if self.method_sha256 != binding.method_sha256 {
             return Err(ServiceQualificationError::EvidenceMethodMismatch { domain });
         }
-        if self.conditions_sha256 != profile.conditions_sha256 {
+        if self.method_conditions_sha256 != binding.conditions_sha256 {
             return Err(ServiceQualificationError::EvidenceConditionsMismatch { domain });
+        }
+        if self.trial_conditions_sha256 != profile.conditions_sha256 {
+            return Err(ServiceQualificationError::EvidenceTrialConditionsMismatch { domain });
         }
         Ok(())
     }
@@ -296,6 +354,9 @@ pub enum ServiceQualificationError {
     MissingField { field: &'static str },
     InvalidDigest { field: &'static str },
     DuplicateRequiredDomain { domain: QualificationDomain },
+    MissingMethodBinding { domain: QualificationDomain },
+    UnexpectedMethodBinding { domain: QualificationDomain },
+    DuplicateMethodBinding { domain: QualificationDomain },
     ProfileMismatch,
     ProtocolMismatch,
     ConditionsMismatch,
@@ -309,6 +370,7 @@ pub enum ServiceQualificationError {
     },
     EvidenceMethodMismatch { domain: QualificationDomain },
     EvidenceConditionsMismatch { domain: QualificationDomain },
+    EvidenceTrialConditionsMismatch { domain: QualificationDomain },
     SameRunCompared,
 }
 
@@ -323,6 +385,15 @@ impl Display for ServiceQualificationError {
             }
             Self::DuplicateRequiredDomain { domain } => {
                 write!(f, "claim profile repeats required domain: {domain:?}")
+            }
+            Self::MissingMethodBinding { domain } => {
+                write!(f, "claim profile has no method binding for {domain:?}")
+            }
+            Self::UnexpectedMethodBinding { domain } => {
+                write!(f, "claim profile has an unrequested method binding for {domain:?}")
+            }
+            Self::DuplicateMethodBinding { domain } => {
+                write!(f, "claim profile has duplicate method bindings for {domain:?}")
             }
             Self::ProfileMismatch => write!(f, "qualification record uses a different claim profile"),
             Self::ProtocolMismatch => write!(f, "qualification record uses a different protocol"),
@@ -350,7 +421,10 @@ impl Display for ServiceQualificationError {
                 write!(f, "evidence method does not match the profile for {domain:?}")
             }
             Self::EvidenceConditionsMismatch { domain } => {
-                write!(f, "evidence conditions do not match the profile for {domain:?}")
+                write!(f, "evidence method conditions do not match the profile for {domain:?}")
+            }
+            Self::EvidenceTrialConditionsMismatch { domain } => {
+                write!(f, "evidence trial conditions do not match the profile for {domain:?}")
             }
             Self::SameRunCompared => {
                 write!(f, "a service run cannot be compared with itself")
@@ -536,6 +610,15 @@ mod tests {
             claim,
             protocol_sha256: digest('a'),
             conditions_sha256: digest('b'),
+            method_bindings: claim
+                .required_domains()
+                .iter()
+                .map(|domain| QualificationMethodBinding {
+                    domain: *domain,
+                    method_sha256: digest('d'),
+                    conditions_sha256: digest('e'),
+                })
+                .collect(),
         }
     }
 
@@ -551,8 +634,17 @@ mod tests {
                 authority: domain.expected_authority(),
                 record_id: format!("assessment-{domain:?}"),
                 evidence_sha256: digest('c'),
-                method_sha256: profile.protocol_sha256.clone(),
-                conditions_sha256: profile.conditions_sha256.clone(),
+                method_sha256: profile
+                    .method_binding(domain)
+                    .expect("profile method")
+                    .method_sha256
+                    .clone(),
+                method_conditions_sha256: profile
+                    .method_binding(domain)
+                    .expect("profile method")
+                    .conditions_sha256
+                    .clone(),
+                trial_conditions_sha256: profile.conditions_sha256.clone(),
             },
         }
     }
@@ -665,7 +757,7 @@ mod tests {
     fn evidence_conditions_must_match_the_frozen_profile() {
         let profile = profile(QualificationClaim::FunctionalService);
         let mut record = record("candidate-01", &profile, AssessmentOutcome::Pass);
-        record.assessments[0].evidence.conditions_sha256 = digest('z');
+        record.assessments[0].evidence.method_conditions_sha256 = digest('z');
         assert_eq!(
             record.validate(&profile),
             Err(ServiceQualificationError::EvidenceConditionsMismatch {
@@ -709,7 +801,7 @@ mod tests {
         assert_eq!(result.disposition, QualificationDisposition::Failed);
         assert_eq!(
             result.failed_domains,
-            vec![QualificationDomain::StandardizedSprayPerformance]
+            vec![QualificationDomain::FixtureMethodPerformance]
         );
     }
 
