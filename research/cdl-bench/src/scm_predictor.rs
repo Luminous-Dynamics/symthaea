@@ -348,6 +348,102 @@ impl BytePredictor for ScmHybridPredictor {
     }
 }
 
+type LagContextHistograms =
+    [[[[u16; BYTE_SYMBOLS]; 4]; BYTE_LANES]; SCM_VARIABLES];
+
+/// Shared stream/header/field statistics with only the lag and parent-specific
+/// context tables duplicated. Every expert sees the same decoded symbols.
+struct ScmMixtureState {
+    position: u64,
+    header: [u16; BYTE_SYMBOLS],
+    base: BaseHistograms,
+    lag_contexts: LagContextHistograms,
+    parent_contexts: ContextHistograms,
+    current_record: [u8; SCM_VARIABLES * BYTE_LANES],
+    previous_record: [u8; SCM_VARIABLES * BYTE_LANES],
+}
+
+impl ScmMixtureState {
+    fn new() -> Self {
+        Self {
+            position: 0,
+            header: [1; BYTE_SYMBOLS],
+            base: [[[1; BYTE_SYMBOLS]; BYTE_LANES]; SCM_VARIABLES],
+            lag_contexts: [[[[1; BYTE_SYMBOLS]; 4]; BYTE_LANES]; SCM_VARIABLES],
+            parent_contexts: [[[[1; BYTE_SYMBOLS]; CONTEXTS]; BYTE_LANES]; SCM_VARIABLES],
+            current_record: [0; SCM_VARIABLES * BYTE_LANES],
+            previous_record: [0; SCM_VARIABLES * BYTE_LANES],
+        }
+    }
+
+    fn parent_context(&self, variable: usize) -> usize {
+        let bucket = |parent: usize| {
+            StructuredState::value_bucket(&self.current_record, parent)
+        };
+        match variable {
+            0 => 0,
+            1 => bucket(0),
+            2 => bucket(0) | (bucket(1) << 2),
+            3 => bucket(2),
+            4 => bucket(1) | (bucket(3) << 2),
+            _ => 0,
+        }
+    }
+
+    fn cdf(&self, conditioning: u8) -> ByteCdf {
+        if self.position < SCM_HEADER_BYTES {
+            return StructuredState::make_cdf(&self.header);
+        }
+        let offset = self.position - SCM_HEADER_BYTES;
+        let variable = ((offset / BYTE_LANES as u64) % SCM_VARIABLES as u64) as usize;
+        let lane = (offset % BYTE_LANES as u64) as usize;
+        let base = &self.base[variable][lane];
+        let context = match conditioning {
+            1 => &self.parent_contexts[variable][lane][self.parent_context(variable)],
+            2 => {
+                let bucket = StructuredState::value_bucket(&self.previous_record, variable);
+                &self.lag_contexts[variable][lane][bucket]
+            }
+            _ => return StructuredState::make_cdf(base),
+        };
+        let mut cdf = [0u32; BYTE_SYMBOLS + 1];
+        for symbol in 0..BYTE_SYMBOLS {
+            cdf[symbol + 1] =
+                cdf[symbol] + base[symbol] as u32 + context[symbol] as u32;
+        }
+        cdf
+    }
+
+    fn observe(&mut self, symbol: u8) {
+        if self.position < SCM_HEADER_BYTES {
+            StructuredState::update_histogram(&mut self.header, symbol);
+        } else {
+            let offset = self.position - SCM_HEADER_BYTES;
+            let variable = ((offset / BYTE_LANES as u64) % SCM_VARIABLES as u64) as usize;
+            let lane = (offset % BYTE_LANES as u64) as usize;
+            let lag_context =
+                StructuredState::value_bucket(&self.previous_record, variable);
+            let parent_context = self.parent_context(variable);
+
+            StructuredState::update_histogram(&mut self.base[variable][lane], symbol);
+            StructuredState::update_histogram(
+                &mut self.lag_contexts[variable][lane][lag_context],
+                symbol,
+            );
+            StructuredState::update_histogram(
+                &mut self.parent_contexts[variable][lane][parent_context],
+                symbol,
+            );
+
+            self.current_record[variable * BYTE_LANES + lane] = symbol;
+            if variable == SCM_VARIABLES - 1 && lane == BYTE_LANES - 1 {
+                self.previous_record = self.current_record;
+            }
+        }
+        self.position += 1;
+    }
+}
+
 const EXPERT_MIXTURE_TOTAL_WEIGHT: u32 = 1 << 24;
 const EXPERT_COUNT: usize = 3;
 // Fixed-share hazard: 1/256 of posterior mass is redistributed equally per byte.
@@ -500,9 +596,7 @@ fn update_expert_weights(
 /// transmitted. The parent expert receives the known SCM topology and is an
 /// oracle control, not a learned causal model. Model ID 7.
 pub struct ScmExpertMixturePredictor {
-    field: StructuredState,
-    lag: StructuredState,
-    parent: StructuredState,
+    state: ScmMixtureState,
     weights: [u32; EXPERT_COUNT],
 }
 
@@ -510,9 +604,7 @@ impl ScmExpertMixturePredictor {
     pub fn new() -> Self {
         let third = EXPERT_MIXTURE_TOTAL_WEIGHT / 3;
         Self {
-            field: StructuredState::new(),
-            lag: StructuredState::new(),
-            parent: StructuredState::new(),
+            state: ScmMixtureState::new(),
             weights: [third, third, EXPERT_MIXTURE_TOTAL_WEIGHT - 2 * third],
         }
     }
@@ -529,9 +621,9 @@ impl ScmExpertMixturePredictor {
 
     fn expert_frequencies(&self) -> [[u32; BYTE_SYMBOLS]; EXPERT_COUNT] {
         [
-            normalize_expert_cdf(&self.field.cdf(0)),
-            normalize_expert_cdf(&self.lag.cdf(2)),
-            normalize_expert_cdf(&self.parent.cdf(1)),
+            normalize_expert_cdf(&self.state.cdf(0)),
+            normalize_expert_cdf(&self.state.cdf(2)),
+            normalize_expert_cdf(&self.state.cdf(1)),
         ]
     }
 }
@@ -560,9 +652,7 @@ impl BytePredictor for ScmExpertMixturePredictor {
         ];
         self.weights = update_expert_weights(&self.weights, &likelihoods);
 
-        self.field.observe(symbol, 0);
-        self.lag.observe(symbol, 2);
-        self.parent.observe(symbol, 1);
+        self.state.observe(symbol);
     }
 }
 
