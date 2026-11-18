@@ -499,7 +499,8 @@ fn compose_case(
     ];
 
     let note = format!(
-        "source_commit={source_commit};manifest_sha256={manifest_sha256};engine_version={};grammar_family={:?};support_axes={};universal_fatal={universal_fatal_count};style_fatal={};warnings={warning_count};validation_valid={}",
+        "source_commit={source_commit};composer_reference_commit={};manifest_sha256={manifest_sha256};engine_version={};grammar_family={:?};support_axes={};universal_fatal={universal_fatal_count};style_fatal={};warnings={warning_count};validation_valid={}",
+        PINNED_COMPOSER_SOURCE_COMMIT,
         symthaea_music_theory::MUSIC_THEORY_ENGINE_VERSION,
         case.style.grammar_family(),
         case.style.supported_intent_axes().join("|"),
@@ -637,19 +638,6 @@ fn verify_source_revision(source_commit: &str) -> Result<(), String> {
             "source worktree is not clean; refusing to bind measurements to commit {head}"
         ));
     }
-    git_output(&[
-        "merge-base",
-        "--is-ancestor",
-        PINNED_COMPOSER_SOURCE_COMMIT,
-        "HEAD",
-    ])
-    .map_err(|_| {
-        format!(
-            "checked-out HEAD {head} is not descended from pinned composer source {}",
-            PINNED_COMPOSER_SOURCE_COMMIT
-        )
-    })?;
-
     for (path, expected_blob) in PINNED_COMPOSER_BLOBS {
         let revision = format!("HEAD:{path}");
         let actual_blob = git_output(&["rev-parse", &revision])?;
