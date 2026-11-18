@@ -1,0 +1,307 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/lightshell-clean-state-0.1.0.json",
+  "title": "Atelier Lightshell Application-Specific Clean-State Qualification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "campaign_id", "state", "frozen_before_first_cycle",
+    "preregistration_ref", "protocol_digest", "target_trial_design_ref",
+    "article", "application", "soil_challenge", "gates", "cycles", "independent_review"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "campaign_id": { "type": "string", "minLength": 1 },
+    "state": { "enum": ["proposed", "measured", "adjudicated"] },
+    "frozen_before_first_cycle": { "type": "boolean" },
+    "preregistration_ref": { "type": "string", "minLength": 1 },
+    "protocol_digest": { "$ref": "#/$defs/digest" },
+    "target_trial_design_ref": { "type": ["string", "null"] },
+    "article": { "$ref": "#/$defs/article" },
+    "application": { "$ref": "#/$defs/application" },
+    "soil_challenge": { "$ref": "#/$defs/soilChallenge" },
+    "gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/gate" }
+    },
+    "cycles": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/cycle" }
+    },
+    "independent_review": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/independentReview" }
+      ]
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-fA-F]{64}$"
+    },
+    "article": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id", "garment_generation_ref", "manufactured_article_ref",
+        "installed_article_digest", "robot_id", "robot_serial", "firmware_revision",
+        "robot_configuration_digest", "mission_profile_ref", "topology_digest",
+        "asbuilt_inspection_ref", "cleaning_mode", "zones"
+      ],
+      "properties": {
+        "candidate_id": { "type": "string", "minLength": 1 },
+        "garment_generation_ref": { "type": "string", "minLength": 1 },
+        "manufactured_article_ref": { "type": "string", "minLength": 1 },
+        "installed_article_digest": { "$ref": "#/$defs/digest" },
+        "robot_id": { "type": "string", "minLength": 1 },
+        "robot_serial": { "type": "string", "minLength": 1 },
+        "firmware_revision": { "type": "string", "minLength": 1 },
+        "robot_configuration_digest": { "$ref": "#/$defs/digest" },
+        "mission_profile_ref": { "type": "string", "minLength": 1 },
+        "topology_digest": { "$ref": "#/$defs/digest" },
+        "asbuilt_inspection_ref": { "type": "string", "minLength": 1 },
+        "cleaning_mode": { "enum": ["installed_in_place", "removed_module"] },
+        "zones": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/zone" }
+        }
+      }
+    },
+    "zone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["zone_ref", "panel_ref", "material_lot_ref", "construction_ref"],
+      "properties": {
+        "zone_ref": { "type": "string", "minLength": 1 },
+        "panel_ref": { "type": "string", "minLength": 1 },
+        "material_lot_ref": { "type": "string", "minLength": 1 },
+        "construction_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "application": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "application_ref", "cleaning_requirement_ref", "acceptance_owner_ref",
+        "use_environment_ref", "cleaning_interval_ref"
+      ],
+      "properties": {
+        "application_ref": { "type": "string", "minLength": 1 },
+        "cleaning_requirement_ref": { "type": "string", "minLength": 1 },
+        "acceptance_owner_ref": { "type": "string", "minLength": 1 },
+        "use_environment_ref": { "type": "string", "minLength": 1 },
+        "cleaning_interval_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "soilChallenge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "soil_profile_ref", "soil_class", "soil_batch_ref", "challenge_recipe_ref",
+        "application_method_ref", "challenge_area_cm2", "target_loading",
+        "loading_uncertainty", "loading_unit", "dwell_seconds", "conditioning_ref"
+      ],
+      "properties": {
+        "soil_profile_ref": { "type": "string", "minLength": 1 },
+        "soil_class": {
+          "enum": ["particulate", "oil", "protein_surrogate", "mineral", "synthetic_marker", "other_non_microbiological"]
+        },
+        "soil_batch_ref": { "type": "string", "minLength": 1 },
+        "challenge_recipe_ref": { "type": "string", "minLength": 1 },
+        "application_method_ref": { "type": "string", "minLength": 1 },
+        "challenge_area_cm2": { "type": "number", "exclusiveMinimum": 0 },
+        "target_loading": { "type": "number", "exclusiveMinimum": 0 },
+        "loading_uncertainty": { "type": "number", "minimum": 0 },
+        "loading_unit": { "type": "string", "minLength": 1 },
+        "dwell_seconds": { "type": "number", "minimum": 0 },
+        "conditioning_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "assayControls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blank_control_ref", "blank_response", "blank_uncertainty", "blank_maximum",
+        "positive_control_ref", "positive_control_response", "positive_control_uncertainty",
+        "positive_control_minimum", "recovery_control_ref", "recovery_fraction",
+        "recovery_uncertainty", "recovery_minimum", "recovery_maximum",
+        "controls_raw_data_digest"
+      ],
+      "properties": {
+        "blank_control_ref": { "type": "string", "minLength": 1 },
+        "blank_response": { "type": "number", "minimum": 0 },
+        "blank_uncertainty": { "type": "number", "minimum": 0 },
+        "blank_maximum": { "type": "number", "minimum": 0 },
+        "positive_control_ref": { "type": "string", "minLength": 1 },
+        "positive_control_response": { "type": "number", "minimum": 0 },
+        "positive_control_uncertainty": { "type": "number", "minimum": 0 },
+        "positive_control_minimum": { "type": "number", "minimum": 0 },
+        "recovery_control_ref": { "type": "string", "minLength": 1 },
+        "recovery_fraction": { "type": "number", "minimum": 0 },
+        "recovery_uncertainty": { "type": "number", "minimum": 0 },
+        "recovery_minimum": { "type": "number", "minimum": 0 },
+        "recovery_maximum": { "type": "number", "minimum": 0 },
+        "controls_raw_data_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gate_id", "zone_ref", "metric_family", "comparison_mode", "unit",
+        "acceptance_limit", "hard_gate", "applicability", "applicability_owner_ref",
+        "not_applicable_rationale_ref", "minimum_replicates_per_cycle",
+        "method_selection_ref", "method_applicability_ref", "acceptance_rule_ref",
+        "assay_controls"
+      ],
+      "properties": {
+        "gate_id": { "type": "string", "minLength": 1 },
+        "zone_ref": { "type": "string", "minLength": 1 },
+        "metric_family": {
+          "enum": ["soil_residue", "cleaner_residue", "textile_property", "coating_integrity", "seam_integrity", "attachment_integrity", "sensor_function"]
+        },
+        "comparison_mode": {
+          "enum": ["max_residual_fraction", "max_absolute_post", "min_retention_fraction"]
+        },
+        "unit": { "type": "string", "minLength": 1 },
+        "acceptance_limit": { "type": "number", "minimum": 0 },
+        "hard_gate": { "type": "boolean" },
+        "applicability": { "enum": ["required", "not_applicable"] },
+        "applicability_owner_ref": { "type": ["string", "null"] },
+        "not_applicable_rationale_ref": { "type": ["string", "null"] },
+        "minimum_replicates_per_cycle": { "type": "integer", "minimum": 1 },
+        "method_selection_ref": { "type": "string", "minLength": 1 },
+        "method_applicability_ref": { "type": "string", "minLength": 1 },
+        "acceptance_rule_ref": { "type": "string", "minLength": 1 },
+        "assay_controls": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/assayControls" }
+          ]
+        }
+      }
+    },
+    "inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["disposition", "inspector_ref", "evidence_ref", "defect_codes"],
+      "properties": {
+        "disposition": { "enum": ["pass", "fail", "unknown"] },
+        "inspector_ref": { "type": "string", "minLength": 1 },
+        "evidence_ref": { "type": "string", "minLength": 1 },
+        "defect_codes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value", "expanded_uncertainty", "unit", "quantification_state",
+        "detection_limit", "quantification_limit", "instrument_ref",
+        "calibration_ref", "calibration_state", "method_selection_ref",
+        "raw_data_digest", "evidence_ref"
+      ],
+      "properties": {
+        "value": { "type": "number", "minimum": 0 },
+        "expanded_uncertainty": { "type": "number", "minimum": 0 },
+        "unit": { "type": "string", "minLength": 1 },
+        "quantification_state": {
+          "enum": ["quantified", "below_detection_limit", "below_quantification_limit", "above_range"]
+        },
+        "detection_limit": { "type": "number", "minimum": 0 },
+        "quantification_limit": { "type": "number", "minimum": 0 },
+        "instrument_ref": { "type": "string", "minLength": 1 },
+        "calibration_ref": { "type": "string", "minLength": 1 },
+        "calibration_state": { "enum": ["current", "expired", "unknown", "uncalibrated"] },
+        "method_selection_ref": { "type": "string", "minLength": 1 },
+        "raw_data_digest": { "$ref": "#/$defs/digest" },
+        "evidence_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_id", "zone_ref", "replicate_index", "before", "after"],
+      "properties": {
+        "gate_id": { "type": "string", "minLength": 1 },
+        "zone_ref": { "type": "string", "minLength": 1 },
+        "replicate_index": { "type": "integer", "minimum": 0 },
+        "before": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/measurement" }
+          ]
+        },
+        "after": { "$ref": "#/$defs/measurement" }
+      }
+    },
+    "cycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cycle_id", "cycle_index", "cleaning_method_selection_ref",
+        "cleaning_method_applicability_ref", "mission_exposure_plan_ref",
+        "cleaning_mode", "cleaning_agent_ref", "cleaning_agent_batch_ref",
+        "agent_concentration", "agent_concentration_unit", "contact_time_seconds",
+        "surface_temperature_c", "application_mode", "application_pressure_kpa",
+        "nozzle_ref", "standoff_cm", "rinse_water_quality_ref", "rinse_volume_l",
+        "drying_method_ref", "robot_isolation_evidence_ref", "removal_record_ref",
+        "reinstallation_inspection_ref", "soil_application_ref", "cleaning_run_ref",
+        "process_record_digest", "raw_process_digest", "post_clean_inspection",
+        "observations"
+      ],
+      "properties": {
+        "cycle_id": { "type": "string", "minLength": 1 },
+        "cycle_index": { "type": "integer", "minimum": 0 },
+        "cleaning_method_selection_ref": { "type": "string", "minLength": 1 },
+        "cleaning_method_applicability_ref": { "type": "string", "minLength": 1 },
+        "mission_exposure_plan_ref": { "type": "string", "minLength": 1 },
+        "cleaning_mode": { "enum": ["installed_in_place", "removed_module"] },
+        "cleaning_agent_ref": { "type": "string", "minLength": 1 },
+        "cleaning_agent_batch_ref": { "type": "string", "minLength": 1 },
+        "agent_concentration": { "type": "number", "minimum": 0 },
+        "agent_concentration_unit": { "type": "string", "minLength": 1 },
+        "contact_time_seconds": { "type": "number", "minimum": 0 },
+        "surface_temperature_c": { "type": "number" },
+        "application_mode": {
+          "enum": ["immersion", "spray", "wipe", "manual_brush", "machine_wash", "other_declared"]
+        },
+        "application_pressure_kpa": { "type": ["number", "null"], "minimum": 0 },
+        "nozzle_ref": { "type": ["string", "null"] },
+        "standoff_cm": { "type": ["number", "null"], "minimum": 0 },
+        "rinse_water_quality_ref": { "type": "string", "minLength": 1 },
+        "rinse_volume_l": { "type": "number", "minimum": 0 },
+        "drying_method_ref": { "type": "string", "minLength": 1 },
+        "robot_isolation_evidence_ref": { "type": ["string", "null"] },
+        "removal_record_ref": { "type": ["string", "null"] },
+        "reinstallation_inspection_ref": { "type": ["string", "null"] },
+        "soil_application_ref": { "type": ["string", "null"] },
+        "cleaning_run_ref": { "type": ["string", "null"] },
+        "process_record_digest": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] },
+        "raw_process_digest": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] },
+        "post_clean_inspection": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/inspection" }]
+        },
+        "observations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/observation" }
+        }
+      }
+    },
+    "independentReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["disposition", "reviewer_ref", "reviewed_at", "review_record_ref"],
+      "properties": {
+        "disposition": { "enum": ["admit", "reject"] },
+        "reviewer_ref": { "type": "string", "minLength": 1 },
+        "reviewed_at": { "type": "string", "format": "date-time" },
+        "review_record_ref": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
