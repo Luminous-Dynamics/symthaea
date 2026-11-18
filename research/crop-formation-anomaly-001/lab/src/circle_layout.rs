@@ -57,6 +57,10 @@ pub enum CircleLayoutError {
     InvalidContactIndex,
     InvalidSensitivityConfig,
     RadiusPerturbationExceedsMinimumRadius,
+    InvalidGrammarFamily,
+    EmptyGrammarSpecId,
+    DuplicateGrammarSpecId(String),
+    InvalidGrammarSpec { spec_id: String },
 }
 
 impl std::fmt::Display for CircleLayoutError {
@@ -97,11 +101,150 @@ impl std::fmt::Display for CircleLayoutError {
             Self::RadiusPerturbationExceedsMinimumRadius => {
                 write!(f, "maximum radius perturbation must be smaller than the minimum source radius")
             }
+            Self::InvalidGrammarFamily => {
+                write!(f, "grammar family requires a non-empty protocol id, positive version and specifications")
+            }
+            Self::EmptyGrammarSpecId => write!(f, "grammar specification id must not be empty"),
+            Self::DuplicateGrammarSpecId(id) => write!(f, "duplicate grammar specification id: {id}"),
+            Self::InvalidGrammarSpec { spec_id } => write!(f, "invalid class count or tolerance in grammar specification {spec_id}"),
         }
     }
 }
 
 impl std::error::Error for CircleLayoutError {}
+
+/// One frozen radius-class/contact-tolerance configuration in a geometry search.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CircleGrammarSpec {
+    pub spec_id: String,
+    pub radius_class_count: usize,
+    pub tangent_gap_tolerance_px: f64,
+}
+
+/// One output from a single configuration of the complete declared geometry family.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CircleGrammarOutcome {
+    pub spec_id: String,
+    pub radius_class_count: usize,
+    pub tangent_gap_tolerance_px: f64,
+    pub contact_count: usize,
+    pub first_last_class_edge_count: usize,
+    pub radius_class_populations: Vec<usize>,
+    pub centred_motif_counts: BTreeMap<(usize, usize, usize), usize>,
+}
+
+/// Frozen-in-use search family. It records the configurations that must be
+/// rerun unchanged for the observation and every matched null replicate.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CircleGrammarFamily {
+    pub protocol_id: String,
+    pub version: u32,
+    specifications: Vec<CircleGrammarSpec>,
+}
+
+impl CircleGrammarFamily {
+    pub fn new(
+        protocol_id: impl Into<String>,
+        version: u32,
+        specifications: Vec<CircleGrammarSpec>,
+    ) -> Result<Self, CircleLayoutError> {
+        let protocol_id = protocol_id.into();
+        if protocol_id.trim().is_empty()
+            || version == 0
+            || specifications.is_empty()
+        {
+            return Err(CircleLayoutError::InvalidGrammarFamily);
+        }
+
+        let mut identifiers = HashSet::with_capacity(specifications.len());
+        for specification in &specifications {
+            if specification.spec_id.trim().is_empty() {
+                return Err(CircleLayoutError::EmptyGrammarSpecId);
+            }
+            if !identifiers.insert(specification.spec_id.as_str()) {
+                return Err(CircleLayoutError::DuplicateGrammarSpecId(
+                    specification.spec_id.clone(),
+                ));
+            }
+            if specification.radius_class_count == 0
+                || !specification.tangent_gap_tolerance_px.is_finite()
+                || specification.tangent_gap_tolerance_px < 0.0
+            {
+                return Err(CircleLayoutError::InvalidGrammarSpec {
+                    spec_id: specification.spec_id.clone(),
+                });
+            }
+        }
+
+        Ok(Self {
+            protocol_id,
+            version,
+            specifications,
+        })
+    }
+
+    pub fn protocol_id(&self) -> &str {
+        &self.protocol_id
+    }
+
+    pub const fn version(&self) -> u32 {
+        self.version
+    }
+
+    pub fn specifications(&self) -> &[CircleGrammarSpec] {
+        &self.specifications
+    }
+
+    /// Recompute centre, radius classes, radial bands, contact graph and motifs
+    /// for every configuration in the frozen family.
+    pub fn evaluate(
+        &self,
+        circles: &[CircleRecord],
+    ) -> Result<Vec<CircleGrammarOutcome>, CircleLayoutError> {
+        validate_circles(circles)?;
+        let mut outcomes = Vec::with_capacity(self.specifications.len());
+        for specification in &self.specifications {
+            if specification.radius_class_count > circles.len() {
+                return Err(CircleLayoutError::InvalidClassCount {
+                    requested: specification.radius_class_count,
+                    available: circles.len(),
+                });
+            }
+            let layout = describe_circle_layout(
+                circles,
+                specification.tangent_gap_tolerance_px,
+            )?;
+            let classing = class_circle_layout(
+                circles,
+                &layout,
+                specification.radius_class_count,
+            )?;
+            let centred_motif_counts =
+                count_centred_motifs(&classing.radius_labels, &layout.contacts)?;
+            let first_last_class_edge_count = count_first_last_class_edges(
+                &classing.radius_labels,
+                &layout.contacts,
+                specification.radius_class_count,
+            );
+            let mut radius_class_populations =
+                vec![0_usize; specification.radius_class_count];
+            for class_label in &classing.radius_labels {
+                radius_class_populations[*class_label - 1] += 1;
+            }
+
+            outcomes.push(CircleGrammarOutcome {
+                spec_id: specification.spec_id.clone(),
+                radius_class_count: specification.radius_class_count,
+                tangent_gap_tolerance_px: specification.tangent_gap_tolerance_px,
+                contact_count: layout.contacts.len(),
+                first_last_class_edge_count,
+                radius_class_populations,
+                centred_motif_counts,
+            });
+        }
+        Ok(outcomes)
+    }
+}
 
 /// Configuration for an explicitly hypothetical image-space measurement stress test.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -938,6 +1081,81 @@ mod tests {
                 }
             ),
             Err(CircleLayoutError::InvalidSensitivityConfig)
+        );
+    }
+
+    #[test]
+    fn full_grammar_family_recomputes_every_frozen_configuration() {
+        let circles = parse_circle_csv(CCAT_ZEALS_KNOLL).expect("valid CCAT fixture");
+        let mut specifications = Vec::new();
+        for class_count in [3, 4, 5] {
+            for tolerance in [30.0, 45.0, 60.0] {
+                specifications.push(CircleGrammarSpec {
+                    spec_id: format!("k{class_count}-tol{tolerance:.0}"),
+                    radius_class_count: class_count,
+                    tangent_gap_tolerance_px: tolerance,
+                });
+            }
+        }
+        let family = CircleGrammarFamily::new(
+            "ccat-radius-class-contact-family",
+            1,
+            specifications,
+        )
+        .expect("frozen geometry family");
+        let outcomes = family.evaluate(&circles).expect("family replay");
+
+        assert_eq!(outcomes.len(), 9);
+        let five_class_45 = outcomes
+            .iter()
+            .find(|outcome| outcome.spec_id == "k5-tol45")
+            .expect("five-class 45px spec");
+        assert_eq!(five_class_45.contact_count, 66);
+        assert_eq!(five_class_45.first_last_class_edge_count, 12);
+        assert_eq!(five_class_45.centred_motif_counts.get(&(1, 5, 2)), Some(&10));
+    }
+
+    #[test]
+    fn grammar_family_rejects_duplicate_or_invalid_specifications() {
+        let duplicate = vec![
+            CircleGrammarSpec { spec_id: "same".into(), radius_class_count: 5, tangent_gap_tolerance_px: 45.0 },
+            CircleGrammarSpec { spec_id: "same".into(), radius_class_count: 4, tangent_gap_tolerance_px: 40.0 },
+        ];
+        assert_eq!(
+            CircleGrammarFamily::new("protocol", 1, duplicate),
+            Err(CircleLayoutError::DuplicateGrammarSpecId("same".into()))
+        );
+        assert_eq!(
+            CircleGrammarFamily::new("protocol", 1, vec![]),
+            Err(CircleLayoutError::InvalidGrammarFamily)
+        );
+        assert_eq!(
+            CircleGrammarFamily::new("protocol", 1, vec![
+                CircleGrammarSpec { spec_id: "bad".into(), radius_class_count: 0, tangent_gap_tolerance_px: 45.0 }
+            ]),
+            Err(CircleLayoutError::InvalidGrammarSpec { spec_id: "bad".into() })
+        );
+    }
+
+    #[test]
+    fn grammar_family_rejects_class_count_exceeding_event_size() {
+        let circles = [
+            CircleRecord { id: 1, center: Point2::new(0.0, 0.0), radius: 1.0 },
+            CircleRecord { id: 2, center: Point2::new(2.0, 0.0), radius: 2.0 },
+        ];
+        let family = CircleGrammarFamily::new(
+            "too-many-classes",
+            1,
+            vec![CircleGrammarSpec {
+                spec_id: "k3".into(),
+                radius_class_count: 3,
+                tangent_gap_tolerance_px: 1.0,
+            }],
+        )
+        .expect("family spec is valid, but not for this event");
+        assert_eq!(
+            family.evaluate(&circles),
+            Err(CircleLayoutError::InvalidClassCount { requested: 3, available: 2 })
         );
     }
 }
