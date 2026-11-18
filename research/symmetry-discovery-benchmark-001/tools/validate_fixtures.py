@@ -236,7 +236,7 @@ def main():
     generated = generator.generate_cases(fixture)
     stored_generated = [
         case for case in fixture["cases"]
-        if case["case_id"].startswith("GENERATED-")
+        if case.get("controls", {}).get("generated", False)
     ]
     if stored_generated != generated:
         fail("generated point-set corpus differs from deterministic generator output")
