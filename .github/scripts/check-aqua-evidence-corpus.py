@@ -7,6 +7,7 @@ qualify instruments, assess hygiene, or authorize standards/compliance claims.
 
 from __future__ import annotations
 
+import argparse
 import copy
 import json
 import sys
@@ -19,6 +20,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = ROOT / "docs/research/aqua-evidence-corpus-v0.1.schema.json"
 CORPUS_PATH = ROOT / "docs/research/aqua-evidence-corpus-v0.1.json"
+RENDER_PATH = ROOT / "docs/research/AQUA_EVIDENCE_CORPUS_V0_1.md"
 
 ALLOWED_SOURCE_TYPES = {
     "manufacturer_declaration": {"manufacturer_datasheet"},
@@ -320,7 +322,157 @@ def run_negative_controls(
     return controls
 
 
+def markdown_escape(value: Any) -> str:
+    return str(value).replace("|", "\\|").replace("\\n", " ").strip()
+
+
+def format_canonical_value(value: dict[str, Any]) -> str:
+    kind = value["kind"]
+    if kind == "scalar":
+        return f"{value['value']:g} {value['unit']}"
+    if kind == "range":
+        unit = value["unit"]
+        minimum = value.get("minimum")
+        maximum = value.get("maximum")
+        if minimum is not None and maximum is not None:
+            return f"{minimum:g}–{maximum:g} {unit}"
+        if minimum is not None:
+            return f"minimum ≥ {minimum:g} {unit}"
+        return f"maximum ≤ {maximum:g} {unit}"
+    return value["text"]
+
+
+def format_conditions(conditions: dict[str, Any]) -> str:
+    parts: list[str] = []
+    if conditions.get("mode"):
+        parts.append(f"mode={conditions['mode']}")
+    if conditions.get("pressure_kpa") is not None:
+        parts.append(f"pressure={conditions['pressure_kpa']:g} kPa")
+    pressure_range = conditions.get("pressure_range_kpa")
+    if pressure_range:
+        parts.append(f"pressure range={format_canonical_value(pressure_range)}")
+    pressure_points = conditions.get("pressure_points_kpa", [])
+    if pressure_points:
+        parts.append(
+            "pressure points="
+            + ", ".join(f"{point:g}" for point in pressure_points)
+            + " kPa"
+        )
+    if conditions.get("pressure_tolerance_kpa") is not None:
+        parts.append(f"pressure tolerance=±{conditions['pressure_tolerance_kpa']:g} kPa")
+    if conditions.get("temperature_c") is not None:
+        parts.append(f"water temperature={conditions['temperature_c']:g} °C")
+    if conditions.get("duration_min") is not None:
+        parts.append(f"duration={conditions['duration_min']:g} min")
+    if conditions.get("task"):
+        parts.append(f"task={conditions['task']}")
+    if conditions.get("method"):
+        parts.append(f"method={conditions['method']}")
+    if conditions.get("sample_count") is not None:
+        parts.append(f"sample n={conditions['sample_count']}")
+    if conditions.get("pressure_datum"):
+        parts.append(f"datum={conditions['pressure_datum']}")
+    if conditions.get("unknown_conditions"):
+        parts.append(
+            "unknown: " + ", ".join(conditions["unknown_conditions"])
+        )
+    if conditions.get("notes"):
+        parts.append(conditions["notes"])
+    return markdown_escape("; ".join(parts) if parts else "Not specified")
+
+
+def render_markdown(corpus: dict[str, Any]) -> str:
+    claim_total = sum(len(entry["claims"]) for entry in corpus["entries"])
+    lines = [
+        "# Luminous Aqua — Evidence Corpus v0.1",
+        "",
+        f"**Snapshot:** {corpus['snapshot_date']}  ",
+        f"**Entries:** {len(corpus['entries'])}  ",
+        f"**Claims:** {claim_total}",
+        "",
+        "> Source-classified evidence register. Manufacturer declarations, standards/programme criteria, local installation references, independent market samples and peer-reviewed results are kept distinct. Values marked unknown have not been inferred. This corpus is not a product certification or evidence of Aqua performance.",
+        "",
+    ]
+
+    for entry in corpus["entries"]:
+        subject = entry["subject"]
+        lines.extend(
+            [
+                f"## {markdown_escape(subject['name'])}",
+                "",
+                f"- **Entry ID:** `{entry['entry_id']}`",
+                f"- **Subject type:** {subject['type']}",
+                f"- **Manufacturer / publisher:** {markdown_escape(subject.get('manufacturer') or 'Not applicable / not stated')}",
+                f"- **SKU:** {markdown_escape(subject.get('sku') or 'Not applicable / not stated')}",
+                f"- **Market:** {markdown_escape(subject.get('market') or 'Not stated')}",
+                f"- **Revision:** {markdown_escape(subject.get('revision') or 'Not stated')}",
+                "",
+                "| Claim ID | Parameter | Canonical value | Evidence class | Result class | Conditions / unknowns | Comparison status | Source |",
+                "|---|---|---|---|---|---|---|---|",
+            ]
+        )
+        for claim in entry["claims"]:
+            source = claim["source"]
+            source_label = markdown_escape(source["publisher"])
+            source_link = f"[{source_label}]({source['url']})"
+            source_date = source.get("published_on") or "date not stated"
+            source_view = f"{source_link}; {source['source_type']}; {source_date}"
+            comparison = (
+                f"{claim['comparison']['status']}: "
+                f"{claim['comparison']['reason']}"
+            )
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        f"`{claim['claim_id']}`",
+                        markdown_escape(claim["parameter"]),
+                        markdown_escape(format_canonical_value(claim["canonical_value"])),
+                        markdown_escape(claim["evidence_class"]),
+                        markdown_escape(claim["result_class"]),
+                        format_conditions(claim["conditions"]),
+                        markdown_escape(comparison),
+                        source_view,
+                    ]
+                )
+                + " |"
+            )
+        lines.append("")
+        for claim in entry["claims"]:
+            limitations = claim["limitations"]
+            if not limitations:
+                continue
+            lines.append(f"**Limitations — `{claim['claim_id']}`:**")
+            for limitation in limitations:
+                lines.append(f"- {markdown_escape(limitation)}")
+            lines.append("")
+    lines.extend(
+        [
+            "---",
+            "",
+            "Generated from `docs/research/aqua-evidence-corpus-v0.1.json` by `.github/scripts/check-aqua-evidence-corpus.py`. Do not edit this rendering independently; change the JSON source and regenerate.",
+            "",
+        ]
+    )
+    return "\\n".join(lines)
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--check-render",
+        action="store_true",
+        help="fail unless the committed Markdown rendering matches the JSON corpus",
+    )
+    parser.add_argument(
+        "--write-render",
+        action="store_true",
+        help="write the Markdown rendering from the JSON corpus",
+    )
+    args = parser.parse_args()
+    if args.check_render and args.write_render:
+        fail("use only one of --check-render and --write-render")
+
     schema = load_json(SCHEMA_PATH)
     corpus = load_json(CORPUS_PATH)
 
@@ -334,13 +486,29 @@ def main() -> None:
         fail(f"{len(errors)} corpus errors; first 50 shown")
 
     negative_controls = run_negative_controls(corpus, validator)
+    claim_count = sum(len(entry["claims"]) for entry in corpus["entries"])
+    render = render_markdown(corpus)
+
+    if args.write_render:
+        RENDER_PATH.write_text(render, encoding="utf-8")
+    if args.check_render:
+        try:
+            committed_render = RENDER_PATH.read_text(encoding="utf-8")
+        except OSError as exc:
+            fail(f"cannot read generated rendering {RENDER_PATH.relative_to(ROOT)}: {exc}")
+        if committed_render != render:
+            fail(
+                f"{RENDER_PATH.relative_to(ROOT)} is stale; regenerate from the JSON corpus"
+            )
+
     print(
         "AQUA-EVIDENCE-CORPUS: PASS "
         f"schema={corpus['schema_version']} "
         f"snapshot={corpus['snapshot_date']} "
         f"entries={len(corpus['entries'])} "
-        f"claims={sum(len(entry['claims']) for entry in corpus['entries'])} "
-        f"negative_controls={negative_controls}"
+        f"claims={claim_count} "
+        f"negative_controls={negative_controls} "
+        f"render={'checked' if args.check_render else 'written' if args.write_render else 'not_checked'}"
     )
 
 
