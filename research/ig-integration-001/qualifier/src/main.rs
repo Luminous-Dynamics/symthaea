@@ -195,8 +195,6 @@ fn score_fixture(fixture: &Fixture) -> Score {
         }
         unique_rows.insert(row.evidence_id.clone(), row);
     }
-    violations += invalid_candidate_ids.len();
-
     if let Some(selected) = &fixture.selected_candidate_id {
         if !candidates.contains(selected) {
             invalid_candidate_ids.insert(selected.clone());
@@ -207,6 +205,7 @@ fn score_fixture(fixture: &Fixture) -> Score {
             violations += 1;
         }
     }
+    violations += invalid_candidate_ids.len();
 
     let row_count = unique_rows.len();
     let mut source_correct = 0usize;
