@@ -1226,7 +1226,7 @@ pub fn summarize_alarm_evaluations(
 /// event-evaluation cohort. Content digests are integrity identifiers, not
 /// signatures or proof that the referenced dataset/model/calibration is authentic.
 pub const PLASMA_EVENT_EVALUATION_RECEIPT_SCHEMA: &str =
-    "luminous.plasma-event-evaluation-receipt.v0.2";
+    "luminous.plasma-event-evaluation-receipt.v0.3";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1245,6 +1245,10 @@ pub struct PlasmaEventEvaluationReceiptBody {
     pub policy: AlarmPolicyConfig,
     pub shot_evaluations: Vec<ShotAlarmEvaluation>,
     pub summary: AlarmEvaluationSummary,
+    /// Optional frozen shot-cluster plan for the exposure-normalized false-alarm interval.
+    pub shot_cluster_bootstrap_plan: Option<ShotClusterBootstrapPlan>,
+    /// Recomputed from the plan and the per-shot alarm traces during verification.
+    pub false_alarms_per_non_disruptive_hour_bootstrap_95: Option<ExposureBootstrapInterval>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1329,6 +1333,39 @@ impl PlasmaEventEvaluationReceiptBody {
                 "receipt cohort summary does not match its per-shot evaluations",
             ));
         }
+        match (
+            &self.shot_cluster_bootstrap_plan,
+            &self.false_alarms_per_non_disruptive_hour_bootstrap_95,
+        ) {
+            (Some(plan), Some(stored_interval)) => {
+                let shot_ids = self
+                    .shot_evaluations
+                    .iter()
+                    .map(|evaluation| evaluation.shot_id.clone())
+                    .collect::<Vec<_>>();
+                let recomputed_interval = bootstrap_false_alarms_per_non_disruptive_hour(
+                    plan,
+                    &shot_ids,
+                    &self.shot_evaluations,
+                )?
+                .ok_or_else(|| {
+                    PlasmaEventEvalError::new(
+                        "stored bootstrap plan does not produce enough valid negative-exposure replicates",
+                    )
+                })?;
+                if recomputed_interval != *stored_interval {
+                    return Err(PlasmaEventEvalError::new(
+                        "receipt bootstrap interval does not match its frozen plan and per-shot evaluations",
+                    ));
+                }
+            }
+            (None, None) => {}
+            _ => {
+                return Err(PlasmaEventEvalError::new(
+                    "bootstrap plan and false-alarm interval must either both be present or both be absent",
+                ));
+            }
+        }
         Ok(())
     }
 
@@ -1376,6 +1413,8 @@ impl PlasmaEventEvaluationReceipt {
             policy,
             shot_evaluations,
             summary,
+            shot_cluster_bootstrap_plan: None,
+            false_alarms_per_non_disruptive_hour_bootstrap_95: None,
         };
         body.verify_evaluations()?;
         let receipt_sha256 = body.content_sha256()?;
@@ -1383,6 +1422,60 @@ impl PlasmaEventEvaluationReceipt {
             body,
             receipt_sha256,
         })
+    }
+
+    /// Builds a receipt with a frozen shot-cluster bootstrap plan and
+    /// recomputed exposure-normalized false-alarm interval. The plan must be
+    /// bound to the exact ordered shot IDs in the supplied evaluations.
+    #[allow(clippy::too_many_arguments)]
+    pub fn build_with_shot_cluster_bootstrap(
+        repository_commit: String,
+        dataset_revision: String,
+        shot_split_sha256: String,
+        preprocessing_sha256: String,
+        model_id: String,
+        model_revision: String,
+        model_artifact_sha256: String,
+        seed: u64,
+        hardware: String,
+        policy: AlarmPolicyConfig,
+        shot_evaluations: Vec<ShotAlarmEvaluation>,
+        plan: ShotClusterBootstrapPlan,
+    ) -> Result<Self, PlasmaEventEvalError> {
+        let mut receipt = Self::build(
+            repository_commit,
+            dataset_revision,
+            shot_split_sha256,
+            preprocessing_sha256,
+            model_id,
+            model_revision,
+            model_artifact_sha256,
+            seed,
+            hardware,
+            policy,
+            shot_evaluations,
+        )?;
+        let shot_ids = receipt
+            .body
+            .shot_evaluations
+            .iter()
+            .map(|evaluation| evaluation.shot_id.clone())
+            .collect::<Vec<_>>();
+        let interval = bootstrap_false_alarms_per_non_disruptive_hour(
+            &plan,
+            &shot_ids,
+            &receipt.body.shot_evaluations,
+        )?
+        .ok_or_else(|| {
+            PlasmaEventEvalError::new(
+                "bootstrap plan has fewer than 95% valid negative-exposure replicates",
+            )
+        })?;
+        receipt.body.shot_cluster_bootstrap_plan = Some(plan);
+        receipt.body.false_alarms_per_non_disruptive_hour_bootstrap_95 = Some(interval);
+        receipt.body.verify_evaluations()?;
+        receipt.receipt_sha256 = receipt.body.content_sha256()?;
+        Ok(receipt)
     }
 
     /// Recomputes all per-shot outcomes, the cohort summary and the outer
