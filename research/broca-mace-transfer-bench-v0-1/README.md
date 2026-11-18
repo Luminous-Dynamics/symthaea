@@ -274,3 +274,26 @@ Controls cover tool-success misattribution, forged action claims, tampered outco
 Draft [PR #12731](https://github.com/Luminous-Dynamics/symthaea/pull/12731) now emits a candidate-side `ConsolidationReceiptProposal` binding the selected disposition and policy ID/version to the exact source event IDs, fixture payload digests, source families and upstream roots. Its structural evaluator checks exact binding, duplicate IDs and minimum independent support; it rejects the frequency-only promotion over correlated echoes.
 
 This is a producer-side proposal with synthetic fixture digests, not a signed or cryptographically verified Mycelix receipt. MACE v0.7 in this PR still consumes injected test registries rather than PR #12731 output. The production adapter and independent verifier are specified in [#12846](https://github.com/Luminous-Dynamics/symthaea/issues/12846).
+
+
+## Raw-session ingestion and bitemporal replay (MACE v0.1)
+
+The `mace_raw_session_ingest` binary starts from append-only Session-A outcomes, Session-C retractions and late-arriving observations, then constructs a candidate memory view for the explicit pair `(valid_at = V, known_at = T)`. It does not start from prebuilt `Experience` records.
+
+The adapter:
+- uses half-open valid-time intervals `[valid_from, valid_to)`;
+- excludes outcomes not recorded by knowledge time `T`;
+- applies only retractions recorded by `T`, preserving earlier as-known replay;
+- rejects duplicate IDs, malformed intervals, invalid measurement bounds, unknown retraction targets and retractions predating their source;
+- preserves source-family, upstream-root and measurement-bound fields when materializing candidate-visible experiences;
+- returns source-event, retraction and contributing-session receipts without mutating the append-only input ledger.
+
+Run:
+```bash
+cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-evaluator --bin mace_raw_session_ingest
+cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-evaluator --bin mace_raw_session_ingest
+```
+
+Eight deterministic regression tests cover A→B→C correction replay, late-arrival leakage, valid-time boundaries, duplicate IDs, malformed retractions, measurement-bound validation, deterministic replay and append-only input preservation.
+
+**Claim boundary:** this is raw structured event ingestion and bitemporal replay, not natural-language transcript extraction, production #9075 ledger integration, cryptographic provenance verification, or a full TimlMemBench raw-native submission. The event schema is a candidate adapter contract; source/event authority remains external.
