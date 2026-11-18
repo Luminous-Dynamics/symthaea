@@ -53,6 +53,7 @@ pub struct FeatureSpec {
     pub nominal_revision_ref: String,
     pub mandatory: bool,
     pub required_metrics: Vec<FeatureMetricRequirement>,
+    pub required_pose_set_ref: Option<String>,
     pub required_pose_refs: Vec<String>,
     pub minimum_coverage_fraction: f64,
     pub acceptance_rule_ref: String,
@@ -276,6 +277,14 @@ impl AsBuiltInspectionManifest {
             if requires_pose_coverage && feature.required_pose_refs.is_empty() {
                 push(&mut findings, "joint_clearance_pose_set_missing", format!("{path}.required_pose_refs"),
                     "A joint-clearance requirement must enumerate the approved robot poses to be inspected.");
+            }
+            if requires_pose_coverage && is_blank_option(&feature.required_pose_set_ref) {
+                push(&mut findings, "joint_clearance_pose_set_identity_missing", format!("{path}.required_pose_set_ref"),
+                    "Joint-clearance pose list must bind an exact owner-approved pose-set revision.");
+            }
+            if !requires_pose_coverage && feature.required_pose_set_ref.is_some() {
+                push(&mut findings, "pose_set_ref_without_joint_clearance", format!("{path}.required_pose_set_ref"),
+                    "A pose-set reference is only valid when joint-clearance metrics are required.");
             }
             if !requires_pose_coverage && !feature.required_pose_refs.is_empty() {
                 push(&mut findings, "pose_set_without_joint_clearance_metric", format!("{path}.required_pose_refs"),
@@ -871,7 +880,7 @@ mod tests {
                 "treatment_state":"as_manufactured"
             },
             "feature_catalog":[
-                {"feature_ref":"forearm_panel","feature_kind":"panel","nominal_geometry_ref":"CAD-PANEL-001","nominal_revision_ref":"CAD-REV-A","mandatory":true,"required_metrics":[{"metric_id":"panel_surface_deviation_mm","unit":"mm","lower_limit":0.0,"upper_limit":1.0}],"required_pose_refs":[],"minimum_coverage_fraction":0.95,"acceptance_rule_ref":"PANEL-ACCEPTANCE-01"},
+                {"feature_ref":"forearm_panel","feature_kind":"panel","nominal_geometry_ref":"CAD-PANEL-001","nominal_revision_ref":"CAD-REV-A","mandatory":true,"required_metrics":[{"metric_id":"panel_surface_deviation_mm","unit":"mm","lower_limit":0.0,"upper_limit":1.0}],"required_pose_set_ref":null,"required_pose_refs":[],"minimum_coverage_fraction":0.95,"acceptance_rule_ref":"PANEL-ACCEPTANCE-01"},
                 {"feature_ref":"elbow_seam","feature_kind":"connection","nominal_geometry_ref":"SEAM-CURVE-001","nominal_revision_ref":"TOPOLOGY-REV-A","mandatory":true,"required_metrics":[{"metric_id":"seam_path_deviation_mm","unit":"mm","lower_limit":0.0,"upper_limit":2.0}],"required_pose_refs":[],"minimum_coverage_fraction":0.98,"acceptance_rule_ref":"SEAM-ACCEPTANCE-01"}
             ],
             "measurement_session":null,
@@ -1237,6 +1246,7 @@ mod tests {
         manifest["feature_catalog"][0]["required_metrics"] = json!([{
             "metric_id":"joint_clearance_mm","unit":"mm","lower_limit":2.0,"upper_limit":20.0
         }]);
+        manifest["feature_catalog"][0]["required_pose_set_ref"] = json!("APPROVED-POSE-SET-REV-A");
         manifest["feature_catalog"][0]["required_pose_refs"] = json!(["POSE-NEUTRAL","POSE-EXTREME"]);
         make_measured(&mut manifest);
         manifest["observations"][0]["metric_id"] = json!("joint_clearance_mm");
@@ -1280,11 +1290,23 @@ mod tests {
     }
 
     #[test]
+    fn joint_clearance_requires_exact_approved_pose_set_identity() {
+        let mut manifest = base_manifest();
+        manifest["feature_catalog"][0]["required_metrics"] = json!([{
+            "metric_id":"joint_clearance_mm","unit":"mm","lower_limit":2.0,"upper_limit":20.0
+        }]);
+        manifest["feature_catalog"][0]["required_pose_refs"] = json!(["POSE-NEUTRAL"]);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "joint_clearance_pose_set_identity_missing"));
+    }
+
+    #[test]
     fn articulated_clearance_rejects_pose_outside_frozen_pose_set() {
         let mut manifest = base_manifest();
         manifest["feature_catalog"][0]["required_metrics"] = json!([{
             "metric_id":"joint_clearance_mm","unit":"mm","lower_limit":2.0,"upper_limit":20.0
         }]);
+        manifest["feature_catalog"][0]["required_pose_set_ref"] = json!("APPROVED-POSE-SET-REV-A");
         manifest["feature_catalog"][0]["required_pose_refs"] = json!(["POSE-NEUTRAL"]);
         make_measured(&mut manifest);
         manifest["observations"][0]["metric_id"] = json!("joint_clearance_mm");
