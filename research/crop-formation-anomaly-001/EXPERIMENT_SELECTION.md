@@ -72,7 +72,30 @@ A practical decision record should contain:
 
 An infeasible or unauthorized experiment is not made acceptable by high EIG. Enforce permission, safety and rights as hard constraints before ranking.
 
-## 5. Worked example: boundary plant orientation
+## 5. Worked example: centre-relative crop-flow discrimination
+
+Suppose two viable models predict a similar plan-view crop boundary:
+- H1: an outward radial or sectoral mechanical flattening process with a declared entry/exit path;
+- H2: a specified wind-driven lodging model with a direction field that varies with terrain and wind exposure.
+
+The formation outline alone may not discriminate them. A calibrated sample of individual stem-axis directions at multiple radial distances can estimate:
+- local nearest-neighbour directional alignment;
+- centre-relative radial alignment (outward/inward);
+- centre-relative tangential alignment (clockwise/counter-clockwise);
+- bend magnitude and breakage distribution.
+
+Before sampling:
+1. survey the field centre and boundary with independent spatial checkpoints;
+2. freeze transect locations and the coordinate-frame/angular sign convention;
+3. register the number of plants and primary directional outcomes;
+4. calculate power with within-transect and within-formation clustering;
+5. blind the measurement and laboratory assessors;
+6. predeclare how uncertainty in the centre propagates into radial/tangential scores;
+7. specify predicted field maps and falsification outcomes under each model.
+
+A single centre-relative scalar is insufficient when the field is multimodal or the centre is poorly determined. Preserve all per-plant vectors and report directional distributions by zone.
+
+## 6. Sequential updating safeguards
 
 Suppose two currently viable mechanisms predict similar plan-view geometry:
 - H1: a mechanical flattening process with a particular entry/exit path;
