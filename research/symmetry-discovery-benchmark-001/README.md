@@ -122,6 +122,41 @@ Use matched physical models and frozen solver profiles. Compare Symtropy's direc
 
 Compare unquotiented exhaustive/baseline search, static quotienting, task-aware quotienting and the evidence-gated compiler. Required gates: zero false hard-prunes, zero missed valid solutions after lift, 100% lift verification, byte-identical replay and complete resource accounting. Search reduction is scored only on fully qualified cases.
 
+
+## Baseline-specific metric contracts and current coverage
+
+Do not compress these methods into one exact-subgroup score. Each method has a native output and a separate independent qualification stage.
+
+| Method family | Native output / fair primary metric | Additional checks | Current corpus coverage |
+|---|---|---|---|
+| LieFlow / group-space flow matching | Distributional subgroup recovery: Wasserstein-1 between learned group distribution and the target distribution under a preregistered metric; support recall@K and support precision | Threshold-free distribution plot, mass outside the target subgroup, orientation / prior sensitivity, exact element-set audit after thresholding | D4 structural cases are suitable for a finite-group adapter. No LieFlow run or native W1 score is present yet. |
+| SymFP | Representation rank-template accuracy and spectral leakage beyond target rank constraints, reported per degree | Local defect localization, subgroup monotonicity, orientation invariance, uncertainty-bound coverage, abstention near rank boundaries | Not populated by the point-set fixture alone. Requires frozen equivariant representation matrices and exact rank/representation templates. |
+| COLT 2026 finite-group regression | Exact subgroup recovery and held-out regression excess risk, with sample complexity and group-query/runtime accounting | Report whether every theorem assumption holds; separate theorem-matched results from violations and out-of-scope cases | Only two hand-authored polynomial sanity cases exist. A 30/30/30 generated regression family and faithful paper implementation are still required. |
+| Soft / learnable equivariance | Task loss, calibration and transformation-consistency / equivariance error | Parameter- and compute-matched non-equivariant baseline; report whether task objective is invariant, equivariant or merely benefits from augmentation | No task dataset is populated in this manifest. Keep it out of the structural-stabilizer leaderboard. |
+| Active acquisition | Worst-case / expected acquisition cost versus static, myopic and non-myopic baselines; risk-coverage curve | Exact decision-tree optimum on small cases, noisy ODT/ASRN comparison, context-feature stress cases | The separate exact finite planner has a four-hypothesis and an eight-hypothesis contextual fixture; these are not yet integrated as baseline scores in this manifest. |
+| Physics / mechanics | Lifted state and constraint errors under matched solver profiles; convergence and invariant drift | Multipliers, per-edge residuals, endpoint tangency, conditioning, failed/abstained cases, memory, energy and verifier overhead | The Symtropy frozen RATTLE case lives in its own repository/PR. It is not part of this point-set JSON corpus. |
+| Proof-carrying quotient | Verified work reduction after full task invariance and successful lifting | False hard-prunes, missed lifted solutions, lift verification rate and independent replay | The protocol is defined, but no benchmark case here grants pruning authority. |
+
+### LieFlow: preserve the distributional problem
+
+LieFlow learns a distribution directly over an ambient group rather than first estimating a generator basis. Its published synthetic 2D SO(2)-to-C4 example reports W1 = 0.054 versus 1.07 for LieGAN; its ModelNet10 table reports W1 values of 0.149 (Tetrahedral), 0.097 (Octahedral), 0.050 (SO(2), z), 0.053 (tilted SO(2)) and 0.129 (Icosahedral), averaged over three seeds. These are published results on that paper's data and metric, **not our results and not directly comparable to the D4 fixture**. The clean comparison should reproduce the same distribution metric, sampling protocol and baseline implementation, then separately threshold support and pass the resulting element set through the exact proposal auditor. The auditor must not be used as a hidden training signal. [LieFlow ICML 2026 paper](https://proceedings.mlr.press/v306/chen26dg.html) · [authors' results and code page](https://jypark0.github.io/lieflow/)
+
+### SymFP: test the representation, not merely the point cloud
+
+SymFP operates on equivariant representation spectra. A valid reproduction lane therefore needs the representation matrices, degree blocks, target rank templates, numerical-rank threshold rule and local symmetry-breaking labels. Report rank/template accuracy and degree-resolved leakage before any subgroup-level promotion. Include caller-bound and matrix-derived perturbation envelopes, report coverage of the true rank under those envelopes, and measure abstention when template intervals overlap. Do not compare its rank-template accuracy directly to LieFlow W1 or to point-set stabilizer accuracy. [SymFP preprint, 5 November 2026](https://arxiv.org/abs/2611.07410)
+
+### COLT 2026: split theorem-matched and stress-test regimes
+
+The paper's symmetry-discovery setting studies an unknown subgroup within a finite reference group and gives polynomial-time recovery / minimax-optimal sample complexity for regression on finite-dimensional feature spaces. The benchmark must reproduce its estimator, sampling, subgroup assumptions, identifiability conditions and sample accounting. Report a theorem-matched lane separately from small/rare subgroups, non-identifiable target functions, unknown ambient groups, non-finite groups and physical dynamics. The two polynomial fixtures in this manifest verify algebraic labels only; they do not constitute a reproduction of the COLT algorithm or its statistical guarantee. [COLT 2026 paper](https://proceedings.mlr.press/v336/soleymani26a.html)
+
+### Active experiment design: optimality gap, not just probe accuracy
+
+AFABench compares static, myopic and reinforcement-learning acquisition policies and includes a context/lookahead stress task. The 2026 AFA survey formulates sequential acquisition as a POMDP and groups approaches into embedded, model-based, model-free and hybrid families. Our finite planner should therefore report adaptive regret / optimality gap against exact decision-tree search on small instances, worst-case and expected cost, and risk-coverage under abstention. On noisy cases, reproduce the JMLR 2024 noisy optimal-decision-tree and Adaptive Submodular Ranking with Noise algorithms; our finite interval and shared-bias replay layer is an evidence model, not a replacement for those optimizers. [AFABench / KDD 2026](https://research.chalmers.se/publication/554178) · [AFA survey / IJCAI 2026](https://ijcai.org/proceedings/2026/860) · [noisy ODT / ASRN, JMLR 2024](https://www.jmlr.org/papers/v25/23-1484.html)
+
+### Mechanics comparisons need numerical failure cases
+
+The benchmark should include sparse, rank-deficient and ill-conditioned constraint Jacobians, near-dependent loops, unilateral contacts, high damping and external forcing—not only clean dense coordinate transformations. MuJoCo 4.0.1's November 2026 changelog records a sparse-Cholesky supernode bug that could produce a wrong Hessian factor for sparse constraint Jacobians, leading to slow convergence, wrong accelerations and divergence. This motivates explicit sparse-factorization and failure-replay checks in the matched mechanics suite. Chrono 10.0.0 includes new implicit-integrator Jacobian update strategies; Pinocchio 4.1.0 adds tangent-space acceleration and jerk limits. Comparisons must pin exact versions and align physics/integrator semantics. [MuJoCo 4.0.1 changelog](https://mujoco.readthedocs.io/en/4.0.1/changelog.html) · [Chrono 10.0.0 release](https://projectchrono.org/news/) · [Pinocchio 4.1.0 changelog](https://github.com/stack-of-tasks/pinocchio/blob/devel/CHANGELOG.md)
+
 ## Frozen protocol rules
 
 - A case is identified by canonical manifest bytes and a digest generated by the harness; the fixture file itself is not the digest.
