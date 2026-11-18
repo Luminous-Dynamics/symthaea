@@ -1535,7 +1535,7 @@ mod tests {
 
         memory.clear();
 
-        assert!(memory.is_empty());
+        assert_eq!(memory.len(), 0);
         assert_eq!(memory.len(), 0);
     }
 
@@ -1951,7 +1951,7 @@ mod provenance_envelope_tests {
             ..Default::default()
         });
         assert!(!invalid_policy.store_if_significant(episode(0.9, 5)));
-        assert!(invalid_policy.is_empty());
+        assert_eq!(invalid_policy.len(), 0);
     }
 
     #[test]
