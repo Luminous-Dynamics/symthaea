@@ -41,9 +41,11 @@ jobs:
 
           root = Path("research/symmetry-discovery-benchmark-001")
           schema = json.loads((root / "schemas/case_manifest.schema.json").read_text())
+          scorecard_schema = json.loads((root / "schemas/run_scorecard.schema.json").read_text())
           manifest = json.loads((root / "fixtures/v0.1/cases.json").read_text())
           Draft202012Validator.check_schema(schema)
           Draft202012Validator(schema).validate(manifest)
+          Draft202012Validator.check_schema(scorecard_schema)
           PY
       - name: Validate exact group axioms, point stabilizers and polynomial invariance
         run: python3 -I research/symmetry-discovery-benchmark-001/tools/validate_fixtures.py
