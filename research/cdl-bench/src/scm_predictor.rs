@@ -24,6 +24,7 @@ struct StructuredState {
     header: [u16; BYTE_SYMBOLS],
     contexts: ContextHistograms,
     current_record: [u8; SCM_VARIABLES * BYTE_LANES],
+    previous_record: [u8; SCM_VARIABLES * BYTE_LANES],
 }
 
 impl StructuredState {
@@ -33,10 +34,11 @@ impl StructuredState {
             header: [1; BYTE_SYMBOLS],
             contexts: [[[[1; BYTE_SYMBOLS]; CONTEXTS]; BYTE_LANES]; SCM_VARIABLES],
             current_record: [0; SCM_VARIABLES * BYTE_LANES],
+            previous_record: [0; SCM_VARIABLES * BYTE_LANES],
         }
     }
 
-    fn histogram(&self, parent_conditioned: bool) -> &[u16; BYTE_SYMBOLS] {
+    fn histogram(&self, conditioning: u8) -> &[u16; BYTE_SYMBOLS] {
         if self.position < SCM_HEADER_BYTES {
             return &self.header;
         }
@@ -44,10 +46,10 @@ impl StructuredState {
         let offset = self.position - SCM_HEADER_BYTES;
         let variable = ((offset / BYTE_LANES as u64) % SCM_VARIABLES as u64) as usize;
         let lane = (offset % BYTE_LANES as u64) as usize;
-        let context = if parent_conditioned {
-            self.parent_context(variable, lane)
-        } else {
-            0
+        let context = match conditioning {
+            1 => self.parent_context(variable, lane),
+            2 => (self.previous_record[variable * BYTE_LANES + lane] >> 6) as usize,
+            _ => 0,
         };
         &self.contexts[variable][lane][context]
     }
@@ -88,17 +90,17 @@ impl StructuredState {
         histogram[symbol as usize] = histogram[symbol as usize].saturating_add(1);
     }
 
-    fn observe(&mut self, symbol: u8, parent_conditioned: bool) {
+    fn observe(&mut self, symbol: u8, conditioning: u8) {
         if self.position < SCM_HEADER_BYTES {
             Self::update_histogram(&mut self.header, symbol);
         } else {
             let offset = self.position - SCM_HEADER_BYTES;
             let variable = ((offset / BYTE_LANES as u64) % SCM_VARIABLES as u64) as usize;
             let lane = (offset % BYTE_LANES as u64) as usize;
-            let context = if parent_conditioned {
-                self.parent_context(variable, lane)
-            } else {
-                0
+            let context = match conditioning {
+                1 => self.parent_context(variable, lane),
+                2 => (self.previous_record[variable * BYTE_LANES + lane] >> 6) as usize,
+                _ => 0,
             };
 
             // Store the observed byte only after the context is selected.
@@ -107,12 +109,15 @@ impl StructuredState {
                 &mut self.contexts[variable][lane][context],
                 symbol,
             );
+            if variable == SCM_VARIABLES - 1 && lane == BYTE_LANES - 1 {
+                self.previous_record = self.current_record;
+            }
         }
         self.position += 1;
     }
 
-    fn cdf(&self, parent_conditioned: bool) -> ByteCdf {
-        Self::make_cdf(self.histogram(parent_conditioned))
+    fn cdf(&self, conditioning: u8) -> ByteCdf {
+        Self::make_cdf(self.histogram(conditioning))
     }
 }
 
@@ -147,11 +152,11 @@ impl BytePredictor for ScmFieldPredictor {
     }
 
     fn cumulative_frequency(&self) -> ByteCdf {
-        self.state.cdf(false)
+        self.state.cdf(0)
     }
 
     fn observe(&mut self, symbol: u8) {
-        self.state.observe(symbol, false);
+        self.state.observe(symbol, 0);
     }
 }
 
@@ -189,11 +194,51 @@ impl BytePredictor for ScmParentPredictor {
     }
 
     fn cumulative_frequency(&self) -> ByteCdf {
-        self.state.cdf(true)
+        self.state.cdf(1)
     }
 
     fn observe(&mut self, symbol: u8) {
-        self.state.observe(symbol, true);
+        self.state.observe(symbol, 1);
+    }
+}
+
+/// Noncausal temporal baseline: conditions each variable/lane on the same
+/// variable/lane in the preceding timestep. Model ID 4. This control has
+/// temporal context but does not inspect other variables or use the SCM graph.
+pub struct ScmLagPredictor {
+    state: StructuredState,
+}
+
+impl ScmLagPredictor {
+    pub fn new() -> Self {
+        Self {
+            state: StructuredState::new(),
+        }
+    }
+
+    /// Approximate inline predictor state, excluding allocator/runtime overhead.
+    pub fn state_bytes() -> usize {
+        std::mem::size_of::<Self>()
+    }
+}
+
+impl Default for ScmLagPredictor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BytePredictor for ScmLagPredictor {
+    fn model_id(&self) -> u8 {
+        4
+    }
+
+    fn cumulative_frequency(&self) -> ByteCdf {
+        self.state.cdf(2)
+    }
+
+    fn observe(&mut self, symbol: u8) {
+        self.state.observe(symbol, 2);
     }
 }
 
@@ -254,10 +299,31 @@ mod tests {
     }
 
     #[test]
-    fn field_and_parent_predictors_have_distinct_stable_ids() {
+    fn lag_predictor_round_trips_observational_and_interventional_scm() {
+        let observational = generate_scm(4096, 29, None).unwrap();
+        let interventional = generate_scm(
+            4096,
+            29,
+            Some(ScmIntervention {
+                variable: 1,
+                start_step: 1024,
+                end_step: 3072,
+                value: 20_000,
+            }),
+        )
+        .unwrap();
+
+        round_trip::<ScmLagPredictor>(&observational.stream, 4);
+        round_trip::<ScmLagPredictor>(&interventional.stream, 4);
+    }
+
+    #[test]
+    fn field_and_parent_and_lag_predictors_have_distinct_stable_ids() {
         assert_eq!(ScmFieldPredictor::default().model_id(), 2);
         assert_eq!(ScmParentPredictor::default().model_id(), 3);
+        assert_eq!(ScmLagPredictor::default().model_id(), 4);
         assert!(ScmFieldPredictor::state_bytes() > 0);
         assert!(ScmParentPredictor::state_bytes() > 0);
+        assert!(ScmLagPredictor::state_bytes() > 0);
     }
 }
