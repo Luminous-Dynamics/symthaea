@@ -98,6 +98,12 @@ struct EnergyBreakdown {
 }
 
 #[derive(Clone, Debug)]
+struct BareTwistResponse {
+    current: Vec<f64>,
+    diamagnetic: Vec<Vec<f64>>,
+}
+
+#[derive(Clone, Debug)]
 struct IntertwinedModel {
     instance_id: String,
     schema_sha256: String,
@@ -944,6 +950,63 @@ impl IntertwinedModel {
         })
     }
 
+    fn bare_twist_response(
+        &self,
+        fields: &[Vec<Complex>],
+        link_phases: &[f64],
+    ) -> Result<BareTwistResponse, String> {
+        if fields.len() != self.sites.len()
+            || fields.iter().any(|values| values.len() != self.components.len())
+            || link_phases.len() != self.edges.len()
+        {
+            return Err("twist-response field or link dimensions do not match the model".to_owned());
+        }
+        let mut current = vec![0.0; self.dimension];
+        let mut diamagnetic =
+            vec![vec![0.0; self.dimension]; self.dimension];
+        let component_count = self.components.len();
+
+        for (edge_index, edge) in self.edges.iter().enumerate() {
+            let gauge_phase = link_phases[edge_index];
+            let transported: Vec<Complex> = fields[edge.target]
+                .iter()
+                .map(|value| value.rotate(gauge_phase))
+                .collect();
+            let stiffness_matrix = &self.gradient_by_axis[edge.axis];
+            let mut pair_current_real = 0.0;
+            let mut pair_current_imag = 0.0;
+
+            for first in 0..component_count {
+                for second in 0..component_count {
+                    let psi_source = fields[edge.source][first];
+                    let psi_target = transported[second];
+                    let coefficient = stiffness_matrix[first][second];
+                    pair_current_real += coefficient
+                        * (psi_source.re * psi_target.re
+                            + psi_source.im * psi_target.im);
+                    pair_current_imag += coefficient
+                        * (psi_source.re * psi_target.im
+                            - psi_source.im * psi_target.re);
+                }
+            }
+
+            let inverse_length = 1.0 / self.shape[edge.axis] as f64;
+            current[edge.axis] += 2.0 * inverse_length * pair_current_imag;
+            diamagnetic[edge.axis][edge.axis] +=
+                2.0 * inverse_length * inverse_length * pair_current_real;
+        }
+
+        if current.iter().any(|value| !value.is_finite())
+            || diamagnetic.iter().flatten().any(|value| !value.is_finite())
+        {
+            return Err("bare twist-response tensor contains non-finite values".to_owned());
+        }
+        Ok(BareTwistResponse {
+            current,
+            diamagnetic,
+        })
+    }
+
     fn common_gauge_transform(
         &self,
         fields: &[Vec<Complex>],
@@ -989,7 +1052,12 @@ impl IntertwinedModel {
             .collect()
     }
 
-    fn receipt(&self, energy: &EnergyBreakdown, gauge_residual: f64) -> Value {
+    fn receipt(
+        &self,
+        energy: &EnergyBreakdown,
+        twist_response: &BareTwistResponse,
+        gauge_residual: f64,
+    ) -> Value {
         let component_mean_amplitudes = self.component_mean_amplitudes(&self.initial_fields());
         let component_metadata: Vec<Value> = self
             .components
@@ -1062,6 +1130,12 @@ impl IntertwinedModel {
                 "quartic_amplitude_form_positive_semidefinite": true,
                 "quartic_psd_note": "Positive semidefiniteness is a sufficient boundedness condition for this quartic amplitude form, not a necessary condition for all GL functionals."
             },
+            "bare_twist_response": {
+                "twist_definition": "A_edge(theta)=A_edge+theta_axis/shape_axis for each positive unit edge",
+                "first_derivative_current": twist_response.current,
+                "second_derivative_diamagnetic_tensor": twist_response.diamagnetic,
+                "unit": "dimensionless_lattice_energy"
+            },
             "common_gauge_invariance": {
                 "absolute_energy_residual": gauge_residual,
                 "tolerance": 1.0e-9,
@@ -1093,13 +1167,36 @@ fn audit_and_evaluate(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value
     let (transformed_fields, transformed_links) =
         model.common_gauge_transform(&fields, &links, &gauge_angles)?;
     let transformed_energy = model.energy_for(&transformed_fields, &transformed_links)?;
+    let twist_response = model.bare_twist_response(&fields, &links)?;
+    let transformed_twist_response =
+        model.bare_twist_response(&transformed_fields, &transformed_links)?;
     let gauge_residual = (energy.total - transformed_energy.total).abs();
     if gauge_residual > 1.0e-9 {
         return Err(format!(
             "common electromagnetic gauge transformation changed energy by {gauge_residual}"
         ));
     }
-    Ok(model.receipt(&energy, gauge_residual))
+    for axis in 0..model.dimension {
+        if (twist_response.current[axis] - transformed_twist_response.current[axis]).abs()
+            > 1.0e-9
+        {
+            return Err(format!(
+                "common gauge transformation changed bare twist current on axis {axis}"
+            ));
+        }
+        for other_axis in 0..model.dimension {
+            if (twist_response.diamagnetic[axis][other_axis]
+                - transformed_twist_response.diamagnetic[axis][other_axis])
+                .abs()
+                > 1.0e-9
+            {
+                return Err(format!(
+                    "common gauge transformation changed bare twist curvature ({axis},{other_axis})"
+                ));
+            }
+        }
+    }
+    Ok(model.receipt(&energy, &twist_response, gauge_residual))
 }
 
 fn read(path: &PathBuf) -> Vec<u8> {
@@ -1251,6 +1348,61 @@ mod tests {
             .energy_for(&fields, &vec![0.0; model.edges.len()])
             .unwrap();
         assert!(energy.gradient.abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn bare_twist_current_is_zero_and_curvature_positive_for_uniform_fixture() {
+        let (schema, fixture) = inputs();
+        let model = IntertwinedModel::from_bytes(&schema, &fixture).unwrap();
+        let response = model
+            .bare_twist_response(&model.initial_fields(), &model.initial_link_phases())
+            .unwrap();
+        assert!(response.current.iter().all(|value| value.abs() < 1.0e-12));
+        for axis in 0..model.dimension {
+            assert!(response.diamagnetic[axis][axis] > 0.0);
+            for other in 0..model.dimension {
+                if axis != other {
+                    assert!(response.diamagnetic[axis][other].abs() < 1.0e-12);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn bare_twist_response_is_invariant_under_common_local_gauge_transform() {
+        let (schema, fixture) = inputs();
+        let model = IntertwinedModel::from_bytes(&schema, &fixture).unwrap();
+        let mut fields = model.initial_fields();
+        for (site_index, site) in fields.iter_mut().enumerate() {
+            for (component_index, field) in site.iter_mut().enumerate() {
+                let x = (site_index * 3 + component_index * 5) as f64;
+                field.re += 0.08 * (0.31 * x).cos();
+                field.im += 0.06 * (0.27 * x).sin();
+            }
+        }
+        let links: Vec<f64> = model.edges.iter().enumerate()
+            .map(|(index, _)| 0.13 * (0.23 * index as f64).sin())
+            .collect();
+        let angles: Vec<f64> = (0..model.sites.len())
+            .map(|index| 0.37 * (index as f64 + 0.2).cos())
+            .collect();
+        let before = model.bare_twist_response(&fields, &links).unwrap();
+        let (fields_after, links_after) =
+            model.common_gauge_transform(&fields, &links, &angles).unwrap();
+        let after = model
+            .bare_twist_response(&fields_after, &links_after)
+            .unwrap();
+        for axis in 0..model.dimension {
+            assert!((before.current[axis] - after.current[axis]).abs() < 1.0e-10);
+            for other_axis in 0..model.dimension {
+                assert!(
+                    (before.diamagnetic[axis][other_axis]
+                        - after.diamagnetic[axis][other_axis])
+                        .abs()
+                        < 1.0e-10
+                );
+            }
+        }
     }
 
     #[test]
