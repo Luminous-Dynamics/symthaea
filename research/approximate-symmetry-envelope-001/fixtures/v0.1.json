@@ -1,0 +1,36 @@
+{
+  "schema_version": "0.1.0",
+  "case_id": "approximate-symmetry-error-envelope-v0.1",
+  "scale": 1000,
+  "units": {
+    "state": "declared fixed-point state unit",
+    "objective": "declared fixed-point objective unit",
+    "constraint": "declared fixed-point constraint unit"
+  },
+  "example": {
+    "contract_id": "illustrative-three-step-expansive-map",
+    "initial_state_error": 0,
+    "one_step_equivariance_defect": 2,
+    "step_lipschitz_scaled": 1500,
+    "horizon_steps": 3,
+    "domain_invariance_verified": true,
+    "domain_boundary_margin": 10,
+    "objective_lipschitz_scaled": 4000,
+    "direct_objective_defect": 1,
+    "constraint_lipschitz_scaled": 2000,
+    "direct_constraint_defect": 0,
+    "constraint_slack": 21,
+    "max_state_error": 10,
+    "max_objective_error": 41,
+    "max_constraint_error": 20,
+    "objective_gap": 83,
+    "expected_upper_bounds": {
+      "state": 10,
+      "objective": 41,
+      "constraint": 20
+    },
+    "expected_epsilon_lift_candidate": true,
+    "expected_hard_prune_authorized": false
+  },
+  "claim_boundary": "Illustrative fixed-point contract only; no defect, Lipschitz or domain bounds are certified by this fixture."
+}
