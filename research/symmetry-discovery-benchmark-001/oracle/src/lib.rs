@@ -1310,6 +1310,70 @@ mod tests {
     }
 
     #[test]
+    fn counterexample_guided_subgroup_refinement_converges_on_discovery_cases() {
+        let oracle = manifest();
+        let cases = field(&oracle.root, "cases").unwrap().as_array().unwrap();
+
+        // Over-promotion: start with D4 for a C4-symmetric chiral orbit.
+        // Every false promotion supplies a moved-point counterexample.
+        let chiral = cases
+            .iter()
+            .find(|case| string_field(case, "case_id").unwrap() == "C4-CHIRAL-ORBIT-001")
+            .unwrap();
+        let mut proposal = vec![
+            "e", "r90", "r180", "r270", "fx", "fy", "fdiag", "fanti",
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+        let first_audit = oracle.audit_proposed_subgroup(chiral, &proposal).unwrap();
+        for decision in first_audit.decisions.iter().filter(|decision| {
+            decision.proposed && !decision.exact
+        }) {
+            assert!(matches!(
+                &decision.witness,
+                StabilizerWitnessV1::MovedPoint { .. }
+            ));
+        }
+        proposal.retain(|element_id| {
+            !first_audit.false_promotion_elements.contains(element_id)
+        });
+        let refined = oracle.audit_proposed_subgroup(chiral, &proposal).unwrap();
+        assert_eq!(refined.proposed_elements, refined.exact_stabilizer);
+        assert!(refined.group_axioms_satisfied);
+        assert!(refined.false_promotion_elements.is_empty());
+        assert!(refined.missed_symmetry_elements.is_empty());
+
+        // Under-promotion: start with C4 for a D4 square. Every missed
+        // reflection has a constructive point permutation witness.
+        let square = cases
+            .iter()
+            .find(|case| string_field(case, "case_id").unwrap() == "D4-SQUARE-POINTSET-001")
+            .unwrap();
+        let mut proposal = vec!["e", "r90", "r180", "r270"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        let first_audit = oracle.audit_proposed_subgroup(square, &proposal).unwrap();
+        for decision in first_audit.decisions.iter().filter(|decision| {
+            !decision.proposed && decision.exact
+        }) {
+            assert!(matches!(
+                &decision.witness,
+                StabilizerWitnessV1::PointPermutation { .. }
+            ));
+        }
+        proposal.extend(first_audit.missed_symmetry_elements.iter().cloned());
+        proposal.sort();
+        proposal.dedup();
+        let refined = oracle.audit_proposed_subgroup(square, &proposal).unwrap();
+        assert_eq!(refined.proposed_elements, refined.exact_stabilizer);
+        assert!(refined.group_axioms_satisfied);
+        assert!(refined.false_promotion_elements.is_empty());
+        assert!(refined.missed_symmetry_elements.is_empty());
+    }
+
+    #[test]
     fn decimal_coordinates_are_parsed_exactly_without_binary_float_rounding() {
         let exact = serde_json::json!(1.01);
         assert_eq!(decimal_scaled(&exact, 1000, "test"), Ok(1010));
