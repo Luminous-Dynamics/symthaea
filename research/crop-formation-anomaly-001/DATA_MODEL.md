@@ -136,6 +136,18 @@ A specimen record:
 
 A custody record proves documented handling, not that the biological interpretation is correct.
 
+### 10. Root anchorage / root–soil support sample
+
+A controlled root/soil anchorage measurement used to estimate translational and rotational support independently from stem flexural rigidity:
+- sample and parent specimen/plot IDs, protocol ID, coordinate frame and loading direction;
+- raw force-to-base-translation and applied-moment-to-root-rotation curves, with SI units and optional timestamps;
+- derived translational stiffness (N/m) and rotational stiffness (N·m/rad), including the fitting window and method;
+- root-plate major/minor spread dimensions, where measurable;
+- soil water mass fraction, bulk density, soil type and preparation / compaction context;
+- failure mode (root-plate rotation, pullout, soil shear, stem failure, other or unknown), failure moment and raw sensor/calibration references.
+
+Root translational and rotational stiffness are not interchangeable with stem EI. Record them as separate measurements and do not infer either from a single whole-plant tip-deflection value. Root-plate spread and soil state are essential covariates, not optional hidden constants in the simulator.
+
 ## Provenance graph
 
 Expected relationships:
