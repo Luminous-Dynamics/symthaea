@@ -140,7 +140,8 @@
           "calibration_id",
           "conditions",
           "raw_data_sha256",
-          "source_reference"
+          "source_reference",
+          "forward_operator_coefficients"
         ],
         "properties": {
           "observation_id": {
@@ -278,6 +279,14 @@
           "source_reference": {
             "type": "string",
             "format": "uri"
+          },
+          "forward_operator_coefficients": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
           }
         }
       }
@@ -335,7 +344,9 @@
         "model_version",
         "target_parameters",
         "prior_definition_id",
-        "observation_operator_version"
+        "observation_operator_version",
+        "parameter_prior_mean",
+        "parameter_prior_precision"
       ],
       "properties": {
         "model_family": {
@@ -365,6 +376,27 @@
         "observation_operator_version": {
           "type": "string",
           "minLength": 1
+        },
+        "parameter_prior_mean": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        },
+        "parameter_prior_precision": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          }
         }
       }
     },
