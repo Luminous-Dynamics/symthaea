@@ -16,8 +16,13 @@
     "label_authority": "measured_experiment",
     "available_features": [
       "chemical_composition",
-      "crystal_prototype",
-      "family_hypothesis"
+      "crystal_prototype"
+    ],
+    "measurement_classes": [
+      "resistive_onset",
+      "zero_resistance",
+      "diamagnetic_onset",
+      "bulk_thermodynamic_transition"
     ]
   },
   "split_regimes": [
