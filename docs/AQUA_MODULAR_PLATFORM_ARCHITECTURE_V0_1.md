@@ -188,3 +188,16 @@ The City of Johannesburg Water Services By-laws 2023 are relevant to any Johanne
 These local provisions do not authorize greywater or rainwater for bathing. They reinforce the architecture rule: physically separate non-potable and potable circuits, no blending, no software-controlled crossover, and a source/use-class decision from the competent authority. The exact installation, approvals and applicability must be checked with the City and registered local professionals.
 
 Primary source: [City of Johannesburg Water Services By-laws 2023, Local Authority Notice 980 of 2023](https://joburg.org.za/documents_/Documents/By-Laws/2023/City%20of%20Johannesburg%20Water%20Services%20Bylaws_%202023%20Gazette.pdf).
+
+
+## Low-pressure installation design and test envelope
+
+Aqua no longer treats 150 kPa as its lowest research pressure. SANS 10252-1:2018 Edition 3.2 Table 3 lists a 50–100 kPa design flow-pressure range for a water-saving showerhead at 10 L/min design flow, and other fixture-specific flow-pressure references for basins, baths and bidets. This motivates additional low-head research at 50 / 75 / 100 kPa; it does not establish that any given fixture is qualified at those pressures. Exact pressure datum and dynamic pressure at the fitting inlet must be recorded.
+
+The same edition's amended clause 5.3.3.2 states a 10 L/min maximum discharge, while Table 3 lists a 12 L/min likely maximum for the water-saving showerhead row. This apparent internal inconsistency is recorded in the competitor ledger and requires interpretation against the controlled SABS edition; Aqua will not treat the Table 3 value as permission to exceed the clause-level maximum.
+
+Track the dedicated low-pressure programme in [AQUA-LOW-PRESSURE-001 #12784](https://github.com/Luminous-Dynamics/symthaea/issues/12784).
+
+## Software continuity evaluator
+
+The product-level continuity vocabulary now has a deterministic Rust implementation in `symthaea-aqua-bench::service_continuity`. It consumes externally supplied owner-qualified state and reports the highest already-qualified mode. It cannot actuate isolation, create a reduced mode, override local protection, or clear requalification requirements. The protocol and negative tests are documented in [AQUA_ESSENTIAL_SERVICE_CONTINUITY_PROTOCOL_V0_1.md](AQUA_ESSENTIAL_SERVICE_CONTINUITY_PROTOCOL_V0_1.md).
