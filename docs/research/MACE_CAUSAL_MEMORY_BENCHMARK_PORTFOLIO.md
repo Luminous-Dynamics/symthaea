@@ -211,10 +211,3 @@ This is a provider-neutral ingestion contract, not yet a provider-native parser 
 ### Producer/consumer integration status (2026-11-18)
 
 Draft PR #12731 now emits a candidate-side source-bound consolidation receipt proposal from exact event-level source references and has a structural evaluator for binding and common-root attacks. Draft PR #12743 requires a separately verified PromoteToProcedure receipt for the exact raw observation event before transfer memory admission. They are not yet wired directly together: #12731's proposal is unsigned and uses fixture digests; #12743's receipt registries are injected test seams. Issue #12846 specifies the canonical bitemporal Mycelix/Symtropy verifier adapter, policy/authority digest, signature, supersession and privacy semantics needed for production.
-
-
-### Raw-native and bitemporal session replay
-
-A separate `mace_raw_session_ingest` evaluator binary starts from append-only raw session events rather than prebuilt `Experience` records. It reconstructs views at `(valid_at, known_at)`, applies retractions only at their recorded transaction time, excludes late arrivals from earlier knowledge, and preserves event/session receipts. Its eight deterministic tests cover A→B→C correction, time leakage, interval boundaries, duplicate IDs, malformed retractions and invalid measurement bounds.
-
-This is an adapter prototype, not the production #9075 source-event ledger, natural-language raw-session ingestion, or a TimlMemBench submission. The integration target is to consume #9075's immutable source-event IDs and valid/transaction-time semantics, then connect #12731's consolidation decisions to MACE's downstream B/C replay. Current MACE policy fixtures remain separately synthetic.

@@ -102,13 +102,24 @@ impl EvidenceVerifier for FixtureVerifier {
     fn verify_outcome(
         &self,
         _receipt_id: &str,
-        _event_id: u32,
+        event_id: u32,
         _observed_at_ms: i64,
         _known_at_ms: i64,
     ) -> Option<VerifiedOutcome> {
+        let observed_utility = match event_id {
+            100 => 0.91,
+            101 => 0.90,
+            102 => 0.42,
+            103 => 0.41,
+            104 => 0.40,
+            105 => 0.39,
+            _ => return None,
+        };
         Some(VerifiedOutcome {
             reconciled: true,
             success: true,
+            observed_utility,
+            utility_unit: "normalized_utility".into(),
             outcome_digest: "3".repeat(64),
         })
     }

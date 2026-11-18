@@ -117,10 +117,14 @@ pub struct VerifiedCausalAssessment {
     pub assessment_digest: String,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct VerifiedOutcome {
     pub reconciled: bool,
     pub success: bool,
+    /// Authoritative value returned by the independently verified outcome receipt.
+    pub observed_utility: f64,
+    /// Unit bound by the outcome receipt, which must match calibration.
+    pub utility_unit: String,
     pub outcome_digest: String,
 }
 
@@ -211,6 +215,9 @@ pub struct EvidenceReceiptBundle {
     pub calibration_revision: String,
     pub causal_assessment_digest: String,
     pub outcome_success: bool,
+    /// Stored as bits so the complete receipt bundle remains exactly comparable.
+    pub outcome_observed_utility_bits: u64,
+    pub outcome_utility_unit: String,
     pub outcome_digest: String,
 }
 
@@ -261,6 +268,9 @@ pub enum IngestReject {
     InvalidMeasurementBound,
     UnverifiedCausalAssessment,
     UnverifiedOutcome,
+    InvalidVerifiedOutcomeValue,
+    OutcomeUnitMismatch,
+    OutcomeValueMismatch,
     OutcomeNotReconciled,
 }
 
@@ -412,6 +422,17 @@ pub fn ingest_as_known(
     if !is_sha256_hex(&outcome.outcome_digest) {
         return Err(IngestReject::UnverifiedOutcome);
     }
+    if !outcome.observed_utility.is_finite()
+        || !(0.0..=1.0).contains(&outcome.observed_utility)
+    {
+        return Err(IngestReject::InvalidVerifiedOutcomeValue);
+    }
+    if outcome.utility_unit != measurement.unit {
+        return Err(IngestReject::OutcomeUnitMismatch);
+    }
+    if raw.observed_utility.to_bits() != outcome.observed_utility.to_bits() {
+        return Err(IngestReject::OutcomeValueMismatch);
+    }
     if !outcome.reconciled {
         return Err(IngestReject::OutcomeNotReconciled);
     }
@@ -423,7 +444,7 @@ pub fn ingest_as_known(
             source_root_id: lineage.source_root_id,
             scope: raw.scope,
             action: raw.action,
-            observed_utility: raw.observed_utility,
+            observed_utility: outcome.observed_utility,
             measurement_error_bound: measurement.absolute_error_bound,
             intervention: causal.intervention_confirmed,
             prediction_pre_registered: causal.prediction_pre_registered,
@@ -460,6 +481,8 @@ pub fn ingest_as_known(
             calibration_revision: measurement.calibration_revision,
             causal_assessment_digest: causal.assessment_digest,
             outcome_success: outcome.success,
+            outcome_observed_utility_bits: outcome.observed_utility.to_bits(),
+            outcome_utility_unit: outcome.utility_unit,
             outcome_digest: outcome.outcome_digest,
         },
     })
@@ -998,6 +1021,9 @@ mod tests {
         error_bound: f64,
         reconciled: bool,
         outcome_success: bool,
+        verified_outcome_utility: f64,
+        verified_outcome_unit: String,
+        verified_outcome_by_event: BTreeMap<u32, f64>,
         intervention: bool,
         delayed_complete: bool,
         retracted_at_ms: Option<i64>,
@@ -1028,6 +1054,9 @@ mod tests {
                 error_bound: 0.02,
                 reconciled: true,
                 outcome_success: true,
+                verified_outcome_utility: 0.87,
+                verified_outcome_unit: "normalized_utility".into(),
+                verified_outcome_by_event: BTreeMap::new(),
                 intervention: true,
                 delayed_complete: true,
                 retracted_at_ms: None,
@@ -1170,13 +1199,19 @@ mod tests {
         fn verify_outcome(
             &self,
             _receipt_id: &str,
-            _event_id: u32,
+            event_id: u32,
             _observed_at_ms: i64,
             _known_at_ms: i64,
         ) -> Option<VerifiedOutcome> {
             Some(VerifiedOutcome {
                 reconciled: self.reconciled,
                 success: self.outcome_success,
+                observed_utility: self
+                    .verified_outcome_by_event
+                    .get(&event_id)
+                    .copied()
+                    .unwrap_or(self.verified_outcome_utility),
+                utility_unit: self.verified_outcome_unit.clone(),
                 outcome_digest: "3".repeat(64),
             })
         }
@@ -1259,6 +1294,50 @@ mod tests {
             ));
             assert_eq!(admitted.receipts.source_trust_status, status);
             assert_eq!(admitted.receipts.source_trust_policy_digest, "8".repeat(64));
+        }
+    }
+
+    #[test]
+    fn candidate_payload_cannot_override_receipt_verified_utility() {
+        let mut forged = raw();
+        forged.observed_utility = 0.01;
+        assert_eq!(
+            ingest_as_known(&forged, query(180, 250), &TestVerifier::default()).err(),
+            Some(IngestReject::OutcomeValueMismatch)
+        );
+
+        let admitted = ingest_as_known(&raw(), query(180, 250), &TestVerifier::default())
+            .expect("receipt-bound outcome should be admitted");
+        assert_eq!(admitted.experience.observed_utility, 0.87);
+        assert_eq!(
+            admitted.receipts.outcome_observed_utility_bits,
+            0.87_f64.to_bits()
+        );
+    }
+
+    #[test]
+    fn receipt_outcome_unit_must_match_the_verified_calibration_unit() {
+        let verifier = TestVerifier {
+            verified_outcome_unit: "usd".into(),
+            ..TestVerifier::default()
+        };
+        assert_eq!(
+            ingest_as_known(&raw(), query(180, 250), &verifier).err(),
+            Some(IngestReject::OutcomeUnitMismatch)
+        );
+    }
+
+    #[test]
+    fn nonfinite_or_out_of_range_receipt_values_are_rejected() {
+        for value in [f64::NAN, f64::INFINITY, -0.01, 1.01] {
+            let verifier = TestVerifier {
+                verified_outcome_utility: value,
+                ..TestVerifier::default()
+            };
+            assert_eq!(
+                ingest_as_known(&raw(), query(180, 250), &verifier).err(),
+                Some(IngestReject::InvalidVerifiedOutcomeValue)
+            );
         }
     }
 
@@ -1490,7 +1569,15 @@ mod tests {
             raw_events.push(event);
         }
 
-        let session_a_verifier = varied_lineage_verifier();
+        let session_a_verifier = TestVerifier {
+            verified_outcome_by_event: BTreeMap::from([
+                (100, 0.91),
+                (101, 0.89),
+                (102, 0.42),
+                (103, 0.40),
+            ]),
+            ..varied_lineage_verifier()
+        };
         let batch_a = ingest_batch_as_known(
             &raw_events,
             query(180, 250),
@@ -1523,6 +1610,11 @@ mod tests {
 
         let session_c_verifier = TestVerifier {
             vary_lineage_by_event: true,
+            verified_outcome_by_event: BTreeMap::from([
+                (101, 0.89),
+                (102, 0.42),
+                (103, 0.40),
+            ]),
             retracted_at_ms: Some(260),
             lifecycle_event_id: Some(100),
             ..TestVerifier::default()
@@ -1842,6 +1934,8 @@ mod tests {
                 Some(VerifiedOutcome {
                     reconciled: true,
                     success: true,
+                    observed_utility: 0.87,
+                    utility_unit: "normalized_utility".into(),
                     outcome_digest: "3".repeat(64),
                 })
             }
