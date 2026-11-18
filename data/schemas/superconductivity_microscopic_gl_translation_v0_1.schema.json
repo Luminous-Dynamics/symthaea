@@ -534,7 +534,8 @@
           "evidence_status",
           "measurement_or_derivation_method",
           "source_artifact_digest",
-          "source_reference"
+          "source_reference",
+          "result_authority"
         ],
         "properties": {
           "observable_id": {
@@ -639,6 +640,15 @@
               "microscopic_xi0",
               "GL_near_Tc_xi",
               "not_applicable"
+            ]
+          },
+          "result_authority": {
+            "enum": [
+              "calculated",
+              "measured",
+              "predicted",
+              "inferred",
+              "reported_summary"
             ]
           }
         }
