@@ -452,11 +452,8 @@ mod tests {
             "../../../../benchmarks/plasma/task-schema-v0.json"
         ))
         .expect("event evaluation manifest");
-        let contract = &manifest["schema_conditioned_task_contract"];
-        assert_eq!(
-            contract["schema_version"],
-            PLASMA_TASK_SCHEMA_VERSION
-        );
+        let contract = &manifest["schema_contract"];
+        assert_eq!(contract["schema_version"], PLASMA_TASK_SCHEMA_VERSION);
         assert_eq!(
             contract["context_temporal_rule"],
             "context_support_end_offset_ns_must_be_lte_zero"
@@ -466,8 +463,18 @@ mod tests {
             "per-signal native sample intervals are retained; no global zero-fill or forced rate conversion"
         );
         assert_eq!(
-            contract["group6_task_anchor"],
-            "end of the 100ms causal history window"
+            manifest["gentoka_group6_reference"]["history_duration_ns"],
+            100_000_000
+        );
+        let group6_schema =
+            &manifest["example_schemas"]["group6_task_6_3_single_plasma_current"];
+        assert_eq!(
+            group6_schema["context_signals"][0]["temporal_support"]["start_offset_ns"],
+            -100_000_000
+        );
+        assert_eq!(
+            group6_schema["context_signals"][0]["temporal_support"]["end_offset_ns"],
+            0
         );
     }
 }
