@@ -669,6 +669,93 @@ mod tests {
     }
 
     #[test]
+    fn profile_rejects_a_missing_domain_method_binding() {
+        let mut profile = profile(QualificationClaim::FunctionalService);
+        profile.method_bindings.pop();
+        assert_eq!(
+            profile.validate(),
+            Err(ServiceQualificationError::MissingMethodBinding {
+                domain: QualificationDomain::LocalSafety
+            })
+        );
+    }
+
+    #[test]
+    fn profile_rejects_duplicate_domain_method_bindings() {
+        let mut profile = profile(QualificationClaim::FunctionalService);
+        let first_binding = profile.method_bindings[0].clone();
+        profile.method_bindings.push(first_binding);
+        assert!(matches!(
+            profile.validate(),
+            Err(ServiceQualificationError::DuplicateMethodBinding { .. })
+        ));
+    }
+
+    #[test]
+    fn profile_rejects_method_binding_outside_claim_scope() {
+        let mut profile = profile(QualificationClaim::FunctionalService);
+        profile.method_bindings.push(QualificationMethodBinding {
+            domain: QualificationDomain::AccessibilityAndUsability,
+            method_sha256: digest('f'),
+            conditions_sha256: digest('e'),
+        });
+        assert_eq!(
+            profile.validate(),
+            Err(ServiceQualificationError::UnexpectedMethodBinding {
+                domain: QualificationDomain::AccessibilityAndUsability
+            })
+        );
+    }
+
+    #[test]
+    fn each_domain_can_bind_its_own_specialist_method() {
+        let mut profile = profile(QualificationClaim::FunctionalService);
+        let fixture_binding = profile
+            .method_bindings
+            .iter_mut()
+            .find(|binding| binding.domain == QualificationDomain::FixtureMethodPerformance)
+            .expect("fixture method binding");
+        fixture_binding.method_sha256 = digest('f');
+        fixture_binding.conditions_sha256 = digest('g');
+
+        let record = record("candidate-01", &profile, AssessmentOutcome::Pass);
+        assert_eq!(record.validate(&profile), Ok(()));
+
+        let metrology = record
+            .assessments
+            .iter()
+            .find(|assessment| assessment.domain == QualificationDomain::MeasurementValidity)
+            .expect("metrology assessment");
+        let fixture = record
+            .assessments
+            .iter()
+            .find(|assessment| assessment.domain == QualificationDomain::FixtureMethodPerformance)
+            .expect("fixture performance assessment");
+
+        assert_ne!(
+            metrology.evidence.method_sha256,
+            fixture.evidence.method_sha256
+        );
+        assert_ne!(
+            metrology.evidence.method_conditions_sha256,
+            fixture.evidence.method_conditions_sha256
+        );
+    }
+
+    #[test]
+    fn receipt_trial_conditions_are_bound_to_the_matched_service_profile() {
+        let profile = profile(QualificationClaim::FunctionalService);
+        let mut record = record("candidate-01", &profile, AssessmentOutcome::Pass);
+        record.assessments[0].evidence.trial_conditions_sha256 = digest('z');
+        assert_eq!(
+            record.validate(&profile),
+            Err(ServiceQualificationError::EvidenceTrialConditionsMismatch {
+                domain: QualificationDomain::MeasurementValidity
+            })
+        );
+    }
+
+    #[test]
     fn complete_functional_service_profile_qualifies() {
         let profile = profile(QualificationClaim::FunctionalService);
         let record = record("candidate-01", &profile, AssessmentOutcome::Pass);
