@@ -23,6 +23,7 @@ struct Scenario {
     agents: Vec<Agent>,
     decision_agent_id: String,
     deliveries: Vec<Delivery>,
+    #[serde(rename = "final")]
     final_record: Option<FinalRecord>,
     expected: Expected,
 }
