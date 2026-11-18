@@ -1,6 +1,6 @@
 use jsonschema::validator_for;
 use serde_json::{Value, json};
-use sha1::{Digest as Sha1Digest, Sha1};
+use sha1::{Digest, Sha1};
 use sha2::Sha256;
 use std::collections::HashSet;
 use std::env;
