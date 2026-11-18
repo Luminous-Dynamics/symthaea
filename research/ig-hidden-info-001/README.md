@@ -90,6 +90,10 @@ The qualifier uses exact evidence IDs and ordered delivery events. It checks tha
 
 The next tranche should add a license-aware HiddenBench adapter, reproduce its structured-communication baseline, capture actual provider/model receipts, and run matched-budget comparisons. Every published-model result must be backed by exact prompts, model revisions, task splits, event logs, scoring code and uncertainty intervals.
 
+## Industry and SOTA comparison
+
+See [SOTA_COMPARISON_V0_1.md](SOTA_COMPARISON_V0_1.md) for the direct HiddenBench/CSCW comparators, Free-MAD and Meta-Moderator decision layers, MAST and MultiAgentBench reliability/transfer baselines, OpenAI Agents SDK / Microsoft Agent Framework / Google ADK industry patterns, current model-backbone scope, matched experimental arms and proposed decision gates.
+
 ## Existing work to compose
 
 - [#11320 / #11323](https://github.com/Luminous-Dynamics/symthaea/issues/11320): private/public stance transitions and exposure.
