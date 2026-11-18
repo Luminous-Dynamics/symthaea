@@ -609,7 +609,7 @@
       }
     },
     {
-      "id": "CS-011-uncertain-low-potential-skip",
+      "id": "CS-011-uncertain-low-potential-skips-calibration",
       "input": {
         "task_id": "CS-011-uncertain-low-potential-skip",
         "task_decomposability": "low",
@@ -631,9 +631,9 @@
         "candidate_architectures": [
           {
             "architecture_id": "parallel_independent",
-            "quality_mean_milli": 760,
-            "quality_lower_milli": 710,
-            "quality_upper_milli": 810,
+            "quality_mean_milli": 710,
+            "quality_lower_milli": 680,
+            "quality_upper_milli": 730,
             "token_cost": 14000,
             "latency_ms": 14000,
             "risk_milli": 170,
@@ -660,9 +660,9 @@
         }
       },
       "expected": {
-        "decision": "CALIBRATE",
-        "selected_architecture_id": null,
-        "reason": "promising_architecture_needs_calibration",
+        "decision": "SINGLE",
+        "selected_architecture_id": "single",
+        "reason": "no_robust_positive_net_gain",
         "robust_net_gain_milli": null
       }
     },
