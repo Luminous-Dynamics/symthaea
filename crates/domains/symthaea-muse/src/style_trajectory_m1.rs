@@ -838,23 +838,24 @@ fn period_sentence_return_semantics_verified(
         return false;
     }
 
-    let created: Vec<_> = trace
+    let lifecycle: Vec<_> = trace
         .obligation_transitions
         .iter()
-        .filter(|transition| {
-            transition.obligation_id == "thematic-return-and-closure"
-                && transition.to == AssertedObligationState::Created
-        })
+        .filter(|transition| transition.obligation_id == "thematic-return-and-closure")
         .collect();
-    let fulfilled: Vec<_> = trace
-        .obligation_transitions
+    let created: Vec<_> = lifecycle
         .iter()
-        .filter(|transition| {
-            transition.obligation_id == "thematic-return-and-closure"
-                && transition.to == AssertedObligationState::Fulfilled
-        })
+        .copied()
+        .filter(|transition| transition.to == AssertedObligationState::Created)
         .collect();
-    if created.len() != 1 || fulfilled.len() != 1 {
+    let fulfilled: Vec<_> = lifecycle
+        .iter()
+        .copied()
+        .filter(|transition| transition.to == AssertedObligationState::Fulfilled)
+        .collect();
+    // A later Deferred/Abandoned/Unresolved transition must not be ignored
+    // simply because a previous transition once said Fulfilled.
+    if lifecycle.len() != 2 || created.len() != 1 || fulfilled.len() != 1 {
         return false;
     }
 
@@ -1371,6 +1372,40 @@ mod tests {
             error,
             StyleTrajectoryM1Error::IndependentTraceVerificationFailed { .. }
                 | StyleTrajectoryM1Error::UnexpectedGrammarEvidence { .. }
+        ));
+    }
+
+    #[test]
+    fn m1_receipt_rejects_post_fulfillment_obligation_transition_after_rehash() {
+        let mut result =
+            realize_classical_to_minimalism_m1(m1_intent(M1_SHARED_AROUSAL)).unwrap();
+        let mut deferred = result.segments[0]
+            .grammar_trace
+            .obligation_transitions
+            .iter()
+            .find(|item| {
+                item.obligation_id == "thematic-return-and-closure"
+                    && item.to == AssertedObligationState::Fulfilled
+            })
+            .expect("Classical segment must retain its Period/Sentence return fulfillment")
+            .clone();
+        deferred.from = Some(AssertedObligationState::Fulfilled);
+        deferred.to = AssertedObligationState::Deferred;
+        deferred.evidence.clear();
+        deferred.responsible_pass = "post-fulfillment-mutation-control".into();
+        result.segments[0]
+            .grammar_trace
+            .obligation_transitions
+            .push(deferred);
+        result.segments[0].evidence_sha256 =
+            segment_evidence_sha256_v1(&result.segments[0]).unwrap();
+        result.receipt_sha256 = m1_receipt_sha256_v1(&result).unwrap();
+
+        let error = verify_classical_to_minimalism_m1_receipt_v1(&result).unwrap_err();
+        assert!(matches!(
+            error,
+            StyleTrajectoryM1Error::UnexpectedGrammarEvidence { .. }
+                | StyleTrajectoryM1Error::IndependentTraceVerificationFailed { .. }
         ));
     }
 
