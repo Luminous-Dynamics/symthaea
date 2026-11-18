@@ -198,7 +198,8 @@ pub struct StyleTrajectoryM1ReceiptVerificationV1 {
     pub verified_segment_count: usize,
     pub trace_integrity_verified_segment_count: usize,
     pub process_additive_score_verified_segment_count: usize,
-    /// False until the PeriodSentence score-semantic oracle is integrated.
+    /// True only when the existing Analyst ReturnMotif oracle has been
+    /// replayed successfully against the exact Classical segment score.
     pub period_sentence_semantics_verified: bool,
     pub total_beats: Duration,
 }
