@@ -636,14 +636,31 @@ impl Manifest {
         let mut structural_count = 0;
         let mut regression_count = 0;
         let mut structural_families = BTreeMap::<String, usize>::new();
+        let mut split_counts = BTreeMap::<String, usize>::new();
+        let mut generated_family_splits = BTreeMap::<(String, String), usize>::new();
         for case in cases {
             let case_id = string_field(case, "case_id")?;
             if !ids.insert(case_id.clone()) {
                 return Err(format!("duplicate case ID: {case_id}"));
             }
+            let split = string_field(case, "split")?;
+            if !["fixture_sanity", "discovery", "calibration", "final_holdout"]
+                .contains(&split.as_str())
+            {
+                return Err(format!("invalid benchmark split {split} in {case_id}"));
+            }
+            *split_counts.entry(split.clone()).or_insert(0) += 1;
             let declared = self.declared_subgroup(case)?;
             let label = string_field(case, "expected_subgroup_label")?;
-            *structural_families.entry(label).or_insert(0) += 1;
+            *structural_families.entry(label.clone()).or_insert(0) += 1;
+            if case_id.starts_with("GENERATED-") {
+                if split == "fixture_sanity" {
+                    return Err(format!("generated case {case_id} cannot use fixture_sanity"));
+                }
+                *generated_family_splits
+                    .entry((label, split))
+                    .or_insert(0) += 1;
+            }
             let track = string_field(case, "track")?;
             let computed = match track.as_str() {
                 "exact_finite_structural_stabilizer" => {
@@ -662,26 +679,51 @@ impl Manifest {
                 ));
             }
         }
-        if structural_count != 303 || regression_count != 2 {
+        if structural_count != 903 || regression_count != 2 {
             return Err(format!(
                 "unexpected fixture lane counts: structural={structural_count}, regression={regression_count}"
             ));
         }
         let expected_families = BTreeMap::from([
-            ("C1".to_owned(), 31_usize),
-            ("C2_FX".to_owned(), 30_usize),
-            ("C2_FY".to_owned(), 30_usize),
-            ("C2_FDIAG".to_owned(), 30_usize),
-            ("C2_FANTI".to_owned(), 30_usize),
-            ("C2_R180".to_owned(), 30_usize),
-            ("C4".to_owned(), 32_usize),
-            ("D4".to_owned(), 32_usize),
-            ("V4_AXIS".to_owned(), 30_usize),
-            ("V4_DIAG".to_owned(), 30_usize),
+            ("C1".to_owned(), 91_usize),
+            ("C2_FX".to_owned(), 90_usize),
+            ("C2_FY".to_owned(), 90_usize),
+            ("C2_FDIAG".to_owned(), 90_usize),
+            ("C2_FANTI".to_owned(), 90_usize),
+            ("C2_R180".to_owned(), 90_usize),
+            ("C4".to_owned(), 92_usize),
+            ("D4".to_owned(), 92_usize),
+            ("V4_AXIS".to_owned(), 90_usize),
+            ("V4_DIAG".to_owned(), 90_usize),
         ]);
         if structural_families != expected_families {
             return Err(format!(
-                "unexpected structural family counts: {structural_families:?}"
+                "unexpected subgroup-family counts: {structural_families:?}"
+            ));
+        }
+        let expected_split_counts = BTreeMap::from([
+            ("fixture_sanity".to_owned(), 5_usize),
+            ("discovery".to_owned(), 300_usize),
+            ("calibration".to_owned(), 300_usize),
+            ("final_holdout".to_owned(), 300_usize),
+        ]);
+        if split_counts != expected_split_counts {
+            return Err(format!("unexpected split counts: {split_counts:?}"));
+        }
+        let expected_generated_family_splits: BTreeMap<(String, String), usize> = [
+            "D4", "C4", "C2_R180", "C2_FX", "C2_FY", "C2_FDIAG", "C2_FANTI",
+            "V4_AXIS", "V4_DIAG", "C1",
+        ]
+        .into_iter()
+        .flat_map(|family| {
+            ["discovery", "calibration", "final_holdout"]
+                .into_iter()
+                .map(move |split| ((family.to_owned(), split.to_owned()), 30_usize))
+        })
+        .collect();
+        if generated_family_splits != expected_generated_family_splits {
+            return Err(format!(
+                "unexpected per-family split counts: {generated_family_splits:?}"
             ));
         }
         Ok((structural_count, regression_count))
@@ -761,7 +803,7 @@ mod tests {
         let counts = manifest()
             .validate_all_cases()
             .expect("all frozen labels must agree with exact integer oracle");
-        assert_eq!(counts.0, 303);
+        assert_eq!(counts.0, 903);
     }
 
     #[test]
