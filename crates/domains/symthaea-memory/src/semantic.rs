@@ -64,6 +64,51 @@ pub struct ProvenancedSemanticEntry {
     pub graduation_provenance: Option<GraduationProvenance>,
 }
 
+/// Input rejected by the semantic-memory admission or query boundary.
+///
+/// The compatibility APIs continue to return their historical shapes; callers
+/// that need to distinguish an invalid input from an empty result should use
+/// the corresponding `try_*` method.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SemanticMemoryInputError {
+    ZeroCapacity,
+    EmptyVector,
+    NonFiniteVector { index: usize },
+    NonFiniteQuery { index: usize },
+    ZeroNormVector,
+    NonFinitePredictionError,
+    DimensionMismatch { expected: usize, actual: usize },
+    InvalidSimilarityThreshold,
+}
+
+impl std::fmt::Display for SemanticMemoryInputError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ZeroCapacity => write!(f, "semantic memory has zero capacity"),
+            Self::EmptyVector => write!(f, "HDC vector must not be empty"),
+            Self::NonFiniteVector { index } => {
+                write!(f, "stored HDC vector contains a non-finite value at index {index}")
+            }
+            Self::NonFiniteQuery { index } => {
+                write!(f, "query HDC vector contains a non-finite value at index {index}")
+            }
+            Self::ZeroNormVector => write!(f, "HDC vector must have non-zero norm"),
+            Self::NonFinitePredictionError => {
+                write!(f, "prediction error must be finite")
+            }
+            Self::DimensionMismatch { expected, actual } => write!(
+                f,
+                "HDC vector dimension mismatch: expected {expected}, received {actual}"
+            ),
+            Self::InvalidSimilarityThreshold => {
+                write!(f, "similarity threshold must be finite and within [0, 1]")
+            }
+        }
+    }
+}
+
+impl std::error::Error for SemanticMemoryInputError {}
+
 impl SemanticEntry {
     /// Create a new semantic entry
     pub fn new(hdc_vector: Vec<f32>, timestamp: u64, prediction_error: f32) -> Self {
@@ -177,12 +222,62 @@ impl SemanticMemory {
         }
     }
 
-    /// Create with custom similarity threshold
+    /// Create with custom similarity threshold.
+    ///
+    /// Invalid thresholds fall back to the default threshold (0.3). Prefer
+    /// `try_with_threshold` when configuration errors must be surfaced.
     pub fn with_threshold(max_entries: usize, similarity_threshold: f32) -> Self {
-        Self {
+        Self::try_with_threshold(max_entries, similarity_threshold)
+            .unwrap_or_else(|_| Self::new(max_entries))
+    }
+
+    /// Create with a validated similarity threshold.
+    pub fn try_with_threshold(
+        max_entries: usize,
+        similarity_threshold: f32,
+    ) -> Result<Self, SemanticMemoryInputError> {
+        if !similarity_threshold.is_finite() || !(0.0..=1.0).contains(&similarity_threshold) {
+            return Err(SemanticMemoryInputError::InvalidSimilarityThreshold);
+        }
+        Ok(Self {
             similarity_threshold,
             ..Self::new(max_entries)
+        })
+    }
+
+    fn validate_hdc_vector(
+        vector: &[f32],
+        expected_dimension: Option<usize>,
+        query: bool,
+    ) -> Result<f64, SemanticMemoryInputError> {
+        if vector.is_empty() {
+            return Err(SemanticMemoryInputError::EmptyVector);
         }
+        for (index, value) in vector.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(if query {
+                    SemanticMemoryInputError::NonFiniteQuery { index }
+                } else {
+                    SemanticMemoryInputError::NonFiniteVector { index }
+                });
+            }
+        }
+        let norm_squared = vector
+            .iter()
+            .map(|value| (*value as f64) * (*value as f64))
+            .sum::<f64>();
+        if !norm_squared.is_finite() || norm_squared <= f64::EPSILON {
+            return Err(SemanticMemoryInputError::ZeroNormVector);
+        }
+        if let Some(expected) = expected_dimension {
+            if vector.len() != expected {
+                return Err(SemanticMemoryInputError::DimensionMismatch {
+                    expected,
+                    actual: vector.len(),
+                });
+            }
+        }
+        Ok(norm_squared.sqrt())
     }
 
     /// Store a new entry in semantic memory.
@@ -227,6 +322,25 @@ impl SemanticMemory {
         )
     }
 
+    /// Validated semantic store. Unlike the compatibility API, this method
+    /// distinguishes rejected input from a successful insertion without eviction.
+    pub fn try_store_with_provenance(
+        &mut self,
+        hdc: Vec<f32>,
+        error: f32,
+        category: Option<String>,
+        graduation_provenance: Option<GraduationProvenance>,
+    ) -> Result<Option<ProvenancedSemanticEntry>, SemanticMemoryInputError> {
+        let timestamp = self.stats.total_stored;
+        self.try_store_with_timestamp_and_provenance(
+            hdc,
+            error,
+            category,
+            timestamp,
+            graduation_provenance,
+        )
+    }
+
     /// Store with timestamp explicitly provided and optional source lineage.
     ///
     /// Returns the evicted entry and its prior lineage when the ring buffer wraps.
@@ -238,9 +352,35 @@ impl SemanticMemory {
         timestamp: u64,
         graduation_provenance: Option<GraduationProvenance>,
     ) -> Option<ProvenancedSemanticEntry> {
+        self.try_store_with_timestamp_and_provenance(
+            hdc,
+            error,
+            category,
+            timestamp,
+            graduation_provenance,
+        )
+        .ok()
+        .flatten()
+    }
+
+    /// Validated timestamped semantic store. Inputs are checked before the
+    /// ring buffer, statistics, or lineage slots are mutated.
+    pub fn try_store_with_timestamp_and_provenance(
+        &mut self,
+        hdc: Vec<f32>,
+        error: f32,
+        category: Option<String>,
+        timestamp: u64,
+        graduation_provenance: Option<GraduationProvenance>,
+    ) -> Result<Option<ProvenancedSemanticEntry>, SemanticMemoryInputError> {
         if self.max_entries == 0 {
-            return None;
+            return Err(SemanticMemoryInputError::ZeroCapacity);
         }
+        if !error.is_finite() {
+            return Err(SemanticMemoryInputError::NonFinitePredictionError);
+        }
+        let expected_dimension = self.entries.first().map(|entry| entry.hdc_vector.len());
+        Self::validate_hdc_vector(&hdc, expected_dimension, false)?;
 
         let entry = SemanticEntry {
             hdc_vector: hdc,
@@ -271,7 +411,7 @@ impl SemanticMemory {
 
         self.write_pos = (self.write_pos + 1) % self.max_entries;
         self.stats.total_stored += 1;
-        evicted
+        Ok(evicted)
     }
 
     /// Legacy timestamped store. Lineage is explicitly absent for this caller.
@@ -300,28 +440,38 @@ impl SemanticMemory {
     ///
     /// Vector of (index, similarity) pairs, sorted by similarity (descending)
     pub fn find_similar(&mut self, query: &[f32], top_k: usize) -> Vec<(usize, f32)> {
+        self.try_find_similar(query, top_k).unwrap_or_default()
+    }
+
+    /// Validated similarity query. Vectors must be finite, non-zero and have
+    /// exactly the same dimension as the stored HDC representation.
+    pub fn try_find_similar(
+        &mut self,
+        query: &[f32],
+        top_k: usize,
+    ) -> Result<Vec<(usize, f32)>, SemanticMemoryInputError> {
         self.stats.total_queries += 1;
+        let expected_dimension = self.entries.first().map(|entry| entry.hdc_vector.len());
+        let query_mag = match Self::validate_hdc_vector(query, expected_dimension, true) {
+            Ok(magnitude) => magnitude,
+            Err(error) => {
+                self.stats.semantic_misses += 1;
+                return Err(error);
+            }
+        };
 
-        if self.entries.is_empty() || query.is_empty() {
+        if self.entries.is_empty() {
             self.stats.semantic_misses += 1;
-            return Vec::new();
+            return Ok(Vec::new());
         }
 
-        // Compute query magnitude for cosine similarity
-        let query_mag = query.iter().map(|x| x * x).sum::<f32>().sqrt();
-        if query_mag < 1e-10 {
-            self.stats.semantic_misses += 1;
-            return Vec::new();
-        }
-
-        // Compute similarities for all entries
         let mut similarities: Vec<(usize, f32)> = self
             .entries
             .iter()
             .enumerate()
             .filter_map(|(idx, entry)| {
                 let sim = Self::cosine_similarity(query, &entry.hdc_vector, query_mag);
-                if sim >= self.similarity_threshold {
+                if sim.is_finite() && sim >= self.similarity_threshold {
                     Some((idx, sim))
                 } else {
                     None
@@ -329,19 +479,13 @@ impl SemanticMemory {
             })
             .collect();
 
-        // Sort by similarity (descending)
         similarities.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-
-        // Take top-k
         similarities.truncate(top_k);
 
-        // Update stats
         if similarities.is_empty() {
             self.stats.semantic_misses += 1;
         } else {
             self.stats.semantic_hits += 1;
-
-            // Update average hit similarity
             let avg_sim =
                 similarities.iter().map(|(_, s)| s).sum::<f32>() / similarities.len().max(1) as f32;
             let n = self.stats.semantic_hits as f32;
@@ -349,7 +493,7 @@ impl SemanticMemory {
                 self.stats.avg_hit_similarity * ((n - 1.0) / n) + avg_sim / n;
         }
 
-        similarities
+        Ok(similarities)
     }
 
     /// Find semantically similar entries with lineage preserved.
@@ -500,6 +644,11 @@ impl SemanticMemory {
         current_phi: f64,
         current_step: u64,
     ) -> f32 {
+        // Invalid cognitive-state input must not inject NaN into the learning
+        // rate. Neutral is safer than manufacturing a modulation direction.
+        if !current_phi.is_finite() {
+            return 1.0;
+        }
         let similar = self.find_similar(query, top_k);
 
         if similar.is_empty() {
@@ -547,27 +696,30 @@ impl SemanticMemory {
     ///
     /// Optimized version that takes pre-computed query magnitude.
     #[inline]
-    fn cosine_similarity(query: &[f32], entry: &[f32], query_mag: f32) -> f32 {
-        let min_len = query.len().min(entry.len());
-        if min_len == 0 {
+    fn cosine_similarity(query: &[f32], entry: &[f32], query_mag: f64) -> f32 {
+        // Dimension mismatch is a hard non-match; never compare only a prefix.
+        if query.is_empty() || query.len() != entry.len() {
             return 0.0;
         }
 
         let mut dot = 0.0f64;
         let mut entry_mag_sq = 0.0f64;
-
-        for i in 0..min_len {
+        for i in 0..query.len() {
             dot += query[i] as f64 * entry[i] as f64;
-            entry_mag_sq += entry[i] as f64 * entry[i] as f64;
+            entry_mag_sq += (entry[i] as f64) * (entry[i] as f64);
         }
 
-        let entry_mag = entry_mag_sq.sqrt() as f32;
-        let dot = dot as f32;
-        if entry_mag < 1e-10 {
+        let entry_mag = entry_mag_sq.sqrt();
+        if !entry_mag.is_finite() || entry_mag <= f64::EPSILON {
             return 0.0;
         }
 
-        dot / (query_mag * entry_mag)
+        let similarity = dot / (query_mag * entry_mag);
+        if similarity.is_finite() {
+            similarity.clamp(-1.0, 1.0) as f32
+        } else {
+            0.0
+        }
     }
 
     /// Get the number of entries currently stored
@@ -605,7 +757,22 @@ impl SemanticMemory {
 
     /// Set the similarity threshold for retrieval
     pub fn set_similarity_threshold(&mut self, threshold: f32) {
-        self.similarity_threshold = threshold.clamp(0.0, 1.0);
+        // Preserve the previous valid threshold when a compatibility caller
+        // supplies NaN, infinity or an out-of-domain configuration value.
+        let _ = self.try_set_similarity_threshold(threshold);
+    }
+
+    /// Set a validated similarity threshold, returning an error without
+    /// mutating configuration when the value is invalid.
+    pub fn try_set_similarity_threshold(
+        &mut self,
+        threshold: f32,
+    ) -> Result<(), SemanticMemoryInputError> {
+        if !threshold.is_finite() || !(0.0..=1.0).contains(&threshold) {
+            return Err(SemanticMemoryInputError::InvalidSimilarityThreshold);
+        }
+        self.similarity_threshold = threshold;
+        Ok(())
     }
 
     /// Get the current similarity threshold
@@ -902,6 +1069,120 @@ mod tests {
             .is_none());
         assert!(mem.is_empty());
         assert_eq!(mem.stats.total_stored, 0);
+    }
+
+
+    #[test]
+    fn semantic_store_rejects_malformed_vectors_and_errors_before_mutation() {
+        let mut mem = SemanticMemory::new(4);
+
+        assert_eq!(
+            mem.try_store_with_provenance(vec![], 0.1, None, None),
+            Err(SemanticMemoryInputError::EmptyVector)
+        );
+        assert_eq!(
+            mem.try_store_with_provenance(vec![0.0, 0.0], 0.1, None, None),
+            Err(SemanticMemoryInputError::ZeroNormVector)
+        );
+        assert_eq!(
+            mem.try_store_with_provenance(vec![1.0, f32::NAN], 0.1, None, None),
+            Err(SemanticMemoryInputError::NonFiniteVector { index: 1 })
+        );
+        assert_eq!(
+            mem.try_store_with_provenance(vec![1.0, 0.0], f32::INFINITY, None, None),
+            Err(SemanticMemoryInputError::NonFinitePredictionError)
+        );
+        assert!(mem.is_empty());
+        assert_eq!(mem.stats.total_stored, 0);
+
+        assert!(mem.store(vec![1.0, f32::NAN], 0.1, None).is_none());
+        assert!(mem.is_empty(), "legacy API must also refuse malformed inputs");
+    }
+
+    #[test]
+    fn semantic_store_requires_exact_vector_dimensions() {
+        let mut mem = SemanticMemory::new(4);
+        assert!(mem
+            .try_store_with_provenance(vec![1.0, 0.0, 0.0], 0.1, None, None)
+            .is_ok());
+        assert_eq!(
+            mem.try_store_with_provenance(vec![1.0, 0.0], 0.2, None, None),
+            Err(SemanticMemoryInputError::DimensionMismatch {
+                expected: 3,
+                actual: 2
+            })
+        );
+        assert_eq!(mem.len(), 1);
+        assert_eq!(mem.stats.total_stored, 1);
+    }
+
+    #[test]
+    fn semantic_query_rejects_nonfinite_zero_and_wrong_dimension_inputs() {
+        let mut mem = SemanticMemory::new(4);
+        mem.store(vec![1.0, 0.0, 0.0], 0.1, None);
+
+        assert_eq!(
+            mem.try_find_similar(&[1.0, f32::NAN, 0.0], 1),
+            Err(SemanticMemoryInputError::NonFiniteQuery { index: 1 })
+        );
+        assert_eq!(
+            mem.try_find_similar(&[0.0, 0.0, 0.0], 1),
+            Err(SemanticMemoryInputError::ZeroNormVector)
+        );
+        assert_eq!(
+            mem.try_find_similar(&[1.0, 0.0], 1),
+            Err(SemanticMemoryInputError::DimensionMismatch {
+                expected: 3,
+                actual: 2
+            })
+        );
+        assert!(mem.find_similar(&[1.0, 0.0], 1).is_empty());
+        assert_eq!(mem.stats.total_queries, 4);
+        assert_eq!(mem.stats.semantic_misses, 4);
+    }
+
+    #[test]
+    fn semantic_cosine_uses_f64_magnitudes_for_large_finite_vectors() {
+        let mut mem = SemanticMemory::new(2);
+        let large = vec![f32::MAX; 4];
+        assert!(mem.try_store_with_provenance(large.clone(), 0.1, None, None).is_ok());
+        let matches = mem.try_find_similar(&large, 1).unwrap();
+        assert_eq!(matches.len(), 1);
+        assert!((matches[0].1 - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn invalid_similarity_threshold_does_not_poison_configuration() {
+        let mut mem = SemanticMemory::with_threshold(4, 0.6);
+        assert_eq!(
+            mem.try_set_similarity_threshold(f32::NAN),
+            Err(SemanticMemoryInputError::InvalidSimilarityThreshold)
+        );
+        mem.set_similarity_threshold(f32::INFINITY);
+        assert_eq!(mem.similarity_threshold(), 0.6);
+        assert_eq!(
+            SemanticMemory::try_with_threshold(4, f32::NAN),
+            Err(SemanticMemoryInputError::InvalidSimilarityThreshold)
+        );
+        assert_eq!(SemanticMemory::with_threshold(4, f32::NAN).similarity_threshold(), 0.3);
+    }
+
+    #[test]
+    fn nonfinite_phi_uses_neutral_semantic_learning_rate() {
+        let mut mem = SemanticMemory::new(2);
+        let vector = make_hdc_vector(123, 8);
+        mem.store(vector.clone(), 0.9, None);
+        assert_eq!(mem.compute_lr_factor_phi_weighted(&vector, 1, f64::NAN, 10), 1.0);
+        assert_eq!(mem.compute_lr_factor_phi_weighted(&vector, 1, f64::INFINITY, 10), 1.0);
+    }
+
+    #[test]
+    fn zero_capacity_try_store_returns_explicit_error() {
+        let mut mem = SemanticMemory::new(0);
+        assert_eq!(
+            mem.try_store_with_provenance(vec![1.0], 0.1, None, None),
+            Err(SemanticMemoryInputError::ZeroCapacity)
+        );
     }
 
     #[test]
