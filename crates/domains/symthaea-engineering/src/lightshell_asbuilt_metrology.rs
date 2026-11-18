@@ -922,7 +922,7 @@ mod tests {
             "excluded_roi_feature_refs":["forearm_panel","elbow_seam"],
             "maximum_holdout_residual_mm":0.5,
             "observed_holdout_residual_mm":0.2,
-            "registration_uncertainty_mm":0.15,
+            "registration_uncertainty_mm":0.05,
             "uncertainty_budget_ref":"UQ-BUDGET-01",
             "uncertainty_budget_includes_registration":true,
             "coverage_fraction":0.99,
@@ -1228,6 +1228,80 @@ mod tests {
         manifest["measurement_session"]["excluded_roi_feature_refs"] = json!(["forearm_panel"]);
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|f| f.code == "mandatory_feature_not_excluded_from_registration"));
+    }
+
+    #[test]
+    fn articulated_clearance_requires_every_frozen_pose() {
+        let mut manifest = base_manifest();
+        manifest["feature_catalog"][0]["required_metrics"] = json!([{
+            "metric_id":"joint_clearance_mm","unit":"mm","lower_limit":2.0,"upper_limit":20.0
+        }]);
+        manifest["feature_catalog"][0]["required_pose_refs"] = json!(["POSE-NEUTRAL","POSE-EXTREME"]);
+        make_measured(&mut manifest);
+        manifest["observations"][0]["metric_id"] = json!("joint_clearance_mm");
+        manifest["observations"][0]["lower_limit"] = json!(2.0);
+        manifest["observations"][0]["upper_limit"] = json!(20.0);
+        manifest["observations"][0]["measured_value"] = json!(8.0);
+        manifest["observations"][0]["expanded_uncertainty"] = json!(0.2);
+        manifest["observations"][0]["pose_ref"] = json!("POSE-NEUTRAL");
+        manifest["observations"][0]["joint_state_ref"] = json!("JOINT-STATE-NEUTRAL");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "mandatory_pose_measurement_missing"));
+    }
+
+    #[test]
+    fn articulated_clearance_accepts_distinct_measurements_for_each_required_pose() {
+        let mut manifest = base_manifest();
+        manifest["feature_catalog"][0]["required_metrics"] = json!([{
+            "metric_id":"joint_clearance_mm","unit":"mm","lower_limit":2.0,"upper_limit":20.0
+        }]);
+        manifest["feature_catalog"][0]["required_pose_refs"] = json!(["POSE-NEUTRAL","POSE-EXTREME"]);
+        make_measured(&mut manifest);
+        manifest["observations"][0]["metric_id"] = json!("joint_clearance_mm");
+        manifest["observations"][0]["lower_limit"] = json!(2.0);
+        manifest["observations"][0]["upper_limit"] = json!(20.0);
+        manifest["observations"][0]["measured_value"] = json!(8.0);
+        manifest["observations"][0]["expanded_uncertainty"] = json!(0.2);
+        manifest["observations"][0]["pose_ref"] = json!("POSE-NEUTRAL");
+        manifest["observations"][0]["joint_state_ref"] = json!("JOINT-STATE-NEUTRAL");
+        let mut extreme = manifest["observations"][0].clone();
+        extreme["measurement_id"] = json!("MEAS-PANEL-POSE-EXTREME");
+        extreme["raw_data_slice_ref"] = json!("RAW-SLICE-POSE-EXTREME");
+        extreme["measurement_evidence_ref"] = json!("MEAS-EVIDENCE-POSE-EXTREME");
+        extreme["pose_ref"] = json!("POSE-EXTREME");
+        extreme["joint_state_ref"] = json!("JOINT-STATE-EXTREME");
+        extreme["measured_value"] = json!(3.0);
+        manifest["observations"].as_array_mut().unwrap().push(extreme);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.is_valid(), "{:?}", report.findings);
+        assert!(report.feature_assessments.iter().filter(|item| item.metric_id == "joint_clearance_mm")
+            .all(|item| item.disposition == "pass"));
+    }
+
+    #[test]
+    fn articulated_clearance_rejects_pose_outside_frozen_pose_set() {
+        let mut manifest = base_manifest();
+        manifest["feature_catalog"][0]["required_metrics"] = json!([{
+            "metric_id":"joint_clearance_mm","unit":"mm","lower_limit":2.0,"upper_limit":20.0
+        }]);
+        manifest["feature_catalog"][0]["required_pose_refs"] = json!(["POSE-NEUTRAL"]);
+        make_measured(&mut manifest);
+        manifest["observations"][0]["metric_id"] = json!("joint_clearance_mm");
+        manifest["observations"][0]["lower_limit"] = json!(2.0);
+        manifest["observations"][0]["upper_limit"] = json!(20.0);
+        manifest["observations"][0]["pose_ref"] = json!("POSE-UNAPPROVED");
+        manifest["observations"][0]["joint_state_ref"] = json!("JOINT-STATE-UNAPPROVED");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "joint_clearance_pose_not_required"));
+    }
+
+    #[test]
+    fn feature_uncertainty_cannot_be_smaller_than_registration_uncertainty() {
+        let mut manifest = base_manifest();
+        make_measured(&mut manifest);
+        manifest["observations"][0]["expanded_uncertainty"] = json!(0.01);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "feature_uncertainty_omits_registration_component"));
     }
 
     #[test]
