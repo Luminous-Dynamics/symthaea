@@ -187,6 +187,13 @@ memory cost, while its final expert weights are printed as diagnostics. The
 parent specialist still receives the known SCM topology and remains an oracle
 expert, not a learned mechanism.
 
+The mixture combines the specialists' original CDF probabilities using an
+exact common rational denominator (u128), then quantizes only the final CDF to
+the arithmetic coder's 32,768 frequency total. It does not first round each
+specialist to a coarse common probability table. The independent reference
+simulation and its small, public-development diagnostic are documented in
+[the fixed-share mixture report](../../docs/research/CDL_EXPERT_MIXTURE_FIXED_SHARE_V1_2026-11-18.md).
+
 For parent, lag, hybrid and shuffled-parent arms, the predictor adds the
 field/lane base frequencies to the selected conditional-context frequencies
 when forming its integer CDF. Both histograms are updated after each decoded
