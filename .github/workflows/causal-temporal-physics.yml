@@ -1,0 +1,407 @@
+name: Causal-Temporal-Geometric Physics Research
+
+on:
+  push:
+    branches:
+      - main
+      - research/causal-temporal-physics-v0.1
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/domains/symthaea-causal-set-lab/**"
+      - "crates/domains/symthaea-chain-theory-audit/**"
+      - "crates/domains/symthaea-fractal-time-lab/**"
+      - "crates/domains/symthaea-gravcraft/**"
+      - "crates/domains/symthaea-metric-geometry-lab/**"
+      - "crates/domains/symthaea-science-evidence/**"
+      - "crates/domains/symthaea-uap-observatory/**"
+      - "docs/research/CAUSAL_TEMPORAL_GEOMETRIC_PHYSICS_PROGRAM_2026-11-06.md"
+      - "docs/research/**"
+      - "docs/research/*reference-results-v0.*.md"
+      - "docs/research/uap-bearing-triangulation-reference-v0.1.md"
+      - "docs/research/dtc-phase-rigidity-benchmark-v0.1.md"
+      - "docs/research/dtc-quantum-sensing-benchmark-v0.1.md"
+      - "docs/research/uap-asynchronous-trajectory-observability-v0.1.md"
+      - "docs/research/uap-model-dependent-detection-eig-v0.1.md"
+      - "docs/research/uap-hypothesis-discriminating-active-design-v0.1.md"
+      - "docs/research/global-identifiability-benchmark-v0.1.md"
+      - "docs/research/curved-causal-set-order-inference-v0.1.md"
+      - ".github/workflows/causal-temporal-physics.yml"
+      - ".github/workflows/causal-physics-lockfile-reconcile.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: causal-temporal-physics-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-rust-validation:
+    name: "${{ matrix.package }} (format + test + examples)"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - symthaea-causal-set-lab
+          - symthaea-chain-theory-audit
+          - symthaea-fractal-time-lab
+          - symthaea-gravcraft
+          - symthaea-metric-geometry-lab
+          - symthaea-science-evidence
+          - symthaea-uap-observatory
+    steps:
+      - name: Checkout exact event head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record source and toolchain identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "source_sha=$(git rev-parse HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "source_tree_clean=$(test -z "$(git status --porcelain)" && echo true || echo false)" | tee -a "$GITHUB_STEP_SUMMARY"
+          rustc --version | tee -a "$GITHUB_STEP_SUMMARY"
+          cargo --version | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Cache Cargo registry and build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-ctgp-${{ matrix.package }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-ctgp-${{ matrix.package }}-
+
+      - name: Format package
+        run: cargo fmt --check -p ${{ matrix.package }}
+
+      - name: Test package library on locked dependency graph
+        run: cargo test --locked -p ${{ matrix.package }} --lib
+
+      - name: Compile package examples on locked dependency graph
+        run: cargo check --locked -p ${{ matrix.package }} --examples
+
+      - name: Run budgeted multifidelity experiment-design benchmark
+        if: matrix.package == 'symthaea-uap-observatory'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-uap-observatory --example budgeted_experiment_design | tee budgeted-experiment-design.csv
+          grep -q 'greedy_expected_target_eig_nats=' budgeted-experiment-design.csv
+          grep -q 'greedy_expected_joint_eig_nats=' budgeted-experiment-design.csv
+          grep -q 'exact_expected_target_eig_nats=' budgeted-experiment-design.csv
+          {
+            echo "## Budgeted multifidelity experimental design"
+            echo "- Greedy expected-EIG/cost selection compared with exhaustive subset oracle"
+            echo "- Data-only rank and prior-regularized information gain reported separately"
+            echo "- Synthetic whitened Jacobians only; no field/deployment claim"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run correlated-observation sensor-design benchmark
+        if: matrix.package == 'symthaea-uap-observatory'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-uap-observatory --example correlated_experiment_design | tee correlated-experiment-design.csv
+          grep -q 'diagonal_limit_equivalence=true' correlated-experiment-design.csv
+          grep -q 'common_mode_information_saturation=true' correlated-experiment-design.csv
+          grep -q 'correlation_is_selected_set_dependent=true' correlated-experiment-design.csv
+          {
+            echo "## Selected-set correlated observation design"
+            cat correlated-experiment-design.csv
+            echo "- Joint covariance and selected principal submatrix used for whitening"
+            echo "- Synthetic Gaussian control only; no field covariance is asserted"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run theory prediction coverage and comparability report
+        if: matrix.package == 'symthaea-science-evidence'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-science-evidence --example theory_prediction_coverage | tee theory-prediction-coverage.txt
+          {
+            echo "## Theory prediction coverage and comparability"
+            cat theory-prediction-coverage.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run planted-model recovery and open-world abstention reference
+        if: matrix.package == 'symthaea-science-evidence'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-science-evidence --example model_recovery_reference | tee model-recovery-reference.txt
+          grep -q 'epistemic_status=DETERMINISTIC_SYNTHETIC_MODEL_RECOVERY_NOT_PHYSICAL_VALIDATION' model-recovery-reference.txt
+          grep -q 'open_world_false_confident_assignment_rate=' model-recovery-reference.txt
+          {
+            echo "## Planted-model recovery and open-world abstention"
+            cat model-recovery-reference.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run model-discriminating experiment EIG reference
+        if: matrix.package == 'symthaea-science-evidence'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-science-evidence --example model_discrimination_reference | tee model-discrimination-eig.txt
+          grep -q 'epistemic_status=SYNTHETIC_MODEL_IDENTITY_EIG_NOT_PHYSICAL_THEORY_VALIDATION' model-discrimination-eig.txt
+          grep -q 'partial-prediction-control,NOT_COMPARABLE' model-discrimination-eig.txt
+          {
+            echo "## Synthetic model-discrimination EIG"
+            cat model-discrimination-eig.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run model-dependent detection and non-detection EIG reference
+        if: matrix.package == 'symthaea-science-evidence'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-science-evidence --example model_detection_reference | tee model-detection-eig.txt
+          grep -q 'epistemic_status=SYNTHETIC_BERNOULLI_GAUSSIAN_DETECTION_CHANNEL_NOT_PHYSICAL_VALIDATION' model-detection-eig.txt
+          grep -q 'I_model_detection=' model-detection-eig.txt
+          grep -q 'I_value_given_detection=' model-detection-eig.txt
+          {
+            echo "## Synthetic model-dependent detection EIG"
+            cat model-detection-eig.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run nominal and robust target-region sensor placement
+        if: matrix.package == 'symthaea-uap-observatory'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-uap-observatory --example sensor_placement_design | tee sensor-placement-design.csv
+          {
+            echo "## Synthetic sensor-placement design comparison"
+            echo '```csv'
+            cat sensor-placement-design.csv
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run global ambiguity mirror-twin regression
+        if: matrix.package == 'symthaea-uap-observatory'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-uap-observatory --example global_ambiguity_screen | tee global-ambiguity-screen.txt
+          grep -q 'local_jacobian_rank=3' global-ambiguity-screen.txt
+          grep -q 'ambiguous_pair_count=1' global-ambiguity-screen.txt
+          {
+            echo '## Local-versus-global observability regression'
+            cat global-ambiguity-screen.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Additional anisotropic-Heisenberg executable check
+        if: matrix.package == 'symthaea-fractal-time-lab'
+        run: cargo check --locked -p symthaea-fractal-time-lab --example heisenberg_2d_sweep
+
+      - name: Run GravCraft ADM derivative-step convergence
+        if: matrix.package == 'symthaea-gravcraft'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-gravcraft --example adm_derivative_step_sweep | tee gravcraft-adm-step-sweep.csv
+          grep -q 'NUMERICAL_STEP_SENSITIVITY_NOT_SOURCE_FEASIBILITY_OR_PROPULSION' gravcraft-adm-step-sweep.csv
+          {
+            echo '## GravCraft ADM derivative-step sensitivity'
+            cat gravcraft-adm-step-sweep.csv
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run independent ADM Hamiltonian and momentum constraints
+        if: matrix.package == 'symthaea-gravcraft'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-gravcraft --example adm_constraint_sweep | tee gravcraft-adm-constraint-sweep.csv
+          grep -q 'independent ADM constraint sweep' gravcraft-adm-constraint-sweep.csv
+          grep -q 'No result here establishes a realizable stress-energy source' gravcraft-adm-constraint-sweep.csv
+          {
+            echo '## Independent ADM Hamiltonian and momentum constraint residuals'
+            cat gravcraft-adm-constraint-sweep.csv
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Diff independent Chain Theory reproduction against pinned author CSV
+        if: matrix.package == 'symthaea-chain-theory-audit'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-chain-theory-audit --example chain_alpha_audit > chain-alpha-audit.txt
+          sed -n '/^record,construction,slot_kinds/,$p' chain-alpha-audit.txt > chain-alpha-rust-rows.csv
+          sed '/^#/d' crates/domains/symthaea-chain-theory-audit/tests/fixtures/author-records-a28db899.csv > chain-alpha-author-rows.csv
+          diff -u chain-alpha-author-rows.csv chain-alpha-rust-rows.csv
+          {
+            echo "## Chain Theory author-record differential reproduction"
+            echo "- Author fixture: a28db8998bce5bd5ef11195c05f13c86cd9dac5c"
+            echo "- Compared rows: 172"
+            echo "- Result: exact CSV match"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run DTC initial-state ensemble and 2D Heisenberg sweep
+        if: matrix.package == 'symthaea-fractal-time-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-fractal-time-lab --example initial_state_ensemble | tee dtc-initial-state-ensemble.csv
+          cargo run --locked -p symthaea-fractal-time-lab --example heisenberg_2d_sweep | tee dtc-heisenberg-2d-sweep.csv
+          {
+            echo "## DTC finite-system initial-state and 2D Heisenberg diagnostics"
+            echo "- Initial-state corpus: all-up/down, defects, random products, Haar-like references; J=0 and J=0.5"
+            echo "- Heisenberg protocol: finite 2D XYZ graphs, declared Trotter refinement"
+            echo "- Claim boundary: finite-system signal and numerical convergence only; not thermodynamic DTC phase proof"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run model-generated Floquet frequency-locking sweep
+        if: matrix.package == 'symthaea-fractal-time-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-fractal-time-lab --example exact_floquet_frequency_locking | tee dtc-frequency-locking.csv
+          grep -q 'all_up,0.000000' dtc-frequency-locking.csv
+          grep -q 'all_up,0.500000' dtc-frequency-locking.csv
+          {
+            echo '## Model-generated finite-sweep frequency locking'
+            cat dtc-frequency-locking.csv
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run finite-Floquet AC probe Fisher-information sweep
+        if: matrix.package == 'symthaea-fractal-time-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-fractal-time-lab --example dtc_ac_probe_sweep | tee dtc-ac-probe-sweep.csv
+          grep -q 'SMALL_CLOSED_SYSTEM_SAMPLED_PROBE_NOT_DIAMOND_SENSOR_REPRODUCTION' dtc-ac-probe-sweep.csv
+          grep -q 'information_metric=classical_Fisher_information_from_exact_total_Z_distribution' dtc-ac-probe-sweep.csv
+          {
+            echo '## Finite-Floquet AC probe sensing and classical Fisher information'
+            cat dtc-ac-probe-sweep.csv
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run curved 1+1D conformal-FRW causal-set sweep
+        if: matrix.package == 'symthaea-causal-set-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-causal-set-lab --example curved_frw_sweep | tee curved-frw-sweep.csv
+          {
+            echo "## Curved 1+1D conformal-FRW causal-set sweep"
+            echo "- Flat kappa=0 control and curved volume-weighted sprinklings"
+            echo "- Empirical order fractions compared with deterministic Halton importance quadrature"
+            echo "- Claim boundary: finite-sample kinematics only; no continuum-limit or quantum-gravity claim"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run dimensionless curved-order inversion
+        if: matrix.package == 'symthaea-causal-set-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-causal-set-lab --example curved_order_inversion | tee curved-order-inversion.txt
+          grep -q 'estimated_dimensionless_curvature_q=' curved-order-inversion.txt
+          {
+            echo '## Model-conditional curved order-statistic inversion'
+            cat curved-order-inversion.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run finite-cone and product-window link-bias reference
+        if: matrix.package == 'symthaea-causal-set-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-causal-set-lab --example link_sampling_bias_reference | tee link-sampling-bias-reference.csv
+          grep -q 'comparison_status=FINITE_CONE_TABLE_I_DISCREPANCY_REQUIRES_CONVENTION_AUDIT' link-sampling-bias-reference.csv
+          {
+            echo "## Finite-cone / product-window link-sampling reference"
+            echo 'The finite-cone Table I discrepancy is retained as an open reproduction audit.'
+            echo '```csv'
+            cat link-sampling-bias-reference.csv
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run finite-size Bayesian causal-set dimension inference
+        if: matrix.package == 'symthaea-causal-set-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-causal-set-lab --example bayesian_dimension_reference | tee bayesian-dimension-reference.csv
+          {
+            echo "## Finite-size Bayesian causal-set dimension reference"
+            echo '```csv'
+            cat bayesian-dimension-reference.csv
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run Bayesian causal-set dimension scale sweep
+        if: matrix.package == 'symthaea-causal-set-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-causal-set-lab --example bayesian_dimension_scale_sweep | tee bayesian-dimension-scale-sweep.csv
+          grep -q 'event_count,truth_dimension,prior_family' bayesian-dimension-scale-sweep.csv
+          grep -q 'next_gate=posterior_coverage_and_out_of_family_abstention' bayesian-dimension-scale-sweep.csv
+          {
+            echo "## Bayesian finite-size dimension calibration sweep"
+            echo '```csv'
+            cat bayesian-dimension-scale-sweep.csv
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run joint interval-profile and longest-chain signature reference
+        if: matrix.package == 'symthaea-causal-set-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-causal-set-lab --example joint_signature_reference | tee joint-causal-set-signature.txt
+          grep -q 'claim_boundary=feature_extraction_only_joint_likelihood_requires_whole_sprinkling_calibration' joint-causal-set-signature.txt
+          {
+            echo '## Joint causal-set signature reference'
+            cat joint-causal-set-signature.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run held-out joint causal-set dimension posterior pilot
+        if: matrix.package == 'symthaea-causal-set-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-causal-set-lab --example joint_dimension_posterior_pilot | tee joint-dimension-posterior-pilot.csv
+          grep -q 'claim_boundary=finite_simulation_pilot' joint-dimension-posterior-pilot.csv
+          grep -q 'joint_mean_log_loss=' joint-dimension-posterior-pilot.csv
+          {
+            echo '## Held-out whole-sprinkling joint dimension posterior pilot'
+            cat joint-dimension-posterior-pilot.csv
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run exact causal-set interval-histogram comparison
+        if: matrix.package == 'symthaea-causal-set-lab'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-causal-set-lab --example interval_histogram_benchmark | tee interval-histogram-benchmark.csv
+          {
+            echo "## Exact interval-histogram algorithm comparison"
+            echo '```csv'
+            cat interval-histogram-benchmark.csv
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish package summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## ${{ matrix.package }}"
+            echo "- Source: ${{ github.sha }}"
+            echo "- Job result: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,34 @@
+[package]
+name = "symthaea-science-evidence"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+license = "AGPL-3.0-or-later"
+description = "Content-addressed scientific experiment manifests and exact-head verification receipts"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[[example]]
+name = "manifest_demo"
+path = "examples/manifest_demo.rs"
+
+[[example]]
+name = "theory_prediction_coverage"
+path = "examples/theory_prediction_coverage.rs"
+
+[[example]]
+name = "model_discrimination_reference"
+path = "examples/model_discrimination_reference.rs"
+
+[[example]]
+name = "model_recovery_reference"
+path = "examples/model_recovery_reference.rs"
+
+[[example]]
+name = "model_detection_reference"
+path = "examples/model_detection_reference.rs"

@@ -1,0 +1,47 @@
+[package]
+name = "symthaea-causal-set-lab"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+license = "AGPL-3.0-or-later"
+description = "Deterministic causal-set sprinkling, order invariants, and 1+1D Minkowski validation"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[lib]
+path = "src/lib.rs"
+
+[[example]]
+name = "minkowski_1p1"
+path = "examples/minkowski_1p1.rs"
+
+# Deliberately std-only. This crate is a small, independently auditable
+# scientific primitive; it must not pull the cognitive or physics workspace
+# dependency graph into the first causal-set verification milestone.
+
+[[example]]
+name = "minkowski_nd"
+path = "examples/minkowski_nd.rs"
+
+[[example]]
+name = "interval_histogram_benchmark"
+path = "examples/interval_histogram_benchmark.rs"
+
+[[example]]
+name = "curved_frw_sweep"
+path = "examples/curved_frw_sweep.rs"
+
+[[example]]
+name = "curved_order_inversion"
+path = "examples/curved_order_inversion.rs"
+
+[[example]]
+name = "link_sampling_bias_reference"
+path = "examples/link_sampling_bias_reference.rs"
+
+[[example]]
+name = "bayesian_dimension_reference"
+path = "examples/bayesian_dimension_reference.rs"
+
+[[example]]
+name = "joint_signature_reference"
+path = "examples/joint_signature_reference.rs"

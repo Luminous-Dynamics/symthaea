@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-chain-theory-audit"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+license = "AGPL-3.0-or-later"
+description = "Independent combinatorial and numerical audit of the published Chain Theory alpha candidate"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[lib]
+path = "src/lib.rs"
+
+[[example]]
+name = "chain_alpha_audit"
+path = "examples/chain_alpha_audit.rs"
+
+# std-only: keep this independent reproduction easy to audit and run.
