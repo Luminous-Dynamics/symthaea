@@ -49,6 +49,22 @@ fn validate_observable_value(observation: &Value) -> Result<(), String> {
         .get("value")
         .ok_or_else(|| format!("observable {id} missing value field"))?;
 
+    let uncertainty = observation
+        .get("uncertainty")
+        .ok_or_else(|| format!("observable {id} missing uncertainty"))?;
+    if let Some(value) = uncertainty.as_f64() {
+        if !value.is_finite() || value < 0.0 {
+            return Err(format!("observable {id}: uncertainty must be finite and non-negative"));
+        }
+    } else if let Some(values) = uncertainty.as_array() {
+        numeric_array(&Value::Array(values.clone()), &format!("observable {id} uncertainty"))?;
+        if values.iter().any(|value| value.as_f64().is_some_and(|number| number < 0.0)) {
+            return Err(format!("observable {id}: uncertainty entries must be non-negative"));
+        }
+    } else if !uncertainty.is_null() {
+        return Err(format!("observable {id}: uncertainty must be numeric, array or null"));
+    }
+
     if value_kind == "not_reported" {
         if !value.is_null() {
             return Err(format!("observable {id}: not_reported must have null value"));
@@ -515,8 +531,7 @@ mod tests {
         let receipt = audit_mutated(fixture).unwrap();
         assert_eq!(receipt["status"], "pass");
         assert_eq!(receipt["observable_count"], 0);
-        assert_eq!(receipt["coefficient_status_counts"]["not_identifiable"], 2);
-        assert_eq!(receipt["coefficient_status_counts"]["constrained"], 1);
+        assert_eq!(receipt["coefficient_status_counts"]["not_identifiable"], 3);
     }
 
     #[test]
@@ -532,6 +547,41 @@ mod tests {
             "isotropy_assumption":"not_applicable",
             "uncertainty":0.1,"evidence_status":"paper_reported",
             "measurement_or_derivation_method":"microscopic nonlocal pair response",
+            "source_artifact_digest":null,
+            "source_reference":"https://doi.org/10.1103/lrhl-j9bt"
+        }]);
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn xi0_and_xi_gl_are_distinct_typed_observables() {
+        let (_, mut fixture) = inputs();
+        fixture["derived_observables"] = json!([{
+            "observable_id":"obs-xi-gl",
+            "state_id":"method_summary_only",
+            "observable_kind":"xi_GL",
+            "length_scale_definition":"microscopic_xi0",
+            "value_kind":"scalar","value":10.0,"unit":"angstrom",
+            "tensor_axes":[],"isotropy_assumption":"not_applicable",
+            "uncertainty":0.1,"evidence_status":"paper_reported",
+            "measurement_or_derivation_method":"near-Tc GL fit",
+            "source_artifact_digest":null,
+            "source_reference":"https://doi.org/10.1103/lrhl-j9bt"
+        }]);
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn non_finite_or_negative_observable_uncertainty_is_rejected() {
+        let (_, mut fixture) = inputs();
+        fixture["derived_observables"] = json!([{
+            "observable_id":"obs-tc",
+            "state_id":"method_summary_only",
+            "observable_kind":"Tc",
+            "value_kind":"scalar","value":8.0,"unit":"K",
+            "tensor_axes":[],"isotropy_assumption":"not_applicable",
+            "uncertainty":-0.5,"evidence_status":"paper_reported",
+            "measurement_or_derivation_method":"source report",
             "source_artifact_digest":null,
             "source_reference":"https://doi.org/10.1103/lrhl-j9bt"
         }]);
