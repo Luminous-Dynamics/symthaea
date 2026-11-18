@@ -260,3 +260,8 @@ The reported \(U_c/t=5.72(1)\), \(z=1\), and \(\nu=0.671\) remain paper-reported
 The QXY smoke receipt is bound to the exact schema and fixture SHA-256 hashes, instance ID, source parameter set and actual random seed. For action, stiffness and vortex-density series it reports the sample mean, sample standard deviation, an explicitly labelled **iid-only** standard error, sample count and lag-one autocorrelation.
 
 These statistics are not a replacement for integrated autocorrelation time, effective sample size, thermalization analysis, multiple independent chains or systematic finite-\(N_\tau\) extrapolation. In particular, the iid standard error must never be used as a publication-quality uncertainty when lagged dependence is present or unquantified.
+
+
+The QXY runner also supports independent-seed ensembles via `--replicates N`. Each chain gets a distinct deterministic seed and its own receipt. For multiple chains it reports between-seed sample standard deviation and standard error for action, stiffness and vortex density. These are **between-chain** diagnostics only: they do not remove within-chain autocorrelation or prove each chain equilibrated. Per-chain lag-one autocorrelation, an initial-positive-sequence integrated-autocorrelation estimate and effective-sample-size diagnostic are included, with an explicit warning that short chains are not publication-quality uncertainties.
+
+The hosted smoke command uses two chains with one warmup and two measurement sweeps each. That is a test of repeatability and receipt plumbing—not a physics-quality sample size.
