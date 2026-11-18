@@ -91,7 +91,7 @@ The dependency-free `service_continuity` module classifies externally supplied, 
 
 It fails closed on unqualified/unknown water-use status, local protection uncertainty, stale or contradictory critical evidence, pressure outside/unknown relative to the admitted envelope, blocked/unknown drainage and detected/unknown leaks. Reduced and manual-only modes are admitted only when explicitly qualified by the local device authority. Loss of optional digital recommendations does not reduce a qualified local service state. A cleared fault cannot automatically clear the requalification-required flag.
 
-This is a product-level classification function only. It does not actuate isolation, control water, establish safety limits, approve water quality, or replace independently qualified hardware protection. The 16 unit tests are authored; no execution pass is claimed until exact-head CI reports it.
+This is a product-level classification function only. It does not actuate isolation, control water, establish safety limits, approve water quality, or replace independently qualified hardware protection. Seventeen unit tests are authored, including exhaustive enumeration of all 57,600 combinations in the finite input vocabulary. No execution pass is claimed until exact-head CI reports it.
 
 
 ## Exact-point pressure / flow evidence
