@@ -161,12 +161,10 @@ fn series_summary(values: &[f64]) -> Value {
     let mean = values.iter().sum::<f64>() / values.len() as f64;
     let standard_deviation = sample_standard_deviation(values);
     let integrated_tau = integrated_autocorrelation_time(values);
-    let effective_sample_size = integrated_tau
-        .map(|tau| (values.len() as f64 / (2.0 * tau)).min(values.len() as f64));
+    let effective_sample_size =
+        integrated_tau.map(|tau| (values.len() as f64 / (2.0 * tau)).min(values.len() as f64));
     let autocorrelation_corrected_standard_error = match (standard_deviation, integrated_tau) {
-        (Some(deviation), Some(tau)) => {
-            Some(deviation * (2.0 * tau / values.len() as f64).sqrt())
-        }
+        (Some(deviation), Some(tau)) => Some(deviation * (2.0 * tau / values.len() as f64).sqrt()),
         _ => None,
     };
     json!({
@@ -199,14 +197,13 @@ fn run_sweep(
             re: original.re + rng.gen_range(-proposal_scale..proposal_scale),
             im: original.im + rng.gen_range(-proposal_scale..proposal_scale),
         };
-        let delta_energy =
-            match model.site_energy_delta(fields, site, candidate, links) {
-                Ok(delta) => delta,
-                Err(_) => {
-                    invalid += 1;
-                    continue;
-                }
-            };
+        let delta_energy = match model.site_energy_delta(fields, site, candidate, links) {
+            Ok(delta) => delta,
+            Err(_) => {
+                invalid += 1;
+                continue;
+            }
+        };
 
         let accept = delta_energy <= 0.0
             || rng.gen_range(0.0..1.0) < (-delta_energy / model.temperature).exp();
@@ -219,11 +216,7 @@ fn run_sweep(
     Ok((accepted, invalid))
 }
 
-fn run_chain(
-    model: &GlModel,
-    config: SamplingConfig,
-    seed: u64,
-) -> Result<Value, String> {
+fn run_chain(model: &GlModel, config: SamplingConfig, seed: u64) -> Result<Value, String> {
     if model.temperature <= 0.0 {
         return Err("Metropolis sampling requires temperature > 0".to_owned());
     }
@@ -294,11 +287,8 @@ fn run_chain(
             .map(|field| field.norm_sqr().sqrt())
             .sum::<f64>()
             / fields.len() as f64;
-        let squared_amplitude_mean = fields
-            .iter()
-            .map(|field| field.norm_sqr())
-            .sum::<f64>()
-            / fields.len() as f64;
+        let squared_amplitude_mean =
+            fields.iter().map(|field| field.norm_sqr()).sum::<f64>() / fields.len() as f64;
 
         energy_series.push(energy.total / fields.len() as f64);
         local_energy_series.push(energy.local / fields.len() as f64);
@@ -323,8 +313,7 @@ fn run_chain(
             vortex_density_series.push(density);
             positive_vortex_series.push(vortices.positive_charge as f64);
             negative_vortex_series.push(vortices.negative_charge as f64);
-            skipped_core_plaquette_series
-                .push(vortices.skipped_low_amplitude_plaquettes as f64);
+            skipped_core_plaquette_series.push(vortices.skipped_low_amplitude_plaquettes as f64);
             json!({
                 "positive_charge": vortices.positive_charge,
                 "negative_charge": vortices.negative_charge,
@@ -393,9 +382,8 @@ fn run_chain(
         0.0
     };
     let energy_variance_per_node = population_variance(&energy_series);
-    let heat_capacity_per_node = fields.len() as f64
-        * energy_variance_per_node
-        / (model.temperature * model.temperature);
+    let heat_capacity_per_node =
+        fields.len() as f64 * energy_variance_per_node / (model.temperature * model.temperature);
     if !heat_capacity_per_node.is_finite() || heat_capacity_per_node < 0.0 {
         return Err("GL heat-capacity fluctuation estimator is invalid".to_owned());
     }
@@ -464,8 +452,7 @@ fn run_chain(
 fn ensemble_summary(values: &[f64]) -> Value {
     let mean = values.iter().sum::<f64>() / values.len() as f64;
     let deviation = sample_standard_deviation(values);
-    let between_chain_standard_error =
-        deviation.map(|value| value / (values.len() as f64).sqrt());
+    let between_chain_standard_error = deviation.map(|value| value / (values.len() as f64).sqrt());
     json!({
         "mean_across_independent_chains": mean,
         "between_chain_sample_standard_deviation": deviation,
@@ -529,7 +516,8 @@ pub(super) fn run(
                 .and_then(Value::as_f64)
         })
         .collect::<Vec<_>>();
-    let mut between_chain_helicity_modulus = vec![vec![Value::Null; model.dimension]; model.dimension];
+    let mut between_chain_helicity_modulus =
+        vec![vec![Value::Null; model.dimension]; model.dimension];
     for alpha in 0..model.dimension {
         for beta in 0..model.dimension {
             let values: Vec<f64> = chains
@@ -543,11 +531,12 @@ pub(super) fn run(
                         .and_then(Value::as_array)
                         .and_then(|row| row.get(beta))
                         .and_then(Value::as_f64)
-                        .ok_or_else(|| format!("chain missing helicity modulus component ({alpha},{beta})"))
+                        .ok_or_else(|| {
+                            format!("chain missing helicity modulus component ({alpha},{beta})")
+                        })
                 })
                 .collect::<Result<_, _>>()?;
-            between_chain_helicity_modulus[alpha][beta] =
-                ensemble_summary(&values);
+            between_chain_helicity_modulus[alpha][beta] = ensemble_summary(&values);
         }
     }
 
@@ -585,8 +574,8 @@ pub(super) fn run(
 
 #[cfg(test)]
 mod tests {
-    use super::{run, GlModel, SamplingOverrides};
-    use serde_json::{json, Value};
+    use super::{GlModel, SamplingOverrides, run};
+    use serde_json::{Value, json};
     use std::fs;
     use std::path::PathBuf;
 
@@ -639,10 +628,10 @@ mod tests {
                 })
             }));
         }
-        let between_chain_stiffness = first["between_chain_summary"]
-            ["thermal_helicity_modulus_tensor"]
-            .as_array()
-            .unwrap();
+        let between_chain_stiffness =
+            first["between_chain_summary"]["thermal_helicity_modulus_tensor"]
+                .as_array()
+                .unwrap();
         assert_eq!(between_chain_stiffness.len(), 2);
     }
 
@@ -732,15 +721,22 @@ mod tests {
         let mut value: Value = serde_json::from_slice(&fixture).unwrap();
         value["thermal"]["temperature"] = json!(0.0);
         let mutated = serde_json::to_vec(&value).unwrap();
-        let schema = {
-            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-            fs::read(
-                root.join("data/schemas/superconductivity_amplitude_phase_instance_v0_1.schema.json"),
+        let schema =
+            {
+                let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+                fs::read(root.join(
+                    "data/schemas/superconductivity_amplitude_phase_instance_v0_1.schema.json",
+                ))
+                .unwrap()
+            };
+        let zero_temperature_model = GlModel::from_bytes(&schema, &mutated).unwrap();
+        assert!(
+            run(
+                &zero_temperature_model,
+                &mutated,
+                SamplingOverrides::default()
             )
-            .unwrap()
-        };
-        let zero_temperature_model =
-            GlModel::from_bytes(&schema, &mutated).unwrap();
-        assert!(run(&zero_temperature_model, &mutated, SamplingOverrides::default()).is_err());
+            .is_err()
+        );
     }
 }
