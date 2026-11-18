@@ -175,6 +175,8 @@ pub struct EtlFaceplateFlowObservation {
     pub pressure_instrument_id: String,
     pub pressure_calibration_receipt_sha256: String,
     pub stabilized_flow_lpm: f64,
+    pub flow_stabilized: bool,
+    pub stabilization_receipt_sha256: String,
     pub flow_uncertainty_lpm: f64,
     pub flow_instrument_id: String,
     pub flow_calibration_receipt_sha256: String,
@@ -220,6 +222,14 @@ impl EtlFaceplateFlowObservation {
             320.0,
         )?;
 
+        if !self.flow_stabilized {
+            return Err(MethodPressureError::FlowNotStabilized);
+        }
+        require_digest(
+            "stabilization_receipt_sha256",
+            &self.stabilization_receipt_sha256,
+        )?;
+
         if !self.stabilized_flow_lpm.is_finite() || self.stabilized_flow_lpm <= 0.0 {
             return Err(MethodPressureError::InvalidFlow);
         }
@@ -240,6 +250,7 @@ pub enum MethodPressureError {
     PressureIntervalOutsideMethodTolerance,
     InletChannelIdentityMismatch { field: &'static str },
     InvalidFlow,
+    FlowNotStabilized,
     InvalidFlowUncertainty,
 }
 
@@ -259,6 +270,9 @@ impl Display for MethodPressureError {
                 write!(f, "UWL inlet channel identity mismatch: {field}")
             }
             Self::InvalidFlow => write!(f, "stabilized flow must be finite and positive"),
+            Self::FlowNotStabilized => {
+                write!(f, "ETL flow result cannot be admitted before stabilization")
+            }
             Self::InvalidFlowUncertainty => {
                 write!(f, "flow uncertainty must be finite and non-negative")
             }
@@ -389,6 +403,8 @@ mod tests {
             pressure_instrument_id: "faceplate-pressure-01".to_owned(),
             pressure_calibration_receipt_sha256: digest('d'),
             stabilized_flow_lpm: 7.1,
+            flow_stabilized: true,
+            stabilization_receipt_sha256: digest('f'),
             flow_uncertainty_lpm: 0.1,
             flow_instrument_id: "flow-01".to_owned(),
             flow_calibration_receipt_sha256: digest('e'),
@@ -421,4 +437,15 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn rejects_etl_faceplate_flow_before_stabilization() {
+        let mut observation = etl_faceplate();
+        observation.flow_stabilized = false;
+        assert_eq!(
+            observation.validate(),
+            Err(MethodPressureError::FlowNotStabilized)
+        );
+    }
+
 }
