@@ -309,3 +309,22 @@ This makes a temporary boost button a commercial precedent, not an Aqua novelty.
 See [AQUA-TASK-SELECTIVE-DELIVERY-001 #12798](https://github.com/Luminous-Dynamics/symthaea/issues/12798) and [AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md](AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md).
 
 Source: https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000
+
+
+## 14. UK Energy Technology List — non-domestic pressure-independence comparator
+
+The UK government's Energy Technology List (ETL) shower criteria provide a useful external pressure-response benchmark for non-domestic products. The current published criteria page states:
+- Shower heads, shower valves and shower systems: maximum available flow of 9 L/min without user-behaviour features (UBFs), or 10.6 L/min with UBFs.
+- Pressure independence: lowest flow at 1.5 bar must be at least 60% of maximum available flow at 3 bar, for products with the 3-bar reference flow at or below 8.0 L/min.
+- Spray coverage: tested using the Unified Water Label scheme published in January 2023.
+
+Source: UK Department for Energy Security and Net Zero, Energy Technology List — Showers, sections 1.1–1.4: https://etl.energysecurity.gov.uk/products/showers/showers
+
+**Scope warning:** the ETL shower category is explicitly for non-domestic applications. It is not a South African legal requirement, not a domestic shower certification and not an Aqua performance result. It is a strong comparative reference for pressure retention and the principle that maximum flow, pressure independence and spray coverage should be evaluated together.
+
+Aqua research targets for exact 150 / 300 kPa paired runs:
+- 60%: external ETL-style reference only when its product category, reference-flow and UWL-method conditions apply;
+- 70%: proposed Aqua internal initial target, measured conservative bound;
+- 80%: proposed Aqua stretch hypothesis, measured conservative bound.
+
+Do not apply these percentages indiscriminately to a product or mode outside the ETL's scope. Flow retention does not establish task quality, comfort, spray force, coverage, hygiene or certification. The paired exact-point comparison is implemented in `symthaea-aqua-bench::pressure_curve::compare_flow_retention` and reports central ratio plus measurement-uncertainty bounds; it does not interpolate a curve or produce a confidence interval over specimens.
