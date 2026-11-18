@@ -222,4 +222,10 @@ Dynamic events—startup, pressure steps, concurrent basin/bath draw, pump/regul
 
 ## Versioned external evidence corpus
 
-The machine-readable evidence register now includes the UK ETL non-domestic shower criteria alongside exact Brondell and Hansgrohe product declarations, WaterSense criteria, SANS installation references and peer-reviewed spray studies. The corpus distinguishes programme criteria from manufacturer declarations and from Aqua results: [AQUA_EVIDENCE_CORPUS_V0_1.md](research/AQUA_EVIDENCE_CORPUS_V0_1.md), source JSON at [aqua-evidence-corpus-v0.1.json](research/aqua-evidence-corpus-v0.1.json). Current snapshot: 11 entries / 55 claims. This is an evidence register, not certification.
+The machine-readable evidence register now includes the UK ETL non-domestic shower criteria alongside exact Brondell and Hansgrohe product declarations, WaterSense criteria, SANS installation references and peer-reviewed spray studies. The corpus distinguishes programme criteria from manufacturer declarations and from Aqua results: [AQUA_EVIDENCE_CORPUS_V0_1.md](research/AQUA_EVIDENCE_CORPUS_V0_1.md), source JSON at [aqua-evidence-corpus-v0.1.json](research/aqua-evidence-corpus-v0.1.json). Current snapshot: 13 entries / 67 claims, including UK ETL electric-shower wastewater-heat-recovery pathways and peer-reviewed 2025/2026 DWHR system studies. This is an evidence register, not certification.
+
+## Power-coupled electric shower and DWHR architecture
+
+The UK ETL's 15 September 2026 update establishes a non-domestic pathway for electric showers: 4.5 L/min standard maximum; up to 9 L/min when electrical input is modulated to minimize energy while maintaining stable output temperature with ETL-compliant wastewater heat recovery; and up to 10.6 L/min where qualifying user-behaviour features are also present. Aqua treats this as an architecture research reference only. It does not imply South African compliance or product eligibility. The complete measured service boundary must include heater electricity, actual receiver-side recovered heat, fresh water, fouling, static losses, parasitics, temperature stability and task completion.
+
+See [AQUA_POWER_COUPLED_SHOWER_DWHR_BENCHMARK_V0_1.md](AQUA_POWER_COUPLED_SHOWER_DWHR_BENCHMARK_V0_1.md) and [#12816](https://github.com/Luminous-Dynamics/symthaea/issues/12816).
