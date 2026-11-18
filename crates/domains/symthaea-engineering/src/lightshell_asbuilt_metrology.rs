@@ -52,9 +52,18 @@ pub struct FeatureSpec {
     pub nominal_geometry_ref: String,
     pub nominal_revision_ref: String,
     pub mandatory: bool,
-    pub required_metric_ids: Vec<String>,
+    pub required_metrics: Vec<FeatureMetricRequirement>,
     pub minimum_coverage_fraction: f64,
     pub acceptance_rule_ref: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FeatureMetricRequirement {
+    pub metric_id: String,
+    pub unit: String,
+    pub lower_limit: f64,
+    pub upper_limit: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -81,7 +90,9 @@ pub struct MeasurementSession {
     pub datum_scheme_ref: String,
     pub transform_ref: String,
     pub registration_evidence_ref: String,
+    pub fit_datum_refs: Vec<String>,
     pub holdout_datum_refs: Vec<String>,
+    pub holdout_datum_residuals: Vec<HoldoutDatumResidual>,
     pub excluded_roi_feature_refs: Vec<String>,
     pub maximum_holdout_residual_mm: f64,
     pub observed_holdout_residual_mm: f64,
@@ -93,6 +104,14 @@ pub struct MeasurementSession {
     pub missing_data_fraction: f64,
     pub gap_disposition_ref: Option<String>,
     pub operator_ref: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HoldoutDatumResidual {
+    pub datum_ref: String,
+    pub residual_mm: f64,
+    pub expanded_uncertainty_mm: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -230,9 +249,9 @@ impl AsBuiltInspectionManifest {
                 push(&mut findings, "unknown_feature_kind", format!("{path}.feature_kind"),
                     "Unknown as-built feature kind.");
             }
-            if feature.required_metric_ids.is_empty() {
-                push(&mut findings, "feature_without_required_metrics", format!("{path}.required_metric_ids"),
-                    "Each feature must declare at least one metric to inspect.");
+            if feature.required_metrics.is_empty() {
+                push(&mut findings, "feature_without_required_metrics", format!("{path}.required_metrics"),
+                    "Each feature must declare at least one metric with frozen, feature-specific acceptance limits.");
             }
             if !feature.minimum_coverage_fraction.is_finite()
                 || feature.minimum_coverage_fraction <= 0.0
@@ -242,14 +261,18 @@ impl AsBuiltInspectionManifest {
                     "Minimum feature coverage must be finite and within (0, 1].");
             }
             let mut metrics = HashSet::new();
-            for metric in &feature.required_metric_ids {
-                if !metrics.insert(metric.as_str()) {
-                    push(&mut findings, "duplicate_required_feature_metric", format!("{path}.required_metric_ids"),
+            for (metric_index, metric) in feature.required_metrics.iter().enumerate() {
+                if !metrics.insert(metric.metric_id.as_str()) {
+                    push(&mut findings, "duplicate_required_feature_metric", format!("{path}.required_metrics[{metric_index}].metric_id"),
                         "Required metric IDs must be unique within one feature.");
                 }
-                if metric_definition(metric).is_none() {
-                    push(&mut findings, "unknown_required_feature_metric", format!("{path}.required_metric_ids"),
-                        format!("Unknown as-built metric {metric}."));
+                if !metric_unit_matches(&metric.metric_id, &metric.unit) {
+                    push(&mut findings, "feature_metric_unit_mismatch", format!("{path}.required_metrics[{metric_index}].unit"),
+                        "Feature requirement unit does not match the canonical metric unit.");
+                }
+                if !metric.lower_limit.is_finite() || !metric.upper_limit.is_finite() || metric.lower_limit > metric.upper_limit {
+                    push(&mut findings, "invalid_feature_acceptance_limits", format!("{path}.required_metrics[{metric_index}]"),
+                        "Feature-specific acceptance limits must be finite and ordered.");
                 }
             }
         }
@@ -296,7 +319,8 @@ impl AsBuiltInspectionManifest {
                     "Measurement references a feature absent from the nominal feature catalog.");
                 continue;
             };
-            if !feature.required_metric_ids.iter().any(|metric| metric == &observation.metric_id) {
+            let requirement = feature.required_metrics.iter().find(|metric| metric.metric_id == observation.metric_id);
+            if requirement.is_none() {
                 push(&mut findings, "measurement_metric_not_required", format!("{path}.metric_id"),
                     "Measurement metric is not declared by this feature's inspection requirements.");
             }
@@ -314,6 +338,15 @@ impl AsBuiltInspectionManifest {
                 push(&mut findings, "invalid_measurement_interval_inputs", &path,
                     "Measurement, uncertainty and acceptance limits must be finite and ordered; uncertainty must be non-negative.");
                 continue;
+            }
+            if let Some(requirement) = requirement {
+                if observation.unit != requirement.unit
+                    || observation.lower_limit.to_bits() != requirement.lower_limit.to_bits()
+                    || observation.upper_limit.to_bits() != requirement.upper_limit.to_bits()
+                {
+                    push(&mut findings, "measurement_acceptance_rule_mismatch", format!("{path}.lower_limit/upper_limit"),
+                        "Measurement acceptance limits and unit must exactly match the feature's frozen nominal acceptance requirement.");
+                }
             }
             if !observation.coverage_fraction.is_finite()
                 || observation.coverage_fraction <= 0.0
@@ -386,12 +419,12 @@ impl AsBuiltInspectionManifest {
 
         if self.state == "measured" || self.state == "adjudicated" {
             for feature in self.feature_catalog.iter().filter(|feature| feature.mandatory) {
-                for metric in &feature.required_metric_ids {
+                for metric in &feature.required_metrics {
                     if !self.observations.iter().any(|observation|
-                        observation.feature_ref == feature.feature_ref && observation.metric_id == *metric)
+                        observation.feature_ref == feature.feature_ref && observation.metric_id == metric.metric_id)
                     {
                         push(&mut findings, "mandatory_feature_measurement_missing", "observations",
-                            format!("Mandatory feature {} is missing required metric {}.", feature.feature_ref, metric));
+                            format!("Mandatory feature {} is missing required metric {}.", feature.feature_ref, metric.metric_id));
                     }
                 }
             }
@@ -450,9 +483,9 @@ impl AsBuiltInspectionManifest {
             && self.engineering_review.as_ref().is_some_and(|review| review.disposition == "accept")
             && findings.is_empty()
             && self.feature_catalog.iter().filter(|feature| feature.mandatory).all(|feature|
-                feature.required_metric_ids.iter().all(|metric| assessments.iter().any(|assessment|
+                feature.required_metrics.iter().all(|metric| assessments.iter().any(|assessment|
                     assessment.feature_ref == feature.feature_ref
-                        && assessment.metric_id == *metric
+                        && assessment.metric_id == metric.metric_id
                         && assessment.disposition == "pass")));
 
         ValidationReport {
@@ -557,9 +590,65 @@ fn validate_session(
         push(findings, "registration_method_not_admitted", "measurement_session.registration_method",
             "Unconstrained best-fit/ICP registration is not admitted for acceptance; use locked datum/fiducial or a validated transform chain.");
     }
+    if session.fit_datum_refs.is_empty() {
+        push(findings, "registration_fit_datums_missing", "measurement_session.fit_datum_refs",
+            "Registration requires explicit datum identities used to compute the transform.");
+    }
     if session.holdout_datum_refs.is_empty() {
         push(findings, "independent_holdout_datums_missing", "measurement_session.holdout_datum_refs",
             "Registration requires at least one independent hold-out datum not used to compute the transform.");
+    }
+    let fit_datums: HashSet<&str> = session.fit_datum_refs.iter().map(String::as_str).collect();
+    if fit_datums.len() != session.fit_datum_refs.len() {
+        push(findings, "duplicate_registration_fit_datum", "measurement_session.fit_datum_refs",
+            "Registration-fit datum identities must be unique.");
+    }
+    let holdout_datums: HashSet<&str> = session.holdout_datum_refs.iter().map(String::as_str).collect();
+    if holdout_datums.len() != session.holdout_datum_refs.len() {
+        push(findings, "duplicate_registration_holdout_datum", "measurement_session.holdout_datum_refs",
+            "Independent hold-out datum identities must be unique.");
+    }
+    if !fit_datums.is_disjoint(&holdout_datums) {
+        push(findings, "registration_fit_holdout_overlap", "measurement_session.fit_datum_refs/holdout_datum_refs",
+            "A datum used to fit registration cannot also serve as an independent hold-out datum.");
+    }
+    let mut residual_refs = HashSet::new();
+    if session.holdout_datum_residuals.len() != session.holdout_datum_refs.len() {
+        push(findings, "holdout_residual_coverage_incomplete", "measurement_session.holdout_datum_residuals",
+            "Every independent hold-out datum requires its own residual and uncertainty record.");
+    }
+    let mut maximum_observed_residual = 0.0_f64;
+    for (index, residual) in session.holdout_datum_residuals.iter().enumerate() {
+        if !holdout_datums.contains(residual.datum_ref.as_str()) {
+            push(findings, "residual_for_unlisted_holdout_datum", format!("measurement_session.holdout_datum_residuals[{index}].datum_ref"),
+                "Residual datum must be declared in the independent hold-out set.");
+        }
+        if !residual_refs.insert(residual.datum_ref.as_str()) {
+            push(findings, "duplicate_holdout_datum_residual", format!("measurement_session.holdout_datum_residuals[{index}].datum_ref"),
+                "Each hold-out datum must have exactly one residual record.");
+        }
+        if fit_datums.contains(residual.datum_ref.as_str()) {
+            push(findings, "holdout_datum_was_used_for_fit", format!("measurement_session.holdout_datum_residuals[{index}].datum_ref"),
+                "A hold-out datum cannot be included in the registration fit set.");
+        }
+        if !residual.residual_mm.is_finite() || residual.residual_mm < 0.0
+            || !residual.expanded_uncertainty_mm.is_finite() || residual.expanded_uncertainty_mm < 0.0
+        {
+            push(findings, "invalid_holdout_datum_residual", format!("measurement_session.holdout_datum_residuals[{index}]"),
+                "Per-datum residual and expanded uncertainty must be finite and non-negative.");
+        } else {
+            maximum_observed_residual = maximum_observed_residual.max(residual.residual_mm);
+            if residual.residual_mm + residual.expanded_uncertainty_mm > session.maximum_holdout_residual_mm {
+                push(findings, "holdout_residual_guard_band_exceeded", format!("measurement_session.holdout_datum_residuals[{index}]"),
+                    "Per-datum residual plus its expanded uncertainty exceeds the maximum registration residual.");
+            }
+        }
+    }
+    if !session.holdout_datum_residuals.is_empty()
+        && (session.observed_holdout_residual_mm - maximum_observed_residual).abs() > 1e-9
+    {
+        push(findings, "aggregate_holdout_residual_mismatch", "measurement_session.observed_holdout_residual_mm",
+            "Aggregate hold-out residual must equal the maximum of the per-datum residual records.");
     }
     let mut holdout_ids = HashSet::new();
     for datum in &session.holdout_datum_refs {
@@ -571,6 +660,23 @@ fn validate_session(
     if session.excluded_roi_feature_refs.is_empty() {
         push(findings, "registration_roi_exclusion_missing", "measurement_session.excluded_roi_feature_refs",
             "Registration must explicitly exclude inspected feature ROIs from the alignment fit.");
+    }
+    let excluded_rois: HashSet<&str> = session.excluded_roi_feature_refs.iter().map(String::as_str).collect();
+    if excluded_rois.len() != session.excluded_roi_feature_refs.len() {
+        push(findings, "duplicate_registration_roi_exclusion", "measurement_session.excluded_roi_feature_refs",
+            "Registration ROI exclusion references must be unique.");
+    }
+    for feature in features.values().filter(|feature| feature.mandatory) {
+        if !excluded_rois.contains(feature.feature_ref) {
+            push(findings, "mandatory_feature_not_excluded_from_registration", "measurement_session.excluded_roi_feature_refs",
+                format!("Mandatory inspection feature {} must be excluded from registration fitting.", feature.feature_ref));
+        }
+    }
+    for feature_ref in &session.excluded_roi_feature_refs {
+        if !features.contains_key(feature_ref.as_str()) {
+            push(findings, "registration_roi_exclusion_unknown_feature", "measurement_session.excluded_roi_feature_refs",
+                format!("Registration exclusion references unknown feature {feature_ref}."));
+        }
     }
     if !session.maximum_holdout_residual_mm.is_finite()
         || session.maximum_holdout_residual_mm <= 0.0
@@ -742,7 +848,12 @@ mod tests {
             "datum_scheme_ref":"DATUM-SCHEME-REV-A",
             "transform_ref":"LOCKED-TRANSFORM-01",
             "registration_evidence_ref":"REGISTRATION-REPORT-01",
+            "fit_datum_refs":["FIT-DATUM-01","FIT-DATUM-02","FIT-DATUM-03"],
             "holdout_datum_refs":["HOLDOUT-DATUM-01","HOLDOUT-DATUM-02"],
+            "holdout_datum_residuals":[
+                {"datum_ref":"HOLDOUT-DATUM-01","residual_mm":0.15,"expanded_uncertainty_mm":0.05},
+                {"datum_ref":"HOLDOUT-DATUM-02","residual_mm":0.2,"expanded_uncertainty_mm":0.05}
+            ],
             "excluded_roi_feature_refs":["forearm_panel","elbow_seam"],
             "maximum_holdout_residual_mm":0.5,
             "observed_holdout_residual_mm":0.2,
