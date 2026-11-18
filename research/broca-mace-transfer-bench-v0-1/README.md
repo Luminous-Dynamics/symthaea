@@ -194,3 +194,10 @@ As of **November 18, 2026**, the official Cycle 2 page says leaderboard publicat
 | Independent verification | SAM/evaluator and replayable evidence | Separate from candidate and model provider |
 
 The advantage should be durable semantics and auditability across providers—not duplicating every provider feature.
+
+
+### Mycelix provenance bridge
+
+Mycelix's [FIN-SYS source profile](https://github.com/Luminous-Dynamics/mycelix/blob/main/docs/finance/FIN_SYS_SOURCE_PROFILE_V1.md) already states the relevant common-cause rule: ten publications reusing one BIS/IMF series remain one upstream provenance family. MACE's `source_root_id` is a synthetic proxy for this lineage, not proof of provenance. In production it must be derived from a verified source-ledger receipt and preserve the acquisition mechanism, original artifact digest, source family, upstream dataset/series, transformation lineage, and supersession links.
+
+Likewise, `measurement_error_bound` is currently a candidate-visible claim. A production error bound must bind its instrument/method, units, calibration revision, operating range, validation evidence and validity interval. An agent must not increase its own trust by asserting a narrower bound.

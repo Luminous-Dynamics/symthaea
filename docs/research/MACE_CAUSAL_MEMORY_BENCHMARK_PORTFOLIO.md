@@ -169,3 +169,10 @@ For Symthaea, these are useful architectural patterns, not systems to copy whole
 TimlMemBench's raw-native track exposes another gap: the current MACE evaluator receives structured `Experience` objects. It does not yet test raw-session ingestion plus consolidation. A future adapter must preserve the full ingest → consolidate → act → correct chain.
 
 The Agent Memory Challenge Cycle 2 official page, checked on November 18, 2026, says results are **expected November 19, 2026**. The October 31 submission deadline and November 4 evaluation close have passed; Cycle 2 is not open for new submissions. Its Add/Search → platform Answer/Eval contract is a target for a future MACE/Mycelix adapter. Do not claim a Cycle 2 rank before official publication.
+
+
+### Mycelix lineage and measurement assurance
+
+The synthetic `source_root_id` and `measurement_error_bound` fields are not trust anchors. Mycelix's FIN-SYS source profile provides a useful existing pattern: multiple publications reusing one upstream BIS/IMF series count as one provenance family. Production MACE should consume equivalent verified lineage receipts, including acquisition mechanism, artifact digest, source family, upstream series/root, transformation and supersession history.
+
+A measurement-error bound must be tied to an identified sensor/method, units, calibration revision, operating interval and evidence record. It must not be an agent-editable confidence claim. This connects MACE to the bitemporal source-event ledger (#9075) and independent evaluator provenance (#11816).
