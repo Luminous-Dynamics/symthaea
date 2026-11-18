@@ -714,9 +714,22 @@ pub(super) fn run(
                 .unwrap_or(f64::NAN)
         })
         .fold(f64::INFINITY, f64::min);
-    let any_negative = chains.iter().any(|chain| {
-        chain["twist_response"]["stiffness_positivity_gate"].as_str()
-            == Some("negative_point_estimate_stable_claim_not_permitted_pending_uncertainty")
+    let any_stable_claim_rejected = chains.iter().any(|chain| {
+        chain["twist_response"]["stiffness_positivity_gate"]
+            .as_str()
+            .is_some_and(|status| status.starts_with("negative_stiffness_"))
+    });
+    let any_stiffness_unresolved = chains.iter().any(|chain| {
+        chain["twist_response"]["stiffness_positivity_gate"]
+            .as_str()
+            .is_some_and(|status| {
+                status.contains("unresolved") || status.contains("insufficient_samples")
+            })
+    });
+    let all_chains_have_jackknife = chains.iter().all(|chain| {
+        chain["twist_response"]["minimum_stiffness_eigenvalue_jackknife_standard_error"]
+            .as_f64()
+            .is_some()
     });
 
     Ok(json!({
@@ -735,7 +748,9 @@ pub(super) fn run(
         "independent_chains": config.independent_chains,
         "base_seed": config.random_seed,
         "minimum_chain_stiffness_eigenvalue": min_stiffness,
-        "negative_stiffness_point_estimate_in_any_chain": any_negative,
+        "stable_superconductor_claim_rejected_in_any_chain": any_stable_claim_rejected,
+        "stiffness_evidence_unresolved_in_any_chain": any_stiffness_unresolved,
+        "all_chains_have_block_jackknife_uncertainty": all_chains_have_jackknife,
         "chain_receipts": chains,
         "claim_ceiling": "Synthetic finite-size multicomponent GL Metropolis software pilot only; stiffness point estimates do not establish a thermodynamically stable superconducting phase."
     }))
