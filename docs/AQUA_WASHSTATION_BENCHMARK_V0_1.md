@@ -53,7 +53,31 @@ Reference copy:
 
 Nominal tub/overflow capacity is not the correct functional unit. Actual fill volume depends on the marked waterline, body displacement, bath geometry and the declared immersion task. Aqua measures actual litres at the intended bathing level and records temperature loss during the service.
 
-## 3. Functional units and complete-service boundaries
+## 3. South African installation-design reference — SANS 10252-1 Table 3
+
+The accessible SANS 10252-1:2018 Edition 3.2 Table 3 provides likely maximum/minimum flow rates, design flow rates and design flow pressures for terminal fittings. These values are useful local pipe-sizing / installation context; they are **not** product-efficiency labels, performance certification thresholds or a substitute for the relevant fixture product standard.
+
+| Fixture / fitting | Likely maximum (L/min) | Likely minimum (L/min) | Design flow (L/min) | Design flow pressure (kPa) |
+|---|---:|---:|---:|---:|
+| Basin: 15 mm plain tap | 25 | 5 | 10 | 10 |
+| Basin: 15 mm aerated tap | 12 | 5 | 8 | 50 |
+| Basin: plain mixer, hot/cold separately | 25 | 5 | 10 | 15 |
+| Basin: aerated mixing valve, hot/cold separately | 12 | 5 | 9 | 50 |
+| Basin: public flow-controlled 15 mm tap | 6 | 3 | 4 | 20 |
+| Bath: 15 mm plain tap | 30 | 12 | 15 | 15 |
+| Bath: 20 mm plain tap | 40 | 20 | 25 | 15 |
+| Bath: 20 mm aerated tap | 20 | 12 | 12 | 50 |
+| Bath: plain mixer, hot/cold separately | 40 | 12 | 25 | 15 |
+| Bath: aerated mixing valve, hot/cold separately | 25 | 15 | 20 | 50 |
+| Bidet: mixer / mixing valve | 12 | 5 | 9 | 50 |
+
+The Table 3 shower rows are handled in the shower benchmark because the same edition's amended clause 5.3.3.2 gives a separate maximum discharge of 10 L/min while Table 3 lists a 12 L/min likely maximum for the water-saving showerhead. That apparent internal conflict requires a controlled SABS interpretation; do not apply the 12 L/min table value as permission to exceed the clause-level limit.
+
+**Design implication:** Aqua must not take a universal low-flow number and apply it to every washstation. A basin grooming task, bath filling task and bidet personal-wash task have different hydraulic demand, temperature, duration and functional outcomes. Test at the local design-pressure references where appropriate, but use measured dynamic pressure at the fitting inlet and exact fixture-specific task quality. A low-flow basin aerator that cannot rinse, fill a glass or wash hands adequately is not a successful product. A bath should be evaluated on actual fill volume and delivered thermal experience, not tap flow alone.
+
+**Source:** SANS 10252-1:2018 Edition 3.2, Table 3 (accessible PDF copy): https://www.uj.ac.za/wp-content/uploads/2022/11/sans-10252-1-water-supply-and-drainage-for-buildings-part-1-water-supply-installations-for-buildings-2018.pdf. Use the controlled SABS copy and confirm current applicability with the responsible professional before a compliance claim.
+
+## 4. Functional units and complete-service boundaries
 
 ### A. AquaBath — one completed bath task
 
