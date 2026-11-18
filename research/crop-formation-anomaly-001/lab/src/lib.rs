@@ -10,7 +10,12 @@ pub mod geometry;
 pub mod grid;
 pub mod statistics;
 
-pub use circle_layout::{CircleClassing, CircleContact, CircleLayout, CircleLayoutError, CircleRecord, class_circle_layout, count_centred_motifs, describe_circle_layout, parse_circle_csv, validate_circles};
+pub use circle_layout::{
+    audit_circle_measurement_sensitivity, class_circle_layout, count_centred_motifs,
+    describe_circle_layout, parse_circle_csv, validate_circles, CircleClassing, CircleContact,
+    CircleLayout, CircleLayoutError, CircleRecord, CircleSensitivityConfig,
+    CircleSensitivitySummary,
+};
 pub use crop_flow::{CropFlowDescriptor, CropFlowError, CropFlowSample, describe_crop_flow, describe_crop_flow_about_center};
 pub use decoder::{
     BitOrder, DecodeError, DecodeOutcome, DecoderSpec, PayloadEncoding, decode,
