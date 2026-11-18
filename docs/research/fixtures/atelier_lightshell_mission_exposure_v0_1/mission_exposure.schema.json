@@ -1,0 +1,543 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:lightshell-mission-exposure:0.1.0",
+  "title": "Atelier Lightshell Mission Exposure Profile",
+  "description": "Maps approved robot mission observations into textile qualification exposures. Not a lifetime prediction or test execution record.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile_id",
+    "state",
+    "platform",
+    "operating_domain",
+    "zones",
+    "source_runs",
+    "observations",
+    "test_blocks",
+    "evidence_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "proposed",
+        "inputs_pending",
+        "profiled",
+        "preregistered"
+      ]
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platform_id",
+        "article_revision",
+        "geometry_digest"
+      ],
+      "properties": {
+        "platform_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "article_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "geometry_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        }
+      }
+    },
+    "operating_domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "odd_profile_ref",
+        "approval_ref",
+        "mission_mix_ref",
+        "service_horizon_ref"
+      ],
+      "properties": {
+        "odd_profile_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "approval_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mission_mix_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "service_horizon_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "zones": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "zone_id",
+          "function_refs"
+        ],
+        "properties": {
+          "zone_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "function_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "source_runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_run_id",
+          "source_kind",
+          "article_revision",
+          "run_ref",
+          "start_time",
+          "end_time",
+          "clock_sync_ref",
+          "raw_data_digest",
+          "instrument_refs",
+          "calibration_refs",
+          "data_quality_state",
+          "missing_data_fraction",
+          "saturation_observed",
+          "gap_disposition_ref"
+        ],
+        "properties": {
+          "source_run_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_kind": {
+            "enum": [
+              "jointlab_run",
+              "field_mission_run",
+              "other_calibrated_run",
+              "synthetic_fixture"
+            ]
+          },
+          "article_revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "run_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_time": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_time": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "clock_sync_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "raw_data_digest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^sha256:[0-9a-fA-F]{64}$"
+          },
+          "instrument_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "calibration_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "data_quality_state": {
+            "enum": [
+              "synthetic_fixture",
+              "pending",
+              "reviewed_usable",
+              "reviewed_with_bounds",
+              "rejected"
+            ]
+          },
+          "missing_data_fraction": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "saturation_observed": {
+            "type": "boolean"
+          },
+          "gap_disposition_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observation_id",
+          "zone_id",
+          "source_run_ref",
+          "exposure_kind",
+          "evidence_origin",
+          "metric_id",
+          "unit",
+          "sample_count",
+          "minimum",
+          "p50",
+          "p95",
+          "p99",
+          "maximum",
+          "frequency_bins",
+          "method_ref",
+          "uncertainty_model_ref",
+          "derivation_ref"
+        ],
+        "properties": {
+          "observation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "zone_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_run_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exposure_kind": {
+            "enum": [
+              "joint_flex",
+              "vibration",
+              "thermal",
+              "humidity",
+              "abrasion_contact",
+              "cleaning",
+              "repair_service"
+            ]
+          },
+          "evidence_origin": {
+            "enum": [
+              "measured",
+              "calibrated_derived",
+              "estimated",
+              "simulation",
+              "synthetic"
+            ]
+          },
+          "metric_id": {
+            "enum": [
+              "joint_rom_deg",
+              "flex_cycles",
+              "vibration_acceleration_m_s2",
+              "temperature_c",
+              "relative_humidity_pct",
+              "abrasion_cycles",
+              "contact_events",
+              "cleaning_cycles",
+              "cleaning_agent_concentration_pct",
+              "service_intervention_count",
+              "repair_duration_min"
+            ]
+          },
+          "unit": {
+            "enum": [
+              "deg",
+              "cycles",
+              "m/s2",
+              "degC",
+              "%",
+              "count",
+              "min"
+            ]
+          },
+          "sample_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "minimum": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "p50": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "p95": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "p99": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "maximum": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "frequency_bins": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "lower_hz",
+                "upper_hz",
+                "level"
+              ],
+              "properties": {
+                "lower_hz": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "upper_hz": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "level": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "method_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uncertainty_model_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "derivation_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "test_blocks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "block_id",
+          "sequence_index",
+          "sequence_group",
+          "zone_id",
+          "exposure_kind",
+          "observation_refs",
+          "method_selection_ref",
+          "protocol_ref",
+          "block_intent",
+          "acceleration_mode",
+          "acceleration_model_ref",
+          "correlation_evidence_ref",
+          "lifetime_equivalence_claim",
+          "state"
+        ],
+        "properties": {
+          "block_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sequence_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sequence_group": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zone_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "exposure_kind": {
+            "enum": [
+              "joint_flex",
+              "vibration",
+              "thermal",
+              "humidity",
+              "abrasion_contact",
+              "cleaning",
+              "repair_service"
+            ]
+          },
+          "observation_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "method_selection_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "protocol_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "block_intent": {
+            "enum": [
+              "mission_replay",
+              "tail_challenge",
+              "screening",
+              "sequence_interaction"
+            ]
+          },
+          "acceleration_mode": {
+            "enum": [
+              "none",
+              "unvalidated_hypothesis",
+              "validated"
+            ]
+          },
+          "acceleration_model_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "correlation_evidence_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lifetime_equivalence_claim": {
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "proposed",
+              "preregistered"
+            ]
+          }
+        }
+      }
+    },
+    "evidence_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "missing_data_never_becomes_zero",
+        "simulated_or_estimated_exposure_is_non_qualifying",
+        "frequency_distribution_preserved",
+        "unvalidated_acceleration_blocks_lifetime_claims",
+        "coupon_plan_is_not_robot_lifetime_qualification"
+      ],
+      "properties": {
+        "missing_data_never_becomes_zero": {
+          "const": true
+        },
+        "simulated_or_estimated_exposure_is_non_qualifying": {
+          "const": true
+        },
+        "frequency_distribution_preserved": {
+          "const": true
+        },
+        "unvalidated_acceleration_blocks_lifetime_claims": {
+          "const": true
+        },
+        "coupon_plan_is_not_robot_lifetime_qualification": {
+          "const": true
+        }
+      }
+    }
+  }
+}
