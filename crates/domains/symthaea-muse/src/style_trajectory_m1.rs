@@ -932,7 +932,28 @@ fn listen_bundle_for_score(
     // The trace verifier needs the same motif-family identity named by
     // composer_trace_from_theory. The definition is recipe-derived metadata;
     // actual occurrence validity is still checked against score event IDs.
-    let motif = style.spec().motif(intent.arousal, intent.seed);
+    // Mirror compose_with_grammar_plan's exact source-motif construction,
+    // including the optional hook-cell graft. The Analyst motif definition
+    // must describe the same recipe that the grammar trace used; a base-spec
+    // motif is not interchangeable with its grafted realization.
+    let spec = style.spec();
+    let motif = spec.motif(intent.arousal, intent.seed);
+    let (motif, motif_source_method) = if spec.texture.hook_cell {
+        (
+            symthaea_music_theory::graft_hook(
+                &motif,
+                &symthaea_music_theory::HookCell::generate_with(
+                    &spec.melody,
+                    intent.seed,
+                    spec.meter as f64,
+                ),
+                spec.meter as f64,
+            ),
+            "builtin-style-spec-motif-plus-hook-cell-v1",
+        )
+    } else {
+        (motif, "builtin-style-spec-motif-v1")
+    };
     let pitched: Vec<_> = motif
         .notes
         .iter()
@@ -945,7 +966,7 @@ fn listen_bundle_for_score(
         durations_beats: pitched.iter().map(|item| item.1).collect(),
         basis: EvidenceBasis {
             status: EvidenceStatus::Observed,
-            source_method: "builtin-style-spec-motif-v1".into(),
+            source_method: motif_source_method.into(),
             confidence: None,
             limitations: vec![
                 "The definition records the configured source motif; it is not a listener-recognition claim.".into(),
