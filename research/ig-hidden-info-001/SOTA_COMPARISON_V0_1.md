@@ -51,12 +51,15 @@ Tracing and observability are a baseline requirement, not a Symthaea differentia
 
 ## 4. Foundation-model backbones
 
-Use current model revisions available to the evaluation account, not brand-name-only references. The November 2026 Anthropic system-card index lists Fable 5.2 / Mythos 5.2, Haiku 5.5, Sonnet 5.5 and Opus 5.5. The Anthropic comparison page also reports Fable 5.2, Opus 5.5, GPT-6 Astra and Gemini 4 Carbon on several tool-using task suites.
+A reproducible multi-agent comparison needs exact API model IDs, not brand names alone. The provider documentation available on 18 November 2026 lists these practical candidate backbones:
 
-- System cards: https://www.anthropic.com/system-cards
-- Model capability comparison: https://www.anthropic.com/claude/mythos
+- **OpenAI:** GPT-6.2 Astra (`gpt-6.2-astra`), GPT-6.2 Sol (`gpt-6.2-sol`), GPT-6 Luna (`gpt-6-luna`). Sources: https://developers.openai.com/api/docs/models and https://developers.openai.com/api/docs/changelog
+- **Anthropic:** Claude Fable 5.2 (`claude-fable-5-2`), Claude Opus 5.5 (`claude-opus-5-5`), Claude Sonnet 5.5 (`claude-sonnet-5-5`), Claude Haiku 5.5 (`claude-haiku-5-5`). Source: https://platform.claude.com/docs/en/models/overview
+- **Google:** Gemini 4 Hydrogen (`gemini-4-hydrogen`), Gemini 4 Carbon (`gemini-4-carbon`), Gemini 4 Argon (`gemini-4-argon`). Source: https://firebase.google.com/docs/ai-logic/models
 
-Those numbers are model/system-level scores on different benchmarks, not multi-agent HiddenBench results. Do not compare them numerically with collective-decision scores. Choose at least two model families that can actually be invoked, pin revisions/endpoints/date/decoding, and run every treatment on the same backbone first. Cross-model generalization is a separate factor.
+The exact IDs and proposed evaluation roles are pinned in [MODEL_ROSTER_V0_1.json](MODEL_ROSTER_V0_1.json). Availability is account-, region-, endpoint- and provider-policy-dependent; re-check the live model catalogue at execution time and record the resolved model/revision and API endpoint in each run receipt. Do not silently substitute a retired model or a rolling alias.
+
+Run coordination architectures within one exact backbone first, matching task, prompts, tools, reasoning/effort settings, total tokens, deadlines and call budgets. Then repeat the same comparison across at least two model families. A frontier-model single-agent score is not interchangeable with multi-agent HiddenBench performance. Published vendor benchmark claims are not comparable unless the underlying task, scoring, tools, budgets and evaluation protocol match.
 
 ## 5. Matched experimental arms
 
