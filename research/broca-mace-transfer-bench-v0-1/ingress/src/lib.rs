@@ -621,51 +621,62 @@ impl ConsolidationEvidencePackV1 {
         &self,
         target_scope: Scope,
     ) -> ConsolidationEvidenceSummaryV1 {
-        let trusted_event_count = self
+        let scoped: Vec<&ConsolidationEvidenceRefV1> = self
             .events
             .iter()
+            .filter(|event| event.scope == target_scope)
+            .collect();
+        let trusted: Vec<&ConsolidationEvidenceRefV1> = scoped
+            .iter()
+            .copied()
             .filter(|event| {
                 event.source_trust_status == SourceTrustStatus::TrustedForScope
             })
-            .count();
-        let independently_observed_successes = self
-            .events
+            .collect();
+        let successful: Vec<&ConsolidationEvidenceRefV1> = trusted
             .iter()
+            .copied()
             .filter(|event| {
-                event.source_trust_status == SourceTrustStatus::TrustedForScope
-                    && event.outcome_success
+                event.outcome_success
                     && event.intervention
                     && event.prediction_pre_registered
                     && event.outcome_reconciled
                     && event.confounders_controlled
                     && event.delayed_horizon_complete
             })
-            .count();
-        let all_trusted_predictions_pre_registered = trusted_event_count > 0
-            && self
-                .events
-                .iter()
-                .filter(|event| {
-                    event.source_trust_status == SourceTrustStatus::TrustedForScope
-                })
-                .all(|event| event.prediction_pre_registered);
+            .collect();
+        let trusted_families: BTreeSet<u16> =
+            trusted.iter().map(|event| event.source_family).collect();
+        let trusted_roots: BTreeSet<u32> =
+            trusted.iter().map(|event| event.source_root_id).collect();
+        let successful_families: BTreeSet<u16> =
+            successful.iter().map(|event| event.source_family).collect();
+        let successful_roots: BTreeSet<u32> =
+            successful.iter().map(|event| event.source_root_id).collect();
+        let all_trusted_predictions_pre_registered = !trusted.is_empty()
+            && trusted.iter().all(|event| event.prediction_pre_registered);
 
         ConsolidationEvidenceSummaryV1 {
             as_known: self.as_known,
             target_scope,
             episode_count: self.events.len(),
-            trusted_source_family_count: self.source_family_count,
-            trusted_source_root_count: self.source_root_count,
-            independently_observed_successes,
-            untrusted_source_count: self.untrusted_event_count,
-            unknown_trust_source_count: self.unknown_trust_event_count,
-            scope_matches: self.events.iter().all(|event| event.scope == target_scope),
+            target_scope_event_count: scoped.len(),
+            trusted_source_family_count: trusted_families.len(),
+            trusted_source_root_count: trusted_roots.len(),
+            independently_observed_successes: successful.len(),
+            qualified_success_source_family_count: successful_families.len(),
+            qualified_success_source_root_count: successful_roots.len(),
+            untrusted_source_count: scoped
+                .iter()
+                .filter(|event| event.source_trust_status == SourceTrustStatus::Untrusted)
+                .count(),
+            unknown_trust_source_count: scoped
+                .iter()
+                .filter(|event| event.source_trust_status == SourceTrustStatus::Unknown)
+                .count(),
+            scope_matches: !self.events.is_empty() && scoped.len() == self.events.len(),
             all_trusted_predictions_pre_registered,
         }
-    }
-
-    pub fn as_known(&self) -> AsKnownQuery {
-        self.as_known
     }
 
     /// Summarize one candidate action in one exact scope. Independent
@@ -808,10 +819,15 @@ pub struct ActionConsolidationEvidenceSummaryV1 {
 pub struct ConsolidationEvidenceSummaryV1 {
     pub as_known: AsKnownQuery,
     pub target_scope: Scope,
+    /// Total selected pack size, including out-of-scope evidence.
     pub episode_count: usize,
+    /// Events matching target_scope; support counts below use only these events.
+    pub target_scope_event_count: usize,
     pub trusted_source_family_count: usize,
     pub trusted_source_root_count: usize,
     pub independently_observed_successes: usize,
+    pub qualified_success_source_family_count: usize,
+    pub qualified_success_source_root_count: usize,
     pub untrusted_source_count: usize,
     pub unknown_trust_source_count: usize,
     pub scope_matches: bool,
@@ -1536,6 +1552,47 @@ mod tests {
         assert!(decide(Policy::ActiveProbe, &memory_c, query_b)
             .probe
             .is_some());
+    }
+
+    #[test]
+    fn global_consolidation_summary_counts_only_target_scope_support() {
+        let mut quality_event = raw();
+        quality_event.event_id = 80;
+        quality_event.payload_sha256 = format!("{:064x}", 80);
+        quality_event.raw_event_receipt_id = "raw-80".into();
+        quality_event.lineage_receipt_id = "lineage-80".into();
+        quality_event.calibration_receipt_id = "calibration-80".into();
+        quality_event.causal_assessment_receipt_id = "causal-80".into();
+        quality_event.outcome_receipt_id = "outcome-80".into();
+
+        let mut cost_event = quality_event.clone();
+        cost_event.event_id = 81;
+        cost_event.payload_sha256 = format!("{:064x}", 81);
+        cost_event.raw_event_receipt_id = "raw-81".into();
+        cost_event.lineage_receipt_id = "lineage-81".into();
+        cost_event.calibration_receipt_id = "calibration-81".into();
+        cost_event.causal_assessment_receipt_id = "causal-81".into();
+        cost_event.outcome_receipt_id = "outcome-81".into();
+        cost_event.scope.objective = Objective::Cost;
+
+        let batch = ingest_batch_as_known(
+            &[quality_event, cost_event],
+            query(180, 250),
+            &varied_lineage_verifier(),
+        )
+        .expect("both events should be admitted under their own scopes");
+        let pack = build_consolidation_evidence_pack(&batch, &[80, 81])
+            .expect("pack should preserve both scope-bound events");
+        let summary = pack.summarize_for_scope(scope());
+
+        assert_eq!(summary.episode_count, 2);
+        assert_eq!(summary.target_scope_event_count, 1);
+        assert_eq!(summary.trusted_source_family_count, 1);
+        assert_eq!(summary.trusted_source_root_count, 1);
+        assert_eq!(summary.qualified_success_source_family_count, 1);
+        assert_eq!(summary.qualified_success_source_root_count, 1);
+        assert_eq!(summary.independently_observed_successes, 1);
+        assert!(!summary.scope_matches);
     }
 
     #[test]
