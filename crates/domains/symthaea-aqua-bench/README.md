@@ -68,4 +68,6 @@ The dependency-free spray_field module summarizes a complete, externally qualifi
 - mapped off-target mass fraction and raw mass totals;
 - fail-closed handling for incomplete capture, duplicate/missing cells, invalid areas/masses and zero mapped mass.
 
+A second helper, `compare_spray_field_to_baseline`, reports matched baseline-to-scale, partial-blockage or post-clean deltas for the same specimen, geometry revision and frozen test context. It rejects cross-specimen, cross-geometry and cross-condition comparisons and validates the public summary's derived-field consistency.
+
 This is descriptive post-processing only. It does not calibrate instruments, prove capture completeness, assess comfort or hygiene, replace ASME/CSA or WaterSense methods, or authorize a physical test. The full protocol is in docs/AQUA_SPRAY_FIELD_METROLOGY_PROTOCOL_V0_1.md.
