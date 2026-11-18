@@ -86,3 +86,28 @@ At exact code head `1dca4ffecf7de3490c65b4c0541aedb43ab12897`, the pinned Rust 1
 ## Repository admission maintenance sync
 
 The research base branch now carries the same coordinated draft-runner admission maintenance as the separate CI-maintenance PR, including the repository checker self-test update and explicit guards for Connectome, Melothaea, AIRROAD, PITB, HLB, beverage, chaos and U1 MPS workflows. This does not change the local noise-model qualification result. A fresh stacked PR run is required to verify the repository-wide admission checker against the updated merge base.
+
+
+## Static diagnostic probe-set design
+
+The library now also provides a non-adaptive measurement-sufficiency baseline for each uncertainty model. It constructs pair-separation obligations, marks pairs that are impossible to distinguish under the admissible probe family, and greedily selects probes by newly covered obligations per unit cost.
+
+- Bounded categorical and bounded numeric models use disjoint allowed-outcome sets/intervals as pair-separation witnesses.
+- Persistent categorical state creates one obligation for each hypothesis pair and each possible shared campaign error state. A probe must distinguish the pair under that exact same state.
+- A common additive numeric bias cancels between hypotheses; unequal nominal predictions are separating witnesses.
+
+The receipt contains the full covered/unresolved obligation sets, selected probe order and total cost. A separate verifier recomputes the deterministic greedy result and rejects altered receipts. The verifier confirms **replay fidelity**, not optimality: `optimality_certified` is always false because this is a greedy weighted set-cover heuristic.
+
+### Adaptive versus static benchmark
+
+A frozen four-hypothesis D4 experiment is shared with the exact adaptive planner in [PR #12670](https://github.com/Luminous-Dynamics/symthaea/pull/12670). On the same hypothesis/probe/cost table:
+- exact adaptive minimax needs worst-case cost 2;
+- any static probe set that separates every hypothesis pair needs all 3 unit-cost probes (cost 3).
+
+This is a small exact fixture, not a general superiority claim. It illustrates why benchmark reporting should distinguish:
+1. **identifiability ceiling:** which pairs can any admissible probe distinguish?;
+2. **static diagnostic cost:** cost of a fixed probe set covering every resolvable pair;
+3. **adaptive policy cost:** worst-case acquisition cost when the next probe depends on earlier outcomes;
+4. **online noisy policy performance:** compared separately with faithful noisy ODT/ASRN and AFABench baselines.
+
+The benchmark must count unresolved pairs rather than hiding them, and must never label a greedy diagnostic set as globally minimum.
