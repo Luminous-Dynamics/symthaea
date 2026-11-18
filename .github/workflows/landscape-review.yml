@@ -1,0 +1,55 @@
+name: Landscape Alternative Review Contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "schemas/landscape-alternative-review-v0.schema.json"
+      - "schemas/landscape-review-validation-report-v0.schema.json"
+      - "fixtures/landscape/review-unranked-v0.json"
+      - "crates/domains/symthaea-landscape-review/**"
+      - "Cargo.lock"
+      - "docs/LANDSCAPE_ALTERNATIVE_REVIEW_V0.md"
+      - ".github/workflows/landscape-review.yml"
+  push:
+    branches: [main]
+    paths:
+      - "schemas/landscape-alternative-review-v0.schema.json"
+      - "schemas/landscape-review-validation-report-v0.schema.json"
+      - "fixtures/landscape/review-unranked-v0.json"
+      - "crates/domains/symthaea-landscape-review/**"
+      - "docs/LANDSCAPE_ALTERNATIVE_REVIEW_V0.md"
+      - ".github/workflows/landscape-review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: landscape-review-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Landscape review structural-policy conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Parse machine-readable artifacts
+        run: |
+          jq empty schemas/landscape-alternative-review-v0.schema.json
+          jq empty schemas/landscape-review-validation-report-v0.schema.json
+          jq empty fixtures/landscape/review-unranked-v0.json
+      - name: Format contract crate
+        run: cargo fmt --manifest-path crates/domains/symthaea-landscape-review/Cargo.toml -- --check
+      - name: Test structural-policy gates
+        run: cargo test --manifest-path crates/domains/symthaea-landscape-review/Cargo.toml --all-targets
+      - name: Validate canonical unranked fixture through CLI
+        run: cargo run --manifest-path crates/domains/symthaea-landscape-review/Cargo.toml --bin landscape-review-check -- fixtures/landscape/review-unranked-v0.json > landscape-review-validation-report.json
+      - name: Check success report
+        run: |
+          jq -e '.valid == true and .errors == [] and .interpretation_limit == "structural-policy-validation-does-not-prove-scientific-validity-or-impact"' landscape-review-validation-report.json

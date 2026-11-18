@@ -21,10 +21,14 @@ exclude = [
     # standalone (`cargo build -p nixward-web` from its own directory).
     "crates/core/nixward-web",
     "crates/core/symthaea-zkproof/methods",
+    # Do not glob-discover this directory until it has a Cargo.toml; otherwise cargo metadata/fmt fails.
+    "crates/core/symthaea-observation-attestation",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
+    # Do not glob-discover this draft directory until its Cargo manifest exists.
+    "crates/domains/symthaea-rea-evidence-verifier",
     # ARCHIVED 2026-07-16 (vision review P2.2): real SigLIP/Moondream/ocrs ONNX
     # stack, but zero consumers — its only reference is foveation's non-default
     # `perception` feature nothing enables, and it duplicates src/perception/'s

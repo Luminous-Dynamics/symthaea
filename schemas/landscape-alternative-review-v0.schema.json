@@ -1,0 +1,1073 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/landscape-alternative-review-v0.schema.json",
+  "title": "Symthaea Landscape Alternative Review Artifact v0",
+  "description": "Read-only analysis output for comparing landscape alternatives. It may explicitly decline to rank alternatives when evidence is missing or conflicting. It is not a construction certificate or actuator command.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_uri",
+    "review_id",
+    "created_at",
+    "analysis_profile",
+    "authority",
+    "inputs",
+    "alternatives",
+    "candidate_sources",
+    "metric_assessments",
+    "comparison",
+    "recommendation",
+    "falsification_questions",
+    "limitations",
+    "replay"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.landscape-alternative-review.v0"
+    },
+    "schema_uri": {
+      "const": "https://luminousdynamics.io/schemas/landscape-alternative-review-v0.schema.json"
+    },
+    "review_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "analysis_profile": {
+      "const": "LAND-REVIEW-001"
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "read_only",
+        "mutates_project",
+        "actuation_authority"
+      ],
+      "properties": {
+        "read_only": {
+          "const": true
+        },
+        "mutates_project": {
+          "const": false
+        },
+        "actuation_authority": {
+          "const": false
+        }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_design",
+        "metric_registry_sha256",
+        "source_catalog_sha256",
+        "source_catalog_status",
+        "scenario_runs"
+      ],
+      "properties": {
+        "baseline_design": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "system",
+            "sha256",
+            "schema",
+            "schema_uri",
+            "scope",
+            "coordinate_frame_kind",
+            "georeferenced",
+            "geometry_status"
+          ],
+          "properties": {
+            "system": {
+              "const": "sol-atlas"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "schema": {
+              "const": "luminous.landscape-design.v0"
+            },
+            "schema_uri": {
+              "const": "https://luminousdynamics.io/schemas/landscape-design-v0.schema.json"
+            },
+            "scope": {
+              "enum": [
+                "site-parcel",
+                "district",
+                "watershed",
+                "bioregion"
+              ]
+            },
+            "coordinate_frame_kind": {
+              "enum": [
+                "LOCAL_CARTESIAN_DRAWING_UNITS"
+              ]
+            },
+            "georeferenced": {
+              "const": false
+            },
+            "geometry_status": {
+              "enum": [
+                "schematic-design-intent",
+                "synthetic-benchmark"
+              ]
+            }
+          }
+        },
+        "metric_registry_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_catalog_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_catalog_status": {
+          "enum": [
+            "metadata-only-not-ingested",
+            "partially-ingested-unqualified",
+            "ingested-unqualified",
+            "qualified"
+          ]
+        },
+        "scenario_runs": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "system",
+              "manifest_sha256",
+              "purpose",
+              "evidence_class",
+              "status",
+              "model_id",
+              "model_version",
+              "pairing_context"
+            ],
+            "properties": {
+              "system": {
+                "const": "symtropy"
+              },
+              "manifest_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "result_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "purpose": {
+                "enum": [
+                  "schema-qualification",
+                  "synthetic-benchmark",
+                  "analytical-simulation"
+                ]
+              },
+              "evidence_class": {
+                "enum": [
+                  "observed",
+                  "curated",
+                  "synthetic",
+                  "modelled",
+                  "assumed",
+                  "missing"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "qualified",
+                  "blocked",
+                  "unsupported",
+                  "conflicted"
+                ]
+              },
+              "model_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "model_version": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "limitations": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "pairing_context": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "alternative_id",
+                  "design_snapshot_sha256",
+                  "boundary_conditions_sha256",
+                  "evaluation_plan_sha256",
+                  "metric_registry_sha256",
+                  "seed",
+                  "scope"
+                ],
+                "properties": {
+                  "alternative_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "design_snapshot_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "boundary_conditions_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "evaluation_plan_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "metric_registry_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "seed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                  },
+                  "scope": {
+                    "enum": [
+                      "site-parcel",
+                      "district",
+                      "watershed",
+                      "bioregion"
+                    ]
+                  }
+                }
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "qualified"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "result_sha256"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "purpose": {
+                      "const": "synthetic-benchmark"
+                    }
+                  },
+                  "required": [
+                    "purpose"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "evidence_class": {
+                      "const": "synthetic"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "purpose": {
+                      "const": "analytical-simulation"
+                    }
+                  },
+                  "required": [
+                    "purpose"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "blocked",
+                        "unsupported",
+                        "conflicted"
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "alternatives": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "alternative_id",
+          "snapshot_sha256",
+          "scope",
+          "coordinate_frame_kind",
+          "geometry_status",
+          "change_summary"
+        ],
+        "properties": {
+          "alternative_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,199}$"
+          },
+          "snapshot_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "scope": {
+            "enum": [
+              "site-parcel",
+              "district",
+              "watershed",
+              "bioregion"
+            ]
+          },
+          "coordinate_frame_kind": {
+            "enum": [
+              "LOCAL_CARTESIAN_DRAWING_UNITS"
+            ]
+          },
+          "geometry_status": {
+            "enum": [
+              "schematic-design-intent",
+              "synthetic-benchmark"
+            ]
+          },
+          "change_summary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "changed_feature_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "candidate_sources": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_id",
+          "catalog_state",
+          "role",
+          "limitation"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "catalog_state": {
+            "enum": [
+              "not-ingested",
+              "ingested-unqualified",
+              "qualified",
+              "unavailable",
+              "license-review-required"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "limitation": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "source_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "metric_assessments": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "family",
+          "status"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "family": {
+            "enum": [
+              "heat-and-comfort",
+              "water",
+              "ecology",
+              "access-and-equity",
+              "materials-and-lifecycle",
+              "resilience-and-stewardship",
+              "economics-and-community"
+            ]
+          },
+          "status": {
+            "enum": [
+              "computed",
+              "blocked",
+              "conflicted",
+              "not-applicable"
+            ]
+          },
+          "value": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "evidence_class": {
+            "enum": [
+              "observed",
+              "curated",
+              "synthetic",
+              "modelled",
+              "assumed"
+            ]
+          },
+          "method_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "input_sha256": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          "uncertainty": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "description"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "interval",
+                  "range",
+                  "qualitative",
+                  "unknown"
+                ]
+              },
+              "lower": {
+                "type": "number"
+              },
+              "upper": {
+                "type": "number"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              }
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "missing_inputs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "conflicting_evidence_refs": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "computed"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "value",
+                "unit",
+                "evidence_class",
+                "method_ref",
+                "input_sha256",
+                "uncertainty"
+              ],
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "reason"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "missing_inputs"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "conflicting_evidence_refs"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "blocked"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "reason",
+                "missing_inputs"
+              ],
+              "not": {
+                "required": [
+                  "value"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "conflicted"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "reason",
+                "conflicting_evidence_refs"
+              ],
+              "not": {
+                "required": [
+                  "value"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "not-applicable"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "reason"
+              ],
+              "not": {
+                "required": [
+                  "value"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ranking_status",
+        "ranking_reasons",
+        "pairwise_tradeoffs"
+      ],
+      "properties": {
+        "ranking_status": {
+          "enum": [
+            "no-defensible-ranking",
+            "partial-comparison",
+            "qualified-comparison"
+          ]
+        },
+        "ranking_reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "pairwise_tradeoffs": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "left_alternative_id",
+              "right_alternative_id",
+              "dimension",
+              "evidence_status",
+              "summary"
+            ],
+            "properties": {
+              "left_alternative_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "right_alternative_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "dimension": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "evidence_status": {
+                "enum": [
+                  "supported",
+                  "partial",
+                  "blocked",
+                  "conflicted",
+                  "qualitative-only"
+                ]
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "ranking_status": {
+                "const": "no-defensible-ranking"
+              }
+            },
+            "required": [
+              "ranking_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "ranking_reasons": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ranking_status": {
+                "const": "qualified-comparison"
+              }
+            },
+            "required": [
+              "ranking_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "ranking_reasons": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "rationale",
+        "next_step"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "no-ranking",
+            "candidate-next-action",
+            "prefer-alternative"
+          ]
+        },
+        "selected_alternative_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000
+        },
+        "tradeoffs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "next_step": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 3000
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low",
+            "not-calibrated"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "no-ranking"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "selected_alternative_id"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "prefer-alternative"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "selected_alternative_id",
+              "tradeoffs",
+              "confidence"
+            ]
+          }
+        }
+      ]
+    },
+    "falsification_questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      }
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "analysis_method_id",
+        "analysis_method_version",
+        "ruleset_sha256",
+        "normalized_inputs_sha256",
+        "replay_class"
+      ],
+      "properties": {
+        "analysis_method_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "analysis_method_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "ruleset_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "normalized_inputs_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "replay_class": {
+          "enum": [
+            "deterministic-structural-review",
+            "deterministic-model-replay",
+            "not-established"
+          ]
+        },
+        "environment_note": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "comparison": {
+            "properties": {
+              "ranking_status": {
+                "const": "no-defensible-ranking"
+              }
+            },
+            "required": [
+              "ranking_status"
+            ]
+          }
+        },
+        "required": [
+          "comparison"
+        ]
+      },
+      "then": {
+        "properties": {
+          "recommendation": {
+            "properties": {
+              "status": {
+                "const": "no-ranking"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "recommendation": {
+            "properties": {
+              "status": {
+                "const": "prefer-alternative"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "recommendation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "comparison": {
+            "properties": {
+              "ranking_status": {
+                "const": "qualified-comparison"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "inputs": {
+            "properties": {
+              "baseline_design": {
+                "properties": {
+                  "geometry_status": {
+                    "const": "synthetic-benchmark"
+                  }
+                },
+                "required": [
+                  "geometry_status"
+                ]
+              }
+            },
+            "required": [
+              "baseline_design"
+            ]
+          }
+        },
+        "required": [
+          "inputs"
+        ]
+      },
+      "then": {
+        "properties": {
+          "metric_assessments": {
+            "items": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "blocked",
+                    "conflicted",
+                    "not-applicable"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "inputs": {
+            "properties": {
+              "baseline_design": {
+                "properties": {
+                  "coordinate_frame_kind": {
+                    "const": "LOCAL_CARTESIAN_DRAWING_UNITS"
+                  }
+                },
+                "required": [
+                  "coordinate_frame_kind"
+                ]
+              }
+            },
+            "required": [
+              "baseline_design"
+            ]
+          }
+        },
+        "required": [
+          "inputs"
+        ]
+      },
+      "then": {
+        "properties": {
+          "metric_assessments": {
+            "items": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "blocked",
+                    "conflicted",
+                    "not-applicable"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

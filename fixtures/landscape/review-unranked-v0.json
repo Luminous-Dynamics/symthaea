@@ -1,0 +1,217 @@
+{
+  "schema": "symthaea.landscape-alternative-review.v0",
+  "schema_uri": "https://luminousdynamics.io/schemas/landscape-alternative-review-v0.schema.json",
+  "review_id": "fixture-johannesburg-unranked-review-v0",
+  "created_at": "2026-10-21T00:00:00Z",
+  "analysis_profile": "LAND-REVIEW-001",
+  "authority": {
+    "read_only": true,
+    "mutates_project": false,
+    "actuation_authority": false
+  },
+  "inputs": {
+    "baseline_design": {
+      "system": "sol-atlas",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "schema": "luminous.landscape-design.v0",
+      "schema_uri": "https://luminousdynamics.io/schemas/landscape-design-v0.schema.json",
+      "scope": "site-parcel",
+      "coordinate_frame_kind": "LOCAL_CARTESIAN_DRAWING_UNITS",
+      "georeferenced": false,
+      "geometry_status": "schematic-design-intent"
+    },
+    "metric_registry_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "source_catalog_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "source_catalog_status": "metadata-only-not-ingested",
+    "scenario_runs": []
+  },
+  "alternatives": [
+    {
+      "alternative_id": "baseline-canopy-water",
+      "snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "scope": "site-parcel",
+      "coordinate_frame_kind": "LOCAL_CARTESIAN_DRAWING_UNITS",
+      "geometry_status": "schematic-design-intent",
+      "change_summary": "Illustrative starter concept with schematic canopy, planting bed, water, path and built symbols.",
+      "changed_feature_ids": [
+        "feature-0001",
+        "feature-0003",
+        "feature-0004"
+      ]
+    },
+    {
+      "alternative_id": "alternative-water-first",
+      "snapshot_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "scope": "site-parcel",
+      "coordinate_frame_kind": "LOCAL_CARTESIAN_DRAWING_UNITS",
+      "geometry_status": "schematic-design-intent",
+      "change_summary": "Illustrative alternative that prioritizes a schematic water symbol and omits any assumption of modelled storage or runoff.",
+      "changed_feature_ids": [
+        "feature-0004",
+        "feature-0008"
+      ]
+    }
+  ],
+  "candidate_sources": [
+    {
+      "source_id": "sanbi.gauteng-cplan-v4",
+      "catalog_state": "not-ingested",
+      "role": "Regional ecological constraints context",
+      "limitation": "Not a species inventory, planting suitability result, or site survey."
+    },
+    {
+      "source_id": "sanbi.national-biodiversity-priority-areas-2023",
+      "catalog_state": "not-ingested",
+      "role": "Biodiversity priority screening context",
+      "limitation": "Priority-area designation does not establish parcel-level habitat condition or species presence."
+    },
+    {
+      "source_id": "climate.chirps-v3-daily-reanalysis",
+      "catalog_state": "not-ingested",
+      "role": "Regional rainfall context",
+      "limitation": "Daily 0.05-degree rainfall is not a local event hyetograph or calibrated runoff input."
+    },
+    {
+      "source_id": "terrain.copernicus-dem-glo30",
+      "catalog_state": "not-ingested",
+      "role": "Regional surface-elevation context",
+      "limitation": "A 30 m surface model is not a surveyed site grade or small-drainage network."
+    },
+    {
+      "source_id": "base.osm-vector",
+      "catalog_state": "not-ingested",
+      "role": "Route and access context",
+      "limitation": "Community mapping may be incomplete and does not establish route accessibility compliance."
+    },
+    {
+      "source_id": "imagery.sentinel-2-l2a",
+      "catalog_state": "not-ingested",
+      "role": "Regional land-cover context",
+      "limitation": "Multispectral imagery is not an individual-tree crown inventory or field species observation."
+    },
+    {
+      "source_id": "ngi.cdngi-topo-orthophoto",
+      "catalog_state": "license-review-required",
+      "role": "Potential higher-detail local map context",
+      "limitation": "Exact sheet/product, date, CRS, accuracy and reuse terms must be verified before ingestion."
+    }
+  ],
+  "metric_assessments": [
+    {
+      "metric_id": "heat.shade_fraction_at_declared_time",
+      "family": "heat-and-comfort",
+      "status": "blocked",
+      "reason": "No georeferenced location, qualified obstacle geometry, or validated shadow method is available in the schematic project.",
+      "missing_inputs": [
+        "Georeferenced area of interest",
+        "Validated terrain/building/canopy geometry",
+        "Date, local time, time zone and solar position",
+        "Validated shadow model and independent reference"
+      ]
+    },
+    {
+      "metric_id": "water.event_runoff_volume",
+      "family": "water",
+      "status": "blocked",
+      "reason": "The candidate-source catalog is metadata-only and contains no calibrated catchment, soil, drainage, or event rainfall inputs.",
+      "missing_inputs": [
+        "Catchment and drainage geometry",
+        "Site soils/infiltration and imperviousness",
+        "Local event hyetograph or qualified design storm",
+        "Calibrated model and independent discharge/volume reference"
+      ]
+    },
+    {
+      "metric_id": "ecology.species_evidence_completeness",
+      "family": "ecology",
+      "status": "blocked",
+      "reason": "Schematic planting symbols do not identify botanical species; biodiversity-priority maps are not a species inventory.",
+      "missing_inputs": [
+        "Species-level planting schedule",
+        "Versioned taxonomy",
+        "Local flora/native-origin reference",
+        "Curated or field-verified species identity"
+      ]
+    },
+    {
+      "metric_id": "access.maximum_path_grade",
+      "family": "access-and-equity",
+      "status": "blocked",
+      "reason": "The rendered path glyph is not a path centerline and the drawing has no validated elevation profile.",
+      "missing_inputs": [
+        "Path centerline geometry",
+        "Measured elevation profile and units",
+        "Applicable accessibility standard/version",
+        "Cross-slope, surface and continuity checks"
+      ]
+    },
+    {
+      "metric_id": "economics.lifecycle_cost_range",
+      "family": "economics-and-community",
+      "status": "blocked",
+      "reason": "The symbols are not a quantity take-off and no local cost or lifecycle schedule is attached.",
+      "missing_inputs": [
+        "Measured quantities",
+        "Local rates/source dates/currency base year",
+        "Maintenance and replacement schedule",
+        "Analysis horizon and discount convention"
+      ]
+    }
+  ],
+  "comparison": {
+    "ranking_status": "no-defensible-ranking",
+    "ranking_reasons": [
+      "All consequence-bearing metric assessments are blocked because the project is schematic and candidate data are not ingested.",
+      "No Symtropy analytical simulation is qualified for this coordinate frame.",
+      "No baseline or alternative has independent observed outcome evidence."
+    ],
+    "pairwise_tradeoffs": [
+      {
+        "left_alternative_id": "baseline-canopy-water",
+        "right_alternative_id": "alternative-water-first",
+        "dimension": "heat-versus-water",
+        "evidence_status": "blocked",
+        "summary": "Whether the canopy-first or water-first design better balances thermal comfort and water demand is unknown until location, canopy geometry, climate and qualified models are available.",
+        "evidence_refs": []
+      },
+      {
+        "left_alternative_id": "baseline-canopy-water",
+        "right_alternative_id": "alternative-water-first",
+        "dimension": "habitat-versus-maintenance",
+        "evidence_status": "blocked",
+        "summary": "Species suitability, establishment, irrigation and maintenance obligations are not specified or verified; no ecological or lifecycle preference is justified.",
+        "evidence_refs": []
+      }
+    ]
+  },
+  "recommendation": {
+    "status": "no-ranking",
+    "rationale": "Do not choose a winner from schematic drawings. Preserve alternatives, obtain the missing validated inputs, then rerun the review against exact pinned project and scenario digests.",
+    "tradeoffs": [
+      "Potential shade benefits versus water demand are unresolved.",
+      "Potential habitat/connectivity benefits versus maintenance burden are unresolved.",
+      "Access, lifecycle cost and community priorities have not been qualified."
+    ],
+    "next_step": "Select a lawful data acquisition path, survey the pilot site as needed, verify source license/CRS/quality, and define a preregistered field evaluation before claiming impacts.",
+    "confidence": "not-calibrated"
+  },
+  "falsification_questions": [
+    "Does independent site mapping or survey contradict the assumed location, elevations, obstacles, or drainage context?",
+    "Do measured outcomes under a declared baseline contradict the direction or magnitude of any proposed benefit?",
+    "Does source-license or consent review forbid the planned ingestion, caching, publication, or site-level disclosure?"
+  ],
+  "limitations": [
+    "This is a schema/conformance fixture only; its digest values and project/authority references are sentinel placeholders and do not identify real source artifacts.",
+    "All geometry is schematic symbol anchors in arbitrary local drawing units, not surveyed geometry or engineering-ready shapes.",
+    "Candidate source references are not ingested or qualified inputs; the fixture contains no measured environmental or social outcome.",
+    "No universal sustainability score, selected winner, construction decision, public-safety certification, or actuator instruction is emitted."
+  ],
+  "replay": {
+    "analysis_method_id": "landscape-evidence-ledger-v0",
+    "analysis_method_version": "0.1.0",
+    "ruleset_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "normalized_inputs_sha256": "abababababababababababababababababababababababababababababababab",
+    "replay_class": "deterministic-structural-review",
+    "environment_note": "Sentinel digest values in this fixture are placeholders; no runtime model calculation was performed."
+  }
+}
