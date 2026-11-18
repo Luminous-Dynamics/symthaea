@@ -1245,6 +1245,89 @@ fn dominated_hypervolume_recursive(points: &[Vec<f64>], reference: &[f64]) -> f6
     volume
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ObjectiveNormalization {
+    pub objective_id: String,
+    pub direction: ObjectiveDirection,
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+}
+
+/// Normalize declared raw objectives into a minimization vector.
+///
+/// Bounds must be pre-registered for the exact task and expressed in the
+/// objective's native units. Out-of-range values fail closed; they are never
+/// silently clamped because clipping changes the Pareto front and hypervolume.
+pub fn normalize_evaluations(
+    evaluations: &[OracleEvaluation],
+    normalizations: &[ObjectiveNormalization],
+) -> Result<Vec<OracleEvaluation>, String> {
+    if normalizations.is_empty() {
+        return Err("at least one objective normalization is required".to_owned());
+    }
+    let mut seen_ids = BTreeSet::new();
+    for rule in normalizations {
+        if rule.objective_id.trim().is_empty() || !seen_ids.insert(rule.objective_id.clone()) {
+            return Err("normalization objective IDs must be non-empty and unique".to_owned());
+        }
+        if !rule.lower_bound.is_finite()
+            || !rule.upper_bound.is_finite()
+            || rule.upper_bound <= rule.lower_bound
+        {
+            return Err(format!("objective {} has invalid normalization bounds", rule.objective_id));
+        }
+    }
+
+    let mut candidate_ids = BTreeSet::new();
+    let mut normalized = Vec::with_capacity(evaluations.len());
+    for evaluation in evaluations {
+        if evaluation.candidate_id.trim().is_empty()
+            || !candidate_ids.insert(evaluation.candidate_id.clone())
+        {
+            return Err("candidate IDs must be non-empty and unique".to_owned());
+        }
+        if evaluation.objectives.is_empty() {
+            if evaluation.gate_state == GateState::Pass {
+                return Err(format!("PASS candidate {} has no objective values", evaluation.candidate_id));
+            }
+            normalized.push(evaluation.clone());
+            continue;
+        }
+        if evaluation.objectives.len() != normalizations.len() {
+            return Err(format!("candidate {} objective count differs from normalization schema", evaluation.candidate_id));
+        }
+
+        let mut values = Vec::with_capacity(normalizations.len());
+        for (objective, rule) in evaluation.objectives.iter().zip(normalizations) {
+            if objective.objective_id != rule.objective_id || objective.direction != rule.direction {
+                return Err(format!("candidate {} objective order/direction differs at {}", evaluation.candidate_id, rule.objective_id));
+            }
+            if !objective.value.is_finite()
+                || objective.value < rule.lower_bound
+                || objective.value > rule.upper_bound
+            {
+                return Err(format!("candidate {} objective {} is outside its pre-registered bounds", evaluation.candidate_id, rule.objective_id));
+            }
+            let width = rule.upper_bound - rule.lower_bound;
+            let value = match rule.direction {
+                ObjectiveDirection::Minimize => (objective.value - rule.lower_bound) / width,
+                ObjectiveDirection::Maximize => (rule.upper_bound - objective.value) / width,
+            };
+            values.push(OracleObjective {
+                objective_id: rule.objective_id.clone(),
+                direction: ObjectiveDirection::Minimize,
+                value,
+            });
+        }
+        normalized.push(OracleEvaluation {
+            candidate_id: evaluation.candidate_id.clone(),
+            gate_state: evaluation.gate_state.clone(),
+            objectives: values,
+        });
+    }
+    Ok(normalized)
+}
+
 /// Compute exact hypervolume for PASS candidates only.
 ///
 /// The reference point is expressed in each objective's native direction and
@@ -2494,6 +2577,57 @@ mod tests {
             make("unknown",GateState::Unknown,0.5,0.5),
         ];
         assert_eq!(exact_pareto_front(&evaluations).unwrap(), vec!["a".to_owned(),"b".to_owned(),"c".to_owned()]);
+    }
+
+    #[test]
+    fn floorplanbench_five_objectives_normalize_to_minimization_reference() {
+        let raw = OracleEvaluation {
+            candidate_id:"floorplan-task-001".to_owned(),
+            gate_state:GateState::Pass,
+            objectives:vec![
+                OracleObjective {objective_id:"efficiency".to_owned(),direction:ObjectiveDirection::Maximize,value:0.75},
+                OracleObjective {objective_id:"circulation".to_owned(),direction:ObjectiveDirection::Minimize,value:5.0},
+                OracleObjective {objective_id:"daylight".to_owned(),direction:ObjectiveDirection::Maximize,value:0.8},
+                OracleObjective {objective_id:"privacy".to_owned(),direction:ObjectiveDirection::Maximize,value:0.6},
+                OracleObjective {objective_id:"carbon".to_owned(),direction:ObjectiveDirection::Minimize,value:400.0},
+            ],
+        };
+        let rules = vec![
+            ObjectiveNormalization {objective_id:"efficiency".to_owned(),direction:ObjectiveDirection::Maximize,lower_bound:0.0,upper_bound:1.0},
+            ObjectiveNormalization {objective_id:"circulation".to_owned(),direction:ObjectiveDirection::Minimize,lower_bound:0.0,upper_bound:10.0},
+            ObjectiveNormalization {objective_id:"daylight".to_owned(),direction:ObjectiveDirection::Maximize,lower_bound:0.0,upper_bound:1.0},
+            ObjectiveNormalization {objective_id:"privacy".to_owned(),direction:ObjectiveDirection::Maximize,lower_bound:0.0,upper_bound:1.0},
+            ObjectiveNormalization {objective_id:"carbon".to_owned(),direction:ObjectiveDirection::Minimize,lower_bound:300.0,upper_bound:800.0},
+        ];
+        let values = normalize_evaluations(&[raw],&rules).unwrap();
+        let vector: Vec<f64> = values[0].objectives.iter().map(|objective| objective.value).collect();
+        assert_eq!(vector, vec![0.25,0.5,0.2,0.4,0.2]);
+        assert!(values[0].objectives.iter().all(|objective| objective.direction == ObjectiveDirection::Minimize));
+        let expected = [0.7501,0.5001,0.8001,0.6001,0.8001].iter().product::<f64>();
+        assert!((exact_hypervolume(&values,&[1.0001;5]).unwrap()-expected).abs()<1e-12);
+    }
+
+    #[test]
+    fn objective_normalization_rejects_bad_bounds_order_and_out_of_range_values() {
+        let raw = OracleEvaluation {
+            candidate_id:"candidate".to_owned(),
+            gate_state:GateState::Pass,
+            objectives:vec![
+                OracleObjective {objective_id:"energy".to_owned(),direction:ObjectiveDirection::Minimize,value:11.0},
+                OracleObjective {objective_id:"comfort".to_owned(),direction:ObjectiveDirection::Maximize,value:8.0},
+            ],
+        };
+        let valid = vec![
+            ObjectiveNormalization {objective_id:"energy".to_owned(),direction:ObjectiveDirection::Minimize,lower_bound:0.0,upper_bound:10.0},
+            ObjectiveNormalization {objective_id:"comfort".to_owned(),direction:ObjectiveDirection::Maximize,lower_bound:0.0,upper_bound:10.0},
+        ];
+        assert!(normalize_evaluations(&[raw.clone()],&valid).is_err());
+        let mut wrong_order = valid.clone();
+        wrong_order.swap(0,1);
+        assert!(normalize_evaluations(&[raw.clone()],&wrong_order).is_err());
+        let mut invalid_bounds = valid;
+        invalid_bounds[0].upper_bound=0.0;
+        assert!(normalize_evaluations(&[raw],&invalid_bounds).is_err());
     }
 
     #[test]
