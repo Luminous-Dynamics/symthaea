@@ -56,12 +56,14 @@ The Rust auditor:
 - checks finite numerical values and non-negative standard uncertainties;
 - validates raw-data SHA-256 syntax while permitting shared digests;
 - records condition variants rather than merging measurements across temperature/field/pressure;
+- requires UTC timestamps and verifies that split pre-registration precedes every observation;
 - validates a complete disjoint calibration/holdout partition;
 - rejects unknown, duplicate or overlapping observation IDs;
 - rejects a held-out modality that appears in calibration;
+- validates the declared two-parameter observation-operator row;
 - records exact schema and fixture SHA-256 values in the receipt.
 
-The receipt is an evidence / split audit only. It does not perform a Bayesian fit, return a posterior, or infer any material parameter.
+The split auditor is an evidence / leakage check only. A separate conjugate Gaussian fitter now performs the first inverse update below.
 
 ## Benchmark ladder
 
@@ -92,3 +94,47 @@ Rank candidate next measurements by their expected reduction in posterior uncert
 ## Claim ceiling
 
 This is a specimen-linked data contract and split auditor. No Bayesian inverse solution, parameter posterior, calibrated material property, Tc, bulk superconductivity or experimental conclusion is established. It is not a synthesis protocol.
+
+
+## First executable inverse baseline: conjugate linear Gaussian
+
+The second binary, `sc_observation_inverse_fit`, is a transparent two-parameter inverse baseline. It is intentionally not yet a nonlinear lattice-GL forward solver.
+
+For a parameter vector \(\theta\in\mathbb R^2\), prior \(\theta\sim\mathcal N(\mu_0,P_0^{-1})\), and declared linear observation operator \(y_i=h_i^T\theta+\epsilon_i\), with independent known Gaussian errors \(\epsilon_i\sim\mathcal N(0,\sigma_i^2)\), the calibration-only posterior is
+
+\[
+P_n=P_0+\sum_{i\in\mathcal C}\frac{h_i h_i^T}{\sigma_i^2},
+\qquad
+\mu_n=P_n^{-1}\left(P_0\mu_0+
+\sum_{i\in\mathcal C}\frac{h_i y_i}{\sigma_i^2}\right).
+\]
+
+For each held-out observation \(h_*\), the predictive distribution is
+
+\[
+y_*\mid\mathcal C\sim
+\mathcal N\left(h_*^T\mu_n,
+\sigma_*^2+h_*^T P_n^{-1}h_*\right).
+\]
+
+The receipt reports posterior mean/covariance, marginal normal intervals, held-out predictive distributions, standardized residuals and total log predictive density. It binds the calculation to the exact schema and fixture hashes and records that held-out observations were not used in the posterior.
+
+### Synthetic fixture example
+
+The synthetic parameter names are `amplitude_scale` and `phase_stiffness_scale`. The calibration split contains amplitude-sensitive spectroscopy and heat capacity; the held-out modality is vortex imaging. The fixture's observation-operator rows are declared in the data, not inferred or silently chosen by the fitter.
+
+With the current synthetic numbers, the calibration-only posterior mean is approximately
+
+\[
+\mu_n\approx(0.91981,\;0.11016),
+\]
+
+and the held-out vortex proxy prediction is approximately \(0.07348\), with predictive standard deviation approximately \(0.02746\). These are synthetic test outputs from a deliberately simple two-parameter linear model—not physical estimates of a superconducting material.
+
+A key negative-control test changes the held-out vortex value: the posterior mean and covariance must remain bit-for-bit unchanged, while the held-out predictive score changes. A separate test changes a calibration observation and requires the posterior to change.
+
+### Explicit limitations
+
+This Gaussian baseline assumes independent observations, known fixed standard uncertainties and a linear observation operator. It does not yet model shared calibration nuisance parameters, cross-modal covariance, nonlinear observation maps, posterior multimodality, model discrepancy, censoring, instrument resolution kernels, or material-specific GL simulation outputs. It is a mathematical calibration/leakage baseline, not a validated physical inverse model.
+
+The next inference gates are synthetic simulation-based calibration, nominal 90% interval coverage, prior/likelihood misspecification tests, and then replacing the synthetic linear operators with forward observables generated from independently qualified GL simulation ensembles.
