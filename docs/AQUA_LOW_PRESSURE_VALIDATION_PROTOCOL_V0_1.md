@@ -133,3 +133,17 @@ These are hypotheses, not achieved results or product guarantees:
 ## 9. Claim ceiling
 
 This protocol is a measurement plan only. It does not establish pressure capability, shower comfort, hygiene, aerosol safety, code compliance, product superiority, or authorisation to modify plumbing. It authorizes no construction, procurement, human exposure or occupied testing. All physical tests require a separately reviewed, rated, unoccupied apparatus and competent professional sign-off.
+
+
+## 10. Deterministic run-record validation
+
+The crate now provides `symthaea-aqua-bench::pressure_curve` for exact-point pressure/flow observations. It records the requested setpoint and tolerance, measured dynamic pressure at the terminal fitting inlet, pressure uncertainty, optional static and upstream residual pressure, flow and uncertainty, complete test-article pressure-rating evidence, optional manufacturer-declared operating range, exact specimen/mode/geometry/context/protocol identity and instrument IDs.
+
+The validator:
+- admits an observation only when measured dynamic pressure plus its uncertainty stays within both the preregistered setpoint tolerance and qualified test-article envelope;
+- never substitutes static or upstream residual pressure for the dynamic fitting-inlet reading;
+- reports manufacturer-declared-range status separately, so an out-of-declared-range observation can be retained as exploratory without being mislabeled as supported operation;
+- permits matched pressure comparisons only with the same frozen context/protocol, same setpoint/tolerance and a preregistered maximum difference between actual measured pressure bands;
+- performs no interpolation and does not determine task success or comfort.
+
+The module has 15 authored tests. These are not yet a current-head CI pass. Mycelix remains the authority for instrument identity/calibration/uncertainty admission; Symtropy remains the authority for hydraulic and resource modeling.
