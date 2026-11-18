@@ -13,6 +13,39 @@ type Point = (i128, i128);
 type Polynomial = BTreeMap<(u32, u32), i128>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StabilizerWitnessV1 {
+    PointPermutation {
+        source_to_target: Vec<usize>,
+    },
+    MovedPoint {
+        source: Point,
+        transformed: Point,
+    },
+    PolynomialIdentity {
+        transformed_terms: Vec<((u32, u32), i128)>,
+    },
+    PolynomialCoefficientMismatch {
+        exponents: (u32, u32),
+        original_coefficient: i128,
+        transformed_coefficient: i128,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ElementDecisionV1 {
+    pub element_id: String,
+    pub accepted: bool,
+    pub witness: StabilizerWitnessV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StabilizerCertificateV1 {
+    pub case_id: String,
+    pub accepted_subgroup: Vec<String>,
+    pub decisions: Vec<ElementDecisionV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Element {
     id: String,
     matrix: Matrix2,
@@ -75,6 +108,94 @@ fn matrix_from_json(value: &Value, context: &str) -> Result<Matrix2, String> {
         }
     }
     Ok(matrix)
+}
+
+fn power_of_ten(exponent: u32) -> Result<i128, String> {
+    let mut value = 1_i128;
+    for _ in 0..exponent {
+        value = value
+            .checked_mul(10)
+            .ok_or_else(|| "decimal scale overflow".to_owned())?;
+    }
+    Ok(value)
+}
+
+/// Convert a JSON decimal number to an exact integer at the requested scale.
+/// No binary floating-point conversion or tolerance is used.
+fn decimal_scaled(value: &Value, scale: i128, context: &str) -> Result<i128, String> {
+    let number = value
+        .as_number()
+        .ok_or_else(|| format!("{context} must be a JSON number"))?;
+    let text = number.to_string();
+    let (mantissa, exponent) = match text.find(['e', 'E']) {
+        Some(index) => {
+            let exponent = text[index + 1..]
+                .parse::<i32>()
+                .map_err(|_| format!("{context} has an invalid decimal exponent"))?;
+            (&text[..index], exponent)
+        }
+        None => (text.as_str(), 0),
+    };
+
+    let negative = mantissa.starts_with('-');
+    let unsigned = mantissa.trim_start_matches(['-', '+']);
+    let (whole, fractional) = match unsigned.split_once('.') {
+        Some((whole, fractional)) => (whole, fractional),
+        None => (unsigned, ""),
+    };
+    let digits = format!("{whole}{fractional}");
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(format!("{context} is not a finite decimal number"));
+    }
+    let mut numerator = digits
+        .parse::<i128>()
+        .map_err(|_| format!("{context} exceeds the exact integer parser range"))?;
+    if negative {
+        numerator = -numerator;
+    }
+
+    let decimal_power = exponent
+        .checked_sub(i32::try_from(fractional.len()).map_err(|_| {
+            format!("{context} has too many decimal places")
+        })?)
+        .ok_or_else(|| format!("{context} decimal exponent overflow"))?;
+
+    let scaled_numerator = numerator
+        .checked_mul(scale)
+        .ok_or_else(|| format!("{context} scaled numerator overflow"))?;
+    if decimal_power >= 0 {
+        scaled_numerator
+            .checked_mul(power_of_ten(decimal_power as u32)?)
+            .ok_or_else(|| format!("{context} scaled value overflow"))
+    } else {
+        let denominator = power_of_ten(decimal_power.unsigned_abs())?;
+        if scaled_numerator % denominator != 0 {
+            return Err(format!(
+                "{context} is not exactly representable at scale {scale}"
+            ));
+        }
+        Ok(scaled_numerator / denominator)
+    }
+}
+
+fn point_from_json(value: &Value, scale: i128, context: &str) -> Result<Point, String> {
+    let coordinates = value
+        .as_array()
+        .ok_or_else(|| format!("{context} must be a 2-vector"))?;
+    if coordinates.len() != 2 {
+        return Err(format!("{context} must contain exactly two coordinates"));
+    }
+    Ok((
+        decimal_scaled(&coordinates[0], scale, &format!("{context}.x"))?,
+        decimal_scaled(&coordinates[1], scale, &format!("{context}.y"))?,
+    ))
+}
+
+fn point_apply(matrix: Matrix2, point: Point) -> Point {
+    (
+        matrix[0][0] * point.0 + matrix[0][1] * point.1,
+        matrix[1][0] * point.0 + matrix[1][1] * point.1,
+    )
 }
 
 fn multiply(left: Matrix2, right: Matrix2) -> Matrix2 {
@@ -267,18 +388,25 @@ impl Manifest {
             }
         }
         let label = string_field(case, "expected_subgroup_label")?;
-        let expected_order = match label.as_str() {
-            "D4" => 8,
-            "C4" => 4,
-            "C2_R180" | "C2_FX" | "C2_FY" | "C2_FDIAG" | "C2_FANTI" => 2,
-            "V4_AXIS" | "V4_DIAG" => 4,
-            "C1" => 1,
+        let expected_members: BTreeSet<String> = match label.as_str() {
+            "D4" => ["e", "r90", "r180", "r270", "fx", "fy", "fdiag", "fanti"],
+            "C4" => ["e", "r90", "r180", "r270"],
+            "C2_R180" => ["e", "r180"],
+            "C2_FX" => ["e", "fx"],
+            "C2_FY" => ["e", "fy"],
+            "C2_FDIAG" => ["e", "fdiag"],
+            "C2_FANTI" => ["e", "fanti"],
+            "V4_AXIS" => ["e", "r180", "fx", "fy"],
+            "V4_DIAG" => ["e", "r180", "fdiag", "fanti"],
+            "C1" => ["e"],
             _ => return Err(format!("unknown fixture subgroup label: {label}")),
-        };
-        if set.len() != expected_order {
+        }
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+        if set != expected_members {
             return Err(format!(
-                "subgroup label {label} declares order {expected_order}, but target has order {}",
-                set.len()
+                "subgroup label {label} does not match its canonical D4 subgroup: {set:?}"
             ));
         }
         Ok(set)
@@ -291,27 +419,8 @@ impl Manifest {
             .ok_or_else(|| "geometry.points must be an array".to_owned())?;
         let mut points = BTreeSet::new();
         for (index, value) in point_values.iter().enumerate() {
-            let coordinates = value
-                .as_array()
-                .ok_or_else(|| format!("point {index} must be a 2-vector"))?;
-            if coordinates.len() != 2 {
-                return Err(format!("point {index} must have two coordinates"));
-            }
-            let mut scaled = [0_i128; 2];
-            for axis in 0..2 {
-                let coordinate = coordinates[axis]
-                    .as_f64()
-                    .ok_or_else(|| format!("point {index} coordinate {axis} must be numeric"))?;
-                let value = coordinate * 1000.0;
-                let rounded = value.round();
-                if (value - rounded).abs() > 1.0e-8 {
-                    return Err(format!(
-                        "point {index} coordinate {axis} is not exactly representable at 1/1000 scale"
-                    ));
-                }
-                scaled[axis] = rounded as i128;
-            }
-            if !points.insert((scaled[0], scaled[1])) {
+            let point = point_from_json(value, 1000, &format!("geometry.points[{index}]"))?;
+            if !points.insert(point) {
                 return Err(format!("duplicate geometric point at index {index}"));
             }
         }
@@ -319,18 +428,160 @@ impl Manifest {
         for element in &self.elements {
             let transformed: BTreeSet<Point> = points
                 .iter()
-                .map(|(x, y)| {
-                    (
-                        element.matrix[0][0] * x + element.matrix[0][1] * y,
-                        element.matrix[1][0] * x + element.matrix[1][1] * y,
-                    )
-                })
+                .map(|point| point_apply(element.matrix, *point))
                 .collect();
             if transformed == points {
                 stabilizer.insert(element.id.clone());
             }
         }
         Ok(stabilizer)
+    }
+
+    fn structural_certificate(
+        &self,
+        case: &Value,
+    ) -> Result<StabilizerCertificateV1, String> {
+        let geometry = field(case, "geometry")?;
+        let point_values = field(geometry, "points")?
+            .as_array()
+            .ok_or_else(|| "geometry.points must be an array".to_owned())?;
+        let points: Vec<Point> = point_values
+            .iter()
+            .enumerate()
+            .map(|(index, value)| point_from_json(value, 1000, &format!("geometry.points[{index}]")))
+            .collect::<Result<_, _>>()?;
+        let point_set: BTreeSet<Point> = points.iter().copied().collect();
+        if point_set.len() != points.len() {
+            return Err("structural fixture contains duplicate points".to_owned());
+        }
+
+        let mut accepted_subgroup = Vec::new();
+        let mut decisions = Vec::with_capacity(self.elements.len());
+        for element in &self.elements {
+            let transformed: Vec<Point> = points
+                .iter()
+                .map(|point| point_apply(element.matrix, *point))
+                .collect();
+            let transformed_set: BTreeSet<Point> = transformed.iter().copied().collect();
+            if transformed_set == point_set {
+                let source_to_target = transformed
+                    .iter()
+                    .map(|point| {
+                        points
+                            .iter()
+                            .position(|candidate| candidate == point)
+                            .ok_or_else(|| "accepted point image has no target index".to_owned())
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                accepted_subgroup.push(element.id.clone());
+                decisions.push(ElementDecisionV1 {
+                    element_id: element.id.clone(),
+                    accepted: true,
+                    witness: StabilizerWitnessV1::PointPermutation { source_to_target },
+                });
+            } else {
+                let (source, transformed_point) = points
+                    .iter()
+                    .copied()
+                    .zip(transformed.iter().copied())
+                    .find(|(_, image)| !point_set.contains(image))
+                    .ok_or_else(|| "rejected point action lacks a moved-point witness".to_owned())?;
+                decisions.push(ElementDecisionV1 {
+                    element_id: element.id.clone(),
+                    accepted: false,
+                    witness: StabilizerWitnessV1::MovedPoint {
+                        source,
+                        transformed: transformed_point,
+                    },
+                });
+            }
+        }
+        accepted_subgroup.sort();
+        decisions.sort_by(|left, right| left.element_id.cmp(&right.element_id));
+        Ok(StabilizerCertificateV1 {
+            case_id: string_field(case, "case_id")?,
+            accepted_subgroup,
+            decisions,
+        })
+    }
+
+    fn polynomial_certificate(
+        &self,
+        case: &Value,
+    ) -> Result<StabilizerCertificateV1, String> {
+        let polynomial = self.polynomial_from_json(case)?;
+        let mut accepted_subgroup = Vec::new();
+        let mut decisions = Vec::with_capacity(self.elements.len());
+        for element in &self.elements {
+            let transformed = transform_polynomial(&polynomial, element.matrix)?;
+            if transformed == polynomial {
+                accepted_subgroup.push(element.id.clone());
+                decisions.push(ElementDecisionV1 {
+                    element_id: element.id.clone(),
+                    accepted: true,
+                    witness: StabilizerWitnessV1::PolynomialIdentity {
+                        transformed_terms: transformed.into_iter().collect(),
+                    },
+                });
+            } else {
+                let mut exponents = BTreeSet::new();
+                exponents.extend(polynomial.keys().copied());
+                exponents.extend(transformed.keys().copied());
+                let mismatch = exponents
+                    .into_iter()
+                    .find_map(|key| {
+                        let original_coefficient = *polynomial.get(&key).unwrap_or(&0);
+                        let transformed_coefficient = *transformed.get(&key).unwrap_or(&0);
+                        (original_coefficient != transformed_coefficient).then_some((
+                            key,
+                            original_coefficient,
+                            transformed_coefficient,
+                        ))
+                    })
+                    .ok_or_else(|| "rejected polynomial action lacks a coefficient witness".to_owned())?;
+                decisions.push(ElementDecisionV1 {
+                    element_id: element.id.clone(),
+                    accepted: false,
+                    witness: StabilizerWitnessV1::PolynomialCoefficientMismatch {
+                        exponents: mismatch.0,
+                        original_coefficient: mismatch.1,
+                        transformed_coefficient: mismatch.2,
+                    },
+                });
+            }
+        }
+        accepted_subgroup.sort();
+        decisions.sort_by(|left, right| left.element_id.cmp(&right.element_id));
+        Ok(StabilizerCertificateV1 {
+            case_id: string_field(case, "case_id")?,
+            accepted_subgroup,
+            decisions,
+        })
+    }
+
+    fn verify_certificate(
+        &self,
+        case: &Value,
+        certificate: &StabilizerCertificateV1,
+    ) -> Result<(), String> {
+        let track = string_field(case, "track")?;
+        let replayed = match track.as_str() {
+            "exact_finite_structural_stabilizer" => self.structural_certificate(case)?,
+            "finite_reference_group_regression_discovery" => self.polynomial_certificate(case)?,
+            _ => return Err(format!("unsupported certificate track: {track}")),
+        };
+        if replayed != *certificate {
+            return Err(format!("certificate replay mismatch for {}", certificate.case_id));
+        }
+        let declared = self.declared_subgroup(case)?;
+        let accepted: BTreeSet<String> = certificate.accepted_subgroup.iter().cloned().collect();
+        if accepted != declared {
+            return Err(format!("certificate subgroup mismatch for {}", certificate.case_id));
+        }
+        if certificate.decisions.len() != self.elements.len() {
+            return Err(format!("certificate omits a group element for {}", certificate.case_id));
+        }
+        Ok(())
     }
 
     fn polynomial_from_json(&self, case: &Value) -> Result<Polynomial, String> {
@@ -554,6 +805,70 @@ mod tests {
                 expected_order
             );
         }
+    }
+
+    #[test]
+    fn accepted_point_actions_carry_bijections_and_rejected_actions_carry_moved_points() {
+        let manifest = manifest();
+        let cases = field(&manifest.root, "cases").unwrap().as_array().unwrap();
+        for case in cases.iter().filter(|case| {
+            string_field(case, "track").unwrap() == "exact_finite_structural_stabilizer"
+        }) {
+            let certificate = manifest.structural_certificate(case).unwrap();
+            manifest.verify_certificate(case, &certificate).unwrap();
+            assert_eq!(certificate.decisions.len(), 8);
+            for decision in &certificate.decisions {
+                match &decision.witness {
+                    StabilizerWitnessV1::PointPermutation { source_to_target } => {
+                        assert!(decision.accepted);
+                        let mut sorted = source_to_target.clone();
+                        sorted.sort_unstable();
+                        assert_eq!(sorted, (0..source_to_target.len()).collect::<Vec<_>>());
+                    }
+                    StabilizerWitnessV1::MovedPoint { source, transformed } => {
+                        assert!(!decision.accepted);
+                        assert_ne!(source, transformed);
+                    }
+                    _ => panic!("structural certificate has a polynomial witness"),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn rejected_polynomial_actions_carry_exact_coefficient_counterexamples() {
+        let manifest = manifest();
+        let cases = field(&manifest.root, "cases").unwrap().as_array().unwrap();
+        for case in cases.iter().filter(|case| {
+            string_field(case, "track").unwrap() == "finite_reference_group_regression_discovery"
+        }) {
+            let certificate = manifest.polynomial_certificate(case).unwrap();
+            manifest.verify_certificate(case, &certificate).unwrap();
+            for decision in &certificate.decisions {
+                match &decision.witness {
+                    StabilizerWitnessV1::PolynomialIdentity { .. } => assert!(decision.accepted),
+                    StabilizerWitnessV1::PolynomialCoefficientMismatch {
+                        original_coefficient,
+                        transformed_coefficient,
+                        ..
+                    } => {
+                        assert!(!decision.accepted);
+                        assert_ne!(original_coefficient, transformed_coefficient);
+                    }
+                    _ => panic!("polynomial certificate has a geometric witness"),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn decimal_coordinates_are_parsed_exactly_without_binary_float_rounding() {
+        let exact = serde_json::json!(1.01);
+        assert_eq!(decimal_scaled(&exact, 1000, "test"), Ok(1010));
+        let scientific = serde_json::json!(1e-3);
+        assert_eq!(decimal_scaled(&scientific, 1000, "test"), Ok(1));
+        let not_representable = serde_json::json!(1.0001);
+        assert!(decimal_scaled(&not_representable, 1000, "test").is_err());
     }
 
     #[test]
