@@ -686,31 +686,6 @@ pub fn validate_meal_proposal(proposal: &MealProposalV1) -> MealProposalValidati
         );
     }
 
-    for ingredient in &proposal.ingredients {
-        for fact_ref in &ingredient.fact_refs {
-            if !fact_ids.contains(fact_ref.as_str()) {
-                violation(
-                    &mut violations,
-                    MealProposalViolationCodeV1::UnknownFactReference,
-                    Some(&ingredient.ingredient_id),
-                    format!("ingredient references unknown fact: {fact_ref}"),
-                );
-            }
-        }
-    }
-    for task in &proposal.tasks {
-        for fact_ref in &task.fact_refs {
-            if !fact_ids.contains(fact_ref.as_str()) {
-                violation(
-                    &mut violations,
-                    MealProposalViolationCodeV1::UnknownFactReference,
-                    Some(&task.task_id),
-                    format!("task references unknown fact: {fact_ref}"),
-                );
-            }
-        }
-    }
-
     let mut uncertainty_paths = BTreeSet::new();
     for item in &proposal.uncertainties {
         if !nonempty(&item.field_path)
@@ -941,13 +916,19 @@ mod tests {
     }
 
     #[test]
-    fn unknown_fact_references_are_rejected() {
+    fn unknown_fact_references_are_rejected_once_per_reference() {
         let mut proposal = valid_proposal();
-        proposal.ingredients[0].fact_refs.push("fact:missing".to_owned());
+        proposal.ingredients[0].fact_refs.push("fact:ingredient-missing".to_owned());
+        proposal.tasks[0].fact_refs.push("fact:task-missing".to_owned());
         let report = validate_meal_proposal(&proposal);
-        assert!(report.violations.iter().any(|v| {
-            v.code == MealProposalViolationCodeV1::UnknownFactReference
-        }));
+        assert_eq!(
+            report
+                .violations
+                .iter()
+                .filter(|v| v.code == MealProposalViolationCodeV1::UnknownFactReference)
+                .count(),
+            2
+        );
     }
 
     #[test]
