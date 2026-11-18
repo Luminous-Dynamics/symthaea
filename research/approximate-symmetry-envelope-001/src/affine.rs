@@ -408,7 +408,9 @@ mod tests {
     #[test]
     fn arithmetic_overflow_in_affine_lipschitz_bound_fails_closed() {
         let mut input = contract();
-        input.step_map.matrix = vec![vec![i128::MAX, i128::MAX], vec![0, 0]];
+        input.step_map.matrix = vec![vec![i128::MIN, i128::MIN], vec![0, 0]];
+        input.action.matrix = vec![vec![1, 0], vec![0, 1]];
+        input.action_order = 1;
         input.reference_region = IntegerBoxV1 {
             lower: vec![0, 0],
             upper: vec![0, 0],
