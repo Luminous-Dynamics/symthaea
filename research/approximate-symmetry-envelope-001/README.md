@@ -61,3 +61,24 @@ Report bound coverage (target 100% on validated toy systems), tightness, false-s
 ## Claim boundary
 
 Finite-horizon discrete error arithmetic only. No proof of the supplied defect/Lipschitz/domain bounds, continuous-time flow theorem implementation, probability model, physical safety authorization, approximate group closure, exact task invariance, hard-prune authorization or production readiness.
+
+
+## Derived exact affine witness (new v0.1 increment)
+
+The companion `affine` module derives a residual and Lipschitz bound from integer affine maps rather than accepting those two values as caller assertions.
+
+For `Phi(x) = A x + b` and `T(x) = G x + c`, it computes the exact integer affine commutator:
+
+```text
+Phi(T(x)) - T(Phi(x))
+  = (A G - G A) x + (A c + b - G b - c)
+```
+
+It then derives:
+- the L-infinity residual bound over an explicit reference box K;
+- the exact integer L-infinity Lipschitz factor of the step map;
+- the declared finite-order identity of the affine action;
+- forward invariance of K under both Phi and T;
+- the L-infinity margin from K to a larger certificate box D.
+
+The recurrence bound is applicable only while the accumulated state error remains within that margin. This is the first derived-bound lane; it is exact only for the integer affine maps and box semantics supplied to it. It does not certify nonlinear systems or infer that the supplied boxes match a real physical domain.
