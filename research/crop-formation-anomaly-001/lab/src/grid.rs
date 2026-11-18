@@ -384,7 +384,6 @@ mod tests {
         assert_eq!(outcomes[0].spec.id, "identity");
         assert_eq!(outcomes[1].spec.id, "vertical-reflection");
     }
-}
 
     #[test]
     fn every_dihedral_transform_has_the_expected_inverse() {
@@ -496,3 +495,4 @@ mod tests {
         assert_eq!(manifest.version(), 1);
         assert_eq!(manifest.run(&grid).len(), 1);
     }
+}
