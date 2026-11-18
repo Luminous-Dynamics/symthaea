@@ -613,8 +613,12 @@ pub struct StreamSession {
     processor: StreamProcessor,
     /// Accumulated phonemes
     phonemes: Vec<String>,
-    /// Word boundaries
+    /// Word boundaries (phoneme offsets).
     boundaries: Vec<usize>,
+    /// Phoneme offsets where an audio discontinuity starts a new segment.
+    segment_boundaries: Vec<usize>,
+    /// Most recent discontinuity retained for the session caller.
+    last_discontinuity: Option<StreamDiscontinuity>,
     /// Is session active
     active: bool,
 }
@@ -626,6 +630,8 @@ impl StreamSession {
             processor: StreamProcessor::new(config),
             phonemes: Vec::new(),
             boundaries: Vec::new(),
+            segment_boundaries: Vec::new(),
+            last_discontinuity: None,
             active: false,
         }
     }
@@ -641,6 +647,8 @@ impl StreamSession {
         self.processor.reset();
         self.phonemes.clear();
         self.boundaries.clear();
+        self.segment_boundaries.clear();
+        self.last_discontinuity = None;
     }
 
     /// Stop the session
@@ -656,6 +664,13 @@ impl StreamSession {
 
         self.processor.push_audio(samples)?;
         let frames = self.processor.process();
+
+        if let Some(gap) = self.processor.take_discontinuity() {
+            if !self.phonemes.is_empty() {
+                self.segment_boundaries.push(self.phonemes.len());
+            }
+            self.last_discontinuity = Some(gap);
+        }
 
         let mut new_phonemes = Vec::new();
 
@@ -676,29 +691,62 @@ impl StreamSession {
         Ok(new_phonemes)
     }
 
-    /// Get full transcription so far
+    /// Format one contiguous phoneme segment, preserving word-boundary markers.
+    fn format_segment(&self, start: usize, end: usize) -> String {
+        let mut result = String::new();
+        let mut cursor = start;
+
+        for &boundary in &self.boundaries {
+            if boundary > cursor && boundary <= end {
+                if !result.is_empty() {
+                    result.push(' ');
+                }
+                result.push_str(&self.phonemes[cursor..boundary].join(" "));
+                cursor = boundary;
+                if cursor < end {
+                    result.push_str(" | ");
+                }
+            }
+        }
+
+        if cursor < end {
+            if !result.is_empty() && !result.ends_with(" | ") {
+                result.push(' ');
+            }
+            result.push_str(&self.phonemes[cursor..end].join(" "));
+        }
+
+        result
+    }
+
+    /// Get full transcription so far. Audio gaps are rendered explicitly;
+    /// phonemes on opposite sides of a discontinuity are not joined silently.
     pub fn get_transcription(&self) -> String {
         if self.phonemes.is_empty() {
             return String::new();
         }
 
-        // Insert spaces at word boundaries
-        let mut result = String::new();
-        let mut last_boundary = 0;
+        let mut segments = Vec::new();
+        let mut start = 0usize;
 
-        for &boundary in &self.boundaries {
-            if boundary > last_boundary && boundary <= self.phonemes.len() {
-                result.push_str(&self.phonemes[last_boundary..boundary].join(" "));
-                result.push_str(" | ");
-                last_boundary = boundary;
+        for &end in &self.segment_boundaries {
+            if end > start && end <= self.phonemes.len() {
+                let segment = self.format_segment(start, end);
+                if !segment.is_empty() {
+                    segments.push(segment);
+                }
+                start = end;
             }
         }
 
-        if last_boundary < self.phonemes.len() {
-            result.push_str(&self.phonemes[last_boundary..].join(" "));
+        if start < self.phonemes.len() {
+            let segment = self.format_segment(start, self.phonemes.len());
+            if !segment.is_empty() {
+                segments.push(segment);
+            }
         }
 
-        format!("/{result}/")
+        format!("/{}/", segments.join(" [audio gap] "))
     }
 
     /// Is session active
@@ -708,7 +756,7 @@ impl StreamSession {
 
     /// Take the most recent input discontinuity, if one occurred.
     pub fn take_discontinuity(&mut self) -> Option<StreamDiscontinuity> {
-        self.processor.take_discontinuity()
+        self.last_discontinuity.take()
     }
 
     /// Number of source samples skipped by input overruns.
