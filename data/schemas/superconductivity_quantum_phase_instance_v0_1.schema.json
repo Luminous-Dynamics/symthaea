@@ -250,8 +250,10 @@
         "temperature",
         "temperature_unit",
         "imaginary_time_slices",
-        "max_abs_charge_state",
-        "random_seed"
+        "random_seed",
+        "representation",
+        "imaginary_time_step",
+        "charge_basis_cutoff"
       ],
       "properties": {
         "algorithm": {
@@ -272,14 +274,43 @@
           "type": "integer",
           "minimum": 4
         },
-        "max_abs_charge_state": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 100000
-        },
         "random_seed": {
           "type": "integer",
           "minimum": 0
+        },
+        "representation": {
+          "enum": [
+            "phase_path_integral",
+            "integer_charge_basis"
+          ]
+        },
+        "imaginary_time_step": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "charge_basis_cutoff": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "max_abs_charge_state"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "not_applicable",
+                "symmetric_integer"
+              ]
+            },
+            "max_abs_charge_state": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1,
+              "maximum": 100000
+            }
+          }
         }
       }
     },
