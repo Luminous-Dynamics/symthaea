@@ -241,6 +241,157 @@ impl EtlFaceplateFlowObservation {
     }
 }
 
+
+/// UWL 2023 functional-test observations for a temporary boost mode.
+///
+/// The flow-control-close / reopen step is explicit. The post-close flow is measured
+/// without actively using boost and must be indistinguishable from regular flow within
+/// the combined declared measurement uncertainty. The boosted-flow upper bound must be
+/// strictly below twice the regular-flow lower bound, following UWL 12.1.2.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UwlBoostFunctionObservation {
+    pub run_id: String,
+    pub specimen_id: String,
+    pub market_variant_id: String,
+    pub mode_id: String,
+    pub hardware_configuration_sha256: String,
+    pub test_context_sha256: String,
+    pub protocol_sha256: String,
+    pub pressure: UwlPressureRun,
+    pub regular_flow_lpm: f64,
+    pub regular_flow_uncertainty_lpm: f64,
+    pub boost_flow_lpm: f64,
+    pub boost_flow_uncertainty_lpm: f64,
+    pub post_close_flow_lpm: f64,
+    pub post_close_flow_uncertainty_lpm: f64,
+    pub boost_activated_receipt_sha256: String,
+    pub flow_close_reopen_receipt_sha256: String,
+    pub boost_reset_observed_after_close: bool,
+    pub flow_instrument_id: String,
+    pub flow_calibration_receipt_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct UwlBoostFunctionResult {
+    pub regular_flow_lpm: f64,
+    pub boost_flow_lpm: f64,
+    pub post_close_flow_lpm: f64,
+    pub boost_to_regular_ratio: f64,
+    pub post_close_difference_lpm: f64,
+    pub post_close_equivalent_within_measurement_uncertainty: bool,
+    pub boost_below_two_times_regular_on_conservative_bounds: bool,
+    /// Method result only. This does not qualify task quality, energy savings, comfort,
+    /// hygiene, a device's safety or complete UWL scheme conformity.
+    pub method_conditions_supported: bool,
+}
+
+impl UwlBoostFunctionObservation {
+    /// Validate the UWL 2023 boost-function sequence at Type 1 P2.
+    ///
+    /// UWL 12.1 defines boost as a temporary increase for a specific user action. Its
+    /// procedure records Qreg, activates boost and records Qboost, closes the flow control,
+    /// reopens without boost and records Qmax. The requirement is Qmax = Qreg and
+    /// Qboost < 2 Qreg. The method does not define a universal absolute L/min equality
+    /// tolerance here, so equality is assessed only within the declared combined flow
+    /// measurement uncertainty; the laboratory must preserve that uncertainty evidence.
+    pub fn validate(&self) -> Result<UwlBoostFunctionResult, MethodPressureError> {
+        for (field, value) in [
+            ("run_id", self.run_id.as_str()),
+            ("specimen_id", self.specimen_id.as_str()),
+            ("market_variant_id", self.market_variant_id.as_str()),
+            ("mode_id", self.mode_id.as_str()),
+            ("flow_instrument_id", self.flow_instrument_id.as_str()),
+        ] {
+            require_text(field, value)?;
+        }
+        for (field, digest) in [
+            ("hardware_configuration_sha256", self.hardware_configuration_sha256.as_str()),
+            ("test_context_sha256", self.test_context_sha256.as_str()),
+            ("protocol_sha256", self.protocol_sha256.as_str()),
+            ("boost_activated_receipt_sha256", self.boost_activated_receipt_sha256.as_str()),
+            ("flow_close_reopen_receipt_sha256", self.flow_close_reopen_receipt_sha256.as_str()),
+            ("flow_calibration_receipt_sha256", self.flow_calibration_receipt_sha256.as_str()),
+        ] {
+            require_digest(field, digest)?;
+        }
+
+        self.pressure.validate()?;
+        if self.pressure.point != UwlPressurePoint::Type1P2 {
+            return Err(MethodPressureError::BoostRequiresType1P2);
+        }
+        if self.pressure.run_id != self.run_id
+            || self.pressure.specimen_id != self.specimen_id
+            || self.pressure.market_variant_id != self.market_variant_id
+            || self.pressure.mode_id != self.mode_id
+            || self.pressure.hardware_configuration_sha256 != self.hardware_configuration_sha256
+            || self.pressure.test_context_sha256 != self.test_context_sha256
+            || self.pressure.protocol_sha256 != self.protocol_sha256
+        {
+            return Err(MethodPressureError::BoostPressureContextMismatch);
+        }
+        if !self.boost_reset_observed_after_close {
+            return Err(MethodPressureError::BoostDidNotResetAfterFlowClose);
+        }
+
+        for (field, flow, uncertainty) in [
+            ("regular_flow_lpm", self.regular_flow_lpm, self.regular_flow_uncertainty_lpm),
+            ("boost_flow_lpm", self.boost_flow_lpm, self.boost_flow_uncertainty_lpm),
+            ("post_close_flow_lpm", self.post_close_flow_lpm, self.post_close_flow_uncertainty_lpm),
+        ] {
+            if !flow.is_finite() || flow <= 0.0 {
+                return Err(MethodPressureError::InvalidFlow);
+            }
+            if !uncertainty.is_finite() || uncertainty < 0.0 {
+                return Err(MethodPressureError::InvalidFlowUncertainty);
+            }
+            if flow - uncertainty <= 0.0 {
+                return Err(MethodPressureError::InvalidFlowUncertainty);
+            }
+            if self.flow_instrument_id.trim().is_empty() {
+                return Err(MethodPressureError::MissingField {
+                    field: "flow_instrument_id",
+                });
+            }
+            let _ = field;
+        }
+
+        if self.boost_flow_lpm - self.boost_flow_uncertainty_lpm
+            <= self.regular_flow_lpm + self.regular_flow_uncertainty_lpm
+        {
+            return Err(MethodPressureError::BoostIncreaseNotResolved);
+        }
+
+        let conservative_boost_upper = self.boost_flow_lpm + self.boost_flow_uncertainty_lpm;
+        let conservative_regular_lower = self.regular_flow_lpm - self.regular_flow_uncertainty_lpm;
+        if conservative_boost_upper >= 2.0 * conservative_regular_lower {
+            return Err(MethodPressureError::BoostNotBelowTwoTimesRegular);
+        }
+
+        let post_close_difference_lpm = (self.post_close_flow_lpm - self.regular_flow_lpm).abs();
+        let combined_uncertainty =
+            self.post_close_flow_uncertainty_lpm + self.regular_flow_uncertainty_lpm;
+        if post_close_difference_lpm > combined_uncertainty {
+            return Err(MethodPressureError::BoostDidNotReturnToRegularFlow);
+        }
+
+        let boost_to_regular_ratio = self.boost_flow_lpm / self.regular_flow_lpm;
+        if !boost_to_regular_ratio.is_finite() || !post_close_difference_lpm.is_finite() {
+            return Err(MethodPressureError::InvalidFlow);
+        }
+
+        Ok(UwlBoostFunctionResult {
+            regular_flow_lpm: self.regular_flow_lpm,
+            boost_flow_lpm: self.boost_flow_lpm,
+            post_close_flow_lpm: self.post_close_flow_lpm,
+            boost_to_regular_ratio,
+            post_close_difference_lpm,
+            post_close_equivalent_within_measurement_uncertainty: true,
+            boost_below_two_times_regular_on_conservative_bounds: true,
+            method_conditions_supported: true,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MethodPressureError {
     MissingField { field: &'static str },
@@ -252,6 +403,12 @@ pub enum MethodPressureError {
     InvalidFlow,
     FlowNotStabilized,
     InvalidFlowUncertainty,
+    BoostRequiresType1P2,
+    BoostPressureContextMismatch,
+    BoostDidNotResetAfterFlowClose,
+    BoostIncreaseNotResolved,
+    BoostNotBelowTwoTimesRegular,
+    BoostDidNotReturnToRegularFlow,
 }
 
 impl Display for MethodPressureError {
@@ -275,6 +432,24 @@ impl Display for MethodPressureError {
             }
             Self::InvalidFlowUncertainty => {
                 write!(f, "flow uncertainty must be finite and non-negative")
+            }
+            Self::BoostRequiresType1P2 => {
+                write!(f, "UWL boost-function test requires Type 1 P2")
+            }
+            Self::BoostPressureContextMismatch => {
+                write!(f, "UWL boost pressure run does not match the boost observation context")
+            }
+            Self::BoostDidNotResetAfterFlowClose => {
+                write!(f, "boost mode did not reset after the flow control was closed")
+            }
+            Self::BoostIncreaseNotResolved => {
+                write!(f, "boost flow increase is not resolved above regular flow uncertainty")
+            }
+            Self::BoostNotBelowTwoTimesRegular => {
+                write!(f, "boost flow upper bound is not below twice regular flow lower bound")
+            }
+            Self::BoostDidNotReturnToRegularFlow => {
+                write!(f, "post-close flow is not equal to regular flow within combined measurement uncertainty")
             }
         }
     }
@@ -445,6 +620,113 @@ mod tests {
         assert_eq!(
             observation.validate(),
             Err(MethodPressureError::FlowNotStabilized)
+        );
+    }
+
+
+    fn boost_observation() -> UwlBoostFunctionObservation {
+        UwlBoostFunctionObservation {
+            run_id: "boost-run-01".to_owned(),
+            specimen_id: "boost-specimen-01".to_owned(),
+            market_variant_id: "boost-variant-01".to_owned(),
+            mode_id: "RAIN-BOOST".to_owned(),
+            hardware_configuration_sha256: digest('a'),
+            test_context_sha256: digest('b'),
+            protocol_sha256: digest('c'),
+            pressure: uwl_run(UwlPressurePoint::Type1P2, 304.0, 310.0),
+            regular_flow_lpm: 3.0,
+            regular_flow_uncertainty_lpm: 0.05,
+            boost_flow_lpm: 4.5,
+            boost_flow_uncertainty_lpm: 0.05,
+            post_close_flow_lpm: 3.02,
+            post_close_flow_uncertainty_lpm: 0.05,
+            boost_activated_receipt_sha256: digest('d'),
+            flow_close_reopen_receipt_sha256: digest('e'),
+            boost_reset_observed_after_close: true,
+            flow_instrument_id: "flow-boost-01".to_owned(),
+            flow_calibration_receipt_sha256: digest('f'),
+        }
+    }
+
+    #[test]
+    fn accepts_uwl_boost_with_reset_and_conservative_flow_bounds() {
+        let result = boost_observation().validate().expect("valid boost test");
+        assert!((result.boost_to_regular_ratio - 1.5).abs() < 1e-12);
+        assert!(result.post_close_equivalent_within_measurement_uncertainty);
+        assert!(result.boost_below_two_times_regular_on_conservative_bounds);
+        assert!(result.method_conditions_supported);
+    }
+
+    #[test]
+    fn rejects_boost_test_without_type1_p2_pressure() {
+        let mut observation = boost_observation();
+        observation.pressure.point = UwlPressurePoint::Type1P1;
+        assert_eq!(
+            observation.validate(),
+            Err(MethodPressureError::BoostRequiresType1P2)
+        );
+    }
+
+    #[test]
+    fn rejects_boost_test_with_pressure_context_mismatch() {
+        let mut observation = boost_observation();
+        observation.pressure.specimen_id = "different-specimen".to_owned();
+        assert_eq!(
+            observation.validate(),
+            Err(MethodPressureError::BoostPressureContextMismatch)
+        );
+    }
+
+    #[test]
+    fn rejects_boost_that_does_not_reset_after_flow_close() {
+        let mut observation = boost_observation();
+        observation.boost_reset_observed_after_close = false;
+        assert_eq!(
+            observation.validate(),
+            Err(MethodPressureError::BoostDidNotResetAfterFlowClose)
+        );
+    }
+
+    #[test]
+    fn rejects_boost_not_demonstrably_above_regular_flow() {
+        let mut observation = boost_observation();
+        observation.boost_flow_lpm = 3.02;
+        assert_eq!(
+            observation.validate(),
+            Err(MethodPressureError::BoostIncreaseNotResolved)
+        );
+    }
+
+    #[test]
+    fn rejects_boost_at_or_above_two_times_regular_flow_conservative_bound() {
+        let mut observation = boost_observation();
+        observation.boost_flow_lpm = 6.2;
+        observation.boost_flow_uncertainty_lpm = 0.1;
+        assert_eq!(
+            observation.validate(),
+            Err(MethodPressureError::BoostNotBelowTwoTimesRegular)
+        );
+    }
+
+    #[test]
+    fn rejects_post_close_flow_not_restored_to_regular() {
+        let mut observation = boost_observation();
+        observation.post_close_flow_lpm = 3.3;
+        assert_eq!(
+            observation.validate(),
+            Err(MethodPressureError::BoostDidNotReturnToRegularFlow)
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_boost_activation_receipt() {
+        let mut observation = boost_observation();
+        observation.boost_activated_receipt_sha256 = "unknown".to_owned();
+        assert_eq!(
+            observation.validate(),
+            Err(MethodPressureError::InvalidDigest {
+                field: "boost_activated_receipt_sha256"
+            })
         );
     }
 
