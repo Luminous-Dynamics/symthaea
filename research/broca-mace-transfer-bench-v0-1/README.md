@@ -12,22 +12,27 @@ This v0.1 slice isolates one narrow bridge: **qualified transition evidence → 
 
 ## Run
 
-The benchmark is a Rust workspace with two separate packages:
+The research workspace contains four separately scoped packages: oracle-blind policy, synthetic evaluator, receipt-gated ingress, and proposal-only consolidation.
 
 ```bash
 cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-evaluator
 cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-policy
 cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-evaluator
+cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-ingress
+cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-consolidation
+cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-consolidation --test raw_session_pipeline
 ```
 
-No external service, GPU, database or model API is required.
+No external service, GPU, database or model API is required. The current verifier used by tests is synthetic, not a production Mycelix adapter.
 
 ## Build-graph boundary
 
-- `policy/` is the candidate-policy crate. It contains only candidate-visible experience/query types, policy logic and decision receipts. It has no dependency on the evaluator and no `OracleTruth` type.
+- `policy/` is the candidate-policy crate. It contains candidate-visible experience/query types, policy logic and decision receipts. It has no dependency on the evaluator and no `OracleTruth` type.
 - `evaluator/` owns scenarios, hidden target utilities, causal labels, scoring and reporting. It depends on the policy crate, not vice versa.
+- `ingress/` verifies receipt interfaces, bitemporal eligibility and source/calibration/outcome lineage before projecting admitted interactions into candidate-visible experiences. It depends on policy, not evaluator.
+- `consolidation/` consumes receipt-derived, action-/scope-specific evidence summaries and emits a proposal-only consolidation recommendation. It depends on ingress and policy; it does not write persistent memory or grant authority.
 
-This is a stronger compile-time boundary than placing the oracle in another Rust type in the same source file. The evaluator source remains openly inspectable in this prototype; **it is not a secret or independently operated evaluator**. For a serious challenge, retain the evaluator in a separate controlled repository or service and expose only a versioned candidate API.
+This is a stronger compile-time boundary than placing the oracle in another Rust type in the same source file. The evaluator source remains openly inspectable in this prototype; **it is not a secret or independently operated evaluator**. For a serious challenge, retain the evaluator in a separate controlled repository or service and expose only a versioned candidate API. The ingress verifier is also only an interface seam: tests use a mock verifier, not live Mycelix signatures or conductor state.
 
 ## Scenario families
 
@@ -56,8 +61,8 @@ The deterministic fixed corpus includes seventeen two-session cases:
 - `no_memory`: fixed conservative fallback.
 - `frequency_only`: aggregate all observed outcomes, ignoring scope and evidence governance.
 - `scope_aware`: restrict to exact regime and objective, but does not qualify source or causal evidence.
-- `causal_qualified`: require exact scope, intervention, pre-registration, reconciled outcome, trusted non-retracted source, confounder control, completed delayed horizon, unique event IDs and at least two independent source families.
-- `invariant_transport`: reuse prior-regime effects only with target-regime witnesses, disjoint source families and a fixed 0.12 empirical-invariance tolerance.
+- `causal_qualified`: require exact scope, intervention, pre-registration, reconciled outcome, trusted non-retracted source, confounder control, completed delayed horizon, unique event IDs, at least two source-family labels and at least two distinct nonzero upstream source roots. A comparative decision also requires qualified support for both candidate actions; one-sided support abstains.
+- `invariant_transport`: reuse prior-regime effects only with target-regime witnesses, disjoint source families and roots, and worst-case source/target effect-interval difference within the fixed 0.12 normalized-utility margin.
 - `active_probe`: try exact-scope and invariant transport first; otherwise emit a typed, bounded environment-interaction request.
 
 The oracle is evaluator-only and is not linked as a dependency into the candidate-policy crate.
@@ -72,7 +77,7 @@ The oracle is evaluator-only and is not linked as a dependency into the candidat
 
 ## What v0.1 can and cannot establish
 
-The harness can regression-test whether transparent policy rules reject these specific synthetic failure modes. The causal-qualified policy is deliberately hand-authored against visible fixture structure. A zero-overclaim or high-accuracy result on these fifteen fixed cases is **not** evidence of causal discovery, real-world transfer, general intelligence or SOTA.
+The harness can regression-test whether transparent policy rules reject these specific synthetic failure modes. The causal-qualified policy is deliberately hand-authored against visible fixture structure. A zero-overclaim or high-accuracy result on these seventeen fixed cases is **not** evidence of causal discovery, real-world transfer, general intelligence or SOTA.
 
 It does not yet include:
 - hidden external evaluator custody or sealed labels;
@@ -172,7 +177,7 @@ Anthropic's Managed Agents describes three replaceable interfaces: an append-onl
 
 TimlMemBench reports 208 reviewed samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases. Its raw-native evaluation requires systems to ingest raw sessions, rather than merely query a prebuilt canonical memory pool. It finds that retrieval accuracy can mask lifecycle, scope, provenance, activation and restraint failures. See the [ACL Anthology paper](https://aclanthology.org/2026.findings-emnlp.507/).
 
-**Implication for MACE:** our current evaluator accepts structured `Experience` records; that is a policy-level harness, not a raw-native memory benchmark. A future adapter must ingest raw Session-A events, run consolidation, preserve evidence lineage, then evaluate Session-B decisions and Session-C corrections.
+**Implication for MACE:** the workspace now includes receipt-gated structured raw-interaction envelopes and a proposal-only consolidation consumer. However, the fixed/generated evaluator binaries still start from structured `Experience` fixtures. The ingress adapter does not yet parse full natural-language session transcripts or bind candidate-extracted claims to exact source-text spans. A raw-native benchmark must test transcript turns → source-span-bound claims → receipt verification → consolidation → Session-B decision → Session-C correction.
 
 ### Agent Memory Challenge Cycle 2
 
@@ -203,7 +208,7 @@ Likewise, `measurement_error_bound` is currently a candidate-visible claim. A pr
 
 ## Raw-native Session-A ingress boundary (research-only)
 
-The workspace adds broca-mace-ingress as its third package and broca-mace-consolidation as its fourth. The ingress crate has 32 deterministic mock-verifier tests exercise receipt-gated single-event admission, bitemporal replay, authority status, lifecycle/retraction, calibration, lineage, outcome reconciliation, batch idempotency and the consolidation evidence-pack projection.
+The workspace adds `broca-mace-ingress` as its third package and `broca-mace-consolidation` as its fourth. The ingress crate has 32 deterministic mock-verifier tests covering receipt-gated single-event admission, bitemporal replay, authority status, lifecycle/retraction, calibration, lineage, outcome reconciliation, batch idempotency and consolidation evidence-pack projection.
 
 The adapter maps a raw interaction envelope into candidate-visible `Experience` only after:
 
@@ -244,6 +249,6 @@ The workspace now includes broca-mace-consolidation, a narrow consumer of receip
 
 The default prototype gate mirrors the governed benchmark's three-support threshold: at least three qualified success events, three distinct source families, and three distinct upstream roots for the same action and exact scope; all trusted predictions must be pre-registered; every success must be receipt-reconciled, interventional, confounder-controlled and past its delayed horizon; the maximum attested measurement-error bound must be at most 0.05 normalized utility units. Untrusted or unknown-trust evidence is quarantined. Insufficient evidence remains provisional.
 
-The proposal contains the exact action/scope, as-known coordinates, evidence event IDs, family/root counts, measurement bound and policy revision. It is a candidate recommendation, not an authorization or storage transaction.
+The proposal contains the exact action/scope, as-known coordinates, evidence event IDs, family/root counts, maximum measurement bound, all threshold parameters and policy revision. Invalid configurations (zero support thresholds or non-finite/out-of-range measurement ceilings) fail closed to provisional. It is a candidate recommendation, not an authorization or storage transaction.
 
-A cross-crate regression in consolidation/tests/raw_session_pipeline.rs now exercises raw Session-A ingestion → receipt pack → action-specific consolidation proposals → Session-B causal decision → Session-C source retraction → rebuilt pack → abstention/active-probe request. The test verifier is synthetic; no production Mycelix verifier is claimed.
+The consolidation crate has 7 unit tests and one cross-crate regression in `consolidation/tests/raw_session_pipeline.rs`. It exercises raw Session-A ingestion → receipt pack → action-specific consolidation proposals → Session-B causal decision → Session-C source retraction → rebuilt pack → abstention/active-probe request. The test verifier is synthetic; no production Mycelix verifier is claimed.
