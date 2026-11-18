@@ -24,7 +24,8 @@ The 4.5 L/min figure is **not** a world-first or evidence of superiority:
 | U.S. EPA WaterSense showerheads | Maximum rated flow 2.0 US gpm (7.6 L/min); independent certification framework also evaluates spray force, spray coverage and pressure compensation | Programme specification; U.S. label, not South African law or Aqua certification |
 | Brondell Nebia Corre, model family N400RO | Manufacturer sheet lists 1.5 gpm (5.7 L/min) in three modes and 1.2 gpm (4.5 L/min) in Super Saver | Manufacturer-declared mode flow; sheet does not establish matched coverage/force at Aqua's 300 kPa point |
 | Hansgrohe Raindance Select E 120 3jet PowderRain EcoSmart+, SKU 28729000 | South African professional datasheet: PowderRain 5.2 L/min, Rain 5.4 L/min, massage 5.2 L/min at 3 bar; maximum 6 L/min; minimum flow pressure 1.5 bar | Exact local-market product declaration; not an independent matched test |
-| Hansgrohe Activera Select S 95 2jet EcoSmart, SKU 28087000 | South African datasheet: Rain 7.2 L/min, ImpactRain 6.5 L/min at 3 bar; minimum flow pressure 0.5 bar | Exact local-market product declaration; retain as a second pressure / spray-style comparator |
+| Hansgrohe Activera Select S shower system, SKU 28087000 | South African datasheet: Rain 7.2 L/min, ImpactRain 6.5 L/min, maximum system flow 8 L/min at 3 bar; minimum pressure 0.5 bar; maximum operating pressure 10 bar; ShowerTablet Select 360 thermostat and SafetyStop at 40°C | Exact local-market low-head shower-system comparator |
+| Hansgrohe Activera Select S shower set, SKU 28048000 | South African product page: Rain 7.2 L/min, ImpactRain 6.5 L/min, 7.2 L/min maximum at 3 bar; function from 3 L/min; 0.5–6 bar operating range | Exact local-market handheld shower-set comparator without ShowerTablet |
 | Consumer Reports 2026 test population | Public ratings show measured examples around 1.4–1.6 gpm (approximately 5.3–6.1 L/min); tests include coverage, force, consumption, temperature drop and ease of use | Independent consumer-lab measurements; acquire exact current SKU and method before a formal replication |
 | South African CLASP sample, summarized by WRC in 2025 | 19 products; pressure-compensating models averaged around 6.6 L/min at 300 kPa; fixed-orifice products averaged substantially higher | Dated local sample, not an exhaustive 2026 market census |
 
@@ -32,7 +33,8 @@ Sources:
 - EPA WaterSense showerhead programme and Version 1.1 specification: https://www.epa.gov/watersense/showerheads and https://19january2021snapshot.epa.gov/sites/static/files/2018-07/documents/ws-products-specification-showerheads-v1-1.pdf
 - Brondell Nebia Corre manufacturer specification: https://www.brondell.com/content/Nebia_Corre_Fixed_Showerhead_Spec_Sheet_web_010623.pdf
 - Hansgrohe South African SKU 28729000 datasheet: https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28729000
-- Hansgrohe South African SKU 28087000 datasheet: https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28087000
+- Hansgrohe South African SKU 28087000 shower-system datasheet: https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28087000
+- Hansgrohe South African SKU 28048000 shower-set page: https://pro.hansgrohe.co.za/articledetail-activera-select-s-shower-set-95-2jet-ecosmart-with-shower-bar-varia-72-cm-28048000
 - Consumer Reports 2026 test overview and ratings: https://www.consumerreports.org/home-garden/showerheads/best-showerheads-of-the-year-a7580523069/ and https://www.consumerreports.org/home-garden/showerheads/c33121/
 - WRC 2025 summary of the CLASP 19-product study: https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf
 
@@ -243,7 +245,7 @@ Source: https://doi.org/10.1016/j.buildenv.2025.112825
 
 ### Low-head research hypothesis
 
-The 50 / 75 / 100 kPa points are added because the SANS 10252-1:2018 Edition 3.2 Table 3 lists a 50–100 kPa design flow pressure for its water-saving showerhead row. This is a reason to test low-head behavior, not evidence that commercial heads are required or guaranteed to deliver a satisfactory bath at every value. Define actual task success, standard endpoints, flow and uncertainty at each point. Compare the exact Hansgrohe Activera 28087000 (manufacturer-declared 0.5 bar minimum) and Brondell Nebia Corre (manufacturer-declared 20–80 psi range) at matched dynamic pressure points where the component ratings and method allow.
+The 50 / 75 / 100 kPa points are added because the SANS 10252-1:2018 Edition 3.2 Table 3 lists a 50–100 kPa design flow pressure for its water-saving showerhead row. This is a reason to test low-head behavior, not evidence that commercial heads are required or guaranteed to deliver a satisfactory bath at every value. Define actual task success, standard endpoints, flow and uncertainty at each point. Compare exact Activera variants separately: 28087000 is the exposed shower system with ShowerTablet Select 360 and 10 bar maximum operating pressure; 28048000 is the shower set with a 6 bar maximum operating pressure. Both declare a 0.5 bar minimum. The Brondell Nebia Corre declares a 20–80 psi range, so 50 / 75 / 100 kPa points are below its declared range and must be labelled exploratory, not supported-range comparisons.
 
 The exact South African pressure datum must be dynamic pressure measured at the fitting inlet under flow. Record static pressure, upstream residual pressure and dynamic pressure separately. If a second fixture is drawing simultaneously, record that condition as a separate concurrent-demand block rather than mixing it with single-fixture results.
 
@@ -275,3 +277,8 @@ For any vortex / air-entraining candidate, preserve:
 A design that raises peripheral velocity while starving the centre, worsens aerosol outcomes, increases pressure demand, introduces hard-to-clean cavities or fails at 50–100 kPa is not a win.
 
 Source: van de Griend et al., Water (2019), 11(12), 2446, https://doi.org/10.3390/w11122446
+
+
+### Exact Activera variant separation
+
+The South African Activera comparator set contains distinct product configurations: 28087000 is the exposed shower system with integrated ShowerTablet Select 360 and 10 bar maximum operating pressure; 28048000 is the shower set with Varia 72 cm bar and 6 bar maximum operating pressure. Both declare 0.5 bar minimum pressure and the same Rain / ImpactRain nominal flow figures. Their installation and complete-system burdens differ, so do not pool observations. Sources: https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28087000 and https://pro.hansgrohe.co.za/articledetail-activera-select-s-shower-set-95-2jet-ecosmart-with-shower-bar-varia-72-cm-28048000.
