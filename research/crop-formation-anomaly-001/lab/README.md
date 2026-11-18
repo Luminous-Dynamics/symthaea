@@ -30,7 +30,7 @@ cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 ```
 
-The crate has no third-party dependencies. It includes a local `[workspace]` declaration so that it is not silently pulled into the root Symthaea workspace. The current source contains 30 authored unit tests; their execution remains pending because this editing environment has no Rust toolchain.
+The crate has no third-party dependencies. It includes a local `[workspace]` declaration so that it is not silently pulled into the root Symthaea workspace. The current source contains 35 authored unit tests; their execution remains pending because this editing environment has no Rust toolchain.
 
 ## Statistical interpretation
 
