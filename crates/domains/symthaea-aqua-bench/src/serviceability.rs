@@ -141,7 +141,6 @@ pub enum ServiceabilityError {
     MissingWaterQualityEvidence,
     MissingMetrologyEvidence,
     FunctionCheckNotPassed,
-    RequalificationEvidenceOnIncompleteJob,
     SameRunCompared,
     MatchedJobContextMismatch { field: &'static str },
     EmptyCohort,
@@ -157,7 +156,7 @@ impl Display for ServiceabilityError {
                 write!(f, "invalid serviceability measurement: {field}")
             }
             Self::SparePartIdentityRequired => {
-                write!(f, "available spare part requires an exact part identifier")
+                write!(f, "known spare-part availability requires an exact part identifier")
             }
             Self::DuplicateTool { tool_id } => {
                 write!(f, "duplicate tool identifier in service job: {tool_id}")
@@ -176,9 +175,6 @@ impl Display for ServiceabilityError {
             }
             Self::FunctionCheckNotPassed => {
                 write!(f, "qualified return-to-service requires a passed function check")
-            }
-            Self::RequalificationEvidenceOnIncompleteJob => {
-                write!(f, "incomplete service job cannot claim qualified return-to-service")
             }
             Self::SameRunCompared => write!(f, "a service run cannot be compared with itself"),
             Self::MatchedJobContextMismatch { field } => {
@@ -238,8 +234,11 @@ impl ServiceJobObservation {
         if let Some(part_id) = &self.spare_part_id {
             require_text("spare_part_id", part_id)?;
         }
-        if self.spare_part_availability == SparePartAvailability::AvailableBeforeJob
-            && self.spare_part_id.is_none()
+        if matches!(
+            self.spare_part_availability,
+            SparePartAvailability::AvailableBeforeJob
+                | SparePartAvailability::NotAvailableBeforeJob
+        ) && self.spare_part_id.is_none()
         {
             return Err(ServiceabilityError::SparePartIdentityRequired);
         }
@@ -281,23 +280,37 @@ impl ServiceJobObservation {
             {
                 return Err(ServiceabilityError::MissingMetrologyEvidence);
             }
-        } else if self.post_repair_function == PostRepairFunction::Pass
-            && !owners.contains(&ServiceEvidenceOwner::IndependentDeviceAuthority)
-            && !self.evidence.is_empty()
-        {
-            return Err(ServiceabilityError::RequalificationEvidenceOnIncompleteJob);
         }
 
         Ok(())
     }
 
+    fn has_required_return_evidence(&self) -> bool {
+        let has_owner = |owner| {
+            self.evidence.iter().any(|evidence| {
+                evidence.owner == owner
+                    && !evidence.record_id.trim().is_empty()
+                    && is_sha256(&evidence.sha256)
+            })
+        };
+
+        has_owner(ServiceEvidenceOwner::IndependentDeviceAuthority)
+            && (!self.water_quality_requalification_required
+                || has_owner(ServiceEvidenceOwner::MycelixWaterQuality))
+            && (!self.metrology_requalification_required
+                || has_owner(ServiceEvidenceOwner::MycelixMetrology))
+    }
+
     pub fn counts_as_qualified_return(&self) -> bool {
-        self.return_to_service == ReturnToServiceStatus::QualifiedReady
+        self.validate().is_ok()
+            && self.return_to_service == ReturnToServiceStatus::QualifiedReady
             && self.post_repair_function == PostRepairFunction::Pass
+            && self.has_required_return_evidence()
     }
 
     pub fn counts_as_non_destructive_repair(&self) -> bool {
-        self.routine_job
+        self.validate().is_ok()
+            && self.routine_job
             && self.access_outcome.is_non_destructive()
             && self.counts_as_qualified_return()
     }
@@ -824,6 +837,56 @@ mod tests {
         );
         record.spare_part_id = None;
         record.spare_part_availability = SparePartAvailability::AvailableBeforeJob;
+        assert_eq!(
+            record.validate(),
+            Err(ServiceabilityError::SparePartIdentityRequired)
+        );
+    }
+
+
+    #[test]
+    fn pending_repair_can_retain_partial_requalification_evidence_without_counting_as_returned() {
+        let mut record = observation(
+            "run-01",
+            ServiceAccessOutcome::WetSideWithoutDestructiveFinish,
+        );
+        record.return_to_service = ReturnToServiceStatus::Pending;
+        record.water_quality_requalification_required = true;
+        record.evidence = vec![evidence(
+            ServiceEvidenceOwner::MycelixWaterQuality,
+            "partial-water-quality",
+            'e',
+        )];
+
+        assert_eq!(record.validate(), Ok(()));
+        assert!(!record.counts_as_qualified_return());
+        assert!(!record.counts_as_non_destructive_repair());
+    }
+
+    #[test]
+    fn public_return_predicate_rejects_missing_required_requalification_receipt() {
+        let mut record = observation(
+            "run-01",
+            ServiceAccessOutcome::WetSideWithoutDestructiveFinish,
+        );
+        record.water_quality_requalification_required = true;
+
+        assert!(!record.counts_as_qualified_return());
+        assert_eq!(
+            record.validate(),
+            Err(ServiceabilityError::MissingWaterQualityEvidence)
+        );
+    }
+
+    #[test]
+    fn known_unavailable_spare_also_requires_exact_part_identity() {
+        let mut record = observation(
+            "run-01",
+            ServiceAccessOutcome::DrySideWithoutDestructiveFinish,
+        );
+        record.spare_part_id = None;
+        record.spare_part_availability = SparePartAvailability::NotAvailableBeforeJob;
+
         assert_eq!(
             record.validate(),
             Err(ServiceabilityError::SparePartIdentityRequired)
