@@ -1427,6 +1427,34 @@ mod tests {
             true
         );
         assert_eq!(
+            manifest["population_and_split_contract"]["primary_temporal_test"],
+            "tokamark_temporal_transfer"
+        );
+        assert_eq!(
+            manifest["population_and_split_contract"]["split_tracks"]["tokamark_temporal_transfer"]["total_shots"],
+            11188
+        );
+        assert_eq!(
+            manifest["population_and_split_contract"]["split_tracks"]["tokamark_temporal_transfer"]["shot_counts"]["train"],
+            6525
+        );
+        assert_eq!(
+            manifest["population_and_split_contract"]["split_tracks"]["tokamark_temporal_transfer"]["shot_counts"]["validation"],
+            1554
+        );
+        assert_eq!(
+            manifest["population_and_split_contract"]["split_tracks"]["tokamark_temporal_transfer"]["shot_counts"]["test"],
+            3109
+        );
+        assert_eq!(
+            manifest["population_and_split_contract"]["split_tracks"]["tokamark_temporal_transfer"]["campaign_membership"]["test"]["M8"],
+            2009
+        );
+        assert_eq!(
+            manifest["population_and_split_contract"]["split_tracks"]["tokamark_temporal_transfer"]["campaign_membership"]["test"]["M9"],
+            1100
+        );
+        assert_eq!(
             manifest["reference_benchmarks"]["gen_toka_group6"]["test_shots"],
             933
         );
