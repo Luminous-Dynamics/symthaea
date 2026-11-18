@@ -163,7 +163,7 @@ For mechanics, align masses, constraints, constitutive/contact models, integrato
 
 ## Artifacts and reproducibility
 
-- `fixtures/v0.1/cases.json`: five hand-authored exact controls plus 150 deterministic generated point-set instances (30 each for D4, C4, half-turn C2, reflection C2, and C1).
+- `fixtures/v0.1/cases.json`: five hand-authored exact controls plus 300 deterministic generated point-set instances (30 each for all ten distinct D4 subgroups: D4, C4, five order-two subgroups, two Klein-four subgroups, and C1).
 - `schemas/case_manifest.schema.json`: manifest validation.
 - Future accepted run: baseline source/version, input and split digests, hardware/software record, raw predictions, verifier receipts, all failures, and scorecard.
 - Never label a target as achieved from fixture unit tests alone.
@@ -191,13 +191,13 @@ The deterministic corpus is regenerated from the manifest's D4 matrices using xo
 
     python3 -I research/symmetry-discovery-benchmark-001/tools/generate_d4_pointsets.py --write
 
-The validator checks that the frozen 150 generated cases exactly match the generator output before computing their stabilizers. The workflow runs these checks against the exact triggering revision and is guarded against draft PR execution. This is fixture qualification only; no external learner baseline is run by it.
+The validator checks that the frozen 300 generated cases exactly match the generator output before computing their stabilizers. The workflow runs these checks against the exact triggering revision and is guarded against draft PR execution. This is fixture qualification only; no external learner baseline is run by it.
 
 
 ## Fixture arithmetic preflight (independent, not CI)
 
 An independent deterministic replay of the current v0.1 manifest checked:
-- all 150 generated point sets reproduce byte-for-byte from the declared seeds/attempt sequence and are unique;
+- all 300 generated point sets reproduce byte-for-byte from the declared seeds/attempt sequence and are unique;
 - each generated set's exact D4 stabilizer equals its declared target subgroup (D4, C4, half-turn C2, reflection C2 or C1);
 - the D4 matrix multiplication table is closed and every element has a two-sided inverse;
 - the three hand-authored geometric labels (D4, C4, C1) match exact point-set stabilizers;
@@ -213,8 +213,8 @@ In addition to the Python exact-rational fixture verifier and deterministic gene
 - all eight D4 matrices are unique and closed;
 - all 64 multiplication-table entries match matrix multiplication;
 - identity, two-sided inverses and associativity;
-- every declared target is a subgroup with the correct order/label, including the distinct (C_2) half-turn and reflection families;
-- all 153 structural fixtures have exactly the declared unordered point-set stabilizer;
+- every declared target is a subgroup with the correct order/label, including all five reflection/half-turn order-two subgroups and both non-cyclic Klein-four subgroups;
+- all 303 structural fixtures have exactly the declared unordered point-set stabilizer;
 - both regression fixtures have exactly the declared polynomial invariance subgroup, using checked integer coefficient expansion.
 
 The fixture workflow now runs both implementations on the exact triggering PR head: Python/Fraction validates the rational JSON and seeded generator, then pinned Rust 1.96 runs format, locked tests and strict Clippy. The two oracles use separate code paths; agreement is stronger than repeating one implementation twice.
