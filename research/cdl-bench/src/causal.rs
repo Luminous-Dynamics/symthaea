@@ -1,16 +1,16 @@
 //! Deterministic finite-state and structural-causal generators for CDL-Bench.
 //!
-//! Ground-truth latent states and SCM records are returned separately from the
-//! observation byte stream. Evaluators should provide only the observation
-//! stream and declared intervention manifest to a learner; retain latent state
-//! and generator parameters in the sealed scoring manifest.
+//! Ground-truth latent states, intervention manifests and mechanism parameters
+//! are kept separately from the learner-visible observation byte stream.
+//! The SCM2 stream header contains schema/length metadata only; intervention
+//! labels and mechanism truth remain evaluator-side.
 
 use std::fmt;
 
 const QMAX: i32 = i16::MAX as i32;
-const SCM_MAGIC: &[u8; 4] = b"SCM1";
-const SCM_VERSION: u16 = 1;
-const SCM_HEADER_LEN: usize = 33;
+const SCM_MAGIC: &[u8; 4] = b"SCM2";
+const SCM_VERSION: u16 = 2;
+const SCM_HEADER_LEN: usize = 16;
 
 /// Invalid configuration for a deterministic causal benchmark generator.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -249,9 +249,10 @@ pub fn e3_mechanism_splits() -> (Vec<ScmMechanismConfig>, Vec<ScmMechanismConfig
 pub struct ScmTrace {
     /// Observed values at each timestep, in variable order x0..x4.
     pub observations: Vec<[i16; 5]>,
-    /// Binary stream: SCM1 header, intervention manifest, then little-endian i16 records.
+    /// Learner-visible SCM2 stream: schema/length header followed by little-endian i16 records.
+    /// It deliberately excludes intervention labels and hidden mechanism parameters.
     pub stream: Vec<u8>,
-    /// Intervention supplied to the generator (also represented in stream header).
+    /// Evaluator-only intervention supplied to the generator; never serialized in `stream`.
     pub intervention: Option<ScmIntervention>,
     /// Hidden generator parameters, reserved for evaluator-side scoring.
     pub mechanisms: ScmMechanismConfig,
@@ -388,28 +389,8 @@ pub fn generate_scm_with_config(
     let mut stream = Vec::with_capacity(stream_capacity);
     stream.extend_from_slice(SCM_MAGIC);
     stream.extend_from_slice(&SCM_VERSION.to_le_bytes());
-    match intervention {
-        Some(do_op) => {
-            stream.push(do_op.variable);
-            stream.extend_from_slice(
-                &u64::try_from(do_op.start_step)
-                    .map_err(|_| GeneratorError::LengthOverflow)?
-                    .to_le_bytes(),
-            );
-            stream.extend_from_slice(
-                &u64::try_from(do_op.end_step)
-                    .map_err(|_| GeneratorError::LengthOverflow)?
-                    .to_le_bytes(),
-            );
-            stream.extend_from_slice(&do_op.value.to_le_bytes());
-        }
-        None => {
-            stream.push(u8::MAX);
-            stream.extend_from_slice(&0u64.to_le_bytes());
-            stream.extend_from_slice(&0u64.to_le_bytes());
-            stream.extend_from_slice(&0i16.to_le_bytes());
-        }
-    }
+    stream.push(0); // flags; v2 requires zero
+    stream.push(5); // fixed schema: x0..x4, signed i16, topological record order
     stream.extend_from_slice(&steps_u64.to_le_bytes());
 
     for record in &observations {
@@ -461,6 +442,33 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(a.stream.len(), SCM_HEADER_LEN + 1000 * 10);
         assert_eq!(&a.stream[..4], SCM_MAGIC);
+    }
+
+    #[test]
+    fn scm2_observation_header_hides_intervention_metadata() {
+        let baseline = generate_scm(128, 77, None).unwrap();
+        let treated = generate_scm(
+            128,
+            77,
+            Some(ScmIntervention {
+                variable: 1,
+                start_step: 32,
+                end_step: 96,
+                value: 20_000,
+            }),
+        )
+        .unwrap();
+
+        assert_eq!(&baseline.stream[..SCM_HEADER_LEN], &treated.stream[..SCM_HEADER_LEN]);
+        assert_eq!(&baseline.stream[..4], b"SCM2");
+        assert_eq!(u16::from_le_bytes([baseline.stream[4], baseline.stream[5]]), 2);
+        assert_eq!(baseline.stream[6], 0);
+        assert_eq!(baseline.stream[7], 5);
+        assert_eq!(
+            u64::from_le_bytes(baseline.stream[8..16].try_into().unwrap()),
+            128
+        );
+        assert_ne!(baseline.intervention, treated.intervention);
     }
 
     #[test]
