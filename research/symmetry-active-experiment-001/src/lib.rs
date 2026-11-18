@@ -663,12 +663,12 @@ pub fn solve_exact_static_probe_design(
             maximum: static_budget.maximum_subsets,
         });
     }
-    let subset_count = 1_u64
-        .checked_shl(admissible.len() as u32)
-        .ok_or(ExperimentErrorV1::ProbeSubsetBudgetExceeded {
+    let subset_count = 1_u64.checked_shl(admissible.len() as u32).ok_or(
+        ExperimentErrorV1::ProbeSubsetBudgetExceeded {
             required: u64::MAX,
             maximum: static_budget.maximum_subsets,
-        })?;
+        },
+    )?;
     if subset_count > static_budget.maximum_subsets {
         return Err(ExperimentErrorV1::ProbeSubsetBudgetExceeded {
             required: subset_count,
@@ -718,9 +718,9 @@ pub fn solve_exact_static_probe_design(
             }
         }
 
-        let covers_every_resolvable_pair = pair_cover_masks.iter().all(|cover_mask| {
-            subset & cover_mask != 0
-        });
+        let covers_every_resolvable_pair = pair_cover_masks
+            .iter()
+            .all(|cover_mask| subset & cover_mask != 0);
         if !covers_every_resolvable_pair {
             continue;
         }
@@ -761,8 +761,7 @@ pub fn verify_exact_static_probe_design(
     problem_budget: QualificationBudgetV1,
     static_budget: StaticProbeBudgetV1,
 ) -> Result<(), ExperimentErrorV1> {
-    let replayed =
-        solve_exact_static_probe_design(problem, problem_budget, static_budget)?;
+    let replayed = solve_exact_static_probe_design(problem, problem_budget, static_budget)?;
     if *certificate != replayed {
         return Err(ExperimentErrorV1::ReceiptMismatch);
     }
@@ -1067,12 +1066,9 @@ mod tests {
     #[test]
     fn exact_static_probe_basis_matches_exhaustive_minimum_and_adaptive_cost() {
         let problem = fixture();
-        let static_certificate = solve_exact_static_probe_design(
-            &problem,
-            budget(),
-            StaticProbeBudgetV1::default(),
-        )
-        .unwrap();
+        let static_certificate =
+            solve_exact_static_probe_design(&problem, budget(), StaticProbeBudgetV1::default())
+                .unwrap();
         let adaptive_certificate = compile_active_experiment(&problem, budget()).unwrap();
 
         assert_eq!(
@@ -1103,12 +1099,9 @@ mod tests {
     fn exact_static_design_preserves_intrinsically_unresolved_hypothesis_pairs() {
         let mut problem = fixture();
         problem.probes[2].outcomes = vec![0, 0, 0, 0];
-        let certificate = solve_exact_static_probe_design(
-            &problem,
-            budget(),
-            StaticProbeBudgetV1::default(),
-        )
-        .unwrap();
+        let certificate =
+            solve_exact_static_probe_design(&problem, budget(), StaticProbeBudgetV1::default())
+                .unwrap();
         assert!(!certificate.all_hypotheses_pairwise_distinguished);
         assert!(!certificate.intrinsically_unresolved_pairs.is_empty());
         assert_eq!(certificate.distinguished_pairs.len(), 5);
@@ -1136,12 +1129,9 @@ mod tests {
     #[test]
     fn exact_static_certificate_rejects_forged_optimum_or_changed_problem() {
         let problem = fixture();
-        let mut certificate = solve_exact_static_probe_design(
-            &problem,
-            budget(),
-            StaticProbeBudgetV1::default(),
-        )
-        .unwrap();
+        let mut certificate =
+            solve_exact_static_probe_design(&problem, budget(), StaticProbeBudgetV1::default())
+                .unwrap();
         verify_exact_static_probe_design(
             &problem,
             &certificate,
