@@ -46,7 +46,11 @@
         "measurement_timestamp": "2026-11-18T09:00:00Z"
       },
       "raw_data_sha256": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "source_reference": "https://doi.org/10.1103/PhysRevB.110.134501"
+      "source_reference": "https://doi.org/10.1103/PhysRevB.110.134501",
+      "forward_operator_coefficients": [
+        1,
+        0
+      ]
     },
     {
       "observation_id": "obs-heat-capacity-001",
@@ -72,7 +76,11 @@
         "measurement_timestamp": "2026-11-18T09:05:00Z"
       },
       "raw_data_sha256": "1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b",
-      "source_reference": "https://doi.org/10.1103/PhysRevB.64.092506"
+      "source_reference": "https://doi.org/10.1103/PhysRevB.64.092506",
+      "forward_operator_coefficients": [
+        0.1,
+        0.8
+      ]
     },
     {
       "observation_id": "obs-vorticity-001",
@@ -98,7 +106,11 @@
         "measurement_timestamp": "2026-11-18T09:10:00Z"
       },
       "raw_data_sha256": "2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c",
-      "source_reference": "https://doi.org/10.1103/PhysRevB.63.132504"
+      "source_reference": "https://doi.org/10.1103/PhysRevB.63.132504",
+      "forward_operator_coefficients": [
+        0.02,
+        0.5
+      ]
     }
   ],
   "split": {
@@ -117,12 +129,25 @@
     "model_family": "lattice_ginzburg_landau",
     "model_version": "SC-AMPLITUDE-PHASE-0.1",
     "target_parameters": [
-      "a_uniform",
-      "b_uniform",
-      "K_uniform"
+      "amplitude_scale",
+      "phase_stiffness_scale"
     ],
-    "prior_definition_id": "synthetic-bounded-uniform-priors-v0",
-    "observation_operator_version": "synthetic-gl-observation-map-v0"
+    "prior_definition_id": "synthetic-independent-gaussian-prior-variance-4-v0",
+    "observation_operator_version": "synthetic-gl-observation-map-v0",
+    "parameter_prior_mean": [
+      0.5,
+      0.5
+    ],
+    "parameter_prior_precision": [
+      [
+        0.25,
+        0
+      ],
+      [
+        0,
+        0.25
+      ]
+    ]
   },
   "source_references": [
     "https://doi.org/10.1103/PhysRevB.110.134501",
