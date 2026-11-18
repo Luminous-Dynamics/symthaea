@@ -139,7 +139,7 @@ Count:
 
 Cold-start controls, demand-controlled hot-water delivery and compact/short branch runs are candidate design hypotheses. Any water/energy saving must be demonstrated on an equal task and must count the hot-water distribution boundary.
 
-## 4. Matched comparator arms
+## 5. Matched comparator arms
 
 Freeze exact market SKU, model, installation, supply, hardware, firmware, accessories and maintenance state before testing.
 
@@ -157,7 +157,7 @@ Freeze exact market SKU, model, installation, supply, hardware, firmware, access
 
 Vendor data may nominate comparators but cannot replace measured results. If local market version or operating boundary is unknown, preserve UNKNOWN and do not rank it.
 
-## 5. Frozen conditions and metrology
+## 6. Frozen conditions and metrology
 
 Preregister:
 - device/fixture serial, exact model and configuration;
@@ -179,7 +179,7 @@ For bath fill and thermal assessment, use actual measured temperature and volume
 
 This is an idealized water sensible-heat calculation only. It does not account for heater efficiency, hot/cold mixing, storage/distribution losses, tub heat capacity, room heat exchange or human-body displacement. Physical meters and the relevant Symtropy thermal authority remain the result source.
 
-## 6. Primary endpoint vector
+## 7. Primary endpoint vector
 
 Do not produce a universal “water-saving fixture score.” Report separately by fixture and task:
 - task completion and quality;
@@ -196,7 +196,7 @@ Do not produce a universal “water-saving fixture score.” Report separately b
 
 Safety, potable-source protection, backflow, temperature limits, hygiene, egress and accessibility are non-compensatory gates. A lower resource number cannot compensate for failure in those categories.
 
-## 7. Proposed targets — hypotheses, not achieved results
+## 8. Proposed targets — hypotheses, not achieved results
 
 ### Basin
 - Primary reference: ≤5.7 L/min at 414 kPa with no less than 3.0 L/min at 138 kPa, using the existing WaterSense specification only as a comparison reference.
@@ -219,7 +219,7 @@ Safety, potable-source protection, backflow, temperature limits, hygiene, egress
 - ≥20% lower lifecycle cost per qualified task is a stretch objective only after matched installed prices, utility costs, cleaning labour, consumables, repairs, replacements and downtime have been independently measured.
 - No cleaning or maintenance burden shifted silently to the resident.
 
-## 8. Adversarial / fault corpus
+## 9. Adversarial / fault corpus
 
 1. low inlet pressure with task flow below the usable floor;
 2. high pressure and pressure-compensator failure;
@@ -239,12 +239,12 @@ Safety, potable-source protection, backflow, temperature limits, hygiene, egress
 
 Synthetic cases validate data/logic only; they do not demonstrate real fixture performance, hygiene or usability.
 
-## 9. Statistical and human-factors design
+## 10. Statistical and human-factors design
 
 Use pilot runs to estimate variance and cluster effects, then preregister the locked confirmation sample size and stopping rule. Preserve independent physical runs separately from multiple readings in the same run; account for device, installation, operator, day and water-batch clustering. Blind task assessors where practical.
 
 Human-factors research requires independent safety review, informed consent, an appropriate protocol and any applicable ethics approval. No human trial can promote a fixture to regulatory or clinical certification.
 
-## 10. Claim ceiling
+## 11. Claim ceiling
 
 This protocol does not establish potable-water safety, bidet hygiene, disease prevention, clinical benefit, accessibility certification, South African standards compliance, water/energy savings, affordability, reliability, product superiority or permission for occupied deployment. Targets are hypotheses until the exact product and matched task have been independently tested.
