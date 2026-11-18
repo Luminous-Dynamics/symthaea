@@ -696,6 +696,51 @@ mod tests {
         run.flow_lpm = -0.1;
         assert_eq!(run.validate(), Err(PressureRunError::InvalidFlow));
     }
+
+
+    #[test]
+    fn matched_comparison_rejects_different_pressure_datums() {
+        let control = observation("control-01", "incumbent", 100.0);
+        let mut candidate = observation("candidate-01", "aqua-article", 101.0);
+        candidate.pressure_datum = PressureMeasurementDatum::PointOfDischarge;
+        assert_eq!(
+            validate_matched_pressure_comparison(&control, &candidate, 3.0),
+            Err(PressureRunError::PressureDatumMismatch)
+        );
+    }
+
+    #[test]
+    fn manufacturer_pressure_range_with_unknown_datum_is_not_scored_as_matched() {
+        let mut run = observation("run-01", "manufacturer-product", 100.0);
+        run.product_declared_range = Some(DeclaredProductPressureRange {
+            minimum_kpa: Some(50.0),
+            maximum_kpa: Some(300.0),
+            pressure_datum: None,
+            source_sha256: digest('e'),
+        });
+        assert_eq!(run.validate(), Ok(()));
+        assert_eq!(
+            run.product_pressure_range_status(),
+            Ok(ProductPressureRangeStatus::DeclaredDatumNotSpecified)
+        );
+    }
+
+    #[test]
+    fn manufacturer_pressure_range_with_other_datum_is_not_scored_as_matched() {
+        let mut run = observation("run-01", "manufacturer-product", 100.0);
+        run.product_declared_range = Some(DeclaredProductPressureRange {
+            minimum_kpa: Some(50.0),
+            maximum_kpa: Some(300.0),
+            pressure_datum: Some(PressureMeasurementDatum::PointOfDischarge),
+            source_sha256: digest('e'),
+        });
+        assert_eq!(run.validate(), Ok(()));
+        assert_eq!(
+            run.product_pressure_range_status(),
+            Ok(ProductPressureRangeStatus::DeclaredDatumMismatch)
+        );
+    }
+
 }
 
 
@@ -1273,6 +1318,29 @@ mod retention_tests {
         assert_eq!(
             compare_flow_retention(&low, &high, 0.60),
             Err(PressureRetentionError::PressureIntervalsNotSeparated)
+        );
+    }
+
+
+    #[test]
+    fn pressure_retention_rejects_different_measurement_datums() {
+        let low = observation("run-150", 150.0, 4.0);
+        let mut high = observation("run-300", 300.0, 5.0);
+        high.pressure_datum = PressureMeasurementDatum::PointOfDischarge;
+        assert_eq!(
+            compare_flow_retention(&low, &high, 0.60),
+            Err(PressureRetentionError::PressureDatumMismatch)
+        );
+    }
+
+    #[test]
+    fn paired_result_preserves_the_pressure_datum() {
+        let low = observation("run-150", 150.0, 4.0);
+        let high = observation("run-300", 300.0, 5.0);
+        let result = compare_flow_retention(&low, &high, 0.60).expect("valid paired runs");
+        assert_eq!(
+            result.pressure_datum,
+            PressureMeasurementDatum::TerminalFittingInlet
         );
     }
 
