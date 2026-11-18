@@ -36,7 +36,8 @@ pub struct RawInteractionV1 {
     pub utility_unit: String,
     pub valid_from_ms: i64,
     pub valid_until_ms: Option<i64>,
-    pub recorded_at_ms: i64,
+    /// Client/source event time; never used as transaction-time authority.
+    pub occurred_at_ms: i64,
     pub prediction_registered_at_ms: Option<i64>,
     pub action_dispatched_at_ms: Option<i64>,
     pub outcome_observed_at_ms: i64,
@@ -78,7 +79,9 @@ pub struct VerifiedRawEvent {
     pub authority_receipt_digest: String,
     pub valid_from_ms: i64,
     pub valid_until_ms: Option<i64>,
-    pub recorded_at_ms: i64,
+    pub occurred_at_ms: i64,
+    /// Server-observed, signed authority receipt time used for known_at.
+    pub received_at_ms: i64,
     pub receipt_digest: String,
 }
 
@@ -164,6 +167,8 @@ pub struct EvidenceReceiptBundle {
     pub raw_event_receipt_digest: String,
     pub canonical_event_hash: String,
     pub authority_receipt_digest: String,
+    pub event_occurred_at_ms: i64,
+    pub authority_received_at_ms: i64,
     pub lineage_digest: String,
     pub source_acquisition_mode: String,
     pub upstream_source_id: String,
@@ -236,8 +241,8 @@ pub fn ingest_as_known(
         || !is_sha256_hex(&event.receipt_digest)
         || event.valid_from_ms != raw.valid_from_ms
         || event.valid_until_ms != raw.valid_until_ms
-        || event.recorded_at_ms != raw.recorded_at_ms
-        || event.receipt_digest.is_empty()
+        || event.occurred_at_ms != raw.occurred_at_ms
+        || event.received_at_ms < 0
     {
         return Err(IngestReject::RawEventReceiptMismatch);
     }
@@ -252,7 +257,7 @@ pub fn ingest_as_known(
     {
         return Err(IngestReject::NotValidAtRequestedTime);
     }
-    if event.recorded_at_ms > query.known_at_ms {
+    if event.received_at_ms > query.known_at_ms {
         return Err(IngestReject::RecordedAfterKnownAt);
     }
     if raw.outcome_observed_at_ms > query.known_at_ms {
@@ -379,6 +384,8 @@ pub fn ingest_as_known(
             raw_event_receipt_digest: event.receipt_digest,
             canonical_event_hash: event.canonical_event_hash,
             authority_receipt_digest: event.authority_receipt_digest,
+            event_occurred_at_ms: event.occurred_at_ms,
+            authority_received_at_ms: event.received_at_ms,
             lineage_digest: lineage.receipt_digest,
             source_acquisition_mode: lineage.acquisition_mode,
             upstream_source_id: lineage.upstream_source_id,
@@ -507,7 +514,8 @@ mod tests {
                 authority_receipt_digest: "b".repeat(64),
                 valid_from_ms: raw.valid_from_ms,
                 valid_until_ms: raw.valid_until_ms,
-                recorded_at_ms: raw.recorded_at_ms,
+                occurred_at_ms: raw.occurred_at_ms,
+                received_at_ms: 220,
                 receipt_digest: "a".repeat(64),
             })
         }
@@ -612,7 +620,7 @@ mod tests {
             utility_unit: "normalized_utility".into(),
             valid_from_ms: 100,
             valid_until_ms: Some(300),
-            recorded_at_ms: 220,
+            occurred_at_ms: 170,
             prediction_registered_at_ms: Some(150),
             action_dispatched_at_ms: Some(170),
             outcome_observed_at_ms: 200,
@@ -700,7 +708,7 @@ mod tests {
         ));
         let mut after_validity = raw();
         after_validity.outcome_observed_at_ms = 350;
-        after_validity.recorded_at_ms = 360;
+        after_validity.occurred_at_ms = 170;
         assert!(matches!(
             ingest_as_known(
                 &after_validity,
@@ -749,6 +757,8 @@ mod tests {
         assert_eq!(admitted.receipts.lineage_digest, "d".repeat(64));
         assert_eq!(admitted.receipts.raw_event_digest, raw().payload_sha256);
         assert_eq!(admitted.receipts.canonical_event_hash, "c".repeat(64));
+        assert_eq!(admitted.receipts.event_occurred_at_ms, 170);
+        assert_eq!(admitted.receipts.authority_received_at_ms, 220);
         assert_eq!(
             admitted.receipts.authority_receipt_digest,
             "b".repeat(64)
@@ -762,6 +772,21 @@ mod tests {
             "bis:dataflow:private-credit"
         );
         assert_eq!(admitted.receipts.measurement_instrument_id, "sensor-17");
+    }
+
+    #[test]
+    fn client_occurred_at_cannot_backdate_known_at_eligibility() {
+        // Event time is 170, but the signed server receipt time is 220.
+        assert!(matches!(
+            ingest_as_known(&raw(), query(180, 210), &TestVerifier::default()),
+            Err(IngestReject::RecordedAfterKnownAt)
+        ));
+        assert!(ingest_as_known(
+            &raw(),
+            query(180, 220),
+            &TestVerifier::default()
+        )
+        .is_ok());
     }
 
     #[test]
