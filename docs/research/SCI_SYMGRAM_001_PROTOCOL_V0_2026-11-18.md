@@ -216,6 +216,10 @@ AI-Newton's published 46-experiment mechanics result is a valuable concept-disco
 
 Scientist World is a broader paper-derived autonomous-research benchmark (1,000 executable environments claimed by its authors). Its reported results concern paper-derived research tasks, not this controlled physics/grammar task, so it belongs on a separate full-cycle research scorecard rather than this leaderboard.
 
+**Whole-system scientific autonomy is another separate scorecard.** Autonomous Science Bench 0.1 evaluates six pilot lab campaigns and requires both discovery quality among selected/measured designs and learning quality on designs never measured. Its public leaderboard reports GPT-6 Astra + Codex at 72.2% and Opus 5.5 + Claude Code at 66.7%; the maintainers note only three trials per task, so small gaps are not meaningful. It also reports all-in campaign cost and agent time. These are not directly comparable to the SCI-SYMGRAM mechanics factorial and must never be pooled with its law-recovery metrics. Reuse Symthaea #10921 for the pinned replay/twin adapter and #12461 for the six-campaign scorecard expansion rather than creating another ASB adapter. References: https://asb.open-ssi.org/ and https://arxiv.org/abs/2610.18449.
+
+SRBench 2025 is the symbolic-expression comparison floor: 25 methods in a Docker-based setup, hyperparameter tuning, and 30 independent runs per dataset across 24 PMLB datasets plus first-principles problems. Use that reproducibility discipline for the PySR/Operon-compatible lane; do not reinterpret it as end-to-end scientific-agent performance. Reference: https://cavalab.org/srbench/.
+
 External baseline status must be explicit:
 - **Reproduced:** same source/task, configuration, budget and scorer independently executed.
 - **Matched adapter:** a common interface and paired task subset, with all divergences recorded.
