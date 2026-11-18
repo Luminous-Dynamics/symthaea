@@ -51,7 +51,7 @@
       }
     ],
     "source_url": "https://arxiv.org/abs/2603.05123v2",
-    "source_revision": "arXiv:2603.05123v2; dated 2026-08-06; Table I and Supplementary Tables S1/S2 transcribed; not reconciled against the 2026-11-03 PRL publication version"
+    "source_revision": "arXiv:2603.05123v2; manuscript dated 2026-08-07 (arXiv version record 2026-08-06); Table I and Supplementary Tables S1/S2 transcribed; not reconciled against the 2026-11-03 PRL publication version"
   },
   "material_states": [
     {
@@ -301,7 +301,7 @@
       }
     },
     {
-      "state_id": "H3S_ambient_200GPa",
+      "state_id": "H3S_200GPa",
       "material_id": "H3S",
       "composition": "H3S",
       "structure_id": "Im3m",
@@ -411,7 +411,7 @@
   },
   "environment": {
     "measurement_or_calculation_scope": "multi_state",
-    "source_temperature": "Tc is tabulated per state; xi0 and lambda_L are low-temperature/zero-temperature response scales in the source methodology",
+    "source_temperature": "Tc is calculated for each state; xi0 and the tabulated lambda_L estimates are source-reported low-temperature response scales; the full supplementary temperature curves are separate data, not collapsed into this single-value fixture",
     "source_pressure": "0 GPa for Al, In, Sn, Ta, Pb, Nb and V3Si; 200 GPa for H3S",
     "state_linkage_rule": "separate_state_records"
   },
@@ -430,7 +430,8 @@
       "measurement_or_derivation_method": "SCDFT calculated superconducting transition temperature; not experimental Tc",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Al_xi0_finite_q",
@@ -443,10 +444,11 @@
       "isotropy_assumption": "not_applicable",
       "uncertainty": null,
       "evidence_status": "paper_reported",
-      "measurement_or_derivation_method": "Microscopic finite-pair-momentum suppression criterion: xi0=1/(sqrt(2)*Q2), with Q2 where Fermi-surface-averaged gap reaches 1/sqrt(2) of the Q=0 value; zero-temperature length scale",
+      "measurement_or_derivation_method": "Microscopic finite-pair-momentum suppression criterion: xi0=1/(sqrt(2)*Q2), with Q2 where Fermi-surface-averaged gap reaches 1/sqrt(2) of the Q=0 value; zero-temperature coherence length, xi0",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "microscopic_xi0"
+      "length_scale_definition": "microscopic_xi0",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Al_lambda_slope",
@@ -462,7 +464,8 @@
       "measurement_or_derivation_method": "Eq. (20) current-slope extraction from the linear-response derivative of superconducting current as Q approaches zero; paper-reported scalar estimate; directionality not specified by source",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Al_lambda_peak",
@@ -478,7 +481,8 @@
       "measurement_or_derivation_method": "Eq. (21) depairing-current peak extraction using a GL relation; approximation stated accurate near Tc and increasingly different from current-slope estimate at lower temperatures; paper-reported scalar estimate; directionality not specified by source",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Al_jdp_intrinsic",
@@ -494,7 +498,8 @@
       "measurement_or_derivation_method": "Calculated intrinsic depairing current density at the maximum of the superconducting current versus Cooper-pair momentum; not measured critical current Jc",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Al_gap_fermi_surface",
@@ -510,7 +515,8 @@
       "measurement_or_derivation_method": "Fermi-surface-averaged superconducting gap from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Al_vf_fermi_surface",
@@ -526,7 +532,8 @@
       "measurement_or_derivation_method": "Fermi-surface-averaged Fermi velocity from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Al_lambda_ep",
@@ -542,7 +549,8 @@
       "measurement_or_derivation_method": "Fröhlich electron-phonon mass-enhancement factor from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "In_tc_scdft",
@@ -558,7 +566,8 @@
       "measurement_or_derivation_method": "SCDFT calculated superconducting transition temperature; not experimental Tc",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "In_xi0_finite_q",
@@ -571,10 +580,11 @@
       "isotropy_assumption": "not_applicable",
       "uncertainty": null,
       "evidence_status": "paper_reported",
-      "measurement_or_derivation_method": "Microscopic finite-pair-momentum suppression criterion: xi0=1/(sqrt(2)*Q2), with Q2 where Fermi-surface-averaged gap reaches 1/sqrt(2) of the Q=0 value; zero-temperature length scale",
+      "measurement_or_derivation_method": "Microscopic finite-pair-momentum suppression criterion: xi0=1/(sqrt(2)*Q2), with Q2 where Fermi-surface-averaged gap reaches 1/sqrt(2) of the Q=0 value; zero-temperature coherence length, xi0",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "microscopic_xi0"
+      "length_scale_definition": "microscopic_xi0",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "In_lambda_slope",
@@ -590,7 +600,8 @@
       "measurement_or_derivation_method": "Eq. (20) current-slope extraction from the linear-response derivative of superconducting current as Q approaches zero; paper-reported scalar estimate; directionality not specified by source",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "In_lambda_peak",
@@ -606,7 +617,8 @@
       "measurement_or_derivation_method": "Eq. (21) depairing-current peak extraction using a GL relation; approximation stated accurate near Tc and increasingly different from current-slope estimate at lower temperatures; paper-reported scalar estimate; directionality not specified by source",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "In_jdp_intrinsic",
@@ -622,7 +634,8 @@
       "measurement_or_derivation_method": "Calculated intrinsic depairing current density at the maximum of the superconducting current versus Cooper-pair momentum; not measured critical current Jc",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "In_gap_fermi_surface",
@@ -638,7 +651,8 @@
       "measurement_or_derivation_method": "Fermi-surface-averaged superconducting gap from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "In_vf_fermi_surface",
@@ -654,7 +668,8 @@
       "measurement_or_derivation_method": "Fermi-surface-averaged Fermi velocity from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "In_lambda_ep",
@@ -670,7 +685,8 @@
       "measurement_or_derivation_method": "Fröhlich electron-phonon mass-enhancement factor from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Sn_tc_scdft",
@@ -686,7 +702,8 @@
       "measurement_or_derivation_method": "SCDFT calculated superconducting transition temperature; not experimental Tc",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Sn_xi0_finite_q",
@@ -699,10 +716,11 @@
       "isotropy_assumption": "not_applicable",
       "uncertainty": null,
       "evidence_status": "paper_reported",
-      "measurement_or_derivation_method": "Microscopic finite-pair-momentum suppression criterion: xi0=1/(sqrt(2)*Q2), with Q2 where Fermi-surface-averaged gap reaches 1/sqrt(2) of the Q=0 value; zero-temperature length scale",
+      "measurement_or_derivation_method": "Microscopic finite-pair-momentum suppression criterion: xi0=1/(sqrt(2)*Q2), with Q2 where Fermi-surface-averaged gap reaches 1/sqrt(2) of the Q=0 value; zero-temperature coherence length, xi0",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "microscopic_xi0"
+      "length_scale_definition": "microscopic_xi0",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Sn_lambda_slope",
@@ -718,7 +736,8 @@
       "measurement_or_derivation_method": "Eq. (20) current-slope extraction from the linear-response derivative of superconducting current as Q approaches zero; paper-reported scalar estimate; directionality not specified by source",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Sn_lambda_peak",
@@ -734,7 +753,8 @@
       "measurement_or_derivation_method": "Eq. (21) depairing-current peak extraction using a GL relation; approximation stated accurate near Tc and increasingly different from current-slope estimate at lower temperatures; paper-reported scalar estimate; directionality not specified by source",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Sn_jdp_intrinsic",
@@ -750,7 +770,8 @@
       "measurement_or_derivation_method": "Calculated intrinsic depairing current density at the maximum of the superconducting current versus Cooper-pair momentum; not measured critical current Jc",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Sn_gap_fermi_surface",
@@ -766,7 +787,8 @@
       "measurement_or_derivation_method": "Fermi-surface-averaged superconducting gap from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Sn_vf_fermi_surface",
@@ -782,7 +804,8 @@
       "measurement_or_derivation_method": "Fermi-surface-averaged Fermi velocity from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Sn_lambda_ep",
@@ -798,7 +821,8 @@
       "measurement_or_derivation_method": "Fröhlich electron-phonon mass-enhancement factor from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Ta_tc_scdft",
@@ -814,7 +838,8 @@
       "measurement_or_derivation_method": "SCDFT calculated superconducting transition temperature; not experimental Tc",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Ta_xi0_finite_q",
@@ -827,10 +852,11 @@
       "isotropy_assumption": "not_applicable",
       "uncertainty": null,
       "evidence_status": "paper_reported",
-      "measurement_or_derivation_method": "Microscopic finite-pair-momentum suppression criterion: xi0=1/(sqrt(2)*Q2), with Q2 where Fermi-surface-averaged gap reaches 1/sqrt(2) of the Q=0 value; zero-temperature length scale",
+      "measurement_or_derivation_method": "Microscopic finite-pair-momentum suppression criterion: xi0=1/(sqrt(2)*Q2), with Q2 where Fermi-surface-averaged gap reaches 1/sqrt(2) of the Q=0 value; zero-temperature coherence length, xi0",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "microscopic_xi0"
+      "length_scale_definition": "microscopic_xi0",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Ta_lambda_slope",
@@ -846,7 +872,8 @@
       "measurement_or_derivation_method": "Eq. (20) current-slope extraction from the linear-response derivative of superconducting current as Q approaches zero; paper-reported scalar estimate; directionality not specified by source",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Ta_lambda_peak",
@@ -862,7 +889,8 @@
       "measurement_or_derivation_method": "Eq. (21) depairing-current peak extraction using a GL relation; approximation stated accurate near Tc and increasingly different from current-slope estimate at lower temperatures; paper-reported scalar estimate; directionality not specified by source",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Ta_jdp_intrinsic",
@@ -878,7 +906,8 @@
       "measurement_or_derivation_method": "Calculated intrinsic depairing current density at the maximum of the superconducting current versus Cooper-pair momentum; not measured critical current Jc",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Ta_gap_fermi_surface",
@@ -894,7 +923,8 @@
       "measurement_or_derivation_method": "Fermi-surface-averaged superconducting gap from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Ta_vf_fermi_surface",
@@ -910,7 +940,8 @@
       "measurement_or_derivation_method": "Fermi-surface-averaged Fermi velocity from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Ta_lambda_ep",
@@ -926,7 +957,8 @@
       "measurement_or_derivation_method": "Fröhlich electron-phonon mass-enhancement factor from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Pb_tc_scdft",
@@ -942,7 +974,8 @@
       "measurement_or_derivation_method": "SCDFT calculated superconducting transition temperature; not experimental Tc",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Pb_xi0_finite_q",
@@ -955,10 +988,11 @@
       "isotropy_assumption": "not_applicable",
       "uncertainty": null,
       "evidence_status": "paper_reported",
-      "measurement_or_derivation_method": "Microscopic finite-pair-momentum suppression criterion: xi0=1/(sqrt(2)*Q2), with Q2 where Fermi-surface-averaged gap reaches 1/sqrt(2) of the Q=0 value; zero-temperature length scale",
+      "measurement_or_derivation_method": "Microscopic finite-pair-momentum suppression criterion: xi0=1/(sqrt(2)*Q2), with Q2 where Fermi-surface-averaged gap reaches 1/sqrt(2) of the Q=0 value; zero-temperature coherence length, xi0",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "microscopic_xi0"
+      "length_scale_definition": "microscopic_xi0",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Pb_lambda_slope",
@@ -974,7 +1008,8 @@
       "measurement_or_derivation_method": "Eq. (20) current-slope extraction from the linear-response derivative of superconducting current as Q approaches zero; paper-reported scalar estimate; directionality not specified by source",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Pb_lambda_peak",
@@ -990,7 +1025,8 @@
       "measurement_or_derivation_method": "Eq. (21) depairing-current peak extraction using a GL relation; approximation stated accurate near Tc and increasingly different from current-slope estimate at lower temperatures; paper-reported scalar estimate; directionality not specified by source",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Pb_jdp_intrinsic",
@@ -1006,7 +1042,8 @@
       "measurement_or_derivation_method": "Calculated intrinsic depairing current density at the maximum of the superconducting current versus Cooper-pair momentum; not measured critical current Jc",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Pb_gap_fermi_surface",
@@ -1022,7 +1059,8 @@
       "measurement_or_derivation_method": "Fermi-surface-averaged superconducting gap from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Pb_vf_fermi_surface",
@@ -1038,7 +1076,8 @@
       "measurement_or_derivation_method": "Fermi-surface-averaged Fermi velocity from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Pb_lambda_ep",
@@ -1054,7 +1093,8 @@
       "measurement_or_derivation_method": "Fröhlich electron-phonon mass-enhancement factor from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Nb_tc_scdft",
@@ -1070,7 +1110,8 @@
       "measurement_or_derivation_method": "SCDFT calculated superconducting transition temperature; not experimental Tc",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Nb_xi0_finite_q",
@@ -1083,10 +1124,11 @@
       "isotropy_assumption": "not_applicable",
       "uncertainty": null,
       "evidence_status": "paper_reported",
-      "measurement_or_derivation_method": "Microscopic finite-pair-momentum suppression criterion: xi0=1/(sqrt(2)*Q2), with Q2 where Fermi-surface-averaged gap reaches 1/sqrt(2) of the Q=0 value; zero-temperature length scale",
+      "measurement_or_derivation_method": "Microscopic finite-pair-momentum suppression criterion: xi0=1/(sqrt(2)*Q2), with Q2 where Fermi-surface-averaged gap reaches 1/sqrt(2) of the Q=0 value; zero-temperature coherence length, xi0",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "microscopic_xi0"
+      "length_scale_definition": "microscopic_xi0",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Nb_lambda_slope",
@@ -1102,7 +1144,8 @@
       "measurement_or_derivation_method": "Eq. (20) current-slope extraction from the linear-response derivative of superconducting current as Q approaches zero; paper-reported scalar estimate; directionality not specified by source",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Nb_lambda_peak",
@@ -1118,7 +1161,8 @@
       "measurement_or_derivation_method": "Eq. (21) depairing-current peak extraction using a GL relation; approximation stated accurate near Tc and increasingly different from current-slope estimate at lower temperatures; paper-reported scalar estimate; directionality not specified by source",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Nb_jdp_intrinsic",
@@ -1134,7 +1178,8 @@
       "measurement_or_derivation_method": "Calculated intrinsic depairing current density at the maximum of the superconducting current versus Cooper-pair momentum; not measured critical current Jc",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Nb_gap_fermi_surface",
@@ -1150,7 +1195,8 @@
       "measurement_or_derivation_method": "Fermi-surface-averaged superconducting gap from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Nb_vf_fermi_surface",
@@ -1166,7 +1212,8 @@
       "measurement_or_derivation_method": "Fermi-surface-averaged Fermi velocity from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "Nb_lambda_ep",
@@ -1182,11 +1229,12 @@
       "measurement_or_derivation_method": "Fröhlich electron-phonon mass-enhancement factor from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "H3S_tc_scdft",
-      "state_id": "H3S_ambient_200GPa",
+      "state_id": "H3S_200GPa",
       "observable_kind": "Tc",
       "value_kind": "scalar",
       "value": 181,
@@ -1198,11 +1246,12 @@
       "measurement_or_derivation_method": "SCDFT calculated superconducting transition temperature; not experimental Tc",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "H3S_xi0_finite_q",
-      "state_id": "H3S_ambient_200GPa",
+      "state_id": "H3S_200GPa",
       "observable_kind": "xi0_microscopic",
       "value_kind": "scalar",
       "value": 3,
@@ -1211,14 +1260,15 @@
       "isotropy_assumption": "not_applicable",
       "uncertainty": null,
       "evidence_status": "paper_reported",
-      "measurement_or_derivation_method": "Microscopic finite-pair-momentum suppression criterion: xi0=1/(sqrt(2)*Q2), with Q2 where Fermi-surface-averaged gap reaches 1/sqrt(2) of the Q=0 value; zero-temperature length scale",
+      "measurement_or_derivation_method": "Microscopic finite-pair-momentum suppression criterion: xi0=1/(sqrt(2)*Q2), with Q2 where Fermi-surface-averaged gap reaches 1/sqrt(2) of the Q=0 value; zero-temperature coherence length, xi0",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "microscopic_xi0"
+      "length_scale_definition": "microscopic_xi0",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "H3S_lambda_slope",
-      "state_id": "H3S_ambient_200GPa",
+      "state_id": "H3S_200GPa",
       "observable_kind": "lambda_L_from_current_slope",
       "value_kind": "scalar",
       "value": 19,
@@ -1230,11 +1280,12 @@
       "measurement_or_derivation_method": "Eq. (20) current-slope extraction from the linear-response derivative of superconducting current as Q approaches zero; paper-reported scalar estimate; directionality not specified by source",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "H3S_lambda_peak",
-      "state_id": "H3S_ambient_200GPa",
+      "state_id": "H3S_200GPa",
       "observable_kind": "lambda_L_from_depairing_peak",
       "value_kind": "scalar",
       "value": 22,
@@ -1246,11 +1297,12 @@
       "measurement_or_derivation_method": "Eq. (21) depairing-current peak extraction using a GL relation; approximation stated accurate near Tc and increasingly different from current-slope estimate at lower temperatures; paper-reported scalar estimate; directionality not specified by source",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "H3S_jdp_intrinsic",
-      "state_id": "H3S_ambient_200GPa",
+      "state_id": "H3S_200GPa",
       "observable_kind": "J_dp_intrinsic",
       "value_kind": "scalar",
       "value": 697,
@@ -1262,11 +1314,12 @@
       "measurement_or_derivation_method": "Calculated intrinsic depairing current density at the maximum of the superconducting current versus Cooper-pair momentum; not measured critical current Jc",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "H3S_gap_fermi_surface",
-      "state_id": "H3S_ambient_200GPa",
+      "state_id": "H3S_200GPa",
       "observable_kind": "fermi_surface_average_gap",
       "value_kind": "scalar",
       "value": 38.77,
@@ -1278,11 +1331,12 @@
       "measurement_or_derivation_method": "Fermi-surface-averaged superconducting gap from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "H3S_vf_fermi_surface",
-      "state_id": "H3S_ambient_200GPa",
+      "state_id": "H3S_200GPa",
       "observable_kind": "fermi_surface_average_velocity",
       "value_kind": "scalar",
       "value": 1.009,
@@ -1294,11 +1348,12 @@
       "measurement_or_derivation_method": "Fermi-surface-averaged Fermi velocity from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "H3S_lambda_ep",
-      "state_id": "H3S_ambient_200GPa",
+      "state_id": "H3S_200GPa",
       "observable_kind": "electron_phonon_mass_enhancement",
       "value_kind": "scalar",
       "value": 2.73,
@@ -1310,7 +1365,8 @@
       "measurement_or_derivation_method": "Fröhlich electron-phonon mass-enhancement factor from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "V3Si_tc_scdft",
@@ -1326,7 +1382,8 @@
       "measurement_or_derivation_method": "SCDFT calculated superconducting transition temperature; not experimental Tc",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "V3Si_xi0_finite_q",
@@ -1339,10 +1396,11 @@
       "isotropy_assumption": "not_applicable",
       "uncertainty": null,
       "evidence_status": "paper_reported",
-      "measurement_or_derivation_method": "Microscopic finite-pair-momentum suppression criterion: xi0=1/(sqrt(2)*Q2), with Q2 where Fermi-surface-averaged gap reaches 1/sqrt(2) of the Q=0 value; zero-temperature length scale",
+      "measurement_or_derivation_method": "Microscopic finite-pair-momentum suppression criterion: xi0=1/(sqrt(2)*Q2), with Q2 where Fermi-surface-averaged gap reaches 1/sqrt(2) of the Q=0 value; zero-temperature coherence length, xi0",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "microscopic_xi0"
+      "length_scale_definition": "microscopic_xi0",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "V3Si_lambda_slope",
@@ -1358,7 +1416,8 @@
       "measurement_or_derivation_method": "Eq. (20) current-slope extraction from the linear-response derivative of superconducting current as Q approaches zero; paper-reported scalar estimate; directionality not specified by source",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "V3Si_lambda_peak",
@@ -1374,7 +1433,8 @@
       "measurement_or_derivation_method": "Eq. (21) depairing-current peak extraction using a GL relation; approximation stated accurate near Tc and increasingly different from current-slope estimate at lower temperatures; paper-reported scalar estimate; directionality not specified by source",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "V3Si_jdp_intrinsic",
@@ -1390,7 +1450,8 @@
       "measurement_or_derivation_method": "Calculated intrinsic depairing current density at the maximum of the superconducting current versus Cooper-pair momentum; not measured critical current Jc",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "V3Si_gap_fermi_surface",
@@ -1406,7 +1467,8 @@
       "measurement_or_derivation_method": "Fermi-surface-averaged superconducting gap from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "V3Si_vf_fermi_surface",
@@ -1422,7 +1484,8 @@
       "measurement_or_derivation_method": "Fermi-surface-averaged Fermi velocity from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     },
     {
       "observable_id": "V3Si_lambda_ep",
@@ -1438,7 +1501,8 @@
       "measurement_or_derivation_method": "Fröhlich electron-phonon mass-enhancement factor from Table S2",
       "source_artifact_digest": null,
       "source_reference": "https://arxiv.org/abs/2603.05123v2",
-      "length_scale_definition": "not_applicable"
+      "length_scale_definition": "not_applicable",
+      "result_authority": "calculated"
     }
   ],
   "effective_gl_coefficients": [
@@ -1494,5 +1558,5 @@
       "state_id": "Nb_ambient_0GPa"
     }
   ],
-  "claim_ceiling": "Paper-reported observables transcribed from arXiv:2603.05123v2 only; not independently reproduced and not reconciled against the 2026-11-03 PRL publication version. No phenomenological GL coefficient is derived by this fixture."
+  "claim_ceiling": "Calculated numerical observables transcribed from the paper-reported arXiv:2603.05123v2 tables only; not independently reproduced and not reconciled against the 2026-11-03 PRL publication version. No phenomenological GL coefficient is derived by this fixture."
 }
