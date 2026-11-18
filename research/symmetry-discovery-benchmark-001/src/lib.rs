@@ -387,16 +387,29 @@ mod tests {
     }
 
     #[test]
-    fn polynomial_transform_is_exactly_compositional_on_the_d4_table() {
+    fn polynomial_representation_obeys_matrix_composition_exactly() {
+        let source = polynomial_map(&C4_POLYNOMIAL);
         for left in 0..8 {
             for right in 0..8 {
-                let composed = multiply_matrix(D4_MATRICES[left], D4_MATRICES[right]);
-                assert!(D4_MATRICES.contains(&composed));
-                assert_eq!(
-                    polynomial_stabilizer(&D4_POLYNOMIAL),
-                    (0..8).collect::<Vec<_>>()
-                );
+                let right_then_left = multiply_matrix(D4_MATRICES[right], D4_MATRICES[left]);
+                let composed = transformed_polynomial(&C4_POLYNOMIAL, right_then_left);
+
+                let right_terms: Vec<PolynomialTermV1> = transformed_polynomial(
+                    &C4_POLYNOMIAL,
+                    D4_MATRICES[right],
+                )
+                .into_iter()
+                .map(|((x_degree, y_degree), coefficient)| PolynomialTermV1 {
+                    x_degree,
+                    y_degree,
+                    coefficient,
+                })
+                .collect();
+                let sequential =
+                    transformed_polynomial(&right_terms, D4_MATRICES[left]);
+                assert_eq!(sequential, composed);
             }
         }
+        assert_eq!(source, polynomial_map(&C4_POLYNOMIAL));
     }
 }
