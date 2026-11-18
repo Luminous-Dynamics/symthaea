@@ -35,7 +35,7 @@ pub use hippocampus::{
 };
 pub use semantic::{
     PROVENANCED_SEMANTIC_ENTRY_SCHEMA_VERSION, ProvenancedSemanticEntry, SemanticEntry,
-    SemanticMemory, SemanticMemoryStats,
+    SemanticMemory, SemanticMemoryInputError, SemanticMemoryStats,
 };
 
 /// Trait abstraction for trainable temporal networks.
