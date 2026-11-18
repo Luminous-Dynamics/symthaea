@@ -38,5 +38,69 @@
     "lipschitz_evidence_id": "fixture-lipschitz-bound-v1",
     "domain_evidence_id": "fixture-domain-certificate-v1"
   },
-  "claim_boundary": "Illustrative fixed-point contract only; no defect, Lipschitz or domain bounds are certified by this fixture."
+  "claim_boundary": "Illustrative fixed-point contract only; no defect, Lipschitz or domain bounds are certified by this fixture.",
+  "affine_oracle_example": {
+    "contract_id": "affine-swap-projection-v1",
+    "step_map": {
+      "matrix": [
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "action": {
+      "matrix": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "offset": [
+        0,
+        0
+      ],
+      "order": 2
+    },
+    "reference_region": {
+      "lower": [
+        -1,
+        -1
+      ],
+      "upper": [
+        1,
+        1
+      ]
+    },
+    "certificate_domain": {
+      "lower": [
+        -3,
+        -3
+      ],
+      "upper": [
+        3,
+        3
+      ]
+    },
+    "expected": {
+      "one_step_equivariance_defect_linf": 1,
+      "step_lipschitz_linf": 1,
+      "domain_boundary_margin_linf": 2,
+      "reference_region_invariant": true,
+      "action_has_declared_finite_order": true
+    },
+    "claim_boundary": "Exact integer affine map and box calculation only; not a nonlinear or physical-domain certificate."
+  }
 }
