@@ -84,6 +84,14 @@ Its predictive analysis is commendably nuanced: the radial-prior baseline report
 
 CCAT's own [claim boundary](https://github.com/salahealer9/ccat-crop-circle-analysis-toolkit/blob/main/docs/CLAIM_BOUNDARY.md) explicitly disclaims symbolic meaning, authorship, physical construction method, intentional message, astronomical decoding and proof of construction according to the recovered grammar. Its [decoding protocol](https://github.com/salahealer9/ccat-crop-circle-analysis-toolkit/blob/main/docs/DECODING_PROTOCOL.md) usefully requires predeclared features, subsets, transformations, scores, null models, success/falsification criteria and preservation of negative results. The contact-tolerance sweep also tests seven thresholds from 30–60 px, runs 5,000 null trials per tolerance/model by default, and applies Benjamini–Hochberg correction across five metrics × seven tolerances separately per null model. CROP-INTEL should adopt and extend those safeguards, not imply they are absent.
 
+### Additional geometry source: FEEDIT Field Edit archive
+
+The [FEEDIT Field Edit archive](https://www.feedit.info/) currently describes 11 parametric formations and 1,195 rendered elements from 1990–2008, with open-data geometry under CC BY-SA 4.0 and source photographs remaining separately copyrighted. CROP-INTEL has created a metadata-only candidate index for its plate pages; the underlying JSON geometry records have not yet been imported.
+
+The archive requires a distinction between declared primitives and rendered expansions. For example, its page metadata reports Windmill Hill Triple Julia as 94 rendered elements from 32 declared; Woodborough Hill sunflower as 310 from 16; and Milk Hill Galaxy as 409 from 69. Some records explicitly repeat a seed motif by symmetry or describe representative satellite elements. Those expanded primitives are useful for synthetic/generative reconstruction tests, but they are not independent field measurements. The Stonehenge Julia Set page says 125 circles were individually digitized from the aerial record, making it a more promising candidate for independent circle-level re-digitization—subject to image rights and independent verification.
+
+Most FEEDIT plate pages identify Claude-Fable-5 as digitizer in August 2026. That provenance and the lack of audited annotation covariance must be retained. FEEDIT's stated fidelity labels are not externally calibrated error metrics. See [the CROP-INTEL FEEDIT metadata audit](datasets/feedit-candidate-index/README.md).
+
 ### CROP-INTEL data interoperability and independent replay
 
 The source project's `data/circles_drag_60.csv` is declared CC BY 4.0 in its [data licence](https://github.com/salahealer9/ccat-crop-circle-analysis-toolkit/blob/main/LICENSE-DATA.md). CROP-INTEL imports only that digitized geometry CSV, retains attribution and the original source Git blob SHA, and does not import the source photograph. The values are image-space pixels; the CSV carries no per-circle uncertainty, independent digitizer comparison or field-metric calibration.
@@ -140,6 +148,16 @@ Recent work already measures lodging by affected area, location, severity and st
 - A 2026 review, [*Multi-scale lodging in rice and wheat: bridging biomechanical traits, phenotypic detection, and intelligent harvesting systems*](https://doi.org/10.3389/fpls.2026.1956108), connects field biomechanics with UAV spectral/photogrammetric products and LiDAR-derived stem inclination. It stresses that canopy posture and remote-sensing products are phenotypic proxies, not direct measurements of intrinsic properties such as flexural rigidity or breaking moment; mechanical ground-truth calibration is required.
 - A 2026 review of [UAV remote sensing in gramineous crops](https://doi.org/10.1016/j.inpa.2026.01.009) covers lodging area identification, severity and angle, with supervised classification and semantic segmentation as major established approaches.
 - Ground-based LiDAR phenotyping has also been used to estimate plant height and lodging angle in field research; see [the 2025 wheat LiDAR phenotyping study](https://doi.org/10.1080/07038992.2025.2516742), which offers a stronger 3D comparator than overhead photographs alone.
+
+### Additional 2025–2026 3D phenotyping baselines and datasets
+
+A particularly useful adjacent benchmark is Ravichandran et al. (2025), [*Precision phenotyping in wheat: LiDAR-based plant height estimation and lodging classification using uncrewed ground vehicles*](https://doi.org/10.1080/07038992.2025.2516742). The study covers 90 plots of 30 historical spring-wheat cultivars across six Canadian research stations and the 2023/2024 seasons. It compares height-distribution vectors, overhead projections, orthographic projections and voxelized spatial grids; the paper reports up to 0.97 quadratic-weighted kappa and 98.51% macro-F1 for evaluated 2-/3-class lodging classification. This is a substantially stronger adjacent-domain 3D posture baseline than an image-only crop outline classifier. It is **not directly comparable** to crop-circle geometry or origin inference.
+
+The 2025 [Wheat3D PartNet](https://doi.org/10.1016/j.compag.2025.110697) paper describes an annotated 3D wheat point-cloud dataset for ear/non-ear segmentation and benchmarks PointNet++-family models. That is relevant to plant-part segmentation and measuring stems/leaves in 3D, not to formation-level geometry.
+
+The 2026 [EO4CerealStress dataset](https://doi.org/10.17026/PT/TFYJBN) provides EnMAP and Sentinel-2 georeferenced wheat-lodging prediction maps from regression approaches. It is licensed CC BY-ND 4.0 and consists of model prediction maps, not a raw independent labelled-image corpus. It should be treated as a model-output comparator; do not assume the raster maps can be altered or re-licensed as training data.
+
+The 2026 review [*Multi-scale lodging in rice and wheat*](https://doi.org/10.3389/fpls.2026.1956108) connects tissue properties, plant mechanics, field posture and remote sensing. Its central distinction is important for our measurement architecture: canopy height, inclination and spectral changes are observable phenotypic proxies; flexural rigidity, breaking force/moment and section modulus require mechanical ground-truth protocols.
 
 ### Implication for CROP-INTEL
 
