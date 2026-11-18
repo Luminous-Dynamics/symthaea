@@ -47,6 +47,12 @@ Frozen reference values for normalized prefixes 1/4, 2/4, 3/4 and 4/4 are:
 
 The audit only verifies the current melody envelope. It does not verify the separate constant accompaniment layers (harmony/bass), acoustic loudness after rendering, perceptual crescendi, expressive timing, or whether the linear envelope is artistically appropriate. The purpose is to prove adherence to an explicit contract, not to claim that this contract is musically optimal.
 
+## Shared score-clock binding
+
+ProcessPlan now carries a serde-defaulted `ProcessClockBindingV1` with the exact Key, the f32 tempo bit pattern and the meter. The audit requires all three to match the realized Score exactly. This prevents a coherent score-wide key transposition, tempo adjustment or meter change from passing merely because the relative scale-degree process remains internally consistent.
+
+Legacy plans without the clock binding still deserialize, but the stronger audit returns `MissingClockBinding`. The clock binding is a plan-level consistency witness, not cryptographic provenance: intent/spec/plan/score and engine revision still need to be pinned by the outer M1 receipt.
+
 ## Accompaniment and identity verification
 
 The score-side audit now covers all three roles emitted by the current ProcessAdditive generator and rejects any extra role:
@@ -73,7 +79,7 @@ In particular, event-count growth is a structural fact, not a listener-experienc
 
 ## Adversarial fixtures authored
 
-Twenty-two new tests are present in `process_grammar.rs`:
+Twenty-six new tests are present in `process_grammar.rs`:
 
 1. Accept unmodified realizations for all four declared trajectory kinds.
 2. Match hand-frozen contour vectors for all four process kinds.
@@ -96,7 +102,7 @@ Twenty-two new tests are present in `process_grammar.rs`:
 19. Reject a source cell containing a zero-duration event.
 20. Reject a shifted cycle boundary.
 21. Reject a missing melody event.
-22. Exercise a deterministic 4,096-case holdout: four process kinds × 256 seeds per kind × 2, 4, 8 and 16 bars.
+22. Exercise a deterministic 4,096-case holdout: four process kinds × 256 seeds per kind × 2, 4, 8 and 16 bars.\n23. Reject a key change, tempo change and meter change against the plan-carried clock binding.\n24. Deserialize a legacy plan without clock binding, then refuse shared-clock verification.
 
 Existing process tests remain in place. No test has been compiled or executed in the current environment. Do not describe these tests as passing.
 
@@ -109,7 +115,7 @@ Report separate measurements; do not collapse them into a single music-quality s
 | Deterministic positive fixtures | Exact plan-to-score audit acceptance | 100% |
 | Frozen adversarial fixtures | Invalid score rejection | 100%; zero false semantic accepts |
 | Expressive envelope | Bit-exact note-level velocity/intensity/emphasis profile adherence | 100% for the declared profile; unsupported/legacy profiles explicitly rejected |
-| Accompaniment contract | Harmony-clock and bass-anchor event correctness, role scope and unassigned identity | 100% deterministic fixtures; zero invented part identities accepted |
+| Accompaniment contract | Harmony-clock and bass-anchor event correctness, role scope and unassigned identity | 100% deterministic fixtures; zero invented part identities accepted |\n| Shared score clock | Exact key, tempo bit-pattern and meter agreement | 100% exact match; mismatches and legacy unbound plans rejected |
 | Generated holdout cohort | Exact adherence across trajectory kinds, seeds, and bar counts | 100% for the pinned deterministic generator |
 | Mutation robustness | Detection rate by mutation class, plus false rejection rate | 100% detection on the frozen matrix; report every class separately |
 | Coverage | Accepted examples / all examples; abstentions by reason | Report explicitly; never hide abstentions in accuracy |
@@ -194,7 +200,7 @@ For deterministic structural invariants, the target should be 100% on frozen pos
 
 The verifier now audits the current three-role realization rather than melody alone. Its serialized report records melody, expressive, harmony and bass event counts. It checks the plan-carried process cell, prefix contour, exact note pitches/durations, velocity and section-intensity bit patterns, phrase-start emphasis, harmony clock, bass anchor, and the no-inferred-PartId boundary. Any extra voice role or assigned part ID is rejected. The existing generator behavior is unchanged; this is an audit of its explicit current contract.
 
-Twenty-two new tests are authored in addition to the three pre-existing ProcessAdditive tests (25 total in the module). No test is compiled or run in this environment.
+Twenty-six new tests are authored in addition to the three pre-existing ProcessAdditive tests (29 total in the module). No test is compiled or run in this environment.
 
 ## Benchmark governance and rights constraints
 
@@ -270,7 +276,7 @@ Sources:
 ## Validation status
 
 - Source branch was created from `main` at `67939c904adcfafd246848b74cd53c52a2cca244`; current `main` has since advanced by two documentation commits (a temporary note addition and its reversion). No code change was made directly to `main`; the research note is present only on this PR branch.
-- Twenty-two new Rust unit tests authored (25 total in the module), including the 4,096-case deterministic holdout, note-level expressive-envelope mutations, accompaniment controls, part-identity negative cases and malformed source-cell controls.
+- Twenty-six new Rust unit tests authored (29 total in the module), including the 4,096-case deterministic holdout, exact key/tempo/meter binding, note-level expressive-envelope mutations, accompaniment controls, part-identity negative cases and malformed source-cell controls.
 - Cargo/rustc/rustfmt are not available in this environment; compilation, formatting and test results are pending.
 - Exact-head CI, PR Governance, Benchmark Suite and Showroom Integrity workflows report `skipped`, not passed.
 - No workflow pass, compile/test result, audio result, human preference result, or SOTA superiority is claimed.
