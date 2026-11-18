@@ -19,6 +19,8 @@ dependencies.
 - E3 factorized SCM mechanism configurations with held-out combinations assembled from individually seen mechanism components; hidden configs remain evaluator-side.
 - CLI file encode/decode and an E0 length comparison against installed
   Zstandard, Brotli, XZ and gzip commands.
+- SCM-specific typed-field and oracle-parent-conditioned byte predictors,
+  exercised through the same arithmetic coder and exact decoder path.
 
 ## Run
 
@@ -139,6 +141,46 @@ synthetic demand-like source is not an external electricity or transit dataset.
 without reporting the fidelity difference.** A future bounded-error benchmark
 must include Cadence and classical error-bounded baselines on identical data,
 tolerance, entropy coder, context-bootstrap and resource accounting.
+
+### Structure-aware SCM coding controls
+
+The `causal` command additionally evaluates two custom byte predictors on every
+SCM1 stream, including observational, interventional, training and held-out E3
+traces. Both use the same arithmetic coder and 32-byte CDL frame as the built-in
+order-0/order-1 arms:
+
+- `field_frame`: separate adaptive byte histograms for each of the five
+  variables and each of their two little-endian byte lanes. This tests whether
+  preserving typed-channel identity helps beyond treating the input as one
+  undifferentiated byte stream.
+- `parent_oracle_frame`: the same field/lane model, conditioned on coarse
+  same-timestep parent-byte buckets from the known SCM graph. It tests whether
+  graph-aligned conditioning helps after typed-channel identity is already
+  accounted for.
+
+The parent-conditioned predictor is an **oracle-topology control**. The graph is
+supplied in its implementation; this is not graph discovery, causal mechanism
+learning, intervention generalization, or a Symthaea HDC/CfC result. The
+conditional histograms are adaptive and decoder-synchronous, but the
+conditioning structure is known in advance.
+
+The two predictors include a separate header histogram and reset to a
+deterministic empty state for each stream. Their inline state sizes are printed
+by the runner; their code/executable costs and any shared model distribution
+must be accounted for separately in a cold-start comparison. The per-stream
+frame size alone is not a complete deployed-system size.
+
+Interpretation order:
+1. First compare field/lane conditioning with order-0/order-1 to isolate the
+   value of typed channel identity.
+2. Then compare parent-oracle with field/lane to isolate the incremental value
+   of parent-conditioned context.
+3. Only after those controls work should a learned mechanism model be tested
+   against the oracle and a matched noncausal context model.
+
+No compression win is implied by source existence. The runner must be compiled
+and executed, and total-size/resource accounting must be complete, before
+reporting an encoded-bit result.
 
 ### E3 mechanism recombination
 
