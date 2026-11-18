@@ -272,6 +272,12 @@ The implementation therefore has asymmetric decisions:
 - no perfect matching: rule out, with a replayable Hall-deficiency set;
 - never: infer that a compatible action is an exact symmetry.
 
+### Subgroup-lattice upper envelope
+
+Element-wise compatibility does not imply that the compatible set is itself a group. The oracle therefore enumerates the ten D4 subgroups contained in the per-element possible set and marks those maximal under inclusion. These are **not-falsified subgroup candidates**, not certified symmetries: each element may have a different compatible point matching, so joint consistency of one shared noisy realization has not yet been established. The exact latent stabilizer must remain in this upper envelope; otherwise the report is rejected.
+
+For the near-symmetric C1 control, the tight radius leaves only the trivial subgroup candidate. At the wider radius, both C1 and C2(FX) are in the upper envelope, while the latent exact stabilizer remains C1. This turns uncertainty into a set of possible subgroup explanations without granting the system permission to accept or prune on that basis.
+
 ### Near-symmetry calibration control
 
 For the perturbed square, the tight uncertainty radius (epsilon=0.003) leaves only identity possible. At (epsilon=0.005), the reflection (f_x) becomes compatible too. The latent exact stabilizer remains C1 in both cases. Widening an uncertainty envelope may increase the possible set; it cannot convert that set into a proven subgroup.
