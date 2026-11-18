@@ -84,6 +84,7 @@ struct SummaryV1 {
     invalid_group_proposals: usize,
     distribution_cases: usize,
     mean_target_subgroup_probability_mass: Option<f64>,
+    mean_outside_subgroup_probability_mass: Option<f64>,
     mean_group_distribution_entropy_nats: Option<f64>,
     mean_wasserstein_1_d4_word_metric: Option<f64>,
 }
@@ -439,6 +440,7 @@ fn run(submission: SubmissionV1) -> Result<AuditReportV1, String> {
     let mut invalid_group_proposals = 0usize;
     let mut distribution_cases = 0usize;
     let mut target_mass_sum = 0.0_f64;
+    let mut outside_mass_sum = 0.0_f64;
     let mut entropy_sum = 0.0_f64;
     let mut wasserstein_sum = 0.0_f64;
 
@@ -491,6 +493,7 @@ fn run(submission: SubmissionV1) -> Result<AuditReportV1, String> {
                             &word_metric,
                         )?;
                         target_mass_sum += target_mass;
+                        outside_mass_sum += outside_mass;
                         entropy_sum += entropy;
                         wasserstein_sum += score;
                         (Some(target_mass), Some(outside_mass), Some(entropy), Some(score))
@@ -550,6 +553,11 @@ fn run(submission: SubmissionV1) -> Result<AuditReportV1, String> {
                 None
             } else {
                 Some(target_mass_sum / distribution_cases as f64)
+            },
+            mean_outside_subgroup_probability_mass: if distribution_cases == 0 {
+                None
+            } else {
+                Some(outside_mass_sum / distribution_cases as f64)
             },
             mean_group_distribution_entropy_nats: if distribution_cases == 0 {
                 None
