@@ -103,4 +103,4 @@ The dependency-free `pressure_curve` module validates exact-point pressure / flo
 - validates exact-point matched comparisons using a shared context/protocol digest and a preregistered maximum pressure separation;
 - does not interpolate an untested pressure or infer a task/comfort result.
 
-Seventeen negative/contract tests are authored. The module validates measurement context only; Mycelix retains metrology admission and Symtropy retains hydraulic/resource authority.
+Twenty negative/contract tests are authored. Manufacturer pressure evidence may specify a minimum only, a maximum only, or a complete range; the validator preserves that distinction and never invents an unpublished bound. The module validates measurement context only; Mycelix retains metrology admission and Symtropy retains hydraulic/resource authority.
