@@ -242,42 +242,20 @@ impl MemoryCoordinator {
                 .map(|sigma| (sigma * 0.15).clamp(0.0, 0.1))
                 .unwrap_or(0.0);
 
-            let verification_claim_bonus = if event.is_verified {
-                match event.source {
-                    MemorySource::ActionFeedback => 0.3,
-                    MemorySource::WebResearch => 0.2,
-                    _ => 0.1,
-                }
-            } else {
-                0.0
-            };
-
-            // Preserve the historical replay-order preference without assigning
-            // its aggregate back into Psi. The old Psi delta contributed half
-            // its magnitude to survival score; the old synthetic +0.5 valence
-            // contributed 0.075. Both are now one explicit non-cognitive bonus.
-            let legacy_priority_proxy = (event.psi_at_graduation
-                + persistence_bonus
-                + sigma_bonus
-                + verification_claim_bonus)
-                .min(1.0);
-            let legacy_psi_priority_delta =
-                (legacy_priority_proxy - event.psi_at_graduation).max(0.0) * 0.5;
-            let synthetic_valence_priority_delta = if event.is_verified { 0.075 } else { 0.0 };
+            // Only persistence and finite, bounded Sigma may influence replay
+            // retention priority. A producer's verification flag is provenance
+            // telemetry only: it must not boost Phi, valence, or replay priority.
+            let legacy_priority_proxy =
+                (event.psi_at_graduation + persistence_bonus + sigma_bonus).min(1.0);
             let consolidation_priority_bonus =
-                legacy_psi_priority_delta + synthetic_valence_priority_delta;
+                (legacy_priority_proxy - event.psi_at_graduation).max(0.0) * 0.5;
 
-            // Keep the source classification and producer's verification claim
-            // attached to the episode. A label is useful context, not a unique
-            // source-event ID or an independently verified receipt.
+            // Preserve only the source class and producer's verification claim.
+            // Arbitrary labels may contain user content and are not stable source
+            // identifiers; do not copy them into durable replay metadata.
             let provenance = GraduationProvenance {
                 source: event.source,
                 verification_claimed: event.is_verified,
-                source_label: if event.label.trim().is_empty() {
-                    None
-                } else {
-                    Some(event.label.clone())
-                },
             };
 
             // Psi stays exactly as measured at graduation; verification is not
@@ -632,9 +610,9 @@ mod tests {
 
         // Simulate multiple WM items graduating at different times
         coord.queue_graduation(make_graduation(1, 5, 0.4, false));
-        let mut verified_event = make_graduation(2, 8, 0.7, true);
+        let mut verified_event = make_graduation(2, 5, 0.4, true);
         verified_event.source = MemorySource::ActionFeedback;
-        verified_event.label = "action-result:fixture-42".to_owned();
+        verified_event.label = "sensitive-looking arbitrary text that must not persist".to_owned();
         coord.queue_graduation(verified_event);
         coord.queue_graduation(make_graduation(3, 2, 0.6, false)); // Below min steps
 
@@ -652,7 +630,12 @@ mod tests {
             .unwrap();
         let verified = top
             .iter()
-            .find(|record| (record.episode.psi - 0.7).abs() < 1e-9)
+            .find(|record| {
+                record
+                    .graduation_provenance
+                    .as_ref()
+                    .is_some_and(|p| p.source == MemorySource::ActionFeedback)
+            })
             .unwrap();
         assert_eq!(low.episode.valence, Some(0.0));
         assert_eq!(verified.episode.valence, Some(0.0));
@@ -670,11 +653,12 @@ mod tests {
         );
         assert_eq!(
             verified.graduation_provenance.as_ref().unwrap().source_label.as_deref(),
-            Some("action-result:fixture-42")
+            MemorySource::ActionFeedback
         );
-        assert!(
-            verified.consolidation_priority_bonus > low.consolidation_priority_bonus,
-            "The producer's verification claim may affect replay priority, not Phi"
+        assert_eq!(
+            verified.consolidation_priority_bonus,
+            low.consolidation_priority_bonus,
+            "A producer verification claim alone must not increase replay priority"
         );
 
         let sampled = episodic.sample_replay_batch_with_provenance(2);
