@@ -293,7 +293,8 @@
     "event_tpr_at_fpr_target": 0.95,
     "false_positive_rate_max": 0.05,
     "minimum_warning_time_ns": 50000000,
-    "all_values_are_research_targets": true
+    "all_values_are_research_targets": true,
+    "shot_cluster_bootstrap_replicates": 2000
   },
   "runtime_reporting": [
     "p50_latency_ns",
@@ -318,7 +319,9 @@
     "event_evaluation_receipt_schema",
     "per_shot_outcomes_and_alarm_episode_timestamps",
     "recomputed_cohort_summary",
-    "outer_receipt_sha256"
+    "outer_receipt_sha256",
+    "shot_cluster_bootstrap_plan_sha256",
+    "shot_cluster_bootstrap_rng_algorithm"
   ],
   "explicit_non_goals": [
     "live_tokamak_control",
@@ -485,5 +488,29 @@
     "hashes_are_authentication": false,
     "frame_shot_id_namespace": "synthetic-shot:<scenario_id>",
     "synthetic_identifiers_must_not_equal_physical_discharge_ids": true
+  },
+  "uncertainty_protocols": {
+    "window_level_metrics": {
+      "resampling_unit": "shot_id",
+      "bootstrap_schema": "luminous.plasma-shot-cluster-bootstrap.v0.1",
+      "replicate_count": 2000,
+      "draws_per_replicate": "N unique held-out shot IDs with replacement",
+      "rng_algorithm": "splitmix64-v1-uniform-rejection",
+      "confidence_interval": "95% percentile interval over shot-cluster bootstrap replicates",
+      "sampling_rule": "when a shot ID is sampled, include every benchmark window belonging to that shot; repeated shot IDs duplicate the entire window cluster",
+      "paired_model_comparison": "use the exact same bootstrap shot-index plan for every model and report paired metric deltas",
+      "forbidden": "resampling individual windows independently or treating windows from one shot as independent observations"
+    },
+    "shot_level_event_metrics": {
+      "method": "Wilson score intervals for event TPR and false-alarm shot rate",
+      "false_alarm_per_hour": "report with the exposure denominator and a shot-cluster bootstrap interval when multiple negative shots are available"
+    },
+    "plan_requirements": [
+      "bind plan to exact dataset revision ID",
+      "bind plan to ordered shot-ID list digest",
+      "bind plan to seed, replicate count and RNG algorithm revision",
+      "verify plan digest before evaluating models",
+      "record plan SHA-256 in every benchmark result receipt"
+    ]
   }
 }
