@@ -35,6 +35,18 @@ cargo run --manifest-path research/ig-integration-001/qualifier/Cargo.toml -- \
   research/ig-integration-001/INTEGRATION_FIXTURES_V0_1.json
 ```
 
+## Local qualification
+
+```bash
+cargo fmt --manifest-path research/ig-integration-001/qualifier/Cargo.toml --check
+cargo test --manifest-path research/ig-integration-001/qualifier/Cargo.toml
+cargo clippy --manifest-path research/ig-integration-001/qualifier/Cargo.toml --all-targets -- -D warnings
+cargo run --manifest-path research/ig-integration-001/qualifier/Cargo.toml -- \
+  research/ig-integration-001/INTEGRATION_FIXTURES_V0_1.json
+```
+
+The exact-head workflow runs these commands on the PR revision. Local Rust formatting, compilation and tests have not been run in the current authoring environment because `rustc` / `cargo` are not installed.
+
 ## Measurement contract
 
 - Surfacing is measured from the evaluator's set of unique evidence IDs recorded as delivered. Repeating an atom never increases coverage.
