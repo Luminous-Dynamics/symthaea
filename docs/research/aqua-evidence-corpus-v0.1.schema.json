@@ -1,0 +1,480 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Luminous Aqua Evidence Corpus",
+  "description": "Source-classified, machine-readable product, standard, installation-reference and peer-reviewed research claims. Evidence class and result class are mandatory to prevent claim laundering.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "snapshot_date",
+    "entries"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "snapshot_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    },
+    "change_log": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "date",
+          "change"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "change": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url",
+        "publisher",
+        "source_type",
+        "published_on",
+        "accessed_on",
+        "document_sha256"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "publisher": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_type": {
+          "enum": [
+            "manufacturer_datasheet",
+            "official_standard_or_programme",
+            "public_authority_by_law",
+            "peer_reviewed_article",
+            "independent_market_study",
+            "industry_association_notice"
+          ]
+        },
+        "published_on": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "accessed_on": {
+          "type": "string",
+          "format": "date"
+        },
+        "document_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id",
+        "name",
+        "manufacturer",
+        "sku",
+        "market",
+        "revision"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "product",
+            "standard",
+            "programme",
+            "installation_reference",
+            "market_sample",
+            "research_study"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manufacturer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sku": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "market": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "quantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "value",
+        "unit"
+      ],
+      "properties": {
+        "kind": {
+          "const": "scalar"
+        },
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "range": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "unit"
+      ],
+      "properties": {
+        "kind": {
+          "const": "range"
+        },
+        "minimum": {
+          "type": "number"
+        },
+        "maximum": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "minimum"
+          ]
+        },
+        {
+          "required": [
+            "maximum"
+          ]
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "minimum",
+              "maximum"
+            ]
+          },
+          "then": {
+            "properties": {
+              "maximum": {
+                "minimum": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "text_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "text"
+      ],
+      "properties": {
+        "kind": {
+          "const": "text"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unknown_conditions"
+      ],
+      "properties": {
+        "mode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pressure_kpa": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "pressure_range_kpa": {
+          "$ref": "#/$defs/range"
+        },
+        "temperature_c": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "duration_min": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "task": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sample_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "pressure_datum": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unknown_conditions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "notes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reason"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "eligible_as_matched_test_reference",
+            "context_only",
+            "not_eligible_until_reproduced"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "derivation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "formula",
+        "inputs",
+        "assumptions"
+      ],
+      "properties": {
+        "formula": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "parameter",
+        "original_value",
+        "canonical_value",
+        "evidence_class",
+        "result_class",
+        "conditions",
+        "source",
+        "comparison",
+        "limitations"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "parameter": {
+          "type": "string",
+          "minLength": 1
+        },
+        "original_value": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonical_value": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/quantity"
+            },
+            {
+              "$ref": "#/$defs/range"
+            },
+            {
+              "$ref": "#/$defs/text_value"
+            }
+          ]
+        },
+        "evidence_class": {
+          "enum": [
+            "manufacturer_declaration",
+            "independent_laboratory_measurement",
+            "standard_or_programme_criterion",
+            "installation_design_reference",
+            "peer_reviewed_study_result",
+            "independent_market_sample"
+          ]
+        },
+        "result_class": {
+          "enum": [
+            "declared",
+            "measured",
+            "derived",
+            "proposed",
+            "modelled"
+          ]
+        },
+        "conditions": {
+          "$ref": "#/$defs/conditions"
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "comparison": {
+          "$ref": "#/$defs/comparison"
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "derivation": {
+          "$ref": "#/$defs/derivation"
+        }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entry_id",
+        "subject",
+        "claims"
+      ],
+      "properties": {
+        "entry_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "subject": {
+          "$ref": "#/$defs/subject"
+        },
+        "claims": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/claim"
+          }
+        }
+      }
+    }
+  }
+}
