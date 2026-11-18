@@ -49,6 +49,14 @@ pub enum ProcessAccompanimentField {
     PartIdentity,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ProcessClockBindingV1 {
+    pub key: Key,
+    /// Exact IEEE-754 f32 bits for the configured score tempo.
+    pub tempo_bpm_bits: u32,
+    pub meter: u8,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ProcessPlan {
     pub trajectory_kind: ProcessTrajectoryKind,
@@ -60,6 +68,10 @@ pub struct ProcessPlan {
     /// receive source-cell realization verification.
     #[serde(default)]
     pub process_cell: Option<Motif>,
+    /// Exact key, tempo and meter configured for this realization. Legacy
+    /// plans remain readable but cannot claim shared-clock verification.
+    #[serde(default)]
+    pub clock_binding: Option<ProcessClockBindingV1>,
     /// Versioned semantics for the note-level expressive envelope. Legacy
     /// serialized plans may omit this field and are not expressive-audited.
     #[serde(default)]
@@ -101,6 +113,19 @@ pub enum ProcessDynamicsField {
 pub enum ProcessRealizationAuditError {
     EmptyPlan,
     MissingProcessCellBinding,
+    MissingClockBinding,
+    ProcessKeyMismatch {
+        expected: Key,
+        actual: Key,
+    },
+    ProcessTempoMismatch {
+        expected_bits: u32,
+        actual_bits: u32,
+    },
+    ProcessMeterMismatch {
+        expected: u8,
+        actual: u8,
+    },
     ProcessCellLengthMismatch {
         expected: usize,
         actual: usize,
@@ -255,6 +280,27 @@ pub fn verify_additive_process_score_v1(
                 event_index,
             });
         }
+    }
+    let clock_binding = plan
+        .clock_binding
+        .ok_or(ProcessRealizationAuditError::MissingClockBinding)?;
+    if score.key != clock_binding.key {
+        return Err(ProcessRealizationAuditError::ProcessKeyMismatch {
+            expected: clock_binding.key,
+            actual: score.key,
+        });
+    }
+    if score.tempo_bpm.to_bits() != clock_binding.tempo_bpm_bits {
+        return Err(ProcessRealizationAuditError::ProcessTempoMismatch {
+            expected_bits: clock_binding.tempo_bpm_bits,
+            actual_bits: score.tempo_bpm.to_bits(),
+        });
+    }
+    if score.meter != clock_binding.meter {
+        return Err(ProcessRealizationAuditError::ProcessMeterMismatch {
+            expected: clock_binding.meter,
+            actual: score.meter,
+        });
     }
     let dynamics_profile = plan
         .dynamics_profile
@@ -754,6 +800,11 @@ pub fn realize_additive_process(
             prefix_lengths,
             cycle_starts,
             process_cell: Some(cell),
+            clock_binding: Some(ProcessClockBindingV1 {
+                key,
+                tempo_bpm_bits: tempo.to_bits(),
+                meter: spec.meter,
+            }),
             dynamics_profile: Some(ProcessDynamicsProfileV1::PrefixLinear),
         },
     }
@@ -1183,6 +1234,64 @@ mod tests {
             Err(ProcessRealizationAuditError::ProcessCellContainsNonPositiveDuration {
                 event_index: 0
             })
+        ));
+    }
+
+
+    #[test]
+    fn score_side_audit_rejects_a_key_mutation() {
+        let mut realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        realization.score.key = Key::major(crate::pitch::PitchClass::D);
+        assert!(matches!(
+            verify_additive_process_score_v1(&realization.plan, &realization.score),
+            Err(ProcessRealizationAuditError::ProcessKeyMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn score_side_audit_rejects_a_tempo_mutation() {
+        let mut realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        realization.score.tempo_bpm += 1.0;
+        assert!(matches!(
+            verify_additive_process_score_v1(&realization.plan, &realization.score),
+            Err(ProcessRealizationAuditError::ProcessTempoMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn score_side_audit_rejects_a_meter_mutation() {
+        let mut realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        realization.score.meter += 1;
+        assert!(matches!(
+            verify_additive_process_score_v1(&realization.plan, &realization.score),
+            Err(ProcessRealizationAuditError::ProcessMeterMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn legacy_plan_without_clock_binding_deserializes_but_is_not_clock_verified() {
+        let realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        let mut legacy_json = serde_json::to_value(&realization.plan).unwrap();
+        legacy_json
+            .as_object_mut()
+            .unwrap()
+            .remove("clock_binding");
+        let legacy_plan: ProcessPlan = serde_json::from_value(legacy_json).unwrap();
+        assert!(matches!(
+            verify_additive_process_score_v1(&legacy_plan, &realization.score),
+            Err(ProcessRealizationAuditError::MissingClockBinding)
         ));
     }
 
