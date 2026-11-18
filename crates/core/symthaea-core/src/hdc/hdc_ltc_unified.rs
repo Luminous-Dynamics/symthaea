@@ -1768,9 +1768,12 @@ impl Default for UnifiedNetworkConfig {
 /// (see [`HdcLtcUnifiedNetwork::snapshot_state_into`]).
 #[derive(Debug, Clone, Default)]
 pub struct NetworkStateSnapshot {
-    /// Exact layer partition captured with the flattened neuron state.
+    /// Exact ordered layer partition captured with the flattened neuron state.
     /// Equal neuron totals are not sufficient: [2, 3] and [3, 2] are different networks.
     layer_sizes: Vec<usize>,
+    /// BLAKE3 identity of network + per-neuron dynamics configuration.
+    /// Learned weights/optimizer state remain separately bound by HDC-R2 model identity.
+    config_identity: [u8; 32],
     neuron_states: Vec<ContinuousHV>,
     layer_outputs: Vec<ContinuousHV>,
     /// Per-neuron (total_time, update_count). total_time is NOT telemetry:
@@ -1789,6 +1792,7 @@ pub struct NetworkStateSnapshot {
 /// parameter revision because learned weights and optimizer state are excluded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NetworkStateRestoreError {
+    ConfigMismatch,
     LayerShapeMismatch,
     NeuronCountMismatch,
     LayerOutputCountMismatch,
@@ -1824,7 +1828,8 @@ impl NetworkStateSnapshot {
     /// outputs, and evolution clocks). The formal test surface for
     /// "this operation does not perturb evolution state".
     pub fn approx_eq(&self, other: &Self, eps: f32) -> bool {
-        if self.layer_sizes != other.layer_sizes
+        if self.config_identity != other.config_identity
+            || self.layer_sizes != other.layer_sizes
             || self.neuron_states.len() != other.neuron_states.len()
             || self.layer_outputs.len() != other.layer_outputs.len()
             || self.neuron_clocks.len() != other.neuron_clocks.len()
@@ -2093,6 +2098,68 @@ impl HdcLtcUnifiedNetwork {
         }
     }
 
+    /// Compute a content identity for configuration that changes recurrent evolution.
+    ///
+    /// This deliberately excludes learned weights and optimizer tensors; those
+    /// belong to the separate HDC-R2 full-model identity. Hashing reads only
+    /// scalar config fields and Fourier frequency vectors and allocates nothing.
+    fn recurrent_state_config_identity(&self) -> [u8; 32] {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea-hdc-ltc-recurrent-config-v1");
+
+        let hash_config = |hasher: &mut blake3::Hasher, config: &UnifiedConfig| {
+            for value in [
+                config.tau_base,
+                config.backbone_tau,
+                config.learning_rate,
+                config.momentum,
+                config.weight_decay,
+                config.gating_steepness,
+                config.interp_bias,
+                config.fourier_amplitude,
+            ] {
+                hasher.update(&value.to_bits().to_le_bytes());
+            }
+            hasher.update(&(config.dimension as u64).to_le_bytes());
+            match config.activation {
+                UnifiedActivation::Tanh => hasher.update(&[0]),
+                UnifiedActivation::Sigmoid => hasher.update(&[1]),
+                UnifiedActivation::SiLU => hasher.update(&[2]),
+                UnifiedActivation::Identity => hasher.update(&[3]),
+                UnifiedActivation::BoundedTanh { scale } => {
+                    hasher.update(&[4]);
+                    hasher.update(&scale.to_bits().to_le_bytes())
+                }
+            };
+            hasher.update(&(config.fourier_frequencies.len() as u64).to_le_bytes());
+            for frequency in &config.fourier_frequencies {
+                hasher.update(&frequency.to_bits().to_le_bytes());
+            }
+        };
+
+        hasher.update(&(self.config.layer_sizes.len() as u64).to_le_bytes());
+        for layer_size in &self.config.layer_sizes {
+            hasher.update(&(*layer_size as u64).to_le_bytes());
+        }
+        hasher.update(&[
+            self.config.use_layer_binding as u8,
+            self.config.skip_connections as u8,
+        ]);
+        hash_config(&mut hasher, &self.config.neuron_config);
+
+        // Neuron configs can be changed through the existing mutable-layer API,
+        // so bind their current ordered values as well as the network defaults.
+        hasher.update(&(self.layers.len() as u64).to_le_bytes());
+        for layer in &self.layers {
+            hasher.update(&(layer.len() as u64).to_le_bytes());
+            for neuron in layer {
+                hash_config(&mut hasher, &neuron.config);
+            }
+        }
+
+        *hasher.finalize().as_bytes()
+    }
+
     /// Snapshot the network's mutable evolution state (neuron state HVs +
     /// cached layer outputs) into a reusable buffer, resizing it on first use.
     ///
@@ -2108,6 +2175,9 @@ impl HdcLtcUnifiedNetwork {
     /// After the buffer warms up (same network shape), snapshot/restore are
     /// allocation-free element-wise copies.
     pub fn snapshot_state_into(&self, snap: &mut NetworkStateSnapshot) {
+        // Configuration hashing is stack-only and does not allocate. It prevents
+        // recurrent state from crossing different LTC/activation/Fourier semantics.
+        snap.config_identity = self.recurrent_state_config_identity();
         // Retain capacity so the warmed-up hot path remains allocation-free.
         snap.layer_sizes.clear();
         snap.layer_sizes.extend(self.layers.iter().map(Vec::len));
@@ -2143,6 +2213,9 @@ impl HdcLtcUnifiedNetwork {
         &mut self,
         snap: &NetworkStateSnapshot,
     ) -> Result<(), NetworkStateRestoreError> {
+        if snap.config_identity != self.recurrent_state_config_identity() {
+            return Err(NetworkStateRestoreError::ConfigMismatch);
+        }
         if snap.layer_sizes.len() != self.layers.len()
             || snap
                 .layer_sizes
@@ -2997,6 +3070,32 @@ mod tests {
         network.snapshot_state_into(&mut restored);
         assert!(expected.approx_eq(&restored, 1e-7));
         assert_eq!(expected.layer_sizes(), &[2, 3, 1]);
+    }
+
+    #[test]
+    fn strict_state_restore_rejects_same_topology_with_different_dynamics_config_atomically() {
+        let mut source_config = UnifiedNetworkConfig::default();
+        source_config.layer_sizes = vec![2, 3, 1];
+        let source = HdcLtcUnifiedNetwork::new(source_config, 0xCAFE);
+
+        let mut target_config = UnifiedNetworkConfig::default();
+        target_config.layer_sizes = vec![2, 3, 1];
+        target_config.neuron_config.tau_base = 0.25;
+        let mut target = HdcLtcUnifiedNetwork::new(target_config, 0xCAFE);
+
+        let mut source_snapshot = NetworkStateSnapshot::default();
+        source.snapshot_state_into(&mut source_snapshot);
+        let mut before = NetworkStateSnapshot::default();
+        target.snapshot_state_into(&mut before);
+
+        assert_eq!(
+            target.try_restore_state_from(&source_snapshot),
+            Err(NetworkStateRestoreError::ConfigMismatch)
+        );
+
+        let mut after = NetworkStateSnapshot::default();
+        target.snapshot_state_into(&mut after);
+        assert!(before.approx_eq(&after, 0.0), "config-rejected restore mutated destination");
     }
 
     #[test]
