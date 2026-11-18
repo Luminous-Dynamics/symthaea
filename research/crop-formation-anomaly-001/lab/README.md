@@ -6,6 +6,7 @@ This is the first executable component of CROP-INTEL-001. It is deliberately sma
 
 - 2D point-set geometry descriptors: centroid, bounds, radius statistics, radial/angular histograms and approximate rotational symmetry residuals.
 - Circle-layout replay: strict CSV ingestion, circle validation, tangent-gap contact graph, quantile-initialized radius/radial classes and centred neighbourhood motif counts.
+- Frozen circle-grammar family evaluator: reruns centre, classing, radial bands, contacts and motifs for every declared class-count/contact-threshold configuration.
 - Event-grouped benchmark splitting: deterministic approximately balanced grouped K-folds with train/validation complement and event/site/source leakage checks.
 - Seeded measurement-sensitivity audit: explicit uniform centre/radius pixel-error bounds, full-pipeline reruns, sample spread, radius-class agreement and exact-signature stability; stress-test assumptions only, not inferred measurement errors.
 - Crop-flow orientation-field descriptors: circular mean/resultant, direction entropy, bend-magnitude spread and nearest-neighbour alignment.
@@ -33,7 +34,7 @@ cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 ```
 
-The crate has no third-party dependencies. It includes a local `[workspace]` declaration so that it is not silently pulled into the root Symthaea workspace. The current source contains 56 authored unit tests; their execution remains pending because this editing environment has no Rust toolchain.
+The crate has no third-party dependencies. It includes a local `[workspace]` declaration so that it is not silently pulled into the root Symthaea workspace. The current source contains 59 authored unit tests; their execution remains pending because this editing environment has no Rust toolchain.
 
 ## Statistical interpretation
 
