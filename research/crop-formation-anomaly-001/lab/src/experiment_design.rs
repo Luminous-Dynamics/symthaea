@@ -237,6 +237,30 @@ mod tests {
     const EPS: f64 = 1.0e-9;
 
 
+
+    #[test]
+    fn equal_value_actions_use_stable_identifier_tie_breaking() {
+        let actions = vec![
+            ExperimentAction {
+                action_id: "zeta".into(),
+                cost_units: 1.0,
+                hard_gates_passed: true,
+                ineligibility_reason: None,
+                conditional_outcome_probabilities: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            },
+            ExperimentAction {
+                action_id: "alpha".into(),
+                cost_units: 1.0,
+                hard_gates_passed: true,
+                ineligibility_reason: None,
+                conditional_outcome_probabilities: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            },
+        ];
+        let ranking = rank_experiment_actions(&[0.5, 0.5], &actions).unwrap();
+        assert_eq!(ranking[0].action_id, "alpha");
+        assert_eq!(ranking[1].action_id, "zeta");
+    }
+
     #[test]
     fn action_ranking_uses_information_gain_per_common_cost_unit() {
         let actions = vec![
