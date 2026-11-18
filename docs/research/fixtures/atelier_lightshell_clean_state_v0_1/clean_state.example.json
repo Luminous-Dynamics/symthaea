@@ -33,7 +33,7 @@
       }
     ],
     "topology_sample_map_ref": "TOPOLOGY-SAMPLE-MAP-REV-SYNTHETIC",
-    "topology_sample_map_digest": "sha256:pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+    "topology_sample_map_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
   },
   "application": {
     "application_ref": "APPLICATION-SYNTHETIC",
