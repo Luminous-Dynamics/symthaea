@@ -1,0 +1,11 @@
+[package]
+name = "agent-authority-composition-reference"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Synthetic reference model for agent authority-composition benchmark fixtures"
+
+[workspace]
+
+[lib]
+path = "src/lib.rs"
