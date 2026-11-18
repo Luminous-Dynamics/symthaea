@@ -207,7 +207,7 @@ Every report records input hashes, source versions, tool commit, parameters, see
 
 ## 5. First benchmark sprint
 
-1. Build synthetic field-like raster/vector fixtures with known geometry and known/absent payloads.
+1. Build synthetic field-like raster/vector fixtures with known geometry and known/absent payloads; the Rust reference now has a 32-way D4/traversal/bit-order positive-control grid containing HELLO and a blank-grid negative control.
 2. Create matched null sets; vary resolution, perspective, occlusion, crop mask and orientation.
 3. Implement a simple, transparent geometry baseline before an ML/LLM approach.
 4. Freeze one decoder tournament with a finite codebook and exact recovery target.
