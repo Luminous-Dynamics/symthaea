@@ -645,6 +645,48 @@ mod tests {
     }
 
     #[test]
+    fn raw_measurements_and_heat_capacity_are_present_and_finite() {
+        let (model, fixture) = inputs();
+        let output = run(
+            &model,
+            &fixture,
+            SamplingOverrides {
+                warmup_sweeps: Some(2),
+                measurement_sweeps: Some(6),
+                thinning: Some(1),
+                independent_chains: Some(2),
+                random_seed: Some(41),
+                ..SamplingOverrides::default()
+            },
+        )
+        .unwrap();
+        for chain in output["chain_receipts"].as_array().unwrap() {
+            let raw = chain["raw_measurements"].as_array().unwrap();
+            assert_eq!(raw.len(), 6);
+            assert!(raw.iter().all(|record| {
+                record["energy_per_node"].as_f64().is_some()
+                    && record["mean_amplitude"].as_f64().is_some()
+                    && record["twist_current"].as_array().is_some()
+            }));
+            let heat_capacity = chain["heat_capacity_per_node_fluctuation_estimate"]
+                .as_f64()
+                .unwrap();
+            assert!(heat_capacity.is_finite() && heat_capacity >= 0.0);
+        }
+        assert!(output["between_chain_summary"]
+            ["heat_capacity_per_node_fluctuation_estimate"]
+            ["mean_across_independent_chains"]
+            .as_f64()
+            .is_some());
+    }
+
+    #[test]
+    fn population_energy_variance_matches_known_series() {
+        let values = [1.0, 2.0, 3.0];
+        assert!((population_variance(&values) - 2.0 / 3.0).abs() < 1.0e-12);
+    }
+
+    #[test]
     fn chain_seeds_are_unique_and_deterministic() {
         let (model, fixture) = inputs();
         let output = run(
