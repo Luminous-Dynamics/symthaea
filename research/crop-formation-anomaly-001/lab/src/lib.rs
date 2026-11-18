@@ -13,7 +13,8 @@ pub mod statistics;
 
 pub use circle_layout::{
     audit_circle_measurement_sensitivity, class_circle_layout, count_centred_motifs,
-    describe_circle_layout, parse_circle_csv, validate_circles, CircleClassing, CircleContact,
+    describe_circle_layout, parse_circle_csv, permute_circle_radii,
+    run_radius_permutation_ensemble, validate_circles, CircleClassing, CircleContact,
     CircleGrammarFamily, CircleGrammarOutcome, CircleGrammarSpec, CircleLayout,
     CircleLayoutError, CircleRecord, CircleSensitivityConfig, CircleSensitivitySummary,
 };
