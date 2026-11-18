@@ -235,9 +235,14 @@ impl MemoryCoordinator {
             // provenance, persistence, or cross-tier context into the cognitive
             // state estimate (Psi) or emotional valence.
             let persistence_bonus = (event.steps_survived as f64 / 10.0).min(0.2);
-            let sigma_bonus = self.signals.sigma.map_or(0.0, |s| (s * 0.15).min(0.1));
+            let sigma_bonus = self
+                .signals
+                .sigma
+                .filter(|sigma| sigma.is_finite() && *sigma >= 0.0)
+                .map(|sigma| (sigma * 0.15).clamp(0.0, 0.1))
+                .unwrap_or(0.0);
 
-            let verification_bonus = if event.is_verified {
+            let verification_claim_bonus = if event.is_verified {
                 match event.source {
                     MemorySource::ActionFeedback => 0.3,
                     MemorySource::WebResearch => 0.2,
@@ -247,17 +252,20 @@ impl MemoryCoordinator {
                 0.0
             };
 
-            // Preserve the previous replay-score contribution without changing
-            // Psi. The old Phi adjustment contributed half its delta to survival
-            // value; the old synthetic +0.5 valence contributed another 0.075.
-            let old_adjusted_phi =
-                (event.psi_at_graduation + persistence_bonus + sigma_bonus + verification_bonus)
-                    .min(1.0);
-            let prior_phi_priority_delta =
-                (old_adjusted_phi - event.psi_at_graduation).max(0.0) * 0.5;
-            let verified_claim_priority_delta = if event.is_verified { 0.075 } else { 0.0 };
+            // Preserve the historical replay-order preference without assigning
+            // its aggregate back into Psi. The old Psi delta contributed half
+            // its magnitude to survival score; the old synthetic +0.5 valence
+            // contributed 0.075. Both are now one explicit non-cognitive bonus.
+            let legacy_priority_proxy = (event.psi_at_graduation
+                + persistence_bonus
+                + sigma_bonus
+                + verification_claim_bonus)
+                .min(1.0);
+            let legacy_psi_priority_delta =
+                (legacy_priority_proxy - event.psi_at_graduation).max(0.0) * 0.5;
+            let synthetic_valence_priority_delta = if event.is_verified { 0.075 } else { 0.0 };
             let consolidation_priority_bonus =
-                prior_phi_priority_delta + verified_claim_priority_delta;
+                legacy_psi_priority_delta + synthetic_valence_priority_delta;
 
             // Keep the source classification and producer's verification claim
             // attached to the episode. A label is useful context, not a unique
