@@ -1227,9 +1227,16 @@ mod tests {
     fn executed_cycles_require_unique_run_and_soil_application_refs() {
         let mut manifest = base_manifest();
         make_measured(&mut manifest);
-        manifest["cycles"][2]["cleaning_run_ref"] = manifest["cycles"][1]["cleaning_run_ref"].clone();
+        let prior_run_ref = manifest["cycles"][1]["cleaning_run_ref"].clone();
+        manifest["cycles"][2]["cleaning_run_ref"] = prior_run_ref;
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|f| f.code == "duplicate_cleaning_run_reference"));
+        let mut duplicate_soil = base_manifest();
+        make_measured(&mut duplicate_soil);
+        let prior_soil_ref = duplicate_soil["cycles"][1]["soil_application_ref"].clone();
+        duplicate_soil["cycles"][2]["soil_application_ref"] = prior_soil_ref;
+        let soil_report = parse_and_validate(&duplicate_soil.to_string()).unwrap();
+        assert!(soil_report.findings.iter().any(|f| f.code == "duplicate_soil_application_reference"));
     }
 
     #[test]
@@ -1440,7 +1447,8 @@ mod tests {
     fn duplicate_cycle_and_replicate_ids_are_rejected() {
         let mut manifest = base_manifest();
         make_measured(&mut manifest);
-        manifest["cycles"][1]["cycle_id"] = manifest["cycles"][0]["cycle_id"].clone();
+        let first_cycle_id = manifest["cycles"][0]["cycle_id"].clone();
+        manifest["cycles"][1]["cycle_id"] = first_cycle_id;
         manifest["cycles"][1]["observations"][0]["replicate_index"] = json!(0);
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|f| f.code == "duplicate_or_blank_cycle_id"));
