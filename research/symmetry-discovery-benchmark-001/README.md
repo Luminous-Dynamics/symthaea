@@ -249,3 +249,40 @@ This corpus split validates bookkeeping and leakage resistance; it does not itse
 ## Exact fixture oracle status (2026-11-18)
 
 The single manifest-driven Rust oracle is under `oracle/`; there is no parallel reference crate. It loads the checked-in JSON manifest and tests D4 closure/inverses, exact point-set stabilizers, polynomial invariance and arithmetic overflow. The fixture/schema validation step passed on the earlier benchmark workflow head. The Rust formatter diff from that run was applied to the consolidated oracle. A fresh exact-head run is required to qualify the current branch. **No external baseline has yet been run and these fixtures are not benchmark results.**
+
+
+## Bounded coordinate-noise falsification (new v0.1 lane)
+
+The companion manifest `fixtures/noisy-v0.1/cases.json` freezes twelve noisy observations: one for each of the ten distinct D4 subgroup families, plus two observations of the near-symmetric but exactly C1 control at different uncertainty radii.
+
+### Semantics: possibility is not promotion
+
+Coordinates are stored at scale 1000. Each observed point is declared to be within `epsilon_scaled / 1000` of its latent point in L-infinity norm. For a proposed group element (g), build a bipartite graph from observed source points (i) to observed target points (j). Add an edge when
+
+[
+|x_i-gx_j|_infty le 2epsilon.
+]
+
+A candidate action is **not ruled out** only when this graph has a perfect matching. A perfect matching is a compatibility certificate, not proof of exact invariance. The exact stabilizer remains the one derived from the latent frozen fixture; a noisy-compatible action must never be promoted to exact membership or used to hard-prune.
+
+When no perfect matching exists, the Rust oracle emits a Hall-deficiency witness (S) with (|N(S)|<|S|). That is a constructive falsification certificate: no point permutation can explain the observation under the declared coordinate-error envelope.
+
+The implementation therefore has asymmetric decisions:
+- perfect matching: retain as a possible action, with a replayable bijection and maximum residual;
+- no perfect matching: rule out, with a replayable Hall-deficiency set;
+- never: infer that a compatible action is an exact symmetry.
+
+### Near-symmetry calibration control
+
+For the perturbed square, the tight uncertainty radius (epsilon=0.003) leaves only identity possible. At (epsilon=0.005), the reflection (f_x) becomes compatible too. The latent exact stabilizer remains C1 in both cases. Widening an uncertainty envelope may increase the possible set; it cannot convert that set into a proven subgroup.
+
+### Qualification
+
+The bounded-noise fixture has its own Draft 2020-12 schema and is included in the exact-head workflow. Tests require:
+- every latent exact stabilizer element remains possible under a valid declared error envelope;
+- every ruled-out element has a Hall-deficiency witness;
+- every possible element has a bijection with residual at most (2epsilon);
+- near-symmetry uncertainty widens the possible set without promoting a false exact symmetry;
+- forged reports and observations outside the declared per-coordinate error bound are rejected.
+
+This is a deterministic bounded-error model, not a probabilistic noise model, sensor calibration, or physical measurement guarantee.
