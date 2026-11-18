@@ -121,4 +121,4 @@ On the shared four-hypothesis deterministic fixture:
 - noise-adapted greedy static design: cost 3;
 - exact adaptive minimax decision tree: worst-case cost 2.
 
-The exact static oracle lives in the deterministic planner PR #12670. It exhaustively verifies the minimum static basis under a subset budget. This noise PR does not yet depend on that unmerged API; a direct cross-crate integration test should follow only after the deterministic crate is merged or otherwise released as a stable dependency. This separation keeps the current noise PR buildable from its own head and avoids tests that compile only against a moving base branch.
+The noise-aware crate now calls the deterministic planner's exact static oracle through its existing pinned path dependency. The shared D4 regression independently verifies the minimum static basis costs 3, replays the exact static certificate, and compares it with adaptive minimax worst-case cost 2. The four-model noise-aware greedy weighted set-cover receipts remain a separate non-optimal baseline; they are not mislabelled as the exact static optimum.
