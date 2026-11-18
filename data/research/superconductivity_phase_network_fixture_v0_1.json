@@ -136,7 +136,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e00d",
@@ -145,7 +149,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e01r",
@@ -154,7 +162,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e01d",
@@ -163,7 +175,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e02r",
@@ -172,7 +188,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e02d",
@@ -181,7 +201,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e03r",
@@ -190,7 +214,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          1
+        ]
       },
       {
         "edge_id": "e03d",
@@ -199,7 +227,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e10r",
@@ -208,7 +240,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e10d",
@@ -217,7 +253,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e11r",
@@ -226,7 +266,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e11d",
@@ -235,7 +279,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e12r",
@@ -244,7 +292,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e12d",
@@ -253,7 +305,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e13r",
@@ -262,7 +318,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          1
+        ]
       },
       {
         "edge_id": "e13d",
@@ -271,7 +331,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e20r",
@@ -280,7 +344,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e20d",
@@ -289,7 +357,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e21r",
@@ -298,7 +370,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e21d",
@@ -307,7 +383,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e22r",
@@ -316,7 +396,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e22d",
@@ -325,7 +409,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e23r",
@@ -334,7 +422,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          1
+        ]
       },
       {
         "edge_id": "e23d",
@@ -343,7 +435,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e30r",
@@ -352,7 +448,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e30d",
@@ -361,7 +461,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          1,
+          0
+        ]
       },
       {
         "edge_id": "e31r",
@@ -370,7 +474,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e31d",
@@ -379,7 +487,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          1,
+          0
+        ]
       },
       {
         "edge_id": "e32r",
@@ -388,7 +500,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          0
+        ]
       },
       {
         "edge_id": "e32d",
@@ -397,7 +513,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          1,
+          0
+        ]
       },
       {
         "edge_id": "e33r",
@@ -406,7 +526,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          0,
+          1
+        ]
       },
       {
         "edge_id": "e33d",
@@ -415,7 +539,11 @@
         "coupling_energy": 1,
         "gauge_link_phase_rad": 0,
         "physical_edge_length": 1,
-        "edge_class": "nearest_neighbor"
+        "edge_class": "nearest_neighbor",
+        "periodic_image_shift": [
+          1,
+          0
+        ]
       }
     ]
   },
@@ -428,6 +556,10 @@
     "twist_angles_rad": [
       0,
       0
+    ],
+    "box_lengths": [
+      4,
+      4
     ]
   },
   "coupling_budget": {
