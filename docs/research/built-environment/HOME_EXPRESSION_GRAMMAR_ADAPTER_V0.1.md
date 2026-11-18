@@ -43,6 +43,16 @@ HOME_EXPRESSION_DESIGN_PROBLEM_V0.1.schema.json defines source bindings, grammar
 
 HOME_EXPRESSION_CANDIDATE_SET_V0.1.schema.json defines lineage, generator identity, candidate provenance and claim ceilings. HOME_EXPRESSION_CANDIDATE_SET_SYNTHETIC_V0.1.json contains three illustrative search directions explicitly marked NOT_EXECUTED / NOT_GENERATED. They are not generated candidates and have no geometry or physical result.
 
+## 4.1 Resident preference graph input
+
+The resident-facing source of pairwise concept choices is Sol-Atlas [HOME-EXPRESSION-DECISION-RECEIPT-001 #917](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/917). Its v0.1 receipt distinguishes NOT_RECORDED, UNDECIDED, PREFERENCES_RECORDED, CONCEPT_DIRECTION_SELECTED and INCOMPARABLE, with pairwise decisions PREFER_LEFT, PREFER_RIGHT, EQUIVALENT, INCOMPARABLE and UNDECIDED.
+
+Symthaea will consume this owner-native graph through [RESIDENT-PARTIAL-ORDER-INPUT-001 #12796](https://github.com/Luminous-Dynamics/symthaea/issues/12796). It must preserve exact candidate/profile/brief/design-revision identity, reject duplicate/reversed/self pairs and directed cycles, and leave every unmentioned comparison unranked. It must not create scalar utility, fill undecided comparisons or choose a candidate when the upstream state is NOT_RECORDED or INCOMPARABLE.
+
+A decision event remains PENDING_MYCELIX_5149_VERIFICATION until the Mycelix authority/consent owner verifies it. A participant reference, event URI, digest or reviewer name does not authenticate authority. Household disagreement and private/shared intent remain under Sol-Atlas #907.
+
+This is a **planned consumer integration**, not an implementation claim for the current v0.1 crate. The current synthetic grammar fixture contains no resident decision and stays NOT_RECORDED.
+
 ## 5. Search-method baseline update
 
 Do not use NSGA-II as the only incumbent. Public [FloorPlanBench](https://floorplanbench.vercel.app/paper) is pinned here to full commit `7dfcca3dda6b11b4808a259499143e9bd75ed878` (MIT). It compares seven classical methods over 28 programmes (249 rooms), four tiers, ten seeds and a 50,000 evaluation-equivalent budget. Its canonical paper reports Greedy→SA at 92% solved runs and median five-objective hypervolume 0.355; the current live page reports 0.363. NSGA-II is 0.098 in the paper but 0.196 on the current live page. Reproduce the pinned core/task/run hashes and resolve the discrepancy before making comparative claims. This is an exact software floor-plan benchmark on integer-decimetre axis-aligned room rectangles, not a physical-building or regulatory certificate. [Pinned commit](https://github.com/Gariyuuu/floorplanbench/commit/7dfcca3dda6b11b4808a259499143e9bd75ed878).
