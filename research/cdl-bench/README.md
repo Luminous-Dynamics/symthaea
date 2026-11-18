@@ -219,6 +219,25 @@ The same causal command also emits:
 
 The mechanism configuration and intervention manifest are kept out of the learner-visible SCM2 stream (truth fields are crate-private). The fixed E3 combinations are public development fixtures, not a blind test set; a confirmatory result requires an externally controlled split and seed manifest. The CLI labels the paired held-out streams and verifies codec round trips; it does not yet train a mechanism learner or measure transfer. A generator unit test also checks that the upstream x0 remains invariant while descendants x2 and x4 respond to the x1 intervention in each held-out world. This is a dataset-generation fixture only.
 
+## Deterministic categorical CDF calibration
+
+`categorical_byte_cdf_from_log2_logits` converts 256 signed Q4 log2 logits
+into a `ByteCdf`. The adapter supplies scores calibrated on a separate
+calibration split and a Q16 inverse-temperature parameter (65,536 = 1.0).
+The converter uses a fixed Q24 `2^(-fraction)` lookup table, clips score
+differences to 16 log2 units, and performs integer largest-remainder
+normalization to a total frequency of 32,768. Every symbol receives a
+configurable minimum frequency (1..=127); ties are resolved by ascending byte
+symbol. No floating-point operation is used in the conversion.
+
+This is only the deterministic final readout-to-CDF step. It does **not** map an
+arbitrary `ContinuousHV` to byte logits, train a categorical readout, fit the
+temperature, or prove calibration. Those steps require the separate HDC/CfC
+adapter and held-out calibration protocol in
+[CDL-Bench-005](https://github.com/Luminous-Dynamics/symthaea/issues/12847).
+The codebook/readout, calibration parameters and decoder costs still count
+toward model accounting.
+
 ## Plugging in a custom predictor
 
 The library exposes:
