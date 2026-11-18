@@ -53,6 +53,7 @@ EXPECTED_VALUES = {
     "maximum_shower_discharge": ("scalar", "L/min"),
     "sample_size": ("scalar", "products"),
     "mean_flow_rate": ("scalar", "L/min"),
+    "observed_flow_rate_range": ("range", "L/min"),
     "water_reduction_at_similar_mean_jet_velocity": ("scalar", "%"),
     "water_chemistry_observation": ("text", None),
     "potential_energy_reduction": ("scalar", "%"),
