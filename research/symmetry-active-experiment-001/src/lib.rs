@@ -150,6 +150,7 @@ pub enum ExperimentErrorV1 {
     ReceiptMismatch,
     InvalidObservationSequence,
     UnknownObservedOutcome { probe_id: String, outcome: u32 },
+    ProbeSubsetBudgetExceeded { required: u64, maximum: u64 },
 }
 
 impl fmt::Display for ExperimentErrorV1 {
@@ -583,6 +584,191 @@ fn outcome_entropy(partitions: &BTreeMap<u32, u64>, hypothesis_count: usize) -> 
         .sum()
 }
 
+/// A hypothesis pair whose deterministic outcome signatures must differ
+/// under a fixed, non-adaptive probe set.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct HypothesisPairV1 {
+    pub hypothesis_a: String,
+    pub hypothesis_b: String,
+}
+
+/// Exact fixed-probe-set design. The subset search is exhaustive over all
+/// admissible probes, with an explicit combinatorial budget.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StaticProbeBudgetV1 {
+    pub maximum_admissible_probes: u8,
+    pub maximum_subsets: u64,
+}
+
+impl Default for StaticProbeBudgetV1 {
+    fn default() -> Self {
+        Self {
+            maximum_admissible_probes: 20,
+            maximum_subsets: 1_048_576,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExactStaticProbeCertificateV1 {
+    pub schema_version: u32,
+    pub problem_id: String,
+    pub problem_contract_bytes: Vec<u8>,
+    pub selected_probe_ids: Vec<String>,
+    pub selected_cost: u64,
+    pub distinguished_pairs: Vec<HypothesisPairV1>,
+    /// Pairs no admissible probe can separate, even with the full probe set.
+    pub intrinsically_unresolved_pairs: Vec<HypothesisPairV1>,
+    pub subsets_examined: u64,
+    pub optimality_certified: bool,
+    pub all_hypotheses_pairwise_distinguished: bool,
+}
+
+/// Solve the exact minimum-cost *static* diagnostic probe basis.
+///
+/// Every subset of admissible probes is enumerated. The objective is total
+/// acquisition cost, then probe count, then lexical probe-ID sequence. Pairs
+/// that no admissible probe can separate are reported explicitly and are not
+/// silently discarded from the full-identification status. If the subset
+/// budget is insufficient, the function returns an error rather than a
+/// partially explored result presented as optimal.
+pub fn solve_exact_static_probe_design(
+    problem: &ActiveExperimentProblemV1,
+    problem_budget: QualificationBudgetV1,
+    static_budget: StaticProbeBudgetV1,
+) -> Result<ExactStaticProbeCertificateV1, ExperimentErrorV1> {
+    validate_problem(problem, problem_budget)?;
+    let mut admissible: Vec<usize> = problem
+        .probes
+        .iter()
+        .enumerate()
+        .filter_map(|(index, probe)| probe.admissible.then_some(index))
+        .collect();
+    admissible.sort_by(|left, right| {
+        problem.probes[*left]
+            .probe_id
+            .cmp(&problem.probes[*right].probe_id)
+    });
+
+    if admissible.len() > usize::from(static_budget.maximum_admissible_probes)
+        || admissible.len() > 63
+    {
+        let required = if admissible.len() >= 64 {
+            u64::MAX
+        } else {
+            1_u64 << admissible.len()
+        };
+        return Err(ExperimentErrorV1::ProbeSubsetBudgetExceeded {
+            required,
+            maximum: static_budget.maximum_subsets,
+        });
+    }
+    let subset_count = 1_u64
+        .checked_shl(admissible.len() as u32)
+        .ok_or(ExperimentErrorV1::ProbeSubsetBudgetExceeded {
+            required: u64::MAX,
+            maximum: static_budget.maximum_subsets,
+        })?;
+    if subset_count > static_budget.maximum_subsets {
+        return Err(ExperimentErrorV1::ProbeSubsetBudgetExceeded {
+            required: subset_count,
+            maximum: static_budget.maximum_subsets,
+        });
+    }
+
+    let mut pair_cover_masks = Vec::new();
+    let mut distinguished_pairs = Vec::new();
+    let mut intrinsically_unresolved_pairs = Vec::new();
+
+    for hypothesis_a in 0..problem.hypotheses.len() {
+        for hypothesis_b in (hypothesis_a + 1)..problem.hypotheses.len() {
+            let pair = HypothesisPairV1 {
+                hypothesis_a: problem.hypotheses[hypothesis_a].clone(),
+                hypothesis_b: problem.hypotheses[hypothesis_b].clone(),
+            };
+            let mut covering_probe_mask = 0_u64;
+            for (admissible_index, probe_index) in admissible.iter().copied().enumerate() {
+                let outcomes = &problem.probes[probe_index].outcomes;
+                if outcomes[hypothesis_a] != outcomes[hypothesis_b] {
+                    covering_probe_mask |= 1_u64 << admissible_index;
+                }
+            }
+            if covering_probe_mask == 0 {
+                intrinsically_unresolved_pairs.push(pair);
+            } else {
+                distinguished_pairs.push(pair);
+                pair_cover_masks.push(covering_probe_mask);
+            }
+        }
+    }
+
+    let mut best: Option<(u64, Vec<String>, Vec<usize>)> = None;
+    for subset in 0..subset_count {
+        let mut selected_indices = Vec::new();
+        let mut selected_ids = Vec::new();
+        let mut selected_cost = 0_u64;
+        for (admissible_index, probe_index) in admissible.iter().copied().enumerate() {
+            if subset & (1_u64 << admissible_index) != 0 {
+                let probe = &problem.probes[probe_index];
+                selected_cost = selected_cost
+                    .checked_add(probe.cost)
+                    .ok_or(ExperimentErrorV1::CostOverflow)?;
+                selected_ids.push(probe.probe_id.clone());
+                selected_indices.push(probe_index);
+            }
+        }
+
+        let covers_every_resolvable_pair = pair_cover_masks.iter().all(|cover_mask| {
+            subset & cover_mask != 0
+        });
+        if !covers_every_resolvable_pair {
+            continue;
+        }
+
+        let replace = match &best {
+            None => true,
+            Some((best_cost, best_ids, _)) => {
+                (selected_cost, selected_ids.len(), &selected_ids)
+                    < (*best_cost, best_ids.len(), best_ids)
+            }
+        };
+        if replace {
+            best = Some((selected_cost, selected_ids, selected_indices));
+        }
+    }
+
+    let (selected_cost, selected_probe_ids, _) =
+        best.ok_or(ExperimentErrorV1::NoCompleteDiscriminationPolicy)?;
+    Ok(ExactStaticProbeCertificateV1 {
+        schema_version: 1,
+        problem_id: problem.problem_id.clone(),
+        problem_contract_bytes: problem.canonical_bytes(),
+        selected_probe_ids,
+        selected_cost,
+        distinguished_pairs,
+        intrinsically_unresolved_pairs: intrinsically_unresolved_pairs.clone(),
+        subsets_examined: subset_count,
+        optimality_certified: true,
+        all_hypotheses_pairwise_distinguished: intrinsically_unresolved_pairs.is_empty(),
+    })
+}
+
+/// Independently rebuild the complete static probe-set optimum and reject any
+/// modified problem, selected probe list, pair frontier or accounting field.
+pub fn verify_exact_static_probe_design(
+    problem: &ActiveExperimentProblemV1,
+    certificate: &ExactStaticProbeCertificateV1,
+    problem_budget: QualificationBudgetV1,
+    static_budget: StaticProbeBudgetV1,
+) -> Result<(), ExperimentErrorV1> {
+    let replayed =
+        solve_exact_static_probe_design(problem, problem_budget, static_budget)?;
+    if *certificate != replayed {
+        return Err(ExperimentErrorV1::ReceiptMismatch);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -875,6 +1061,116 @@ mod tests {
         assert_eq!(
             compile_active_experiment(&fixture(), tiny),
             Err(ExperimentErrorV1::WorkBudgetExceeded)
+        );
+    }
+
+    #[test]
+    fn exact_static_probe_basis_matches_exhaustive_minimum_and_adaptive_cost() {
+        let problem = fixture();
+        let static_certificate = solve_exact_static_probe_design(
+            &problem,
+            budget(),
+            StaticProbeBudgetV1::default(),
+        )
+        .unwrap();
+        let adaptive_certificate = compile_active_experiment(&problem, budget()).unwrap();
+
+        assert_eq!(
+            static_certificate.selected_probe_ids,
+            vec![
+                "boundary-probe".to_owned(),
+                "defect-localization-probe".to_owned(),
+                "orientation-probe".to_owned(),
+            ]
+        );
+        assert_eq!(static_certificate.selected_cost, 3);
+        assert_eq!(static_certificate.subsets_examined, 8);
+        assert!(static_certificate.optimality_certified);
+        assert!(static_certificate.all_hypotheses_pairwise_distinguished);
+        assert!(static_certificate.intrinsically_unresolved_pairs.is_empty());
+        assert_eq!(adaptive_certificate.root_worst_case_cost, 2);
+        assert!(static_certificate.selected_cost > adaptive_certificate.root_worst_case_cost);
+        verify_exact_static_probe_design(
+            &problem,
+            &static_certificate,
+            budget(),
+            StaticProbeBudgetV1::default(),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn exact_static_design_preserves_intrinsically_unresolved_hypothesis_pairs() {
+        let mut problem = fixture();
+        problem.probes[2].outcomes = vec![0, 0, 0, 0];
+        let certificate = solve_exact_static_probe_design(
+            &problem,
+            budget(),
+            StaticProbeBudgetV1::default(),
+        )
+        .unwrap();
+        assert!(!certificate.all_hypotheses_pairwise_distinguished);
+        assert!(!certificate.intrinsically_unresolved_pairs.is_empty());
+        assert_eq!(certificate.distinguished_pairs.len(), 5);
+        assert_eq!(certificate.selected_cost, 2);
+    }
+
+    #[test]
+    fn exact_static_design_fails_closed_when_subset_budget_is_too_small() {
+        assert_eq!(
+            solve_exact_static_probe_design(
+                &fixture(),
+                budget(),
+                StaticProbeBudgetV1 {
+                    maximum_admissible_probes: 20,
+                    maximum_subsets: 7,
+                },
+            ),
+            Err(ExperimentErrorV1::ProbeSubsetBudgetExceeded {
+                required: 8,
+                maximum: 7
+            })
+        );
+    }
+
+    #[test]
+    fn exact_static_certificate_rejects_forged_optimum_or_changed_problem() {
+        let problem = fixture();
+        let mut certificate = solve_exact_static_probe_design(
+            &problem,
+            budget(),
+            StaticProbeBudgetV1::default(),
+        )
+        .unwrap();
+        verify_exact_static_probe_design(
+            &problem,
+            &certificate,
+            budget(),
+            StaticProbeBudgetV1::default(),
+        )
+        .unwrap();
+
+        certificate.selected_cost = 2;
+        assert_eq!(
+            verify_exact_static_probe_design(
+                &problem,
+                &certificate,
+                budget(),
+                StaticProbeBudgetV1::default(),
+            ),
+            Err(ExperimentErrorV1::ReceiptMismatch)
+        );
+
+        let mut changed = fixture();
+        changed.probes[0].cost += 1;
+        assert_eq!(
+            verify_exact_static_probe_design(
+                &changed,
+                &certificate,
+                budget(),
+                StaticProbeBudgetV1::default(),
+            ),
+            Err(ExperimentErrorV1::ReceiptMismatch)
         );
     }
 
