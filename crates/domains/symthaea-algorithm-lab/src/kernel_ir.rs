@@ -104,7 +104,7 @@ impl KernelPlan {
             return Err(KernelPlanError::InvalidAccumulatorCount);
         }
         let word_count = 2048 / self.word_width.bytes();
-        if !word_count.is_multiple_of(usize::from(self.unroll_factor)) {
+        if word_count % usize::from(self.unroll_factor) != 0 {
             return Err(KernelPlanError::UnrollDoesNotDivideWordCount);
         }
         Ok(())
