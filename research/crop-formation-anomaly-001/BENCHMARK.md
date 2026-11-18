@@ -182,7 +182,7 @@ Separate:
 - **Independent digitization:** if source imagery rights permit, compare at least two independent circle annotations and propagate centre/radius uncertainty.
 - **Causal/semantic claims:** geometric grammar remains a geometry claim; authorship, mechanism and semantic payload require separate evidence.
 
-The source CCAT result is useful but single-event. Its radial baseline had higher mean accuracy than the pair/motif model, while the latter had higher macro-F1 and improved minority-class/anchor recovery. Use both metrics and per-class performance; do not promote one aggregate score.
+The source CCAT result is useful but single-event. Its radial baseline had higher mean accuracy than the pair/motif model, while the latter had higher macro-F1 and improved minority-class/anchor recovery. CCAT also conducts a declared seven-threshold (30–60 px) sweep, with 5,000 null trials per tolerance/model by default and BH correction across five metrics × seven thresholds per null model. Use both accuracy and macro-F1, report per-class performance, and build on—rather than overlook—these existing multiplicity controls.
 
 ## 4. Baselines and industry comparison
 
