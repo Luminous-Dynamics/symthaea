@@ -27,7 +27,7 @@ use symthaea_music_theory::{
 const HEADER: &str =
     "case_id,cohort,style,seed,valence_code,arousal_code,energy_code,bars_code";
 
-const METRICS: [&str; 14] = [
+const METRICS: [&str; 18] = [
     "score_note_count",
     "score_total_beats",
     "score_total_seconds",
@@ -41,7 +41,11 @@ const METRICS: [&str; 14] = [
     "score_mean_section_intensity",
     "score_mean_note_duration_beats",
     "score_assigned_part_fraction",
+    "score_universal_fatal_count",
+    "score_style_fatal_count",
+    "score_warning_count",
     "score_universal_valid",
+    "score_full_validation_valid",
 ];
 
 const CONFIRMATION_STYLES: [&str; 6] = [
@@ -444,9 +448,19 @@ fn compose_case(
         ("score_mean_section_intensity", mean(&intensities)),
         ("score_mean_note_duration_beats", mean(&durations)),
         ("score_assigned_part_fraction", assigned_part_fraction),
+        ("score_universal_fatal_count", Some(universal_fatal_count as f64)),
+        (
+            "score_style_fatal_count",
+            Some(all_fatal_count.saturating_sub(universal_fatal_count) as f64),
+        ),
+        ("score_warning_count", Some(warning_count as f64)),
         (
             "score_universal_valid",
             Some(if universal_fatal_count == 0 { 1.0 } else { 0.0 }),
+        ),
+        (
+            "score_full_validation_valid",
+            Some(if validation.valid { 1.0 } else { 0.0 }),
         ),
     ];
 
