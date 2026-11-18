@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "artifact": "HiddenBench official task corpus",
+  "upstream_repository": "https://github.com/Yassellee/HiddenBench_ICML",
+  "upstream_commit": "3be6ca16973e4fb751ffc0dfb7eb11f2d28335d1",
+  "upstream_commit_date": "2026-05-06T15:02:28Z",
+  "upstream_path": "data/benchmark.json",
+  "upstream_git_blob_sha": "918366d953ecfe7e86a0e8cf7906cf757f574012",
+  "upstream_license_path": "LICENSE",
+  "upstream_license_git_blob_sha": "1d455570babe71dba56639719f658f61ca2a1869",
+  "license": "MIT",
+  "license_notice": "Copyright (c) 2026 Yuxuan Li",
+  "paper": "https://proceedings.mlr.press/v306/li26ej.html",
+  "task_count": 65,
+  "hidden_profile_agent_count_histogram": {
+    "3": 7,
+    "4": 58
+  },
+  "benchmark_caveat": "The correct_answer field is evaluator-only and must never enter agent prompts, memory, or controller state.",
+  "import_policy": "Exact upstream file bytes copied; do not edit. Any transformation must be a separately versioned derived artifact."
+}
