@@ -218,3 +218,8 @@ Aqua will benchmark low-flow base service with explicitly user-authorized, local
 AQS-1 now distinguishes steady-state pressure independence from dynamic supply response. The UK non-domestic ETL reference uses a 3 bar / 1.5 bar flow-retention comparison with a 60% minimum under stated conditions; Aqua's proposed 70% initial / 80% stretch are internal research targets using conservative measurement-uncertainty bounds, not certification claims. Exact-point same-specimen comparison is implemented in pressure_curve. See the updated low-pressure protocol and competitor ledger.
 
 Dynamic events—startup, pressure steps, concurrent basin/bath draw, pump/regulator cycling, hot/cold interruptions and restoration—are covered separately by [AQUA_DYNAMIC_SUPPLY_TRANSIENT_PROTOCOL_V0_1.md](AQUA_DYNAMIC_SUPPLY_TRANSIENT_PROTOCOL_V0_1.md) and [#12801](https://github.com/Luminous-Dynamics/symthaea/issues/12801). No steady-state flow ratio is used to infer transient performance.
+
+
+## Versioned external evidence corpus
+
+The machine-readable evidence register now includes the UK ETL non-domestic shower criteria alongside exact Brondell and Hansgrohe product declarations, WaterSense criteria, SANS installation references and peer-reviewed spray studies. The corpus distinguishes programme criteria from manufacturer declarations and from Aqua results: [AQUA_EVIDENCE_CORPUS_V0_1.md](research/AQUA_EVIDENCE_CORPUS_V0_1.md), source JSON at [aqua-evidence-corpus-v0.1.json](research/aqua-evidence-corpus-v0.1.json). Current snapshot: 11 entries / 55 claims. This is an evidence register, not certification.
