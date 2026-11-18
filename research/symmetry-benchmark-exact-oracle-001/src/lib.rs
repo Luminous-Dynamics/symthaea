@@ -233,10 +233,13 @@ fn validate_subgroup(
     if elements.len() != case.target_subgroup.len() || elements.is_empty() {
         return Err(OracleError::InvalidSubgroup(case.case_id.clone()));
     }
-    if !elements.contains("e") && !group.elements.iter().any(|element| {
-        element.matrix == identity()
-            && elements.contains(&element.id)
-    }) {
+    let identity_id = group
+        .elements
+        .iter()
+        .find(|element| element.matrix == identity())
+        .map(|element| element.id.as_str())
+        .ok_or(OracleError::MissingIdentity)?;
+    if !elements.contains(identity_id) {
         return Err(OracleError::InvalidSubgroup(case.case_id.clone()));
     }
     for id in &elements {
@@ -295,7 +298,8 @@ fn point_set_stabilizer(
         // For this signed-permutation ambient group, multiplication changes
         // only signs and coordinate order. IEEE equality is exact here;
         // no tolerance may promote the near-symmetry control.
-        let key = (point[0].to_bits(), point[1].to_bits());
+        let canonical = canonical_point(*point);
+        let key = canonical;
         if !seen.insert(key) {
             return Err(OracleError::DuplicatePoint(case_id.to_owned()));
         }
@@ -423,11 +427,26 @@ fn polynomial_stabilizer(
     Ok(stabilizer)
 }
 
-fn subgroup_label(order: usize) -> &'static str {
-    match order {
+fn subgroup_label(
+    members: &[String],
+    by_id: &BTreeMap<String, Matrix2>,
+) -> &'static str {
+    match members.len() {
         1 => "C1",
         2 => "C2",
-        4 => "C4",
+        4 => {
+            let has_order_four = members.iter().any(|id| {
+                let matrix = by_id[id];
+                let square = multiply_matrix(matrix, matrix);
+                square != identity()
+                    && multiply_matrix(square, square) == identity()
+            });
+            if has_order_four {
+                "C4"
+            } else {
+                "V4"
+            }
+        }
         8 => "D4",
         _ => "unclassified",
     }
@@ -480,7 +499,7 @@ fn validate_manifest(manifest: &Manifest) -> Result<OracleReport, OracleError> {
                 actual,
             });
         }
-        let label = subgroup_label(actual.len());
+        let label = subgroup_label(&actual, &ids);
         if case.expected_subgroup_label != label {
             return Err(OracleError::InvalidCase(format!(
                 "{} label {} disagrees with subgroup order {}",
@@ -514,7 +533,12 @@ fn validate_manifest(manifest: &Manifest) -> Result<OracleReport, OracleError> {
             && manifest
                 .benchmark_status
                 .fixture_validation
-                .contains("authored"),
+                .contains("authored")
+            && manifest.benchmark_status.external_baseline_runs == "not_started"
+            && manifest
+                .benchmark_status
+                .claim_boundary
+                .contains("not benchmark results"),
         cases: results,
     })
 }
@@ -599,10 +623,36 @@ mod tests {
 
     #[test]
     fn subgroup_order_label_is_not_inferred_from_case_name() {
-        assert_eq!(subgroup_label(1), "C1");
-        assert_eq!(subgroup_label(2), "C2");
-        assert_eq!(subgroup_label(4), "C4");
-        assert_eq!(subgroup_label(8), "D4");
-        assert_eq!(subgroup_label(6), "unclassified");
+        let members = BTreeMap::from([
+            ("e".to_owned(), identity()),
+            ("r90".to_owned(), [[0, -1], [1, 0]]),
+            ("r180".to_owned(), [[-1, 0], [0, -1]]),
+            ("r270".to_owned(), [[0, 1], [-1, 0]]),
+            ("fx".to_owned(), [[1, 0], [0, -1]]),
+            ("fy".to_owned(), [[-1, 0], [0, 1]]),
+            ("fdiag".to_owned(), [[0, 1], [1, 0]]),
+            ("fanti".to_owned(), [[0, -1], [-1, 0]]),
+        ]);
+        assert_eq!(subgroup_label(&["e".to_owned()], &members), "C1");
+        assert_eq!(subgroup_label(&["e".to_owned(), "r180".to_owned()], &members), "C2");
+        assert_eq!(
+            subgroup_label(
+                &["e".to_owned(), "r90".to_owned(), "r180".to_owned(), "r270".to_owned()],
+                &members
+            ),
+            "C4"
+        );
+        assert_eq!(
+            subgroup_label(
+                &["e".to_owned(), "r180".to_owned(), "fx".to_owned(), "fy".to_owned()],
+                &members
+            ),
+            "V4"
+        );
+        assert_eq!(subgroup_label(&members.keys().cloned().collect::<Vec<_>>(), &members), "D4");
+        assert_eq!(
+            subgroup_label(&["a".to_owned(), "b".to_owned(), "c".to_owned()], &members),
+            "unclassified"
+        );
     }
 }
