@@ -45,6 +45,13 @@ fn validate_observable_value(observation: &Value) -> Result<(), String> {
     let id = required_text(observation, "observable_id")?;
     let kind = required_text(observation, "observable_kind")?;
     let value_kind = required_text(observation, "value_kind")?;
+    let result_authority = required_text(observation, "result_authority")?;
+    if !matches!(
+        result_authority,
+        "calculated" | "measured" | "predicted" | "inferred" | "reported_summary"
+    ) {
+        return Err(format!("observable {id}: unsupported result authority"));
+    }
     let value = observation
         .get("value")
         .ok_or_else(|| format!("observable {id} missing value field"))?;
@@ -467,6 +474,7 @@ fn audit_bundle(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Stri
     let mut observable_ids = HashSet::new();
     let mut observables = HashMap::with_capacity(observable_values.len());
     let mut observable_kind_counts: HashMap<String, usize> = HashMap::new();
+    let mut result_authority_counts: HashMap<String, usize> = HashMap::new();
     for observable in observable_values {
         let id = required_text(observable, "observable_id")?;
         if !observable_ids.insert(id.to_owned()) {
@@ -479,6 +487,8 @@ fn audit_bundle(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Stri
         validate_observable_value(observable)?;
         let kind = required_text(observable, "observable_kind")?.to_owned();
         *observable_kind_counts.entry(kind).or_insert(0) += 1;
+        let authority = required_text(observable, "result_authority")?.to_owned();
+        *result_authority_counts.entry(authority).or_insert(0) += 1;
         observables.insert(id.to_owned(), observable);
     }
 
@@ -546,6 +556,7 @@ fn audit_bundle(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Stri
         "material_states": material_state_summaries,
         "observable_count": observable_values.len(),
         "observable_kind_counts": observable_kind_counts,
+        "result_authority_counts": result_authority_counts,
         "gl_coefficient_count": coefficient_values.len(),
         "coefficient_status_counts": coefficient_status_counts,
         "exportable_gl_coefficients": exportable,
@@ -676,6 +687,7 @@ mod tests {
         let (_, mut fixture) = inputs();
         fixture["derived_observables"] = json!([{
             "observable_id":"obs-xi-0",
+            "result_authority":"calculated",
             "state_id":"method_summary_only",
             "observable_kind":"xi0_microscopic",
             "length_scale_definition":"GL_near_Tc_xi",
@@ -695,6 +707,7 @@ mod tests {
         let (_, mut fixture) = inputs();
         fixture["derived_observables"] = json!([{
             "observable_id":"obs-xi-gl",
+            "result_authority":"calculated",
             "state_id":"method_summary_only",
             "observable_kind":"xi_GL",
             "length_scale_definition":"microscopic_xi0",
@@ -713,6 +726,7 @@ mod tests {
         let (_, mut fixture) = inputs();
         fixture["derived_observables"] = json!([{
             "observable_id":"obs-tc",
+            "result_authority":"calculated",
             "state_id":"method_summary_only",
             "observable_kind":"Tc",
             "value_kind":"scalar","value":8.0,"unit":"K",
@@ -730,6 +744,7 @@ mod tests {
         let (_, mut fixture) = inputs();
         fixture["derived_observables"] = json!([{
             "observable_id":"lambda-scalar",
+            "result_authority":"calculated",
             "state_id":"method_summary_only",
             "observable_kind":"lambda_L_scalar",
             "value_kind":"scalar","value":100.0,"unit":"nm",
@@ -748,6 +763,7 @@ mod tests {
         let (_, mut fixture) = inputs();
         fixture["derived_observables"] = json!([{
             "observable_id":"lambda-matrix",
+            "result_authority":"calculated",
             "state_id":"method_summary_only",
             "observable_kind":"lambda_L_tensor",
             "value_kind":"matrix","value":[[100.0,0.0],[0.0,120.0]],"unit":"nm",
@@ -767,6 +783,7 @@ mod tests {
         fixture["source_record"]["evidence_status"] = json!("independently_reproduced");
         fixture["derived_observables"] = json!([{
             "observable_id":"pair-susc",
+            "result_authority":"calculated",
             "state_id":"method_summary_only",
             "observable_kind":"quadratic_pair_susceptibility",
             "value_kind":"scalar","value":1.0,"unit":"arb",
@@ -803,6 +820,7 @@ mod tests {
         let (_, mut fixture) = inputs();
         fixture["derived_observables"] = json!([{
             "observable_id":"pair-susc",
+            "result_authority":"calculated",
             "state_id":"method_summary_only",
             "observable_kind":"quadratic_pair_susceptibility",
             "value_kind":"scalar","value":1.0,"unit":"arb",
@@ -854,6 +872,7 @@ mod tests {
         fixture["material_states"][1]["state_id"] = json!("second-pressure-state");
         fixture["derived_observables"] = json!([{
             "observable_id":"xi-at-state-2",
+            "result_authority":"calculated",
             "state_id":"second-pressure-state",
             "observable_kind":"xi0_microscopic",
             "length_scale_definition":"microscopic_xi0",
@@ -874,6 +893,7 @@ mod tests {
         let (_, mut fixture) = inputs();
         fixture["derived_observables"] = json!([{
             "observable_id":"made-up-reproduced",
+            "result_authority":"calculated",
             "state_id":"method_summary_only",
             "observable_kind":"Tc",
             "value_kind":"scalar","value":300.0,"unit":"K",
