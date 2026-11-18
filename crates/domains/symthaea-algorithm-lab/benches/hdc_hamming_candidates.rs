@@ -46,7 +46,7 @@ fn hdc_hamming_candidates(c: &mut Criterion) {
             .validate()
             .expect("correctness evidence must self-validate before benchmarking");
 
-        for (profile, left, right) in input_profiles {
+        for (profile, left, right) in input_profiles.iter().copied() {
             group.bench_with_input(
                 BenchmarkId::new(candidate.name(), profile),
                 &(left, right),
