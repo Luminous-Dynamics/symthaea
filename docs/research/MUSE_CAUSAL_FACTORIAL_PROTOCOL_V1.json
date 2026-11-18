@@ -238,11 +238,13 @@
     "confirmation_attempts": 5832,
     "total_generation_attempts": 15228,
     "conditions_per_block": 81,
-    "scalar_contrasts_per_metric_per_block": 32,
+    "scalar_contrasts_per_metric_per_block": 80,
     "terms": {
       "main_effects": 8,
       "pairwise_interactions": 24,
-      "higher_order_terms_in_primary_report": 0
+      "primary_terms": 32,
+      "higher_order_diagnostic_terms": 48,
+      "total_terms": 80
     }
   },
   "analysis": {
@@ -265,7 +267,7 @@
       }
     },
     "coefficient_formula": "sum(response_i × contrast_weight_i) / sum(contrast_weight_i²)",
-    "terms": "all 8 one-factor linear/quadratic contrasts and all 24 pairwise products",
+    "terms": "all 8 one-factor linear/quadratic contrasts, all 24 pairwise products as primary terms, and all 48 three-/four-factor products as explicitly diagnostic higher-order terms",
     "seed_aggregation": {
       "per_seed_estimates": true,
       "across_seed_statistics": [
@@ -281,7 +283,8 @@
     },
     "no_observed_change": "report explicitly; do not infer a universal dead control from tested levels alone",
     "non_monotonic_effects": "valid response pattern; do not force monotonicity",
-    "unsupported_or_not_applicable_metric": "explicit status required; do not drop rows silently"
+    "unsupported_or_not_applicable_metric": "explicit status required; do not drop rows silently",
+    "higher_order_handling": "orders 1-2 are primary; orders 3-4 are reported separately as higher-order diagnostics and must not be promoted to primary success criteria without a protocol revision"
   },
   "required_measurement_channels": [
     {
