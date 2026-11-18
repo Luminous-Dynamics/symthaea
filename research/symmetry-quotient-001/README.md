@@ -85,6 +85,8 @@ The certificate reports two distinct quantities:
 - the **maximum pairwise orbit range** (the gate checked against the requested tolerance);
 - the **maximum orbit-to-representative deviation** (\varepsilon_*), which is the additive regret bound for selecting the best representative.
 
+This is exactly the requested per-action condition on a finite group orbit: for any two members x and y of the same orbit, transitivity gives some group element g with y=g*x. Thus the maximum pairwise range max(f)-min(f) equals max over all orbit members x and group elements g of |f(g*x)-f(x)|. When the range is too large, the compiler identifies minimum and maximum members and records the group element g_max * inverse(g_min), then checks that it maps the minimum member to the maximum member.
+
 It also binds canonical versioned bytes for the full original problem and action, including objective values, candidate identities, group table and permutations, alongside objective unit/scale, optimization sense, tolerance and every orbit/member/inverse witness. The byte encoding is replay identity, not a cryptographic digest or signature.
 
 If every orbit member is within \(\varepsilon_*\) of its feasible representative, selecting the best feasible representative yields:
