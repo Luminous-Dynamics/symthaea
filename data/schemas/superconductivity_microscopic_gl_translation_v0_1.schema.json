@@ -564,7 +564,9 @@
               "J_dp_intrinsic",
               "electron_phonon_mass_enhancement",
               "fermi_surface_average_gap",
-              "fermi_surface_average_velocity"
+              "fermi_surface_average_velocity",
+              "lambda_L_from_current_slope",
+              "lambda_L_from_depairing_peak"
             ]
           },
           "value_kind": {
