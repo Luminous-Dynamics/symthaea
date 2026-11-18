@@ -33,6 +33,8 @@ The closest new industry baselines are now directly relevant:
 - **SABench** (2026-10-25) contains 201 email/calendar/ticket tasks and 2,211 model-task pairs across 11 models. It reports 15.2% collateral-damage runs and unauthorized writes in 12.8% of goal-satisfied runs; ambiguity was a particularly difficult trap family. <https://arxiv.org/abs/2610.34167>
 
 These results are the baseline to beat on matched tasks, not numbers to subtract from synthetic Symthaea/Mycelix fixtures. Reuse compatible upstream tasks only after licensing and semantic review; preserve each benchmark's native scoring. CyberGym remains useful for vulnerability-exploitation capability, but a successful proof of concept is not a measure of whether an agent stayed within delegated authority.
+Memory adds a second, complementary benchmark axis. **Mem2ActBench** evaluates memory-dependent tool selection and parameter grounding across 2,029 sessions and 400 tasks; the paper reports that 91.3% of the tasks were judged strongly memory-dependent, while evaluated systems often failed to make retrieved memory materially influence tool choice/arguments. **TimlMemBench** separates canonical-pool QA from raw-native ingestion and tests lifecycle updates, scope boundaries, provenance recovery, activation and restraint (its current package reports 208 reviewed samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases). These benchmarks do not measure owner authorization or external effects. They are useful inputs for S3 only when coupled to LARP's independent effect/authority oracle: remembering the right fact is not the same as being permitted to act on it.
+
 
 A 2026 review of 15 mainstream agent benchmarks found safety/security and cost-efficiency often absent from primary scoring and many relied on binary task success. This describes that selected mainstream sample, not the entire dedicated security-benchmark landscape.
 
@@ -292,6 +294,8 @@ A credible result would demonstrate, with an independent oracle and matched cand
 - NIST NCCoE, [Software and AI Agent Identity and Authorization concept paper](https://csrc.nist.gov/pubs/other/2026/02/05/accelerating-the-adoption-of-software-and-ai-agent/ipd), 2026-02-05; comments closed 2026-04-02.
 - [AuthorizationBench](https://arxiv.org/abs/2610.27548), 2026-10-20; 286 tasks / 6,864 trajectories.
 - [SABench](https://arxiv.org/abs/2610.34167), 2026-10-25; 201 tasks / 2,211 model-task pairs.
+- [Mem2ActBench](https://aclanthology.org/2026.acl-long.XXX/), 2026; memory-dependent tool selection and parameter grounding across 2,029 sessions / 400 tasks (pin the final ACL identifier from the official anthology record before formal release).
+- [TimlMemBench](https://aclanthology.org/2026.findings-acl.XXX/), 2026; raw-native memory lifecycle, scope, provenance, activation and restraint (pin the official identifier/license before formal release).
 - [Agent Security Bench](https://proceedings.iclr.cc/paper_files/paper/2025/hash/5750f91d8fb9d5c02bd8ad2c3b44456b-Abstract-Conference.html), ICLR 2025.
 - [CyberGym](https://www.cybergym.io/cybergym/), AI-agent cybersecurity capability benchmark.
 - [OWASP ACS v0.1.4 conformance profiles](https://owaspacs.org/docs/spec/conformance/); self-declared profile compatibility is not independent certification.
