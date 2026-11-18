@@ -205,7 +205,7 @@ The Symthaea differentiator should not be another image classifier or gallery. I
 - experiment selection by expected information gain and statistical power;
 - independent replay and claim-ceiling enforcement.
 
-## 4. Release gates
+## 5. Release gates
 
 | Gate | Required evidence | Permitted claim |
 |---|---|---|
@@ -219,7 +219,7 @@ The Symthaea differentiator should not be another image classifier or gallery. I
 
 Every report records input hashes, source versions, tool commit, parameters, seeds, excluded observations, all tested hypotheses/decoders, and independent reviewer status. Skipped or unrun tests are not passes.
 
-## 5. First benchmark sprint
+## 6. First benchmark sprint
 
 1. Build synthetic field-like raster/vector fixtures with known geometry and known/absent payloads; the Rust reference now has a 32-way D4/traversal/bit-order positive-control grid containing HELLO and a blank-grid negative control.
 2. Create matched null sets; vary resolution, perspective, occlusion, crop mask and orientation.
