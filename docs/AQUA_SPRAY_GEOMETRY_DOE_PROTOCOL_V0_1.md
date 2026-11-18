@@ -26,7 +26,7 @@ The exact values and low / centre / high settings must be established from CAD, 
 | F7 | Passive pressure compensation | None / qualified commercial element / candidate passive concept | F5, F6 |
 | F8 | Cassette face / seal / retention geometry | Serviceable, manufacturable interface alternatives | F1, F5 |
 | F9 | Passive feedback-channel / oscillator geometry (optional research arm) | No oscillator / single-feedback / double-feedback; feasible cavity and channel ratios from a defined design envelope | F1, F3, F5, F6 |
-| F10 | Nozzle-area ratio and resistance factor | Exact dimensionless definitions and manufacturable bounds taken from the replicated literature method / CAD | F1, F2, F5, F6 |
+| F10 | Nozzle-area ratio and resistance factor | Exact dimensionless definitions and manufacturable bounds taken from the replicated literature method / CAD | F1, F2, F5, F6 |\n| F11 | Internal vortex / tangential-feed / hyperbolic-funnel geometry | No-vortex control and CAD-bounded vortex / air-core variants | F1, F2, F5, F6, F9 |
 
 Each factor entry must include: units, exact CAD parameter, physical rationale, manufacturable range, tolerance distribution, process route, material/finish, rated pressure/temperature constraints, and a digest of the source CAD / configuration. If a factor changes another dimension unintentionally, record the dependency rather than treating the variables as independent.
 
@@ -48,7 +48,7 @@ The Rust helper in `symthaea-aqua-bench` calculates these descriptive values and
 
 ### Other independent outcomes
 
-Retain separate outputs for flow, dynamic inlet pressure, standardized force/coverage, temperature drop at declared bather-plane location(s), spray-to-skin heat-transfer coefficient only where the measurement method is validated, splash/off-target capture, noise, scale, partial blockage, cleaning labour, post-clean performance recovery, manufacturing yield and unit-to-unit variation.
+Retain separate outputs for flow, dynamic inlet pressure, standardized force/coverage, mean and spatial jet velocity, breakup length and droplet size, temperature drop at declared bather-plane location(s), spray-to-skin heat-transfer coefficient only where the measurement method is validated, splash/off-target capture, time-resolved aerosol count/size, noise, scale, partial blockage, cleaning labour, post-clean performance recovery, manufacturing yield and unit-to-unit variation. Where an internal vortex/air-ingestion arm is studied, Mycelix / water-quality owners should decide whether dissolved oxygen, pH or other chemistry endpoints are applicable; Aqua must not interpret them as a water-quality pass.
 
 No single weighted score may compensate for a hard-constraint violation. Do not infer comfort, cleaning efficacy or aerosol safety from deposited-water density.
 
@@ -201,3 +201,22 @@ Zhang, Mui and Wong (Water, 2024, 16(7), 928) tested five showerheads and 18 spr
 This is important prior evidence: nozzle geometry should not be optimized independently of the thermal-service boundary. Aqua should preserve the paper's dimensionless predictor variables where definitions can be reproduced, and separately measure water flow, pressure, delivered temperature, bather-plane temperature and any validated heat-transfer coefficient. A product-level thermal or human-comfort claim requires a matched Aqua test and its own independent endpoint method; the paper's 20% result is not an Aqua target or guarantee.
 
 Source: https://www.mdpi.com/2073-4441/16/7/928
+
+
+## 13. Prior art — hyperbolic-vortex / air-entraining shower geometry
+
+Van de Griend et al. (Water, 2019, 11(12), 2446) compared two externally similar showerheads, one with a hyperbolic internal funnel / vortex geometry. They reported the same mean jet velocity with 14.4 ± 5.6% less water (p < 0.01) in their comparison method, across tested flows of 6, 7, 8 and 9 L/min. The study did not directly establish Aqua-equivalent task outcomes or run a new human comfort trial: its comfort inference relies on earlier work relating jet velocity to shower experience. The authors explicitly note that the centre nozzles acting as air inlets changed the spatial distribution, which might or might not be desirable. Their recirculating chemical-characterization rig also observed changes in dissolved oxygen / pH / redox behavior; those are not a hygiene or safety qualification.
+
+This is important prior art, so Aqua must not claim to invent the vortex funnel. Instead, investigate whether a manufacturable, serviceable variant can reproduce or exceed the reported water/jet-velocity trade-off **while also** meeting the complete standard-method spray-force/coverage criteria, Aqua spatial task map, low-pressure envelope, temperature stability, aerosol characterization, water-quality owner review, scale tolerance and post-clean recovery.
+
+### Falsification and comparison
+
+- The 14.4 ± 5.6% figure is a literature comparator, not a guaranteed or independently replicated result.
+- First reproduce the conventional and vortex control geometries at their declared flow conditions and verify the pressure datum / velocity analysis.
+- Compare radial / sector-specific jet velocity and deposition, not only a weighted mean that can hide central under-delivery.
+- Inspect the effect of air-core geometry on startup, air ingestion, noise, droplet breakup and temporal aerosol size/count.
+- Measure all standard / task endpoints and chemistry observations separately.
+- A candidate that improves outer jets but starves centre regions, worsens aerosol profile, raises pressure demand, clogs or cannot be cleaned is not a win.
+- Do not convert equivalent average jet velocity into equivalent comfort without a separately approved human-factors study.
+
+Source: van de Griend et al., Water (2019), 11(12), 2446, https://www.mdpi.com/2073-4441/11/12/2446, DOI 10.3390/w11122446.
