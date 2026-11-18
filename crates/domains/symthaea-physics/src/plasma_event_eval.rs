@@ -10,6 +10,7 @@
 use crate::plasma_observability::{
     BlockedChannel, DecisionChannelRequirement, DecisionInputGate, PlasmaObservationFrame,
 };
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
@@ -48,6 +49,9 @@ struct AlarmObservation {
     pub window_end_ns: u64,
     /// A predeclared risk score, not assumed to be a calibrated probability.
     pub risk_score: Option<f64>,
+    pub lower_bound: Option<f64>,
+    pub upper_bound: Option<f64>,
+    pub risk_evidence_sha256: Option<String>,
     pub evidence_quality: AlarmEvidenceQuality,
 }
 
@@ -122,6 +126,142 @@ impl AlarmPolicyConfig {
     }
 }
 
+
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value.bytes().all(|byte| {
+            byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+        })
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut encoded = String::with_capacity(64);
+    for byte in digest {
+        use std::fmt::Write as _;
+        let _ = write!(&mut encoded, "{byte:02x}");
+    }
+    encoded
+}
+
+fn observation_frame_sha256(
+    frame: &PlasmaObservationFrame,
+) -> Result<String, PlasmaEventEvalError> {
+    let canonical = serde_json::to_vec(frame).map_err(|error| {
+        PlasmaEventEvalError::new(format!("observation-frame serialization failed: {error}"))
+    })?;
+    Ok(sha256_hex(&canonical))
+}
+
+/// Model-bound score evidence for one exact observation frame and forecast horizon.
+///
+/// Digests are content identities, not signatures or proof that the model,
+/// training split, or calibration process is trustworthy. Those claims require
+/// independently verifiable registries and signed receipts outside this module.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RiskScoreEvidence {
+    pub shot_id: String,
+    pub frame_id: String,
+    pub frame_time_ns: u64,
+    /// SHA-256 of the exact serialized PlasmaObservationFrame.
+    pub input_frame_sha256: String,
+    pub horizon_ns: u64,
+    pub target_time_ns: u64,
+    pub model_id: String,
+    pub model_revision: String,
+    pub model_artifact_sha256: String,
+    pub training_split_sha256: String,
+    pub calibration_id: String,
+    pub calibration_revision: String,
+    pub calibration_receipt_sha256: String,
+    /// Point score and uncertainty bounds share the frozen policy threshold scale.
+    pub estimate: f64,
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+}
+
+impl RiskScoreEvidence {
+    pub fn validate_for_frame(
+        &self,
+        frame: &PlasmaObservationFrame,
+    ) -> Result<(), PlasmaEventEvalError> {
+        for (value, field) in [
+            (self.shot_id.as_str(), "risk evidence shot_id"),
+            (self.frame_id.as_str(), "risk evidence frame_id"),
+            (self.model_id.as_str(), "model_id"),
+            (self.model_revision.as_str(), "model_revision"),
+            (self.calibration_id.as_str(), "calibration_id"),
+            (self.calibration_revision.as_str(), "calibration_revision"),
+        ] {
+            if value.trim().is_empty() {
+                return Err(PlasmaEventEvalError::new(format!(
+                    "{field} must be non-empty"
+                )));
+            }
+        }
+
+        for (digest, field) in [
+            (self.input_frame_sha256.as_str(), "input_frame_sha256"),
+            (self.model_artifact_sha256.as_str(), "model_artifact_sha256"),
+            (self.training_split_sha256.as_str(), "training_split_sha256"),
+            (
+                self.calibration_receipt_sha256.as_str(),
+                "calibration_receipt_sha256",
+            ),
+        ] {
+            if !valid_sha256(digest) {
+                return Err(PlasmaEventEvalError::new(format!(
+                    "{field} must be 64 lowercase hexadecimal characters"
+                )));
+            }
+        }
+
+        if !self.estimate.is_finite()
+            || !self.lower_bound.is_finite()
+            || !self.upper_bound.is_finite()
+            || self.lower_bound > self.estimate
+            || self.estimate > self.upper_bound
+        {
+            return Err(PlasmaEventEvalError::new(
+                "risk estimate and interval bounds must be finite and ordered",
+            ));
+        }
+        if self.horizon_ns == 0 {
+            return Err(PlasmaEventEvalError::new(
+                "risk evidence horizon_ns must be positive",
+            ));
+        }
+        let expected_target = frame
+            .frame_time_ns
+            .checked_add(self.horizon_ns)
+            .ok_or_else(|| PlasmaEventEvalError::new("risk target timestamp overflow"))?;
+        if self.shot_id != frame.shot_id
+            || self.frame_id != frame.frame_id
+            || self.frame_time_ns != frame.frame_time_ns
+            || self.target_time_ns != expected_target
+        {
+            return Err(PlasmaEventEvalError::new(
+                "risk evidence shot/frame/time/horizon does not match the input frame",
+            ));
+        }
+        let actual_frame_digest = observation_frame_sha256(frame)?;
+        if self.input_frame_sha256 != actual_frame_digest {
+            return Err(PlasmaEventEvalError::new(
+                "risk evidence input_frame_sha256 does not match the exact observation frame",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Identity of this exact model/split/calibration/frame/horizon score record.
+    pub fn evidence_sha256(&self) -> Result<String, PlasmaEventEvalError> {
+        let canonical = serde_json::to_vec(self).map_err(|error| {
+            PlasmaEventEvalError::new(format!("risk evidence serialization failed: {error}"))
+        })?;
+        Ok(sha256_hex(&canonical))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AlarmAbstentionReason {
     EvidenceGateBlocked(Vec<BlockedChannel>),
@@ -133,23 +273,37 @@ pub enum AlarmAbstentionReason {
 pub enum AlarmPolicyUpdate {
     BelowThreshold {
         at_ns: u64,
+        risk_evidence_sha256: String,
     },
     PendingTrigger {
         at_ns: u64,
         consecutive_windows: usize,
+        risk_evidence_sha256: String,
     },
     Raised {
         at_ns: u64,
+        risk_evidence_sha256: String,
     },
     Active {
         at_ns: u64,
+        risk_evidence_sha256: String,
     },
     PendingClear {
         at_ns: u64,
         consecutive_windows: usize,
+        risk_evidence_sha256: String,
     },
     Cleared {
         at_ns: u64,
+        risk_evidence_sha256: String,
+    },
+    Uncertain {
+        at_ns: u64,
+        estimate: f64,
+        lower_bound: f64,
+        upper_bound: f64,
+        risk_evidence_sha256: String,
+        alert_remains_active: bool,
     },
     Abstained {
         at_ns: u64,
@@ -219,22 +373,27 @@ impl OnlinePlasmaAlarmPolicy {
         &mut self,
         frame: &PlasmaObservationFrame,
         requirements: &[DecisionChannelRequirement],
-        risk_score: Option<f64>,
+        risk_evidence: Option<RiskScoreEvidence>,
     ) -> Result<AlarmPolicyUpdate, PlasmaEventEvalError> {
         let gate = frame
             .evaluate_decision_requirements(requirements)
             .map_err(|error| PlasmaEventEvalError::new(error.message))?;
         match gate {
             DecisionInputGate::MeasuredInputsAvailable(inputs) => {
-                let score = risk_score.ok_or_else(|| {
+                let evidence = risk_evidence.ok_or_else(|| {
                     PlasmaEventEvalError::new(
-                        "a qualified measured frame requires a finite risk score",
+                        "a qualified measured frame requires model-bound risk evidence",
                     )
                 })?;
+                evidence.validate_for_frame(frame)?;
+                let risk_evidence_sha256 = evidence.evidence_sha256()?;
                 let observation = AlarmObservation {
                     shot_id: inputs.shot_id().to_owned(),
                     window_end_ns: inputs.frame_time_ns(),
-                    risk_score: Some(score),
+                    risk_score: Some(evidence.estimate),
+                    lower_bound: Some(evidence.lower_bound),
+                    upper_bound: Some(evidence.upper_bound),
+                    risk_evidence_sha256: Some(risk_evidence_sha256),
                     evidence_quality: AlarmEvidenceQuality::DirectMeasured,
                 };
                 self.update(&observation)
@@ -243,9 +402,9 @@ impl OnlinePlasmaAlarmPolicy {
                 frame_id: _,
                 blocked_channels,
             } => {
-                if risk_score.is_some() {
+                if risk_evidence.is_some() {
                     return Err(PlasmaEventEvalError::new(
-                        "a blocked evidence frame must not carry an alarm risk score",
+                        "a blocked evidence frame must not carry model-bound risk evidence",
                     ));
                 }
                 self.validate_timeline(&frame.shot_id, frame.frame_time_ns)?;
@@ -293,74 +452,118 @@ impl OnlinePlasmaAlarmPolicy {
     ) -> Result<AlarmPolicyUpdate, PlasmaEventEvalError> {
         self.validate_timeline(&observation.shot_id, observation.window_end_ns)?;
 
-        match (observation.evidence_quality, observation.risk_score) {
-            (AlarmEvidenceQuality::DirectMeasured, Some(score)) if score.is_finite() => {}
-            (AlarmEvidenceQuality::DirectMeasured, _) => {
-                return Err(PlasmaEventEvalError::new(
-                    "direct-measured observations require a finite risk_score",
-                ));
-            }
-            (_, None) => {}
-            (_, Some(_)) => {
-                return Err(PlasmaEventEvalError::new(
-                    "non-measured evidence must not carry a policy risk_score",
-                ));
-            }
-        }
+        let (score, lower_bound, upper_bound, risk_evidence_sha256) =
+            match observation.evidence_quality {
+                AlarmEvidenceQuality::DirectMeasured => {
+                    let score = observation.risk_score.ok_or_else(|| {
+                        PlasmaEventEvalError::new("measured evidence requires a risk score")
+                    })?;
+                    let lower = observation.lower_bound.ok_or_else(|| {
+                        PlasmaEventEvalError::new("measured evidence requires a lower bound")
+                    })?;
+                    let upper = observation.upper_bound.ok_or_else(|| {
+                        PlasmaEventEvalError::new("measured evidence requires an upper bound")
+                    })?;
+                    let digest = observation.risk_evidence_sha256.as_deref().ok_or_else(|| {
+                        PlasmaEventEvalError::new("measured evidence requires an evidence digest")
+                    })?;
+                    if !score.is_finite()
+                        || !lower.is_finite()
+                        || !upper.is_finite()
+                        || lower > score
+                        || score > upper
+                        || !valid_sha256(digest)
+                    {
+                        return Err(PlasmaEventEvalError::new(
+                            "risk score, uncertainty interval or evidence digest is invalid",
+                        ));
+                    }
+                    (score, lower, upper, digest.to_owned())
+                }
+                _ => {
+                    if observation.risk_score.is_some()
+                        || observation.lower_bound.is_some()
+                        || observation.upper_bound.is_some()
+                        || observation.risk_evidence_sha256.is_some()
+                    {
+                        return Err(PlasmaEventEvalError::new(
+                            "non-measured evidence must not carry a risk score or evidence digest",
+                        ));
+                    }
+                    return Err(PlasmaEventEvalError::new(
+                        "internal alarm state machine accepts only gate-qualified measured input",
+                    ));
+                }
+            };
 
         self.last_window_end_ns = Some(observation.window_end_ns);
 
-        if observation.evidence_quality != AlarmEvidenceQuality::DirectMeasured {
-            return Err(PlasmaEventEvalError::new(
-                "internal alarm state machine accepts only gate-qualified measured input",
-            ));
-        }
-
-        let score = observation
-            .risk_score
-            .ok_or_else(|| PlasmaEventEvalError::new("validated risk_score disappeared"))?;
-
         if !self.active {
             self.low_run = 0;
-            if score >= self.config.trigger_threshold {
+            if lower_bound >= self.config.trigger_threshold {
                 self.high_run = self.high_run.saturating_add(1);
                 if self.high_run >= self.config.trigger_persistence_windows {
                     self.active = true;
                     self.high_run = 0;
                     return Ok(AlarmPolicyUpdate::Raised {
                         at_ns: observation.window_end_ns,
+                        risk_evidence_sha256,
                     });
                 }
                 return Ok(AlarmPolicyUpdate::PendingTrigger {
                     at_ns: observation.window_end_ns,
                     consecutive_windows: self.high_run,
+                    risk_evidence_sha256,
                 });
             }
             self.high_run = 0;
-            return Ok(AlarmPolicyUpdate::BelowThreshold {
+            if upper_bound < self.config.trigger_threshold {
+                return Ok(AlarmPolicyUpdate::BelowThreshold {
+                    at_ns: observation.window_end_ns,
+                    risk_evidence_sha256,
+                });
+            }
+            return Ok(AlarmPolicyUpdate::Uncertain {
                 at_ns: observation.window_end_ns,
+                estimate: score,
+                lower_bound,
+                upper_bound,
+                risk_evidence_sha256,
+                alert_remains_active: false,
             });
         }
 
         self.high_run = 0;
-        if score <= self.config.clear_threshold {
+        if upper_bound <= self.config.clear_threshold {
             self.low_run = self.low_run.saturating_add(1);
             if self.low_run >= self.config.clear_persistence_windows {
                 self.active = false;
                 self.low_run = 0;
                 return Ok(AlarmPolicyUpdate::Cleared {
                     at_ns: observation.window_end_ns,
+                    risk_evidence_sha256,
                 });
             }
             return Ok(AlarmPolicyUpdate::PendingClear {
                 at_ns: observation.window_end_ns,
                 consecutive_windows: self.low_run,
+                risk_evidence_sha256,
             });
         }
-
         self.low_run = 0;
-        Ok(AlarmPolicyUpdate::Active {
+        if lower_bound > self.config.clear_threshold {
+            return Ok(AlarmPolicyUpdate::Active {
+                at_ns: observation.window_end_ns,
+                risk_evidence_sha256,
+            });
+        }
+        Ok(AlarmPolicyUpdate::Uncertain {
             at_ns: observation.window_end_ns,
+            estimate: score,
+            lower_bound,
+            upper_bound,
+            risk_evidence_sha256,
+            alert_remains_active: true,
         })
     }
 }
@@ -704,6 +907,32 @@ mod tests {
         }
     }
 
+    fn risk_evidence(
+        frame: &PlasmaObservationFrame,
+        estimate: f64,
+        lower_bound: f64,
+        upper_bound: f64,
+    ) -> RiskScoreEvidence {
+        RiskScoreEvidence {
+            shot_id: frame.shot_id.clone(),
+            frame_id: frame.frame_id.clone(),
+            frame_time_ns: frame.frame_time_ns,
+            input_frame_sha256: observation_frame_sha256(frame).expect("frame digest"),
+            horizon_ns: 10,
+            target_time_ns: frame.frame_time_ns.checked_add(10).expect("target time"),
+            model_id: "symthaea-plasma-risk".to_owned(),
+            model_revision: "test-model-v1".to_owned(),
+            model_artifact_sha256: "1".repeat(64),
+            training_split_sha256: "2".repeat(64),
+            calibration_id: "plasma-risk-calibration".to_owned(),
+            calibration_revision: "cal-v1".to_owned(),
+            calibration_receipt_sha256: "3".repeat(64),
+            estimate,
+            lower_bound,
+            upper_bound,
+        }
+    }
+
     fn synthetic_disposition() -> ObservationDisposition {
         ObservationDisposition::Synthetic {
             value: 0.8,
@@ -725,6 +954,9 @@ mod tests {
             shot_id: shot_id.to_owned(),
             window_end_ns: time_ns,
             risk_score: Some(score),
+            lower_bound: Some(score),
+            upper_bound: Some(score),
+            risk_evidence_sha256: Some("d".repeat(64)),
             evidence_quality: AlarmEvidenceQuality::DirectMeasured,
         }
     }
@@ -846,7 +1078,11 @@ mod tests {
         let (measured_frame, requirements) =
             observation_frame(measured_disposition(10), 10);
         policy
-            .update_from_frame(&measured_frame, &requirements, Some(0.9))
+            .update_from_frame(
+                &measured_frame,
+                &requirements,
+                Some(risk_evidence(&measured_frame, 0.9, 0.9, 0.9)),
+            )
             .expect("direct measurement should be admitted");
 
         let (synthetic_frame, requirements) = observation_frame(synthetic_disposition(), 20);
@@ -866,7 +1102,11 @@ mod tests {
             observation_frame(measured_disposition(30), 30);
         assert!(matches!(
             policy
-                .update_from_frame(&measured_frame, &requirements, Some(0.9))
+                .update_from_frame(
+                    &measured_frame,
+                    &requirements,
+                    Some(risk_evidence(&measured_frame, 0.9, 0.9, 0.9)),
+                )
                 .expect("direct measurement should be admitted"),
             AlarmPolicyUpdate::PendingTrigger {
                 consecutive_windows: 1,
@@ -880,9 +1120,17 @@ mod tests {
         let mut policy = OnlinePlasmaAlarmPolicy::new(config()).expect("valid policy");
         policy.reset_for_shot("shot-1").expect("valid shot");
         let (frame_10, requirements) = observation_frame(measured_disposition(10), 10);
-        policy.update_from_frame(&frame_10, &requirements, Some(0.9)).expect("update");
+        policy.update_from_frame(
+            &frame_10,
+            &requirements,
+            Some(risk_evidence(&frame_10, 0.9, 0.9, 0.9)),
+        ).expect("update");
         let (frame_20, requirements) = observation_frame(measured_disposition(20), 20);
-        policy.update_from_frame(&frame_20, &requirements, Some(0.9)).expect("update");
+        policy.update_from_frame(
+            &frame_20,
+            &requirements,
+            Some(risk_evidence(&frame_20, 0.9, 0.9, 0.9)),
+        ).expect("update");
         assert!(policy.is_active());
 
         let (frame_30, requirements) = observation_frame(unavailable_disposition(), 30);
@@ -906,7 +1154,11 @@ mod tests {
         policy.reset_for_shot("shot-1").expect("valid shot");
         let (frame, requirements) = observation_frame(synthetic_disposition(), 10);
         assert!(policy
-            .update_from_frame(&frame, &requirements, Some(0.99))
+            .update_from_frame(
+                &frame,
+                &requirements,
+                Some(risk_evidence(&frame, 0.99, 0.99, 0.99)),
+            )
             .is_err());
         assert_eq!(policy.last_window_end_ns, None);
     }
@@ -1017,6 +1269,177 @@ mod tests {
         assert_eq!(summary.false_alarm_shot_rate, None);
         assert_eq!(summary.false_alarm_shot_rate_wilson_95, None);
         assert_eq!(summary.false_alarms_per_non_disruptive_shot, None);
+    }
+
+    #[test]
+    fn risk_evidence_is_bound_to_frame_model_split_calibration_and_horizon() {
+        let mut policy = OnlinePlasmaAlarmPolicy::new(config()).expect("valid policy");
+        policy.reset_for_shot("shot-1").expect("valid shot");
+        let (frame, requirements) = observation_frame(measured_disposition(10), 10);
+
+        let mut wrong_frame_digest = risk_evidence(&frame, 0.9, 0.9, 0.9);
+        wrong_frame_digest.input_frame_sha256 = "f".repeat(64);
+        assert!(policy
+            .update_from_frame(&frame, &requirements, Some(wrong_frame_digest))
+            .is_err());
+        assert_eq!(policy.last_window_end_ns, None);
+
+        let mut wrong_artifact = risk_evidence(&frame, 0.9, 0.9, 0.9);
+        wrong_artifact.model_artifact_sha256 = "not-a-digest".to_owned();
+        assert!(policy
+            .update_from_frame(&frame, &requirements, Some(wrong_artifact))
+            .is_err());
+        assert_eq!(policy.last_window_end_ns, None);
+
+        let mut wrong_target = risk_evidence(&frame, 0.9, 0.9, 0.9);
+        wrong_target.target_time_ns += 1;
+        assert!(policy
+            .update_from_frame(&frame, &requirements, Some(wrong_target))
+            .is_err());
+        assert_eq!(policy.last_window_end_ns, None);
+
+        let mut invalid_interval = risk_evidence(&frame, 0.9, 0.95, 0.8);
+        assert!(policy
+            .update_from_frame(&frame, &requirements, Some(invalid_interval.clone()))
+            .is_err());
+        invalid_interval.lower_bound = f64::NAN;
+        assert!(policy
+            .update_from_frame(&frame, &requirements, Some(invalid_interval))
+            .is_err());
+        assert_eq!(policy.last_window_end_ns, None);
+    }
+
+    #[test]
+    fn uncertain_interval_breaks_trigger_persistence_without_raising() {
+        let mut policy = OnlinePlasmaAlarmPolicy::new(config()).expect("valid policy");
+        policy.reset_for_shot("shot-1").expect("valid shot");
+
+        let (frame_10, requirements) = observation_frame(measured_disposition(10), 10);
+        policy
+            .update_from_frame(
+                &frame_10,
+                &requirements,
+                Some(risk_evidence(&frame_10, 0.9, 0.9, 0.95)),
+            )
+            .expect("first high-confidence window");
+        let (frame_20, requirements) = observation_frame(measured_disposition(20), 20);
+        let uncertain = policy
+            .update_from_frame(
+                &frame_20,
+                &requirements,
+                Some(risk_evidence(&frame_20, 0.85, 0.7, 0.9)),
+            )
+            .expect("uncertain interval is a valid evidence record");
+        assert!(matches!(
+            uncertain,
+            AlarmPolicyUpdate::Uncertain {
+                at_ns: 20,
+                alert_remains_active: false,
+                ..
+            }
+        ));
+        assert!(!policy.is_active());
+
+        let (frame_30, requirements) = observation_frame(measured_disposition(30), 30);
+        assert!(matches!(
+            policy
+                .update_from_frame(
+                    &frame_30,
+                    &requirements,
+                    Some(risk_evidence(&frame_30, 0.92, 0.85, 0.97)),
+                )
+                .expect("high-confidence forecast"),
+            AlarmPolicyUpdate::PendingTrigger {
+                consecutive_windows: 1,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn uncertain_interval_does_not_clear_an_active_alarm() {
+        let mut policy = OnlinePlasmaAlarmPolicy::new(config()).expect("valid policy");
+        policy.reset_for_shot("shot-1").expect("valid shot");
+        for time_ns in [10, 20] {
+            let (frame, requirements) =
+                observation_frame(measured_disposition(time_ns), time_ns);
+            policy
+                .update_from_frame(
+                    &frame,
+                    &requirements,
+                    Some(risk_evidence(&frame, 0.95, 0.9, 1.0)),
+                )
+                .expect("high-confidence forecast");
+        }
+        assert!(policy.is_active());
+
+        let (frame_30, requirements) = observation_frame(measured_disposition(30), 30);
+        let uncertain = policy
+            .update_from_frame(
+                &frame_30,
+                &requirements,
+                Some(risk_evidence(&frame_30, 0.25, 0.2, 0.4)),
+            )
+            .expect("uncertain interval should preserve active alarm");
+        assert!(matches!(
+            uncertain,
+            AlarmPolicyUpdate::Uncertain {
+                at_ns: 30,
+                alert_remains_active: true,
+                ..
+            }
+        ));
+        assert!(policy.is_active());
+
+        let (frame_40, requirements) = observation_frame(measured_disposition(40), 40);
+        assert!(matches!(
+            policy
+                .update_from_frame(
+                    &frame_40,
+                    &requirements,
+                    Some(risk_evidence(&frame_40, 0.2, 0.1, 0.25)),
+                )
+                .expect("high-confidence clear evidence"),
+            AlarmPolicyUpdate::PendingClear {
+                consecutive_windows: 1,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn risk_evidence_digest_changes_with_model_split_calibration_and_interval() {
+        let (frame, _) = observation_frame(measured_disposition(10), 10);
+        let original = risk_evidence(&frame, 0.9, 0.8, 0.95);
+        let original_digest = original.evidence_sha256().expect("risk evidence digest");
+
+        let mut changed_model = original.clone();
+        changed_model.model_revision = "test-model-v2".to_owned();
+        assert_ne!(
+            original_digest,
+            changed_model.evidence_sha256().expect("changed digest")
+        );
+
+        let mut changed_split = original.clone();
+        changed_split.training_split_sha256 = "4".repeat(64);
+        assert_ne!(
+            original_digest,
+            changed_split.evidence_sha256().expect("changed digest")
+        );
+
+        let mut changed_calibration = original.clone();
+        changed_calibration.calibration_revision = "cal-v2".to_owned();
+        assert_ne!(
+            original_digest,
+            changed_calibration.evidence_sha256().expect("changed digest")
+        );
+
+        let mut changed_interval = original;
+        changed_interval.upper_bound = 0.99;
+        assert_ne!(
+            original_digest,
+            changed_interval.evidence_sha256().expect("changed digest")
+        );
     }
 
     #[test]
