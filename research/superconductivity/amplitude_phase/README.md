@@ -187,17 +187,28 @@ If one site is set to \(\psi=0\), its local contribution changes by \(+0.5\), wh
 
 These are algebraic/software controls, not measured material energies.
 
-### Current limitations
+### Current implementation and qualification limits
 
-Not implemented or qualified:
-- thermal Metropolis / hybrid Monte Carlo sampling of the full complex field;
-- equilibration, autocorrelation, independent-chain error estimates and finite-size scaling;
-- thermodynamic integration of constrained vortex free energy;
-- BKT versus first-order phase-transition classification;
+Implemented in the current public branch:
+- finite-size single-site complex-field Metropolis pilot;
+- deterministic independent chains with recorded seeds and acceptance / invalid-proposal counts;
+- exact local energy differences over the changed site and its incident links, checked against full-lattice recomputation;
+- per-sample raw energy components, amplitude moments, twist derivatives and vortex/core diagnostics;
+- initial-positive-sequence autocorrelation / effective-sample diagnostics;
+- gauge-invariant thermal helicity-modulus tensor estimator;
+- finite-size heat-capacity fluctuation estimator.
+
+Not yet implemented or scientifically qualified:
+- robust equilibration and convergence stopping criteria;
+- blocked jackknife / bootstrap uncertainties for heat capacity and helicity modulus;
+- energy-histogram, Binder-cumulant and multi-size transition classification;
+- thermodynamic integration of constrained vortex-core free energy;
+- bound/free vortex-antivortex pair discrimination;
+- hybrid Monte Carlo, overrelaxation, replica exchange or other mixing baselines;
 - self-consistent Maxwell screening or a magnetic-field minimizer;
 - dynamics, noise, fluctuation-dissipation and conductivity.
 
-The current vortex output is a phase-winding count with an explicit amplitude threshold. It does not yet estimate vortex-core free energy, distinguish bound from unbound pairs, or classify the transition.
+The current CI configuration intentionally runs only two short chains. It is a software smoke, not a thermal-equilibrium or transition calculation. Raw measurements are retained so later histogram and resampling analyses can use the exact chain trace.
 
 
 ## Complex-field Metropolis pilot
@@ -263,3 +274,18 @@ For a thermal ensemble, the twist free-energy Hessian is estimated as
 The code preserves the raw twist-response tensor in the per-chain receipt and aggregates it across independent seeds. Its normalization is the second derivative with respect to the declared total twist vector; it is not silently converted into a three-dimensional superfluid density or material penetration depth. For the uniform 4×4, zero-field, \(|\psi|=1,K=1\) fixture, the bare diamagnetic twist curvature is \(2\) along each axis and zero off-diagonal. A gauge-transformation test verifies that both current and diamagnetic tensors are invariant.
 
 The current Metropolis pilot reports a finite-chain helicity-modulus estimate from sample means/covariances. It does not yet have blocked jackknife uncertainties or finite-size scaling. For BKT classification, compare the size-dependent helicity-modulus crossing/jump and vortex behaviour; do not enforce a universal jump where strong amplitude fluctuations may drive a first-order transition.
+
+
+### Raw sample and heat-capacity evidence
+
+Each Metropolis chain now retains every measured configuration-level summary rather than only its aggregate moments. The raw row includes total/local/gradient energy per site, mean \(|\psi|\), mean \(|\psi|^2\), the full first- and second-twist derivative tensors, and the gauge-invariant vortex diagnostics with skipped core plaquettes.
+
+For a canonical finite lattice with \(N\) sites, the energy fluctuation estimator is
+
+\[
+\frac{C}{N}=\frac{N}{T^2}\operatorname{Var}\left(\frac{E}{N}\right).
+\]
+
+The variance is evaluated from centered deviations to avoid the cancellation error of \(\langle e^2\rangle-\langle e\rangle^2\) when the energy has a large offset. The receipt labels this as a finite-chain estimate. Autocorrelation affects its uncertainty; a chain-level point estimate is not a converged heat capacity or transition signature.
+
+The current benchmark target follows the published lattice-GL studies: compare energy, specific heat, vortex density, helicity modulus and mean amplitude jointly, then assess whether the transition is continuous/BKT-like or first-order using finite-size scaling and distributional evidence. This matters because strong amplitude fluctuations can alter the transition character rather than merely shift a universal BKT temperature. See Alvarez & Fort (2001) and Furutani et al. (2024).
