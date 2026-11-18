@@ -174,6 +174,7 @@ pub enum IngestReject {
     InvalidUtility,
     UnverifiedLineage,
     UnknownSourceRoot,
+    UnknownSourceFamily,
     UnverifiedCalibration,
     InvalidMeasurementBound,
     UnverifiedCausalAssessment,
@@ -256,6 +257,9 @@ pub fn ingest_as_known(
     if lineage.source_root_id == 0 {
         return Err(IngestReject::UnknownSourceRoot);
     }
+    if lineage.source_family == 0 || lineage.receipt_digest.is_empty() {
+        return Err(IngestReject::UnknownSourceFamily);
+    }
 
     let measurement = verifier
         .verify_measurement(
@@ -268,9 +272,11 @@ pub fn ingest_as_known(
         .ok_or(IngestReject::UnverifiedCalibration)?;
     if !measurement.absolute_error_bound.is_finite()
         || !(0.0..=1.0).contains(&measurement.absolute_error_bound)
+        || raw.utility_unit.is_empty()
         || measurement.unit != raw.utility_unit
         || measurement.method_id.is_empty()
         || measurement.calibration_revision.is_empty()
+        || measurement.calibration_digest.is_empty()
         || measurement.valid_from_ms > raw.outcome_observed_at_ms
         || measurement
             .valid_until_ms
@@ -287,6 +293,9 @@ pub fn ingest_as_known(
             query.known_at_ms,
         )
         .ok_or(IngestReject::UnverifiedCausalAssessment)?;
+    if causal.assessment_digest.is_empty() {
+        return Err(IngestReject::UnverifiedCausalAssessment);
+    }
     let outcome = verifier
         .verify_outcome(
             &raw.outcome_receipt_id,
@@ -295,6 +304,9 @@ pub fn ingest_as_known(
             query.known_at_ms,
         )
         .ok_or(IngestReject::UnverifiedOutcome)?;
+    if outcome.outcome_digest.is_empty() {
+        return Err(IngestReject::UnverifiedOutcome);
+    }
     if !outcome.reconciled {
         return Err(IngestReject::OutcomeNotReconciled);
     }
