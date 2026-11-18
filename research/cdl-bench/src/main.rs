@@ -283,8 +283,21 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
         sources.push((format!("e3-train-{index}"), trace.stream));
     }
     for (index, config) in e3_held_out.iter().enumerate() {
-        let trace = generate_scm_with_config(steps, seed + index as u64 + 200, *config, None)?;
-        sources.push((format!("e3-heldout-{index}"), trace.stream));
+        let world_seed = seed + index as u64 + 200;
+        let observational = generate_scm_with_config(steps, world_seed, *config, None)?;
+        let interventional = generate_scm_with_config(
+            steps,
+            world_seed,
+            *config,
+            Some(ScmIntervention {
+                variable: 1,
+                start_step: steps / 4,
+                end_step: (steps * 3) / 4,
+                value: 20_000,
+            }),
+        )?;
+        sources.push((format!("e3-heldout-{index}-observational"), observational.stream));
+        sources.push((format!("e3-heldout-{index}-do-x1"), interventional.stream));
     }
 
     for (name, source) in &sources {
@@ -313,6 +326,8 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# scm_intervention=do(x1=20000) on [steps/4,3*steps/4)");
     println!("# e3_training_configs={}", e3_training.len());
     println!("# e3_heldout_combinations={}", e3_held_out.len());
+    println!("# e3_heldout_intervention_pairs={}", e3_held_out.len());
+    println!("# note=each E3 held-out world has paired observational and do(x1=20000) streams using the same seed");
     println!("# note=E3 held-out tuples reuse mechanism component values but combine them in unseen configurations");
     println!("# note=these are deterministic generator and codec smoke measurements, not predictive transfer results");
     Ok(())
