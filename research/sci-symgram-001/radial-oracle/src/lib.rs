@@ -181,6 +181,7 @@ pub enum QualificationError {
     NonPositiveCoupling,
     CouplingOutsideBound { coupling: i128, maximum: i128 },
     ExponentOutsideBound { exponent: u32, maximum: u32 },
+    StateCoordinateOutsideBound { index: usize, maximum_magnitude: i128 },
 }
 
 impl fmt::Display for QualificationError {
@@ -192,6 +193,9 @@ impl fmt::Display for QualificationError {
             }
             Self::ExponentOutsideBound { exponent, maximum } => {
                 write!(formatter, "exponent {exponent} exceeds the supported maximum {maximum}")
+            }
+            Self::StateCoordinateOutsideBound { index, maximum_magnitude } => {
+                write!(formatter, "state coordinate {index} exceeds the supported magnitude {maximum_magnitude}")
             }
         }
     }
@@ -298,7 +302,19 @@ fn determinant3(matrix: [[i128; 3]; 3]) -> i128 {
 
 /// Whether the invariant map (a,b,c,ell) has differential rank three at a
 /// state. The origin is the non-free orbit; x=0 with v!=0 is regular.
-pub fn quotient_invariant_map_has_rank_three_at(state: [i128; 4]) -> bool {
+pub fn quotient_invariant_map_has_rank_three_at(
+    state: [i128; 4],
+) -> Result<bool, QualificationError> {
+    const MAX_STATE_MAGNITUDE: i128 = 1_000_000;
+    for (index, coordinate) in state.iter().enumerate() {
+        if coordinate.unsigned_abs() > MAX_STATE_MAGNITUDE as u128 {
+            return Err(QualificationError::StateCoordinateOutsideBound {
+                index,
+                maximum_magnitude: MAX_STATE_MAGNITUDE,
+            });
+        }
+    }
+
     let (a, b, c, angular_momentum) = invariant_polynomials();
     let invariants = [a, b, c, angular_momentum];
     let jacobian: [[i128; 4]; 4] = std::array::from_fn(|row| {
@@ -314,11 +330,11 @@ pub fn quotient_invariant_map_has_rank_three_at(state: [i128; 4]) -> bool {
                 std::array::from_fn(|column| jacobian[rows[row]][columns[column]])
             });
             if determinant3(minor) != 0 {
-                return true;
+                return Ok(true);
             }
         }
     }
-    false
+    Ok(false)
 }
 
 /// Check the exact SO(2)-equivariant radial family
@@ -490,10 +506,17 @@ mod tests {
 
     #[test]
     fn regular_boundary_orbits_are_distinguished_from_the_fixed_origin() {
-        assert!(quotient_invariant_map_has_rank_three_at([0, 0, 1, 0]));
-        assert!(quotient_invariant_map_has_rank_three_at([0, 0, 0, 1]));
-        assert!(quotient_invariant_map_has_rank_three_at([1, 0, 2, 0]));
-        assert!(!quotient_invariant_map_has_rank_three_at([0, 0, 0, 0]));
+        assert_eq!(quotient_invariant_map_has_rank_three_at([0, 0, 1, 0]), Ok(true));
+        assert_eq!(quotient_invariant_map_has_rank_three_at([0, 0, 0, 1]), Ok(true));
+        assert_eq!(quotient_invariant_map_has_rank_three_at([1, 0, 2, 0]), Ok(true));
+        assert_eq!(quotient_invariant_map_has_rank_three_at([0, 0, 0, 0]), Ok(false));
+        assert_eq!(
+            quotient_invariant_map_has_rank_three_at([i128::MIN, 0, 0, 0]),
+            Err(QualificationError::StateCoordinateOutsideBound {
+                index: 0,
+                maximum_magnitude: 1_000_000
+            })
+        );
     }
 
     #[test]
