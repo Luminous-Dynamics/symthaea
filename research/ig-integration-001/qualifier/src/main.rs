@@ -140,7 +140,9 @@ fn score_fixture(fixture: &Fixture) -> Score {
         if !catalog.contains_key(evidence_id) {
             violations += 1;
         }
-        surfaced.insert(evidence_id.clone());
+        if !surfaced.insert(evidence_id.clone()) {
+            violations += 1;
+        }
     }
 
     let mut required = HashSet::<String>::new();
@@ -445,5 +447,31 @@ mod tests {
         let score = score_fixture(fixture);
         assert_eq!(score.disposition, "reject");
         assert_eq!(score.unsupported_matrix_rows, 1);
+    }
+
+    #[test]
+    fn unknown_selected_candidate_is_rejected() {
+        let fixtures = fixture_set();
+        let mut fixture = fixtures.fixtures.iter()
+            .find(|fixture| fixture.id == "IF-001-perfect-integration")
+            .expect("perfect integration fixture exists")
+            .clone();
+        fixture.selected_candidate_id = Some("UNKNOWN".to_string());
+        let score = score_fixture(&fixture);
+        assert_eq!(score.disposition, "reject");
+        assert_eq!(score.provenance_violations, 1);
+    }
+
+    #[test]
+    fn duplicate_surfaced_evidence_ids_are_rejected() {
+        let fixtures = fixture_set();
+        let mut fixture = fixtures.fixtures.iter()
+            .find(|fixture| fixture.id == "IF-001-perfect-integration")
+            .expect("perfect integration fixture exists")
+            .clone();
+        fixture.surfaced_evidence_ids.push("EA1".to_string());
+        let score = score_fixture(&fixture);
+        assert_eq!(score.disposition, "reject");
+        assert_eq!(score.provenance_violations, 1);
     }
 }
