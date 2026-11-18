@@ -143,3 +143,71 @@ A quantum rotor phase diagram is not a microscopic pairing calculation, not a me
 - Classical topology / thermal XY network: https://github.com/Luminous-Dynamics/symthaea/issues/12755
 - Quantum / thermal / dissipative dynamics: https://github.com/Luminous-Dynamics/symthaea/issues/12779
 - Synthesis protocol to phase to property: https://github.com/Luminous-Dynamics/symthaea/issues/12671
+
+
+## Exact source reconstruction: Ponticelli et al. (2026)
+
+The full preprint is openly accessible as arXiv:2512.20476 (23 December 2025); it was subsequently published as Phys. Rev. B 114, 134503 (3 September 2026):
+- Published DOI: https://doi.org/10.1103/jbz7-l9h4
+- Preprint: https://arxiv.org/abs/2512.20476
+
+The exact phase-representation Hamiltonian in Eq. (1) is:
+
+\[
+H=-t\sum_{\langle ij\rangle}\cos(\phi_i-\phi_j)
++\frac{U}{2}\sum_i\left(-i\frac{\partial}{\partial\phi_i}\right)^2.
+\]
+
+The model is a nearest-neighbour \(L\times L\) square lattice. The authors set \(\hbar=k_B=2e=1\) and use \(t\) as the energy unit. The source model is therefore a special case of the generic compact quantum rotor, with a diagonal on-site charging matrix \(U_{ij}=U\delta_{ij}\), uniform nearest-neighbour Josephson energy \(E_J=t\), zero link gauge field and no dissipative bath.
+
+The Suzuki–Trotter / Villain mapping gives:
+
+\[
+S=-\sum_{\tau,\langle ij\rangle}K_s\cos(\phi_i(\tau)-\phi_j(\tau))
+-\sum_{\tau,i}K_\tau\cos(\phi_i(\tau)-\phi_i(\tau+\Delta\tau)),
+\]
+
+with \(K_s=t\Delta\tau\), \(K_\tau=1/(U\Delta\tau)\), \(N_\tau=\beta/\Delta\tau\), and periodic imaginary-time boundary conditions. **The spatial and imaginary-time couplings are anisotropic in the source's finite-\(\Delta\tau\) scheme.** Replacing them with an isotropic 3D XY model changes non-universal critical values; the paper explicitly discusses this source of disagreement with earlier values.
+
+### Source-reported numerical targets
+
+- Finite-temperature transition: BKT for \(U<U_c\), with finite-size criterion \(\Upsilon_L(U,T_c(L))=2T_c(L)/(t\pi)\) and \(T_c(L)=T_c(\infty)+a_T/[\ln(b_TL)]^2\).
+- Zero-temperature critical point: \(U_c(0)/t=5.72(1)\), obtained by extrapolating finite-\(\Delta\tau\) estimates linearly to \(\Delta\tau\to0\).
+- At finite \(\Delta\tau=1/150\), the reported finite-step estimate is \(U_c/t=5.63(2)\); do not substitute this for the extrapolated result.
+- Quantum critical scaling: \(\Upsilon=L^{-z}f((U-U_c)L^{1/\nu})\), with \(z=1\) and \(\nu=0.671\); at criticality \(\Upsilon L\) should be size-independent.
+- The finite-temperature BKT line persists for \(U<U_c\); for \(U>U_c\) the source reports finite resistance and a metallic-to-insulating crossover rather than a finite-temperature superconducting transition.
+- Quantum fluctuations increase total vortex density at low temperatures. The source's total vortex count does not separate bound pairs from unbound vortices.
+
+### Numerical burden and convergence targets
+
+The source demonstrates why an arbitrary small \(N_\tau\) is unsafe:
+- At \(L=48\), \(U/t=4\), stiffness convergence near the transition required \(N_\tau=1000\) in the displayed comparison.
+- A lower-temperature scaling case uses \(T/t=0.05\) and \(N_\tau=5000\).
+- The paper shows an example with \(L=48\), \(N_\tau=1000\), \(U/t=4\), and temperature values around \(T/t=0.3\) and \(0.72\).
+- For the zero-temperature scaling path it uses \(L=\beta\), \(z=1\), and extrapolates multiple \(\Delta\tau\) values.
+
+Those values are source-specific reference points, not a universal minimum for every implementation. Record the chosen \(L\), \(N_\tau\), \(\Delta\tau\), \(\beta\), \(U/t\), random seed, cluster/Metropolis update schedule, equilibration and autocorrelation evidence for every run. Enforce \(N_\tau\Delta\tau=\beta=1/T\) in the input auditor.
+
+### Stiffness and transport
+
+The paper's superfluid stiffness is obtained from a boundary twist and a current-fluctuation estimator. The source's normalization is tied to its conventions \(\hbar=2e=k_B=1\); compare formulas only after matching these conventions.
+
+For transport, the source computes the imaginary-time current-current correlator \(F(\tau)=\langle I(\tau)I(0)\rangle\), then reconstructs the real-frequency regular conductivity through:
+
+\[
+F(\tau)=\frac{1}{\pi}\int_0^\infty d\omega\,
+\sigma_{\mathrm{reg}}(\omega)\,
+\frac{\omega\cosh[\omega(\beta-2\tau)/2]}{\sinh(\omega\beta/2)}.
+\]
+
+The paper uses a constrained Lorentzian-plus-symmetrized-Gaussian ansatz above the transition and a symmetrized-Gaussian ansatz below it. It explicitly warns that finite-size effects prevent physically reliable analytic continuation near the critical region. Our benchmark must reproduce the source method for a baseline comparison but also test alternative continuation methods, uncertainty and resolution; it must not elevate one fitted spectrum to a unique result.
+
+## Contract update motivated by the source
+
+The input schema now records:
+- \(\hbar\), \(k_B\), and Cooper-pair charge \(2e\) conventions separately;
+- imaginary-time step \(\Delta\tau\) and slice count \(N_\tau\);
+- whether the solver uses a phase-path-integral representation or an integer-charge basis;
+- an explicit null/not-applicable charge-basis cutoff for a phase-path-integral solver.
+
+The auditor enforces \(N_\tau\Delta\tau=1/T\) in the declared \(k_B=1\) units. A phase-path-integral input cannot silently claim an integer charge-state truncation. This prevents a generic rotor contract from misrepresenting the source paper's numerical discretisation.
