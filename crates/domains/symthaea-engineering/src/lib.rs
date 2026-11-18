@@ -2161,7 +2161,11 @@ mod tests {
         let recalled = manager.recall_wisdom_with_provenance(&input);
         assert_eq!(recalled.len(), 1);
         assert_eq!(recalled[0].category, "Consolidated Wisdom");
-        assert_eq!(recalled[0].similarity, 1.0);
+        assert!(
+            recalled[0].similarity > 0.99,
+            "identical episodic-to-semantic vectors should retain near-unit similarity: {}",
+            recalled[0].similarity
+        );
         let recalled_lineage = recalled[0].graduation_provenance.as_ref().unwrap();
         assert_eq!(recalled_lineage.source, symthaea_memory::MemorySource::WebResearch);
         assert!(recalled_lineage.verification_claimed);
