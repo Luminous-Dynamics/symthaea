@@ -222,7 +222,7 @@ Dynamic events—startup, pressure steps, concurrent basin/bath draw, pump/regul
 
 ## Versioned external evidence corpus
 
-The machine-readable evidence register now includes the UK ETL non-domestic shower criteria alongside exact Brondell and Hansgrohe product declarations, WaterSense criteria, SANS installation references and peer-reviewed spray studies. The corpus distinguishes programme criteria from manufacturer declarations and from Aqua results: [AQUA_EVIDENCE_CORPUS_V0_1.md](research/AQUA_EVIDENCE_CORPUS_V0_1.md), source JSON at [aqua-evidence-corpus-v0.1.json](research/aqua-evidence-corpus-v0.1.json). Current snapshot: 15 entries / 75 claims, including EN 18021:2025, UWL 2023 pressure-method criteria, UK ETL electric-shower wastewater-heat-recovery pathways and peer-reviewed 2025/2026 DWHR system studies. This is an evidence register, not certification.
+The machine-readable evidence register now includes the UK ETL non-domestic shower criteria alongside exact Brondell and Hansgrohe product declarations, WaterSense criteria, SANS installation references and peer-reviewed spray studies. The corpus distinguishes programme criteria from manufacturer declarations and from Aqua results: [AQUA_EVIDENCE_CORPUS_V0_1.md](research/AQUA_EVIDENCE_CORPUS_V0_1.md), source JSON at [aqua-evidence-corpus-v0.1.json](research/aqua-evidence-corpus-v0.1.json). Current snapshot: 15 entries / 77 claims, including EN 18021:2025, UWL 2023 pressure-method criteria, UK ETL electric-shower wastewater-heat-recovery pathways and peer-reviewed 2025/2026 DWHR system studies. This is an evidence register, not certification.
 
 ## Power-coupled electric shower and DWHR architecture
 
@@ -239,3 +239,12 @@ The Aqua evidence chain now records test-method datums explicitly. EN 18021:2025
 ## Method-specific pressure evidence contracts
 
 The pressure/flow evidence layer is split by the actual measurement method. The generic pressure_curve module admits one explicit terminal-inlet or point-of-discharge channel and rejects cross-datum comparisons. The separate standard_methods module represents UWL hot/cold inlet channels and ETL's faceplate-centre P2 pressure, with separate measurement and calibration receipts. Neither module by itself constitutes a full standard-method test or certification. See [AQUA_METHOD_CROSSWALK_V0_1.md](AQUA_METHOD_CROSSWALK_V0_1.md).
+
+
+## Task-selective delivery and formal boost qualification
+
+AQS-1 now has a task-phase software contract for PREPARE, BASE_DELIVERY, OPTIONAL_BOOST, PAUSE, RINSE and RETURN_TO_READY. Any boost capability must be bound to the exact market variant, hardware configuration, delivery conditions, qualification method and current receipt; it must be locally controlled by an explicit user hold with qualified automatic return, and remain within its independently qualified duration limit. Symthaea can only present an advisory plan. It does not command valves or infer water/energy savings from nominal flow x time.
+
+The UWL 2023 Clause 12.1 boost test is incorporated as a method-specific evidence contract. It checks regular flow Qreg, boosted Qboost, flow-control closure, reopening without boost and post-close Qmax; UWL requires Qmax = Qreg, Qboost < 2 x Qreg and Qreg listed on the scheme label. Aqua's validator preserves separate hot/cold Type 1 P2 inlet pressure and uncertainty. It does not certify product conformity.
+
+See [AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md](AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md), [AQUA_METHOD_CROSSWALK_V0_1.md](AQUA_METHOD_CROSSWALK_V0_1.md), and [#12798](https://github.com/Luminous-Dynamics/symthaea/issues/12798).
