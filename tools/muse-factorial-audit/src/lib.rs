@@ -11,9 +11,10 @@
 //!   quadratic = [ 1,-2, 1]
 //!
 //! For each complete style/seed/metric block, this module computes 8 main
-//! effects and 24 pairwise interaction coefficients. It intentionally does
-//! not emit p-values or claim causal identification outside the frozen,
-//! deterministic intervention design.
+//! effects and 24 pairwise interaction coefficients as primary terms, plus
+//! 48 three- and four-factor terms labelled as higher-order diagnostics. It
+//! intentionally does not emit p-values or claim causal identification
+//! outside the frozen, deterministic intervention design.
 
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
