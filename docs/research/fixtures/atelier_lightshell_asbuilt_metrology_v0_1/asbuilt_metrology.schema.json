@@ -134,7 +134,8 @@
           "required_metric_ids",
           "minimum_coverage_fraction",
           "acceptance_rule_ref",
-          "required_pose_refs"
+          "required_pose_refs",
+          "required_pose_set_ref"
         ],
         "properties": {
           "feature_ref": {
@@ -193,6 +194,12 @@
               "type": "string",
               "minLength": 1
             }
+          },
+          "required_pose_set_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       }
