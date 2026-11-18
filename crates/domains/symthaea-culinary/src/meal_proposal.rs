@@ -12,8 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 pub const MEAL_PROPOSAL_SCHEMA_VERSION: u32 = 1;
-pub const MEAL_PROPOSAL_CLAIM_CEILING: &str =
-    "A user-reviewable culinary proposal with scoped source references and explicit uncertainty; not verified household inventory, nutrition/health advice, food-safety approval, equipment compatibility, a schedule, or actuation authority.";
+pub const MEAL_PROPOSAL_CLAIM_CEILING: &str = "A user-reviewable culinary proposal with scoped source references and explicit uncertainty; not verified household inventory, nutrition/health advice, food-safety approval, equipment compatibility, a schedule, or actuation authority.";
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -378,9 +377,11 @@ pub fn validate_meal_proposal(proposal: &MealProposalV1) -> MealProposalValidati
         );
     }
     if proposal.constraints.currency_code.is_some()
-        && proposal.constraints.currency_code.as_deref().is_none_or(|value| {
-            value.len() != 3 || !value.bytes().all(|b| b.is_ascii_uppercase())
-        })
+        && proposal
+            .constraints
+            .currency_code
+            .as_deref()
+            .is_none_or(|value| value.len() != 3 || !value.bytes().all(|b| b.is_ascii_uppercase()))
     {
         violation(
             &mut violations,
@@ -540,7 +541,10 @@ pub fn validate_meal_proposal(proposal: &MealProposalV1) -> MealProposalValidati
                 "fact ID is empty or duplicated",
             );
         }
-        if !nonempty(&fact.source_ref) || !nonempty(&fact.source_record_id) || !nonempty(&fact.source_version) {
+        if !nonempty(&fact.source_ref)
+            || !nonempty(&fact.source_record_id)
+            || !nonempty(&fact.source_version)
+        {
             violation(
                 &mut violations,
                 MealProposalViolationCodeV1::MissingFactSource,
@@ -549,7 +553,9 @@ pub fn validate_meal_proposal(proposal: &MealProposalV1) -> MealProposalValidati
             );
         }
         if fact.observed_at_epoch_ms == 0
-            || fact.valid_until_epoch_ms.is_some_and(|expiry| expiry < fact.observed_at_epoch_ms)
+            || fact
+                .valid_until_epoch_ms
+                .is_some_and(|expiry| expiry < fact.observed_at_epoch_ms)
         {
             violation(
                 &mut violations,
@@ -583,7 +589,10 @@ pub fn validate_meal_proposal(proposal: &MealProposalV1) -> MealProposalValidati
             );
         }
         if fact.kind == CulinaryFactKindV1::Price
-            && fact.market_ref.as_deref().is_none_or(|value| !nonempty(value))
+            && fact
+                .market_ref
+                .as_deref()
+                .is_none_or(|value| !nonempty(value))
         {
             violation(
                 &mut violations,
@@ -593,7 +602,10 @@ pub fn validate_meal_proposal(proposal: &MealProposalV1) -> MealProposalValidati
             );
         }
         if fact.kind == CulinaryFactKindV1::Availability
-            && (fact.market_ref.as_deref().is_none_or(|value| !nonempty(value))
+            && (fact
+                .market_ref
+                .as_deref()
+                .is_none_or(|value| !nonempty(value))
                 || fact.valid_until_epoch_ms.is_none())
         {
             violation(
@@ -604,7 +616,10 @@ pub fn validate_meal_proposal(proposal: &MealProposalV1) -> MealProposalValidati
             );
         }
         if fact.kind == CulinaryFactKindV1::AllergenDeclaration
-            && !matches!(fact.scope, FactScopeV1::ProductSku | FactScopeV1::SupplierLot)
+            && !matches!(
+                fact.scope,
+                FactScopeV1::ProductSku | FactScopeV1::SupplierLot
+            )
         {
             violation(
                 &mut violations,
@@ -810,10 +825,9 @@ mod tests {
 
     #[test]
     fn handoff_schema_and_fixture_are_versioned_without_hardware_authority() {
-        let schema: serde_json::Value = serde_json::from_str(include_str!(
-            "../schemas/MealProposalV1.schema.json"
-        ))
-        .expect("meal proposal schema must parse");
+        let schema: serde_json::Value =
+            serde_json::from_str(include_str!("../schemas/MealProposalV1.schema.json"))
+                .expect("meal proposal schema must parse");
         let fixtures: serde_json::Value = serde_json::from_str(include_str!(
             "../tests/fixtures/meal-proposal-handoff-v1.json"
         ))
@@ -837,7 +851,9 @@ mod tests {
         assert!(!property_names.contains("module_id"));
         assert!(!property_names.contains("device_command"));
         assert!(!property_names.contains("actuator"));
-        let cases = fixtures["cases"].as_array().expect("cases must be an array");
+        let cases = fixtures["cases"]
+            .as_array()
+            .expect("cases must be an array");
         assert_eq!(cases.len(), 13);
         let mut ids = BTreeSet::new();
         for case in cases {
@@ -879,9 +895,12 @@ mod tests {
             unit: QuantityUnitV1::Litre,
         });
         let report = validate_meal_proposal(&proposal);
-        assert!(report.violations.iter().any(|v| {
-            v.code == MealProposalViolationCodeV1::InvalidQuantity
-        }));
+        assert!(
+            report
+                .violations
+                .iter()
+                .any(|v| { v.code == MealProposalViolationCodeV1::InvalidQuantity })
+        );
     }
 
     #[test]
@@ -889,37 +908,57 @@ mod tests {
         let mut proposal = valid_proposal();
         proposal.uncertainties.clear();
         let report = validate_meal_proposal(&proposal);
-        assert!(report.violations.iter().any(|v| {
-            v.code == MealProposalViolationCodeV1::MissingUnknownReason
-        }));
+        assert!(
+            report
+                .violations
+                .iter()
+                .any(|v| { v.code == MealProposalViolationCodeV1::MissingUnknownReason })
+        );
     }
 
     #[test]
     fn unknown_lot_is_not_inferred_from_ingredient_name() {
         let proposal = valid_proposal();
-        assert!(proposal.ingredients.iter().all(|i| i.product_lot_ref.is_none()));
+        assert!(
+            proposal
+                .ingredients
+                .iter()
+                .all(|i| i.product_lot_ref.is_none())
+        );
         assert!(validate_meal_proposal(&proposal).is_valid());
     }
 
     #[test]
     fn unknown_ingredient_and_task_dependency_are_rejected() {
         let mut proposal = valid_proposal();
-        proposal.tasks[0].ingredient_refs.push("imaginary".to_owned());
+        proposal.tasks[0]
+            .ingredient_refs
+            .push("imaginary".to_owned());
         proposal.tasks[1].depends_on.push("missing-task".to_owned());
         let report = validate_meal_proposal(&proposal);
-        assert!(report.violations.iter().any(|v| {
-            v.code == MealProposalViolationCodeV1::UnknownIngredientReference
-        }));
-        assert!(report.violations.iter().any(|v| {
-            v.code == MealProposalViolationCodeV1::UnknownTaskDependency
-        }));
+        assert!(
+            report
+                .violations
+                .iter()
+                .any(|v| { v.code == MealProposalViolationCodeV1::UnknownIngredientReference })
+        );
+        assert!(
+            report
+                .violations
+                .iter()
+                .any(|v| { v.code == MealProposalViolationCodeV1::UnknownTaskDependency })
+        );
     }
 
     #[test]
     fn unknown_fact_references_are_rejected_once_per_reference() {
         let mut proposal = valid_proposal();
-        proposal.ingredients[0].fact_refs.push("fact:ingredient-missing".to_owned());
-        proposal.tasks[0].fact_refs.push("fact:task-missing".to_owned());
+        proposal.ingredients[0]
+            .fact_refs
+            .push("fact:ingredient-missing".to_owned());
+        proposal.tasks[0]
+            .fact_refs
+            .push("fact:task-missing".to_owned());
         let report = validate_meal_proposal(&proposal);
         assert_eq!(
             report
@@ -952,12 +991,18 @@ mod tests {
             license_ref: None,
         });
         let report = validate_meal_proposal(&proposal);
-        assert!(report.violations.iter().any(|v| {
-            v.code == MealProposalViolationCodeV1::MissingFactUnitOrBasis
-        }));
-        assert!(report.violations.iter().any(|v| {
-            v.code == MealProposalViolationCodeV1::MissingFactMarket
-        }));
+        assert!(
+            report
+                .violations
+                .iter()
+                .any(|v| { v.code == MealProposalViolationCodeV1::MissingFactUnitOrBasis })
+        );
+        assert!(
+            report
+                .violations
+                .iter()
+                .any(|v| { v.code == MealProposalViolationCodeV1::MissingFactMarket })
+        );
     }
 
     #[test]
@@ -981,9 +1026,12 @@ mod tests {
             license_ref: None,
         });
         let report = validate_meal_proposal(&proposal);
-        assert!(report.violations.iter().any(|v| {
-            v.code == MealProposalViolationCodeV1::InvalidAllergenFactScope
-        }));
+        assert!(
+            report
+                .violations
+                .iter()
+                .any(|v| { v.code == MealProposalViolationCodeV1::InvalidAllergenFactScope })
+        );
     }
 
     #[test]
@@ -991,9 +1039,12 @@ mod tests {
         let mut proposal = valid_proposal();
         proposal.tasks[0].depends_on.push("cook".to_owned());
         let report = validate_meal_proposal(&proposal);
-        assert!(report.violations.iter().any(|v| {
-            v.code == MealProposalViolationCodeV1::DependencyCycle
-        }));
+        assert!(
+            report
+                .violations
+                .iter()
+                .any(|v| { v.code == MealProposalViolationCodeV1::DependencyCycle })
+        );
         assert_eq!(
             report
                 .violations
@@ -1027,11 +1078,17 @@ mod tests {
             license_ref: None,
         });
         let report = validate_meal_proposal(&proposal);
-        assert!(report.violations.iter().any(|v| {
-            v.code == MealProposalViolationCodeV1::InvalidDurationWindow
-        }));
-        assert!(report.violations.iter().any(|v| {
-            v.code == MealProposalViolationCodeV1::InvalidFactTimeWindow
-        }));
+        assert!(
+            report
+                .violations
+                .iter()
+                .any(|v| { v.code == MealProposalViolationCodeV1::InvalidDurationWindow })
+        );
+        assert!(
+            report
+                .violations
+                .iter()
+                .any(|v| { v.code == MealProposalViolationCodeV1::InvalidFactTimeWindow })
+        );
     }
 }
