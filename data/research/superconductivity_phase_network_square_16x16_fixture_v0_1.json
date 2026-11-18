@@ -1,0 +1,8503 @@
+{
+  "contract": "SC-PHASE-NETWORK-0.1",
+  "instance_id": "synthetic-square-xy-16x16-periodic-v0",
+  "fixture_only": true,
+  "model": {
+    "kind": "classical_xy_phase_only",
+    "version": "0.1",
+    "pair_amplitude_mode": "fixed_not_simulated",
+    "boltzmann_constant_convention": "kB_equals_1",
+    "temperature_unit": "coupling_energy_units",
+    "notes": "Synthetic 16x16 square-lattice finite-size input; no simulation output is attached."
+  },
+  "graph": {
+    "spatial_dimension": 2,
+    "topology_family": "regular_square_lattice",
+    "embedding": "physical_coordinates",
+    "nodes": [
+      {
+        "node_id": "n00",
+        "position": [
+          0,
+          0
+        ]
+      },
+      {
+        "node_id": "n01",
+        "position": [
+          0,
+          1
+        ]
+      },
+      {
+        "node_id": "n02",
+        "position": [
+          0,
+          2
+        ]
+      },
+      {
+        "node_id": "n03",
+        "position": [
+          0,
+          3
+        ]
+      },
+      {
+        "node_id": "n04",
+        "position": [
+          0,
+          4
+        ]
+      },
+      {
+        "node_id": "n05",
+        "position": [
+          0,
+          5
+        ]
+      },
+      {
+        "node_id": "n06",
+        "position": [
+          0,
+          6
+        ]
+      },
+      {
+        "node_id": "n07",
+        "position": [
+          0,
+          7
+        ]
+      },
+      {
+        "node_id": "n08",
+        "position": [
+          0,
+          8
+        ]
+      },
+      {
+        "node_id": "n09",
+        "position": [
+          0,
+          9
+        ]
+      },
+      {
+        "node_id": "n010",
+        "position": [
+          0,
+          10
+        ]
+      },
+      {
+        "node_id": "n011",
+        "position": [
+          0,
+          11
+        ]
+      },
+      {
+        "node_id": "n012",
+        "position": [
+          0,
+          12
+        ]
+      },
+      {
+        "node_id": "n013",
+        "position": [
+          0,
+          13
+        ]
+      },
+      {
+        "node_id": "n014",
+        "position": [
+          0,
+          14
+        ]
+      },
+      {
+        "node_id": "n015",
+        "position": [
+          0,
+          15
+        ]
+      },
+      {
+        "node_id": "n10",
+        "position": [
+          1,
+          0
+        ]
+      },
+      {
+        "node_id": "n11",
+        "position": [
+          1,
+          1
+        ]
+      },
+      {
+        "node_id": "n12",
+        "position": [
+          1,
+          2
+        ]
+      },
+      {
+        "node_id": "n13",
+        "position": [
+          1,
+          3
+        ]
+      },
+      {
+        "node_id": "n14",
+        "position": [
+          1,
+          4
+        ]
+      },
+      {
+        "node_id": "n15",
+        "position": [
+          1,
+          5
+        ]
+      },
+      {
+        "node_id": "n16",
+        "position": [
+          1,
+          6
+        ]
+      },
+      {
+        "node_id": "n17",
+        "position": [
+          1,
+          7
+        ]
+      },
+      {
+        "node_id": "n18",
+        "position": [
+          1,
+          8
+        ]
+      },
+      {
+        "node_id": "n19",
+        "position": [
+          1,
+          9
+        ]
+      },
+      {
+        "node_id": "n110",
+        "position": [
+          1,
+          10
+        ]
+      },
+      {
+        "node_id": "n111",
+        "position": [
+          1,
+          11
+        ]
+      },
+      {
+        "node_id": "n112",
+        "position": [
+          1,
+          12
+        ]
+      },
+      {
+        "node_id": "n113",
+        "position": [
+          1,
+          13
+        ]
+      },
+      {
+        "node_id": "n114",
+        "position": [
+          1,
+          14
+        ]
+      },
+      {
+        "node_id": "n115",
+        "position": [
+          1,
+          15
+        ]
+      },
+      {
+        "node_id": "n20",
+        "position": [
+          2,
+          0
+        ]
+      },
+      {
+        "node_id": "n21",
+        "position": [
+          2,
+          1
+        ]
+      },
+      {
+        "node_id": "n22",
+        "position": [
+          2,
+          2
+        ]
+      },
+      {
+        "node_id": "n23",
+        "position": [
+          2,
+          3
+        ]
+      },
+      {
+        "node_id": "n24",
+        "position": [
+          2,
+          4
+        ]
+      },
+      {
+        "node_id": "n25",
+        "position": [
+          2,
+          5
+        ]
+      },
+      {
+        "node_id": "n26",
+        "position": [
+          2,
+          6
+        ]
+      },
+      {
+        "node_id": "n27",
+        "position": [
+          2,
+          7
+        ]
+      },
+      {
+        "node_id": "n28",
+        "position": [
+          2,
+          8
+        ]
+      },
+      {
+        "node_id": "n29",
+        "position": [
+          2,
+          9
+        ]
+      },
+      {
+        "node_id": "n210",
+        "position": [
+          2,
+          10
+        ]
+      },
+      {
+        "node_id": "n211",
+        "position": [
+          2,
+          11
+        ]
+      },
+      {
+        "node_id": "n212",
+        "position": [
+          2,
+          12
+        ]
+      },
+      {
+        "node_id": "n213",
+        "position": [
+          2,
+          13
+        ]
+      },
+      {
+        "node_id": "n214",
+        "position": [
+          2,
+          14
+        ]
+      },
+      {
+        "node_id": "n215",
+        "position": [
+          2,
+          15
+        ]
+      },
+      {
+        "node_id": "n30",
+        "position": [
+          3,
+          0
+        ]
+      },
+      {
+        "node_id": "n31",
+        "position": [
+          3,
+          1
+        ]
+      },
+      {
+        "node_id": "n32",
+        "position": [
+          3,
+          2
+        ]
+      },
+      {
+        "node_id": "n33",
+        "position": [
+          3,
+          3
+        ]
+      },
+      {
+        "node_id": "n34",
+        "position": [
+          3,
+          4
+        ]
+      },
+      {
+        "node_id": "n35",
+        "position": [
+          3,
+          5
+        ]
+      },
+      {
+        "node_id": "n36",
+        "position": [
+          3,
+          6
+        ]
+      },
+      {
+        "node_id": "n37",
+        "position": [
+          3,
+          7
+        ]
+      },
+      {
+        "node_id": "n38",
+        "position": [
+          3,
+          8
+        ]
+      },
+      {
+        "node_id": "n39",
+        "position": [
+          3,
+          9
+        ]
+      },
+      {
+        "node_id": "n310",
+        "position": [
+          3,
+          10
+        ]
+      },
+      {
+        "node_id": "n311",
+        "position": [
+          3,
+          11
+        ]
+      },
+      {
+        "node_id": "n312",
+        "position": [
+          3,
+          12
+        ]
+      },
+      {
+        "node_id": "n313",
+        "position": [
+          3,
+          13
+        ]
+      },
+      {
+        "node_id": "n314",
+        "position": [
+          3,
+          14
+        ]
+      },
+      {
+        "node_id": "n315",
+        "position": [
+          3,
+          15
+        ]
+      },
+      {
+        "node_id": "n40",
+        "position": [
+          4,
+          0
+        ]
+      },
+      {
+        "node_id": "n41",
+        "position": [
+          4,
+          1
+        ]
+      },
+      {
+        "node_id": "n42",
+        "position": [
+          4,
+          2
+        ]
+      },
+      {
+        "node_id": "n43",
+        "position": [
+          4,
+          3
+        ]
+      },
+      {
+        "node_id": "n44",
+        "position": [
+          4,
+          4
+        ]
+      },
+      {
+        "node_id": "n45",
+        "position": [
+          4,
+          5
+        ]
+      },
+      {
+        "node_id": "n46",
+        "position": [
+          4,
+          6
+        ]
+      },
+      {
+        "node_id": "n47",
+        "position": [
+          4,
+          7
+        ]
+      },
+      {
+        "node_id": "n48",
+        "position": [
+          4,
+          8
+        ]
+      },
+      {
+        "node_id": "n49",
+        "position": [
+          4,
+          9
+        ]
+      },
+      {
+        "node_id": "n410",
+        "position": [
+          4,
+          10
+        ]
+      },
+      {
+        "node_id": "n411",
+        "position": [
+          4,
+          11
+        ]
+      },
+      {
+        "node_id": "n412",
+        "position": [
+          4,
+          12
+        ]
+      },
+      {
+        "node_id": "n413",
+        "position": [
+          4,
+          13
+        ]
+      },
+      {
+        "node_id": "n414",
+        "position": [
+          4,
+          14
+        ]
+      },
+      {
+        "node_id": "n415",
+        "position": [
+          4,
+          15
+        ]
+      },
+      {
+        "node_id": "n50",
+        "position": [
+          5,
+          0
+        ]
+      },
+      {
+        "node_id": "n51",
+        "position": [
+          5,
+          1
+        ]
+      },
+      {
+        "node_id": "n52",
+        "position": [
+          5,
+          2
+        ]
+      },
+      {
+        "node_id": "n53",
+        "position": [
+          5,
+          3
+        ]
+      },
+      {
+        "node_id": "n54",
+        "position": [
+          5,
+          4
+        ]
+      },
+      {
+        "node_id": "n55",
+        "position": [
+          5,
+          5
+        ]
+      },
+      {
+        "node_id": "n56",
+        "position": [
+          5,
+          6
+        ]
+      },
+      {
+        "node_id": "n57",
+        "position": [
+          5,
+          7
+        ]
+      },
+      {
+        "node_id": "n58",
+        "position": [
+          5,
+          8
+        ]
+      },
+      {
+        "node_id": "n59",
+        "position": [
+          5,
+          9
+        ]
+      },
+      {
+        "node_id": "n510",
+        "position": [
+          5,
+          10
+        ]
+      },
+      {
+        "node_id": "n511",
+        "position": [
+          5,
+          11
+        ]
+      },
+      {
+        "node_id": "n512",
+        "position": [
+          5,
+          12
+        ]
+      },
+      {
+        "node_id": "n513",
+        "position": [
+          5,
+          13
+        ]
+      },
+      {
+        "node_id": "n514",
+        "position": [
+          5,
+          14
+        ]
+      },
+      {
+        "node_id": "n515",
+        "position": [
+          5,
+          15
+        ]
+      },
+      {
+        "node_id": "n60",
+        "position": [
+          6,
+          0
+        ]
+      },
+      {
+        "node_id": "n61",
+        "position": [
+          6,
+          1
+        ]
+      },
+      {
+        "node_id": "n62",
+        "position": [
+          6,
+          2
+        ]
+      },
+      {
+        "node_id": "n63",
+        "position": [
+          6,
+          3
+        ]
+      },
+      {
+        "node_id": "n64",
+        "position": [
+          6,
+          4
+        ]
+      },
+      {
+        "node_id": "n65",
+        "position": [
+          6,
+          5
+        ]
+      },
+      {
+        "node_id": "n66",
+        "position": [
+          6,
+          6
+        ]
+      },
+      {
+        "node_id": "n67",
+        "position": [
+          6,
+          7
+        ]
+      },
+      {
+        "node_id": "n68",
+        "position": [
+          6,
+          8
+        ]
+      },
+      {
+        "node_id": "n69",
+        "position": [
+          6,
+          9
+        ]
+      },
+      {
+        "node_id": "n610",
+        "position": [
+          6,
+          10
+        ]
+      },
+      {
+        "node_id": "n611",
+        "position": [
+          6,
+          11
+        ]
+      },
+      {
+        "node_id": "n612",
+        "position": [
+          6,
+          12
+        ]
+      },
+      {
+        "node_id": "n613",
+        "position": [
+          6,
+          13
+        ]
+      },
+      {
+        "node_id": "n614",
+        "position": [
+          6,
+          14
+        ]
+      },
+      {
+        "node_id": "n615",
+        "position": [
+          6,
+          15
+        ]
+      },
+      {
+        "node_id": "n70",
+        "position": [
+          7,
+          0
+        ]
+      },
+      {
+        "node_id": "n71",
+        "position": [
+          7,
+          1
+        ]
+      },
+      {
+        "node_id": "n72",
+        "position": [
+          7,
+          2
+        ]
+      },
+      {
+        "node_id": "n73",
+        "position": [
+          7,
+          3
+        ]
+      },
+      {
+        "node_id": "n74",
+        "position": [
+          7,
+          4
+        ]
+      },
+      {
+        "node_id": "n75",
+        "position": [
+          7,
+          5
+        ]
+      },
+      {
+        "node_id": "n76",
+        "position": [
+          7,
+          6
+        ]
+      },
+      {
+        "node_id": "n77",
+        "position": [
+          7,
+          7
+        ]
+      },
+      {
+        "node_id": "n78",
+        "position": [
+          7,
+          8
+        ]
+      },
+      {
+        "node_id": "n79",
+        "position": [
+          7,
+          9
+        ]
+      },
+      {
+        "node_id": "n710",
+        "position": [
+          7,
+          10
+        ]
+      },
+      {
+        "node_id": "n711",
+        "position": [
+          7,
+          11
+        ]
+      },
+      {
+        "node_id": "n712",
+        "position": [
+          7,
+          12
+        ]
+      },
+      {
+        "node_id": "n713",
+        "position": [
+          7,
+          13
+        ]
+      },
+      {
+        "node_id": "n714",
+        "position": [
+          7,
+          14
+        ]
+      },
+      {
+        "node_id": "n715",
+        "position": [
+          7,
+          15
+        ]
+      },
+      {
+        "node_id": "n80",
+        "position": [
+          8,
+          0
+        ]
+      },
+      {
+        "node_id": "n81",
+        "position": [
+          8,
+          1
+        ]
+      },
+      {
+        "node_id": "n82",
+        "position": [
+          8,
+          2
+        ]
+      },
+      {
+        "node_id": "n83",
+        "position": [
+          8,
+          3
+        ]
+      },
+      {
+        "node_id": "n84",
+        "position": [
+          8,
+          4
+        ]
+      },
+      {
+        "node_id": "n85",
+        "position": [
+          8,
+          5
+        ]
+      },
+      {
+        "node_id": "n86",
+        "position": [
+          8,
+          6
+        ]
+      },
+      {
+        "node_id": "n87",
+        "position": [
+          8,
+          7
+        ]
+      },
+      {
+        "node_id": "n88",
+        "position": [
+          8,
+          8
+        ]
+      },
+      {
+        "node_id": "n89",
+        "position": [
+          8,
+          9
+        ]
+      },
+      {
+        "node_id": "n810",
+        "position": [
+          8,
+          10
+        ]
+      },
+      {
+        "node_id": "n811",
+        "position": [
+          8,
+          11
+        ]
+      },
+      {
+        "node_id": "n812",
+        "position": [
+          8,
+          12
+        ]
+      },
+      {
+        "node_id": "n813",
+        "position": [
+          8,
+          13
+        ]
+      },
+      {
+        "node_id": "n814",
+        "position": [
+          8,
+          14
+        ]
+      },
+      {
+        "node_id": "n815",
+        "position": [
+          8,
+          15
+        ]
+      },
+      {
+        "node_id": "n90",
+        "position": [
+          9,
+          0
+        ]
+      },
+      {
+        "node_id": "n91",
+        "position": [
+          9,
+          1
+        ]
+      },
+      {
+        "node_id": "n92",
+        "position": [
+          9,
+          2
+        ]
+      },
+      {
+        "node_id": "n93",
+        "position": [
+          9,
+          3
+        ]
+      },
+      {
+        "node_id": "n94",
+        "position": [
+          9,
+          4
+        ]
+      },
+      {
+        "node_id": "n95",
+        "position": [
+          9,
+          5
+        ]
+      },
+      {
+        "node_id": "n96",
+        "position": [
+          9,
+          6
+        ]
+      },
+      {
+        "node_id": "n97",
+        "position": [
+          9,
+          7
+        ]
+      },
+      {
+        "node_id": "n98",
+        "position": [
+          9,
+          8
+        ]
+      },
+      {
+        "node_id": "n99",
+        "position": [
+          9,
+          9
+        ]
+      },
+      {
+        "node_id": "n910",
+        "position": [
+          9,
+          10
+        ]
+      },
+      {
+        "node_id": "n911",
+        "position": [
+          9,
+          11
+        ]
+      },
+      {
+        "node_id": "n912",
+        "position": [
+          9,
+          12
+        ]
+      },
+      {
+        "node_id": "n913",
+        "position": [
+          9,
+          13
+        ]
+      },
+      {
+        "node_id": "n914",
+        "position": [
+          9,
+          14
+        ]
+      },
+      {
+        "node_id": "n915",
+        "position": [
+          9,
+          15
+        ]
+      },
+      {
+        "node_id": "n100",
+        "position": [
+          10,
+          0
+        ]
+      },
+      {
+        "node_id": "n101",
+        "position": [
+          10,
+          1
+        ]
+      },
+      {
+        "node_id": "n102",
+        "position": [
+          10,
+          2
+        ]
+      },
+      {
+        "node_id": "n103",
+        "position": [
+          10,
+          3
+        ]
+      },
+      {
+        "node_id": "n104",
+        "position": [
+          10,
+          4
+        ]
+      },
+      {
+        "node_id": "n105",
+        "position": [
+          10,
+          5
+        ]
+      },
+      {
+        "node_id": "n106",
+        "position": [
+          10,
+          6
+        ]
+      },
+      {
+        "node_id": "n107",
+        "position": [
+          10,
+          7
+        ]
+      },
+      {
+        "node_id": "n108",
+        "position": [
+          10,
+          8
+        ]
+      },
+      {
+        "node_id": "n109",
+        "position": [
+          10,
+          9
+        ]
+      },
+      {
+        "node_id": "n1010",
+        "position": [
+          10,
+          10
+        ]
+      },
+      {
+        "node_id": "n1011",
+        "position": [
+          10,
+          11
+        ]
+      },
+      {
+        "node_id": "n1012",
+        "position": [
+          10,
+          12
+        ]
+      },
+      {
+        "node_id": "n1013",
+        "position": [
+          10,
+          13
+        ]
+      },
+      {
+        "node_id": "n1014",
+        "position": [
+          10,
+          14
+        ]
+      },
+      {
+        "node_id": "n1015",
+        "position": [
+          10,
+          15
+        ]
+      },
+      {
+        "node_id": "n110",
+        "position": [
+          11,
+          0
+        ]
+      },
+      {
+        "node_id": "n111",
+        "position": [
+          11,
+          1
+        ]
+      },
+      {
+        "node_id": "n112",
+        "position": [
+          11,
+          2
+        ]
+      },
+      {
+        "node_id": "n113",
+        "position": [
+          11,
+          3
+        ]
+      },
+      {
+        "node_id": "n114",
+        "position": [
+          11,
+          4
+        ]
+      },
+      {
+        "node_id": "n115",
+        "position": [
+          11,
+          5
+        ]
+      },
+      {
+        "node_id": "n116",
+        "position": [
+          11,
+          6
+        ]
+      },
+      {
+        "node_id": "n117",
+        "position": [
+          11,
+          7
+        ]
+      },
+      {
+        "node_id": "n118",
+        "position": [
+          11,
+          8
+        ]
+      },
+      {
+        "node_id": "n119",
+        "position": [
+          11,
+          9
+        ]
+      },
+      {
+        "node_id": "n1110",
+        "position": [
+          11,
+          10
+        ]
+      },
+      {
+        "node_id": "n1111",
+        "position": [
+          11,
+          11
+        ]
+      },
+      {
+        "node_id": "n1112",
+        "position": [
+          11,
+          12
+        ]
+      },
+      {
+        "node_id": "n1113",
+        "position": [
+          11,
+          13
+        ]
+      },
+      {
+        "node_id": "n1114",
+        "position": [
+          11,
+          14
+        ]
+      },
+      {
+        "node_id": "n1115",
+        "position": [
+          11,
+          15
+        ]
+      },
+      {
+        "node_id": "n120",
+        "position": [
+          12,
+          0
+        ]
+      },
+      {
+        "node_id": "n121",
+        "position": [
+          12,
+          1
+        ]
+      },
+      {
+        "node_id": "n122",
+        "position": [
+          12,
+          2
+        ]
+      },
+      {
+        "node_id": "n123",
+        "position": [
+          12,
+          3
+        ]
+      },
+      {
+        "node_id": "n124",
+        "position": [
+          12,
+          4
+        ]
+      },
+      {
+        "node_id": "n125",
+        "position": [
+          12,
+          5
+        ]
+      },
+      {
+        "node_id": "n126",
+        "position": [
+          12,
+          6
+        ]
+      },
+      {
+        "node_id": "n127",
+        "position": [
+          12,
+          7
+        ]
+      },
+      {
+        "node_id": "n128",
+        "position": [
+          12,
+          8
+        ]
+      },
+      {
+        "node_id": "n129",
+        "position": [
+          12,
+          9
+        ]
+      },
+      {
+        "node_id": "n1210",
+        "position": [
+          12,
+          10
+        ]
+      },
+      {
+        "node_id": "n1211",
+        "position": [
+          12,
+          11
+        ]
+      },
+      {
+        "node_id": "n1212",
+        "position": [
+          12,
+          12
+        ]
+      },
+      {
+        "node_id": "n1213",
+        "position": [
+          12,
+          13
+        ]
+      },
+      {
+        "node_id": "n1214",
+        "position": [
+          12,
+          14
+        ]
+      },
+      {
+        "node_id": "n1215",
+        "position": [
+          12,
+          15
+        ]
+      },
+      {
+        "node_id": "n130",
+        "position": [
+          13,
+          0
+        ]
+      },
+      {
+        "node_id": "n131",
+        "position": [
+          13,
+          1
+        ]
+      },
+      {
+        "node_id": "n132",
+        "position": [
+          13,
+          2
+        ]
+      },
+      {
+        "node_id": "n133",
+        "position": [
+          13,
+          3
+        ]
+      },
+      {
+        "node_id": "n134",
+        "position": [
+          13,
+          4
+        ]
+      },
+      {
+        "node_id": "n135",
+        "position": [
+          13,
+          5
+        ]
+      },
+      {
+        "node_id": "n136",
+        "position": [
+          13,
+          6
+        ]
+      },
+      {
+        "node_id": "n137",
+        "position": [
+          13,
+          7
+        ]
+      },
+      {
+        "node_id": "n138",
+        "position": [
+          13,
+          8
+        ]
+      },
+      {
+        "node_id": "n139",
+        "position": [
+          13,
+          9
+        ]
+      },
+      {
+        "node_id": "n1310",
+        "position": [
+          13,
+          10
+        ]
+      },
+      {
+        "node_id": "n1311",
+        "position": [
+          13,
+          11
+        ]
+      },
+      {
+        "node_id": "n1312",
+        "position": [
+          13,
+          12
+        ]
+      },
+      {
+        "node_id": "n1313",
+        "position": [
+          13,
+          13
+        ]
+      },
+      {
+        "node_id": "n1314",
+        "position": [
+          13,
+          14
+        ]
+      },
+      {
+        "node_id": "n1315",
+        "position": [
+          13,
+          15
+        ]
+      },
+      {
+        "node_id": "n140",
+        "position": [
+          14,
+          0
+        ]
+      },
+      {
+        "node_id": "n141",
+        "position": [
+          14,
+          1
+        ]
+      },
+      {
+        "node_id": "n142",
+        "position": [
+          14,
+          2
+        ]
+      },
+      {
+        "node_id": "n143",
+        "position": [
+          14,
+          3
+        ]
+      },
+      {
+        "node_id": "n144",
+        "position": [
+          14,
+          4
+        ]
+      },
+      {
+        "node_id": "n145",
+        "position": [
+          14,
+          5
+        ]
+      },
+      {
+        "node_id": "n146",
+        "position": [
+          14,
+          6
+        ]
+      },
+      {
+        "node_id": "n147",
+        "position": [
+          14,
+          7
+        ]
+      },
+      {
+        "node_id": "n148",
+        "position": [
+          14,
+          8
+        ]
+      },
+      {
+        "node_id": "n149",
+        "position": [
+          14,
+          9
+        ]
+      },
+      {
+        "node_id": "n1410",
+        "position": [
+          14,
+          10
+        ]
+      },
+      {
+        "node_id": "n1411",
+        "position": [
+          14,
+          11
+        ]
+      },
+      {
+        "node_id": "n1412",
+        "position": [
+          14,
+          12
+        ]
+      },
+      {
+        "node_id": "n1413",
+        "position": [
+          14,
+          13
+        ]
+      },
+      {
+        "node_id": "n1414",
+        "position": [
+          14,
+          14
+        ]
+      },
+      {
+        "node_id": "n1415",
+        "position": [
+          14,
+          15
+        ]
+      },
+      {
+        "node_id": "n150",
+        "position": [
+          15,
+          0
+        ]
+      },
+      {
+        "node_id": "n151",
+        "position": [
+          15,
+          1
+        ]
+      },
+      {
+        "node_id": "n152",
+        "position": [
+          15,
+          2
+        ]
+      },
+      {
+        "node_id": "n153",
+        "position": [
+          15,
+          3
+        ]
+      },
+      {
+        "node_id": "n154",
+        "position": [
+          15,
+          4
+        ]
+      },
+      {
+        "node_id": "n155",
+        "position": [
+          15,
+          5
+        ]
+      },
+      {
+        "node_id": "n156",
+        "position": [
+          15,
+          6
+        ]
+      },
+      {
+        "node_id": "n157",
+        "position": [
+          15,
+          7
+        ]
+      },
+      {
+        "node_id": "n158",
+        "position": [
+          15,
+          8
+        ]
+      },
+      {
+        "node_id": "n159",
+        "position": [
+          15,
+          9
+        ]
+      },
+      {
+        "node_id": "n1510",
+        "position": [
+          15,
+          10
+        ]
+      },
+      {
+        "node_id": "n1511",
+        "position": [
+          15,
+          11
+        ]
+      },
+      {
+        "node_id": "n1512",
+        "position": [
+          15,
+          12
+        ]
+      },
+      {
+        "node_id": "n1513",
+        "position": [
+          15,
+          13
+        ]
+      },
+      {
+        "node_id": "n1514",
+        "position": [
+          15,
+          14
+        ]
+      },
+      {
+        "node_id": "n1515",
+        "position": [
+          15,
+          15
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "e00r",
+        "source": "n00",
+        "target": "n01",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e00d",
+        "source": "n00",
+        "target": "n10",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e01r",
+        "source": "n01",
+        "target": "n02",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e01d",
+        "source": "n01",
+        "target": "n11",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e02r",
+        "source": "n02",
+        "target": "n03",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e02d",
+        "source": "n02",
+        "target": "n12",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e03r",
+        "source": "n03",
+        "target": "n04",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e03d",
+        "source": "n03",
+        "target": "n13",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e04r",
+        "source": "n04",
+        "target": "n05",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e04d",
+        "source": "n04",
+        "target": "n14",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e05r",
+        "source": "n05",
+        "target": "n06",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e05d",
+        "source": "n05",
+        "target": "n15",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e06r",
+        "source": "n06",
+        "target": "n07",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e06d",
+        "source": "n06",
+        "target": "n16",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e07r",
+        "source": "n07",
+        "target": "n08",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e07d",
+        "source": "n07",
+        "target": "n17",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e08r",
+        "source": "n08",
+        "target": "n09",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e08d",
+        "source": "n08",
+        "target": "n18",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e09r",
+        "source": "n09",
+        "target": "n010",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e09d",
+        "source": "n09",
+        "target": "n19",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e010r",
+        "source": "n010",
+        "target": "n011",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e010d",
+        "source": "n010",
+        "target": "n110",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e011r",
+        "source": "n011",
+        "target": "n012",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e011d",
+        "source": "n011",
+        "target": "n111",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e012r",
+        "source": "n012",
+        "target": "n013",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e012d",
+        "source": "n012",
+        "target": "n112",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e013r",
+        "source": "n013",
+        "target": "n014",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e013d",
+        "source": "n013",
+        "target": "n113",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e014r",
+        "source": "n014",
+        "target": "n015",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e014d",
+        "source": "n014",
+        "target": "n114",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e015r",
+        "source": "n015",
+        "target": "n00",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e015d",
+        "source": "n015",
+        "target": "n115",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e10r",
+        "source": "n10",
+        "target": "n11",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e10d",
+        "source": "n10",
+        "target": "n20",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e11r",
+        "source": "n11",
+        "target": "n12",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e11d",
+        "source": "n11",
+        "target": "n21",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e12r",
+        "source": "n12",
+        "target": "n13",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e12d",
+        "source": "n12",
+        "target": "n22",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e13r",
+        "source": "n13",
+        "target": "n14",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e13d",
+        "source": "n13",
+        "target": "n23",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e14r",
+        "source": "n14",
+        "target": "n15",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e14d",
+        "source": "n14",
+        "target": "n24",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e15r",
+        "source": "n15",
+        "target": "n16",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e15d",
+        "source": "n15",
+        "target": "n25",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e16r",
+        "source": "n16",
+        "target": "n17",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e16d",
+        "source": "n16",
+        "target": "n26",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e17r",
+        "source": "n17",
+        "target": "n18",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e17d",
+        "source": "n17",
+        "target": "n27",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e18r",
+        "source": "n18",
+        "target": "n19",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e18d",
+        "source": "n18",
+        "target": "n28",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e19r",
+        "source": "n19",
+        "target": "n110",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e19d",
+        "source": "n19",
+        "target": "n29",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e110r",
+        "source": "n110",
+        "target": "n111",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e110d",
+        "source": "n110",
+        "target": "n210",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e111r",
+        "source": "n111",
+        "target": "n112",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e111d",
+        "source": "n111",
+        "target": "n211",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e112r",
+        "source": "n112",
+        "target": "n113",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e112d",
+        "source": "n112",
+        "target": "n212",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e113r",
+        "source": "n113",
+        "target": "n114",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e113d",
+        "source": "n113",
+        "target": "n213",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e114r",
+        "source": "n114",
+        "target": "n115",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e114d",
+        "source": "n114",
+        "target": "n214",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e115r",
+        "source": "n115",
+        "target": "n10",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e115d",
+        "source": "n115",
+        "target": "n215",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e20r",
+        "source": "n20",
+        "target": "n21",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e20d",
+        "source": "n20",
+        "target": "n30",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e21r",
+        "source": "n21",
+        "target": "n22",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e21d",
+        "source": "n21",
+        "target": "n31",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e22r",
+        "source": "n22",
+        "target": "n23",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e22d",
+        "source": "n22",
+        "target": "n32",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e23r",
+        "source": "n23",
+        "target": "n24",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e23d",
+        "source": "n23",
+        "target": "n33",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e24r",
+        "source": "n24",
+        "target": "n25",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e24d",
+        "source": "n24",
+        "target": "n34",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e25r",
+        "source": "n25",
+        "target": "n26",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e25d",
+        "source": "n25",
+        "target": "n35",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e26r",
+        "source": "n26",
+        "target": "n27",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e26d",
+        "source": "n26",
+        "target": "n36",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e27r",
+        "source": "n27",
+        "target": "n28",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e27d",
+        "source": "n27",
+        "target": "n37",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e28r",
+        "source": "n28",
+        "target": "n29",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e28d",
+        "source": "n28",
+        "target": "n38",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e29r",
+        "source": "n29",
+        "target": "n210",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e29d",
+        "source": "n29",
+        "target": "n39",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e210r",
+        "source": "n210",
+        "target": "n211",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e210d",
+        "source": "n210",
+        "target": "n310",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e211r",
+        "source": "n211",
+        "target": "n212",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e211d",
+        "source": "n211",
+        "target": "n311",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e212r",
+        "source": "n212",
+        "target": "n213",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e212d",
+        "source": "n212",
+        "target": "n312",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e213r",
+        "source": "n213",
+        "target": "n214",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e213d",
+        "source": "n213",
+        "target": "n313",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e214r",
+        "source": "n214",
+        "target": "n215",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e214d",
+        "source": "n214",
+        "target": "n314",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e215r",
+        "source": "n215",
+        "target": "n20",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e215d",
+        "source": "n215",
+        "target": "n315",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e30r",
+        "source": "n30",
+        "target": "n31",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e30d",
+        "source": "n30",
+        "target": "n40",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e31r",
+        "source": "n31",
+        "target": "n32",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e31d",
+        "source": "n31",
+        "target": "n41",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e32r",
+        "source": "n32",
+        "target": "n33",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e32d",
+        "source": "n32",
+        "target": "n42",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e33r",
+        "source": "n33",
+        "target": "n34",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e33d",
+        "source": "n33",
+        "target": "n43",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e34r",
+        "source": "n34",
+        "target": "n35",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e34d",
+        "source": "n34",
+        "target": "n44",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e35r",
+        "source": "n35",
+        "target": "n36",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e35d",
+        "source": "n35",
+        "target": "n45",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e36r",
+        "source": "n36",
+        "target": "n37",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e36d",
+        "source": "n36",
+        "target": "n46",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e37r",
+        "source": "n37",
+        "target": "n38",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e37d",
+        "source": "n37",
+        "target": "n47",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e38r",
+        "source": "n38",
+        "target": "n39",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e38d",
+        "source": "n38",
+        "target": "n48",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e39r",
+        "source": "n39",
+        "target": "n310",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e39d",
+        "source": "n39",
+        "target": "n49",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e310r",
+        "source": "n310",
+        "target": "n311",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e310d",
+        "source": "n310",
+        "target": "n410",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e311r",
+        "source": "n311",
+        "target": "n312",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e311d",
+        "source": "n311",
+        "target": "n411",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e312r",
+        "source": "n312",
+        "target": "n313",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e312d",
+        "source": "n312",
+        "target": "n412",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e313r",
+        "source": "n313",
+        "target": "n314",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e313d",
+        "source": "n313",
+        "target": "n413",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e314r",
+        "source": "n314",
+        "target": "n315",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e314d",
+        "source": "n314",
+        "target": "n414",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e315r",
+        "source": "n315",
+        "target": "n30",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e315d",
+        "source": "n315",
+        "target": "n415",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e40r",
+        "source": "n40",
+        "target": "n41",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e40d",
+        "source": "n40",
+        "target": "n50",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e41r",
+        "source": "n41",
+        "target": "n42",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e41d",
+        "source": "n41",
+        "target": "n51",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e42r",
+        "source": "n42",
+        "target": "n43",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e42d",
+        "source": "n42",
+        "target": "n52",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e43r",
+        "source": "n43",
+        "target": "n44",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e43d",
+        "source": "n43",
+        "target": "n53",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e44r",
+        "source": "n44",
+        "target": "n45",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e44d",
+        "source": "n44",
+        "target": "n54",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e45r",
+        "source": "n45",
+        "target": "n46",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e45d",
+        "source": "n45",
+        "target": "n55",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e46r",
+        "source": "n46",
+        "target": "n47",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e46d",
+        "source": "n46",
+        "target": "n56",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e47r",
+        "source": "n47",
+        "target": "n48",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e47d",
+        "source": "n47",
+        "target": "n57",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e48r",
+        "source": "n48",
+        "target": "n49",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e48d",
+        "source": "n48",
+        "target": "n58",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e49r",
+        "source": "n49",
+        "target": "n410",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e49d",
+        "source": "n49",
+        "target": "n59",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e410r",
+        "source": "n410",
+        "target": "n411",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e410d",
+        "source": "n410",
+        "target": "n510",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e411r",
+        "source": "n411",
+        "target": "n412",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e411d",
+        "source": "n411",
+        "target": "n511",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e412r",
+        "source": "n412",
+        "target": "n413",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e412d",
+        "source": "n412",
+        "target": "n512",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e413r",
+        "source": "n413",
+        "target": "n414",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e413d",
+        "source": "n413",
+        "target": "n513",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e414r",
+        "source": "n414",
+        "target": "n415",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e414d",
+        "source": "n414",
+        "target": "n514",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e415r",
+        "source": "n415",
+        "target": "n40",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e415d",
+        "source": "n415",
+        "target": "n515",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e50r",
+        "source": "n50",
+        "target": "n51",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e50d",
+        "source": "n50",
+        "target": "n60",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e51r",
+        "source": "n51",
+        "target": "n52",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e51d",
+        "source": "n51",
+        "target": "n61",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e52r",
+        "source": "n52",
+        "target": "n53",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e52d",
+        "source": "n52",
+        "target": "n62",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e53r",
+        "source": "n53",
+        "target": "n54",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e53d",
+        "source": "n53",
+        "target": "n63",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e54r",
+        "source": "n54",
+        "target": "n55",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e54d",
+        "source": "n54",
+        "target": "n64",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e55r",
+        "source": "n55",
+        "target": "n56",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e55d",
+        "source": "n55",
+        "target": "n65",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e56r",
+        "source": "n56",
+        "target": "n57",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e56d",
+        "source": "n56",
+        "target": "n66",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e57r",
+        "source": "n57",
+        "target": "n58",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e57d",
+        "source": "n57",
+        "target": "n67",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e58r",
+        "source": "n58",
+        "target": "n59",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e58d",
+        "source": "n58",
+        "target": "n68",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e59r",
+        "source": "n59",
+        "target": "n510",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e59d",
+        "source": "n59",
+        "target": "n69",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e510r",
+        "source": "n510",
+        "target": "n511",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e510d",
+        "source": "n510",
+        "target": "n610",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e511r",
+        "source": "n511",
+        "target": "n512",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e511d",
+        "source": "n511",
+        "target": "n611",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e512r",
+        "source": "n512",
+        "target": "n513",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e512d",
+        "source": "n512",
+        "target": "n612",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e513r",
+        "source": "n513",
+        "target": "n514",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e513d",
+        "source": "n513",
+        "target": "n613",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e514r",
+        "source": "n514",
+        "target": "n515",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e514d",
+        "source": "n514",
+        "target": "n614",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e515r",
+        "source": "n515",
+        "target": "n50",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e515d",
+        "source": "n515",
+        "target": "n615",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e60r",
+        "source": "n60",
+        "target": "n61",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e60d",
+        "source": "n60",
+        "target": "n70",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e61r",
+        "source": "n61",
+        "target": "n62",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e61d",
+        "source": "n61",
+        "target": "n71",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e62r",
+        "source": "n62",
+        "target": "n63",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e62d",
+        "source": "n62",
+        "target": "n72",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e63r",
+        "source": "n63",
+        "target": "n64",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e63d",
+        "source": "n63",
+        "target": "n73",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e64r",
+        "source": "n64",
+        "target": "n65",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e64d",
+        "source": "n64",
+        "target": "n74",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e65r",
+        "source": "n65",
+        "target": "n66",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e65d",
+        "source": "n65",
+        "target": "n75",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e66r",
+        "source": "n66",
+        "target": "n67",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e66d",
+        "source": "n66",
+        "target": "n76",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e67r",
+        "source": "n67",
+        "target": "n68",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e67d",
+        "source": "n67",
+        "target": "n77",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e68r",
+        "source": "n68",
+        "target": "n69",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e68d",
+        "source": "n68",
+        "target": "n78",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e69r",
+        "source": "n69",
+        "target": "n610",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e69d",
+        "source": "n69",
+        "target": "n79",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e610r",
+        "source": "n610",
+        "target": "n611",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e610d",
+        "source": "n610",
+        "target": "n710",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e611r",
+        "source": "n611",
+        "target": "n612",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e611d",
+        "source": "n611",
+        "target": "n711",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e612r",
+        "source": "n612",
+        "target": "n613",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e612d",
+        "source": "n612",
+        "target": "n712",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e613r",
+        "source": "n613",
+        "target": "n614",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e613d",
+        "source": "n613",
+        "target": "n713",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e614r",
+        "source": "n614",
+        "target": "n615",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e614d",
+        "source": "n614",
+        "target": "n714",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e615r",
+        "source": "n615",
+        "target": "n60",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e615d",
+        "source": "n615",
+        "target": "n715",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e70r",
+        "source": "n70",
+        "target": "n71",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e70d",
+        "source": "n70",
+        "target": "n80",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e71r",
+        "source": "n71",
+        "target": "n72",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e71d",
+        "source": "n71",
+        "target": "n81",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e72r",
+        "source": "n72",
+        "target": "n73",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e72d",
+        "source": "n72",
+        "target": "n82",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e73r",
+        "source": "n73",
+        "target": "n74",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e73d",
+        "source": "n73",
+        "target": "n83",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e74r",
+        "source": "n74",
+        "target": "n75",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e74d",
+        "source": "n74",
+        "target": "n84",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e75r",
+        "source": "n75",
+        "target": "n76",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e75d",
+        "source": "n75",
+        "target": "n85",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e76r",
+        "source": "n76",
+        "target": "n77",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e76d",
+        "source": "n76",
+        "target": "n86",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e77r",
+        "source": "n77",
+        "target": "n78",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e77d",
+        "source": "n77",
+        "target": "n87",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e78r",
+        "source": "n78",
+        "target": "n79",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e78d",
+        "source": "n78",
+        "target": "n88",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e79r",
+        "source": "n79",
+        "target": "n710",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e79d",
+        "source": "n79",
+        "target": "n89",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e710r",
+        "source": "n710",
+        "target": "n711",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e710d",
+        "source": "n710",
+        "target": "n810",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e711r",
+        "source": "n711",
+        "target": "n712",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e711d",
+        "source": "n711",
+        "target": "n811",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e712r",
+        "source": "n712",
+        "target": "n713",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e712d",
+        "source": "n712",
+        "target": "n812",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e713r",
+        "source": "n713",
+        "target": "n714",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e713d",
+        "source": "n713",
+        "target": "n813",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e714r",
+        "source": "n714",
+        "target": "n715",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e714d",
+        "source": "n714",
+        "target": "n814",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e715r",
+        "source": "n715",
+        "target": "n70",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e715d",
+        "source": "n715",
+        "target": "n815",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e80r",
+        "source": "n80",
+        "target": "n81",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e80d",
+        "source": "n80",
+        "target": "n90",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e81r",
+        "source": "n81",
+        "target": "n82",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e81d",
+        "source": "n81",
+        "target": "n91",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e82r",
+        "source": "n82",
+        "target": "n83",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e82d",
+        "source": "n82",
+        "target": "n92",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e83r",
+        "source": "n83",
+        "target": "n84",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e83d",
+        "source": "n83",
+        "target": "n93",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e84r",
+        "source": "n84",
+        "target": "n85",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e84d",
+        "source": "n84",
+        "target": "n94",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e85r",
+        "source": "n85",
+        "target": "n86",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e85d",
+        "source": "n85",
+        "target": "n95",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e86r",
+        "source": "n86",
+        "target": "n87",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e86d",
+        "source": "n86",
+        "target": "n96",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e87r",
+        "source": "n87",
+        "target": "n88",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e87d",
+        "source": "n87",
+        "target": "n97",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e88r",
+        "source": "n88",
+        "target": "n89",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e88d",
+        "source": "n88",
+        "target": "n98",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e89r",
+        "source": "n89",
+        "target": "n810",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e89d",
+        "source": "n89",
+        "target": "n99",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e810r",
+        "source": "n810",
+        "target": "n811",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e810d",
+        "source": "n810",
+        "target": "n910",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e811r",
+        "source": "n811",
+        "target": "n812",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e811d",
+        "source": "n811",
+        "target": "n911",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e812r",
+        "source": "n812",
+        "target": "n813",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e812d",
+        "source": "n812",
+        "target": "n912",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e813r",
+        "source": "n813",
+        "target": "n814",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e813d",
+        "source": "n813",
+        "target": "n913",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e814r",
+        "source": "n814",
+        "target": "n815",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e814d",
+        "source": "n814",
+        "target": "n914",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e815r",
+        "source": "n815",
+        "target": "n80",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e815d",
+        "source": "n815",
+        "target": "n915",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e90r",
+        "source": "n90",
+        "target": "n91",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e90d",
+        "source": "n90",
+        "target": "n100",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e91r",
+        "source": "n91",
+        "target": "n92",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e91d",
+        "source": "n91",
+        "target": "n101",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e92r",
+        "source": "n92",
+        "target": "n93",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e92d",
+        "source": "n92",
+        "target": "n102",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e93r",
+        "source": "n93",
+        "target": "n94",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e93d",
+        "source": "n93",
+        "target": "n103",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e94r",
+        "source": "n94",
+        "target": "n95",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e94d",
+        "source": "n94",
+        "target": "n104",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e95r",
+        "source": "n95",
+        "target": "n96",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e95d",
+        "source": "n95",
+        "target": "n105",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e96r",
+        "source": "n96",
+        "target": "n97",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e96d",
+        "source": "n96",
+        "target": "n106",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e97r",
+        "source": "n97",
+        "target": "n98",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e97d",
+        "source": "n97",
+        "target": "n107",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e98r",
+        "source": "n98",
+        "target": "n99",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e98d",
+        "source": "n98",
+        "target": "n108",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e99r",
+        "source": "n99",
+        "target": "n910",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e99d",
+        "source": "n99",
+        "target": "n109",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e910r",
+        "source": "n910",
+        "target": "n911",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e910d",
+        "source": "n910",
+        "target": "n1010",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e911r",
+        "source": "n911",
+        "target": "n912",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e911d",
+        "source": "n911",
+        "target": "n1011",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e912r",
+        "source": "n912",
+        "target": "n913",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e912d",
+        "source": "n912",
+        "target": "n1012",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e913r",
+        "source": "n913",
+        "target": "n914",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e913d",
+        "source": "n913",
+        "target": "n1013",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e914r",
+        "source": "n914",
+        "target": "n915",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e914d",
+        "source": "n914",
+        "target": "n1014",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e915r",
+        "source": "n915",
+        "target": "n90",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e915d",
+        "source": "n915",
+        "target": "n1015",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e100r",
+        "source": "n100",
+        "target": "n101",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e100d",
+        "source": "n100",
+        "target": "n110",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e101r",
+        "source": "n101",
+        "target": "n102",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e101d",
+        "source": "n101",
+        "target": "n111",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e102r",
+        "source": "n102",
+        "target": "n103",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e102d",
+        "source": "n102",
+        "target": "n112",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e103r",
+        "source": "n103",
+        "target": "n104",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e103d",
+        "source": "n103",
+        "target": "n113",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e104r",
+        "source": "n104",
+        "target": "n105",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e104d",
+        "source": "n104",
+        "target": "n114",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e105r",
+        "source": "n105",
+        "target": "n106",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e105d",
+        "source": "n105",
+        "target": "n115",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e106r",
+        "source": "n106",
+        "target": "n107",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e106d",
+        "source": "n106",
+        "target": "n116",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e107r",
+        "source": "n107",
+        "target": "n108",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e107d",
+        "source": "n107",
+        "target": "n117",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e108r",
+        "source": "n108",
+        "target": "n109",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e108d",
+        "source": "n108",
+        "target": "n118",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e109r",
+        "source": "n109",
+        "target": "n1010",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e109d",
+        "source": "n109",
+        "target": "n119",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1010r",
+        "source": "n1010",
+        "target": "n1011",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1010d",
+        "source": "n1010",
+        "target": "n1110",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1011r",
+        "source": "n1011",
+        "target": "n1012",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1011d",
+        "source": "n1011",
+        "target": "n1111",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1012r",
+        "source": "n1012",
+        "target": "n1013",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1012d",
+        "source": "n1012",
+        "target": "n1112",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1013r",
+        "source": "n1013",
+        "target": "n1014",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1013d",
+        "source": "n1013",
+        "target": "n1113",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1014r",
+        "source": "n1014",
+        "target": "n1015",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1014d",
+        "source": "n1014",
+        "target": "n1114",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1015r",
+        "source": "n1015",
+        "target": "n100",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1015d",
+        "source": "n1015",
+        "target": "n1115",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e110r",
+        "source": "n110",
+        "target": "n111",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e110d",
+        "source": "n110",
+        "target": "n120",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e111r",
+        "source": "n111",
+        "target": "n112",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e111d",
+        "source": "n111",
+        "target": "n121",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e112r",
+        "source": "n112",
+        "target": "n113",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e112d",
+        "source": "n112",
+        "target": "n122",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e113r",
+        "source": "n113",
+        "target": "n114",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e113d",
+        "source": "n113",
+        "target": "n123",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e114r",
+        "source": "n114",
+        "target": "n115",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e114d",
+        "source": "n114",
+        "target": "n124",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e115r",
+        "source": "n115",
+        "target": "n116",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e115d",
+        "source": "n115",
+        "target": "n125",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e116r",
+        "source": "n116",
+        "target": "n117",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e116d",
+        "source": "n116",
+        "target": "n126",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e117r",
+        "source": "n117",
+        "target": "n118",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e117d",
+        "source": "n117",
+        "target": "n127",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e118r",
+        "source": "n118",
+        "target": "n119",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e118d",
+        "source": "n118",
+        "target": "n128",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e119r",
+        "source": "n119",
+        "target": "n1110",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e119d",
+        "source": "n119",
+        "target": "n129",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1110r",
+        "source": "n1110",
+        "target": "n1111",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1110d",
+        "source": "n1110",
+        "target": "n1210",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1111r",
+        "source": "n1111",
+        "target": "n1112",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1111d",
+        "source": "n1111",
+        "target": "n1211",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1112r",
+        "source": "n1112",
+        "target": "n1113",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1112d",
+        "source": "n1112",
+        "target": "n1212",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1113r",
+        "source": "n1113",
+        "target": "n1114",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1113d",
+        "source": "n1113",
+        "target": "n1213",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1114r",
+        "source": "n1114",
+        "target": "n1115",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1114d",
+        "source": "n1114",
+        "target": "n1214",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1115r",
+        "source": "n1115",
+        "target": "n110",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1115d",
+        "source": "n1115",
+        "target": "n1215",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e120r",
+        "source": "n120",
+        "target": "n121",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e120d",
+        "source": "n120",
+        "target": "n130",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e121r",
+        "source": "n121",
+        "target": "n122",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e121d",
+        "source": "n121",
+        "target": "n131",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e122r",
+        "source": "n122",
+        "target": "n123",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e122d",
+        "source": "n122",
+        "target": "n132",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e123r",
+        "source": "n123",
+        "target": "n124",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e123d",
+        "source": "n123",
+        "target": "n133",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e124r",
+        "source": "n124",
+        "target": "n125",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e124d",
+        "source": "n124",
+        "target": "n134",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e125r",
+        "source": "n125",
+        "target": "n126",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e125d",
+        "source": "n125",
+        "target": "n135",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e126r",
+        "source": "n126",
+        "target": "n127",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e126d",
+        "source": "n126",
+        "target": "n136",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e127r",
+        "source": "n127",
+        "target": "n128",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e127d",
+        "source": "n127",
+        "target": "n137",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e128r",
+        "source": "n128",
+        "target": "n129",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e128d",
+        "source": "n128",
+        "target": "n138",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e129r",
+        "source": "n129",
+        "target": "n1210",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e129d",
+        "source": "n129",
+        "target": "n139",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1210r",
+        "source": "n1210",
+        "target": "n1211",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1210d",
+        "source": "n1210",
+        "target": "n1310",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1211r",
+        "source": "n1211",
+        "target": "n1212",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1211d",
+        "source": "n1211",
+        "target": "n1311",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1212r",
+        "source": "n1212",
+        "target": "n1213",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1212d",
+        "source": "n1212",
+        "target": "n1312",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1213r",
+        "source": "n1213",
+        "target": "n1214",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1213d",
+        "source": "n1213",
+        "target": "n1313",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1214r",
+        "source": "n1214",
+        "target": "n1215",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1214d",
+        "source": "n1214",
+        "target": "n1314",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1215r",
+        "source": "n1215",
+        "target": "n120",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1215d",
+        "source": "n1215",
+        "target": "n1315",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e130r",
+        "source": "n130",
+        "target": "n131",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e130d",
+        "source": "n130",
+        "target": "n140",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e131r",
+        "source": "n131",
+        "target": "n132",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e131d",
+        "source": "n131",
+        "target": "n141",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e132r",
+        "source": "n132",
+        "target": "n133",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e132d",
+        "source": "n132",
+        "target": "n142",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e133r",
+        "source": "n133",
+        "target": "n134",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e133d",
+        "source": "n133",
+        "target": "n143",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e134r",
+        "source": "n134",
+        "target": "n135",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e134d",
+        "source": "n134",
+        "target": "n144",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e135r",
+        "source": "n135",
+        "target": "n136",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e135d",
+        "source": "n135",
+        "target": "n145",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e136r",
+        "source": "n136",
+        "target": "n137",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e136d",
+        "source": "n136",
+        "target": "n146",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e137r",
+        "source": "n137",
+        "target": "n138",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e137d",
+        "source": "n137",
+        "target": "n147",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e138r",
+        "source": "n138",
+        "target": "n139",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e138d",
+        "source": "n138",
+        "target": "n148",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e139r",
+        "source": "n139",
+        "target": "n1310",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e139d",
+        "source": "n139",
+        "target": "n149",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1310r",
+        "source": "n1310",
+        "target": "n1311",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1310d",
+        "source": "n1310",
+        "target": "n1410",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1311r",
+        "source": "n1311",
+        "target": "n1312",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1311d",
+        "source": "n1311",
+        "target": "n1411",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1312r",
+        "source": "n1312",
+        "target": "n1313",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1312d",
+        "source": "n1312",
+        "target": "n1412",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1313r",
+        "source": "n1313",
+        "target": "n1314",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1313d",
+        "source": "n1313",
+        "target": "n1413",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1314r",
+        "source": "n1314",
+        "target": "n1315",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1314d",
+        "source": "n1314",
+        "target": "n1414",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1315r",
+        "source": "n1315",
+        "target": "n130",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1315d",
+        "source": "n1315",
+        "target": "n1415",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e140r",
+        "source": "n140",
+        "target": "n141",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e140d",
+        "source": "n140",
+        "target": "n150",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e141r",
+        "source": "n141",
+        "target": "n142",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e141d",
+        "source": "n141",
+        "target": "n151",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e142r",
+        "source": "n142",
+        "target": "n143",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e142d",
+        "source": "n142",
+        "target": "n152",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e143r",
+        "source": "n143",
+        "target": "n144",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e143d",
+        "source": "n143",
+        "target": "n153",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e144r",
+        "source": "n144",
+        "target": "n145",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e144d",
+        "source": "n144",
+        "target": "n154",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e145r",
+        "source": "n145",
+        "target": "n146",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e145d",
+        "source": "n145",
+        "target": "n155",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e146r",
+        "source": "n146",
+        "target": "n147",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e146d",
+        "source": "n146",
+        "target": "n156",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e147r",
+        "source": "n147",
+        "target": "n148",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e147d",
+        "source": "n147",
+        "target": "n157",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e148r",
+        "source": "n148",
+        "target": "n149",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e148d",
+        "source": "n148",
+        "target": "n158",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e149r",
+        "source": "n149",
+        "target": "n1410",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e149d",
+        "source": "n149",
+        "target": "n159",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1410r",
+        "source": "n1410",
+        "target": "n1411",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1410d",
+        "source": "n1410",
+        "target": "n1510",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1411r",
+        "source": "n1411",
+        "target": "n1412",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1411d",
+        "source": "n1411",
+        "target": "n1511",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1412r",
+        "source": "n1412",
+        "target": "n1413",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1412d",
+        "source": "n1412",
+        "target": "n1512",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1413r",
+        "source": "n1413",
+        "target": "n1414",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1413d",
+        "source": "n1413",
+        "target": "n1513",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1414r",
+        "source": "n1414",
+        "target": "n1415",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1414d",
+        "source": "n1414",
+        "target": "n1514",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1415r",
+        "source": "n1415",
+        "target": "n140",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1415d",
+        "source": "n1415",
+        "target": "n1515",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e150r",
+        "source": "n150",
+        "target": "n151",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e150d",
+        "source": "n150",
+        "target": "n00",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e151r",
+        "source": "n151",
+        "target": "n152",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e151d",
+        "source": "n151",
+        "target": "n01",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e152r",
+        "source": "n152",
+        "target": "n153",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e152d",
+        "source": "n152",
+        "target": "n02",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e153r",
+        "source": "n153",
+        "target": "n154",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e153d",
+        "source": "n153",
+        "target": "n03",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e154r",
+        "source": "n154",
+        "target": "n155",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e154d",
+        "source": "n154",
+        "target": "n04",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e155r",
+        "source": "n155",
+        "target": "n156",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e155d",
+        "source": "n155",
+        "target": "n05",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e156r",
+        "source": "n156",
+        "target": "n157",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e156d",
+        "source": "n156",
+        "target": "n06",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e157r",
+        "source": "n157",
+        "target": "n158",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e157d",
+        "source": "n157",
+        "target": "n07",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e158r",
+        "source": "n158",
+        "target": "n159",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e158d",
+        "source": "n158",
+        "target": "n08",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e159r",
+        "source": "n159",
+        "target": "n1510",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e159d",
+        "source": "n159",
+        "target": "n09",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1510r",
+        "source": "n1510",
+        "target": "n1511",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1510d",
+        "source": "n1510",
+        "target": "n010",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1511r",
+        "source": "n1511",
+        "target": "n1512",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1511d",
+        "source": "n1511",
+        "target": "n011",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1512r",
+        "source": "n1512",
+        "target": "n1513",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1512d",
+        "source": "n1512",
+        "target": "n012",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1513r",
+        "source": "n1513",
+        "target": "n1514",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1513d",
+        "source": "n1513",
+        "target": "n013",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1514r",
+        "source": "n1514",
+        "target": "n1515",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1514d",
+        "source": "n1514",
+        "target": "n014",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1515r",
+        "source": "n1515",
+        "target": "n150",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ],
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e1515d",
+        "source": "n1515",
+        "target": "n015",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ],
+        "edge_class": "nearest_neighbor"
+      }
+    ]
+  },
+  "boundary_conditions": {
+    "kind": "periodic",
+    "periodic_axes": [
+      0,
+      1
+    ],
+    "twist_angles_rad": [
+      0,
+      0
+    ],
+    "box_lengths": [
+      16,
+      16
+    ]
+  },
+  "coupling_budget": {
+    "normalization": "sum_edge_couplings_divided_by_node_count",
+    "total_coupling_energy": 512,
+    "per_node_coupling_budget": 2,
+    "declared_nonlocal_edge_cost": 0
+  },
+  "disorder": {
+    "family": "none",
+    "strength": 0,
+    "spatial_correlation": null,
+    "generator_id": null
+  },
+  "random_seed": 0,
+  "source_references": [
+    "https://doi.org/10.1103/PhysRevB.104.165132",
+    "https://doi.org/10.1088/1742-5468/aba686"
+  ],
+  "claim_ceiling": "Model input only; not a solved state, measured Tc, or experimental material result."
+}
