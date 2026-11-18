@@ -163,6 +163,112 @@ pub struct GridDecodeOutcome {
     pub result: Result<DecodedPayload, DecodeError>,
 }
 
+/// Result of one deterministic row/column-margin-preserving null shuffle.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NullGridResult {
+    pub grid: BinaryGrid,
+    pub seed: u64,
+    pub attempted_swaps: usize,
+    pub accepted_swaps: usize,
+}
+
+struct XorShift64 {
+    state: u64,
+}
+
+impl XorShift64 {
+    fn new(seed: u64) -> Self {
+        Self {
+            state: if seed == 0 {
+                0x9e37_79b9_7f4a_7c15
+            } else {
+                seed
+            },
+        }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        let mut value = self.state;
+        value ^= value << 13;
+        value ^= value >> 7;
+        value ^= value << 17;
+        self.state = value;
+        value
+    }
+
+    fn index(&mut self, upper: usize) -> usize {
+        ((self.next_u64() % upper as u64) as usize).min(upper - 1)
+    }
+
+    fn distinct_pair(&mut self, upper: usize) -> (usize, usize) {
+        let first = self.index(upper);
+        let mut second = self.index(upper - 1);
+        if second >= first {
+            second += 1;
+        }
+        (first, second)
+    }
+}
+
+/// Generate a deterministic binary-grid null by applying 2x2 switches.
+///
+/// A switch is accepted only for a checkerboard block:
+///
+/// `1 0`       `0 1`
+/// `0 1`  <->  `1 0`
+///
+/// Each accepted switch preserves every row sum, every column sum, and the
+/// global occupied-cell count. It does **not** preserve connected components,
+/// perimeter, local texture or higher-order spatial structure. It is one
+/// matched-null family, not a universal null model.
+///
+/// XorShift64 is used for reproducible test/control generation, not security.
+pub fn margin_preserving_shuffle(
+    grid: &BinaryGrid,
+    seed: u64,
+    attempts: usize,
+) -> NullGridResult {
+    let mut cells = grid.cells.clone();
+    let mut random = XorShift64::new(seed);
+    let mut attempted_swaps = 0;
+    let mut accepted_swaps = 0;
+
+    if grid.rows >= 2 && grid.columns >= 2 {
+        for _ in 0..attempts {
+            attempted_swaps += 1;
+            let (row_a, row_b) = random.distinct_pair(grid.rows);
+            let (column_a, column_b) = random.distinct_pair(grid.columns);
+
+            let top_left = row_a * grid.columns + column_a;
+            let top_right = row_a * grid.columns + column_b;
+            let bottom_left = row_b * grid.columns + column_a;
+            let bottom_right = row_b * grid.columns + column_b;
+
+            if cells[top_left] == cells[bottom_right]
+                && cells[top_right] == cells[bottom_left]
+                && cells[top_left] != cells[top_right]
+            {
+                cells[top_left] = !cells[top_left];
+                cells[top_right] = !cells[top_right];
+                cells[bottom_left] = !cells[bottom_left];
+                cells[bottom_right] = !cells[bottom_right];
+                accepted_swaps += 1;
+            }
+        }
+    }
+
+    NullGridResult {
+        grid: BinaryGrid {
+            rows: grid.rows,
+            columns: grid.columns,
+            cells,
+        },
+        seed,
+        attempted_swaps,
+        accepted_swaps,
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ManifestError {
     EmptyProtocolId,
@@ -494,5 +600,72 @@ mod tests {
         assert_eq!(manifest.protocol_id(), "crop-intel-positive-control");
         assert_eq!(manifest.version(), 1);
         assert_eq!(manifest.run(&grid).len(), 1);
+    }
+
+    fn row_and_column_margins(grid: &BinaryGrid) -> (Vec<usize>, Vec<usize>) {
+        let rows = (0..grid.rows())
+            .map(|row| {
+                (0..grid.columns())
+                    .filter(|column| grid.cells[row * grid.columns() + column])
+                    .count()
+            })
+            .collect();
+        let columns = (0..grid.columns())
+            .map(|column| {
+                (0..grid.rows())
+                    .filter(|row| grid.cells[row * grid.columns() + column])
+                    .count()
+            })
+            .collect();
+        (rows, columns)
+    }
+
+    #[test]
+    fn margin_shuffle_preserves_each_row_and_column_sum() {
+        let grid = BinaryGrid::new(
+            2,
+            2,
+            vec![true, false, false, true],
+        )
+        .expect("valid checkerboard");
+        let before = row_and_column_margins(&grid);
+        let shuffled = margin_preserving_shuffle(&grid, 42, 11);
+        let after = row_and_column_margins(&shuffled.grid);
+
+        assert_eq!(before, after);
+        assert_eq!(shuffled.attempted_swaps, 11);
+        assert_eq!(shuffled.accepted_swaps, 11);
+    }
+
+    #[test]
+    fn margin_shuffle_is_deterministic_for_a_frozen_seed() {
+        let grid = BinaryGrid::new(
+            3,
+            3,
+            vec![
+                true, false, true,
+                false, true, false,
+                true, false, true,
+            ],
+        )
+        .expect("valid grid");
+        let a = margin_preserving_shuffle(&grid, 12345, 100);
+        let b = margin_preserving_shuffle(&grid, 12345, 100);
+
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn margin_shuffle_does_not_change_non_switchable_patterns() {
+        let grid = BinaryGrid::new(
+            2,
+            2,
+            vec![true, true, false, false],
+        )
+        .expect("valid grid");
+        let shuffled = margin_preserving_shuffle(&grid, 7, 20);
+
+        assert_eq!(shuffled.grid, grid);
+        assert_eq!(shuffled.accepted_swaps, 0);
     }
 }
