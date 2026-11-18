@@ -22,6 +22,8 @@ exclude = [
     "crates/core/nixward-web",
     # Stale directory contains examples only; no Cargo.toml. Avoid glob member metadata failure.
     "crates/core/symthaea",
+    # Stale test-only directory contains no Cargo.toml; exclude from core/* workspace glob.
+    "crates/core/symthaea-iit",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
