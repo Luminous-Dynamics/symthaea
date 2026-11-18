@@ -61,14 +61,15 @@
       ],
       "expected": {
         "disposition": "qualified",
-        "new_independent_roots_milli": 1,
         "unique_new_root_count": 1,
         "duplicate_message_count": 0,
         "retained_message_count": 1,
         "original_tokens": 100,
         "transmitted_tokens": 100,
         "token_savings_milli": 0,
-        "provenance_violations": 0
+        "provenance_violations": 0,
+        "required_roots_delivered_count": 1,
+        "required_root_coverage_milli": 1000
       }
     },
     {
@@ -120,14 +121,15 @@
       ],
       "expected": {
         "disposition": "qualified",
-        "new_independent_roots_milli": 1,
         "unique_new_root_count": 1,
         "duplicate_message_count": 0,
         "retained_message_count": 1,
         "original_tokens": 100,
         "transmitted_tokens": 35,
         "token_savings_milli": 650,
-        "provenance_violations": 0
+        "provenance_violations": 0,
+        "required_roots_delivered_count": 1,
+        "required_root_coverage_milli": 1000
       }
     },
     {
@@ -179,14 +181,15 @@
       ],
       "expected": {
         "disposition": "qualified",
-        "new_independent_roots_milli": 0,
         "unique_new_root_count": 0,
         "duplicate_message_count": 0,
         "retained_message_count": 0,
         "original_tokens": 100,
         "transmitted_tokens": 0,
         "token_savings_milli": 1000,
-        "provenance_violations": 0
+        "provenance_violations": 0,
+        "required_roots_delivered_count": 0,
+        "required_root_coverage_milli": null
       }
     },
     {
@@ -275,14 +278,15 @@
       ],
       "expected": {
         "disposition": "qualified",
-        "new_independent_roots_milli": 1,
         "unique_new_root_count": 1,
         "duplicate_message_count": 1,
         "retained_message_count": 2,
         "original_tokens": 200,
         "transmitted_tokens": 200,
         "token_savings_milli": 0,
-        "provenance_violations": 0
+        "provenance_violations": 0,
+        "required_roots_delivered_count": 1,
+        "required_root_coverage_milli": 1000
       }
     },
     {
@@ -334,14 +338,15 @@
       ],
       "expected": {
         "disposition": "qualified",
-        "new_independent_roots_milli": 1,
         "unique_new_root_count": 1,
         "duplicate_message_count": 0,
         "retained_message_count": 1,
         "original_tokens": 100,
         "transmitted_tokens": 35,
         "token_savings_milli": 650,
-        "provenance_violations": 0
+        "provenance_violations": 0,
+        "required_roots_delivered_count": 1,
+        "required_root_coverage_milli": 1000
       }
     },
     {
@@ -393,14 +398,15 @@
       ],
       "expected": {
         "disposition": "qualified",
-        "new_independent_roots_milli": 1,
         "unique_new_root_count": 1,
         "duplicate_message_count": 0,
         "retained_message_count": 1,
         "original_tokens": 100,
         "transmitted_tokens": 35,
         "token_savings_milli": 650,
-        "provenance_violations": 0
+        "provenance_violations": 0,
+        "required_roots_delivered_count": 1,
+        "required_root_coverage_milli": 1000
       }
     },
     {
@@ -452,14 +458,15 @@
       ],
       "expected": {
         "disposition": "reject",
-        "new_independent_roots_milli": 1,
         "unique_new_root_count": 1,
         "duplicate_message_count": 0,
         "retained_message_count": 1,
         "original_tokens": 100,
         "transmitted_tokens": 35,
         "token_savings_milli": 650,
-        "provenance_violations": 1
+        "provenance_violations": 1,
+        "required_roots_delivered_count": 1,
+        "required_root_coverage_milli": 1000
       }
     },
     {
@@ -510,14 +517,15 @@
       ],
       "expected": {
         "disposition": "reject",
-        "new_independent_roots_milli": 1,
         "unique_new_root_count": 1,
         "duplicate_message_count": 0,
         "retained_message_count": 1,
         "original_tokens": 100,
         "transmitted_tokens": 35,
         "token_savings_milli": 650,
-        "provenance_violations": 1
+        "provenance_violations": 1,
+        "required_roots_delivered_count": 1,
+        "required_root_coverage_milli": 1000
       }
     },
     {
@@ -568,14 +576,15 @@
       ],
       "expected": {
         "disposition": "reject",
-        "new_independent_roots_milli": 1,
         "unique_new_root_count": 1,
         "duplicate_message_count": 0,
         "retained_message_count": 1,
         "original_tokens": 100,
         "transmitted_tokens": 35,
         "token_savings_milli": 650,
-        "provenance_violations": 1
+        "provenance_violations": 1,
+        "required_roots_delivered_count": 1,
+        "required_root_coverage_milli": 1000
       }
     },
     {
@@ -626,14 +635,15 @@
       ],
       "expected": {
         "disposition": "reject",
-        "new_independent_roots_milli": 1,
         "unique_new_root_count": 1,
         "duplicate_message_count": 0,
         "retained_message_count": 1,
         "original_tokens": 100,
         "transmitted_tokens": 35,
         "token_savings_milli": 650,
-        "provenance_violations": 2
+        "provenance_violations": 2,
+        "required_roots_delivered_count": 1,
+        "required_root_coverage_milli": 1000
       }
     },
     {
@@ -685,14 +695,15 @@
       ],
       "expected": {
         "disposition": "qualified",
-        "new_independent_roots_milli": 1,
         "unique_new_root_count": 1,
         "duplicate_message_count": 0,
         "retained_message_count": 1,
         "original_tokens": 100,
         "transmitted_tokens": 35,
         "token_savings_milli": 650,
-        "provenance_violations": 0
+        "provenance_violations": 0,
+        "required_roots_delivered_count": 1,
+        "required_root_coverage_milli": 1000
       }
     },
     {
@@ -743,14 +754,15 @@
       ],
       "expected": {
         "disposition": "reject",
-        "new_independent_roots_milli": 1,
         "unique_new_root_count": 1,
         "duplicate_message_count": 0,
         "retained_message_count": 1,
         "original_tokens": 100,
         "transmitted_tokens": 35,
         "token_savings_milli": 650,
-        "provenance_violations": 2
+        "provenance_violations": 2,
+        "required_roots_delivered_count": 1,
+        "required_root_coverage_milli": 1000
       }
     },
     {
@@ -800,14 +812,15 @@
       ],
       "expected": {
         "disposition": "reject",
-        "new_independent_roots_milli": 0,
         "unique_new_root_count": 1,
         "duplicate_message_count": 0,
         "retained_message_count": 1,
         "original_tokens": 100,
         "transmitted_tokens": 35,
         "token_savings_milli": 650,
-        "provenance_violations": 1
+        "provenance_violations": 1,
+        "required_roots_delivered_count": 0,
+        "required_root_coverage_milli": null
       }
     },
     {
@@ -857,14 +870,15 @@
       ],
       "expected": {
         "disposition": "qualified",
-        "new_independent_roots_milli": 0,
         "unique_new_root_count": 0,
         "duplicate_message_count": 0,
         "retained_message_count": 0,
         "original_tokens": 100,
         "transmitted_tokens": 0,
         "token_savings_milli": 1000,
-        "provenance_violations": 0
+        "provenance_violations": 0,
+        "required_roots_delivered_count": 0,
+        "required_root_coverage_milli": null
       }
     },
     {
@@ -916,14 +930,15 @@
       ],
       "expected": {
         "disposition": "reject",
-        "new_independent_roots_milli": 0,
         "unique_new_root_count": 0,
         "duplicate_message_count": 0,
         "retained_message_count": 0,
         "original_tokens": 100,
         "transmitted_tokens": 0,
         "token_savings_milli": 1000,
-        "provenance_violations": 1
+        "provenance_violations": 1,
+        "required_roots_delivered_count": 0,
+        "required_root_coverage_milli": 0
       }
     },
     {
@@ -1049,14 +1064,15 @@
       ],
       "expected": {
         "disposition": "qualified",
-        "new_independent_roots_milli": 1,
         "unique_new_root_count": 1,
         "duplicate_message_count": 2,
         "retained_message_count": 3,
         "original_tokens": 300,
         "transmitted_tokens": 300,
         "token_savings_milli": 0,
-        "provenance_violations": 0
+        "provenance_violations": 0,
+        "required_roots_delivered_count": 1,
+        "required_root_coverage_milli": 1000
       }
     },
     {
@@ -1108,14 +1124,15 @@
       ],
       "expected": {
         "disposition": "reject",
-        "new_independent_roots_milli": 1,
         "unique_new_root_count": 1,
         "duplicate_message_count": 0,
         "retained_message_count": 1,
         "original_tokens": 100,
         "transmitted_tokens": 35,
         "token_savings_milli": 650,
-        "provenance_violations": 1
+        "provenance_violations": 1,
+        "required_roots_delivered_count": 1,
+        "required_root_coverage_milli": 1000
       }
     },
     {
@@ -1165,14 +1182,15 @@
       ],
       "expected": {
         "disposition": "qualified",
-        "new_independent_roots_milli": 0,
         "unique_new_root_count": 0,
         "duplicate_message_count": 0,
         "retained_message_count": 0,
         "original_tokens": 100,
         "transmitted_tokens": 0,
         "token_savings_milli": 1000,
-        "provenance_violations": 0
+        "provenance_violations": 0,
+        "required_roots_delivered_count": 0,
+        "required_root_coverage_milli": null
       }
     },
     {
@@ -1222,14 +1240,15 @@
       ],
       "expected": {
         "disposition": "reject",
-        "new_independent_roots_milli": 0,
         "unique_new_root_count": 0,
         "duplicate_message_count": 0,
         "retained_message_count": 0,
         "original_tokens": 100,
         "transmitted_tokens": 0,
         "token_savings_milli": 1000,
-        "provenance_violations": 1
+        "provenance_violations": 1,
+        "required_roots_delivered_count": 0,
+        "required_root_coverage_milli": null
       }
     },
     {
@@ -1281,14 +1300,15 @@
       ],
       "expected": {
         "disposition": "reject",
-        "new_independent_roots_milli": 1,
         "unique_new_root_count": 1,
         "duplicate_message_count": 0,
         "retained_message_count": 1,
         "original_tokens": 100,
         "transmitted_tokens": 120,
         "token_savings_milli": -200,
-        "provenance_violations": 1
+        "provenance_violations": 1,
+        "required_roots_delivered_count": 1,
+        "required_root_coverage_milli": 1000
       }
     }
   ]
