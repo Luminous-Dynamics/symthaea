@@ -220,19 +220,34 @@ impl KernelPlan {
             .expect("writing to String cannot fail");
             writeln!(
                 source,
-                "        let left_{offset} = {rust_type}::from_ne_bytes(\n            a.0[byte_index_{offset}..byte_index_{offset} + WORD_BYTES].try_into().expect(\"fixed-width word\"),\n        );"
+                "        let left_{offset} = {rust_type}::from_ne_bytes("
             )
             .expect("writing to String cannot fail");
             writeln!(
                 source,
-                "        let right_{offset} = {rust_type}::from_ne_bytes(\n            b.0[byte_index_{offset}..byte_index_{offset} + WORD_BYTES].try_into().expect(\"fixed-width word\"),\n        );"
+                "            a.0[byte_index_{offset}..byte_index_{offset} + WORD_BYTES]"
+            )
+            .expect("writing to String cannot fail");
+            source.push_str("                .try_into().expect(\"fixed-width word\"),\n");
+            source.push_str("        );\n");
+            writeln!(
+                source,
+                "        let right_{offset} = {rust_type}::from_ne_bytes("
             )
             .expect("writing to String cannot fail");
             writeln!(
                 source,
-                "        accumulators[word_index_{offset} % {accumulators}] += (left_{offset} ^ right_{offset}).count_ones();"
+                "            b.0[byte_index_{offset}..byte_index_{offset} + WORD_BYTES]"
             )
             .expect("writing to String cannot fail");
+            source.push_str("                .try_into().expect(\"fixed-width word\"),\n");
+            source.push_str("        );\n");
+            writeln!(
+                source,
+                "        accumulators[word_index_{offset} % {accumulators}] += (left_{offset} ^ right_{offset})"
+            )
+            .expect("writing to String cannot fail");
+            source.push_str("            .count_ones();\n");
         }
 
         source.push_str("    }\n");
