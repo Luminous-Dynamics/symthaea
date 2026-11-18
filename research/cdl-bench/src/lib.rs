@@ -4,7 +4,10 @@
 //! The adaptive model is reconstructed from decoded symbols; no model state is hidden
 //! in the payload. Every frame includes source and payload CRC-32 checksums.
 
+pub mod bounded_error;
 pub mod causal;
+
+pub use bounded_error::{compress_bounded_i16, decompress_bounded_i16, BoundedError, BoundedPredictor};
 pub mod numeric;
 
 pub use numeric::{compress_i16, decompress_i16, NumericError, NumericTransform};
