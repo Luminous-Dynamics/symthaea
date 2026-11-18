@@ -307,10 +307,14 @@ struct PrioritizedEpisode {
     consolidation_priority_bonus: f64,
 }
 
+/// Version of the provenance-bearing replay envelope.
+pub const PROVENANCED_EPISODE_SCHEMA_VERSION: u16 = 1;
+
 /// Public retrieval envelope that preserves the source and policy-derived replay
 /// metadata without changing the long-standing serialized Episode representation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProvenancedEpisode {
+    pub schema_version: u16,
     pub episode: Episode,
     pub graduation_provenance: Option<GraduationProvenance>,
     pub consolidation_priority_bonus: f64,
@@ -319,6 +323,7 @@ pub struct ProvenancedEpisode {
 impl PrioritizedEpisode {
     fn as_provenanced_episode(&self) -> ProvenancedEpisode {
         ProvenancedEpisode {
+            schema_version: PROVENANCED_EPISODE_SCHEMA_VERSION,
             episode: self.episode.clone(),
             graduation_provenance: self.graduation_provenance.clone(),
             consolidation_priority_bonus: self.consolidation_priority_bonus,
@@ -1911,5 +1916,119 @@ mod tests {
         let result = memory.replay_session(&mut net, 0.01);
         assert!(!result.skipped);
         assert!(result.episodes_replayed > 0);
+    }
+}
+
+
+#[cfg(test)]
+mod provenance_envelope_tests {
+    use super::*;
+
+    fn episode(psi: f64, timestamp: u64) -> Episode {
+        Episode::new(
+            ContinuousHV::random(64, timestamp),
+            ContinuousHV::random(64, timestamp + 1),
+            psi,
+            timestamp,
+        )
+    }
+
+    #[test]
+    fn raw_psi_and_invalid_numeric_values_are_enforced_before_heap_insertion() {
+        let mut memory = EpisodicMemory::new(EpisodicReplayConfig {
+            psi_threshold: 0.5,
+            ..Default::default()
+        });
+
+        assert!(!memory.store_if_significant(episode(f64::NAN, 1)));
+        assert!(!memory.store_if_significant(episode(f64::INFINITY, 2)));
+        assert!(!memory.store_if_significant(episode(-0.01, 3)));
+        assert!(!memory.store_if_significant(episode(1.01, 4)));
+        assert!(memory.is_empty());
+
+        let mut invalid_policy = EpisodicMemory::new(EpisodicReplayConfig {
+            psi_threshold: f64::NAN,
+            ..Default::default()
+        });
+        assert!(!invalid_policy.store_if_significant(episode(0.9, 5)));
+        assert!(invalid_policy.is_empty());
+    }
+
+    #[test]
+    fn provenance_envelope_round_trips_without_changing_episode_layout() {
+        let mut memory = EpisodicMemory::new(EpisodicReplayConfig {
+            psi_threshold: 0.0,
+            ..Default::default()
+        });
+        let provenance = GraduationProvenance {
+            source: MemorySource::ActionFeedback,
+            verification_claimed: true,
+            source_label: Some("action-result:roundtrip".to_owned()),
+        };
+        assert!(memory.store_if_significant_with_provenance(
+            episode(0.7, 11),
+            Some(provenance),
+            0.2,
+        ));
+
+        let records = memory.get_top_episodes_with_provenance(1);
+        assert_eq!(records.len(), 1);
+        let record = &records[0];
+        assert_eq!(record.schema_version, PROVENANCED_EPISODE_SCHEMA_VERSION);
+        assert_eq!(record.episode.psi, 0.7);
+        assert_eq!(
+            record.graduation_provenance.as_ref().unwrap().source,
+            MemorySource::ActionFeedback
+        );
+        assert!(record
+            .graduation_provenance
+            .as_ref()
+            .unwrap()
+            .verification_claimed);
+
+        let encoded = bincode::serialize(record).expect("serialize provenance envelope");
+        let decoded: ProvenancedEpisode =
+            bincode::deserialize(&encoded).expect("deserialize provenance envelope");
+        assert_eq!(decoded.schema_version, PROVENANCED_EPISODE_SCHEMA_VERSION);
+        assert_eq!(decoded.episode.psi, 0.7);
+        assert_eq!(
+            decoded.graduation_provenance.unwrap().source_label.as_deref(),
+            Some("action-result:roundtrip")
+        );
+        assert_eq!(decoded.consolidation_priority_bonus, 0.2);
+    }
+
+    #[test]
+    fn legacy_sampling_api_remains_available_and_envelope_sampler_keeps_lineage() {
+        let mut memory = EpisodicMemory::new(EpisodicReplayConfig {
+            psi_threshold: 0.0,
+            psi_weighted_sampling: false,
+            ..Default::default()
+        });
+        let provenance = GraduationProvenance {
+            source: MemorySource::WebResearch,
+            verification_claimed: false,
+            source_label: Some("research-note".to_owned()),
+        };
+        assert!(memory.store_if_significant_with_provenance(
+            episode(0.6, 21),
+            Some(provenance),
+            0.1,
+        ));
+
+        let legacy = memory.sample_replay_batch(1);
+        assert_eq!(legacy.len(), 1);
+        assert_eq!(legacy[0].psi, 0.6);
+
+        let preserved = memory.sample_replay_batch_with_provenance(1);
+        assert_eq!(preserved.len(), 1);
+        assert_eq!(
+            preserved[0].graduation_provenance.as_ref().unwrap().source,
+            MemorySource::WebResearch
+        );
+
+        let conditioned = memory.sample_replay_batch_conditioned_with_provenance(1, None);
+        assert_eq!(conditioned.len(), 1);
+        assert!(conditioned[0].graduation_provenance.is_some());
     }
 }
