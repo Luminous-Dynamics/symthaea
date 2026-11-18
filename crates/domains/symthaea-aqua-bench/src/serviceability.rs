@@ -318,7 +318,7 @@ pub fn summarize_serviceability_cohort(
     let mut routine_unknown_access_count = 0;
     let mut routine_destructive_access_count = 0;
     let mut qualified_return_count = 0;
-    let mut first_pass_function_success_count = 0;
+    let mut post_repair_function_pass_count = 0;
     let mut technician_times = Vec::with_capacity(observations.len());
     let mut downtime_times = Vec::with_capacity(observations.len());
 
@@ -354,7 +354,7 @@ pub fn summarize_serviceability_cohort(
             qualified_return_count += 1;
         }
         if observation.post_repair_function == PostRepairFunction::Pass {
-            first_pass_function_success_count += 1;
+            post_repair_function_pass_count += 1;
         }
     }
 
@@ -572,7 +572,7 @@ mod tests {
         assert_eq!(summary.routine_job_count, 2);
         assert_eq!(summary.routine_non_destructive_qualified_count, 1);
         assert_eq!(summary.routine_unknown_access_count, 1);
-        assert!((summary.routine_non_destructive_qualified_fraction - 0.5).abs() < 1e-12);
+        assert!((summary.routine_non_destructive_qualified_fraction.expect("routine denominator") - 0.5).abs() < 1e-12);
     }
 
     #[test]
