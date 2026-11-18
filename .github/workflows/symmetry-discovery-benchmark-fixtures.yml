@@ -43,18 +43,26 @@ jobs:
           schema = json.loads((root / "schemas/case_manifest.schema.json").read_text())
           scorecard_schema = json.loads((root / "schemas/run_scorecard.schema.json").read_text())
           proposal_schema = json.loads((root / "schemas/proposal_submission.schema.json").read_text())
+          public_schema = json.loads((root / "schemas/public_inputs.schema.json").read_text())
           manifest = json.loads((root / "fixtures/v0.1/cases.json").read_text())
           proposal_smoke = json.loads((root / "fixtures/v0.1/proposal_oracle_selftest.json").read_text())
           Draft202012Validator.check_schema(schema)
           Draft202012Validator(schema).validate(manifest)
           Draft202012Validator.check_schema(scorecard_schema)
           Draft202012Validator.check_schema(proposal_schema)
+          Draft202012Validator.check_schema(public_schema)
           Draft202012Validator(proposal_schema).validate(proposal_smoke)
+          for split in ("discovery", "calibration", "final_holdout"):
+              public_case_file = root / "fixtures" / "v0.1" / "public_inputs" / f"{split}.json"
+              public_cases = json.loads(public_case_file.read_text())
+              Draft202012Validator(public_schema).validate(public_cases)
           PY
       - name: Validate exact group axioms, point stabilizers and polynomial invariance
         run: python3 -I research/symmetry-discovery-benchmark-001/tools/validate_fixtures.py
       - name: Self-test auditable benchmark scorecard validator
         run: python3 -I research/symmetry-discovery-benchmark-001/tools/validate_scorecard.py --self-test
+      - name: Verify label-free public input exports
+        run: python3 -I research/symmetry-discovery-benchmark-001/tools/export_public_inputs.py --check
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
