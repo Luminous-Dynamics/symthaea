@@ -70,7 +70,8 @@
       "clear_threshold",
       "trigger_persistence_windows",
       "clear_persistence_windows",
-      "required_warning_ns"
+      "required_warning_ns",
+      "risk_model_binding"
     ],
     "policy_config_sha256": "computed from exact policy ID, score scale ID, validation receipt, threshold bit patterns, persistence counts and required warning interval",
     "risk_score_contract": {
@@ -116,10 +117,23 @@
       "interval_coverage_claim": "nominal method metadata only; empirical coverage must be reported on held-out data",
       "evidence_digest": "SHA-256 content identity only; not source/model/calibration authenticity proof",
       "threshold_scale_identity": "risk evidence score_scale_id must exactly match frozen policy score_scale_id",
-      "policy_config_digest_schema": "luminous.plasma-alarm-policy.v0.2"
+      "policy_config_digest_schema": "luminous.plasma-alarm-policy.v0.4",
+      "exact_model_and_calibration_binding_required": true,
+      "model_training_split_calibration_uncertainty_must_match_frozen_policy": true
     },
-    "policy_config_digest_schema": "luminous.plasma-alarm-policy.v0.3",
-    "policy_config_digest_encoding": "length-prefixed UTF-8 fields plus exact IEEE-754 threshold bit patterns; delimiter characters in IDs cannot create ambiguous field boundaries"
+    "policy_config_digest_schema": "luminous.plasma-alarm-policy.v0.4",
+    "policy_config_digest_encoding": "length-prefixed UTF-8 fields plus exact IEEE-754 threshold bit patterns; delimiter characters in IDs cannot create ambiguous field boundaries; includes exact model artifact, training split, calibration identity/receipt, uncertainty method and nominal coverage",
+    "risk_model_binding_fields": [
+      "model_id",
+      "model_revision",
+      "model_artifact_sha256",
+      "training_split_sha256",
+      "calibration_id",
+      "calibration_revision",
+      "calibration_receipt_sha256",
+      "uncertainty_method_id",
+      "nominal_coverage"
+    ]
   },
   "offline_scoring_contract": {
     "event_reference_entered_after_trace_generation": true,
