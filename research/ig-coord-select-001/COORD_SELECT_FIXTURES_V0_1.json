@@ -1,0 +1,741 @@
+{
+  "schema_version": 1,
+  "protocol_id": "IG-COORD-SELECT-001",
+  "fixtures": [
+    {
+      "id": "CS-001-targeted-hidden-info",
+      "input": {
+        "task_id": "CS-001-targeted-hidden-info",
+        "task_decomposability": "medium",
+        "sequential_coupling": "low",
+        "latent_information_asymmetry": "high",
+        "distribution_shift": false,
+        "single_agent": {
+          "architecture_id": "single",
+          "quality_mean_milli": 650,
+          "quality_lower_milli": 620,
+          "quality_upper_milli": 680,
+          "token_cost": 4000,
+          "latency_ms": 2500,
+          "risk_milli": 30,
+          "calibration_blocks": 20,
+          "out_of_distribution": false,
+          "available": true
+        },
+        "candidate_architectures": [
+          {
+            "architecture_id": "targeted_discovery",
+            "quality_mean_milli": 800,
+            "quality_lower_milli": 770,
+            "quality_upper_milli": 830,
+            "token_cost": 12000,
+            "latency_ms": 9000,
+            "risk_milli": 70,
+            "calibration_blocks": 20,
+            "out_of_distribution": false,
+            "available": true
+          }
+        ],
+        "policy": {
+          "min_calibration_blocks": 8,
+          "max_quality_interval_width_milli": 180,
+          "min_robust_quality_gain_milli": 25,
+          "min_robust_net_utility_gain_milli": 10,
+          "token_penalty_milli_per_1000": 2,
+          "latency_penalty_milli_per_second": 1,
+          "risk_penalty_milli_per_1000": 10
+        }
+      },
+      "evaluation_only": {
+        "oracle_architecture_id": "targeted_discovery",
+        "realized_quality_milli_by_architecture": {
+          "single": 650,
+          "targeted_discovery": 810
+        }
+      },
+      "expected": {
+        "decision": "SELECT",
+        "selected_architecture_id": "targeted_discovery",
+        "reason": "robust_positive_net_gain",
+        "robust_net_gain_milli": 67
+      }
+    },
+    {
+      "id": "CS-002-capability-saturation-single",
+      "input": {
+        "task_id": "CS-002-capability-saturation-single",
+        "task_decomposability": "low",
+        "sequential_coupling": "low",
+        "latent_information_asymmetry": "low",
+        "distribution_shift": false,
+        "single_agent": {
+          "architecture_id": "single",
+          "quality_mean_milli": 940,
+          "quality_lower_milli": 920,
+          "quality_upper_milli": 960,
+          "token_cost": 3000,
+          "latency_ms": 2000,
+          "risk_milli": 20,
+          "calibration_blocks": 20,
+          "out_of_distribution": false,
+          "available": true
+        },
+        "candidate_architectures": [
+          {
+            "architecture_id": "structured_meeting",
+            "quality_mean_milli": 950,
+            "quality_lower_milli": 925,
+            "quality_upper_milli": 970,
+            "token_cost": 18000,
+            "latency_ms": 14000,
+            "risk_milli": 100,
+            "calibration_blocks": 20,
+            "out_of_distribution": false,
+            "available": true
+          },
+          {
+            "architecture_id": "parallel_sampling",
+            "quality_mean_milli": 945,
+            "quality_lower_milli": 925,
+            "quality_upper_milli": 965,
+            "token_cost": 12000,
+            "latency_ms": 9000,
+            "risk_milli": 80,
+            "calibration_blocks": 20,
+            "out_of_distribution": false,
+            "available": true
+          }
+        ],
+        "policy": {
+          "min_calibration_blocks": 8,
+          "max_quality_interval_width_milli": 180,
+          "min_robust_quality_gain_milli": 25,
+          "min_robust_net_utility_gain_milli": 10,
+          "token_penalty_milli_per_1000": 2,
+          "latency_penalty_milli_per_second": 1,
+          "risk_penalty_milli_per_1000": 10
+        }
+      },
+      "evaluation_only": {
+        "oracle_architecture_id": "single",
+        "realized_quality_milli_by_architecture": {
+          "single": 940,
+          "structured_meeting": 935,
+          "parallel_sampling": 938
+        }
+      },
+      "expected": {
+        "decision": "SINGLE",
+        "selected_architecture_id": "single",
+        "reason": "no_robust_positive_net_gain",
+        "robust_net_gain_milli": null
+      }
+    },
+    {
+      "id": "CS-003-decomposable-parallel",
+      "input": {
+        "task_id": "CS-003-decomposable-parallel",
+        "task_decomposability": "high",
+        "sequential_coupling": "low",
+        "latent_information_asymmetry": "low",
+        "distribution_shift": false,
+        "single_agent": {
+          "architecture_id": "single",
+          "quality_mean_milli": 540,
+          "quality_lower_milli": 500,
+          "quality_upper_milli": 580,
+          "token_cost": 4000,
+          "latency_ms": 3500,
+          "risk_milli": 60,
+          "calibration_blocks": 20,
+          "out_of_distribution": false,
+          "available": true
+        },
+        "candidate_architectures": [
+          {
+            "architecture_id": "parallel_independent",
+            "quality_mean_milli": 760,
+            "quality_lower_milli": 720,
+            "quality_upper_milli": 800,
+            "token_cost": 14000,
+            "latency_ms": 7000,
+            "risk_milli": 90,
+            "calibration_blocks": 20,
+            "out_of_distribution": false,
+            "available": true
+          }
+        ],
+        "policy": {
+          "min_calibration_blocks": 8,
+          "max_quality_interval_width_milli": 180,
+          "min_robust_quality_gain_milli": 25,
+          "min_robust_net_utility_gain_milli": 10,
+          "token_penalty_milli_per_1000": 2,
+          "latency_penalty_milli_per_second": 1,
+          "risk_penalty_milli_per_1000": 10
+        }
+      },
+      "evaluation_only": {
+        "oracle_architecture_id": "parallel_independent",
+        "realized_quality_milli_by_architecture": {
+          "single": 535,
+          "parallel_independent": 770
+        }
+      },
+      "expected": {
+        "decision": "SELECT",
+        "selected_architecture_id": "parallel_independent",
+        "reason": "robust_positive_net_gain",
+        "robust_net_gain_milli": 116
+      }
+    },
+    {
+      "id": "CS-004-sequential-coupling-single",
+      "input": {
+        "task_id": "CS-004-sequential-coupling-single",
+        "task_decomposability": "low",
+        "sequential_coupling": "high",
+        "latent_information_asymmetry": "low",
+        "distribution_shift": false,
+        "single_agent": {
+          "architecture_id": "single",
+          "quality_mean_milli": 570,
+          "quality_lower_milli": 540,
+          "quality_upper_milli": 600,
+          "token_cost": 5000,
+          "latency_ms": 4000,
+          "risk_milli": 40,
+          "calibration_blocks": 20,
+          "out_of_distribution": false,
+          "available": true
+        },
+        "candidate_architectures": [
+          {
+            "architecture_id": "parallel_independent",
+            "quality_mean_milli": 590,
+            "quality_lower_milli": 520,
+            "quality_upper_milli": 640,
+            "token_cost": 16000,
+            "latency_ms": 12000,
+            "risk_milli": 180,
+            "calibration_blocks": 20,
+            "out_of_distribution": false,
+            "available": true
+          },
+          {
+            "architecture_id": "structured_meeting",
+            "quality_mean_milli": 560,
+            "quality_lower_milli": 530,
+            "quality_upper_milli": 610,
+            "token_cost": 14000,
+            "latency_ms": 15000,
+            "risk_milli": 120,
+            "calibration_blocks": 20,
+            "out_of_distribution": false,
+            "available": true
+          }
+        ],
+        "policy": {
+          "min_calibration_blocks": 8,
+          "max_quality_interval_width_milli": 180,
+          "min_robust_quality_gain_milli": 25,
+          "min_robust_net_utility_gain_milli": 10,
+          "token_penalty_milli_per_1000": 2,
+          "latency_penalty_milli_per_second": 1,
+          "risk_penalty_milli_per_1000": 10
+        }
+      },
+      "evaluation_only": {
+        "oracle_architecture_id": "single",
+        "realized_quality_milli_by_architecture": {
+          "single": 580,
+          "parallel_independent": 540,
+          "structured_meeting": 550
+        }
+      },
+      "expected": {
+        "decision": "SINGLE",
+        "selected_architecture_id": "single",
+        "reason": "no_robust_positive_net_gain",
+        "robust_net_gain_milli": null
+      }
+    },
+    {
+      "id": "CS-005-uncertain-promising-team",
+      "input": {
+        "task_id": "CS-005-uncertain-promising-team",
+        "task_decomposability": "medium",
+        "sequential_coupling": "medium",
+        "latent_information_asymmetry": "medium",
+        "distribution_shift": false,
+        "single_agent": {
+          "architecture_id": "single",
+          "quality_mean_milli": 620,
+          "quality_lower_milli": 590,
+          "quality_upper_milli": 650,
+          "token_cost": 4000,
+          "latency_ms": 3000,
+          "risk_milli": 40,
+          "calibration_blocks": 20,
+          "out_of_distribution": false,
+          "available": true
+        },
+        "candidate_architectures": [
+          {
+            "architecture_id": "meta_moderator",
+            "quality_mean_milli": 730,
+            "quality_lower_milli": 620,
+            "quality_upper_milli": 850,
+            "token_cost": 11000,
+            "latency_ms": 9000,
+            "risk_milli": 100,
+            "calibration_blocks": 3,
+            "out_of_distribution": false,
+            "available": true
+          }
+        ],
+        "policy": {
+          "min_calibration_blocks": 8,
+          "max_quality_interval_width_milli": 180,
+          "min_robust_quality_gain_milli": 25,
+          "min_robust_net_utility_gain_milli": 10,
+          "token_penalty_milli_per_1000": 2,
+          "latency_penalty_milli_per_second": 1,
+          "risk_penalty_milli_per_1000": 10
+        }
+      },
+      "evaluation_only": {
+        "oracle_architecture_id": "meta_moderator",
+        "realized_quality_milli_by_architecture": {
+          "single": 610,
+          "meta_moderator": 760
+        }
+      },
+      "expected": {
+        "decision": "CALIBRATE",
+        "selected_architecture_id": null,
+        "reason": "promising_architecture_needs_calibration",
+        "robust_net_gain_milli": null
+      }
+    },
+    {
+      "id": "CS-006-out-of-distribution-task",
+      "input": {
+        "task_id": "CS-006-out-of-distribution-task",
+        "task_decomposability": "high",
+        "sequential_coupling": "low",
+        "latent_information_asymmetry": "medium",
+        "distribution_shift": true,
+        "single_agent": {
+          "architecture_id": "single",
+          "quality_mean_milli": 650,
+          "quality_lower_milli": 610,
+          "quality_upper_milli": 690,
+          "token_cost": 4000,
+          "latency_ms": 3000,
+          "risk_milli": 30,
+          "calibration_blocks": 20,
+          "out_of_distribution": false,
+          "available": true
+        },
+        "candidate_architectures": [
+          {
+            "architecture_id": "agenda_flow",
+            "quality_mean_milli": 790,
+            "quality_lower_milli": 750,
+            "quality_upper_milli": 830,
+            "token_cost": 18000,
+            "latency_ms": 10000,
+            "risk_milli": 100,
+            "calibration_blocks": 20,
+            "out_of_distribution": false,
+            "available": true
+          }
+        ],
+        "policy": {
+          "min_calibration_blocks": 8,
+          "max_quality_interval_width_milli": 180,
+          "min_robust_quality_gain_milli": 25,
+          "min_robust_net_utility_gain_milli": 10,
+          "token_penalty_milli_per_1000": 2,
+          "latency_penalty_milli_per_second": 1,
+          "risk_penalty_milli_per_1000": 10
+        }
+      },
+      "evaluation_only": {
+        "oracle_architecture_id": "agenda_flow",
+        "realized_quality_milli_by_architecture": {
+          "single": 640,
+          "agenda_flow": 800
+        }
+      },
+      "expected": {
+        "decision": "CALIBRATE",
+        "selected_architecture_id": null,
+        "reason": "task_distribution_shift",
+        "robust_net_gain_milli": null
+      }
+    },
+    {
+      "id": "CS-007-team-gain-eaten-by-cost",
+      "input": {
+        "task_id": "CS-007-team-gain-eaten-by-cost",
+        "task_decomposability": "high",
+        "sequential_coupling": "low",
+        "latent_information_asymmetry": "low",
+        "distribution_shift": false,
+        "single_agent": {
+          "architecture_id": "single",
+          "quality_mean_milli": 650,
+          "quality_lower_milli": 620,
+          "quality_upper_milli": 680,
+          "token_cost": 3000,
+          "latency_ms": 2500,
+          "risk_milli": 20,
+          "calibration_blocks": 20,
+          "out_of_distribution": false,
+          "available": true
+        },
+        "candidate_architectures": [
+          {
+            "architecture_id": "parallel_independent",
+            "quality_mean_milli": 760,
+            "quality_lower_milli": 735,
+            "quality_upper_milli": 785,
+            "token_cost": 65000,
+            "latency_ms": 45000,
+            "risk_milli": 100,
+            "calibration_blocks": 20,
+            "out_of_distribution": false,
+            "available": true
+          }
+        ],
+        "policy": {
+          "min_calibration_blocks": 8,
+          "max_quality_interval_width_milli": 180,
+          "min_robust_quality_gain_milli": 25,
+          "min_robust_net_utility_gain_milli": 10,
+          "token_penalty_milli_per_1000": 2,
+          "latency_penalty_milli_per_second": 1,
+          "risk_penalty_milli_per_1000": 10
+        }
+      },
+      "evaluation_only": {
+        "oracle_architecture_id": "single",
+        "realized_quality_milli_by_architecture": {
+          "single": 655,
+          "parallel_independent": 660
+        }
+      },
+      "expected": {
+        "decision": "SINGLE",
+        "selected_architecture_id": "single",
+        "reason": "no_robust_positive_net_gain",
+        "robust_net_gain_milli": null
+      }
+    },
+    {
+      "id": "CS-008-central-verification",
+      "input": {
+        "task_id": "CS-008-central-verification",
+        "task_decomposability": "medium",
+        "sequential_coupling": "high",
+        "latent_information_asymmetry": "medium",
+        "distribution_shift": false,
+        "single_agent": {
+          "architecture_id": "single",
+          "quality_mean_milli": 610,
+          "quality_lower_milli": 580,
+          "quality_upper_milli": 640,
+          "token_cost": 5000,
+          "latency_ms": 4000,
+          "risk_milli": 280,
+          "calibration_blocks": 20,
+          "out_of_distribution": false,
+          "available": true
+        },
+        "candidate_architectures": [
+          {
+            "architecture_id": "centralized_verification",
+            "quality_mean_milli": 740,
+            "quality_lower_milli": 710,
+            "quality_upper_milli": 770,
+            "token_cost": 15000,
+            "latency_ms": 11000,
+            "risk_milli": 60,
+            "calibration_blocks": 20,
+            "out_of_distribution": false,
+            "available": true
+          }
+        ],
+        "policy": {
+          "min_calibration_blocks": 8,
+          "max_quality_interval_width_milli": 180,
+          "min_robust_quality_gain_milli": 25,
+          "min_robust_net_utility_gain_milli": 10,
+          "token_penalty_milli_per_1000": 2,
+          "latency_penalty_milli_per_second": 1,
+          "risk_penalty_milli_per_1000": 10
+        }
+      },
+      "evaluation_only": {
+        "oracle_architecture_id": "centralized_verification",
+        "realized_quality_milli_by_architecture": {
+          "single": 600,
+          "centralized_verification": 755
+        }
+      },
+      "expected": {
+        "decision": "SELECT",
+        "selected_architecture_id": "centralized_verification",
+        "reason": "robust_positive_net_gain",
+        "robust_net_gain_milli": 45
+      }
+    },
+    {
+      "id": "CS-009-insufficient-single-baseline",
+      "input": {
+        "task_id": "CS-009-insufficient-single-baseline",
+        "task_decomposability": "high",
+        "sequential_coupling": "low",
+        "latent_information_asymmetry": "high",
+        "distribution_shift": false,
+        "single_agent": {
+          "architecture_id": "single",
+          "quality_mean_milli": 600,
+          "quality_lower_milli": 500,
+          "quality_upper_milli": 700,
+          "token_cost": 4000,
+          "latency_ms": 3000,
+          "risk_milli": 50,
+          "calibration_blocks": 2,
+          "out_of_distribution": false,
+          "available": true
+        },
+        "candidate_architectures": [
+          {
+            "architecture_id": "targeted_discovery",
+            "quality_mean_milli": 820,
+            "quality_lower_milli": 780,
+            "quality_upper_milli": 860,
+            "token_cost": 12000,
+            "latency_ms": 9000,
+            "risk_milli": 70,
+            "calibration_blocks": 20,
+            "out_of_distribution": false,
+            "available": true
+          }
+        ],
+        "policy": {
+          "min_calibration_blocks": 8,
+          "max_quality_interval_width_milli": 180,
+          "min_robust_quality_gain_milli": 25,
+          "min_robust_net_utility_gain_milli": 10,
+          "token_penalty_milli_per_1000": 2,
+          "latency_penalty_milli_per_second": 1,
+          "risk_penalty_milli_per_1000": 10
+        }
+      },
+      "evaluation_only": {
+        "oracle_architecture_id": "targeted_discovery",
+        "realized_quality_milli_by_architecture": {
+          "single": 590,
+          "targeted_discovery": 830
+        }
+      },
+      "expected": {
+        "decision": "CALIBRATE",
+        "selected_architecture_id": null,
+        "reason": "single_baseline_not_calibrated",
+        "robust_net_gain_milli": null
+      }
+    },
+    {
+      "id": "CS-010-no-available-team",
+      "input": {
+        "task_id": "CS-010-no-available-team",
+        "task_decomposability": "medium",
+        "sequential_coupling": "low",
+        "latent_information_asymmetry": "medium",
+        "distribution_shift": false,
+        "single_agent": {
+          "architecture_id": "single",
+          "quality_mean_milli": 700,
+          "quality_lower_milli": 670,
+          "quality_upper_milli": 730,
+          "token_cost": 4000,
+          "latency_ms": 3000,
+          "risk_milli": 30,
+          "calibration_blocks": 20,
+          "out_of_distribution": false,
+          "available": true
+        },
+        "candidate_architectures": [
+          {
+            "architecture_id": "agenda_flow",
+            "quality_mean_milli": 820,
+            "quality_lower_milli": 790,
+            "quality_upper_milli": 850,
+            "token_cost": 15000,
+            "latency_ms": 9000,
+            "risk_milli": 70,
+            "calibration_blocks": 20,
+            "out_of_distribution": false,
+            "available": false
+          }
+        ],
+        "policy": {
+          "min_calibration_blocks": 8,
+          "max_quality_interval_width_milli": 180,
+          "min_robust_quality_gain_milli": 25,
+          "min_robust_net_utility_gain_milli": 10,
+          "token_penalty_milli_per_1000": 2,
+          "latency_penalty_milli_per_second": 1,
+          "risk_penalty_milli_per_1000": 10
+        }
+      },
+      "evaluation_only": {
+        "oracle_architecture_id": "single",
+        "realized_quality_milli_by_architecture": {
+          "single": 710,
+          "agenda_flow": 800
+        }
+      },
+      "expected": {
+        "decision": "SINGLE",
+        "selected_architecture_id": "single",
+        "reason": "no_robust_positive_net_gain",
+        "robust_net_gain_milli": null
+      }
+    },
+    {
+      "id": "CS-011-uncertain-low-potential-skips-calibration",
+      "input": {
+        "task_id": "CS-011-uncertain-low-potential-skips-calibration",
+        "task_decomposability": "low",
+        "sequential_coupling": "high",
+        "latent_information_asymmetry": "low",
+        "distribution_shift": false,
+        "single_agent": {
+          "architecture_id": "single",
+          "quality_mean_milli": 750,
+          "quality_lower_milli": 720,
+          "quality_upper_milli": 780,
+          "token_cost": 4000,
+          "latency_ms": 3000,
+          "risk_milli": 40,
+          "calibration_blocks": 20,
+          "out_of_distribution": false,
+          "available": true
+        },
+        "candidate_architectures": [
+          {
+            "architecture_id": "parallel_independent",
+            "quality_mean_milli": 710,
+            "quality_lower_milli": 680,
+            "quality_upper_milli": 730,
+            "token_cost": 14000,
+            "latency_ms": 14000,
+            "risk_milli": 170,
+            "calibration_blocks": 2,
+            "out_of_distribution": false,
+            "available": true
+          }
+        ],
+        "policy": {
+          "min_calibration_blocks": 8,
+          "max_quality_interval_width_milli": 180,
+          "min_robust_quality_gain_milli": 25,
+          "min_robust_net_utility_gain_milli": 10,
+          "token_penalty_milli_per_1000": 2,
+          "latency_penalty_milli_per_second": 1,
+          "risk_penalty_milli_per_1000": 10
+        }
+      },
+      "evaluation_only": {
+        "oracle_architecture_id": "single",
+        "realized_quality_milli_by_architecture": {
+          "single": 755,
+          "parallel_independent": 730
+        }
+      },
+      "expected": {
+        "decision": "SINGLE",
+        "selected_architecture_id": "single",
+        "reason": "no_robust_positive_net_gain",
+        "robust_net_gain_milli": null
+      }
+    },
+    {
+      "id": "CS-012-deterministic-tie-break",
+      "input": {
+        "task_id": "CS-012-deterministic-tie-break",
+        "task_decomposability": "high",
+        "sequential_coupling": "low",
+        "latent_information_asymmetry": "medium",
+        "distribution_shift": false,
+        "single_agent": {
+          "architecture_id": "single",
+          "quality_mean_milli": 500,
+          "quality_lower_milli": 470,
+          "quality_upper_milli": 530,
+          "token_cost": 4000,
+          "latency_ms": 3000,
+          "risk_milli": 30,
+          "calibration_blocks": 20,
+          "out_of_distribution": false,
+          "available": true
+        },
+        "candidate_architectures": [
+          {
+            "architecture_id": "alpha_team",
+            "quality_mean_milli": 760,
+            "quality_lower_milli": 730,
+            "quality_upper_milli": 790,
+            "token_cost": 10000,
+            "latency_ms": 8000,
+            "risk_milli": 50,
+            "calibration_blocks": 20,
+            "out_of_distribution": false,
+            "available": true
+          },
+          {
+            "architecture_id": "beta_team",
+            "quality_mean_milli": 760,
+            "quality_lower_milli": 730,
+            "quality_upper_milli": 790,
+            "token_cost": 10000,
+            "latency_ms": 8000,
+            "risk_milli": 50,
+            "calibration_blocks": 20,
+            "out_of_distribution": false,
+            "available": true
+          }
+        ],
+        "policy": {
+          "min_calibration_blocks": 8,
+          "max_quality_interval_width_milli": 180,
+          "min_robust_quality_gain_milli": 25,
+          "min_robust_net_utility_gain_milli": 10,
+          "token_penalty_milli_per_1000": 2,
+          "latency_penalty_milli_per_second": 1,
+          "risk_penalty_milli_per_1000": 10
+        }
+      },
+      "evaluation_only": {
+        "oracle_architecture_id": "alpha_team",
+        "realized_quality_milli_by_architecture": {
+          "single": 500,
+          "alpha_team": 760,
+          "beta_team": 760
+        }
+      },
+      "expected": {
+        "decision": "SELECT",
+        "selected_architecture_id": "alpha_team",
+        "reason": "robust_positive_net_gain",
+        "robust_net_gain_milli": 183
+      }
+    }
+  ]
+}
