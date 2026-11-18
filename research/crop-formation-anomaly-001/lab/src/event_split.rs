@@ -171,19 +171,6 @@ pub fn grouped_event_kfold(
             .filter(|index| !validation_set.contains(index))
             .collect();
 
-        let train_group_count = groups_for_fold
-            .len()
-            .checked_sub(groups_for_fold.len())
-            .map_or_else(
-                || {
-                    let validation_ids: HashSet<&str> = groups_for_fold
-                        .iter()
-                        .map(|(id, _)| id.as_str())
-                        .collect();
-                    groups_for_fold.len().saturating_sub(validation_ids.len())
-                },
-                |_| 0,
-            );
         let validation_group_count = groups_for_fold.len();
         let all_group_count = samples
             .iter()
@@ -250,11 +237,22 @@ pub fn validate_event_fold_plan(
         return Err(EventSplitError::InvalidFoldCount);
     }
 
+    let expected_group_count: HashSet<&str> = samples
+        .iter()
+        .map(|sample| sample.leakage_group_id.as_str())
+        .collect();
+    if plan.leakage_group_count != expected_group_count.len() {
+        return Err(EventSplitError::InvalidFoldCount);
+    }
+
     let mut validation_counts = vec![0_usize; samples.len()];
     let mut group_fold: HashMap<&str, usize> = HashMap::new();
 
-    for fold in &plan.folds {
+    for (expected_fold_index, fold) in plan.folds.iter().enumerate() {
         let fold_index = fold.fold_index;
+        if fold_index != expected_fold_index {
+            return Err(EventSplitError::InvalidFoldCount);
+        }
         if fold.train_sample_indices.is_empty() || fold.validation_sample_indices.is_empty() {
             return Err(EventSplitError::EmptyFold { fold_index });
         }
