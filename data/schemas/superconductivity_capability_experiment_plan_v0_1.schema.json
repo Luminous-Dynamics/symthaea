@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_capability_experiment_plan_v0_1.schema.json",
+  "title": "Superconductivity Capability-Gated Experiment Planning Instance",
+  "description": "Synthetic action graph for cost-constrained planning over measurement and enabling-capability actions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "instance_id",
+    "fixture_only",
+    "parameter_names",
+    "prior_precision",
+    "target_direction",
+    "initial_capabilities",
+    "budget_units",
+    "actions",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SC-CAPABILITY-PLAN-0.1"
+    },
+    "instance_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_only": {
+      "type": "boolean"
+    },
+    "parameter_names": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "prior_precision": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "type": "number"
+        }
+      }
+    },
+    "target_direction": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "number"
+      }
+    },
+    "initial_capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "budget_units": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action_id",
+          "action_type",
+          "label",
+          "cost_units",
+          "requires_capabilities",
+          "provides_capabilities",
+          "information_matrix",
+          "eligible",
+          "exclusion_reason"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action_type": {
+            "enum": [
+              "capability",
+              "measurement",
+              "replication",
+              "analysis"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cost_units": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "requires_capabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "provides_capabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "information_matrix": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "exclusion_reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "Synthetic capability-gated planning benchmark only; no physical experiment is authorized or performed and no material property is established."
+    }
+  }
+}
