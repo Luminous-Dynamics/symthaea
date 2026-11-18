@@ -2,7 +2,9 @@ name: Symmetry discovery benchmark fixture validation
 
 on:
   push:
-    branches: [research/symm-qualification-benchmark-v0-1]
+    branches:
+      - research/symm-qualification-benchmark-v0-1
+      - research/symm-noisy-robustness-v0-1
     paths:
       - "research/symmetry-discovery-benchmark-001/**"
       - ".github/workflows/symmetry-discovery-benchmark-fixtures.yml"
