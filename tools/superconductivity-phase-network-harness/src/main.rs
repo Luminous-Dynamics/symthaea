@@ -567,4 +567,51 @@ mod tests {
         fixture["fixture_only"] = json!(false);
         assert!(audit_mutated(fixture).is_err());
     }
+
+    #[test]
+    fn periodic_image_shift_recovers_short_boundary_bond() {
+        let (_, fixture) = inputs();
+        let edge = &fixture["graph"]["edges"][3];
+        assert_eq!(edge["physical_edge_length"], 1.0);
+        assert_eq!(edge["periodic_image_shift"], json!([0, 1]));
+        assert!(audit_mutated(fixture).is_ok());
+    }
+
+    #[test]
+    fn incorrect_periodic_image_shift_fails_closed() {
+        let (_, mut fixture) = inputs();
+        let edge = fixture["graph"]["edges"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|edge| edge["edge_id"] == "e03r")
+            .unwrap();
+        edge["periodic_image_shift"] = json!([0, 0]);
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn physical_edge_length_must_match_image_aware_geometry() {
+        let (_, mut fixture) = inputs();
+        fixture["graph"]["edges"][0]["physical_edge_length"] = json!(2.0);
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn abstract_graph_must_not_claim_physical_image_shifts() {
+        let (_, mut fixture) = inputs();
+        fixture["graph"]["embedding"] = json!("abstract_graph");
+        for node in fixture["graph"]["nodes"].as_array_mut().unwrap() {
+            node.as_object_mut().unwrap().remove("position");
+        }
+        for edge in fixture["graph"]["edges"].as_array_mut().unwrap() {
+            edge.as_object_mut().unwrap().remove("physical_edge_length");
+            edge.as_object_mut().unwrap().remove("periodic_image_shift");
+        }
+        fixture["boundary_conditions"]
+            .as_object_mut()
+            .unwrap()
+            .remove("box_lengths");
+        assert!(audit_mutated(fixture).is_ok());
+    }
 }
