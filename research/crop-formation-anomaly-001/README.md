@@ -138,7 +138,7 @@ The public sources located so far do not establish a recognized, community-wide 
 - **Mycelix/evidence layer:** source assertions, immutable evidence IDs, custody/transfer events, signatures and reproducible receipts. Provenance does not establish truth.
 - **Sol-Atlas / geospatial tools:** map alignment, field context, remote-sensing provenance and rights-aware imagery handling where appropriate.
 
-Reuse the existing Symthaea falsification/power reference and open-world work rather than implementing a duplicate statistical framework. The current research branch begins with specifications only; it does not imply that any runtime component exists.
+Reuse the existing Symthaea falsification/power reference and open-world work rather than implementing a duplicate statistical framework. The branch now includes a small dependency-free Rust reference crate for calibrated point-set geometry, explicit binary-grid transforms, raw-bit decoder attempts, and simple statistical helpers. It is not a production image-analysis pipeline and has not yet been compiled or executed.
 
 ## Work packages
 
