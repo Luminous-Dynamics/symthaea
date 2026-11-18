@@ -23,3 +23,15 @@ This parser is only the first bounded reader. General/specific model JSON, objec
 ## Upstream source and license
 
 This parser is authored for the Symthaea audit and is not copied from AI-Newton. The upstream artifact inventory and MIT license identity are pinned in ../manifest.v0.json.
+
+
+## Pinned upstream syntax preflight
+
+The pinned upstream file `data/test_cases/example_1/1/1_knowledge.txt` (Git blob SHA `b8e90a8fce1ee5af37f09f9d4f2c6d17e6086dc5`, 137,926 bytes) was inspected in full with an independent source-structure preflight:
+
+- 5,102 total lines; 152 records in the [Knowledge] section.
+- 9 ordinary symbols, 83 C_* concept entries, 60 R_* native-rule entries.
+- Native rule suffixes: 36 "is conserved", 24 "is zero".
+- 0 malformed records and 0 duplicate identifiers in this file.
+
+This checks that the reader's bounded syntax model matches this pinned file. It does not verify the mathematical correctness of the expressions or native rule labels. The Rust tests have not yet been executed locally; the PR workflow is the exact-head implementation gate.
