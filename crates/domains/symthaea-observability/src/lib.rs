@@ -20,11 +20,18 @@ use std::time::SystemTime;
 
 pub mod causal_observer;
 pub mod counterfactual_reasoning;
+pub mod decision_diagnosability;
 
 pub use causal_observer::CausalTraceObserver;
 pub use counterfactual_reasoning::{
     CausalLink, CausalNode, CounterfactualConfig, CounterfactualEngine, CounterfactualResult,
     CounterfactualUncertainty,
+};
+
+pub use decision_diagnosability::{
+    CommonModeCutSet, CrossDecisionPairReport, DecisionWorld, DiagnosabilityError,
+    DiagnosabilityModel, DiagnosabilityResult, DiagnosticSensor, SensorCutSet,
+    SensorObservation, SensorSet, WorldSensorObservation, MAX_EXACT_SENSOR_COUNT,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
