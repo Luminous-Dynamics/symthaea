@@ -15,9 +15,9 @@ The v1 pilot searches a bounded, auditable implementation grammar over the exist
 - 128-bit XOR + popcount;
 - the current native Symthaea SIMD implementation.
 
-This is the first parameterized search surface, not an exhaustive implementation grammar and not proof of autonomous algorithm invention. The width/reduction variants are explicit implementation hypotheses; the discovery system must still show that it selects useful candidates under independent measurements.
+This is the first parameterized search surface, not an exhaustive implementation grammar and not proof of autonomous algorithm invention. The width/reduction variants are explicit implementation hypotheses; the discovery system must still show that it selects useful candidates under independent measurements. The discovery-run generator identity is derived from the ordered candidate set, so adding, removing or renaming a candidate changes the run identity.
 
-Before a candidate is benchmarked, it must match an intentionally simple bit-by-bit oracle on eight deterministic edge cases (including single-bit, high-bit, word-boundary and alternating-complement cases) and 128 seeded random pairs in both operand orders. Correctness evidence is opaque and self-validating.
+Before a candidate is benchmarked, it must match an intentionally simple bit-by-bit oracle on eight deterministic edge cases (including single-bit, high-bit, word-boundary and alternating-complement cases) and 128 seeded random pairs in both operand orders: 264 checked pairs per candidate. Correctness evidence is opaque and self-validating.
 
 Criterion compares every candidate across four deterministic input distributions:
 
