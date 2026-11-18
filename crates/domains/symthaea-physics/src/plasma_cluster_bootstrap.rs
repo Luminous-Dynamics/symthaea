@@ -118,6 +118,95 @@ fn sample_bounded(state: &mut u64, upper_exclusive: u64) -> u64 {
     }
 }
 
+/// Paired confidence interval for a metric difference between two models.
+///
+/// The direction is `model_b_minus_model_a_delta`. Both model metrics are
+/// evaluated on the exact same sampled shot clusters for every replicate.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PairedMetricBootstrapInterval {
+    pub model_a_metric: f64,
+    pub model_b_metric: f64,
+    pub model_b_minus_model_a_delta: f64,
+    pub delta_lower_95: f64,
+    pub delta_upper_95: f64,
+    pub confidence_level: f64,
+    pub requested_replicates: usize,
+    pub valid_replicates: usize,
+    pub plan_sha256: String,
+    pub rng_algorithm: String,
+}
+
+/// Computes a paired 95% percentile bootstrap interval for the difference
+/// between two model metrics. The evaluator receives shot indices with
+/// replacement; it must expand each selected index to all of that shot's
+/// windows, preserving repeated cluster multiplicity.
+///
+/// The same resampled index vector is passed to both models inside one
+/// evaluator invocation. Undefined or non-finite metrics fail closed rather
+/// than being silently dropped from the interval.
+pub fn paired_shot_cluster_bootstrap<F, E>(
+    plan: &ShotClusterBootstrapPlan,
+    shot_ids: &[String],
+    evaluate_pair: F,
+) -> Result<PairedMetricBootstrapInterval, ShotClusterBootstrapError>
+where
+    F: Fn(&[usize]) -> Result<(f64, f64), E>,
+    E: std::fmt::Display,
+{
+    verify_shot_cluster_bootstrap_plan(plan, &plan.body.dataset_revision_id, shot_ids)?;
+
+    let full_cohort = (0..shot_ids.len()).collect::<Vec<_>>();
+    let (model_a_metric, model_b_metric) = evaluate_pair(&full_cohort).map_err(|error| {
+        bootstrap_error(format!("full-cohort paired metric evaluation failed: {error}"))
+    })?;
+    if !model_a_metric.is_finite() || !model_b_metric.is_finite() {
+        return Err(bootstrap_error(
+            "full-cohort paired metrics must be finite",
+        ));
+    }
+
+    let mut deltas = Vec::with_capacity(plan.body.replicate_count);
+    for replicate_index in 0..plan.body.replicate_count {
+        let indices = shot_cluster_bootstrap_indices(plan, shot_ids, replicate_index)?;
+        let (metric_a, metric_b) = evaluate_pair(&indices).map_err(|error| {
+            bootstrap_error(format!(
+                "paired metric evaluation failed for replicate {replicate_index}: {error}"
+            ))
+        })?;
+        if !metric_a.is_finite() || !metric_b.is_finite() {
+            return Err(bootstrap_error(format!(
+                "paired metrics must be finite for replicate {replicate_index}",
+            )));
+        }
+        deltas.push(metric_b - metric_a);
+    }
+
+    if deltas.iter().any(|delta| !delta.is_finite()) {
+        return Err(bootstrap_error("paired metric delta overflowed"));
+    }
+    deltas.sort_by(f64::total_cmp);
+    let lower_index = ((deltas.len() as f64 * 0.025).ceil() as usize)
+        .saturating_sub(1)
+        .min(deltas.len() - 1);
+    let upper_index = ((deltas.len() as f64 * 0.975).ceil() as usize)
+        .saturating_sub(1)
+        .min(deltas.len() - 1);
+
+    Ok(PairedMetricBootstrapInterval {
+        model_a_metric,
+        model_b_metric,
+        model_b_minus_model_a_delta: model_b_metric - model_a_metric,
+        delta_lower_95: deltas[lower_index],
+        delta_upper_95: deltas[upper_index],
+        confidence_level: 0.95,
+        requested_replicates: plan.body.replicate_count,
+        valid_replicates: deltas.len(),
+        plan_sha256: plan.plan_sha256.clone(),
+        rng_algorithm: SHOT_CLUSTER_BOOTSTRAP_RNG_ALGORITHM.to_owned(),
+    })
+}
+
 /// Builds a reproducible plan. Each replicate draws exactly N shot clusters
 /// with replacement from N unique shot IDs. The supplied order of shot IDs is
 /// part of the plan identity and must be preserved by the benchmark runner.
@@ -273,6 +362,60 @@ mod tests {
             assert_eq!(indices.len(), ids.len());
             assert!(indices.iter().all(|index| *index < ids.len()));
         }
+    }
+
+    #[test]
+    fn paired_metric_bootstrap_uses_the_same_shot_draws_for_both_models() {
+        let ids = shot_ids();
+        let plan = build_shot_cluster_bootstrap_plan("tokamark-v1", &ids, 42, 500)
+            .expect("paired plan");
+        let values_a = [0.1, 0.3, 0.5, 0.7, 0.9];
+        let values_b = [0.2, 0.4, 0.6, 0.8, 1.0];
+
+        let interval = paired_shot_cluster_bootstrap(&plan, &ids, |indices| {
+            let sum_a = indices.iter().map(|index| values_a[*index]).sum::<f64>();
+            let sum_b = indices.iter().map(|index| values_b[*index]).sum::<f64>();
+            let denominator = indices.len() as f64;
+            Ok::<(f64, f64), String>((sum_a / denominator, sum_b / denominator))
+        }).expect("paired bootstrap");
+        
+        assert!((interval.model_a_metric - 0.5).abs() < 1e-12);
+        assert!((interval.model_b_metric - 0.6).abs() < 1e-12);
+        assert!((interval.model_b_minus_model_a_delta - 0.1).abs() < 1e-12);
+        assert!((interval.delta_lower_95 - 0.1).abs() < 1e-12);
+        assert!((interval.delta_upper_95 - 0.1).abs() < 1e-12);
+        assert_eq!(interval.requested_replicates, 500);
+        assert_eq!(interval.valid_replicates, 500);
+        assert_eq!(interval.plan_sha256, plan.plan_sha256);
+    }
+
+    #[test]
+    fn paired_metric_bootstrap_rejects_non_finite_or_undefined_replicates() {
+        let ids = shot_ids();
+        let plan = build_shot_cluster_bootstrap_plan("tokamark-v1", &ids, 7, 100)
+            .expect("plan");
+        let result = paired_shot_cluster_bootstrap(&plan, &ids, |_indices| {
+            Ok::<(f64, f64), String>((0.5, f64::NAN))
+        });
+        assert!(result.is_err());
+
+        let result = paired_shot_cluster_bootstrap(&plan, &ids, |_indices| {
+            Err::<(f64, f64), _>("metric undefined for this sampled cohort")
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn paired_metric_bootstrap_binds_exact_ordered_population() {
+        let ids = shot_ids();
+        let plan = build_shot_cluster_bootstrap_plan("tokamark-v1", &ids, 42, 50)
+            .expect("plan");
+        let mut reversed = ids.clone();
+        reversed.reverse();
+        let result = paired_shot_cluster_bootstrap(&plan, &reversed, |_indices| {
+            Ok::<(f64, f64), String>((0.4, 0.5))
+        });
+        assert!(result.is_err());
     }
 
     #[test]
