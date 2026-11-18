@@ -1,6 +1,7 @@
 use cdl_bench::{
     compress, compress_bounded_i16, compress_i16, crc32, decompress, decompress_bounded_i16,
-    decompress_i16, generate_e0, generate_fsm, generate_scm, predictor_state_bytes,
+    decompress_i16, e3_mechanism_splits, generate_e0, generate_fsm, generate_scm,
+    generate_scm_with_config, predictor_state_bytes,
     BoundedPredictor, E0Kind, ModelKind, NumericTransform, ScmIntervention,
 };
 use std::error::Error;
