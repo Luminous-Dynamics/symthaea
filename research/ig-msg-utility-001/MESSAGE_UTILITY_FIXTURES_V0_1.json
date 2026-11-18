@@ -1,0 +1,1295 @@
+{
+  "schema_version": 1,
+  "protocol_id": "IG-MSG-UTILITY-001",
+  "required_preserved_fields": [
+    "source",
+    "root",
+    "evidence_id",
+    "polarity",
+    "scope",
+    "freshness",
+    "uncertainty",
+    "authorization"
+  ],
+  "fixtures": [
+    {
+      "id": "MU-001-original-new-evidence",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E1",
+          "root_id": "R1",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "required": true
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [
+        "R1"
+      ],
+      "messages": [
+        {
+          "message_id": "M1",
+          "evidence_id": "E1",
+          "root_id": "R1",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "transformation": "original",
+          "original_digest": "sha256:original-M1",
+          "original_tokens": 100,
+          "transmitted_tokens": 100,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "qualified",
+        "new_independent_roots_milli": 1,
+        "unique_new_root_count": 1,
+        "duplicate_message_count": 0,
+        "retained_message_count": 1,
+        "original_tokens": 100,
+        "transmitted_tokens": 100,
+        "token_savings_milli": 0,
+        "provenance_violations": 0
+      }
+    },
+    {
+      "id": "MU-002-compact-preserves-semantics",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E2",
+          "root_id": "R2",
+          "source_agent_id": "B",
+          "polarity": "opposes",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "medium",
+          "authorized": true,
+          "required": true
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [
+        "R2"
+      ],
+      "messages": [
+        {
+          "message_id": "M2",
+          "evidence_id": "E2",
+          "root_id": "R2",
+          "source_agent_id": "B",
+          "polarity": "opposes",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "medium",
+          "authorized": true,
+          "transformation": "compact",
+          "original_digest": "sha256:original-M2",
+          "original_tokens": 100,
+          "transmitted_tokens": 35,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "qualified",
+        "new_independent_roots_milli": 1,
+        "unique_new_root_count": 1,
+        "duplicate_message_count": 0,
+        "retained_message_count": 1,
+        "original_tokens": 100,
+        "transmitted_tokens": 35,
+        "token_savings_milli": 650,
+        "provenance_violations": 0
+      }
+    },
+    {
+      "id": "MU-003-known-echo-omitted",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E3",
+          "root_id": "R3",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "required": true
+        }
+      ],
+      "receiver_known_roots": [
+        "R3"
+      ],
+      "required_evidence_roots": [],
+      "messages": [
+        {
+          "message_id": "M3",
+          "evidence_id": "E3",
+          "root_id": "R3",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "transformation": "omit",
+          "original_digest": "sha256:original-M3",
+          "original_tokens": 100,
+          "transmitted_tokens": 0,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "qualified",
+        "new_independent_roots_milli": 0,
+        "unique_new_root_count": 0,
+        "duplicate_message_count": 0,
+        "retained_message_count": 0,
+        "original_tokens": 100,
+        "transmitted_tokens": 0,
+        "token_savings_milli": 1000,
+        "provenance_violations": 0
+      }
+    },
+    {
+      "id": "MU-004-duplicate-transmission-not-new",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E4a",
+          "root_id": "R4",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "required": true
+        },
+        {
+          "evidence_id": "E4b",
+          "root_id": "R4",
+          "source_agent_id": "B",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "required": true
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [
+        "R4"
+      ],
+      "messages": [
+        {
+          "message_id": "M4a",
+          "evidence_id": "E4a",
+          "root_id": "R4",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "transformation": "original",
+          "original_digest": "sha256:original-M4a",
+          "original_tokens": 100,
+          "transmitted_tokens": 100,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        },
+        {
+          "message_id": "M4b",
+          "evidence_id": "E4b",
+          "root_id": "R4",
+          "source_agent_id": "B",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "transformation": "original",
+          "original_digest": "sha256:original-M4b",
+          "original_tokens": 100,
+          "transmitted_tokens": 100,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "qualified",
+        "new_independent_roots_milli": 1,
+        "unique_new_root_count": 1,
+        "duplicate_message_count": 1,
+        "retained_message_count": 2,
+        "original_tokens": 200,
+        "transmitted_tokens": 200,
+        "token_savings_milli": 0,
+        "provenance_violations": 0
+      }
+    },
+    {
+      "id": "MU-005-minority-decisive-fact-kept",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E5",
+          "root_id": "R5",
+          "source_agent_id": "Minority",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "high",
+          "authorized": true,
+          "required": true
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [
+        "R5"
+      ],
+      "messages": [
+        {
+          "message_id": "M5",
+          "evidence_id": "E5",
+          "root_id": "R5",
+          "source_agent_id": "Minority",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "high",
+          "authorized": true,
+          "transformation": "compact",
+          "original_digest": "sha256:original-M5",
+          "original_tokens": 100,
+          "transmitted_tokens": 35,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "qualified",
+        "new_independent_roots_milli": 1,
+        "unique_new_root_count": 1,
+        "duplicate_message_count": 0,
+        "retained_message_count": 1,
+        "original_tokens": 100,
+        "transmitted_tokens": 35,
+        "token_savings_milli": 650,
+        "provenance_violations": 0
+      }
+    },
+    {
+      "id": "MU-006-negative-evidence-kept",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E6",
+          "root_id": "R6",
+          "source_agent_id": "AgentB",
+          "polarity": "opposes",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "required": true
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [
+        "R6"
+      ],
+      "messages": [
+        {
+          "message_id": "M6",
+          "evidence_id": "E6",
+          "root_id": "R6",
+          "source_agent_id": "AgentB",
+          "polarity": "opposes",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "transformation": "compact",
+          "original_digest": "sha256:original-M6",
+          "original_tokens": 100,
+          "transmitted_tokens": 35,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "qualified",
+        "new_independent_roots_milli": 1,
+        "unique_new_root_count": 1,
+        "duplicate_message_count": 0,
+        "retained_message_count": 1,
+        "original_tokens": 100,
+        "transmitted_tokens": 35,
+        "token_savings_milli": 650,
+        "provenance_violations": 0
+      }
+    },
+    {
+      "id": "MU-007-polarity-reversal",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E7",
+          "root_id": "R7",
+          "source_agent_id": "A",
+          "polarity": "opposes",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "required": true
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [
+        "R7"
+      ],
+      "messages": [
+        {
+          "message_id": "M7",
+          "evidence_id": "E7",
+          "root_id": "R7",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "transformation": "compact",
+          "original_digest": "sha256:original-M7",
+          "original_tokens": 100,
+          "transmitted_tokens": 35,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "reject",
+        "new_independent_roots_milli": 1,
+        "unique_new_root_count": 1,
+        "duplicate_message_count": 0,
+        "retained_message_count": 1,
+        "original_tokens": 100,
+        "transmitted_tokens": 35,
+        "token_savings_milli": 650,
+        "provenance_violations": 1
+      }
+    },
+    {
+      "id": "MU-008-source-stripped",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E8",
+          "root_id": "R8",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "required": true
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [
+        "R8"
+      ],
+      "messages": [
+        {
+          "message_id": "M8",
+          "evidence_id": "E8",
+          "root_id": "R8",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "transformation": "compact",
+          "original_digest": "sha256:original-M8",
+          "original_tokens": 100,
+          "transmitted_tokens": 35,
+          "preserved_fields": [
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "reject",
+        "new_independent_roots_milli": 1,
+        "unique_new_root_count": 1,
+        "duplicate_message_count": 0,
+        "retained_message_count": 1,
+        "original_tokens": 100,
+        "transmitted_tokens": 35,
+        "token_savings_milli": 650,
+        "provenance_violations": 1
+      }
+    },
+    {
+      "id": "MU-009-uncertainty-stripped",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E9",
+          "root_id": "R9",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "high",
+          "authorized": true,
+          "required": true
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [
+        "R9"
+      ],
+      "messages": [
+        {
+          "message_id": "M9",
+          "evidence_id": "E9",
+          "root_id": "R9",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "high",
+          "authorized": true,
+          "transformation": "compact",
+          "original_digest": "sha256:original-M9",
+          "original_tokens": 100,
+          "transmitted_tokens": 35,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "reject",
+        "new_independent_roots_milli": 1,
+        "unique_new_root_count": 1,
+        "duplicate_message_count": 0,
+        "retained_message_count": 1,
+        "original_tokens": 100,
+        "transmitted_tokens": 35,
+        "token_savings_milli": 650,
+        "provenance_violations": 1
+      }
+    },
+    {
+      "id": "MU-010-scope-stripped",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E10",
+          "root_id": "R10",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "required": true
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [
+        "R10"
+      ],
+      "messages": [
+        {
+          "message_id": "M10",
+          "evidence_id": "E10",
+          "root_id": "R10",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-2",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "transformation": "compact",
+          "original_digest": "sha256:original-M10",
+          "original_tokens": 100,
+          "transmitted_tokens": 35,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "reject",
+        "new_independent_roots_milli": 1,
+        "unique_new_root_count": 1,
+        "duplicate_message_count": 0,
+        "retained_message_count": 1,
+        "original_tokens": 100,
+        "transmitted_tokens": 35,
+        "token_savings_milli": 650,
+        "provenance_violations": 2
+      }
+    },
+    {
+      "id": "MU-011-stale-evidence-labelled",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E11",
+          "root_id": "R11",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "stale",
+          "uncertainty": "high",
+          "authorized": true,
+          "required": true
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [
+        "R11"
+      ],
+      "messages": [
+        {
+          "message_id": "M11",
+          "evidence_id": "E11",
+          "root_id": "R11",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "stale",
+          "uncertainty": "high",
+          "authorized": true,
+          "transformation": "compact",
+          "original_digest": "sha256:original-M11",
+          "original_tokens": 100,
+          "transmitted_tokens": 35,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "qualified",
+        "new_independent_roots_milli": 1,
+        "unique_new_root_count": 1,
+        "duplicate_message_count": 0,
+        "retained_message_count": 1,
+        "original_tokens": 100,
+        "transmitted_tokens": 35,
+        "token_savings_milli": 650,
+        "provenance_violations": 0
+      }
+    },
+    {
+      "id": "MU-012-stale-evidence-presented-current",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E12",
+          "root_id": "R12",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "stale",
+          "uncertainty": "medium",
+          "authorized": true,
+          "required": true
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [
+        "R12"
+      ],
+      "messages": [
+        {
+          "message_id": "M12",
+          "evidence_id": "E12",
+          "root_id": "R12",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "medium",
+          "authorized": true,
+          "transformation": "compact",
+          "original_digest": "sha256:original-M12",
+          "original_tokens": 100,
+          "transmitted_tokens": 35,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "reject",
+        "new_independent_roots_milli": 1,
+        "unique_new_root_count": 1,
+        "duplicate_message_count": 0,
+        "retained_message_count": 1,
+        "original_tokens": 100,
+        "transmitted_tokens": 35,
+        "token_savings_milli": 650,
+        "provenance_violations": 2
+      }
+    },
+    {
+      "id": "MU-013-unauthorized-disclosure",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E13",
+          "root_id": "R13",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": false,
+          "required": true
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [],
+      "messages": [
+        {
+          "message_id": "M13",
+          "evidence_id": "E13",
+          "root_id": "R13",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": false,
+          "transformation": "compact",
+          "original_digest": "sha256:original-M13",
+          "original_tokens": 100,
+          "transmitted_tokens": 35,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "reject",
+        "new_independent_roots_milli": 0,
+        "unique_new_root_count": 1,
+        "duplicate_message_count": 0,
+        "retained_message_count": 1,
+        "original_tokens": 100,
+        "transmitted_tokens": 35,
+        "token_savings_milli": 650,
+        "provenance_violations": 1
+      }
+    },
+    {
+      "id": "MU-014-unauthorized-message-omitted",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E14",
+          "root_id": "R14",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": false,
+          "required": true
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [],
+      "messages": [
+        {
+          "message_id": "M14",
+          "evidence_id": "E14",
+          "root_id": "R14",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": false,
+          "transformation": "omit",
+          "original_digest": "sha256:original-M14",
+          "original_tokens": 100,
+          "transmitted_tokens": 0,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "qualified",
+        "new_independent_roots_milli": 0,
+        "unique_new_root_count": 0,
+        "duplicate_message_count": 0,
+        "retained_message_count": 0,
+        "original_tokens": 100,
+        "transmitted_tokens": 0,
+        "token_savings_milli": 1000,
+        "provenance_violations": 0
+      }
+    },
+    {
+      "id": "MU-015-required-fact-omitted",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E15",
+          "root_id": "R15",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "required": true
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [
+        "R15"
+      ],
+      "messages": [
+        {
+          "message_id": "M15",
+          "evidence_id": "E15",
+          "root_id": "R15",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "transformation": "omit",
+          "original_digest": "sha256:original-M15",
+          "original_tokens": 100,
+          "transmitted_tokens": 0,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "reject",
+        "new_independent_roots_milli": 0,
+        "unique_new_root_count": 0,
+        "duplicate_message_count": 0,
+        "retained_message_count": 0,
+        "original_tokens": 100,
+        "transmitted_tokens": 0,
+        "token_savings_milli": 1000,
+        "provenance_violations": 1
+      }
+    },
+    {
+      "id": "MU-016-echo-chain-one-root",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E16a",
+          "root_id": "R16",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "required": true
+        },
+        {
+          "evidence_id": "E16b",
+          "root_id": "R16",
+          "source_agent_id": "B",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "required": true
+        },
+        {
+          "evidence_id": "E16c",
+          "root_id": "R16",
+          "source_agent_id": "C",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "required": true
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [
+        "R16"
+      ],
+      "messages": [
+        {
+          "message_id": "M16a",
+          "evidence_id": "E16a",
+          "root_id": "R16",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "transformation": "original",
+          "original_digest": "sha256:original-M16a",
+          "original_tokens": 100,
+          "transmitted_tokens": 100,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        },
+        {
+          "message_id": "M16b",
+          "evidence_id": "E16b",
+          "root_id": "R16",
+          "source_agent_id": "B",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "transformation": "original",
+          "original_digest": "sha256:original-M16b",
+          "original_tokens": 100,
+          "transmitted_tokens": 100,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        },
+        {
+          "message_id": "M16c",
+          "evidence_id": "E16c",
+          "root_id": "R16",
+          "source_agent_id": "C",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "transformation": "original",
+          "original_digest": "sha256:original-M16c",
+          "original_tokens": 100,
+          "transmitted_tokens": 100,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "qualified",
+        "new_independent_roots_milli": 1,
+        "unique_new_root_count": 1,
+        "duplicate_message_count": 2,
+        "retained_message_count": 3,
+        "original_tokens": 300,
+        "transmitted_tokens": 300,
+        "token_savings_milli": 0,
+        "provenance_violations": 0
+      }
+    },
+    {
+      "id": "MU-017-missing-original-digest",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E17",
+          "root_id": "R17",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "required": true
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [
+        "R17"
+      ],
+      "messages": [
+        {
+          "message_id": "M17",
+          "evidence_id": "E17",
+          "root_id": "R17",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "transformation": "compact",
+          "original_digest": "",
+          "original_tokens": 100,
+          "transmitted_tokens": 35,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "reject",
+        "new_independent_roots_milli": 1,
+        "unique_new_root_count": 1,
+        "duplicate_message_count": 0,
+        "retained_message_count": 1,
+        "original_tokens": 100,
+        "transmitted_tokens": 35,
+        "token_savings_milli": 650,
+        "provenance_violations": 1
+      }
+    },
+    {
+      "id": "MU-018-omitted-nonessential-retained-in-audit",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E18",
+          "root_id": "R18",
+          "source_agent_id": "A",
+          "polarity": "neutral",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "unknown",
+          "authorized": true,
+          "required": false
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [],
+      "messages": [
+        {
+          "message_id": "M18",
+          "evidence_id": "E18",
+          "root_id": "R18",
+          "source_agent_id": "A",
+          "polarity": "neutral",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "unknown",
+          "authorized": true,
+          "transformation": "omit",
+          "original_digest": "sha256:original-M18",
+          "original_tokens": 100,
+          "transmitted_tokens": 0,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "qualified",
+        "new_independent_roots_milli": 0,
+        "unique_new_root_count": 0,
+        "duplicate_message_count": 0,
+        "retained_message_count": 0,
+        "original_tokens": 100,
+        "transmitted_tokens": 0,
+        "token_savings_milli": 1000,
+        "provenance_violations": 0
+      }
+    },
+    {
+      "id": "MU-019-omitted-message-audit-deleted",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E19",
+          "root_id": "R19",
+          "source_agent_id": "A",
+          "polarity": "neutral",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "unknown",
+          "authorized": true,
+          "required": false
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [],
+      "messages": [
+        {
+          "message_id": "M19",
+          "evidence_id": "E19",
+          "root_id": "R19",
+          "source_agent_id": "A",
+          "polarity": "neutral",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "unknown",
+          "authorized": true,
+          "transformation": "omit",
+          "original_digest": "sha256:original-M19",
+          "original_tokens": 100,
+          "transmitted_tokens": 0,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": false
+        }
+      ],
+      "expected": {
+        "disposition": "reject",
+        "new_independent_roots_milli": 0,
+        "unique_new_root_count": 0,
+        "duplicate_message_count": 0,
+        "retained_message_count": 0,
+        "original_tokens": 100,
+        "transmitted_tokens": 0,
+        "token_savings_milli": 1000,
+        "provenance_violations": 1
+      }
+    },
+    {
+      "id": "MU-020-compact-cost-not-lower",
+      "evidence_catalog": [
+        {
+          "evidence_id": "E20",
+          "root_id": "R20",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "required": true
+        }
+      ],
+      "receiver_known_roots": [],
+      "required_evidence_roots": [
+        "R20"
+      ],
+      "messages": [
+        {
+          "message_id": "M20",
+          "evidence_id": "E20",
+          "root_id": "R20",
+          "source_agent_id": "A",
+          "polarity": "supports",
+          "scope": "task-1",
+          "freshness": "current",
+          "uncertainty": "low",
+          "authorized": true,
+          "transformation": "compact",
+          "original_digest": "sha256:original-M20",
+          "original_tokens": 100,
+          "transmitted_tokens": 120,
+          "preserved_fields": [
+            "source",
+            "root",
+            "evidence_id",
+            "polarity",
+            "scope",
+            "freshness",
+            "uncertainty",
+            "authorization"
+          ],
+          "audit_record_present": true
+        }
+      ],
+      "expected": {
+        "disposition": "reject",
+        "new_independent_roots_milli": 1,
+        "unique_new_root_count": 1,
+        "duplicate_message_count": 0,
+        "retained_message_count": 1,
+        "original_tokens": 100,
+        "transmitted_tokens": 120,
+        "token_savings_milli": -200,
+        "provenance_violations": 1
+      }
+    }
+  ]
+}
