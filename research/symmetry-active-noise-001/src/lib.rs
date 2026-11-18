@@ -1297,6 +1297,345 @@ pub fn shared_bias_pair_identifiability(
     })
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ProbeDesignObligationV1 {
+    pub hypothesis_a: String,
+    pub hypothesis_b: String,
+    /// Present for models with campaign-persistent nuisance states.
+    pub error_state_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProbeDesignReceiptV1 {
+    pub schema_version: u32,
+    pub problem_id: String,
+    pub problem_contract_bytes: Vec<u8>,
+    /// Greedy selection order, which is deterministic for a frozen contract.
+    pub selected_probe_ids: Vec<String>,
+    pub selected_cost: u64,
+    pub required_obligations: Vec<ProbeDesignObligationV1>,
+    pub unresolved_obligations: Vec<ProbeDesignObligationV1>,
+    pub covered_obligations: Vec<ProbeDesignObligationV1>,
+    /// Greedy weighted set-cover is a baseline, not an optimality certificate.
+    pub optimality_certified: bool,
+    pub complete_pairwise_separation: bool,
+}
+
+fn pair_obligation(
+    hypothesis_ids: &[String],
+    hypothesis_a: usize,
+    hypothesis_b: usize,
+    error_state_id: Option<String>,
+) -> ProbeDesignObligationV1 {
+    ProbeDesignObligationV1 {
+        hypothesis_a: hypothesis_ids[hypothesis_a].clone(),
+        hypothesis_b: hypothesis_ids[hypothesis_b].clone(),
+        error_state_id,
+    }
+}
+
+fn greedy_probe_cover(
+    problem_id: &str,
+    problem_contract_bytes: Vec<u8>,
+    probes: &[NoiseProbeV1],
+    required_obligations: Vec<ProbeDesignObligationV1>,
+    unresolved_obligations: Vec<ProbeDesignObligationV1>,
+    coverage_by_probe: Vec<BTreeSet<usize>>,
+) -> Result<ProbeDesignReceiptV1, NoiseErrorV1> {
+    let mut remaining: BTreeSet<usize> = (0..required_obligations.len()).collect();
+    let mut selected_probe_indices = Vec::new();
+    let mut selected_cost = 0_u64;
+
+    while !remaining.is_empty() {
+        let mut best: Option<(usize, usize)> = None;
+        for (probe_index, probe) in probes.iter().enumerate() {
+            if !probe.admissible || selected_probe_indices.contains(&probe_index) {
+                continue;
+            }
+            let newly_covered = coverage_by_probe[probe_index]
+                .intersection(&remaining)
+                .count();
+            if newly_covered == 0 {
+                continue;
+            }
+            let replace = match best {
+                None => true,
+                Some((best_index, best_count)) => {
+                    let best_probe = &probes[best_index];
+                    let left = (newly_covered as u128) * (best_probe.cost as u128);
+                    let right = (best_count as u128) * (probe.cost as u128);
+                    left > right
+                        || (left == right
+                            && (probe.cost, probe.probe_id.as_str())
+                                < (best_probe.cost, best_probe.probe_id.as_str()))
+                }
+            };
+            if replace {
+                best = Some((probe_index, newly_covered));
+            }
+        }
+
+        let Some((selected, _)) = best else {
+            // Every required obligation was constructed only when at least one
+            // admissible separating probe exists. Reaching this branch means
+            // the design bookkeeping is internally inconsistent.
+            return Err(NoiseErrorV1::InvalidDeterministicInput);
+        };
+        selected_cost = selected_cost
+            .checked_add(probes[selected].cost)
+            .ok_or(NoiseErrorV1::IntervalArithmeticOverflow)?;
+        selected_probe_indices.push(selected);
+        for obligation in &coverage_by_probe[selected] {
+            remaining.remove(obligation);
+        }
+    }
+
+    let covered_obligations = required_obligations.clone();
+    let selected_probe_ids = selected_probe_indices
+        .iter()
+        .map(|index| probes[*index].probe_id.clone())
+        .collect();
+    Ok(ProbeDesignReceiptV1 {
+        schema_version: 1,
+        problem_id: problem_id.to_owned(),
+        problem_contract_bytes,
+        selected_probe_ids,
+        selected_cost,
+        required_obligations,
+        unresolved_obligations: unresolved_obligations.clone(),
+        covered_obligations,
+        optimality_certified: false,
+        complete_pairwise_separation: unresolved_obligations.is_empty(),
+    })
+}
+
+/// Greedy minimum-cost non-adaptive diagnostic design for bounded categorical
+/// outcomes. One probe covers a hypothesis pair when their allowed outcome
+/// sets for that probe are disjoint.
+pub fn design_bounded_noise_probe_set(
+    problem: &BoundedNoiseProblemV1,
+) -> Result<ProbeDesignReceiptV1, NoiseErrorV1> {
+    problem.validate()?;
+    let mut required = Vec::new();
+    let mut unresolved = Vec::new();
+    let mut coverage = vec![BTreeSet::new(); problem.probes.len()];
+
+    for hypothesis_a in 0..problem.hypothesis_ids.len() {
+        for hypothesis_b in (hypothesis_a + 1)..problem.hypothesis_ids.len() {
+            let obligation = pair_obligation(
+                &problem.hypothesis_ids,
+                hypothesis_a,
+                hypothesis_b,
+                None,
+            );
+            let mut separating_probes = Vec::new();
+            for (probe_index, probe) in problem.probes.iter().enumerate() {
+                if !probe.admissible {
+                    continue;
+                }
+                let allowed_a: BTreeSet<u32> = problem.allowed_outcomes_by_hypothesis
+                    [hypothesis_a][probe_index]
+                    .iter()
+                    .copied()
+                    .collect();
+                let allowed_b: BTreeSet<u32> = problem.allowed_outcomes_by_hypothesis
+                    [hypothesis_b][probe_index]
+                    .iter()
+                    .copied()
+                    .collect();
+                if allowed_a.is_disjoint(&allowed_b) {
+                    separating_probes.push(probe_index);
+                }
+            }
+            if separating_probes.is_empty() {
+                unresolved.push(obligation);
+            } else {
+                let obligation_index = required.len();
+                required.push(obligation);
+                for probe_index in separating_probes {
+                    coverage[probe_index].insert(obligation_index);
+                }
+            }
+        }
+    }
+
+    greedy_probe_cover(
+        &problem.problem_id,
+        problem.canonical_bytes(),
+        &problem.probes,
+        required,
+        unresolved,
+        coverage,
+    )
+}
+
+/// Greedy minimum-cost non-adaptive diagnostic design under one persistent
+/// categorical error state. Each (hypothesis pair, global error state) is a
+/// separate obligation; a selected probe must separate the pair under that
+/// same state. A nuisance state cannot switch between measurements.
+pub fn design_persistent_noise_probe_set(
+    problem: &PersistentNoiseProblemV1,
+) -> Result<ProbeDesignReceiptV1, NoiseErrorV1> {
+    problem.validate()?;
+    let mut required = Vec::new();
+    let mut unresolved = Vec::new();
+    let mut coverage = vec![BTreeSet::new(); problem.probes.len()];
+
+    for hypothesis_a in 0..problem.hypothesis_ids.len() {
+        for hypothesis_b in (hypothesis_a + 1)..problem.hypothesis_ids.len() {
+            for (state_index, state_id) in problem.error_state_ids.iter().enumerate() {
+                let obligation = pair_obligation(
+                    &problem.hypothesis_ids,
+                    hypothesis_a,
+                    hypothesis_b,
+                    Some(state_id.clone()),
+                );
+                let separating_probes: Vec<usize> = problem
+                    .probes
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, probe)| probe.admissible)
+                    .filter_map(|(probe_index, _)| {
+                        let outcome_a = problem.predicted_outcomes_by_hypothesis[hypothesis_a]
+                            [probe_index][state_index];
+                        let outcome_b = problem.predicted_outcomes_by_hypothesis[hypothesis_b]
+                            [probe_index][state_index];
+                        (outcome_a != outcome_b).then_some(probe_index)
+                    })
+                    .collect();
+                if separating_probes.is_empty() {
+                    unresolved.push(obligation);
+                } else {
+                    let obligation_index = required.len();
+                    required.push(obligation);
+                    for probe_index in separating_probes {
+                        coverage[probe_index].insert(obligation_index);
+                    }
+                }
+            }
+        }
+    }
+
+    greedy_probe_cover(
+        &problem.problem_id,
+        problem.canonical_bytes(),
+        &problem.probes,
+        required,
+        unresolved,
+        coverage,
+    )
+}
+
+/// Greedy minimum-cost non-adaptive diagnostic design for bounded numeric
+/// intervals. Disjoint predicted intervals are robust pair-separation witnesses.
+pub fn design_bounded_interval_probe_set(
+    problem: &BoundedIntervalProblemV1,
+) -> Result<ProbeDesignReceiptV1, NoiseErrorV1> {
+    problem.validate()?;
+    let mut required = Vec::new();
+    let mut unresolved = Vec::new();
+    let mut coverage = vec![BTreeSet::new(); problem.probes.len()];
+
+    for hypothesis_a in 0..problem.hypothesis_ids.len() {
+        for hypothesis_b in (hypothesis_a + 1)..problem.hypothesis_ids.len() {
+            let obligation = pair_obligation(
+                &problem.hypothesis_ids,
+                hypothesis_a,
+                hypothesis_b,
+                None,
+            );
+            let separating_probes: Vec<usize> = problem
+                .probes
+                .iter()
+                .enumerate()
+                .filter(|(_, probe)| probe.admissible)
+                .filter_map(|(probe_index, _)| {
+                    let interval_a =
+                        problem.predicted_intervals_by_hypothesis[hypothesis_a][probe_index];
+                    let interval_b =
+                        problem.predicted_intervals_by_hypothesis[hypothesis_b][probe_index];
+                    interval_a
+                        .intersection(interval_b)
+                        .is_none()
+                        .then_some(probe_index)
+                })
+                .collect();
+            if separating_probes.is_empty() {
+                unresolved.push(obligation);
+            } else {
+                let obligation_index = required.len();
+                required.push(obligation);
+                for probe_index in separating_probes {
+                    coverage[probe_index].insert(obligation_index);
+                }
+            }
+        }
+    }
+
+    greedy_probe_cover(
+        &problem.problem_id,
+        problem.canonical_bytes(),
+        &problem.probes,
+        required,
+        unresolved,
+        coverage,
+    )
+}
+
+/// Greedy minimum-cost non-adaptive diagnostic design under one campaign-wide
+/// additive numeric bias. A common bias cancels between the two hypotheses,
+/// so unequal nominal predictions are separating witnesses.
+pub fn design_shared_bias_probe_set(
+    problem: &SharedAdditiveBiasProblemV1,
+) -> Result<ProbeDesignReceiptV1, NoiseErrorV1> {
+    problem.validate()?;
+    let mut required = Vec::new();
+    let mut unresolved = Vec::new();
+    let mut coverage = vec![BTreeSet::new(); problem.probes.len()];
+
+    for hypothesis_a in 0..problem.hypothesis_ids.len() {
+        for hypothesis_b in (hypothesis_a + 1)..problem.hypothesis_ids.len() {
+            let obligation = pair_obligation(
+                &problem.hypothesis_ids,
+                hypothesis_a,
+                hypothesis_b,
+                None,
+            );
+            let separating_probes: Vec<usize> = problem
+                .probes
+                .iter()
+                .enumerate()
+                .filter(|(_, probe)| probe.admissible)
+                .filter_map(|(probe_index, _)| {
+                    let prediction_a =
+                        problem.nominal_predictions_by_hypothesis[hypothesis_a][probe_index];
+                    let prediction_b =
+                        problem.nominal_predictions_by_hypothesis[hypothesis_b][probe_index];
+                    (prediction_a != prediction_b).then_some(probe_index)
+                })
+                .collect();
+            if separating_probes.is_empty() {
+                unresolved.push(obligation);
+            } else {
+                let obligation_index = required.len();
+                required.push(obligation);
+                for probe_index in separating_probes {
+                    coverage[probe_index].insert(obligation_index);
+                }
+            }
+        }
+    }
+
+    greedy_probe_cover(
+        &problem.problem_id,
+        problem.canonical_bytes(),
+        &problem.probes,
+        required,
+        unresolved,
+        coverage,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1423,6 +1762,129 @@ mod tests {
             persistent_pair_identifiability(&persistent, 0, 2),
             Err(NoiseErrorV1::InvalidHypothesisPair)
         );
+    }
+
+    #[test]
+    fn bounded_categorical_probe_set_covers_every_resolvable_pair_and_reports_the_frontier() {
+        let problem = bounded_fixture();
+        let receipt = design_bounded_noise_probe_set(&problem).unwrap();
+        assert_eq!(receipt.selected_probe_ids, vec!["p0".to_owned(), "p1".to_owned()]);
+        assert_eq!(receipt.selected_cost, 3);
+        assert_eq!(receipt.required_obligations.len(), 2);
+        assert_eq!(receipt.covered_obligations, receipt.required_obligations);
+        assert_eq!(receipt.unresolved_obligations.len(), 1);
+        assert_eq!(
+            (
+                receipt.unresolved_obligations[0].hypothesis_a.as_str(),
+                receipt.unresolved_obligations[0].hypothesis_b.as_str()
+            ),
+            ("H-B", "H-C")
+        );
+        assert!(!receipt.complete_pairwise_separation);
+        assert!(!receipt.optimality_certified);
+    }
+
+    #[test]
+    fn persistent_categorical_probe_set_covers_every_shared_error_state() {
+        let problem = persistent_fixture();
+        let receipt = design_persistent_noise_probe_set(&problem).unwrap();
+        assert_eq!(receipt.selected_probe_ids, vec!["p-right".to_owned()]);
+        assert_eq!(receipt.required_obligations.len(), 2);
+        assert!(receipt.unresolved_obligations.is_empty());
+        assert!(receipt.complete_pairwise_separation);
+        assert!(
+            receipt
+                .required_obligations
+                .iter()
+                .all(|obligation| obligation.error_state_id.is_some())
+        );
+    }
+
+    #[test]
+    fn bounded_numeric_probe_set_reports_minimum_cost_greedy_witness_basis() {
+        let problem = BoundedIntervalProblemV1 {
+            problem_id: "bounded-interval-probe-design-v1".to_owned(),
+            quantity_unit_id: "millimetre-integer".to_owned(),
+            hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned(), "H-C".to_owned()],
+            probes: vec![
+                NoiseProbeV1 {
+                    probe_id: "p-overlap".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p-separate-ab".to_owned(),
+                    cost: 2,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p-separate-ac".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+            ],
+            predicted_intervals_by_hypothesis: vec![
+                vec![
+                    FixedIntervalV1::new(0, 10).unwrap(),
+                    FixedIntervalV1::new(0, 2).unwrap(),
+                    FixedIntervalV1::new(0, 10).unwrap(),
+                ],
+                vec![
+                    FixedIntervalV1::new(5, 15).unwrap(),
+                    FixedIntervalV1::new(20, 30).unwrap(),
+                    FixedIntervalV1::new(5, 15).unwrap(),
+                ],
+                vec![
+                    FixedIntervalV1::new(6, 9).unwrap(),
+                    FixedIntervalV1::new(6, 9).unwrap(),
+                    FixedIntervalV1::new(20, 30).unwrap(),
+                ],
+            ],
+        };
+        let receipt = design_bounded_interval_probe_set(&problem).unwrap();
+        assert!(receipt.selected_probe_ids.contains(&"p-separate-ab".to_owned()));
+        assert!(receipt.selected_probe_ids.contains(&"p-separate-ac".to_owned()));
+        assert_eq!(receipt.required_obligations.len(), 3);
+        assert_eq!(receipt.covered_obligations, receipt.required_obligations);
+        assert!(receipt.complete_pairwise_separation);
+        assert!(!receipt.optimality_certified);
+    }
+
+    #[test]
+    fn shared_bias_probe_set_uses_a_common_shift_for_every_pair() {
+        let problem = SharedAdditiveBiasProblemV1 {
+            problem_id: "shared-bias-probe-design-v1".to_owned(),
+            quantity_unit_id: "micrometre-integer".to_owned(),
+            hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned(), "H-C".to_owned()],
+            probes: vec![
+                NoiseProbeV1 {
+                    probe_id: "p0".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p1".to_owned(),
+                    cost: 2,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p2".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+            ],
+            nominal_predictions_by_hypothesis: vec![
+                vec![0, 0, 0],
+                vec![0, 10, 0],
+                vec![0, 0, 20],
+            ],
+            global_bias_interval: FixedIntervalV1::new(-100, 100).unwrap(),
+        };
+        let receipt = design_shared_bias_probe_set(&problem).unwrap();
+        assert_eq!(receipt.required_obligations.len(), 3);
+        assert_eq!(receipt.covered_obligations, receipt.required_obligations);
+        assert!(receipt.complete_pairwise_separation);
+        assert_eq!(receipt.selected_cost, 4);
     }
 
     #[test]
