@@ -473,6 +473,52 @@ impl GlModel {
         })
     }
 
+    fn site_energy_delta(
+        &self,
+        fields: &[Complex],
+        site: usize,
+        candidate: Complex,
+        gauge_phases: &[f64],
+    ) -> Result<f64, String> {
+        if fields.len() != self.nodes.len() || site >= self.nodes.len() {
+            return Err("site-energy update has invalid field dimensions or node index".to_owned());
+        }
+        if gauge_phases.len() != self.edges.len()
+            || !candidate.re.is_finite()
+            || !candidate.im.is_finite()
+        {
+            return Err("site-energy update has invalid links or non-finite candidate field".to_owned());
+        }
+
+        let node = &self.nodes[site];
+        let original = fields[site];
+        let original_rho_squared = original.norm_sqr();
+        let candidate_rho_squared = candidate.norm_sqr();
+        let mut delta = node.a * (candidate_rho_squared - original_rho_squared)
+            + 0.5 * node.b
+                * (candidate_rho_squared * candidate_rho_squared
+                    - original_rho_squared * original_rho_squared);
+
+        for (edge, gauge_phase) in self.edges.iter().zip(gauge_phases) {
+            if edge.source != site && edge.target != site {
+                continue;
+            }
+            let original_difference =
+                fields[edge.source].sub(fields[edge.target].rotate(*gauge_phase));
+            let candidate_difference = if edge.source == site {
+                candidate.sub(fields[edge.target].rotate(*gauge_phase))
+            } else {
+                fields[edge.source].sub(candidate.rotate(*gauge_phase))
+            };
+            delta += edge.coupling
+                * (candidate_difference.norm_sqr() - original_difference.norm_sqr());
+        }
+        if !delta.is_finite() {
+            return Err("local GL energy difference is non-finite".to_owned());
+        }
+        Ok(delta)
+    }
+
     fn initial_fields(&self) -> Vec<Complex> {
         self.nodes.iter().map(|node| node.psi).collect()
     }
@@ -1035,6 +1081,35 @@ mod tests {
         assert!((energy.local - (-7.5)).abs() < 1.0e-12);
         assert!((energy.gradient - 4.0).abs() < 1.0e-12);
         assert!((energy.total - (-3.5)).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn local_site_energy_delta_matches_full_lattice_recomputation() {
+        let (schema, fixture) = inputs();
+        let model = GlModel::from_bytes(&schema, &fixture).unwrap();
+        let mut fields: Vec<Complex> = (0..model.nodes.len())
+            .map(|index| Complex {
+                re: 0.7 + 0.09 * (index as f64 * 0.31).cos(),
+                im: 0.2 * (index as f64 * 0.17).sin(),
+            })
+            .collect();
+        let links: Vec<f64> = (0..model.edges.len())
+            .map(|index| 0.12 * (index as f64 * 0.23).sin())
+            .collect();
+
+        for site in 0..fields.len() {
+            let candidate = Complex {
+                re: fields[site].re + 0.137,
+                im: fields[site].im - 0.091,
+            };
+            let before = model.free_energy_for(&fields, &links).unwrap().total;
+            let delta = model
+                .site_energy_delta(&fields, site, candidate, &links)
+                .unwrap();
+            fields[site] = candidate;
+            let after = model.free_energy_for(&fields, &links).unwrap().total;
+            assert!((delta - (after - before)).abs() < 1.0e-10);
+        }
     }
 
     #[test]
