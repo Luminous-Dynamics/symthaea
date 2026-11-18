@@ -223,6 +223,8 @@ Include \(x=0\) and states where the stabilizer changes. The implementation must
 
 ## 8. Independent qualification
 
+The standalone Rust oracle now includes exact scalar-output checks: `a`, `b`, `c` and signed `ell` are SO(2)-invariant, while absolute external-frame coordinate `x1` is rejected as non-invariant. This validates one observable-level obligation only; the complete task contract and pruning permission remain owned by #11616.
+
 The exact development oracle should independently verify:
 1. SO(2) group-generator algebra and the block action on \((x,v)\).
 2. Exact vector-field equivariance \(DF(s)As=AF(s)\) for every admitted \(m,k\).
