@@ -191,3 +191,105 @@ These are research targets, not current results. They should be finalized before
 7. Retain all original C1/C2/C3 findings and their caveats. The new benchmark must be judged on actual bitstreams and held-out causal transfer, not on earlier normalized cosine diagnostics.
 
 **Evidence boundary:** this document is a literature-grounded competitive amendment. It contains no new compression run, no reproduced industry result, and no claim that CDL-Bench currently beats any baseline.
+
+
+## 7. New strategic result: lossless and bounded-error prediction have different economics
+
+Cadence (Tacconelli, 2026-09-05), *Error-Bounded Lossy Compression of Demand Time Series with a Time-Series Foundation Model*, should materially change how CDL-Bench allocates effort.
+
+Its central quantitative observation is that when a well-matched residual model's code length scales with residual magnitude, improving a predictor transfers only logarithmically into lossless bit savings:
+
+[
+\Delta b \approx \log_2\left(\frac{\operatorname{MAE}_{old}}{\operatorname{MAE}_{new}}\right).
+]
+
+The paper reports a TimesFM-3 versus linear-predictor accuracy ratio of about 1.51x but only 0.60 bits out of 20.28, approximately 2.9% on that example. It argues that a 2x reduction in a 20-bit-per-value lossless code would require an implausibly large predictor improvement. This is a warning against assuming that a better forecast automatically creates a large lossless compression win.
+
+Cadence instead uses an error-bounded residual quantizer. When the forecast is within a declared tolerance band, the residual index is zero, changing the coding economics discontinuously. The paper reports:
+- 13.3% median gains over its best classical error-bounded predictor on 49 EIA-930 grid-load series at tolerance 0.05;
+- 28.3% on 50 MTA subway ridership series at the corresponding reported tolerance;
+- 21.4% median across 297 demand-series/tolerance pairs in its final abstract;
+- a negative result of -0.8% median and 0/27 gains on SDRBench scientific-field slices.
+
+The last result is as important as the gains: the advantage is localized to the tested aggregate human-demand domain, not evidence that the approach improves generic numerical data.
+
+Cadence further reports an encoder/decoder determinism issue: neural predictions varied with batch size and execution configuration, creating a desynchronization risk. Its container therefore records group size and device/execution configuration. CDL-Bench should adopt the general lesson: **the decoder's entire prediction-state evolution must be reproducible from the container and decoded prefix, not merely statistically similar.**
+
+Primary sources:
+- Paper: https://arxiv.org/abs/2609.06008
+- Code and results: https://github.com/robtacconelli/Cadence
+- Experiments log: https://github.com/robtacconelli/Cadence/blob/main/EXPERIMENTS.md
+
+### 7.1 Strategic change
+
+Keep the exact-lossless track, but do not expect a large foundation model's modest forecasting gain to yield a proportionate compression gain. On structured numeric streams, compare small residual models carefully and require a real, shared entropy coder.
+
+Add a separate **bounded-error numeric track** with an explicit per-sample guarantee:
+
+[
+|x_t-\hat{x}_t|\leq\tau
+\quad\text{for every sample }t.
+]
+
+This track must not share a leaderboard or headline score with exact lossless compression. It must report the exact tolerance, maximum observed error, error distribution, residual-code bits, model/bootstrap bytes, decoder configuration, and end-to-end size.
+
+### 7.2 What CDL-Bench can test beyond Cadence
+
+Cadence has already demonstrated that error-bounded predictive coding can be effective in a domain-localized demand regime. We should not claim novelty for “forecast plus tolerance quantization” alone.
+
+Our candidate research contribution is to test:
+1. **Mechanism-conditioned bounded-error coding:** causal multi-channel mechanisms predict the current series; encode quantized residuals only when required.
+2. **Cross-channel interventions:** change one upstream variable and test whether the model preserves unrelated channels while adapting descendants.
+3. **Per-channel error budgets:** allocate a global application error budget according to measurement units, risk, and downstream utility, while preserving hard per-sample limits.
+4. **Regime-adaptive, decoder-synchronous coding:** segment non-stationary streams only when the segmentation decision can be reproduced exactly by the decoder or is explicitly coded.
+5. **Active tolerance selection:** choose a tolerance from an application-specified error budget, never silently increase it to improve compression.
+6. **Domain-localization and falsification:** test demand series, telemetry, sensor streams, and scientific fields separately; expect domain failures and retain them.
+
+### 7.3 Revised SOTA comparisons
+
+| Track | Required competitive baselines | What must be matched |
+|---|---|---|
+| Exact integer lossless | Pco, Sprintz, Gorilla/Chimp where applicable, Zstd, TSCom-Bench/SEP for appropriate corpora | Same input values, column layout, units/metadata, train/test rules, hardware |
+| Exact float lossless | Gorilla, Chimp, Elf, Pco where supported, Zstd; SEP for general byte streams | Exact IEEE bit patterns, NaN payload policy, signed zero, timestamp layout |
+| Error-bounded numeric | Cadence, SZ3/Lorenzo, interpolation/LPC predictors, Machete only under its published error semantics, plus domain baselines | Same pointwise tolerance, data split, predictor budget, entropy coder and context bootstrap |
+| Non-stationary streaming | WZS, adaptive segmentation, Zstd stream mode, Sprintz/edge baselines | Same change points, latency budget, chunk reset semantics and memory cap |
+| Causal transfer | CDL E1/E2 paired mechanism interventions, plus CausalWorld for embodied external evaluation | Same observations, interventions, online information, compute and adaptation budget |
+
+### 7.4 Revised success targets
+
+For **exact lossless** coding:
+- retain 100% byte/value-exact round-trip as a hard requirement;
+- a small predictor-only improvement is not success unless total coded size, after all metadata, is materially better;
+- use a domain-targeted total-size target and report the Pareto frontier instead of optimizing a generic average.
+
+For **bounded-error numeric coding**:
+- target at least 10% lower end-to-end bytes than the strongest reproduced classical error-bounded predictor on a preregistered domain family, with paired confidence intervals excluding zero;
+- enforce the exact per-sample tolerance for 100% of reconstructed samples;
+- include all model bootstrap/context, metadata and per-block state costs;
+- require a held-out domain and an explicit negative-control domain;
+- report results separately by tolerance level and stream length.
+
+For **causal multi-channel coding**:
+- target a measurable improvement in both total residual bits and adaptation cost after interventions;
+- require held-out structural mechanisms and combinations, not merely a new random seed;
+- never attribute a gain to causal reasoning unless the mechanism arm beats matched non-causal predictors under the same entropy coder and information budget.
+
+These are targets for future registered experiments, not current results.
+
+## 8. SEP, WZS and the numerical baseline implications
+
+SEP (IJCAI 2025) reports 5.1% average compression-ratio improvement, 7.6% with pretraining, 30.0% average speed improvement, and 36.2% average GPU memory-footprint reduction on its seven tested corpora under its A800-based evaluation. It is a strong general lossless neural compression comparison, although its framework and compute scale differ substantially from this small Rust prototype.
+
+WZS (Information Processing & Management, September 2026) reports evaluation over 43 datasets and claims a 36.41% average compression-ratio improvement, 13.28% over Camel, and 15.07% over general compression methods in its experimental setup. It is especially relevant to non-stationary streams and adaptive segmentation. These are author-reported results and should be independently reproduced before being adopted as expected performance.
+
+Pco's 2025 paper describes a dedicated numerical format using mode decomposition and delta encoding before a binning-based entropy model; it reports 29–94% higher compression ratio than compared approaches on six real-world datasets. Pco's documentation warns against mixing semantically different sequences into a single chunk and recommends sufficiently large chunks for good compression.
+
+Primary sources:
+- SEP: https://ijcai.org/proceedings/2025/370
+- WZS: https://www.sciencedirect.com/science/article/pii/S0306457326000889
+- Pco paper: https://arxiv.org/abs/2502.06112
+- Pco implementation and format: https://github.com/pcodec/pcodec
+
+### 8.1 Engineering consequence
+
+Do not replace the current small arithmetic coder. Retain it as a transparent reference backend. Build and compare typed transforms and numeric codecs as separate baselines. A serious competitive result must include Pco and the relevant domain-specialist baselines, not only raw bytes and Zstandard.
