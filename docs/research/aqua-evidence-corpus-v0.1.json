@@ -2559,6 +2559,136 @@
           "limitations": [
             "Aqua's spatial deposition map remains supplementary and is not a substitute for the UWL method."
           ]
+        },
+        {
+          "claim_id": "uk.etl.electric.maximum-flow.standard",
+          "parameter": "maximum_rated_flow",
+          "original_value": "4.5 L/min standard pathway",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 4.5,
+            "unit": "L/min"
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "Standard maximum available flow for electric showers",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "UK ETL Showers criteria section 1.3.2; updated 15 September 2026",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "product-specific test report",
+              "whole-system energy result for any Aqua implementation"
+            ],
+            "notes": "Non-domestic UK ETL pathway. The 9 L/min allowance requires power modulation, stable output temperature and ETL-compliant wastewater heat recovery; 10.6 L/min additionally requires UBF."
+          },
+          "source": {
+            "url": "https://etl.energysecurity.gov.uk/products/showers/showers",
+            "publisher": "UK Department for Energy Security and Net Zero — Energy Technology List",
+            "source_type": "official_standard_or_programme",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Current non-domestic electric-shower programme pathway; not South African law, domestic certification or evidence of Aqua performance."
+          },
+          "limitations": [
+            "Programme ceiling / eligibility condition, not a measured product result or guaranteed useful-task flow.",
+            "Do not apply the 9 L/min pathway without compliant wastewater heat recovery, power modulation and stable output temperature."
+          ]
+        },
+        {
+          "claim_id": "uk.etl.electric.maximum-flow.with-dwhr",
+          "parameter": "maximum_rated_flow",
+          "original_value": "9 L/min conditional DWHR pathway",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 9,
+            "unit": "L/min"
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "Maximum available flow where electric input is modulated to minimize electricity and maintain stable output temperature with ETL-compliant wastewater heat recovery",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "UK ETL Showers criteria section 1.3.2; updated 15 September 2026",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "product-specific test report",
+              "whole-system energy result for any Aqua implementation"
+            ],
+            "notes": "Non-domestic UK ETL pathway. The 9 L/min allowance requires power modulation, stable output temperature and ETL-compliant wastewater heat recovery; 10.6 L/min additionally requires UBF."
+          },
+          "source": {
+            "url": "https://etl.energysecurity.gov.uk/products/showers/showers",
+            "publisher": "UK Department for Energy Security and Net Zero — Energy Technology List",
+            "source_type": "official_standard_or_programme",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Current non-domestic electric-shower programme pathway; not South African law, domestic certification or evidence of Aqua performance."
+          },
+          "limitations": [
+            "Programme ceiling / eligibility condition, not a measured product result or guaranteed useful-task flow.",
+            "Do not apply the 9 L/min pathway without compliant wastewater heat recovery, power modulation and stable output temperature."
+          ]
+        },
+        {
+          "claim_id": "uk.etl.electric.maximum-flow.with-dwhr-and-ubf",
+          "parameter": "maximum_rated_flow",
+          "original_value": "10.6 L/min conditional DWHR + UBF pathway",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 10.6,
+            "unit": "L/min"
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": "Maximum available flow where the qualifying DWHR/power-modulation pathway also includes user-behaviour features",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "UK ETL Showers criteria section 1.3.2; updated 15 September 2026",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "product-specific test report",
+              "whole-system energy result for any Aqua implementation"
+            ],
+            "notes": "Non-domestic UK ETL pathway. The 9 L/min allowance requires power modulation, stable output temperature and ETL-compliant wastewater heat recovery; 10.6 L/min additionally requires UBF."
+          },
+          "source": {
+            "url": "https://etl.energysecurity.gov.uk/products/showers/showers",
+            "publisher": "UK Department for Energy Security and Net Zero — Energy Technology List",
+            "source_type": "official_standard_or_programme",
+            "published_on": null,
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "eligible_as_matched_test_reference",
+            "reason": "Current non-domestic electric-shower programme pathway; not South African law, domestic certification or evidence of Aqua performance."
+          },
+          "limitations": [
+            "Programme ceiling / eligibility condition, not a measured product result or guaranteed useful-task flow.",
+            "Do not apply the 9 L/min pathway without compliant wastewater heat recovery, power modulation and stable output temperature.",
+            "The 10.6 L/min pathway additionally requires a qualifying user-behaviour feature."
+          ]
         }
       ]
     }
@@ -2567,6 +2697,10 @@
     {
       "date": "2026-11-18",
       "change": "Added UK non-domestic ETL shower flow, pressure-independence and spray-coverage criteria as source-classified programme evidence."
+    },
+    {
+      "date": "2026-11-18",
+      "change": "Added current UK ETL electric-shower 4.5 / 9 / 10.6 L/min pathways conditional on power modulation, wastewater heat recovery and user-behaviour features."
     }
   ]
 }
