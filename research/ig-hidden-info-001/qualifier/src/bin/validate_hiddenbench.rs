@@ -23,8 +23,6 @@ struct Task {
     correct_answer: String,
 }
 
-#[derive(Debug, Deserialize)]
-struct TaskSet(Vec<Task>);
 
 #[derive(Debug, Serialize)]
 struct CorpusReport {
