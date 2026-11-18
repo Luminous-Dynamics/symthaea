@@ -150,9 +150,11 @@ fn population_variance(values: &[f64]) -> f64 {
         return 0.0;
     }
     let mean = values.iter().sum::<f64>() / values.len() as f64;
-    (values.iter().map(|value| value * value).sum::<f64>() / values.len() as f64
-        - mean * mean)
-        .max(0.0)
+    values
+        .iter()
+        .map(|value| (value - mean).powi(2))
+        .sum::<f64>()
+        / values.len() as f64
 }
 
 fn series_summary(values: &[f64]) -> Value {
