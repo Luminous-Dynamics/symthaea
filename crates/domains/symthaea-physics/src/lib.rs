@@ -51,6 +51,7 @@ pub mod grid;
 pub mod multiscale;
 pub mod nppad_validation;
 pub mod plasma_control;
+pub mod plasma_event_eval;
 pub mod plasma_hdc_encoder;
 pub mod threat;
 
@@ -69,6 +70,12 @@ pub use plasma_hdc_encoder::{
     // Streaming
     PlasmaStateBuffer,
     StabilityAssessment,
+};
+
+pub use plasma_event_eval::{
+    AlarmAbstentionReason, AlarmEvaluationSummary, AlarmEvidenceQuality, AlarmObservation,
+    AlarmPolicyConfig, AlarmPolicyUpdate, OnlinePlasmaAlarmPolicy, PlasmaEventEvalError,
+    ShotAlarmEvaluation, ShotReferenceOutcome, score_shot_alarms, summarize_alarm_evaluations,
 };
 
 pub use plasma_control::{
