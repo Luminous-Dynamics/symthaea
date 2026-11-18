@@ -128,3 +128,18 @@ The issue's 20% coherence-robustness target is a preregistered research target, 
 - Nonlocal rewiring can change the interaction range and effective dimensionality. Such edges must be physically embedded and their coupling / fabrication cost counted. Do not compare them to local lattices as though only graph topology had changed.
 - The reference solver must be compared against both Monte Carlo and tensor-network approaches. For the 2D BKT case, Ueda–Oshikawa level spectroscopy (0.892943(2)) and Jha HOTRG (0.89290(5)) are distinct high-precision comparators; neither is treated as a universal value for arbitrary graphs.
 - For the 3D XY control, retain critical-coupling and correction-to-scaling analysis. The 2025 Hasenbusch paper is a modern methodology comparator, but its improved clock-model Hamiltonian is not numerically identical to the nearest-neighbour XY model.
+
+## Geometry required for stiffness and twist calculations
+
+A periodic graph's endpoint coordinates are not enough to reconstruct its physical bond displacement: a boundary-crossing edge can appear long or even degenerate when only wrapped coordinates are used. Physical-coordinate instances therefore carry:
+- a positive box length for every spatial axis;
+- an integer `periodic_image_shift` on each edge;
+- a measured/declared positive physical edge length.
+
+The auditor reconstructs the unwrapped displacement as
+
+\[
+\mathbf d_{ij}=\mathbf r_j+\mathbf n_{ij}\odot\mathbf L-\mathbf r_i
+\]
+
+and checks its norm against the declared edge length. Nonzero image shifts are admitted only on periodic axes. The per-axis twist vector and this unwrapped bond geometry are prerequisites for a later gauge-consistent helicity-modulus calculation. Abstract graphs may omit physical coordinates, box lengths and image shifts; they are not silently treated as embedded materials.
