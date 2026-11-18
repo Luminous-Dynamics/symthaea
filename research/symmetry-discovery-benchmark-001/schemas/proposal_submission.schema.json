@@ -147,7 +147,8 @@
               "properties": {
                 "proposed_elements": {
                   "maxItems": 0
-                }
+                },
+                "group_distribution": false
               }
             }
           }
