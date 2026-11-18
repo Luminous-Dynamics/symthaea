@@ -410,7 +410,7 @@ impl InstalledSystemManifest {
                     push(&mut findings, "pose_run_binding_missing", format!("{path}.pose_ref/joint_state_ref"),
                         "Clearance run requires exact pose and joint-state references.");
                 }
-                if run.pose_ref.as_deref().is_some_and(|pose| !gate.required_pose_refs.iter().any(|required| required == pose)) {
+                if run.pose_ref.as_deref().is_some_and(|pose| !gate.required_pose_refs.iter().any(|required| required.as_str() == pose)) {
                     push(&mut findings, "unapproved_pose_reference", format!("{path}.pose_ref"),
                         "Run pose is not in the gate's frozen owner-approved pose set.");
                 }
