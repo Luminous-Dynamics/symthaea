@@ -1,5 +1,6 @@
 use cdl_bench::{
-    compress, crc32, decompress, generate_e0, predictor_state_bytes, E0Kind, ModelKind,
+    compress, crc32, decompress, generate_e0, generate_fsm, generate_scm,
+    predictor_state_bytes, E0Kind, ModelKind, ScmIntervention,
 };
 use std::error::Error;
 use std::fs;
@@ -16,9 +17,10 @@ fn usage() -> &'static str {
   cdl-bench encode [--model order0|order1] INPUT OUTPUT
   cdl-bench decode [--max-bytes N] INPUT OUTPUT
   cdl-bench e0 [--bytes N] [--seed N]
+  cdl-bench causal [--steps N] [--seed N]
 
-The E0 command checks round-trip integrity and compares compressed lengths with
-installed zstd, brotli, xz, and gzip commands when available."
+The E0 and causal commands check round-trip integrity and compare compressed
+lengths with installed zstd, brotli, xz, and gzip commands when available."
 }
 
 fn parse_usize(value: Option<&String>, flag: &str) -> Result<usize, Box<dyn Error>> {
@@ -217,12 +219,86 @@ fn e0_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+
+fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut steps = 10_000usize;
+    let mut seed = 0xCA55_A1u64;
+    let mut index = 1;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--steps" => {
+                steps = parse_usize(args.get(index + 1), "--steps")?;
+                index += 2;
+            }
+            "--seed" => {
+                seed = parse_u64(args.get(index + 1), "--seed")?;
+                index += 2;
+            }
+            other => return Err(format!("unknown causal option: {other}\n{}", usage()).into()),
+        }
+    }
+    if steps > 1_000_000 {
+        return Err("causal generator limit is 1,000,000 steps per trace".into());
+    }
+
+    println!("# benchmark=CDL-Bench-E1-E2-v1");
+    println!("# steps={steps}");
+    println!("# seed={seed}");
+    println!("source,raw_bytes,cdl_order0_frame,cdl_order1_frame,zstd,round_trip");
+
+    let fsm = generate_fsm(steps, 8, 4, seed)?;
+    let scm_observational = generate_scm(steps, seed, None)?;
+    let scm_interventional = generate_scm(
+        steps,
+        seed,
+        Some(ScmIntervention {
+            variable: 1,
+            start_step: steps / 4,
+            end_step: (steps * 3) / 4,
+            value: 20_000,
+        }),
+    )?;
+
+    let sources: [(&str, &[u8]); 3] = [
+        ("fsm-observations", &fsm.observations),
+        ("scm-observational", &scm_observational.stream),
+        ("scm-do-x1", &scm_interventional.stream),
+    ];
+
+    for (name, source) in sources {
+        let frame0 = compress(source, ModelKind::Order0)?;
+        let frame1 = compress(source, ModelKind::Order1)?;
+        if decompress(&frame0, source.len())? != source
+            || decompress(&frame1, source.len())? != source
+        {
+            return Err(format!("round-trip failure for {name}").into());
+        }
+        let zstd = external_compressed_len("zstd", &["-q", "-c"], source)
+            .map_or_else(|| "NA".to_owned(), |value| value.to_string());
+        println!(
+            "{name},{},{},{},{zstd},exact",
+            source.len(),
+            frame0.len(),
+            frame1.len()
+        );
+    }
+
+    // The latent states are evaluator-only ground truth; print only counts here.
+    println!("# fsm_latent_state_count={}", fsm.state_count);
+    println!("# fsm_observation_alphabet_size={}", fsm.alphabet_size);
+    println!("# scm_variables=5");
+    println!("# scm_intervention=do(x1=20000) on [steps/4,3*steps/4)");
+    println!("# note=these are deterministic generator and codec smoke measurements, not predictive transfer results");
+    Ok(())
+}
+
 fn run() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("encode") => encode_command(&args),
         Some("decode") => decode_command(&args),
         Some("e0") => e0_command(&args),
+        Some("causal") => causal_command(&args),
         _ => Err(usage().into()),
     }
 }
