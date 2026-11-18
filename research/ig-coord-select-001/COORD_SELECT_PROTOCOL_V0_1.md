@@ -52,6 +52,21 @@ Token/latency/risk penalties in v0.1 are transparent fixed-point arithmetic. The
 
 The selector consumes calibrated estimates; it does not create them. Candidate estimates must be generated from prior randomized calibration experiments, separately from confirmatory task outcomes.
 
+## Mandatory test-time-compute baseline ladder
+
+The 13 November 2026 synthesis *More Agents, More Samples, or More Thinking?* (arXiv:2611.17610) reports that many multi-agent gains disappear when comparisons are matched for sample count or total resource budget. It aggregates nine evaluations / 516 configurations and reports multi-agent accuracy at or below matched baselines in 74% of comparable contrasts. This synthesis is not a universal theorem, but it exposes a confound that this selector must not repeat: a multi-agent architecture should not be credited for additional samples, tokens or verifier compute.
+
+Every task/model block therefore needs:
+1. single greedy response;
+2. single-agent best-of-N/self-consistency at the same generated sample count;
+3. independent parallel samples with no communication;
+4. communication with identical evidence allocation;
+5. communication with truly partitioned/private evidence;
+6. independent tool/program verification at the same cost;
+7. cross-model teams where independent error diversity is itself the treatment.
+
+Only the remaining gain after these controls may be attributed to coordination. Record a six-dimensional resource vector at minimum: model calls/samples, input tokens, output tokens, tool/verification calls, wall-clock latency, and monetary cost. Add context-window occupancy and energy/CPU/GPU where observable. Use the same scoring/evaluator policy across the ladder.
+
 ## Candidate architectures
 
 Compare:
