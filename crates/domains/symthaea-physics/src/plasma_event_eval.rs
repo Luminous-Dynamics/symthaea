@@ -47,16 +47,35 @@ pub struct AlarmObservation {
     pub evidence_quality: AlarmEvidenceQuality,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AlarmPolicyConfig {
+    pub policy_id: String,
+    /// SHA-256 content identity for the frozen validation/calibration receipt.
+    pub validation_receipt_sha256: String,
     pub trigger_threshold: f64,
     pub clear_threshold: f64,
     pub trigger_persistence_windows: usize,
     pub clear_persistence_windows: usize,
+    pub required_warning_ns: u64,
 }
 
 impl AlarmPolicyConfig {
-    pub fn validate(self) -> Result<(), PlasmaEventEvalError> {
+    pub fn validate(&self) -> Result<(), PlasmaEventEvalError> {
+        if self.policy_id.trim().is_empty() {
+            return Err(PlasmaEventEvalError::new("policy_id must be non-empty"));
+        }
+        if self.validation_receipt_sha256.len() != 64
+            || !self.validation_receipt_sha256.bytes().all(|byte| {
+                byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+            })
+        {
+            return Err(PlasmaEventEvalError::new(
+                "validation receipt must be 64 lowercase hexadecimal characters",
+            ));
+        }
+        if self.required_warning_ns == 0 {
+            return Err(PlasmaEventEvalError::new("required_warning_ns must be positive"));
+        }
         if !self.trigger_threshold.is_finite() || !self.clear_threshold.is_finite() {
             return Err(PlasmaEventEvalError::new(
                 "alarm thresholds must be finite",
@@ -173,6 +192,10 @@ impl OnlinePlasmaAlarmPolicy {
         self.active
     }
 
+    pub fn policy_config(&self) -> &AlarmPolicyConfig {
+        &self.config
+    }
+
     /// Processes exactly one observation in time order.
     ///
     /// Non-direct evidence causes abstention and breaks persistence continuity.
@@ -284,6 +307,9 @@ pub enum ShotReferenceOutcome {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShotAlarmEvaluation {
     pub shot_id: String,
+    pub policy_id: String,
+    pub validation_receipt_sha256: String,
+    pub required_warning_ns: u64,
     pub disruptive: bool,
     pub event_detected: bool,
     pub false_alarm_events: usize,
@@ -296,15 +322,11 @@ pub fn score_shot_alarms(
     shot_id: &str,
     outcome: ShotReferenceOutcome,
     alarm_times_ns: &[u64],
-    required_warning_ns: u64,
+    policy: &AlarmPolicyConfig,
 ) -> Result<ShotAlarmEvaluation, PlasmaEventEvalError> {
+    policy.validate()?;
     if shot_id.trim().is_empty() {
         return Err(PlasmaEventEvalError::new("shot_id must be non-empty"));
-    }
-    if required_warning_ns == 0 {
-        return Err(PlasmaEventEvalError::new(
-            "required_warning_ns must be positive",
-        ));
     }
     for pair in alarm_times_ns.windows(2) {
         if pair[1] <= pair[0] {
@@ -326,9 +348,12 @@ pub fn score_shot_alarms(
                 .copied()
                 .filter(|time| *time < t_cut_ns)
                 .map(|time| t_cut_ns - time)
-                .filter(|lead| *lead >= required_warning_ns);
+                .filter(|lead| *lead >= policy.required_warning_ns);
             Ok(ShotAlarmEvaluation {
                 shot_id: shot_id.to_owned(),
+                policy_id: policy.policy_id.clone(),
+                validation_receipt_sha256: policy.validation_receipt_sha256.clone(),
+                required_warning_ns: policy.required_warning_ns,
                 disruptive: true,
                 event_detected: lead_time_ns.is_some(),
                 false_alarm_events: 0,
@@ -348,6 +373,9 @@ pub fn score_shot_alarms(
             }
             Ok(ShotAlarmEvaluation {
                 shot_id: shot_id.to_owned(),
+                policy_id: policy.policy_id.clone(),
+                validation_receipt_sha256: policy.validation_receipt_sha256.clone(),
+                required_warning_ns: policy.required_warning_ns,
                 disruptive: false,
                 event_detected: false,
                 false_alarm_events: alarm_times_ns.len(),
@@ -359,6 +387,9 @@ pub fn score_shot_alarms(
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AlarmEvaluationSummary {
+    pub policy_id: String,
+    pub validation_receipt_sha256: String,
+    pub required_warning_ns: u64,
     pub shot_count: usize,
     pub disruptive_shots: usize,
     pub non_disruptive_shots: usize,
@@ -398,6 +429,9 @@ pub fn summarize_alarm_evaluations(
     }
 
     let mut shot_ids = BTreeSet::new();
+    let mut policy_id: Option<String> = None;
+    let mut validation_receipt_sha256: Option<String> = None;
+    let mut required_warning_ns: Option<u64> = None;
     let mut disruptive_shots = 0usize;
     let mut non_disruptive_shots = 0usize;
     let mut detected_disruptions = 0usize;
@@ -411,6 +445,23 @@ pub fn summarize_alarm_evaluations(
                 "shot IDs must be non-empty and unique in one evaluation cohort",
             ));
         }
+        match (&policy_id, &validation_receipt_sha256, required_warning_ns) {
+            (None, None, None) => {
+                policy_id = Some(evaluation.policy_id.clone());
+                validation_receipt_sha256 = Some(evaluation.validation_receipt_sha256.clone());
+                required_warning_ns = Some(evaluation.required_warning_ns);
+            }
+            (Some(id), Some(digest), Some(warning))
+                if id == &evaluation.policy_id
+                    && digest == &evaluation.validation_receipt_sha256
+                    && warning == evaluation.required_warning_ns => {}
+            _ => {
+                return Err(PlasmaEventEvalError::new(
+                    "one summary cannot mix alarm policy identities or warning requirements",
+                ));
+            }
+        }
+
         if evaluation.disruptive {
             disruptive_shots += 1;
             if evaluation.event_detected != evaluation.lead_time_ns.is_some()
@@ -451,6 +502,9 @@ pub fn summarize_alarm_evaluations(
     };
 
     Ok(AlarmEvaluationSummary {
+        policy_id: policy_id.unwrap_or_default(),
+        validation_receipt_sha256: validation_receipt_sha256.unwrap_or_default(),
+        required_warning_ns: required_warning_ns.unwrap_or_default(),
         shot_count: evaluations.len(),
         disruptive_shots,
         non_disruptive_shots,
