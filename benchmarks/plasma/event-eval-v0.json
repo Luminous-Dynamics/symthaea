@@ -55,7 +55,8 @@
       "trigger_persistence_windows",
       "clear_persistence_windows",
       "required_warning_ns"
-    ]
+    ],
+    "policy_config_sha256": "computed from exact policy ID, validation receipt, threshold bit patterns, persistence counts and required warning interval"
   },
   "offline_scoring_contract": {
     "event_reference_entered_after_trace_generation": true,
@@ -72,7 +73,7 @@
     ],
     "warning_requirement_ns": 50000000,
     "warning_requirement_is_research_target_not_achieved_result": true,
-    "confidence_intervals": "shot-level bootstrap, stratified by machine and event class",
+    "confidence_intervals": "Wilson score 95% intervals for event TPR and false-alarm-shot rate; for multi-machine or event-class subgroup aggregates, add a shot-level stratified bootstrap and report the resampling seed",
     "undefined_metrics": "return null when the denominator cohort is empty"
   },
   "required_ablation_families": [
@@ -124,7 +125,8 @@
     "seed",
     "hardware",
     "metrics",
-    "uncertainty_intervals"
+    "uncertainty_intervals",
+    "policy_config_sha256"
   ],
   "explicit_non_goals": [
     "live_tokamak_control",
