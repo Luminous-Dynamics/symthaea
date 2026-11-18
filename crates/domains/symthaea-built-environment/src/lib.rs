@@ -1,9 +1,10 @@
-//! Typed resident-intent and candidate-lineage contracts for built-environment design.
+//! Source-bound resident-intent and candidate-search primitives.
 //!
-//! This crate does not generate geometry or evaluate building physics. It
-//! validates source-bound five-axis intent, separates authority from
-//! preferences, gates mappings, derives deterministic IDs and prevents
-//! unknown or unqualified candidates entering a physical Pareto set.
+//! This crate validates a five-axis design problem and provides deterministic
+//! finite-domain search utilities. It does not generate building geometry,
+//! simulate physical performance, establish legal compliance or certify work.
+//! Approval and physical-result verification remain blocked until their
+//! Mycelix/Symtropy trust-boundary adapters are integrated.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -11,22 +12,50 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub const DESIGN_PROBLEM_SCHEMA_VERSION: &str = "0.1.0";
 pub const CANDIDATE_SET_SCHEMA_VERSION: &str = "0.1.0";
+pub const INTENT_ONLY_CLAIM_CEILING: &str =
+    "INTENT_ONLY_NO_GEOMETRY_COST_PERFORMANCE_CODE_OR_PROFESSIONAL_APPROVAL";
+
+const SYNTHETIC_PROBLEM: &str = include_str!(
+    "../../../../docs/research/built-environment/HOME_EXPRESSION_DESIGN_PROBLEM_SYNTHETIC_V0.1.json"
+);
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum AxisState { Undecided, IntentSelected, IntentOnlyNotEvaluated, ConflictUnresolved }
+pub enum AxisState {
+    Undecided,
+    IntentSelected,
+    IntentOnlyNotEvaluated,
+    ConflictUnresolved,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum ExperienceState { Undecided, OptionalIdeasOnly, ConflictUnresolved }
+pub enum ExperienceState {
+    Undecided,
+    OptionalIdeasOnly,
+    ConflictUnresolved,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum Preference { Preferred, Considered, Avoided, Undecided }
+pub enum Preference {
+    Preferred,
+    Considered,
+    Avoided,
+    Undecided,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum ExpressionRole { Primary, Secondary, Accent, ReferenceOnly, Avoid, Acceptable, Undecided }
+pub enum ExpressionRole {
+    Primary,
+    Secondary,
+    Accent,
+    ReferenceOnly,
+    Avoid,
+    Acceptable,
+    Undecided,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct OptionPreferenceEntry {
@@ -44,7 +73,6 @@ pub struct IntentAxis {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ExpressionEntry {
     pub option_id: String,
-    #[serde(rename = "role")]
     pub role: ExpressionRole,
     pub resident_selected: bool,
     #[serde(default)]
@@ -108,12 +136,20 @@ pub struct SourceBindings {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum RequirementSourceClass {
-    ResidentNonNegotiable, JurisdictionalRule, ProfessionalReviewRequirement, SystemInvariant,
+    ResidentNonNegotiable,
+    JurisdictionalRule,
+    ProfessionalReviewRequirement,
+    SystemInvariant,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum VerificationState { ExplicitUnverified, SourceBoundUnreviewed, OwnerValidated, Unknown }
+pub enum VerificationState {
+    ExplicitUnverified,
+    SourceBoundUnreviewed,
+    OwnerValidated,
+    Unknown,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Requirement {
@@ -126,16 +162,26 @@ pub struct Requirement {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DesignAxis {
-    #[serde(rename = "SPATIAL_TYPOLOGY")] SpatialTypology,
-    #[serde(rename = "ARCHITECTURAL_EXPRESSION")] ArchitecturalExpression,
-    #[serde(rename = "MATERIAL_AND_TECTONIC_INTENT")] MaterialTectonicIntent,
-    #[serde(rename = "ENVIRONMENTAL_STRATEGY_INTENT")] EnvironmentalStrategyIntent,
-    #[serde(rename = "EXPERIENCE_AND_PROGRAMME")] ExperienceProgramme,
+    #[serde(rename = "SPATIAL_TYPOLOGY")]
+    SpatialTypology,
+    #[serde(rename = "ARCHITECTURAL_EXPRESSION")]
+    ArchitecturalExpression,
+    #[serde(rename = "MATERIAL_AND_TECTONIC_INTENT")]
+    MaterialTectonicIntent,
+    #[serde(rename = "ENVIRONMENTAL_STRATEGY_INTENT")]
+    EnvironmentalStrategyIntent,
+    #[serde(rename = "EXPERIENCE_AND_PROGRAMME")]
+    ExperienceProgramme,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum MappingReviewState { Draft, OwnerReview, Approved, Rejected }
+pub enum MappingReviewState {
+    Draft,
+    OwnerReview,
+    Approved,
+    Rejected,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MappingRule {
@@ -152,12 +198,18 @@ pub struct MappingRule {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum MappingState { NoOwnerReviewedMapping, Partial, Qualified }
+pub enum MappingState {
+    NoOwnerReviewedMapping,
+    Partial,
+    Qualified,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum CompilationState {
-    IntentParsedNotCompiledToGeometry, CompiledToSymbolicDesignQuestion, ReadyForCandidateGeneration,
+    IntentParsedNotCompiledToGeometry,
+    CompiledToSymbolicDesignQuestion,
+    ReadyForCandidateGeneration,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -176,23 +228,31 @@ pub struct Compilation {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum SymbolicGenerationPermission { RequiresReviewedMappingRules, AllowedWithReviewedMappings, Blocked }
+pub enum SymbolicGenerationPermission {
+    RequiresReviewedMappingRules,
+    AllowedWithReviewedMappings,
+    Blocked,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GeometryGenerationPermission {
-    BlockedPendingSymtropyGeometryProviderAndOwnerReview, AllowedWithQualifiedGeometryProvider,
+    BlockedPendingSymtropyGeometryProviderAndOwnerReview,
+    AllowedWithQualifiedGeometryProvider,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PhysicalEvaluationPermission {
-    BlockedPendingExactRealizedGeometryAndQualifiedSolverInputs, AllowedWithQualifiedSolverInputs,
+    BlockedPendingExactRealizedGeometryAndQualifiedSolverInputs,
+    AllowedWithQualifiedSolverInputs,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum CertificationPermission { Prohibited }
+pub enum CertificationPermission {
+    Prohibited,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GenerationPermissions {
@@ -204,7 +264,10 @@ pub struct GenerationPermissions {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum DecisionState { NoResidentChoiceOrDesignApprovalRecorded, PartialResidentIntentRecorded }
+pub enum DecisionState {
+    NoResidentChoiceOrDesignApprovalRecorded,
+    PartialResidentIntentRecorded,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DesignProblem {
@@ -230,8 +293,8 @@ pub struct CatalogueVocabulary {
 }
 
 impl CatalogueVocabulary {
-    /// Load the shared v0.2 identifiers from caller-pinned catalogue bytes.
-    /// This crate intentionally contains no second copy of the UI vocabulary.
+    /// Parse shared option IDs from the exact caller-pinned catalogue bytes.
+    /// The list itself is never copied into this crate or another UI module.
     pub fn from_catalogue_json(source: &str) -> Result<Self, String> {
         let value: Value = serde_json::from_str(source)
             .map_err(|error| format!("catalogue JSON is invalid: {error}"))?;
@@ -239,21 +302,32 @@ impl CatalogueVocabulary {
             catalogue_revision: required_string(&value, "catalog_revision")?,
             ..Self::default()
         };
-        let styles = value.get("style_catalog").and_then(Value::as_array)
+        let styles = value
+            .get("style_catalog")
+            .and_then(Value::as_array)
             .ok_or_else(|| "style_catalog is missing or not an array".to_owned())?;
         for style in styles {
             let id = required_string(style, "style_id")?;
-            let sources = style.get("reference_sources").and_then(Value::as_array)
+            let sources = style
+                .get("reference_sources")
+                .and_then(Value::as_array)
                 .ok_or_else(|| format!("style {id} has no reference_sources array"))?
-                .iter().filter_map(Value::as_str).map(str::to_owned).collect();
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect();
             if vocabulary.style_sources.insert(id.clone(), sources).is_some() {
-                return Err(format!("duplicate style identifier: {id}"));
+                return Err(format!("duplicate style ID {id}"));
             }
         }
-        vocabulary.spatial_typology_ids = collect_ids(&value, "spatial_typology_catalog", "option_id")?;
-        vocabulary.material_tectonic_ids = collect_ids(&value, "material_tectonic_intent_catalog", "option_id")?;
-        vocabulary.environmental_strategy_ids = collect_ids(&value, "environmental_strategy_intent_catalog", "option_id")?;
-        vocabulary.experience_package_ids = collect_ids(&value, "experience_catalog", "package_id")?;
+        vocabulary.spatial_typology_ids =
+            collect_ids(&value, "spatial_typology_catalog", "option_id")?;
+        vocabulary.material_tectonic_ids =
+            collect_ids(&value, "material_tectonic_intent_catalog", "option_id")?;
+        vocabulary.environmental_strategy_ids =
+            collect_ids(&value, "environmental_strategy_intent_catalog", "option_id")?;
+        vocabulary.experience_package_ids =
+            collect_ids(&value, "experience_catalog", "package_id")?;
         Ok(vocabulary)
     }
 
@@ -262,19 +336,27 @@ impl CatalogueVocabulary {
             DesignAxis::SpatialTypology => self.spatial_typology_ids.contains(option_id),
             DesignAxis::ArchitecturalExpression => self.style_sources.contains_key(option_id),
             DesignAxis::MaterialTectonicIntent => self.material_tectonic_ids.contains(option_id),
-            DesignAxis::EnvironmentalStrategyIntent => self.environmental_strategy_ids.contains(option_id),
+            DesignAxis::EnvironmentalStrategyIntent => {
+                self.environmental_strategy_ids.contains(option_id)
+            }
             DesignAxis::ExperienceProgramme => self.experience_package_ids.contains(option_id),
         }
     }
 }
 
 fn required_string(value: &Value, key: &str) -> Result<String, String> {
-    value.get(key).and_then(Value::as_str).filter(|s| !s.trim().is_empty())
-        .map(str::to_owned).ok_or_else(|| format!("required non-empty string {key} is missing"))
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|text| !text.trim().is_empty())
+        .map(str::to_owned)
+        .ok_or_else(|| format!("required non-empty string {key} is missing"))
 }
 
 fn collect_ids(value: &Value, catalogue_key: &str, id_key: &str) -> Result<BTreeSet<String>, String> {
-    let items = value.get(catalogue_key).and_then(Value::as_array)
+    let items = value
+        .get(catalogue_key)
+        .and_then(Value::as_array)
         .ok_or_else(|| format!("{catalogue_key} is missing or not an array"))?;
     let mut ids = BTreeSet::new();
     for item in items {
@@ -286,23 +368,19 @@ fn collect_ids(value: &Value, catalogue_key: &str, id_key: &str) -> Result<BTree
     Ok(ids)
 }
 
-fn is_lower_hex(value: &str, expected_len: usize) -> bool {
-    value.len() == expected_len
+fn is_lowercase_sha1(value: &str) -> bool {
+    value.len() == 40
         && value
             .bytes()
             .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
-fn is_git_sha1(value: &str) -> bool {
-    is_lower_hex(value, 40)
-}
-
-fn is_evidence_digest(value: &str) -> bool {
-    // Symtropy and specialist receipts may use SHA-256 or BLAKE3 digests.
-    is_lower_hex(value, 64)
-}
-
-fn validate_intent_axis(name: &str, axis: &IntentAxis, allowed: &BTreeSet<String>, errors: &mut Vec<String>) {
+fn validate_intent_axis(
+    name: &str,
+    axis: &IntentAxis,
+    allowed_ids: &BTreeSet<String>,
+    errors: &mut Vec<String>,
+) {
     if axis.entries.is_empty() && axis.state != AxisState::Undecided {
         errors.push(format!("{name}: empty axis must remain UNDECIDED"));
     }
@@ -310,25 +388,37 @@ fn validate_intent_axis(name: &str, axis: &IntentAxis, allowed: &BTreeSet<String
         errors.push(format!("{name}: non-empty axis cannot be UNDECIDED"));
     }
     let mut seen = BTreeSet::new();
-    let mut preferred = 0usize;
+    let mut preferred_count = 0;
     for entry in &axis.entries {
-        if entry.option_id.trim().is_empty() || !allowed.contains(&entry.option_id) {
+        if entry.option_id.trim().is_empty() || !allowed_ids.contains(&entry.option_id) {
             errors.push(format!("{name}: unknown option ID {}", entry.option_id));
         }
         if !seen.insert(entry.option_id.clone()) {
             errors.push(format!("{name}: duplicate option ID {}", entry.option_id));
         }
-        if entry.preference == Preference::Preferred { preferred += 1; }
+        if entry.preference == Preference::Preferred {
+            preferred_count += 1;
+        }
     }
-    if name == "spatial_typology" && preferred > 1 && axis.state != AxisState::ConflictUnresolved {
-        errors.push("spatial_typology: multiple preferred entries must remain CONFLICT_UNRESOLVED".to_owned());
+    if name == "spatial_typology"
+        && preferred_count > 1
+        && axis.state != AxisState::ConflictUnresolved
+    {
+        errors.push("spatial_typology: multiple preferred options must remain CONFLICT_UNRESOLVED".to_owned());
     }
-    if name == "spatial_typology" && axis.state == AxisState::ConflictUnresolved && preferred < 2 {
-        errors.push("spatial_typology: conflict state requires multiple preferred entries".to_owned());
+    if name == "spatial_typology"
+        && axis.state == AxisState::ConflictUnresolved
+        && preferred_count < 2
+    {
+        errors.push("spatial_typology: conflict state requires multiple preferred options".to_owned());
     }
 }
 
-fn validate_expression_axis(axis: &ExpressionAxis, vocabulary: &CatalogueVocabulary, errors: &mut Vec<String>) {
+fn validate_expression_axis(
+    axis: &ExpressionAxis,
+    vocabulary: &CatalogueVocabulary,
+    errors: &mut Vec<String>,
+) {
     if axis.entries.is_empty() && axis.state != AxisState::Undecided {
         errors.push("architectural_expression: empty axis must remain UNDECIDED".to_owned());
     }
@@ -336,7 +426,7 @@ fn validate_expression_axis(axis: &ExpressionAxis, vocabulary: &CatalogueVocabul
         errors.push("architectural_expression: non-empty axis cannot be UNDECIDED".to_owned());
     }
     let mut seen = BTreeSet::new();
-    let mut primary = 0usize;
+    let mut primary_count = 0;
     for entry in &axis.entries {
         if !vocabulary.style_sources.contains_key(&entry.option_id) {
             errors.push(format!("architectural_expression: unknown style ID {}", entry.option_id));
@@ -345,17 +435,22 @@ fn validate_expression_axis(axis: &ExpressionAxis, vocabulary: &CatalogueVocabul
             errors.push(format!("architectural_expression: duplicate style ID {}", entry.option_id));
         }
         if !entry.resident_selected {
-            errors.push(format!("architectural_expression: {} has no resident selection", entry.option_id));
+            errors.push(format!("architectural_expression: {} lacks resident selection", entry.option_id));
         }
-        if entry.role == ExpressionRole::Primary { primary += 1; }
+        if entry.role == ExpressionRole::Primary {
+            primary_count += 1;
+        }
         if entry.role == ExpressionRole::ReferenceOnly {
-            let allowed = vocabulary.style_sources.get(&entry.option_id);
-            if entry.source_refs.is_empty() {
-                errors.push(format!("architectural_expression: reference {} has no source", entry.option_id));
-            } else if let Some(allowed_sources) = allowed {
-                for source in &entry.source_refs {
-                    if !allowed_sources.contains(source) {
-                        errors.push(format!("architectural_expression: source {source} is not catalogue-bound for {}", entry.option_id));
+            match vocabulary.style_sources.get(&entry.option_id) {
+                None => errors.push(format!("reference-only style {} is unknown", entry.option_id)),
+                Some(allowed) if entry.source_refs.is_empty() => {
+                    errors.push(format!("reference-only style {} has no source", entry.option_id));
+                }
+                Some(allowed) => {
+                    for source in &entry.source_refs {
+                        if !allowed.contains(source) {
+                            errors.push(format!("unbound source {source} for style {}", entry.option_id));
+                        }
                     }
                 }
             }
@@ -364,12 +459,16 @@ fn validate_expression_axis(axis: &ExpressionAxis, vocabulary: &CatalogueVocabul
             errors.push(format!("architectural_expression: blend weight for {} exceeds 100", entry.option_id));
         }
     }
-    if primary > 1 {
-        errors.push("architectural_expression: more than one PRIMARY role".to_owned());
+    if primary_count > 1 {
+        errors.push("architectural_expression: multiple PRIMARY roles are unresolved".to_owned());
     }
 }
 
-fn validate_experience_axis(axis: &ExperienceAxis, allowed: &BTreeSet<String>, errors: &mut Vec<String>) {
+fn validate_experience_axis(
+    axis: &ExperienceAxis,
+    allowed_ids: &BTreeSet<String>,
+    errors: &mut Vec<String>,
+) {
     if axis.entries.is_empty() && axis.state != ExperienceState::Undecided {
         errors.push("experience_programme: empty axis must remain UNDECIDED".to_owned());
     }
@@ -378,7 +477,7 @@ fn validate_experience_axis(axis: &ExperienceAxis, allowed: &BTreeSet<String>, e
     }
     let mut seen = BTreeSet::new();
     for entry in &axis.entries {
-        if !allowed.contains(&entry.option_id) {
+        if !allowed_ids.contains(&entry.option_id) {
             errors.push(format!("experience_programme: unknown package ID {}", entry.option_id));
         }
         if !seen.insert(entry.option_id.clone()) {
@@ -387,18 +486,25 @@ fn validate_experience_axis(axis: &ExperienceAxis, allowed: &BTreeSet<String>, e
     }
 }
 
-fn validate_requirements(requirements: &[Requirement], seen: &mut BTreeSet<String>, errors: &mut Vec<String>) {
+fn validate_requirements(
+    requirements: &[Requirement],
+    seen: &mut BTreeSet<String>,
+    errors: &mut Vec<String>,
+) {
     for requirement in requirements {
         if requirement.requirement_id.trim().is_empty()
             || requirement.statement.trim().is_empty()
             || !seen.insert(requirement.requirement_id.clone())
         {
-            errors.push(format!("requirement has an empty or duplicate ID/statement: {}", requirement.requirement_id));
+            errors.push(format!("empty or duplicate requirement ID/statement: {}", requirement.requirement_id));
         }
-        if matches!(&requirement.source_class, RequirementSourceClass::JurisdictionalRule | RequirementSourceClass::ProfessionalReviewRequirement)
-            && requirement.source_ref.as_deref().is_none_or(str::is_empty)
+        if matches!(
+            requirement.source_class,
+            RequirementSourceClass::JurisdictionalRule
+                | RequirementSourceClass::ProfessionalReviewRequirement
+        ) && requirement.source_ref.as_deref().is_none_or(str::is_empty)
         {
-            errors.push(format!("authority requirement {} has no source reference", requirement.requirement_id));
+            errors.push(format!("authority requirement {} lacks a source reference", requirement.requirement_id));
         }
         if requirement.verification_state == VerificationState::OwnerValidated
             && requirement.source_ref.as_deref().is_none_or(str::is_empty)
@@ -408,30 +514,42 @@ fn validate_requirements(requirements: &[Requirement], seen: &mut BTreeSet<Strin
     }
 }
 
-fn validate_compilation(compilation: &Compilation, input: &ResidentIntent, vocabulary: &CatalogueVocabulary, errors: &mut Vec<String>) {
+fn validate_compilation(
+    compilation: &Compilation,
+    input: &ResidentIntent,
+    vocabulary: &CatalogueVocabulary,
+    errors: &mut Vec<String>,
+) {
     let mut requirement_ids = BTreeSet::new();
     validate_requirements(&compilation.hard_requirements, &mut requirement_ids, errors);
     validate_requirements(&compilation.authority_constraints, &mut requirement_ids, errors);
 
     let mut mapping_ids = BTreeSet::new();
     let mut detailed_ids = Vec::new();
-    let mut approved_pairs = BTreeSet::new();
+    let mut approved_sources = BTreeSet::new();
     for rule in &compilation.mapping_rules {
-        if rule.mapping_rule_id.trim().is_empty() || !mapping_ids.insert(rule.mapping_rule_id.clone()) {
-            errors.push(format!("missing or duplicate mapping rule ID: {}", rule.mapping_rule_id));
+        if rule.mapping_rule_id.trim().is_empty()
+            || !mapping_ids.insert(rule.mapping_rule_id.clone())
+        {
+            errors.push(format!("missing or duplicate mapping ID {}", rule.mapping_rule_id));
         }
         detailed_ids.push(rule.mapping_rule_id.clone());
         if !vocabulary.contains_source_option(&rule.source_axis, &rule.source_option_id) {
-            errors.push(format!("mapping {} references unknown source option {}", rule.mapping_rule_id, rule.source_option_id));
+            errors.push(format!("mapping {} refers to unknown source option {}", rule.mapping_rule_id, rule.source_option_id));
         }
-        if rule.target_parameter.trim().is_empty() || rule.mapping_version.trim().is_empty() || rule.scope.trim().is_empty() {
-            errors.push(format!("mapping rule {} lacks target, version or scope", rule.mapping_rule_id));
+        if rule.target_parameter.trim().is_empty()
+            || rule.mapping_version.trim().is_empty()
+            || rule.scope.trim().is_empty()
+        {
+            errors.push(format!("mapping {} lacks target, version or scope", rule.mapping_rule_id));
         }
         if rule.review_state == MappingReviewState::Approved {
-            if rule.source_ref.as_deref().is_none_or(str::is_empty) || rule.owner_reviewer.as_deref().is_none_or(str::is_empty) {
-                errors.push(format!("approved mapping rule {} lacks source/reviewer", rule.mapping_rule_id));
+            if rule.source_ref.as_deref().is_none_or(str::is_empty)
+                || rule.owner_reviewer.as_deref().is_none_or(str::is_empty)
+            {
+                errors.push(format!("approved mapping {} lacks source/reviewer", rule.mapping_rule_id));
             } else {
-                approved_pairs.insert((rule.source_axis.clone(), rule.source_option_id.clone()));
+                approved_sources.insert((rule.source_axis.clone(), rule.source_option_id.clone()));
             }
         }
     }
@@ -439,47 +557,66 @@ fn validate_compilation(compilation: &Compilation, input: &ResidentIntent, vocab
     let mut declared_ids = compilation.mapping_rule_ids.clone();
     declared_ids.sort();
     if detailed_ids != declared_ids {
-        errors.push("mapping_rule_ids does not match detailed mapping_rules".to_owned());
+        errors.push("mapping_rule_ids differs from detailed mapping_rules".to_owned());
     }
-    match &compilation.mapping_state {
-        MappingState::NoOwnerReviewedMapping if compilation.mapping_rules.iter().any(|r| r.review_state == MappingReviewState::Approved) => {
-            errors.push("NO_OWNER_REVIEWED_MAPPING cannot contain approved mapping rules".to_owned());
+
+    match compilation.mapping_state {
+        MappingState::NoOwnerReviewedMapping
+            if compilation.mapping_rules.iter().any(|rule| rule.review_state == MappingReviewState::Approved) =>
+        {
+            errors.push("NO_OWNER_REVIEWED_MAPPING cannot contain approved mappings".to_owned());
         }
-        MappingState::Partial if compilation.mapping_rules.is_empty() || compilation.mapping_rules.iter().all(|r| r.review_state == MappingReviewState::Approved) => {
-            errors.push("PARTIAL mapping state needs covered and uncovered mapping scope".to_owned());
+        MappingState::Partial
+            if compilation.mapping_rules.is_empty()
+                || compilation.mapping_rules.iter().all(|rule| rule.review_state == MappingReviewState::Approved) =>
+        {
+            errors.push("PARTIAL requires both covered and uncovered mapping scope".to_owned());
         }
         MappingState::Qualified => {
-            if compilation.mapping_rules.is_empty() || compilation.mapping_rules.iter().any(|r| r.review_state != MappingReviewState::Approved) {
-                errors.push("QUALIFIED mapping state requires only owner-approved mapping rules".to_owned());
+            if compilation.mapping_rules.is_empty()
+                || compilation.mapping_rules.iter().any(|rule| rule.review_state != MappingReviewState::Approved)
+            {
+                errors.push("QUALIFIED requires only approved mapping rules".to_owned());
             }
-            let axes: Vec<(DesignAxis, Vec<String>)> = vec![
-                (DesignAxis::SpatialTypology, input.axis_intent.spatial_typology.entries.iter().map(|e| e.option_id.clone()).collect()),
-                (DesignAxis::ArchitecturalExpression, input.axis_intent.architectural_expression.entries.iter().map(|e| e.option_id.clone()).collect()),
-                (DesignAxis::MaterialTectonicIntent, input.axis_intent.material_tectonic_intent.entries.iter().map(|e| e.option_id.clone()).collect()),
-                (DesignAxis::EnvironmentalStrategyIntent, input.axis_intent.environmental_strategy_intent.entries.iter().map(|e| e.option_id.clone()).collect()),
-                (DesignAxis::ExperienceProgramme, input.axis_intent.experience_programme.entries.iter().map(|e| e.option_id.clone()).collect()),
+            let axes = [
+                (DesignAxis::SpatialTypology, input.axis_intent.spatial_typology.entries.iter().map(|e| e.option_id.as_str()).collect::<Vec<_>>()),
+                (DesignAxis::ArchitecturalExpression, input.axis_intent.architectural_expression.entries.iter().map(|e| e.option_id.as_str()).collect::<Vec<_>>()),
+                (DesignAxis::MaterialTectonicIntent, input.axis_intent.material_tectonic_intent.entries.iter().map(|e| e.option_id.as_str()).collect::<Vec<_>>()),
+                (DesignAxis::EnvironmentalStrategyIntent, input.axis_intent.environmental_strategy_intent.entries.iter().map(|e| e.option_id.as_str()).collect::<Vec<_>>()),
+                (DesignAxis::ExperienceProgramme, input.axis_intent.experience_programme.entries.iter().map(|e| e.option_id.as_str()).collect::<Vec<_>>()),
             ];
             for (axis, ids) in axes {
                 for id in ids {
-                    if !approved_pairs.contains(&(axis.clone(), id.clone())) {
-                        errors.push(format!("QUALIFIED mapping state lacks approved mapping for {axis:?}:{id}"));
+                    if !approved_sources.contains(&(axis.clone(), id.to_owned())) {
+                        errors.push(format!("QUALIFIED lacks approved mapping for {axis:?}:{id}"));
                     }
                 }
             }
             if !compilation.unresolved_conflicts.is_empty() {
-                errors.push("QUALIFIED mapping state cannot retain unresolved conflicts".to_owned());
+                errors.push("QUALIFIED cannot erase unresolved conflicts".to_owned());
             }
         }
         _ => {}
     }
 }
 
-pub fn validate_design_problem(problem: &DesignProblem, vocabulary: &CatalogueVocabulary) -> Result<(), Vec<String>> {
+pub fn validate_design_problem(
+    problem: &DesignProblem,
+    vocabulary: &CatalogueVocabulary,
+) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
-    if problem.schema_version != DESIGN_PROBLEM_SCHEMA_VERSION { errors.push("unsupported design-problem schema version".to_owned()); }
-    if problem.problem_id.trim().is_empty() { errors.push("problem_id is required".to_owned()); }
-    if problem.source_bindings.catalogue_revision != vocabulary.catalogue_revision { errors.push("catalogue revision does not match loaded vocabulary".to_owned()); }
-    if !problem.source_bindings.sol_atlas_pr.starts_with("https://github.com/") { errors.push("Sol-Atlas source must be an HTTPS GitHub PR URL".to_owned()); }
+    if problem.schema_version != DESIGN_PROBLEM_SCHEMA_VERSION {
+        errors.push("unsupported schema_version".to_owned());
+    }
+    if problem.problem_id.trim().is_empty() {
+        errors.push("problem_id is required".to_owned());
+    }
+    if problem.source_bindings.catalogue_revision != vocabulary.catalogue_revision {
+        errors.push("catalogue revision does not match parsed vocabulary".to_owned());
+    }
+    if !problem.source_bindings.sol_atlas_pr.starts_with("https://github.com/Luminous-Dynamics/sol-atlas-leptos/pull/") {
+        errors.push("Sol-Atlas source must be an explicit PR URL".to_owned());
+    }
     for (name, digest) in [
         ("sol_atlas_pr_head_sha", problem.source_bindings.sol_atlas_pr_head_sha.as_str()),
         ("catalogue_blob_sha", problem.source_bindings.catalogue_blob_sha.as_str()),
@@ -487,16 +624,25 @@ pub fn validate_design_problem(problem: &DesignProblem, vocabulary: &CatalogueVo
         ("conformance_corpus_blob_sha", problem.source_bindings.conformance_corpus_blob_sha.as_str()),
         ("conformance_corpus_schema_blob_sha", problem.source_bindings.conformance_corpus_schema_blob_sha.as_str()),
     ] {
-        if !is_git_sha1(digest) { errors.push(format!("{name} is not a lowercase 40-character Git object SHA")); }
+        if !is_lowercase_sha1(digest) {
+            errors.push(format!("{name} is not a lowercase 40-character Git object SHA"));
+        }
     }
+
     let input = &problem.input;
-    if input.grammar_id.trim().is_empty() || input.design_revision_ref.trim().is_empty() || input.source_fixture_ref.trim().is_empty() {
-        errors.push("grammar_id, design_revision_ref and source_fixture_ref are required".to_owned());
+    if input.grammar_id.trim().is_empty()
+        || input.design_revision_ref.trim().is_empty()
+        || input.source_fixture_ref.trim().is_empty()
+    {
+        errors.push("grammar_id/design_revision_ref/source_fixture_ref are required".to_owned());
     }
-    if input.resident_statement.len() > 3000 { errors.push("resident_statement exceeds the v0.2 contract limit".to_owned()); }
+    if input.resident_statement.chars().count() > 3000 {
+        errors.push("resident_statement exceeds upstream maximum length".to_owned());
+    }
     if !["UNKNOWN", "PARTIAL", "SOURCE_BOUND_NOT_QUALIFIED"].contains(&input.context_state.as_str()) {
-        errors.push("context_state is unsupported or over-claimed".to_owned());
+        errors.push("context state is unsupported or over-claimed".to_owned());
     }
+
     let axes = &input.axis_intent;
     validate_intent_axis("spatial_typology", &axes.spatial_typology, &vocabulary.spatial_typology_ids, &mut errors);
     validate_expression_axis(&axes.architectural_expression, vocabulary, &mut errors);
@@ -505,102 +651,284 @@ pub fn validate_design_problem(problem: &DesignProblem, vocabulary: &CatalogueVo
     validate_experience_axis(&axes.experience_programme, &vocabulary.experience_package_ids, &mut errors);
     validate_compilation(&problem.compilation, input, vocabulary, &mut errors);
 
-    if problem.compilation.state == CompilationState::ReadyForCandidateGeneration && problem.compilation.mapping_state != MappingState::Qualified {
+    if problem.compilation.state == CompilationState::ReadyForCandidateGeneration
+        && problem.compilation.mapping_state != MappingState::Qualified
+    {
         errors.push("READY_FOR_CANDIDATE_GENERATION requires QUALIFIED mapping state".to_owned());
     }
     if problem.generation_permissions.certification != CertificationPermission::Prohibited {
-        errors.push("this adapter must never issue certification".to_owned());
+        errors.push("certification must remain PROHIBITED".to_owned());
     }
-    if problem.generation_permissions.geometry_generation == GeometryGenerationPermission::AllowedWithQualifiedGeometryProvider
+    if problem.generation_permissions.geometry_generation
+        == GeometryGenerationPermission::AllowedWithQualifiedGeometryProvider
         && problem.compilation.mapping_state != MappingState::Qualified
     {
-        errors.push("geometry generation permission requires qualified intent mappings".to_owned());
+        errors.push("geometry permission requires qualified mapping".to_owned());
     }
-    if problem.generation_permissions.physical_evaluation == PhysicalEvaluationPermission::AllowedWithQualifiedSolverInputs
-        && problem.generation_permissions.geometry_generation != GeometryGenerationPermission::AllowedWithQualifiedGeometryProvider
+    if problem.generation_permissions.physical_evaluation
+        == PhysicalEvaluationPermission::AllowedWithQualifiedSolverInputs
+        && problem.generation_permissions.geometry_generation
+            != GeometryGenerationPermission::AllowedWithQualifiedGeometryProvider
     {
-        errors.push("physical evaluation permission requires qualified geometry permission".to_owned());
+        errors.push("physical evaluation permission requires geometry permission".to_owned());
     }
+    if problem.claim_ceiling != INTENT_ONLY_CLAIM_CEILING {
+        errors.push("claim_ceiling exceeds the intent-only contract".to_owned());
+    }
+
     if errors.is_empty() { Ok(()) } else { Err(errors) }
 }
 
-pub fn symbolic_candidate_generation_allowed(problem: &DesignProblem) -> bool {
-    problem.compilation.mapping_state == MappingState::Qualified
-        && problem.compilation.state == CompilationState::ReadyForCandidateGeneration
-        && problem.generation_permissions.symbolic_candidate_generation == SymbolicGenerationPermission::AllowedWithReviewedMappings
-        && problem.compilation.unresolved_conflicts.is_empty()
-        && problem.compilation.mapping_rules.iter().all(|rule| {
-            rule.review_state == MappingReviewState::Approved
-                && rule.source_ref.as_deref().is_some_and(|source| !source.is_empty())
-                && rule.owner_reviewer.as_deref().is_some_and(|reviewer| !reviewer.is_empty())
-        })
+/// The v0.1 crate intentionally does not activate candidate generation.
+/// A future Mycelix adapter must cryptographically verify authority receipts;
+/// a text field naming an owner/reviewer is not proof of approval.
+pub fn symbolic_candidate_generation_allowed(_problem: &DesignProblem) -> bool {
+    false
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct GeometryProviderQualification {
-    pub provider_id: String,
-    pub provider_revision: String,
-    pub qualified: bool,
-    pub exact_geometry_digest: Option<String>,
+pub struct ReplayReceipt {
+    pub problem_digest: String,
+    pub generator_build_digest: String,
+    pub seed: u64,
+    pub ordered_candidate_ids: Vec<String>,
 }
-
-pub fn geometry_handoff_eligible(problem: &DesignProblem, provider: &GeometryProviderQualification) -> bool {
-    symbolic_candidate_generation_allowed(problem)
-        && problem.generation_permissions.geometry_generation == GeometryGenerationPermission::AllowedWithQualifiedGeometryProvider
-        && provider.qualified && !provider.provider_id.is_empty() && !provider.provider_revision.is_empty()
-        && provider.exact_geometry_digest.as_deref().is_some_and(is_evidence_digest)
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct ObjectiveValue { pub objective_id: String, pub value: f64, pub unit: String, pub source_receipt_digest: String }
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct PhysicalEvaluationReceipt { pub owner_system: String, pub solver_version: String, pub exact_input_digest: String, pub qualified: bool }
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct Candidate {
-    pub candidate_id: String,
-    pub parent_candidate_ids: Vec<String>,
-    pub source_intent_refs: Vec<String>,
-    pub parameter_deltas: BTreeMap<String, Value>,
-    pub unresolved_requirements: Vec<String>,
-    pub hard_gate_state: GateState,
-    pub geometry_ref: Option<String>,
-    pub physical_evaluations: Vec<PhysicalEvaluationReceipt>,
-    pub objectives: Vec<ObjectiveValue>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum GateState { Pass, Fail, Unknown, Conditional }
-
-pub fn candidate_eligible_for_physical_pareto(candidate: &Candidate) -> bool {
-    candidate.hard_gate_state == GateState::Pass
-        && candidate.geometry_ref.as_deref().is_some_and(|r| !r.is_empty())
-        && !candidate.physical_evaluations.is_empty()
-        && candidate.physical_evaluations.iter().all(|r| r.qualified && !r.owner_system.is_empty() && !r.solver_version.is_empty() && is_evidence_digest(&r.exact_input_digest))
-        && !candidate.objectives.is_empty()
-        && candidate.objectives.iter().all(|o| o.value.is_finite() && !o.objective_id.is_empty() && !o.unit.is_empty() && is_evidence_digest(&o.source_receipt_digest))
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ReplayReceipt { pub problem_digest: String, pub generator_build_digest: String, pub seed: u64, pub ordered_candidate_ids: Vec<String> }
 
 pub fn design_problem_digest(problem: &DesignProblem) -> Result<String, serde_json::Error> {
     Ok(blake3::hash(&serde_json::to_vec(problem)?).to_hex().to_string())
 }
 
-pub fn derive_candidate_id(problem_digest: &str, generator_build_digest: &str, seed: u64, ordinal: u32, parameter_deltas: &BTreeMap<String, Value>) -> Result<String, serde_json::Error> {
-    let bytes = serde_json::to_vec(&(problem_digest, generator_build_digest, seed, ordinal, parameter_deltas))?;
+pub fn derive_candidate_id(
+    problem_digest: &str,
+    generator_build_digest: &str,
+    seed: u64,
+    ordinal: u32,
+    parameter_deltas: &BTreeMap<String, Value>,
+) -> Result<String, serde_json::Error> {
+    let bytes = serde_json::to_vec(&(
+        problem_digest,
+        generator_build_digest,
+        seed,
+        ordinal,
+        parameter_deltas,
+    ))?;
     Ok(format!("cand-{}", blake3::hash(&bytes).to_hex()))
 }
 
-pub fn replay_matches(expected: &ReplayReceipt, actual: &ReplayReceipt) -> bool { expected == actual }
+pub fn replay_matches(expected: &ReplayReceipt, actual: &ReplayReceipt) -> bool {
+    expected == actual
+}
+
+/// A finite categorical variable used by the exact-enumeration oracle.
+/// Values are sorted before expansion so results do not depend on source order.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DiscreteVariable {
+    pub variable_id: String,
+    pub domain: Vec<String>,
+}
+
+pub type Assignment = BTreeMap<String, String>;
+
+pub fn enumerate_assignments(
+    variables: &[DiscreteVariable],
+    max_assignments: usize,
+) -> Result<Vec<Assignment>, String> {
+    if variables.is_empty() {
+        return Err("search space must contain at least one variable".to_owned());
+    }
+    let mut variable_ids = BTreeSet::new();
+    let mut domains = Vec::with_capacity(variables.len());
+    let mut cardinality = 1usize;
+
+    for variable in variables {
+        if variable.variable_id.trim().is_empty() || !variable_ids.insert(variable.variable_id.clone()) {
+            return Err(format!("empty or duplicate variable ID: {}", variable.variable_id));
+        }
+        if variable.domain.is_empty() {
+            return Err(format!("{} has an empty domain", variable.variable_id));
+        }
+        let mut domain = variable.domain.clone();
+        domain.sort();
+        domain.dedup();
+        if domain.len() != variable.domain.len() {
+            return Err(format!("{} has duplicate domain values", variable.variable_id));
+        }
+        cardinality = cardinality
+            .checked_mul(domain.len())
+            .ok_or_else(|| "search-space cardinality overflow".to_owned())?;
+        if cardinality > max_assignments {
+            return Err(format!(
+                "search space has {cardinality} assignments, cap is {max_assignments}"
+            ));
+        }
+        domains.push(domain);
+    }
+
+    let mut assignments = vec![Assignment::new()];
+    for (variable, domain) in variables.iter().zip(domains) {
+        let mut next = Vec::with_capacity(assignments.len() * domain.len());
+        for partial in &assignments {
+            for value in &domain {
+                let mut assignment = partial.clone();
+                assignment.insert(variable.variable_id.clone(), value.clone());
+                next.push(assignment);
+            }
+        }
+        assignments = next;
+    }
+    Ok(assignments)
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ObjectiveDirection {
+    Minimize,
+    Maximize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct OracleObjective {
+    pub objective_id: String,
+    pub direction: ObjectiveDirection,
+    pub value: f64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct OracleEvaluation {
+    pub candidate_id: String,
+    pub gate_state: GateState,
+    pub objectives: Vec<OracleObjective>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum GateState {
+    Pass,
+    Fail,
+    Unknown,
+    Conditional,
+}
+
+fn dominates(left: &OracleEvaluation, right: &OracleEvaluation) -> bool {
+    if left.objectives.len() != right.objectives.len() || left.objectives.is_empty() {
+        return false;
+    }
+    let mut strictly_better = false;
+    for (l, r) in left.objectives.iter().zip(&right.objectives) {
+        if l.objective_id != r.objective_id || l.direction != r.direction {
+            return false;
+        }
+        let (no_worse, better) = match l.direction {
+            ObjectiveDirection::Minimize => (l.value <= r.value, l.value < r.value),
+            ObjectiveDirection::Maximize => (l.value >= r.value, l.value > r.value),
+        };
+        if !no_worse { return false; }
+        strictly_better |= better;
+    }
+    strictly_better
+}
+
+/// Compute an exact front over a finite, already evaluated set.
+/// Only PASS candidates with finite and structurally identical objective vectors
+/// are considered. FAIL/UNKNOWN/CONDITIONAL entries are never admitted.
+pub fn exact_pareto_front(evaluations: &[OracleEvaluation]) -> Result<Vec<String>, String> {
+    let mut ids = BTreeSet::new();
+    for evaluation in evaluations {
+        if evaluation.candidate_id.trim().is_empty() || !ids.insert(evaluation.candidate_id.clone()) {
+            return Err("candidate IDs must be non-empty and unique".to_owned());
+        }
+    }
+    let eligible: Vec<&OracleEvaluation> = evaluations
+        .iter()
+        .filter(|evaluation| {
+            evaluation.gate_state == GateState::Pass
+                && !evaluation.objectives.is_empty()
+                && evaluation.objectives.iter().all(|objective| {
+                    !objective.objective_id.trim().is_empty() && objective.value.is_finite()
+                })
+        })
+        .collect();
+    if let Some(first) = eligible.first() {
+        for candidate in &eligible[1..] {
+            if candidate.objectives.len() != first.objectives.len()
+                || candidate.objectives.iter().zip(&first.objectives).any(|(a, b)| {
+                    a.objective_id != b.objective_id || a.direction != b.direction
+                })
+            {
+                return Err("eligible candidates have mismatched objective schemas".to_owned());
+            }
+        }
+    }
+    let mut front = Vec::new();
+    for candidate in &eligible {
+        let dominated = eligible.iter().any(|other| {
+            other.candidate_id != candidate.candidate_id && dominates(other, candidate)
+        });
+        if !dominated {
+            front.push(candidate.candidate_id.clone());
+        }
+    }
+    front.sort();
+    Ok(front)
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ScenarioEvaluation {
+    pub scenario_id: String,
+    pub gate_state: GateState,
+    pub objectives: Vec<OracleObjective>,
+}
+
+/// Conservative worst-case aggregation over an explicitly supplied scenario set.
+/// Missing, unknown or failing scenarios abstain instead of being pooled away.
+pub fn worst_case_objectives(
+    scenarios: &[ScenarioEvaluation],
+) -> Result<Vec<OracleObjective>, String> {
+    if scenarios.is_empty() {
+        return Err("at least one named scenario is required".to_owned());
+    }
+    let mut scenario_ids = BTreeSet::new();
+    let first = &scenarios[0];
+    if first.scenario_id.trim().is_empty() || !scenario_ids.insert(first.scenario_id.clone()) {
+        return Err("scenario IDs must be non-empty and unique".to_owned());
+    }
+    if first.gate_state != GateState::Pass || first.objectives.is_empty() {
+        return Err("every scenario must PASS and contain objective values".to_owned());
+    }
+    let mut result = first.objectives.clone();
+    if result.iter().any(|objective| !objective.value.is_finite() || objective.objective_id.trim().is_empty()) {
+        return Err("scenario objective values must be finite and named".to_owned());
+    }
+
+    for scenario in &scenarios[1..] {
+        if scenario.scenario_id.trim().is_empty() || !scenario_ids.insert(scenario.scenario_id.clone()) {
+            return Err("scenario IDs must be non-empty and unique".to_owned());
+        }
+        if scenario.gate_state != GateState::Pass {
+            return Err(format!("scenario {} is not PASS; robust aggregate abstains", scenario.scenario_id));
+        }
+        if scenario.objectives.len() != result.len() {
+            return Err("scenario objective count differs".to_owned());
+        }
+        for (aggregate, observation) in result.iter_mut().zip(&scenario.objectives) {
+            if aggregate.objective_id != observation.objective_id
+                || aggregate.direction != observation.direction
+                || !observation.value.is_finite()
+            {
+                return Err(format!("scenario {} has incompatible objective schema/value", scenario.scenario_id));
+            }
+            match aggregate.direction {
+                ObjectiveDirection::Minimize => aggregate.value = aggregate.value.max(observation.value),
+                ObjectiveDirection::Maximize => aggregate.value = aggregate.value.min(observation.value),
+            }
+        }
+    }
+    Ok(result)
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    const SYNTHETIC_PROBLEM: &str = include_str!("../../../docs/research/built-environment/HOME_EXPRESSION_DESIGN_PROBLEM_SYNTHETIC_V0.1.json");
 
     fn synthetic_catalogue() -> Value {
         serde_json::json!({
@@ -616,111 +944,136 @@ mod tests {
         })
     }
 
-    #[test]
-    fn upstream_synthetic_problem_deserializes_and_validates() {
-        let vocabulary = CatalogueVocabulary::from_catalogue_json(&synthetic_catalogue().to_string()).unwrap();
-        let problem: DesignProblem = serde_json::from_str(SYNTHETIC_PROBLEM).unwrap();
-        assert!(validate_design_problem(&problem, &vocabulary).is_ok());
-        assert_eq!(problem.input.axis_intent.spatial_typology.state, AxisState::Undecided);
-        assert!(!symbolic_candidate_generation_allowed(&problem));
+    fn parsed_problem() -> DesignProblem {
+        serde_json::from_str(SYNTHETIC_PROBLEM).expect("synthetic problem must deserialize")
+    }
+
+    fn vocabulary() -> CatalogueVocabulary {
+        CatalogueVocabulary::from_catalogue_json(&synthetic_catalogue().to_string()).unwrap()
     }
 
     #[test]
-    fn unknown_source_option_is_rejected() {
-        let vocabulary = CatalogueVocabulary::from_catalogue_json(&synthetic_catalogue().to_string()).unwrap();
-        let mut problem: DesignProblem = serde_json::from_str(SYNTHETIC_PROBLEM).unwrap();
-        problem.input.axis_intent.material_tectonic_intent.entries[0].option_id = "UNLISTED_COMPOSITE".to_owned();
-        assert!(validate_design_problem(&problem, &vocabulary).is_err());
+    fn upstream_synthetic_problem_deserializes_and_validates() {
+        let problem = parsed_problem();
+        assert!(validate_design_problem(&problem, &vocabulary()).is_ok());
+        assert_eq!(problem.input.axis_intent.spatial_typology.state, AxisState::Undecided);
+        assert_eq!(problem.claim_ceiling, INTENT_ONLY_CLAIM_CEILING);
+    }
+
+    #[test]
+    fn unknown_or_duplicate_option_ids_are_rejected() {
+        let mut problem = parsed_problem();
+        problem.input.axis_intent.material_tectonic_intent.entries[0].option_id =
+            "UNLISTED_COMPOSITE".to_owned();
+        assert!(validate_design_problem(&problem, &vocabulary()).is_err());
+
+        let mut duplicate = parsed_problem();
+        duplicate.input.axis_intent.material_tectonic_intent.entries.push(
+            duplicate.input.axis_intent.material_tectonic_intent.entries[0].clone()
+        );
+        assert!(validate_design_problem(&duplicate, &vocabulary()).is_err());
     }
 
     #[test]
     fn reference_only_style_requires_catalogue_bound_source() {
-        let vocabulary = CatalogueVocabulary::from_catalogue_json(&synthetic_catalogue().to_string()).unwrap();
-        let mut problem: DesignProblem = serde_json::from_str(SYNTHETIC_PROBLEM).unwrap();
-        problem.input.axis_intent.architectural_expression.entries[1].source_refs = vec!["https://example.org/unbound".to_owned()];
-        assert!(validate_design_problem(&problem, &vocabulary).is_err());
+        let mut problem = parsed_problem();
+        problem.input.axis_intent.architectural_expression.entries[1].source_refs =
+            vec!["https://example.invalid/not-in-catalogue".to_owned()];
+        assert!(validate_design_problem(&problem, &vocabulary()).is_err());
     }
 
     #[test]
-    fn preferred_typology_conflict_is_not_collapsed() {
-        let vocabulary = CatalogueVocabulary::from_catalogue_json(&synthetic_catalogue().to_string()).unwrap();
-        let mut problem: DesignProblem = serde_json::from_str(SYNTHETIC_PROBLEM).unwrap();
+    fn unresolved_typology_conflict_is_preserved_not_resolved() {
+        let mut problem = parsed_problem();
         problem.input.axis_intent.spatial_typology = IntentAxis {
             state: AxisState::ConflictUnresolved,
             entries: vec![
                 OptionPreferenceEntry { option_id:"COURTYARD".to_owned(), preference:Preference::Preferred },
-                OptionPreferenceEntry { option_id:"ROW_TERRACE".to_owned(), preference:Preference::Preferred }
-            ]
+                OptionPreferenceEntry { option_id:"ROW_TERRACE".to_owned(), preference:Preference::Preferred },
+            ],
         };
-        assert!(validate_design_problem(&problem, &vocabulary).is_ok());
+        assert!(validate_design_problem(&problem, &vocabulary()).is_ok());
         problem.input.axis_intent.spatial_typology.state = AxisState::IntentOnlyNotEvaluated;
-        assert!(validate_design_problem(&problem, &vocabulary).is_err());
+        assert!(validate_design_problem(&problem, &vocabulary()).is_err());
     }
 
     #[test]
-    fn no_owner_reviewed_mapping_blocks_generation() {
-        let vocabulary = CatalogueVocabulary::from_catalogue_json(&synthetic_catalogue().to_string()).unwrap();
-        let problem: DesignProblem = serde_json::from_str(SYNTHETIC_PROBLEM).unwrap();
+    fn mapping_name_alone_never_authorizes_generation() {
+        let problem = parsed_problem();
         assert!(!symbolic_candidate_generation_allowed(&problem));
-        assert!(problem.compilation.mapping_rules.is_empty());
-        assert_eq!(problem.generation_permissions.certification, CertificationPermission::Prohibited);
+        assert_eq!(problem.compilation.mapping_state, MappingState::NoOwnerReviewedMapping);
     }
 
     #[test]
-    fn mapping_rules_must_match_catalogue_and_owner_approval() {
-        let vocabulary = CatalogueVocabulary::from_catalogue_json(&synthetic_catalogue().to_string()).unwrap();
-        let mut problem: DesignProblem = serde_json::from_str(SYNTHETIC_PROBLEM).unwrap();
-        let rule = MappingRule {
-            mapping_rule_id:"MAP-001".to_owned(),
-            source_axis:DesignAxis::MaterialTectonicIntent,
-            source_option_id:"STONE_MASONRY".to_owned(),
-            target_parameter:"assembly.material_family".to_owned(),
-            mapping_version:"0.1.0".to_owned(),
-            scope:"PAVILION_ONLY".to_owned(),
-            source_ref:Some("https://example.org/reviewed-material-spec".to_owned()),
-            owner_reviewer:Some("domain-owner".to_owned()),
-            review_state:MappingReviewState::OwnerReview
+    fn exact_source_bindings_require_lowercase_git_sha_shapes() {
+        let mut problem = parsed_problem();
+        problem.source_bindings.catalogue_blob_sha = "NOT_A_GIT_SHA".to_owned();
+        assert!(validate_design_problem(&problem, &vocabulary()).is_err());
+    }
+
+    #[test]
+    fn finite_domain_enumeration_is_exact_sorted_and_bounded() {
+        let variables = vec![
+            DiscreteVariable { variable_id:"topology".to_owned(), domain:vec!["courtyard".to_owned(),"row".to_owned()] },
+            DiscreteVariable { variable_id:"shade".to_owned(), domain:vec!["external".to_owned(),"internal".to_owned()] },
+        ];
+        let assignments = enumerate_assignments(&variables, 4).unwrap();
+        assert_eq!(assignments.len(), 4);
+        assert_eq!(assignments[0]["shade"], "external");
+        assert_eq!(assignments[3]["topology"], "row");
+        assert!(enumerate_assignments(&variables, 3).is_err());
+    }
+
+    #[test]
+    fn exact_oracle_excludes_invalid_and_returns_known_pareto_front() {
+        let make = |id: &str, gate_state: GateState, first: f64, second: f64| OracleEvaluation {
+            candidate_id:id.to_owned(),
+            gate_state,
+            objectives:vec![
+                OracleObjective {objective_id:"energy".to_owned(),direction:ObjectiveDirection::Minimize,value:first},
+                OracleObjective {objective_id:"water".to_owned(),direction:ObjectiveDirection::Minimize,value:second},
+            ],
         };
-        problem.compilation.mapping_state = MappingState::Partial;
-        problem.compilation.mapping_rule_ids = vec!["MAP-001".to_owned()];
-        problem.compilation.mapping_rules = vec![rule.clone()];
-        assert!(validate_design_problem(&problem, &vocabulary).is_ok());
-        assert!(!symbolic_candidate_generation_allowed(&problem));
-        let mut invalid = rule;
-        invalid.source_option_id = "UNLISTED_MATERIAL".to_owned();
-        problem.compilation.mapping_rules = vec![invalid];
-        assert!(validate_design_problem(&problem, &vocabulary).is_err());
+        let evaluations = vec![
+            make("a",GateState::Pass,5.0,5.0),
+            make("b",GateState::Pass,4.0,7.0),
+            make("c",GateState::Pass,7.0,4.0),
+            make("dominated",GateState::Pass,6.0,6.0),
+            make("invalid",GateState::Fail,1.0,1.0),
+            make("unknown",GateState::Unknown,0.5,0.5),
+        ];
+        assert_eq!(exact_pareto_front(&evaluations).unwrap(), vec!["a","b","c"]);
     }
 
     #[test]
-    fn unknown_or_failed_hard_gates_never_enter_physical_pareto() {
-        let mut candidate = Candidate {
-            candidate_id:"cand-1".to_owned(), parent_candidate_ids:vec![], source_intent_refs:vec![],
-            parameter_deltas:BTreeMap::new(), unresolved_requirements:vec![],
-            hard_gate_state:GateState::Unknown, geometry_ref:Some("geometry://exact".to_owned()),
-            physical_evaluations:vec![PhysicalEvaluationReceipt {owner_system:"symtropy".to_owned(),solver_version:"v1".to_owned(),exact_input_digest:"a".repeat(64),qualified:true}],
-            objectives:vec![ObjectiveValue {objective_id:"energy".to_owned(),value:10.0,unit:"kWh".to_owned(),source_receipt_digest:"b".repeat(64)}]
+    fn robust_worst_case_preserves_scenario_adversity_and_abstains_on_unknown() {
+        let scenario = |id: &str, gate: GateState, energy: f64, comfort: f64| ScenarioEvaluation {
+            scenario_id:id.to_owned(),
+            gate_state:gate,
+            objectives:vec![
+                OracleObjective {objective_id:"energy".to_owned(),direction:ObjectiveDirection::Minimize,value:energy},
+                OracleObjective {objective_id:"comfort_hours".to_owned(),direction:ObjectiveDirection::Maximize,value:comfort},
+            ],
         };
-        assert!(!candidate_eligible_for_physical_pareto(&candidate));
-        candidate.hard_gate_state = GateState::Pass;
-        assert!(candidate_eligible_for_physical_pareto(&candidate));
-        candidate.objectives[0].value = f64::NAN;
-        assert!(!candidate_eligible_for_physical_pareto(&candidate));
+        let result = worst_case_objectives(&[
+            scenario("dry-hot",GateState::Pass,10.0,120.0),
+            scenario("cool-wet",GateState::Pass,12.0,150.0),
+        ]).unwrap();
+        assert_eq!(result[0].value, 12.0);
+        assert_eq!(result[1].value, 120.0);
+        assert!(worst_case_objectives(&[
+            scenario("known",GateState::Pass,10.0,120.0),
+            scenario("unknown",GateState::Unknown,9.0,160.0),
+        ]).is_err());
     }
 
     #[test]
-    fn problem_digest_candidate_id_and_replay_are_deterministic() {
-        let vocabulary = CatalogueVocabulary::from_catalogue_json(&synthetic_catalogue().to_string()).unwrap();
-        let problem: DesignProblem = serde_json::from_str(SYNTHETIC_PROBLEM).unwrap();
-        assert!(validate_design_problem(&problem, &vocabulary).is_ok());
-        let digest = design_problem_digest(&problem).unwrap();
-        assert_eq!(digest, design_problem_digest(&problem).unwrap());
-        let deltas = BTreeMap::from([("intent.shading".to_owned(), Value::String("EXTERNAL".to_owned()))]);
-        assert_eq!(derive_candidate_id(&digest,"generator-build",7,0,&deltas).unwrap(), derive_candidate_id(&digest,"generator-build",7,0,&deltas).unwrap());
-        let receipt = ReplayReceipt {problem_digest:digest,generator_build_digest:"b".repeat(64),seed:7,ordered_candidate_ids:vec!["cand-1".to_owned(),"cand-2".to_owned()]};
-        let mut changed = receipt.clone();
-        changed.ordered_candidate_ids.reverse();
-        assert!(replay_matches(&receipt,&receipt));
-        assert!(!replay_matches(&receipt,&changed));
+    fn deterministic_problem_digest_and_candidate_ids_replay() {
+        let problem = parsed_problem();
+        let first = design_problem_digest(&problem).unwrap();
+        assert_eq!(first, design_problem_digest(&problem).unwrap());
+        let deltas = BTreeMap::from([("intent.shade".to_owned(),Value::String("external".to_owned()))]);
+        let id = derive_candidate_id(&first,"generator-build",7,0,&deltas).unwrap();
+        assert_eq!(id,derive_candidate_id(&first,"generator-build",7,0,&deltas).unwrap());
     }
 }
