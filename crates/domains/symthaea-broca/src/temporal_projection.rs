@@ -22,10 +22,63 @@
 //! - `ln_gamma`, `ln_beta`: `[256]` each — LayerNorm
 //! - Total: ~393K params (36× fewer than spatial projection)
 
+use anyhow::{ensure, Result};
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 
 use crate::projection::{GradientStepMetrics, LocalFepLayer};
+
+/// Align a teacher-forced hidden-state trajectory to the temporal projection's
+/// chunk count using endpoint-preserving linear interpolation.
+///
+/// Input shape: [teacher_tokens, hidden_dim].
+/// Output shape: [target_steps * hidden_dim], flattened row-major.
+///
+/// A one-token target is repeated across requested steps because it contains no
+/// temporal variation to interpolate. Otherwise, every output step is sampled at
+/// an evenly spaced location over the observed teacher-forced trajectory.
+pub(crate) fn align_teacher_hidden_states(
+    teacher_states: &[Vec<f32>],
+    target_steps: usize,
+    hidden_dim: usize,
+) -> Result<Vec<f32>> {
+    ensure!(!teacher_states.is_empty(), "teacher trajectory is empty");
+    ensure!(target_steps > 0, "target step count must be positive");
+    ensure!(hidden_dim > 0, "hidden dimension must be positive");
+
+    for (step, state) in teacher_states.iter().enumerate() {
+        ensure!(
+            state.len() == hidden_dim,
+            "teacher state {step} has dimension {}, expected {hidden_dim}",
+            state.len()
+        );
+        ensure!(
+            state.iter().all(|value| value.is_finite()),
+            "teacher state {step} contains a non-finite value"
+        );
+    }
+
+    let mut aligned = Vec::with_capacity(target_steps * hidden_dim);
+    for target_index in 0..target_steps {
+        let source_position = if target_steps == 1 || teacher_states.len() == 1 {
+            0.0
+        } else {
+            target_index as f32 * (teacher_states.len() - 1) as f32
+                / (target_steps - 1) as f32
+        };
+        let lower = source_position.floor() as usize;
+        let upper = source_position.ceil() as usize;
+        let fraction = source_position - lower as f32;
+
+        for dimension in 0..hidden_dim {
+            let left = teacher_states[lower][dimension];
+            let right = teacher_states[upper][dimension];
+            aligned.push(left + (right - left) * fraction);
+        }
+    }
+
+    Ok(aligned)
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LOCAL FEP LEARNING (Predictive Coding)
@@ -39,6 +92,22 @@ impl LocalFepLayer for TemporalProjection {
         observation: &[f32], // Observed SSM states (after teacher forcing)
         lr: f32,
     ) -> f64 {
+        // This trait cannot return Result, so fail loudly before indexing if a caller
+        // violates the sequence contract. The teacher trajectory must be aligned to
+        // [num_chunks, ssm_dim] before reaching this update.
+        let expected_ssm_values = self.num_chunks * self.ssm_dim;
+        assert_eq!(input.len(), self.hdc_dim, "HDC input dimension mismatch");
+        assert_eq!(
+            prediction.len(),
+            expected_ssm_values,
+            "temporal prediction must contain one SSM vector per chunk"
+        );
+        assert_eq!(
+            observation.len(),
+            expected_ssm_values,
+            "temporal observation must be aligned to one SSM vector per chunk"
+        );
+
         let mut total_cost = 0.0;
 
         // Predictive Coding: update each chunk's up-projection locally
@@ -2230,6 +2299,56 @@ mod tests {
 
     fn test_genesis() -> GenesisSeed {
         GenesisSeed::from_phrase("test-temporal-projection")
+    }
+
+    #[test]
+    fn teacher_trajectory_alignment_preserves_endpoints_and_interpolates() {
+        let states = vec![vec![0.0, 10.0], vec![2.0, 14.0]];
+        let aligned = align_teacher_hidden_states(&states, 4, 2).unwrap();
+
+        assert_eq!(aligned.len(), 8);
+        assert_eq!(&aligned[0..2], &[0.0, 10.0]);
+        assert!((aligned[2] - (2.0 / 3.0)).abs() < 1e-6);
+        assert!((aligned[3] - (10.0 + 4.0 / 3.0)).abs() < 1e-6);
+        assert!((aligned[6] - 2.0).abs() < 1e-6);
+        assert!((aligned[7] - 14.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn teacher_trajectory_alignment_supports_one_chunk_and_one_token() {
+        let states = vec![vec![3.0, 5.0], vec![7.0, 9.0]];
+        assert_eq!(
+            align_teacher_hidden_states(&states, 1, 2).unwrap(),
+            vec![3.0, 5.0]
+        );
+        assert_eq!(
+            align_teacher_hidden_states(&[vec![4.0, 6.0]], 4, 2).unwrap(),
+            vec![4.0, 6.0, 4.0, 6.0, 4.0, 6.0, 4.0, 6.0]
+        );
+    }
+
+    #[test]
+    fn teacher_trajectory_alignment_handles_64_chunks_and_detects_reversed_time() {
+        let forward: Vec<Vec<f32>> = (0..5).map(|step| vec![step as f32; 3]).collect();
+        let reversed: Vec<Vec<f32>> = forward.iter().cloned().rev().collect();
+
+        let aligned = align_teacher_hidden_states(&forward, 64, 3).unwrap();
+        let wrong_order = align_teacher_hidden_states(&reversed, 64, 3).unwrap();
+
+        assert_eq!(aligned.len(), 64 * 3);
+        assert_eq!(&aligned[0..3], &[0.0, 0.0, 0.0]);
+        assert_eq!(&aligned[63 * 3..64 * 3], &[4.0, 4.0, 4.0]);
+        assert_eq!(&wrong_order[0..3], &[4.0, 4.0, 4.0]);
+        assert_eq!(&wrong_order[63 * 3..64 * 3], &[0.0, 0.0, 0.0]);
+        assert_ne!(aligned, wrong_order, "reversed teacher time must be detectable");
+    }
+
+    #[test]
+    fn teacher_trajectory_alignment_rejects_bad_shapes_and_non_finite_values() {
+        assert!(align_teacher_hidden_states(&[], 2, 3).is_err());
+        assert!(align_teacher_hidden_states(&[vec![1.0, 2.0]], 2, 3).is_err());
+        assert!(align_teacher_hidden_states(&[vec![f32::NAN]], 2, 1).is_err());
+        assert!(align_teacher_hidden_states(&[vec![1.0]], 0, 1).is_err());
     }
 
     #[test]
