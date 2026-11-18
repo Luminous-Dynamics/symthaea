@@ -13,6 +13,7 @@ It uses sparse integer-coefficient polynomials in \`(x1, x2, v1, v2)\`. The impl
 - Gram-determinant identity:
   \`(x · x)(v · v) - (x · v)^2 - det(x, v)^2 = 0\`.
 - Exact reduced invariant dynamics for \`a = x·x\`, \`b = x·v\`, \`c = v·v\`, and \`ell = det(x,v)\`.
+- SO(2) invariance checks for the four quotient observables and rejection of absolute external-frame coordinate `x1`.
 - Conservation of signed angular momentum.
 - Conservation of the integer-scaled energy \`2(m+1)H\`.
 - Rejection of the unequal-stiffness oscillator as SO(2)-equivariant.
