@@ -1,0 +1,516 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:lightshell-robust-downselect:0.1.0",
+  "title": "Atelier Lightshell Robust Zone Candidate Decision",
+  "description": "Consumes zone requirements, physical coupon evidence and MAT-UQ calibration records to admit robust candidates and compute conservative interval-Pareto fronts. Not material or robot qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "decision_id",
+    "stage",
+    "platform_id",
+    "article_revision",
+    "geometry_digest",
+    "zone_id",
+    "zone_requirement_ref",
+    "zone_requirement_revision",
+    "requirements_state",
+    "mission_profile_ref",
+    "decision_domain_ref",
+    "confirmatory_plan_ref",
+    "requirements",
+    "candidates",
+    "evidence_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "decision_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "exploratory",
+        "downselection",
+        "confirmatory"
+      ]
+    },
+    "platform_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "article_revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "geometry_digest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[0-9a-fA-F]{64}$"
+    },
+    "zone_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "zone_requirement_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "zone_requirement_revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "requirements_state": {
+      "enum": [
+        "proposed",
+        "frozen"
+      ]
+    },
+    "mission_profile_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "decision_domain_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "confirmatory_plan_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "requirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "unit",
+          "direction",
+          "role",
+          "lower_limit",
+          "upper_limit",
+          "requirement_ref",
+          "acceptance_rule_ref"
+        ],
+        "properties": {
+          "metric_id": {
+            "enum": [
+              "compression_energy_j_g",
+              "transmitted_force_n",
+              "vibration_transmissibility_ratio",
+              "air_permeability_mm_s",
+              "temperature_delta_c",
+              "joint_rom_delta_deg",
+              "flex_fatigue_cycles",
+              "minimum_clearance_mm",
+              "abrasion_cycles",
+              "fluid_ingress_mass_g_m2",
+              "chemical_mass_change_pct",
+              "cleaning_residue_fraction",
+              "sensor_occlusion_fraction",
+              "repair_time_min",
+              "added_mass_g",
+              "seam_strength_n",
+              "transition_strain_concentration_ratio",
+              "stiffness_jump_ratio",
+              "compression_continuity_ratio",
+              "seam_fatigue_cycles",
+              "peel_strength_n_per_mm",
+              "delamination_cycles",
+              "attachment_retention_cycles"
+            ]
+          },
+          "unit": {
+            "enum": [
+              "J/g",
+              "N",
+              "ratio",
+              "mm/s",
+              "degC",
+              "deg",
+              "cycles",
+              "mm",
+              "g/m2",
+              "%",
+              "fraction",
+              "min",
+              "g",
+              "N/mm"
+            ]
+          },
+          "direction": {
+            "enum": [
+              "higher_is_better",
+              "lower_is_better",
+              "within_declared_band"
+            ]
+          },
+          "role": {
+            "enum": [
+              "hard_gate",
+              "pareto_objective"
+            ]
+          },
+          "lower_limit": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "upper_limit": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "requirement_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "acceptance_rule_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_id",
+          "construction_ref",
+          "material_lot_ref",
+          "process_route_ref",
+          "process_revision_ref",
+          "manufacturing_article_ref",
+          "process_capability_state",
+          "machine_ref",
+          "machine_program_revision_ref",
+          "process_capability_evidence_ref",
+          "transition_ref",
+          "properties"
+        ],
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "construction_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "material_lot_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "process_route_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "process_revision_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "manufacturing_article_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "process_capability_state": {
+            "enum": [
+              "unknown",
+              "pending",
+              "preflight_passed",
+              "qualified",
+              "not_capable"
+            ]
+          },
+          "machine_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machine_program_revision_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "process_capability_evidence_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "transition_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "properties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "metric_id",
+                "unit",
+                "lower_bound",
+                "upper_bound",
+                "interval_semantics",
+                "coverage_fraction",
+                "evidence_origin",
+                "applicability_state",
+                "uncertainty_profile_ref",
+                "calibration_receipt_ref",
+                "predictor_generation_ref",
+                "calibration_receipt_predictor_generation_ref",
+                "calibration_domain_ref",
+                "coupon_evidence_ref",
+                "coupon_run_ref",
+                "method_selection_ref",
+                "raw_data_digest",
+                "evidence_material_lot_ref",
+                "evidence_process_revision_ref",
+                "evidence_construction_ref"
+              ],
+              "properties": {
+                "metric_id": {
+                  "enum": [
+                    "compression_energy_j_g",
+                    "transmitted_force_n",
+                    "vibration_transmissibility_ratio",
+                    "air_permeability_mm_s",
+                    "temperature_delta_c",
+                    "joint_rom_delta_deg",
+                    "flex_fatigue_cycles",
+                    "minimum_clearance_mm",
+                    "abrasion_cycles",
+                    "fluid_ingress_mass_g_m2",
+                    "chemical_mass_change_pct",
+                    "cleaning_residue_fraction",
+                    "sensor_occlusion_fraction",
+                    "repair_time_min",
+                    "added_mass_g",
+                    "seam_strength_n",
+                    "transition_strain_concentration_ratio",
+                    "stiffness_jump_ratio",
+                    "compression_continuity_ratio",
+                    "seam_fatigue_cycles",
+                    "peel_strength_n_per_mm",
+                    "delamination_cycles",
+                    "attachment_retention_cycles"
+                  ]
+                },
+                "unit": {
+                  "enum": [
+                    "J/g",
+                    "N",
+                    "ratio",
+                    "mm/s",
+                    "degC",
+                    "deg",
+                    "cycles",
+                    "mm",
+                    "g/m2",
+                    "%",
+                    "fraction",
+                    "min",
+                    "g",
+                    "N/mm"
+                  ]
+                },
+                "lower_bound": {
+                  "type": "number"
+                },
+                "upper_bound": {
+                  "type": "number"
+                },
+                "interval_semantics": {
+                  "enum": [
+                    "bounded_interval",
+                    "measurement_interval",
+                    "prediction_interval"
+                  ]
+                },
+                "coverage_fraction": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0,
+                  "maximum": 1
+                },
+                "evidence_origin": {
+                  "enum": [
+                    "physical_measurement",
+                    "calibrated_prediction",
+                    "simulation",
+                    "supplier_claim",
+                    "synthetic"
+                  ]
+                },
+                "applicability_state": {
+                  "enum": [
+                    "in_declared_domain",
+                    "near_boundary",
+                    "ood_detected",
+                    "ood_suspected",
+                    "unknown"
+                  ]
+                },
+                "uncertainty_profile_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "calibration_receipt_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "predictor_generation_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "calibration_receipt_predictor_generation_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "calibration_domain_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "coupon_evidence_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "coupon_run_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "method_selection_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "raw_data_digest": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^sha256:[0-9a-fA-F]{64}$"
+                },
+                "evidence_material_lot_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "evidence_process_revision_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "evidence_construction_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "evidence_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unknown_is_not_zero",
+        "physical_and_predicted_evidence_never_mix",
+        "ood_or_unknown_applicability_blocks_prediction",
+        "process_capability_required_for_physical_downselection",
+        "no_weighted_aggregate_score",
+        "robust_pareto_uses_interval_dominance",
+        "this_is_not_robot_or_material_qualification"
+      ],
+      "properties": {
+        "unknown_is_not_zero": {
+          "const": true
+        },
+        "physical_and_predicted_evidence_never_mix": {
+          "const": true
+        },
+        "ood_or_unknown_applicability_blocks_prediction": {
+          "const": true
+        },
+        "process_capability_required_for_physical_downselection": {
+          "const": true
+        },
+        "no_weighted_aggregate_score": {
+          "const": true
+        },
+        "robust_pareto_uses_interval_dominance": {
+          "const": true
+        },
+        "this_is_not_robot_or_material_qualification": {
+          "const": true
+        }
+      }
+    }
+  }
+}
