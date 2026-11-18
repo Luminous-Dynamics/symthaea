@@ -62,7 +62,7 @@
         "shot_id",
         "frame_id",
         "frame_time_ns",
-        "exact_input_frame_sha256",
+        "input_frame_sha256",
         "horizon_ns",
         "target_time_ns",
         "model_id",
