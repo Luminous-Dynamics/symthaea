@@ -421,9 +421,9 @@ fn run_chain(
     let stiffness_status = if min_stiffness_eigenvalue
         < -model.stiffness_tolerance
     {
-        "hard_failure_negative_stiffness_estimate"
+        "negative_point_estimate_stable_claim_not_permitted_pending_uncertainty"
     } else {
-        "nonnegative_sample_point_estimate_uncertainty_unresolved"
+        "nonnegative_point_estimate_uncertainty_unresolved"
     };
 
     let energy_variance = population_variance(&energy_series);
@@ -539,8 +539,8 @@ pub(super) fn run(
         })
         .fold(f64::INFINITY, f64::min);
     let any_negative = chains.iter().any(|chain| {
-        chain["twist_response"]["stiffness_positivity_gate"]
-            == "hard_failure_negative_stiffness_estimate"
+        chain["twist_response"]["stiffness_positivity_gate"].as_str()
+            == Some("negative_point_estimate_stable_claim_not_permitted_pending_uncertainty")
     });
 
     Ok(json!({
@@ -608,6 +608,52 @@ mod tests {
             assert!(chain["observables"]["energy_per_site"]["mean"].as_f64().unwrap().is_finite());
             assert!(chain["twist_response"]["minimum_stiffness_eigenvalue"].as_f64().unwrap().is_finite());
             assert_eq!(chain["raw_measurements"].as_array().unwrap().len(), 4);
+        }
+    }
+
+    #[test]
+    fn short_pilot_reports_component_amplitudes_phase_locking_and_stiffness_gate() {
+        let (model, fixture, temperature) = inputs();
+        let output = run(
+            &model,
+            temperature,
+            &fixture,
+            SamplingOverrides {
+                warmup_sweeps: Some(2),
+                measurement_sweeps: Some(4),
+                independent_chains: Some(2),
+                random_seed: Some(77),
+                ..SamplingOverrides::default()
+            },
+        )
+        .unwrap();
+        for chain in output["chain_receipts"].as_array().unwrap() {
+            assert_eq!(
+                chain["observables"]["component_amplitudes"]
+                    .as_array()
+                    .unwrap()
+                    .len(),
+                model.components.len()
+            );
+            assert_eq!(
+                chain["observables"]["relative_phase_locking"]
+                    .as_array()
+                    .unwrap()
+                    .len(),
+                model.phase_locking_terms.len()
+            );
+            let status = chain["twist_response"]["stiffness_positivity_gate"]
+                .as_str()
+                .unwrap();
+            assert!(status == "negative_point_estimate_stable_claim_not_permitted_pending_uncertainty"
+                || status == "nonnegative_point_estimate_uncertainty_unresolved");
+            assert!(chain["raw_measurements"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|row| row["component_mean_amplitudes"]
+                    .as_array()
+                    .is_some_and(|values| values.len() == model.components.len())));
         }
     }
 
