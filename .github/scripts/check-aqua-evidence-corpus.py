@@ -23,7 +23,7 @@ CORPUS_PATH = ROOT / "docs/research/aqua-evidence-corpus-v0.1.json"
 RENDER_PATH = ROOT / "docs/research/AQUA_EVIDENCE_CORPUS_V0_1.md"
 
 ALLOWED_SOURCE_TYPES = {
-    "manufacturer_declaration": {"manufacturer_datasheet"},
+    "manufacturer_declaration": {"manufacturer_datasheet", "manufacturer_product_page"},
     "independent_laboratory_measurement": {"independent_market_study"},
     "standard_or_programme_criterion": {
         "official_standard_or_programme",
@@ -39,6 +39,8 @@ EXPECTED_VALUES = {
     "supply_pressure_range": ("range", "kPa"),
     "maximum_flow_rate": ("scalar", "L/min"),
     "flow_regulator_setting": ("scalar", "L/min"),
+    "task_selective_boost_feature": ("text", None),
+    "manufacturer_specification_scope_ambiguity": ("text", None),
     "minimum_operating_pressure": ("scalar", "kPa"),
     "maximum_operating_pressure": ("range", "kPa"),
     "minimum_function_flow": ("scalar", "L/min"),
