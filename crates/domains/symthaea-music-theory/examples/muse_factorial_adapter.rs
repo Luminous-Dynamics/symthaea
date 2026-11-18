@@ -662,11 +662,17 @@ fn run() -> Result<(), String> {
         manifest_sha256
     );
 
-    if failed_cases > 0 || not_applicable_rows > 0 {
+    if failed_cases > 0 {
         return Err(format!(
-            "composer adapter produced {} failed cases and {} not-applicable metric rows; inspect the CSV and run analyze-results (non-pass)",
-            failed_cases, not_applicable_rows
+            "composer adapter produced {} failed cases; inspect the CSV and run analyze-results to preserve the incomplete denominator",
+            failed_cases
         ));
+    }
+    if not_applicable_rows > 0 {
+        eprintln!(
+            "adapter completed with {} not-applicable metric rows; the result analyzer will retain them and suppress incomplete-block estimates",
+            not_applicable_rows
+        );
     }
     Ok(())
 }
