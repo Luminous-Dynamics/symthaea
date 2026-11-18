@@ -99,3 +99,58 @@ Claim boundary: this is an adapter contract, not evidence that Symthaea currentl
 
 
 The Rust adapter now contains a deterministic exact Pareto-front oracle and a separate exact hypervolume function. Hypervolume is computed over PASS-only fronts, supports any objective dimension and mixed minimize/maximize directions, rejects malformed PASS receipts, and requires a manifest-pinned reference point and explicit unit/normalization bounds. Regression tests include a hand-computed 2D union, mixed directions, invalid reference points and the five-objective FloorPlanBench shape. This is a metric implementation, not a FloorPlanBench reproduction.
+
+
+## FloorPlanBench exact metric contract
+
+The reproduction target is pinned to the MIT FloorPlanBench source commit
+`7dfcca3dda6b11b4808a259499143e9bd75ed878`. The checked-in synthetic manifest
+`FLOORPLANBENCH_REPRO_MANIFEST_SYNTHETIC_V0.1.json` and schema bind the exact
+upstream source-object SHAs and the scoring rules.
+
+FloorPlanBench stores nine raw objectives, but only five define dominance and
+hypervolume:
+
+| Objective | Direction | Unit / interpretation |
+|---|---|---|
+| `efficiency` | maximize | non-circulation room area / boundary area |
+| `circulation` | minimize | trip-weighted door-graph path length in metres |
+| `daylight` | maximize | geometric daylit-zone proxy |
+| `privacy` | maximize | door-graph privacy-depth proxy |
+| `carbon` | minimize | partition + envelope + slab embodied-carbon proxy |
+
+The four additional raw metrics are preferred adjacency, compactness, exterior
+exposure and accessibility; preserve them in run records, but do not insert
+them into the five-dimensional dominance relation.
+
+The upstream task-local transform maps the five headline objectives into a
+minimization vector in `[0,1]`:
+
+- efficiency: `1 - raw_efficiency`;
+- circulation: `raw_circulation / circulation_reference`, where the reference
+  is twice the boundary diagonal;
+- daylight: `1 - raw_daylight_proxy`;
+- privacy: `1 - raw_privacy_proxy`;
+- carbon: `(raw_carbon - carbon_floor) / (carbon_upper - carbon_floor)`, where
+  `carbon_floor` is the fixed envelope + slab estimate and `carbon_upper` is
+  the task-specific worst-case carbon upper bound.
+
+Exact hypervolume uses reference point `[1.0001; 5]`. The values for the
+circulation and carbon normalization bounds are **per task**. The same raw
+metrics, bounds, objective order and reference point must be frozen for every
+method/seed on that task. Cross-task hypervolume comparisons are not valid
+unless normalization references are reconciled. Daylight is a geometric
+6-metre window-depth proxy, not Radiance/EnergyPlus; carbon is a simple embodied
+proxy, not a lifecycle assessment.
+
+Symthaea's `normalize_evaluations` requires those raw bounds to be declared,
+turns all directions into minimization, and rejects out-of-range values rather
+than clipping them. `exact_hypervolume` then rejects a reference point that
+does not bound every PASS candidate. The implementation uses an exact
+dimension-sweep algorithm; the Rust regression suite cross-checks it against
+a test-only WFG reference implementation over 2D–5D fronts.
+
+**The manifest's example task is synthetic and its circulation/carbon numeric
+bounds are placeholders.** It is not a canonical FloorPlanBench task and
+provides no benchmark result. The 1,960-run canonical reproduction remains
+unstarted pending the external source/test/run capture in issue #12778.
