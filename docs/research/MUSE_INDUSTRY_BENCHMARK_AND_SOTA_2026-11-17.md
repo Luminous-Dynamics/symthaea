@@ -252,3 +252,20 @@ Suno Studio 2.0 (13 August 2026) already advertises MIDI editing, automation, sy
 - ICASSP 2027 Audio Editing Challenge / MMAE: https://audio-editing-challenge.github.io/
 - CAST (Scientific Reports, 14 Apr 2026): https://www.nature.com/articles/s41598-026-46750-0
 - Suno Studio 2.0 official notes: https://help.suno.com/en/articles/13670529
+
+
+### Recent symbolic-control baseline — published 2026-11-17
+
+Mishra and Suma's lightweight controllable-polyphonic-generation study is a timely comparator for prompt-to-symbolic control. It maps natural-language prompts to deterministic genre, tempo and note-density tokens, and compares an LSTM with a decoder-only Transformer trained on approximately 11,000 MIDI files.
+
+Reported results:
+- Transformer prompt adherence on 150 generations: genre 82.0%, tempo 88.7%, density 88.0%.
+- Transformer output: 7.1 notes/s and 28.1% polyphony, versus the paper's human reference cohort of 5.20±2.14 notes/s and 32.50±8.42%.
+- LSTM output suffered temporal collapse: 47.3 notes/s and 86.4% polyphony despite comparable cross-entropy convergence.
+- The rule parser does not handle negation or conflicting controls and resolves ambiguous matches by choosing the last matched token. Genre labels are instrument-program heuristics, with 85.6% accuracy and κ=0.82 on a 250-track manually reviewed subset. The prompt-adherence cohort is small (N=150), and the paper lists code as not applicable.
+
+This paper is useful evidence that loss-only evaluation misses temporal failure and that lightweight symbolic controls can be competitive on modest hardware. It is not a comprehensive SOTA result and does not test exact event preservation, complex formal obligations, source-grounded edits, or reciprocal collaboration.
+
+**Muse implication:** extend the control surface beyond coarse genre/tempo/density classes. Measure each requested control as an intervention; require exact supported symbolic constraints, quantify off-target drift, include negation/conflict/underspecified prompts, and report note density/polyphony distributions by style and section rather than optimizing one global mean. The paper's GAR/TAR/DAR values are comparison context only, not a directly matched benchmark result.
+
+Source: Mishra & Suma, *A lightweight natural language conditioning framework for controllable polyphonic music generation*, published 17 November 2026, https://doi.org/10.1007/s44163-026-02725-8
