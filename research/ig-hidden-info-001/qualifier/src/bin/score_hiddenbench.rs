@@ -128,8 +128,18 @@ fn load_run_records(path: &str) -> Result<(Value, Vec<Value>), String> {
     if let Some(conditions) = results.get("conditions").and_then(Value::as_array) {
         for condition in conditions {
             if let Some(runs) = condition.get("runs").and_then(Value::as_array) {
+                let condition_metadata = serde_json::json!({
+                    "condition_id": condition.get("condition_id"),
+                    "model": condition.get("model"),
+                    "percentage_special": condition.get("percentage_special"),
+                    "discussion_mode": condition.get("discussion_mode")
+                });
                 for run in runs {
-                    flattened.push(run.clone());
+                    let mut enriched = run.clone();
+                    if let Some(object) = enriched.as_object_mut() {
+                        object.entry("_condition").or_insert(condition_metadata.clone());
+                    }
+                    flattened.push(enriched);
                 }
             }
         }
@@ -140,60 +150,136 @@ fn load_run_records(path: &str) -> Result<(Value, Vec<Value>), String> {
     Ok((results, flattened))
 }
 
-fn load_multiple_run_records(paths: &[String]) -> Result<(Value, Vec<Value>), String> {
-    if paths.is_empty() {
-        return Err("at least one hidden-profile result file is required".to_string());
+fn result_model_name(results: &Value) -> Option<String> {
+    if let Some(model) = metadata_string(results, "model") {
+        if !model.trim().is_empty() {
+            return Some(model);
+        }
     }
 
-    let mut combined_metadata: Option<Value> = None;
+    let mut models = std::collections::BTreeSet::<String>::new();
+    if let Some(conditions) = results.get("conditions").and_then(Value::as_array) {
+        for condition in conditions {
+            if let Some(model) = condition.get("model").and_then(Value::as_str) {
+                if !model.trim().is_empty() {
+                    models.insert(model.to_string());
+                }
+            }
+        }
+    }
+    if let Some(runs) = results.get("runs").and_then(Value::as_array) {
+        for run in runs {
+            if let Some(model) = run.get("model").and_then(Value::as_str) {
+                if !model.trim().is_empty() {
+                    models.insert(model.to_string());
+                }
+            }
+        }
+    }
+    if models.len() == 1 {
+        models.into_iter().next()
+    } else if models.is_empty() {
+        None
+    } else {
+        Some(models.into_iter().collect::<Vec<_>>().join(","))
+    }
+}
+
+fn result_profile_name(results: &Value) -> Option<String> {
+    if let Some(profile) = metadata_string(results, "profile") {
+        if !profile.trim().is_empty() {
+            return Some(profile);
+        }
+    }
+
+    let mut profiles = std::collections::BTreeSet::<String>::new();
+    if let Some(runs) = results.get("runs").and_then(Value::as_array) {
+        for run in runs.iter().take(10) {
+            if let Some(profile) = run.get("profile").and_then(Value::as_str) {
+                if !profile.trim().is_empty() {
+                    profiles.insert(profile.to_string());
+                }
+            }
+        }
+    }
+    if profiles.len() == 1 {
+        return profiles.into_iter().next();
+    }
+    if profiles.len() > 1 {
+        return Some(profiles.into_iter().collect::<Vec<_>>().join(","));
+    }
+
+    if let Some(conditions) = results.get("conditions").and_then(Value::as_array) {
+        if conditions.iter().any(|condition| {
+            condition.get("percentage_special").is_some_and(|value| !value.is_null())
+        }) {
+            return Some("legacy".to_string());
+        }
+    }
+    None
+}
+
+fn require_single_identity(value: Option<String>, field: &str, path: &str) -> Result<Option<String>, String> {
+    if let Some(value) = &value {
+        if value.contains(',') {
+            return Err(format!("{field} is ambiguous across multiple values in {path}: {value}"));
+        }
+    }
+    Ok(value)
+}
+
+fn load_multiple_run_records(
+    paths: &[String],
+    expected_profile: &str,
+) -> Result<(Value, Vec<Value>), String> {
+    if paths.is_empty() {
+        return Err("at least one result file is required".to_string());
+    }
+
     let mut combined_runs = Vec::new();
     let mut expected_model: Option<String> = None;
-    let mut expected_profile: Option<String> = None;
+    let mut observed_profiles = std::collections::BTreeSet::<String>::new();
 
     for path in paths {
-        let (metadata, runs) = load_run_records(path)?;
-        let model = metadata_string(&metadata, "model");
-        let profile = metadata_string(&metadata, "profile");
-        if profile.as_deref().is_some_and(|value| value != "hidden") {
-            return Err(format!("hidden result input has non-hidden profile metadata ({path})"));
+        let (results, runs) = load_run_records(path)?;
+        let model = require_single_identity(result_model_name(&results), "model", path)?;
+        let profile = require_single_identity(result_profile_name(&results), "profile", path)?;
+
+        if let Some(profile) = &profile {
+            if profile != "legacy" && profile != expected_profile {
+                return Err(format!(
+                    "expected {expected_profile} profile input, found {profile} ({path})"
+                ));
+            }
+            observed_profiles.insert(profile.clone());
         }
 
         if let (Some(expected), Some(actual)) = (&expected_model, &model) {
             if expected != actual {
                 return Err(format!(
-                    "hidden result files use different models: {expected} vs {actual} ({path})"
+                    "result files use different models: {expected} vs {actual} ({path})"
                 ));
             }
-        }
-        if let (Some(expected), Some(actual)) = (&expected_profile, &profile) {
-            if expected != actual {
-                return Err(format!(
-                    "hidden result files use different profiles: {expected} vs {actual} ({path})"
-                ));
-            }
-        }
-        if expected_model.is_none() {
+        } else if expected_model.is_none() {
             expected_model = model.clone();
-        }
-        if expected_profile.is_none() {
-            expected_profile = profile.clone();
-        }
-        let replace_metadata = match combined_metadata.as_ref() {
-            None => true,
-            Some(existing) => {
-                metadata_string(existing, "model").is_none() && model.is_some()
-            }
-        };
-        if replace_metadata {
-            combined_metadata = Some(metadata);
         }
         combined_runs.extend(runs);
     }
 
-    Ok((
-        combined_metadata.unwrap_or(Value::Null),
-        combined_runs,
-    ))
+    if observed_profiles.len() > 1 {
+        return Err(format!(
+            "result files mix incompatible profile metadata: {}",
+            observed_profiles.into_iter().collect::<Vec<_>>().join(",")
+        ));
+    }
+
+    let normalized_metadata = serde_json::json!({
+        "metadata": {
+            "model": expected_model,
+            "profile": expected_profile
+        }
+    });
+    Ok((normalized_metadata, combined_runs))
 }
 
 fn vote_values(run: &Value, field: &str) -> Vec<String> {
@@ -337,7 +423,7 @@ fn score(
     const BOOTSTRAP_SEED: u64 = 20_261_118;
 
     let (tasks, lookup) = load_tasks(benchmark_path)?;
-    let (results_json, runs) = load_multiple_run_records(hidden_results_paths)?;
+    let (results_json, runs) = load_multiple_run_records(hidden_results_paths, "hidden")?;
     let mut per_run = Vec::with_capacity(runs.len());
     let mut by_task = BTreeMap::<String, TaskAccumulator>::new();
 
@@ -438,15 +524,19 @@ fn score(
     let mut task_clustered_hidden_post_minus_full_pre_gap = None;
     if let Some(full_path) = full_results_path {
         let (full_json, full_runs) = load_run_records(full_path)?;
-        if metadata_string(&full_json, "profile")
+        let full_profile = require_single_identity(result_profile_name(&full_json), "profile", full_path)?;
+        if full_profile.as_deref().is_some_and(|value| value != "full" && value != "legacy") {
+            return Err(format!("expected full-profile input, found {} ({full_path})", full_profile.unwrap_or_default()));
+        }
+        if result_profile_name(&full_json)
             .as_deref()
             .is_some_and(|value| value != "full")
         {
             return Err("full-profile result input has non-full profile metadata".to_string());
         }
         if let (Some(hidden_model), Some(full_model)) = (
-            metadata_string(&results_json, "model"),
-            metadata_string(&full_json, "model"),
+            result_model_name(&results_json),
+            result_model_name(&full_json),
         ) {
             if hidden_model != full_model {
                 return Err(format!(
@@ -495,7 +585,7 @@ fn score(
     Ok(ScoreReport {
         protocol_id: "IG-HIDDEN-INFO-001",
         model: metadata_string(&results_json, "model"),
-        profile: metadata_string(&results_json, "profile"),
+        profile: result_profile_name(&results_json),
         run_count: per_run.len(),
         task_count: by_task.len(),
         average_accuracy,
@@ -647,7 +737,7 @@ mod tests {
             first_path.to_string_lossy().to_string(),
             second_path.to_string_lossy().to_string(),
         ];
-        let error = load_multiple_run_records(&paths).expect_err("different models must not combine");
+        let error = load_multiple_run_records(&paths, "hidden").expect_err("different models must not combine");
         let _ = std::fs::remove_file(first_path);
         let _ = std::fs::remove_file(second_path);
         assert!(error.contains("different models"));
