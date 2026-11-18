@@ -82,6 +82,9 @@ jobs:
               "missed_symmetries": 0,
               "invalid_group_proposals": 0,
               "distribution_cases": 300,
+              "mean_target_subgroup_probability_mass": 1.0,
+              "mean_outside_subgroup_probability_mass": 0.0,
+              "mean_group_distribution_entropy_nats": 0.970406052783923,
               "mean_wasserstein_1_d4_word_metric": 0.0,
           }
           if report["summary"] != expected:
