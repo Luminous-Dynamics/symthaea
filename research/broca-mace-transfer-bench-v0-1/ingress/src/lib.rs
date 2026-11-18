@@ -176,6 +176,8 @@ pub trait EvidenceVerifier {
 pub struct EvidenceReceiptBundle {
     pub raw_event_digest: String,
     pub raw_event_receipt_digest: String,
+    pub session_id: String,
+    pub task_id: String,
     pub canonical_event_hash: String,
     pub authority_receipt_digest: String,
     pub event_occurred_at_ms: i64,
@@ -197,9 +199,23 @@ pub struct EvidenceReceiptBundle {
 
 #[derive(Clone, Debug)]
 pub struct IngestedExperience {
-    pub experience: Experience,
-    pub as_known: AsKnownQuery,
-    pub receipts: EvidenceReceiptBundle,
+    experience: Experience,
+    as_known: AsKnownQuery,
+    receipts: EvidenceReceiptBundle,
+}
+
+impl IngestedExperience {
+    pub fn experience(&self) -> &Experience {
+        &self.experience
+    }
+
+    pub fn as_known(&self) -> AsKnownQuery {
+        self.as_known
+    }
+
+    pub fn receipts(&self) -> &EvidenceReceiptBundle {
+        &self.receipts
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -400,6 +416,8 @@ pub fn ingest_as_known(
         receipts: EvidenceReceiptBundle {
             raw_event_digest: event.payload_sha256,
             raw_event_receipt_digest: event.receipt_digest,
+            session_id: event.session_id,
+            task_id: event.task_id,
             canonical_event_hash: event.canonical_event_hash,
             authority_receipt_digest: event.authority_receipt_digest,
             event_occurred_at_ms: event.occurred_at_ms,
@@ -423,8 +441,209 @@ pub fn ingest_as_known(
 
 #[derive(Clone, Debug)]
 pub struct IngestBatch {
-    pub admitted: Vec<IngestedExperience>,
-    pub duplicate_event_ids: Vec<u32>,
+    admitted: Vec<IngestedExperience>,
+    duplicate_event_ids: Vec<u32>,
+    as_known: AsKnownQuery,
+}
+
+impl IngestBatch {
+    pub fn admitted(&self) -> &[IngestedExperience] {
+        &self.admitted
+    }
+
+    pub fn duplicate_event_ids(&self) -> &[u32] {
+        &self.duplicate_event_ids
+    }
+
+    pub fn as_known(&self) -> AsKnownQuery {
+        self.as_known
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ConsolidationEvidenceRefV1 {
+    event_id: u32,
+    session_id: String,
+    task_id: String,
+    scope: Scope,
+    action: Action,
+    observed_utility: f64,
+    measurement_error_bound: f64,
+    source_family: u16,
+    source_root_id: u32,
+    intervention: bool,
+    prediction_pre_registered: bool,
+    outcome_reconciled: bool,
+    confounders_controlled: bool,
+    delayed_horizon_complete: bool,
+    receipts: EvidenceReceiptBundle,
+}
+
+impl ConsolidationEvidenceRefV1 {
+    pub fn event_id(&self) -> u32 {
+        self.event_id
+    }
+
+    pub fn session_id(&self) -> &str {
+        &self.session_id
+    }
+
+    pub fn task_id(&self) -> &str {
+        &self.task_id
+    }
+
+    pub fn scope(&self) -> Scope {
+        self.scope
+    }
+
+    pub fn action(&self) -> Action {
+        self.action
+    }
+
+    pub fn observed_utility(&self) -> f64 {
+        self.observed_utility
+    }
+
+    pub fn measurement_error_bound(&self) -> f64 {
+        self.measurement_error_bound
+    }
+
+    pub fn source_family(&self) -> u16 {
+        self.source_family
+    }
+
+    pub fn source_root_id(&self) -> u32 {
+        self.source_root_id
+    }
+
+    pub fn intervention(&self) -> bool {
+        self.intervention
+    }
+
+    pub fn prediction_pre_registered(&self) -> bool {
+        self.prediction_pre_registered
+    }
+
+    pub fn outcome_reconciled(&self) -> bool {
+        self.outcome_reconciled
+    }
+
+    pub fn confounders_controlled(&self) -> bool {
+        self.confounders_controlled
+    }
+
+    pub fn delayed_horizon_complete(&self) -> bool {
+        self.delayed_horizon_complete
+    }
+
+    pub fn receipts(&self) -> &EvidenceReceiptBundle {
+        &self.receipts
+    }
+}
+
+/// Immutable evidence input to a consolidation decision. This contains no
+/// proposed action, oracle label, or authorization grant.
+#[derive(Clone, Debug)]
+pub struct ConsolidationEvidencePackV1 {
+    as_known: AsKnownQuery,
+    events: Vec<ConsolidationEvidenceRefV1>,
+    source_family_count: usize,
+    source_root_count: usize,
+}
+
+impl ConsolidationEvidencePackV1 {
+    pub fn as_known(&self) -> AsKnownQuery {
+        self.as_known
+    }
+
+    pub fn events(&self) -> &[ConsolidationEvidenceRefV1] {
+        &self.events
+    }
+
+    pub fn source_family_count(&self) -> usize {
+        self.source_family_count
+    }
+
+    pub fn source_root_count(&self) -> usize {
+        self.source_root_count
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ConsolidationPackReject {
+    EmptySelection,
+    DuplicateRequestedEvent(u32),
+    MissingAdmittedEvent(u32),
+    DuplicateAdmittedEvent(u32),
+    InconsistentKnowledgeSnapshot,
+}
+
+/// Build a deterministic, receipt-preserving input pack for consolidation.
+/// It derives source diversity from ingress-issued records; it does not decide
+/// whether any abstraction should be promoted or grant durable-memory authority.
+pub fn build_consolidation_evidence_pack(
+    batch: &IngestBatch,
+    requested_event_ids: &[u32],
+) -> Result<ConsolidationEvidencePackV1, ConsolidationPackReject> {
+    if requested_event_ids.is_empty() {
+        return Err(ConsolidationPackReject::EmptySelection);
+    }
+
+    let mut admitted_by_id = BTreeMap::<u32, &IngestedExperience>::new();
+    for item in &batch.admitted {
+        let event_id = item.experience.event_id;
+        if admitted_by_id.insert(event_id, item).is_some() {
+            return Err(ConsolidationPackReject::DuplicateAdmittedEvent(event_id));
+        }
+        if item.as_known != batch.as_known {
+            return Err(ConsolidationPackReject::InconsistentKnowledgeSnapshot);
+        }
+    }
+
+    let mut requested = BTreeSet::new();
+    let mut events = Vec::with_capacity(requested_event_ids.len());
+    let mut source_families = BTreeSet::new();
+    let mut source_roots = BTreeSet::new();
+
+    for event_id in requested_event_ids {
+        if !requested.insert(*event_id) {
+            return Err(ConsolidationPackReject::DuplicateRequestedEvent(*event_id));
+        }
+        let item = admitted_by_id
+            .get(event_id)
+            .ok_or(ConsolidationPackReject::MissingAdmittedEvent(*event_id))?;
+        let experience = &item.experience;
+        if experience.source_family == 0 || experience.source_root_id == 0 {
+            return Err(ConsolidationPackReject::InconsistentKnowledgeSnapshot);
+        }
+        source_families.insert(experience.source_family);
+        source_roots.insert(experience.source_root_id);
+        events.push(ConsolidationEvidenceRefV1 {
+            event_id: experience.event_id,
+            session_id: item.receipts.session_id.clone(),
+            task_id: item.receipts.task_id.clone(),
+            scope: experience.scope,
+            action: experience.action,
+            observed_utility: experience.observed_utility,
+            measurement_error_bound: experience.measurement_error_bound,
+            source_family: experience.source_family,
+            source_root_id: experience.source_root_id,
+            intervention: experience.intervention,
+            prediction_pre_registered: experience.prediction_pre_registered,
+            outcome_reconciled: experience.outcome_reconciled,
+            confounders_controlled: experience.confounders_controlled,
+            delayed_horizon_complete: experience.delayed_horizon_complete,
+            receipts: item.receipts.clone(),
+        });
+    }
+
+    events.sort_by_key(|item| item.event_id);
+    Ok(ConsolidationEvidencePackV1 {
+        as_known: batch.as_known,
+        events,
+        source_family_count: source_families.len(),
+        source_root_count: source_roots.len(),
+    })
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -469,6 +688,7 @@ pub fn ingest_batch_as_known(
     Ok(IngestBatch {
         admitted,
         duplicate_event_ids,
+        as_known: query,
     })
 }
 
@@ -495,6 +715,7 @@ mod tests {
         authority_receipt_variant: bool,
         authority_status: AuthorityStatus,
         retraction_status_known: bool,
+        vary_lineage_by_event: bool,
     }
 
     impl Default for TestVerifier {
@@ -516,6 +737,7 @@ mod tests {
                 authority_receipt_variant: false,
                 authority_status: AuthorityStatus::ReceiptAttested,
                 retraction_status_known: true,
+                vary_lineage_by_event: false,
             }
         }
     }
@@ -557,13 +779,21 @@ mod tests {
         fn verify_lineage(
             &self,
             _receipt_id: &str,
-            _event_id: u32,
+            event_id: u32,
             _scope: Scope,
             _known_at_ms: i64,
         ) -> Option<VerifiedLineage> {
             self.lineage_valid.then(|| VerifiedLineage {
-                source_family: self.family_id,
-                source_root_id: self.root_id,
+                source_family: if self.vary_lineage_by_event {
+                    u16::try_from(event_id).unwrap_or(self.family_id)
+                } else {
+                    self.family_id
+                },
+                source_root_id: if self.vary_lineage_by_event {
+                    1_000 + event_id
+                } else {
+                    self.root_id
+                },
                 acquisition_mode: "api".into(),
                 upstream_source_id: "bis:dataflow:private-credit".into(),
                 source_artifact_digest: "e".repeat(64),
@@ -776,6 +1006,64 @@ mod tests {
     }
 
     #[test]
+    fn consolidation_pack_preserves_receipts_and_derives_true_source_diversity() {
+        let mut second = raw();
+        second.event_id = 43;
+        second.session_id = "session-b".into();
+        second.task_id = "task-b".into();
+        second.payload_sha256 = "f".repeat(64);
+        second.raw_event_receipt_id = "raw-event-2".into();
+
+        let batch = ingest_batch_as_known(
+            &[raw(), second],
+            query(180, 250),
+            &varied_lineage_verifier(),
+        )
+        .expect("both source receipts should be admitted");
+        let pack = build_consolidation_evidence_pack(&batch, &[43, 42])
+            .expect("pack should be built from verified ingress");
+
+        assert_eq!(pack.as_known(), query(180, 250));
+        assert_eq!(pack.events().len(), 2);
+        assert_eq!(pack.events()[0].event_id(), 42);
+        assert_eq!(pack.events()[1].event_id(), 43);
+        assert_eq!(pack.source_family_count(), 2);
+        assert_eq!(pack.source_root_count(), 2);
+        assert_eq!(pack.events()[0].session_id(), "session-a");
+        assert_eq!(
+            pack.events()[0].receipts().canonical_event_hash,
+            "c".repeat(64)
+        );
+        assert_eq!(
+            pack.events()[1].receipts().source_artifact_digest,
+            "e".repeat(64)
+        );
+    }
+
+    #[test]
+    fn consolidation_pack_rejects_duplicate_or_unadmitted_event_ids() {
+        let batch = ingest_batch_as_known(
+            &[raw()],
+            query(180, 250),
+            &TestVerifier::default(),
+        )
+        .expect("source event should be admitted");
+
+        assert_eq!(
+            build_consolidation_evidence_pack(&batch, &[]).err(),
+            Some(ConsolidationPackReject::EmptySelection)
+        );
+        assert_eq!(
+            build_consolidation_evidence_pack(&batch, &[42, 42]).err(),
+            Some(ConsolidationPackReject::DuplicateRequestedEvent(42))
+        );
+        assert_eq!(
+            build_consolidation_evidence_pack(&batch, &[999]).err(),
+            Some(ConsolidationPackReject::MissingAdmittedEvent(999))
+        );
+    }
+
+    #[test]
     fn batch_duplicate_delivery_is_idempotent() {
         let batch = ingest_batch_as_known(
             &[raw(), raw()],
@@ -783,8 +1071,8 @@ mod tests {
             &TestVerifier::default(),
         )
         .expect("identical duplicate deliveries are idempotent");
-        assert_eq!(batch.admitted.len(), 1);
-        assert_eq!(batch.duplicate_event_ids, vec![42]);
+        assert_eq!(batch.admitted().len(), 1);
+        assert_eq!(batch.duplicate_event_ids(), vec![42]);
     }
 
     #[test]
@@ -927,6 +1215,13 @@ mod tests {
             .err(),
             Some(IngestBatchReject::ConflictingPayloadForEvent(42))
         );
+    }
+
+    fn varied_lineage_verifier() -> TestVerifier {
+        TestVerifier {
+            vary_lineage_by_event: true,
+            ..TestVerifier::default()
+        }
     }
 
     #[test]
