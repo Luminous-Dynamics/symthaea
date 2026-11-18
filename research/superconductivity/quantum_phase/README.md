@@ -211,3 +211,45 @@ The input schema now records:
 - an explicit null/not-applicable charge-basis cutoff for a phase-path-integral solver.
 
 The auditor enforces \(N_\tau\Delta\tau=1/T\) in the declared \(k_B=1\) units. A phase-path-integral input cannot silently claim an integer charge-state truncation. This prevents a generic rotor contract from misrepresenting the source paper's numerical discretisation.
+
+
+## QXY path-integral solver prototype
+
+A first restricted Rust execution path has been added in `tools/superconductivity-quantum-phase-harness/src/bin/qxy_phase_pimc.rs`. It is specific to the source Hamiltonian above; it is not a generic QMC engine and does not yet reproduce the paper's published results.
+
+### Implemented model mapping
+
+For a declared uniform square lattice with zero offset charge, no bath and zero gauge field, the executable constructs the anisotropic spacetime action using
+
+\[
+K_s=t\Delta\tau,\qquad K_\tau=\frac{1}{U\Delta\tau},
+\qquad N_\tau\Delta\tau=\beta=\frac{1}{T}.
+\]
+
+Each spatial time-slice has both positive-direction nearest-neighbour bonds; each spatial site has a periodic imaginary-time bond. The Wolff embedded-cluster update uses the corresponding bond coupling \(K_s\) or \(K_\tau\) and is followed by a random-site Metropolis sweep. The solver refuses nonuniform Josephson energies, nonzero offset charges, gauge links / flux, baths, non-square lattices and malformed/duplicate lattice bonds rather than silently running a different model.
+
+### Source observables implemented
+
+- Euclidean action per spacetime site.
+- Source-normalized superfluid stiffness estimator
+  \[
+  \Upsilon=\frac{1}{t}\frac{\langle S_s\rangle-\beta\langle I^2\rangle}{2L^2},
+  \qquad
+  S_s=\frac{1}{\beta}\sum_{\tau,\langle ij\rangle}K_s\cos(\Delta\phi),
+  \qquad
+  I=\frac{t\Delta\tau}{\beta}\sum_{\tau,\langle ij\rangle}\sin(\Delta\phi).
+  \]
+- Total spatial-plaquette vortex density using the source's wrapped phase-circulation definition.
+
+A deterministic aligned-phase unit test checks the normalization \(\Upsilon=1\), zero vortex density and the expected action per spacetime site. Input tests separately check the source anisotropic couplings and the \(N_\tau\Delta\tau=\beta\) constraint.
+
+### Exact smoke inputs and boundaries
+
+- `superconductivity_quantum_phase_QXY_smoke_fixture_v0_1.json`: L=4, U/t=4, T/t=0.3, Nτ=16. This is deliberately under-resolved and is only suitable for testing execution, determinism and finite-valued output.
+- `superconductivity_quantum_phase_ponticelli_2026_U4_T03_input_fixture_v0_1.json`: L=4, U/t=4, T/t=0.3, Nτ=1000. This checks the source's discretisation/parameter mapping; it is not the paper's L=48 simulation.
+
+The smoke receipt includes exact schema and fixture SHA-256 values, instance identity, model parameters, couplings, actual seed, update counts, Metropolis acceptance and the observable outputs. The workflow's short run is not a statistical measurement.
+
+**Not implemented / not qualified yet:** production-size L=48 and larger runs, error bars, integrated autocorrelation / effective-sample-size analysis, warmup and convergence criteria, Δτ extrapolation, BKT finite-size scaling, zero-temperature 3D-XY scaling, quantum-critical finite-size collapse, current-current imaginary-time correlators, conductivity sum rules, analytic continuation and the dissipative bath extension.
+
+The reported \(U_c/t=5.72(1)\), \(z=1\), and \(\nu=0.671\) remain paper-reported targets. We have not reproduced them. The source's \(N_\tau=1000\) at L=48 and \(N_\tau=5000\) at T/t=0.05 illustrate the computational burden; do not promote the L=4 smoke to source parity.
