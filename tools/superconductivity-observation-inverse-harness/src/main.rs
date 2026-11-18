@@ -111,9 +111,7 @@ fn validate_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
         {
             return Err(format!("observation {id} raw_data_sha256 must be lowercase hex SHA-256"));
         }
-        if !raw_hashes.insert(raw_hash.to_owned()) {
-            return Err(format!("duplicate raw-data digest across observations at {id}"));
-        }
+        raw_hashes.insert(raw_hash.to_owned());
 
         let conditions = observation
             .get("conditions")
@@ -143,17 +141,11 @@ fn validate_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
             .map_err(|error| format!("could not canonicalize conditions for {id}: {error}"))?;
         condition_variants.insert(condition_fingerprint);
 
-        if index > 0 {
-            let first_conditions = &observations[0]["conditions"];
-            let first_geometry = required_text(first_conditions, "geometry_id")?;
-            if geometry_id != first_geometry {
-                return Err(format!(
-                    "observation {id} geometry differs from the specimen region; split into a separate specimen/region record"
-                ));
-            }
-        }
+        // The top-level region_id binds observations to a specimen region.
+        // geometry_id remains observation-specific because instruments and
+        // modalities may have different measurement geometries.
 
-        let _ = (measurand, unit);
+        let _ = (measurand, unit, index);
     }
 
     let split = fixture
@@ -268,6 +260,7 @@ fn validate_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
             "region_id": region_id
         },
         "observation_count": observations.len(),
+        "unique_raw_data_digest_count": raw_hashes.len(),
         "modality_count": observation_count_by_modality.len(),
         "modalities": observation_count_by_modality,
         "condition_variant_count": condition_variants.len(),
@@ -435,11 +428,20 @@ mod tests {
     }
 
     #[test]
-    fn duplicated_raw_data_digest_is_rejected() {
+    fn shared_raw_data_digest_is_allowed_for_derived_observations() {
         let (_, mut fixture) = inputs();
-        fixture["observations"][1]["raw_data_sha256"] =
-            fixture["observations"][0]["raw_data_sha256"].clone();
-        assert!(audit_mutated(fixture).is_err());
+        let shared_digest = fixture["observations"][0]["raw_data_sha256"].clone();
+        fixture["observations"][1]["raw_data_sha256"] = shared_digest;
+        let receipt = audit_mutated(fixture).unwrap();
+        assert_eq!(receipt["observation_count"], 3);
+        assert_eq!(receipt["unique_raw_data_digest_count"], 2);
+    }
+
+    #[test]
+    fn observation_specific_geometry_ids_can_differ_within_one_region() {
+        let (_, mut fixture) = inputs();
+        fixture["observations"][1]["conditions"]["geometry_id"] = json!("instrument-geometry-b");
+        assert!(audit_mutated(fixture).is_ok());
     }
 
     #[test]
