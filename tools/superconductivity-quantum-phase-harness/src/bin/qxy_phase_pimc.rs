@@ -837,6 +837,7 @@ fn simulate_replicates(
     let action = numeric_values("mean_action_per_spacetime_site")?;
     let stiffness = numeric_values("mean_finite_size_stiffness_source_normalization")?;
     let vortices = numeric_values("mean_total_vortex_density")?;
+    drop(numeric_values);
 
     Ok(json!({
         "status": "pass",
@@ -861,7 +862,7 @@ fn simulate_replicates(
 
 fn usage(program: &str) {
     eprintln!(
-        "Usage: {program} --schema <schema.json> --fixture <source-qxy-instance.json> [--warmup-sweeps <n>] [--measurement-sweeps <n>] [--seed <n>] [--out <receipt.json>]"
+        "Usage: {program} --schema <schema.json> --fixture <source-qxy-instance.json> [--warmup-sweeps <n>] [--measurement-sweeps <n>] [--seed <n>] [--replicates <n>] [--out <receipt.json>]"
     );
 }
 
