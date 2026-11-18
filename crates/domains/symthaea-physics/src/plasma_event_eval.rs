@@ -160,8 +160,13 @@ pub fn observation_frame_sha256(
 /// Digests are content identities, not signatures or proof that the model,
 /// training split, or calibration process is trustworthy. Those claims require
 /// independently verifiable registries and signed receipts outside this module.
+pub const PLASMA_RISK_SCORE_EVIDENCE_SCHEMA: &str =
+    "luminous.plasma-risk-score-evidence.v0.1";
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RiskScoreEvidence {
+    pub schema_version: String,
     pub shot_id: String,
     pub frame_id: String,
     pub frame_time_ns: u64,
@@ -176,6 +181,9 @@ pub struct RiskScoreEvidence {
     pub calibration_id: String,
     pub calibration_revision: String,
     pub calibration_receipt_sha256: String,
+    pub uncertainty_method_id: String,
+    /// Nominal coverage of the reported interval, not a guarantee of empirical coverage.
+    pub nominal_coverage: f64,
     /// Point score and uncertainty bounds share the frozen policy threshold scale.
     pub estimate: f64,
     pub lower_bound: f64,
@@ -187,6 +195,11 @@ impl RiskScoreEvidence {
         &self,
         frame: &PlasmaObservationFrame,
     ) -> Result<(), PlasmaEventEvalError> {
+        if self.schema_version != PLASMA_RISK_SCORE_EVIDENCE_SCHEMA {
+            return Err(PlasmaEventEvalError::new(
+                "unsupported plasma risk score evidence schema",
+            ));
+        }
         for (value, field) in [
             (self.shot_id.as_str(), "risk evidence shot_id"),
             (self.frame_id.as_str(), "risk evidence frame_id"),
@@ -194,6 +207,7 @@ impl RiskScoreEvidence {
             (self.model_revision.as_str(), "model_revision"),
             (self.calibration_id.as_str(), "calibration_id"),
             (self.calibration_revision.as_str(), "calibration_revision"),
+            (self.uncertainty_method_id.as_str(), "uncertainty_method_id"),
         ] {
             if value.trim().is_empty() {
                 return Err(PlasmaEventEvalError::new(format!(
@@ -218,6 +232,14 @@ impl RiskScoreEvidence {
             }
         }
 
+        if !self.nominal_coverage.is_finite()
+            || self.nominal_coverage <= 0.0
+            || self.nominal_coverage >= 1.0
+        {
+            return Err(PlasmaEventEvalError::new(
+                "nominal_coverage must be finite and strictly between zero and one",
+            ));
+        }
         if !self.estimate.is_finite()
             || !self.lower_bound.is_finite()
             || !self.upper_bound.is_finite()
@@ -916,6 +938,7 @@ mod tests {
         upper_bound: f64,
     ) -> RiskScoreEvidence {
         RiskScoreEvidence {
+            schema_version: PLASMA_RISK_SCORE_EVIDENCE_SCHEMA.to_owned(),
             shot_id: frame.shot_id.clone(),
             frame_id: frame.frame_id.clone(),
             frame_time_ns: frame.frame_time_ns,
@@ -929,6 +952,8 @@ mod tests {
             calibration_id: "plasma-risk-calibration".to_owned(),
             calibration_revision: "cal-v1".to_owned(),
             calibration_receipt_sha256: "3".repeat(64),
+            uncertainty_method_id: "heldout-conformal-v1".to_owned(),
+            nominal_coverage: 0.9,
             estimate,
             lower_bound,
             upper_bound,
@@ -1448,11 +1473,20 @@ mod tests {
             changed_calibration.evidence_sha256().expect("changed digest")
         );
 
-        let mut changed_interval = original;
+        let mut changed_interval = original.clone();
         changed_interval.upper_bound = 0.99;
         assert_ne!(
             original_digest,
             changed_interval.evidence_sha256().expect("changed digest")
+        );
+
+        let mut changed_uncertainty_method = original;
+        changed_uncertainty_method.uncertainty_method_id = "ensemble-quantile-v2".to_owned();
+        assert_ne!(
+            original_digest,
+            changed_uncertainty_method
+                .evidence_sha256()
+                .expect("changed digest")
         );
     }
 
