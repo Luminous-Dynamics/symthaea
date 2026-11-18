@@ -1,0 +1,407 @@
+{
+  "schema": "muse-causal-factorial-preregistration-v1",
+  "protocol_id": "MUSE-CAUSAL-001",
+  "protocol_version": "1.0.0",
+  "status": "preregistered_not_executed",
+  "created_utc": "2026-11-18",
+  "repository": "Luminous-Dynamics/symthaea",
+  "source_revision": {
+    "branch": "muse/style-genre-profile-v1",
+    "commit": "bd227d416878a4373eb87a53e182e7067a2411a5",
+    "note": "The experiment is pinned to the source inventory and routed composer revision below. Any source change requires a new protocol revision or an explicit compatibility review."
+  },
+  "source_blobs": {
+    "crates/domains/symthaea-music-theory/src/style.rs": "81192045a724823b47107702185b814cb9921cbf",
+    "crates/domains/symthaea-music-theory/src/grammar.rs": "a44ec71c774cc749dcdbded96ec2ced5500ccd7c",
+    "crates/domains/symthaea-music-theory/src/composer.rs": "e9a7bf7de176a8f8091163c6809bb4e8855b3a5a",
+    "crates/domains/symthaea-music-theory/src/spec.rs": "2ea178ab065ab7582ab6d3619818b88a3da5787e",
+    "crates/domains/symthaea-music-theory/src/fingerprint.rs": "97c4f127a1b460f424cb4201d4290c89899932ae",
+    "crates/domains/symthaea-music-theory/src/score.rs": "7e42614f0bd79bb5d769d4bea7d289ebf6c503c8",
+    "crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs": "bf51ab11df3c1ca2c4ca28b894e8597eaef490e3"
+  },
+  "question": "Which musical-intent controls produce reproducible main effects and interactions on symbolic musical outputs, and how stable are those responses across previously unseen seeds?",
+  "scope": {
+    "unit_of_execution": "one style × one seed × one complete 3^4 condition block",
+    "generator": "compose_with_grammar_plan (same routed public composer path as compose_styled)",
+    "symbolic_only": true,
+    "audio_rendering": false,
+    "human_perceptual_measurement": false,
+    "no_model_training": true,
+    "tonic_fixed": "C",
+    "fixed_reference_intent": {
+      "valence": 0,
+      "arousal": 0.5,
+      "energy": 0.5,
+      "bars": 16,
+      "tonic": "C"
+    },
+    "seed_role": "replication_block_not_a_musical_intent_factor"
+  },
+  "factors": [
+    {
+      "name": "valence",
+      "levels": [
+        {
+          "code": 0,
+          "value": -1,
+          "label": "low"
+        },
+        {
+          "code": 1,
+          "value": 0,
+          "label": "centre"
+        },
+        {
+          "code": 2,
+          "value": 1,
+          "label": "high"
+        }
+      ]
+    },
+    {
+      "name": "arousal",
+      "levels": [
+        {
+          "code": 0,
+          "value": 0,
+          "label": "low"
+        },
+        {
+          "code": 1,
+          "value": 0.5,
+          "label": "centre"
+        },
+        {
+          "code": 2,
+          "value": 1,
+          "label": "high"
+        }
+      ]
+    },
+    {
+      "name": "energy",
+      "levels": [
+        {
+          "code": 0,
+          "value": 0,
+          "label": "low"
+        },
+        {
+          "code": 1,
+          "value": 0.5,
+          "label": "centre"
+        },
+        {
+          "code": 2,
+          "value": 1,
+          "label": "high"
+        }
+      ]
+    },
+    {
+      "name": "bars",
+      "levels": [
+        {
+          "code": 0,
+          "value": 8,
+          "label": "short"
+        },
+        {
+          "code": 1,
+          "value": 16,
+          "label": "centre"
+        },
+        {
+          "code": 2,
+          "value": 24,
+          "label": "long"
+        }
+      ]
+    }
+  ],
+  "case_identity": {
+    "code_semantics": "0=low, 1=centre, 2=high",
+    "case_id_template": "{COHORT}__{StyleVariant}__s{seed}__v{valence_code}a{arousal_code}e{energy_code}b{bars_code}",
+    "enumeration_order": [
+      "style",
+      "seed",
+      "valence_code",
+      "arousal_code",
+      "energy_code",
+      "bars_code"
+    ],
+    "conditions_per_style_seed": 81,
+    "exact_cartesian_product": true,
+    "missing_duplicate_unexpected_or_mutated_case": "reject"
+  },
+  "cohorts": {
+    "discovery": {
+      "styles": [
+        "Classical",
+        "Waltz",
+        "Folk",
+        "Cinematic",
+        "Playful",
+        "Nocturne",
+        "March",
+        "Lullaby",
+        "ModalFolk",
+        "Fugue",
+        "Passacaglia",
+        "Tango",
+        "Celtic",
+        "Blues",
+        "Impressionism",
+        "SacredChoral",
+        "Minimalism",
+        "JazzBallad",
+        "BaroqueSuite",
+        "ProgFolk",
+        "Ambient",
+        "Sonata",
+        "RenaissancePolyphony",
+        "AfroCuban",
+        "Flamenco",
+        "BossaNova",
+        "Opera",
+        "IrishTraditional",
+        "HindustaniInspired"
+      ],
+      "seeds": [
+        90210,
+        130363,
+        222731,
+        918273
+      ],
+      "style_count": 29,
+      "seed_count": 4,
+      "blocks": 116,
+      "expected_generation_attempts": 9396,
+      "purpose": "screening and effect-pattern discovery; not confirmatory inference"
+    },
+    "confirmation": {
+      "styles": [
+        {
+          "id": "Classical",
+          "grammar_family": "PeriodSentence",
+          "selection_role": "shared period-pipeline reference"
+        },
+        {
+          "id": "Fugue",
+          "grammar_family": "Contrapuntal",
+          "selection_role": "dedicated contrapuntal grammar"
+        },
+        {
+          "id": "Passacaglia",
+          "grammar_family": "GroundVariation",
+          "selection_role": "known zero-supported-axis negative-control style"
+        },
+        {
+          "id": "Blues",
+          "grammar_family": "BluesCallResponse",
+          "selection_role": "dedicated call-and-response grammar"
+        },
+        {
+          "id": "AfroCuban",
+          "grammar_family": "GrooveCycle",
+          "selection_role": "dedicated groove-cycle grammar"
+        },
+        {
+          "id": "HindustaniInspired",
+          "grammar_family": "RagaModalArc",
+          "selection_role": "dedicated modal-arc grammar"
+        }
+      ],
+      "seeds": [
+        1000003,
+        1000033,
+        1000037,
+        1000039,
+        1000081,
+        1000099,
+        1000117,
+        1000121,
+        1000133,
+        1000151,
+        1000159,
+        1000171
+      ],
+      "style_count": 6,
+      "seed_count": 12,
+      "blocks": 72,
+      "expected_generation_attempts": 5832,
+      "purpose": "held-out confirmation across a preselected route-diverse panel"
+    }
+  },
+  "totals": {
+    "discovery_attempts": 9396,
+    "confirmation_attempts": 5832,
+    "total_generation_attempts": 15228,
+    "conditions_per_block": 81,
+    "scalar_contrasts_per_metric_per_block": 32,
+    "terms": {
+      "main_effects": 8,
+      "pairwise_interactions": 24,
+      "higher_order_terms_in_primary_report": 0
+    }
+  },
+  "analysis": {
+    "contrast_basis": {
+      "linear": {
+        "coefficients": [
+          -1,
+          0,
+          1
+        ],
+        "interpretation": "coded linear response per one-level step"
+      },
+      "quadratic": {
+        "coefficients": [
+          1,
+          -2,
+          1
+        ],
+        "interpretation": "curvature contrast across low/centre/high"
+      }
+    },
+    "coefficient_formula": "sum(response_i × contrast_weight_i) / sum(contrast_weight_i²)",
+    "terms": "all 8 one-factor linear/quadratic contrasts and all 24 pairwise products",
+    "seed_aggregation": {
+      "per_seed_estimates": true,
+      "across_seed_statistics": [
+        "mean",
+        "sample_standard_deviation",
+        "minimum",
+        "maximum",
+        "seed_count"
+      ],
+      "report_p_values": false,
+      "report_confidence_intervals": false,
+      "rationale": "seed blocks provide replication dispersion; this protocol does not claim inferential p-values from deterministic design contrasts"
+    },
+    "no_observed_change": "report explicitly; do not infer a universal dead control from tested levels alone",
+    "non_monotonic_effects": "valid response pattern; do not force monotonicity",
+    "unsupported_or_not_applicable_metric": "explicit status required; do not drop rows silently"
+  },
+  "required_measurement_channels": [
+    {
+      "id": "tempo_bpm",
+      "kind": "scalar",
+      "availability": "required"
+    },
+    {
+      "id": "meter_beats",
+      "kind": "categorical_or_scalar",
+      "availability": "required"
+    },
+    {
+      "id": "total_duration_beats",
+      "kind": "scalar",
+      "availability": "required"
+    },
+    {
+      "id": "score_note_count",
+      "kind": "scalar",
+      "availability": "required"
+    },
+    {
+      "id": "distinct_midi_pitches",
+      "kind": "scalar",
+      "availability": "required"
+    },
+    {
+      "id": "pitch_span_semitones",
+      "kind": "scalar",
+      "availability": "required"
+    },
+    {
+      "id": "score_key_tonic_pc",
+      "kind": "categorical_or_scalar",
+      "availability": "required"
+    },
+    {
+      "id": "score_key_tonality",
+      "kind": "categorical",
+      "availability": "required"
+    },
+    {
+      "id": "mean_velocity",
+      "kind": "scalar",
+      "availability": "required"
+    },
+    {
+      "id": "velocity_standard_deviation",
+      "kind": "scalar",
+      "availability": "required"
+    },
+    {
+      "id": "mean_note_duration_beats",
+      "kind": "scalar",
+      "availability": "required"
+    },
+    {
+      "id": "mean_section_intensity",
+      "kind": "scalar",
+      "availability": "required"
+    },
+    {
+      "id": "section_intensity_standard_deviation",
+      "kind": "scalar",
+      "availability": "required"
+    },
+    {
+      "id": "emphasis_counts",
+      "kind": "vector",
+      "availability": "required"
+    },
+    {
+      "id": "form_section_count",
+      "kind": "scalar_or_not_applicable",
+      "availability": "explicit_status_required"
+    },
+    {
+      "id": "plan_requested_bars",
+      "kind": "scalar_or_not_applicable",
+      "availability": "explicit_status_required"
+    },
+    {
+      "id": "plan_realized_bars",
+      "kind": "scalar_or_not_applicable",
+      "availability": "explicit_status_required"
+    },
+    {
+      "id": "structural_fingerprint_layer_distances",
+      "kind": "vector",
+      "availability": "required"
+    },
+    {
+      "id": "exact_fingerprint",
+      "kind": "identity_diagnostic",
+      "availability": "required"
+    }
+  ],
+  "adversarial_controls": [
+    "identical style/seed/intent replay must produce identical symbolic digest",
+    "reordering the input manifest must not change case identities or estimates",
+    "null intervention must preserve the full input and exact output identity",
+    "sham metadata-only change must not count as a composer intervention",
+    "non-finite measurement values reject",
+    "missing, duplicated, unexpected, or mutated case identities reject",
+    "generation failure and invalid score remain explicit failure outcomes"
+  ],
+  "targets": {
+    "deterministic_case_coverage": 1,
+    "duplicate_input_exact_replay": 1,
+    "malformed_case_rejection": 1,
+    "false_sham_effects": 0,
+    "discovery_to_confirmation_effect_classification_concordance": 0.9,
+    "note": "Targets are prospective. Classification threshold/noise floor must be calibrated from deterministic replay controls and frozen before confirmation outcomes are opened."
+  },
+  "limitations": [
+    "This protocol measures symbolic generator responses, not audio quality or listener-perceived emotion.",
+    "A changed score fingerprint is not proof that the intended control target was correctly executed.",
+    "A flat response at the tested levels is not proof of universal control absence.",
+    "The six-style confirmation panel tests route diversity; it does not represent all global musical traditions.",
+    "No external corpus is ingested and no benchmark data is used for training."
+  ]
+}
