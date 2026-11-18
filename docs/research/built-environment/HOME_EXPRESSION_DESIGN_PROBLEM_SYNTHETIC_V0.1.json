@@ -4,7 +4,7 @@
   "maturity": "SYNTHETIC_NOT_EVALUATED",
   "source_bindings": {
     "sol_atlas_pr": "https://github.com/Luminous-Dynamics/sol-atlas-leptos/pull/935",
-    "sol_atlas_pr_head_sha": "42caacb8b3e00f87fcf46c0dd8ceae87763aa1d6",
+    "sol_atlas_pr_head_sha": "e7020fee33254ae130417d7885a04b6d4d797ac6",
     "catalogue_revision": "HOME-EXPRESSION-CATALOG-0.2.0",
     "catalogue_blob_sha": "d784b285a706068aeba7bf7a88bdb857ed2053cc",
     "grammar_schema_blob_sha": "661c2c5a96e13c7678b80714bdb9e59d787c5a7f",
