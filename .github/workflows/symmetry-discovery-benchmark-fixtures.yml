@@ -81,8 +81,8 @@ jobs:
               "false_promotions": 0,
               "missed_symmetries": 0,
               "invalid_group_proposals": 0,
-            "distribution_cases": 300,
-            "mean_wasserstein_1_d4_word_metric": 0.0,
+              "distribution_cases": 300,
+              "mean_wasserstein_1_d4_word_metric": 0.0,
           }
           if report["summary"] != expected:
               raise SystemExit(f"proposal adapter smoke mismatch: {report['summary']!r}")
