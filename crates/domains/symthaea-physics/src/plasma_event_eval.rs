@@ -1460,7 +1460,7 @@ mod tests {
         );
         assert_eq!(
             manifest["online_policy_contract"]["policy_config_digest_schema"],
-            "luminous.plasma-alarm-policy.v0.4"
+            "luminous.plasma-alarm-policy.v0.5"
         );
         assert_eq!(
             manifest["online_policy_contract"]["risk_score_contract"]["exact_model_and_calibration_binding_required"],
@@ -1482,12 +1482,30 @@ mod tests {
             manifest["offline_scoring_contract"]["warning_requirement_ns"],
             50_000_000
         );
+        assert_eq!(
+            manifest["offline_scoring_contract"]["maximum_warning_horizon_source"],
+            "validation-selected and frozen in AlarmPolicyConfig.max_warning_ns"
+        );
+        assert_eq!(
+            manifest["offline_scoring_contract"]["alarms_outside_warning_interval"],
+            "count as false alarm episodes; they do not satisfy event detection"
+        );
         assert!(
             manifest["offline_scoring_contract"]["metrics"]
                 .as_array()
                 .expect("metrics array")
                 .iter()
                 .any(|metric| metric == "false_alarms_per_non_disruptive_hour")
+        );
+        assert!(
+            manifest["offline_scoring_contract"]["metrics"]
+                .as_array()
+                .expect("metrics array")
+                .iter()
+                .any(|metric| metric == "false_alarm_events_on_disruptive_shots")
+        );
+        /*
+        .any(|metric| metric == "false_alarms_per_non_disruptive_hour")
         );
         assert_eq!(
             manifest["offline_scoring_contract"]["false_alarm_rate_denominators"]["per_hour"],
@@ -1632,6 +1650,10 @@ mod tests {
         let mut changed_warning = original.clone();
         changed_warning.required_warning_ns += 1;
         assert_ne!(digest, changed_warning.policy_config_sha256());
+
+        let mut changed_max_warning = original.clone();
+        changed_max_warning.max_warning_ns -= 1;
+        assert_ne!(digest, changed_max_warning.policy_config_sha256());
 
         let mut changed_validation = original.clone();
         changed_validation.validation_receipt_sha256 = "b".repeat(64);
@@ -1851,6 +1873,54 @@ mod tests {
         .expect("valid shot evaluation");
         assert!(!too_late.event_detected);
         assert_eq!(too_late.lead_time_ns, None);
+    }
+
+    #[test]
+    fn disruption_warning_must_fall_inside_frozen_minimum_and_maximum_lead_window() {
+        let valid = score_shot_alarms(
+            "valid-window",
+            ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
+            &[20],
+            &config(),
+        )
+        .expect("valid warning window");
+        assert!(valid.event_detected);
+        assert_eq!(valid.lead_time_ns, Some(80));
+        assert_eq!(valid.false_alarm_events, 0);
+
+        let too_early = score_shot_alarms(
+            "too-early",
+            ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
+            &[0],
+            &config(),
+        )
+        .expect("too-early warning is still a valid evaluation");
+        assert!(!too_early.event_detected);
+        assert_eq!(too_early.lead_time_ns, None);
+        assert_eq!(too_early.false_alarm_events, 1);
+
+        let one_valid_one_outside = score_shot_alarms(
+            "multiple-episodes",
+            ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
+            &[0, 20, 70],
+            &config(),
+        )
+        .expect("mixed early, valid and late episodes");
+        assert!(one_valid_one_outside.event_detected);
+        assert_eq!(one_valid_one_outside.lead_time_ns, Some(80));
+        assert_eq!(one_valid_one_outside.false_alarm_events, 2);
+
+        let summary = summarize_alarm_evaluations(&[
+            too_early,
+            one_valid_one_outside,
+        ]).expect("cohort should aggregate");
+        assert_eq!(summary.detected_disruptions, 1);
+        assert_eq!(summary.missed_disruptions, 1);
+        assert_eq!(summary.false_alarm_events_on_disruptive_shots, 3);
+        assert_eq!(summary.false_alarm_events_on_non_disruptive_shots, 0);
+        assert_eq!(summary.false_alarm_events, 3);
+        assert_eq!(summary.warning_time_p50_ns, Some(80));
+        assert_eq!(summary.false_alarm_shot_rate, None);
     }
 
     #[test]
