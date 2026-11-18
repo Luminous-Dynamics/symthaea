@@ -1,0 +1,83 @@
+name: Muse Factorial Audit Harness
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/muse-factorial-audit/**"
+      - "docs/research/MUSE_CAUSAL_FACTORIAL_PROTOCOL_V1.json"
+      - ".github/workflows/muse-factorial-audit.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/muse-factorial-audit/**"
+      - "docs/research/MUSE_CAUSAL_FACTORIAL_PROTOCOL_V1.json"
+      - ".github/workflows/muse-factorial-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-factorial-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  factorial-audit:
+    name: Standalone factorial design and contrast tests
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact source revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install the pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/muse-factorial-audit/Cargo.toml -- --check
+
+      - name: Run standalone Rust tests
+        run: cargo test --manifest-path tools/muse-factorial-audit/Cargo.toml
+
+      - name: Materialize and verify the frozen design
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin emit-cases -- discovery \
+            > /tmp/muse-discovery-cases.csv
+          cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin emit-cases -- confirmation \
+            > /tmp/muse-confirmation-cases.csv
+
+          test "$(wc -l < /tmp/muse-discovery-cases.csv)" -eq 9397
+          test "$(wc -l < /tmp/muse-confirmation-cases.csv)" -eq 5833
+          test "$(head -n 1 /tmp/muse-discovery-cases.csv)" = \
+            "case_id,cohort,style,seed,valence_code,arousal_code,energy_code,bars_code"
+          test "$(head -n 1 /tmp/muse-confirmation-cases.csv)" = \
+            "case_id,cohort,style,seed,valence_code,arousal_code,energy_code,bars_code"
+
+          if cut -d, -f1 /tmp/muse-discovery-cases.csv | tail -n +2 | sort | uniq -d | grep -q .; then
+            echo "duplicate discovery case IDs detected" >&2
+            exit 1
+          fi
+          if cut -d, -f1 /tmp/muse-confirmation-cases.csv | tail -n +2 | sort | uniq -d | grep -q .; then
+            echo "duplicate confirmation case IDs detected" >&2
+            exit 1
+          fi
+
+          discovery_sha="$(sha256sum /tmp/muse-discovery-cases.csv | cut -d' ' -f1)"
+          confirmation_sha="$(sha256sum /tmp/muse-confirmation-cases.csv | cut -d' ' -f1)"
+          {
+            echo "## Muse factorial audit harness"
+            echo
+            echo "- Tested checkout: $(git rev-parse HEAD)"
+            echo "- Discovery cases: 9,396 (CSV SHA-256: $discovery_sha)"
+            echo "- Confirmation cases: 5,832 (CSV SHA-256: $confirmation_sha)"
+            echo "- Composer execution: not part of this workflow"
+          } >> "$GITHUB_STEP_SUMMARY"

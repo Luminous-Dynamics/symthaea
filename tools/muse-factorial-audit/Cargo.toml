@@ -1,0 +1,11 @@
+[package]
+name = "muse-factorial-audit"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Dependency-free factorial design and orthogonal contrast kernel for Muse research"
+
+# Keep this research harness isolated from the monorepo workspace so its
+# design and analysis tests can run even when the root Cargo workspace cannot
+# be enumerated. It does not replace or bypass production workspace gates.
+[workspace]
