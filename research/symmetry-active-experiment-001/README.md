@@ -36,6 +36,17 @@ cargo clippy --locked --manifest-path research/symmetry-active-experiment-001/Ca
 
 cargo run --release --locked --manifest-path research/symmetry-active-experiment-001/Cargo.toml --example decision_tree_probe
 
+
+## Contextual lookahead benchmark (v0.3)
+
+A second frozen fixture has eight hypotheses in four pairs. A cost-1 context probe reveals which pair remains; each pair has one specialized cost-1 follow-up probe. The exact adaptive policy spends 2 in the worst case. The exact non-adaptive set-cover oracle must select the context probe plus all four specialized probes, total cost 5.
+
+All eight hidden hypotheses are replayed through the adaptive tree and must terminate at the correct singleton. The static optimum is exhaustively certified over all 32 probe subsets. This yields a **2.5× static-versus-adaptive cost ratio on this deliberately constructed fixture**. It is not a general claim: the context fixture is designed to expose the value of conditioning the second acquisition on the first outcome, analogous to AFAContext's non-myopic evaluation principle.
+
+The benchmark now reports both:
+- the four-hypothesis orientation case (static cost 3 vs adaptive worst-case cost 2);
+- the eight-hypothesis context case (static cost 5 vs adaptive worst-case cost 2).
+
 ## Claim boundary
 
 Finite deterministic experiments only. It does not model noisy measurements, causal interventions, continuous group posteriors, physical experiment safety, or proof that a surviving candidate is a physical symmetry. No probe may be physically executed without a separate safety/authorization gate.
