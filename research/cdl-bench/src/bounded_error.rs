@@ -13,6 +13,8 @@ const MAGIC: &[u8; 4] = b"BE16";
 const VERSION: u16 = 1;
 const HEADER_LEN: usize = 36;
 const MAX_INDEX_BYTES: usize = 10;
+// |source - linear predictor| is at most 131,070 for two i16 history values.
+const MAX_ABS_RESIDUAL_INDEX: u64 = 131_070;
 
 /// Decoder-synchronous integer predictors for bounded-error coding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,6 +59,7 @@ pub enum BoundedError {
     NonCanonicalVarint,
     InvalidTolerance(u16),
     NumericOverflow,
+    ResidualOutOfRange,
 }
 
 impl fmt::Display for BoundedError {
@@ -80,6 +83,7 @@ impl fmt::Display for BoundedError {
             Self::NonCanonicalVarint => write!(f, "non-canonical bounded-error residual varint"),
             Self::InvalidTolerance(v) => write!(f, "bounded-error tolerance {v} exceeds the supported i16 range"),
             Self::NumericOverflow => write!(f, "bounded-error residual reconstruction overflowed i64"),
+            Self::ResidualOutOfRange => write!(f, "bounded-error residual index is outside the range reachable from i16 input and predictor"),
         }
     }
 }
@@ -152,6 +156,9 @@ fn nearest_integer_quotient(residual: i64, step: i64) -> i64 {
 }
 
 fn reconstruct(prediction: i64, index: i64, step: i64) -> Result<i16, BoundedError> {
+    if index.unsigned_abs() > MAX_ABS_RESIDUAL_INDEX {
+        return Err(BoundedError::ResidualOutOfRange);
+    }
     let residual = index.checked_mul(step).ok_or(BoundedError::NumericOverflow)?;
     let value = prediction
         .checked_add(residual)
@@ -434,11 +441,15 @@ mod tests {
         );
         assert_eq!(
             reconstruct(0, i64::MAX, 3),
-            Err(BoundedError::NumericOverflow)
+            Err(BoundedError::ResidualOutOfRange)
         );
         assert_eq!(
             reconstruct(-2, i64::MIN, 1),
-            Err(BoundedError::NumericOverflow)
+            Err(BoundedError::ResidualOutOfRange)
+        );
+        assert_eq!(
+            reconstruct(0, 131_071, 1),
+            Err(BoundedError::ResidualOutOfRange)
         );
     }
 
