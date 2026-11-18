@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-11-18",
+  "purpose": "Explicit model identifiers for controlled multi-agent collaboration comparisons. Verify endpoint availability and exact revision at run time; this is not a claim that any specific user's account has access.",
+  "providers": [
+    {
+      "provider": "openai",
+      "family": "GPT-6",
+      "models": [
+        {
+          "display_name": "GPT-6.2 Astra",
+          "model_id": "gpt-6.2-astra",
+          "role": "frontier reasoning / high-quality baseline",
+          "source": "https://developers.openai.com/api/docs/models"
+        },
+        {
+          "display_name": "GPT-6.2 Sol",
+          "model_id": "gpt-6.2-sol",
+          "role": "balanced agent-workflow baseline",
+          "source": "https://developers.openai.com/api/docs/models"
+        },
+        {
+          "display_name": "GPT-6 Luna",
+          "model_id": "gpt-6-luna",
+          "role": "lower-cost high-volume baseline",
+          "source": "https://developers.openai.com/api/docs/models"
+        }
+      ]
+    },
+    {
+      "provider": "anthropic",
+      "family": "Claude 5",
+      "models": [
+        {
+          "display_name": "Claude Fable 5.2",
+          "model_id": "claude-fable-5-2",
+          "role": "demanding reasoning / long-horizon agent baseline",
+          "source": "https://platform.claude.com/docs/en/models/overview"
+        },
+        {
+          "display_name": "Claude Opus 5.5",
+          "model_id": "claude-opus-5-5",
+          "role": "frontier general-purpose baseline",
+          "source": "https://platform.claude.com/docs/en/models/overview"
+        },
+        {
+          "display_name": "Claude Sonnet 5.5",
+          "model_id": "claude-sonnet-5-5",
+          "role": "speed/capability tradeoff baseline",
+          "source": "https://platform.claude.com/docs/en/models/overview"
+        },
+        {
+          "display_name": "Claude Haiku 5.5",
+          "model_id": "claude-haiku-5-5",
+          "role": "high-volume / latency-sensitive baseline",
+          "source": "https://platform.claude.com/docs/en/models/overview"
+        }
+      ]
+    },
+    {
+      "provider": "google",
+      "family": "Gemini 4",
+      "models": [
+        {
+          "display_name": "Gemini 4 Hydrogen",
+          "model_id": "gemini-4-hydrogen",
+          "role": "frontier quality baseline",
+          "source": "https://firebase.google.com/docs/ai-logic/models"
+        },
+        {
+          "display_name": "Gemini 4 Carbon",
+          "model_id": "gemini-4-carbon",
+          "role": "balanced baseline",
+          "source": "https://firebase.google.com/docs/ai-logic/models"
+        },
+        {
+          "display_name": "Gemini 4 Argon",
+          "model_id": "gemini-4-argon",
+          "role": "alternate cost/latency baseline",
+          "source": "https://firebase.google.com/docs/ai-logic/models"
+        }
+      ]
+    }
+  ],
+  "protocol_rules": [
+    "Run coordination architectures within one exact backbone first; do not mix model families inside a treatment unless heterogeneity is itself the treatment.",
+    "Record the exact model ID, provider endpoint, request date, decoding/effort settings, context settings, tool availability and provider request ID for every call.",
+    "Repeat the same architecture comparison across at least two model families before claiming transfer.",
+    "Compare cost/latency using observed billing and elapsed time, not catalog prices or token counts alone.",
+    "A model's standalone benchmark score is not interchangeable with collective task performance."
+  ]
+}
