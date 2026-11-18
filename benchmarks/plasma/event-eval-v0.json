@@ -72,6 +72,9 @@
         "calibration_id",
         "calibration_revision",
         "calibration_receipt_sha256",
+        "schema_version",
+        "uncertainty_method_id",
+        "nominal_coverage",
         "estimate",
         "lower_bound",
         "upper_bound"
@@ -85,7 +88,9 @@
       "clear_condition": "upper_bound <= clear_threshold",
       "uncertainty_straddles_threshold": "return_uncertain_and_preserve_current_alarm_state",
       "uncertainty_breaks_persistence": true,
-      "digests_are_content_identity_not_authentication": true
+      "digests_are_content_identity_not_authentication": true,
+      "risk_evidence_schema_version": "luminous.plasma-risk-score-evidence.v0.1",
+      "uncertainty_method_and_nominal_coverage_required": true
     }
   },
   "offline_scoring_contract": {
