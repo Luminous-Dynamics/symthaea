@@ -1,0 +1,13 @@
+[package]
+name = "symmetry-discovery-benchmark-oracle"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Exact D4 group, point-set stabilizer and polynomial invariance oracle for the frozen benchmark"
+
+[dependencies]
+serde_json = "=1.0.150"
+
+[workspace]
