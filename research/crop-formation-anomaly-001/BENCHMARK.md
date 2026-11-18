@@ -170,6 +170,8 @@ Primary endpoints must be declared in advance. Secondary endpoints include histo
 
 No field result is qualified by software-only tests. Independent laboratory replication is mandatory before generalizing across formations.
 
+For the full event/site/source split policy, data provenance classes and cross-event benchmark tracks, see [CROSS_EVENT_BENCHMARK.md](CROSS_EVENT_BENCHMARK.md). The Rust lab includes a grouped K-fold splitter and a conditional radius-permutation null that reruns the frozen circle grammar family.
+
 ## 3. Direct geometry-grammar baseline: CCAT
 
 Use the attributed [CCAT Zeals Knoll 2026 fixture](datasets/ccat-zeals-knoll-2026/README.md) and [replication protocol](CCAT_REPLICATION.md) as a first fixed-input reference.
