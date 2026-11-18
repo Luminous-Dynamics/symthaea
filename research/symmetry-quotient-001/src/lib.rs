@@ -2170,6 +2170,42 @@ mod tests {
     }
 
 
+    fn d4_bounded_objective_problem() -> SearchProblemV1 {
+        let mut candidate_ids = Vec::with_capacity(16);
+        let mut semantics = Vec::with_capacity(16);
+        for source in 0_usize..4 {
+            for target in 0_usize..4 {
+                let distance = source.abs_diff(target).min(4 - source.abs_diff(target));
+                let base = match distance {
+                    0 => 10_i64,
+                    1 => 20_i64,
+                    2 => 30_i64,
+                    _ => unreachable!(),
+                };
+                let offset = match distance {
+                    0 | 2 => (source % 3) as i64,
+                    1 => ((source + target) % 3) as i64,
+                    _ => unreachable!(),
+                };
+                candidate_ids.push(format!("p{source}{target}"));
+                semantics.push(CandidateSemanticsV1 {
+                    in_search_domain: true,
+                    admissible: true,
+                    feasible: true,
+                    objective_cost: base + offset,
+                    constraint_signature: vec![distance as i64],
+                    boundary_condition_id: "fixed-d4-boundary".to_owned(),
+                    output_equivalence_id: format!("distance-{distance}"),
+                });
+            }
+        }
+        SearchProblemV1 {
+            problem_id: "D4-bounded-objective-drift-v1".to_owned(),
+            candidate_ids,
+            semantics,
+        }
+    }
+
     fn approximate_min_problem() -> SearchProblemV1 {
         let mut problem = c2_problem();
         problem.semantics[1].objective_cost = 8;
@@ -2599,6 +2635,85 @@ mod tests {
                 QualificationBudgetV1::default(),
             ),
             Err(ApproximateQuotientErrorV1::CertificateMismatch)
+        );
+    }
+
+    #[test]
+    fn non_abelian_d4_pairwise_objective_range_is_qualified_with_three_orbits() {
+        let problem = d4_bounded_objective_problem();
+        let action = d4_action();
+        // Prove this is not an abelian smoke test.
+        assert_ne!(
+            action.group.multiplication[1][4],
+            action.group.multiplication[4][1]
+        );
+        let contract = approximate_contract(ObjectiveSenseV1::Minimize, 2);
+        let ApproximateCompileOutcomeV1::Authorized(certificate) = compile_approximate_quotient(
+            &problem,
+            &action,
+            &contract,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap()
+        else {
+            panic!("D4 orbit ranges exactly at tolerance must qualify");
+        };
+
+        assert_eq!(certificate.orbits.len(), 3);
+        assert_eq!(
+            certificate
+                .orbits
+                .iter()
+                .map(|orbit| orbit.members.len())
+                .collect::<Vec<_>>(),
+            vec![4, 8, 4]
+        );
+        assert_eq!(certificate.maximum_pairwise_objective_deviation, 2);
+        assert!(certificate.certified_additive_optimality_gap <= 2);
+        verify_approximate_certificate(
+            &problem,
+            &action,
+            &contract,
+            &certificate,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn non_abelian_d4_over_tolerance_witness_maps_minimum_member_to_maximum() {
+        let problem = d4_bounded_objective_problem();
+        let action = d4_action();
+        let contract = approximate_contract(ObjectiveSenseV1::Minimize, 1);
+        let ApproximateCompileOutcomeV1::Blocked(
+            ApproximateBlockedV1::ObjectiveDeviationExceedsTolerance {
+                group_element,
+                source_index,
+                image_index,
+                absolute_objective_deviation,
+                maximum_additive_gap,
+                ..
+            },
+        ) = compile_approximate_quotient(
+            &problem,
+            &action,
+            &contract,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap()
+        else {
+            panic!("D4 objective range 2 must block at tolerance 1");
+        };
+
+        assert_eq!(absolute_objective_deviation, 2);
+        assert_eq!(maximum_additive_gap, 1);
+        assert_eq!(
+            action.permutations[group_element][source_index],
+            image_index
+        );
+        assert!(
+            problem.semantics[source_index].objective_cost
+                < problem.semantics[image_index].objective_cost
         );
     }
 
