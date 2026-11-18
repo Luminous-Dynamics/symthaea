@@ -395,6 +395,10 @@ impl InstalledSystemManifest {
                 _ => {}
             }
             if let Some(pose_set) = gate.required_pose_set_ref.as_deref() {
+                if pose_set != self.article.pose_set_ref {
+                    push(&mut findings, "gate_pose_set_mismatch", format!("{path}.pose_ref"),
+                        "Gate pose-set revision must match the exact robot-approved pose-set bound to the article.");
+                }
                 if run.pose_ref.is_none() || run.joint_state_ref.is_none() {
                     push(&mut findings, "pose_run_binding_missing", format!("{path}.pose_ref/joint_state_ref"),
                         "Clearance run requires exact pose and joint-state references.");
@@ -466,6 +470,17 @@ impl InstalledSystemManifest {
                 .or_default().push(run);
         }
 
+        for ((gate_id, _pair_id, _pose_ref, _replicate), group_runs) in &paired_groups {
+            if gates.get(gate_id).is_some_and(|gate| gate.comparison_mode != "absolute_interval") {
+                let baseline_count = group_runs.iter().filter(|run| run.condition == "baseline_uncovered").count();
+                let installed_count = group_runs.iter().filter(|run| run.condition == "garment_installed").count();
+                if baseline_count != 1 || installed_count != 1 || group_runs.len() != 2 {
+                    push(&mut findings, "paired_group_not_one_to_one", format!("runs.{gate_id}.paired_group_id"),
+                        "Each paired comparison group must contain exactly one uncovered baseline and one garment-installed run for the same replicate/pose.");
+                }
+            }
+        }
+
         let mut gate_assessments = Vec::new();
         for gate in &self.gates {
             if gate.applicability == "not_applicable" {
@@ -480,7 +495,7 @@ impl InstalledSystemManifest {
                 });
                 continue;
             }
-            let mut runs: Vec<&SystemRun> = self.runs.iter().filter(|run| run.gate_id == gate.gate_id).collect();
+            let runs: Vec<&SystemRun> = self.runs.iter().filter(|run| run.gate_id == gate.gate_id).collect();
             let installed: Vec<&SystemRun> = runs.iter().copied().filter(|run| run.condition == "garment_installed").collect();
             let baseline: Vec<&SystemRun> = runs.iter().copied().filter(|run| run.condition == "baseline_uncovered").collect();
             let mut pair_bounds: Vec<(f64, f64)> = Vec::new();
@@ -534,9 +549,16 @@ impl InstalledSystemManifest {
                         ));
                     }
                 }
-                for pose in &gate.required_pose_refs {
-                    if !installed.iter().any(|run| run.pose_ref.as_deref() == Some(pose.as_str())) {
-                        missing_pose_refs.push(pose.clone());
+                if gate.required_pose_refs.is_empty() {
+                    if installed.len() < gate.minimum_replicates as usize {
+                        insufficient = true;
+                    }
+                } else {
+                    for pose in &gate.required_pose_refs {
+                        let pose_replicates = installed.iter().filter(|run| run.pose_ref.as_deref() == Some(pose.as_str())).count();
+                        if pose_replicates < gate.minimum_replicates as usize {
+                            missing_pose_refs.push(pose.clone());
+                        }
                     }
                 }
                 if !missing_pose_refs.is_empty() {
@@ -648,8 +670,10 @@ impl InstalledSystemManifest {
         let system_acceptance_admitted = self.state == "adjudicated"
             && self.engineering_review.as_ref().is_some_and(|review| review.disposition == "accept")
             && findings.is_empty()
-            && gate_assessments.iter().all(|assessment|
-                matches!(assessment.disposition.as_str(), "pass" | "not_applicable"));
+            && gate_assessments.iter().all(|assessment| {
+                gates.get(assessment.gate_id.as_str()).is_some_and(|gate|
+                    !gate.hard_gate || matches!(assessment.disposition.as_str(), "pass" | "not_applicable"))
+            });
 
         ValidationReport {
             findings,
