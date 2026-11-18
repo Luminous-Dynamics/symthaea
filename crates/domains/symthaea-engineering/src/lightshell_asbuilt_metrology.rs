@@ -936,6 +936,7 @@ mod tests {
     fn measured_observation(id: &str, feature: &str, metric: &str, value: f64, uncertainty: f64, upper: f64) -> Value {
         json!({
             "measurement_id":id,"feature_ref":feature,"metric_id":metric,"unit":"mm",
+            "pose_ref":null,"joint_state_ref":null,
             "measured_value":value,"expanded_uncertainty":uncertainty,"lower_limit":0.0,"upper_limit":upper,
             "coverage_fraction":0.99,"measurement_origin":"physical_measurement",
             "method_selection_ref":"METHOD-SELECTION-01","raw_data_slice_ref":format!("RAW-SLICE-{id}"),
