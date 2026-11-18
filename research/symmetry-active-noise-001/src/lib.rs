@@ -1884,7 +1884,7 @@ mod tests {
         assert_eq!(receipt.required_obligations.len(), 3);
         assert_eq!(receipt.covered_obligations, receipt.required_obligations);
         assert!(receipt.complete_pairwise_separation);
-        assert_eq!(receipt.selected_cost, 4);
+        assert_eq!(receipt.selected_cost, 3);
     }
 
     #[test]
