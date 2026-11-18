@@ -55,6 +55,13 @@ pub enum TechnicianSkillClass {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SparePartAvailability {
+    AvailableBeforeJob,
+    NotAvailableBeforeJob,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PostRepairFunction {
     Pass,
     Fail,
@@ -108,7 +115,7 @@ pub struct ServiceJobObservation {
     pub disassembly_depth: u32,
     pub tools_used: Vec<String>,
     pub spare_part_id: Option<String>,
-    pub spare_part_available_before_job: bool,
+    pub spare_part_availability: SparePartAvailability,
     pub technician_skill: TechnicianSkillClass,
     pub technician_minutes: f64,
     pub downtime_minutes: f64,
@@ -127,6 +134,7 @@ pub enum ServiceabilityError {
     MissingField { field: &'static str },
     InvalidDigest { field: &'static str },
     InvalidMeasurement { field: &'static str },
+    SparePartIdentityRequired,
     DuplicateTool { tool_id: String },
     DuplicateEvidenceOwner { owner: ServiceEvidenceOwner },
     MissingDeviceAuthorityEvidence,
@@ -147,6 +155,9 @@ impl Display for ServiceabilityError {
             Self::InvalidDigest { field } => write!(f, "invalid serviceability SHA-256: {field}"),
             Self::InvalidMeasurement { field } => {
                 write!(f, "invalid serviceability measurement: {field}")
+            }
+            Self::SparePartIdentityRequired => {
+                write!(f, "available spare part requires an exact part identifier")
             }
             Self::DuplicateTool { tool_id } => {
                 write!(f, "duplicate tool identifier in service job: {tool_id}")
@@ -227,6 +238,11 @@ impl ServiceJobObservation {
         if let Some(part_id) = &self.spare_part_id {
             require_text("spare_part_id", part_id)?;
         }
+        if self.spare_part_availability == SparePartAvailability::AvailableBeforeJob
+            && self.spare_part_id.is_none()
+        {
+            return Err(ServiceabilityError::SparePartIdentityRequired);
+        }
 
         let mut tools = HashSet::with_capacity(self.tools_used.len());
         for tool in &self.tools_used {
@@ -296,6 +312,12 @@ pub struct ServiceabilityCohortSummary {
     pub routine_non_destructive_qualified_fraction: Option<f64>,
     pub routine_unknown_access_count: usize,
     pub routine_destructive_access_count: usize,
+    pub routine_spare_available_before_job_count: usize,
+    pub routine_spare_unavailable_before_job_count: usize,
+    pub routine_spare_availability_unknown_count: usize,
+    pub routine_spare_available_fraction_among_known: Option<f64>,
+    pub unique_spare_part_count: usize,
+    pub median_disassembly_depth: f64,
     pub qualified_return_count: usize,
     pub post_repair_function_pass_count: usize,
     pub unique_tool_count: usize,
@@ -317,6 +339,11 @@ pub fn summarize_serviceability_cohort(
     let mut routine_non_destructive_qualified_count = 0;
     let mut routine_unknown_access_count = 0;
     let mut routine_destructive_access_count = 0;
+    let mut routine_spare_available_before_job_count = 0;
+    let mut routine_spare_unavailable_before_job_count = 0;
+    let mut routine_spare_availability_unknown_count = 0;
+    let mut spare_parts = HashSet::new();
+    let mut disassembly_depths = Vec::with_capacity(observations.len());
     let mut qualified_return_count = 0;
     let mut post_repair_function_pass_count = 0;
     let mut technician_times = Vec::with_capacity(observations.len());
@@ -331,8 +358,12 @@ pub fn summarize_serviceability_cohort(
         }
 
         tools.extend(observation.tools_used.iter().map(String::as_str));
+        if let Some(part_id) = &observation.spare_part_id {
+            spare_parts.insert(part_id.as_str());
+        }
         technician_times.push(observation.technician_minutes);
         downtime_times.push(observation.downtime_minutes);
+        disassembly_depths.push(observation.disassembly_depth as f64);
 
         if observation.routine_job {
             routine_job_count += 1;
@@ -348,6 +379,17 @@ pub fn summarize_serviceability_cohort(
                 ServiceAccessOutcome::DrySideWithoutDestructiveFinish
                 | ServiceAccessOutcome::WetSideWithoutDestructiveFinish => {}
             }
+            match observation.spare_part_availability {
+                SparePartAvailability::AvailableBeforeJob => {
+                    routine_spare_available_before_job_count += 1;
+                }
+                SparePartAvailability::NotAvailableBeforeJob => {
+                    routine_spare_unavailable_before_job_count += 1;
+                }
+                SparePartAvailability::Unknown => {
+                    routine_spare_availability_unknown_count += 1;
+                }
+            }
         }
 
         if observation.counts_as_qualified_return() {
@@ -360,6 +402,7 @@ pub fn summarize_serviceability_cohort(
 
     technician_times.sort_by(f64::total_cmp);
     downtime_times.sort_by(f64::total_cmp);
+    disassembly_depths.sort_by(f64::total_cmp);
     let median = |values: &[f64]| {
         let middle = values.len() / 2;
         if values.len() % 2 == 0 {
@@ -374,6 +417,17 @@ pub fn summarize_serviceability_cohort(
     } else {
         Some(routine_non_destructive_qualified_count as f64 / routine_job_count as f64)
     };
+    let known_spare_availability_count = routine_spare_available_before_job_count
+        + routine_spare_unavailable_before_job_count;
+    let routine_spare_available_fraction_among_known =
+        if known_spare_availability_count == 0 {
+            None
+        } else {
+            Some(
+                routine_spare_available_before_job_count as f64
+                    / known_spare_availability_count as f64,
+            )
+        };
 
     Ok(ServiceabilityCohortSummary {
         observation_count: observations.len(),
@@ -382,6 +436,12 @@ pub fn summarize_serviceability_cohort(
         routine_non_destructive_qualified_fraction,
         routine_unknown_access_count,
         routine_destructive_access_count,
+        routine_spare_available_before_job_count,
+        routine_spare_unavailable_before_job_count,
+        routine_spare_availability_unknown_count,
+        routine_spare_available_fraction_among_known,
+        unique_spare_part_count: spare_parts.len(),
+        median_disassembly_depth: median(&disassembly_depths),
         qualified_return_count,
         post_repair_function_pass_count,
         unique_tool_count: tools.len(),
@@ -462,7 +522,7 @@ mod tests {
             disassembly_depth: 2,
             tools_used: vec!["hex-key".to_owned(), "spanner".to_owned()],
             spare_part_id: Some("nozzle-cassette-01".to_owned()),
-            spare_part_available_before_job: true,
+            spare_part_availability: SparePartAvailability::AvailableBeforeJob,
             technician_skill: TechnicianSkillClass::GeneralPlumber,
             technician_minutes: 12.0,
             downtime_minutes: 20.0,
@@ -697,4 +757,77 @@ mod tests {
         record.return_to_service = ReturnToServiceStatus::Failed;
         assert!(!record.counts_as_qualified_return());
     }
+
+    #[test]
+    fn keeps_spare_unavailable_and_unknown_states_separate() {
+        let available = observation(
+            "run-01",
+            ServiceAccessOutcome::DrySideWithoutDestructiveFinish,
+        );
+        let mut unavailable = observation(
+            "run-02",
+            ServiceAccessOutcome::DrySideWithoutDestructiveFinish,
+        );
+        unavailable.spare_part_availability = SparePartAvailability::NotAvailableBeforeJob;
+        let mut unknown = observation(
+            "run-03",
+            ServiceAccessOutcome::Unknown,
+        );
+        unknown.spare_part_availability = SparePartAvailability::Unknown;
+        unknown.spare_part_id = None;
+
+        let summary =
+            summarize_serviceability_cohort(&[available, unavailable, unknown]).expect("cohort");
+        assert_eq!(summary.routine_spare_available_before_job_count, 1);
+        assert_eq!(summary.routine_spare_unavailable_before_job_count, 1);
+        assert_eq!(summary.routine_spare_availability_unknown_count, 1);
+        assert_eq!(
+            summary.routine_spare_available_fraction_among_known,
+            Some(0.5)
+        );
+        assert_eq!(summary.unique_spare_part_count, 1);
+    }
+
+    #[test]
+    fn zero_known_spare_availability_keeps_fraction_undefined() {
+        let mut unknown = observation(
+            "run-01",
+            ServiceAccessOutcome::Unknown,
+        );
+        unknown.spare_part_availability = SparePartAvailability::Unknown;
+        unknown.spare_part_id = None;
+        let summary = summarize_serviceability_cohort(&[unknown]).expect("cohort");
+        assert_eq!(summary.routine_spare_available_fraction_among_known, None);
+    }
+
+    #[test]
+    fn reports_disassembly_depth_as_a_separate_median() {
+        let mut first = observation(
+            "run-01",
+            ServiceAccessOutcome::DrySideWithoutDestructiveFinish,
+        );
+        let mut second = observation(
+            "run-02",
+            ServiceAccessOutcome::WetSideWithoutDestructiveFinish,
+        );
+        first.disassembly_depth = 1;
+        second.disassembly_depth = 4;
+        let summary = summarize_serviceability_cohort(&[first, second]).expect("cohort");
+        assert_eq!(summary.median_disassembly_depth, 2.5);
+    }
+
+    #[test]
+    fn available_spare_requires_exact_part_identity() {
+        let mut record = observation(
+            "run-01",
+            ServiceAccessOutcome::DrySideWithoutDestructiveFinish,
+        );
+        record.spare_part_id = None;
+        record.spare_part_availability = SparePartAvailability::AvailableBeforeJob;
+        assert_eq!(
+            record.validate(),
+            Err(ServiceabilityError::SparePartIdentityRequired)
+        );
+    }
+
 }
