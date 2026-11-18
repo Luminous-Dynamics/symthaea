@@ -58,7 +58,8 @@ jobs:
       - name: Validate exact group axioms, point stabilizers and polynomial invariance
         run: python3 -I research/symmetry-discovery-benchmark-001/tools/validate_fixtures.py
       - name: Validate bounded-noise symmetry fixtures
-        run: python3 - <<'PY'
+        run: |
+          python3 - <<'PY'
           import json
           from pathlib import Path
 
