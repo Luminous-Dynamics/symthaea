@@ -23,7 +23,7 @@ fields, commas, embedded newlines, escaped quotes, and CRLF are supported.
 An observed measurement is not accepted without an artifact digest. The importer
 validates the digest's shape; it does not recompute the digest from an audio or
 score artifact, authenticate who produced it, or prove that the digest names the
-correct artifact. The future composer adapter must compute and bind that evidence.
+correct artifact. The companion composer adapter computes the score digest from serialized score bytes and binds it to the exact source commit and case-manifest digest in the diagnostic note.
 
 ## Run
 
