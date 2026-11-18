@@ -497,8 +497,10 @@ mod exhaustive_state_space_tests {
                                                 || local_protection
                                                     != LocalProtectionState::Qualified
                                                 || critical_evidence != EvidenceFreshness::Current
-                                                || pressure
-                                                    != PressureEnvelopeState::InsideQualifiedEnvelope
+                                                || !matches!(
+                                                    pressure,
+                                                    PressureEnvelopeState::InsideQualifiedEnvelope
+                                                )
                                                 || drain != DrainPathState::Clear
                                                 || leak != LeakState::Clear;
 
