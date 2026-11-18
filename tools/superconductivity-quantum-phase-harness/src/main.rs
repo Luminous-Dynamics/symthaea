@@ -109,6 +109,7 @@ fn validate_instance(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
         || required_text(model, "energy_unit")? != "coupling_energy_units"
         || required_text(model, "temperature_unit")? != "coupling_energy_units"
         || required_text(model, "charge_convention")? != "integer_cooper_pair_number"
+        || required_text(model, "pair_charge_convention")? != "2e_equals_1"
         || required_text(model, "phase_compactification")? != "2pi"
     {
         return Err("unsupported quantum-phase units or operator conventions".to_owned());
@@ -711,6 +712,13 @@ mod tests {
     fn imaginary_time_slices_and_step_must_recover_beta() {
         let (_, mut fixture) = inputs();
         fixture["simulation"]["imaginary_time_step"] = json!(0.1);
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn pair_charge_normalization_must_be_explicit() {
+        let (_, mut fixture) = inputs();
+        fixture["model"]["pair_charge_convention"] = json!("electron_charge_equals_1");
         assert!(audit_mutated(fixture).is_err());
     }
 
