@@ -74,6 +74,7 @@ A post-hoc ratio or sentence is a hypothesis only. Do not promote it based on vi
 #### Null and control families
 
 - randomized occupancy patterns preserving area fraction, perimeter, component count and spatial resolution;
+- row/column-margin-preserving 2x2 switch nulls (preserve each row/column occupancy and total density, but not perimeter, connected components or higher-order texture; use only as one control family);
 - shuffled angular/radial arrangements preserving the same primitive inventory;
 - geometric designs from human artists and documented circle-makers;
 - algorithmic ornaments: L-systems, Voronoi, spirals, regular tilings, fractals and procedurally generated designs;
@@ -82,7 +83,7 @@ A post-hoc ratio or sentence is a hypothesis only. Do not promote it based on vi
 - human-made formations with a known author or construction plan where such provenance is genuinely available;
 - matched random codebooks and alternative rotations, reflections, segmentation thresholds and row/column orientations.
 
-A null must preserve the nuisance structure relevant to the question. Uniform random pixels alone are too easy and are not a sufficient null.
+A null must preserve the nuisance structure relevant to the question. Uniform random pixels alone are too easy and are not a sufficient null. The initial Rust 2x2-switch generator is deterministic and preserves row/column margins, but its finite-step output is **not yet claimed to be uniform, well-mixed, or exchangeable**. Validate reachability/mixing and compare multiple chain lengths before using it for inferential p-values; supplement it with nulls preserving perimeter, connected components, and other relevant nuisance structure.
 
 #### Decoder tournament rules
 
