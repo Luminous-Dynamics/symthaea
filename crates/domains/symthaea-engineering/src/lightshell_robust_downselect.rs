@@ -380,6 +380,10 @@ impl RobustDecisionManifest {
                         }
                     }
                     "calibrated_prediction" => {
+                        if is_blank_option(&self.decision_domain_ref) {
+                            push(&mut findings, "prediction_target_domain_missing", "decision_domain_ref",
+                                "Calibrated prediction evidence requires an explicit target applicability domain.");
+                        }
                         if evidence.interval_semantics != "prediction_interval" {
                             push(&mut findings, "prediction_interval_semantics_required", format!("{epath}.interval_semantics"),
                                 "Calibrated model predictions must use explicit prediction-interval semantics.");
@@ -558,12 +562,12 @@ fn assess_candidate(
     assessment.blocking_metrics.sort();
     assessment.blocking_metrics.dedup();
 
-    if definite_failure {
-        assessment.disposition = "infeasible".to_string();
-        return assessment;
-    }
     if applicability_blocked {
         assessment.disposition = "applicability_blocked".to_string();
+        return assessment;
+    }
+    if definite_failure {
+        assessment.disposition = "infeasible".to_string();
         return assessment;
     }
     if candidate.process_capability_state == "not_capable"
@@ -978,6 +982,59 @@ mod tests {
         }
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|f| f.code == "prediction_calibration_domain_mismatch"));
+    }
+
+    #[test]
+    fn ood_prediction_does_not_make_an_infeasibility_claim() {
+        let mut manifest = base_manifest();
+        manifest["stage"] = json!("exploratory");
+        manifest["candidates"] = json!([candidate("P",[90.0,95.0],[120.0,130.0],"preflight_passed")]);
+        for property in manifest["candidates"][0]["properties"].as_array_mut().unwrap() {
+            property["evidence_origin"] = json!("calibrated_prediction");
+            property["interval_semantics"] = json!("prediction_interval");
+            property["calibration_receipt_ref"] = json!("CALIBRATION-01");
+            property["predictor_generation_ref"] = json!("PREDICTOR-01");
+            property["calibration_receipt_predictor_generation_ref"] = json!("PREDICTOR-01");
+            property["calibration_domain_ref"] = json!("LIGHTSHELL-DOMAIN-REV-A");
+            property["uncertainty_profile_ref"] = json!("MAT-UQ-01");
+            property["applicability_state"] = json!("ood_detected");
+            property["coupon_evidence_ref"] = json!(null);
+            property["coupon_run_ref"] = json!(null);
+            property["method_selection_ref"] = json!(null);
+            property["raw_data_digest"] = json!(null);
+            property["evidence_material_lot_ref"] = json!(null);
+            property["evidence_process_revision_ref"] = json!(null);
+            property["evidence_construction_ref"] = json!(null);
+        }
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert_eq!(report.candidate_assessments[0].disposition, "applicability_blocked");
+    }
+
+    #[test]
+    fn calibrated_prediction_requires_target_domain_binding() {
+        let mut manifest = base_manifest();
+        manifest["stage"] = json!("exploratory");
+        manifest["decision_domain_ref"] = json!(null);
+        manifest["candidates"] = json!([candidate("P",[60.0,70.0],[120.0,130.0],"preflight_passed")]);
+        for property in manifest["candidates"][0]["properties"].as_array_mut().unwrap() {
+            property["evidence_origin"] = json!("calibrated_prediction");
+            property["interval_semantics"] = json!("prediction_interval");
+            property["calibration_receipt_ref"] = json!("CALIBRATION-01");
+            property["predictor_generation_ref"] = json!("PREDICTOR-01");
+            property["calibration_receipt_predictor_generation_ref"] = json!("PREDICTOR-01");
+            property["calibration_domain_ref"] = json!("LIGHTSHELL-DOMAIN-REV-A");
+            property["uncertainty_profile_ref"] = json!("MAT-UQ-01");
+            property["applicability_state"] = json!("in_declared_domain");
+            property["coupon_evidence_ref"] = json!(null);
+            property["coupon_run_ref"] = json!(null);
+            property["method_selection_ref"] = json!(null);
+            property["raw_data_digest"] = json!(null);
+            property["evidence_material_lot_ref"] = json!(null);
+            property["evidence_process_revision_ref"] = json!(null);
+            property["evidence_construction_ref"] = json!(null);
+        }
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "prediction_target_domain_missing"));
     }
 
     #[test]
