@@ -44,6 +44,7 @@ struct Component {
     role: String,
     band_orbital_id: String,
     symmetry_label: String,
+    form_factor: String,
     momentum: Vec<f64>,
 }
 
@@ -370,6 +371,7 @@ impl IntertwinedModel {
             let role = required_text(component_value, "component_role")?.to_owned();
             let band_orbital_id = required_text(component_value, "band_orbital_id")?.to_owned();
             let symmetry_label = required_text(component_value, "symmetry_label")?.to_owned();
+            let form_factor = required_text(component_value, "form_factor")?.to_owned();
             if required_text(component_value, "gauge_charge")? != "Cooper_pair_charge_2e" {
                 return Err(format!(
                     "component {id} must carry the common Cooper-pair gauge charge"
@@ -402,6 +404,7 @@ impl IntertwinedModel {
                 role,
                 band_orbital_id,
                 symmetry_label,
+                form_factor,
                 momentum,
             });
         }
@@ -1076,6 +1079,7 @@ impl IntertwinedModel {
                     "component_role": component.role,
                     "band_orbital_id": component.band_orbital_id,
                     "symmetry_label": component.symmetry_label,
+                    "form_factor": component.form_factor,
                     "momentum_vector": component.momentum,
                     "mean_amplitude": component_mean_amplitudes[index],
                     "basis_gauge_charge": "Cooper_pair_charge_2e"
@@ -1108,11 +1112,30 @@ impl IntertwinedModel {
                 })).collect::<Vec<_>>()
             },
             "components": component_metadata,
+            "model_coefficients": {
+                "quadratic_matrix": self.quadratic,
+                "gradient_matrices_by_axis": self.gradient_by_axis,
+                "quartic_self_coefficients": self.quartic_self,
+                "quartic_density_density_terms": self.density_terms.iter().map(|term| json!({
+                    "component_a": self.components[term.first].id,
+                    "component_b": self.components[term.second].id,
+                    "coefficient": term.coefficient
+                })).collect::<Vec<_>>(),
+                "phase_locking_terms": self.phase_locking_terms.iter().map(|term| json!({
+                    "component_a": self.components[term.first].id,
+                    "component_b": self.components[term.second].id,
+                    "coefficient": term.coefficient
+                })).collect::<Vec<_>>()
+            },
             "secondary_order_fields": self.secondary_orders.iter().map(|field| json!({
                 "field_id": field.id,
                 "field_kind": field.kind,
                 "site_values": field.site_values,
-                "component_coupling_count": field.component_coefficients.len()
+                "component_couplings": field.component_coefficients.iter().map(|(component, coefficient)| json!({
+                    "component_id": self.components[*component].id,
+                    "coefficient": coefficient,
+                    "term": "secondary_field_times_component_amplitude_squared"
+                })).collect::<Vec<_>>()
             })).collect::<Vec<_>>(),
             "model_scope": {
                 "evaluated_component_momenta": "zero_only",
@@ -1503,13 +1526,35 @@ mod tests {
 
         let permuted_bytes = serde_json::to_vec(&permuted).unwrap();
         let permuted_model = IntertwinedModel::from_bytes(&schema, &permuted_bytes).unwrap();
+        let permuted_fields = permuted_model.initial_fields();
+        let permuted_links = permuted_model.initial_link_phases();
         let permuted_energy = permuted_model
-            .energy_for(
-                &permuted_model.initial_fields(),
-                &permuted_model.initial_link_phases(),
-            )
+            .energy_for(&permuted_fields, &permuted_links)
             .unwrap()
             .total;
         assert!((original_energy - permuted_energy).abs() < 1.0e-10);
+        let original_twist = original_model
+            .bare_twist_response(
+                &original_model.initial_fields(),
+                &original_model.initial_link_phases(),
+            )
+            .unwrap();
+        let permuted_twist = permuted_model
+            .bare_twist_response(&permuted_fields, &permuted_links)
+            .unwrap();
+        for axis in 0..original_model.dimension {
+            assert!(
+                (original_twist.current[axis] - permuted_twist.current[axis]).abs()
+                    < 1.0e-10
+            );
+            for other_axis in 0..original_model.dimension {
+                assert!(
+                    (original_twist.diamagnetic[axis][other_axis]
+                        - permuted_twist.diamagnetic[axis][other_axis])
+                        .abs()
+                        < 1.0e-10
+                );
+            }
+        }
     }
 }
