@@ -840,8 +840,12 @@ mod tests {
             let status = chain["twist_response"]["stiffness_positivity_gate"]
                 .as_str()
                 .unwrap();
-            assert!(status == "negative_point_estimate_stable_claim_not_permitted_pending_uncertainty"
-                || status == "nonnegative_point_estimate_uncertainty_unresolved");
+            assert!(
+                status == "negative_stiffness_approx95_jackknife_interval_stable_claim_rejected"
+                    || status == "positive_stiffness_approx95_jackknife_interval_within_sample_only"
+                    || status == "stiffness_approx95_jackknife_interval_includes_zero_unresolved"
+                    || status == "insufficient_samples_for_stiffness_jackknife"
+            );
             assert!(chain["raw_measurements"]
                 .as_array()
                 .unwrap()
