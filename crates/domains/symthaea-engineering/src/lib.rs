@@ -11,6 +11,7 @@ pub mod lightshell_zone_spec;
 pub mod lightshell_coupon_evidence;
 pub mod lightshell_zone_transition;
 pub mod lightshell_method_applicability;
+pub mod lightshell_mission_profile;
 
 use serde::{Deserialize, Serialize};
 use symthaea_broca::{BrocaConfig, BrocaGenerator, ThoughtChannels};
