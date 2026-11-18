@@ -117,7 +117,9 @@
       "evidence_digest": "SHA-256 content identity only; not source/model/calibration authenticity proof",
       "threshold_scale_identity": "risk evidence score_scale_id must exactly match frozen policy score_scale_id",
       "policy_config_digest_schema": "luminous.plasma-alarm-policy.v0.2"
-    }
+    },
+    "policy_config_digest_schema": "luminous.plasma-alarm-policy.v0.3",
+    "policy_config_digest_encoding": "length-prefixed UTF-8 fields plus exact IEEE-754 threshold bit patterns; delimiter characters in IDs cannot create ambiguous field boundaries"
   },
   "offline_scoring_contract": {
     "event_reference_entered_after_trace_generation": true,
@@ -130,12 +132,19 @@
       "mean_warning_time",
       "warning_time_p05",
       "warning_time_p10",
-      "warning_time_p50"
+      "warning_time_p50",
+      "false_alarms_per_non_disruptive_hour",
+      "total_non_disruptive_exposure_ns"
     ],
     "warning_requirement_ns": 50000000,
     "warning_requirement_is_research_target_not_achieved_result": true,
     "confidence_intervals": "Wilson score 95% intervals for event TPR and false-alarm-shot rate; for multi-machine or event-class subgroup aggregates, add a shot-level stratified bootstrap and report the resampling seed",
-    "undefined_metrics": "return null when the denominator cohort is empty"
+    "undefined_metrics": "return null when the denominator cohort is empty",
+    "false_alarm_rate_denominators": {
+      "per_shot": "number of non-disruptive shots",
+      "per_hour": "sum of non-disruptive shot exposure durations in hours",
+      "alarm_events": "timestamps at which the online policy transitions into Raised"
+    }
   },
   "required_ablation_families": [
     "clean",
