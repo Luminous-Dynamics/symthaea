@@ -9,7 +9,8 @@
     "catalogue_blob_sha": "0ba1af38685636c51d19fa399dee315d648585a6",
     "grammar_schema_blob_sha": "661c2c5a96e13c7678b80714bdb9e59d787c5a7f",
     "conformance_corpus_blob_sha": "61ff73fca82af4905bb9d5dd2a020bfaf438e94f",
-    "conformance_corpus_schema_blob_sha": "918ab3b936b45528360a705975f3f50328aea293"
+    "conformance_corpus_schema_blob_sha": "918ab3b936b45528360a705975f3f50328aea293",
+    "catalogue_schema_blob_sha": "fd995c652c690ecdd54f24b3b5d7b8ed695d7288"
   },
   "input": {
     "grammar_id": "SYNTH-HIGHVELD-GRAMMAR-001",
