@@ -1,8 +1,8 @@
 # Luminous Aqua — Evidence Corpus v0.1
 
 **Snapshot:** 2026-11-18  
-**Entries:** 15  
-**Claims:** 77
+**Entries:** 17  
+**Claims:** 79
 
 > Source-classified evidence register. Manufacturer declarations, standards/programme criteria, local installation references, independent market samples and peer-reviewed results are kept distinct. Values marked unknown have not been inferred. This corpus is not a product certification or evidence of Aqua performance.
 
@@ -536,6 +536,42 @@
 **Limitations — `uwl.2023.boost.criteria`:**
 - Do not compare nominal manufacturer mode declarations as a UWL result.
 - The numeric method check does not assess task-quality, comfort, aerosol, safety or energy outcome.
+
+## ISO 20887:2020 — Design for disassembly and adaptability
+
+- **Entry ID:** `iso-20887-2020-design-for-disassembly`
+- **Subject type:** standard
+- **Manufacturer / publisher:** Not applicable / not stated
+- **SKU:** Not applicable / not stated
+- **Market:** International; buildings, civil engineering works and constituent parts
+- **Revision:** Edition 1; reviewed and confirmed 2025
+
+| Claim ID | Parameter | Canonical value | Evidence class | Result class | Conditions / unknowns | Comparison status | Source |
+|---|---|---|---|---|---|---|---|
+| `iso.20887.2020.design-for-disassembly-scope` | design_for_disassembly_scope | Building/civil-engineering design-for-disassembly and adaptability principles with performance-measurement guidance; no universal numeric levels. | standard_or_programme_criterion | declared | method=ISO 20887:2020, Edition 1; ISO catalogue review confirmation 2025; unknown: No universal numeric repairability / disassembly threshold, AQS-specific component requirements and acceptance levels; Current version confirmed by ISO in 2025; applies to buildings, civil engineering works and constituent parts. | context_only: Design-for-disassembly principles guide the AQS service-spine and component access design; the standard supplies no product-specific numeric pass/fail threshold. | [International Organization for Standardization (ISO)](https://www.iso.org/standard/69370.html); official_standard_or_programme; 2020-01-01 |
+
+**Limitations — `iso.20887.2020.design-for-disassembly-scope`:**
+- Not a showerhead, plumbing fixture or bathroom product certification.
+- Does not set a universal numeric disassembly or repairability threshold.
+- Aqua-specific job manifests and measured trials are still required.
+
+## EN 45554:2020 — Assessment of ability to repair, reuse and upgrade energy-related products
+
+- **Entry ID:** `en-45554-2020-repair-reuse-upgrade`
+- **Subject type:** standard
+- **Manufacturer / publisher:** Not applicable / not stated
+- **SKU:** Not applicable / not stated
+- **Market:** European standard; energy-related products
+- **Revision:** 2020 edition
+
+| Claim ID | Parameter | Canonical value | Evidence class | Result class | Conditions / unknowns | Comparison status | Source |
+|---|---|---|---|---|---|---|---|
+| `en.45554.2020.repair-assessment-scope` | repairability_assessment_scope | Generic repair/reuse/upgrade assessment methods for energy-related products, with criteria such as disassembly depth, fasteners/connectors, tools and support. | standard_or_programme_criterion | declared | method=EN 45554:2020; unknown: Direct product-group applicability to passive plumbing fixtures, Aqua-specific repairability score or numeric thresholds; Use relevant methods as design inspiration only unless product-group applicability is confirmed. | context_only: Methodological reference for repair-job factors; its stated scope is energy-related products, so direct application to passive plumbing fixtures is not assumed. | [Royal Netherlands Standardization Institute (NEN)](https://www.nen.nl/en/nen-en-45554-2020-en-270440); official_standard_or_programme; 2020-01-01 |
+
+**Limitations — `en.45554.2020.repair-assessment-scope`:**
+- The stated scope is energy-related products; it is not automatically applicable to passive plumbing fixtures.
+- It is not an Aqua product repairability result or a universal repairability score.
+- Aqua must establish a product-specific fault/job manifest and measured acceptance method.
 
 ---
 
