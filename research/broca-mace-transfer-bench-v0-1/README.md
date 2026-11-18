@@ -254,12 +254,12 @@ The proposal contains the exact action/scope, as-known coordinates, evidence eve
 The consolidation crate has 7 unit tests and one cross-crate regression in `consolidation/tests/raw_session_pipeline.rs`. It exercises raw Session-A ingestion → receipt pack → action-specific consolidation proposals → Session-B causal decision → Session-C source retraction → rebuilt pack → abstention/active-probe request. The test verifier is synthetic; no production Mycelix verifier is claimed.
 
 
-## Raw-native ingestion and bitemporal replay (MACE v0.6 research)
+## Raw-native ingestion and bitemporal replay (MACE v0.7 research)
 
-The evaluator now includes a provider-neutral JSONL ingestion path. It receives session events and derives candidate-visible experiences itself. It preserves original event lines, rejects duplicate IDs and non-monotonic sequence numbers, separates event/valid time from knowledge/recording time, and applies retractions only when they were known at the requested `known_at`.
+The evaluator now includes a provider-neutral JSONL ingestion path. It receives session events and derives candidate-visible experiences itself. It preserves original event lines, computes SHA-256 digests for the full raw session and each event, rejects duplicate IDs and non-monotonic sequence numbers, separates event/valid time from knowledge/recording time, and applies retractions only when they were known at the requested `known_at`.
 
 The pipeline distinguishes pre-registered action intent, dispatched action, tool-reported success, independently receipted world observation, verified source-artifact digest/source-root lineage, and later source retraction/supersession. A tool's own success report does not become outcome memory.
 
-Source roots, trust and measurement-error bounds come from an external verified-source registry rather than being accepted from the raw event payload. This registry is a test seam representing a future Mycelix verifier, not an implemented cryptographic adapter. The current event envelope is provider-neutral; OpenAI Agents SDK and Anthropic Managed Agents provider-specific adapters remain future work.
+Action/intervention/pre-registration evidence comes from a separate verified execution-receipt registry; world-state observations come from a separately reconciled outcome-receipt registry; source roots, trust and measurement-error bounds come from a verified source registry. Raw payload claims cannot override those registries. These are injected Symtropy/Mycelix verifier seams, not implemented cryptographic adapters. The current event envelope is provider-neutral; OpenAI Agents SDK and Anthropic Managed Agents provider-specific adapters remain future work.
 
-Controls cover raw ingestion, tool-success misattribution, late-arriving observations, bitemporal retraction, unknown source artifacts, malformed/duplicate/out-of-order events, invalid error bounds, valid-time boundaries and original-line preservation.
+Controls cover raw ingestion, tool-success misattribution, forged action claims, tampered outcome payloads, missing execution/outcome receipts, late-arriving observations, bitemporal retraction, unknown source artifacts, malformed/duplicate/out-of-order events, invalid error bounds, valid-time boundaries, more than 256 later events without raw-history truncation, and content-digest replay.

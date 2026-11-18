@@ -8,6 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use broca_mace_policy::{Action, Experience, Objective, Regime, Scope};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
 #[derive(Clone, Debug)]
 struct RawEvent {
@@ -22,6 +23,7 @@ struct RawEvent {
     valid_to_ms: Option<u64>,
     payload: Value,
     raw_line: String,
+    raw_line_sha256: String,
 }
 
 impl RawEvent {
@@ -81,12 +83,19 @@ pub(super) type VerifiedOutcomeRegistry = BTreeMap<String, VerifiedOutcomeReceip
 #[derive(Clone, Debug, Default)]
 pub(super) struct IngestReport {
     pub raw_event_count: usize,
+    pub raw_session_sha256: String,
+    pub raw_event_digests: Vec<(u32, String)>,
     pub visible_event_count: usize,
-    pub tool_success_without_world_observation: usize,
+    pub tool_success_without_verified_world_observation: usize,
     pub unverified_outcome_receipt_count: usize,
     pub raw_payload_outcome_mismatch_count: usize,
     pub retracted_observation_count: usize,
     pub experiences: Vec<Experience>,
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 fn parse_jsonl(input: &str) -> Result<Vec<RawEvent>, String> {
@@ -174,6 +183,7 @@ fn parse_jsonl(input: &str) -> Result<Vec<RawEvent>, String> {
             valid_to_ms,
             payload,
             raw_line: line.to_owned(),
+            raw_line_sha256: sha256_hex(line.as_bytes()),
         });
     }
     if events.is_empty() {
@@ -290,6 +300,11 @@ pub(super) fn derive_as_known(
 
     let mut report = IngestReport {
         raw_event_count: events.len(),
+        raw_session_sha256: sha256_hex(input.as_bytes()),
+        raw_event_digests: events
+            .iter()
+            .map(|event| (event.event_id, event.raw_line_sha256.clone()))
+            .collect(),
         visible_event_count: visible.len(),
         ..IngestReport::default()
     };
@@ -391,7 +406,7 @@ pub(super) fn derive_as_known(
             })
         })
         .collect();
-    report.tool_success_without_world_observation = tool_results
+    report.tool_success_without_verified_world_observation = tool_results
         .iter()
         .filter(|(action_id, _)| !observed_action_ids.contains(action_id.as_str()))
         .map(|(_, count)| *count)
@@ -615,7 +630,7 @@ mod tests {
     }
 
     #[test]
-    fn tool_success_without_world_observation_never_becomes_outcome_memory() {
+    fn tool_success_without_verified_world_observation_never_becomes_outcome_memory() {
         let mut events = observation_events();
         events.retain(|event| {
             event["event_type"].as_str() != Some("world_observation")
@@ -630,7 +645,7 @@ mod tests {
             json!({ "action_id": "a1", "success": true }),
         ));
         let report = derive_fixture(&jsonl(events), 100, 100).unwrap();
-        assert_eq!(report.tool_success_without_world_observation, 1);
+        assert_eq!(report.tool_success_without_verified_world_observation, 1);
         assert_eq!(report.experiences.len(), 3);
     }
 
@@ -779,6 +794,50 @@ mod tests {
     }
 
     #[test]
+    fn post_dispatch_action_plan_cannot_be_relabelled_as_preregistered() {
+        let mut events = observation_events();
+        events[0]["occurred_at_ms"] = json!(25);
+        events[0]["recorded_at_ms"] = json!(25);
+        let report = derive_fixture(&jsonl(events), 100, 100).unwrap();
+        let item = report.experiences.iter().find(|item| item.event_id == 3).unwrap();
+        assert!(!item.prediction_pre_registered);
+        assert!(!item.intervention);
+    }
+
+    #[test]
+    fn raw_session_history_is_not_truncated_at_the_consolidation_window() {
+        let mut events = observation_events();
+        for offset in 0..260_u32 {
+            events.push(raw_event(
+                1000 + offset,
+                13 + u64::from(offset),
+                "assistant_note",
+                40 + u64::from(offset),
+                40 + u64::from(offset),
+                json!({ "text": format!("later-note-{offset}") }),
+            ));
+        }
+        let parsed = parse_jsonl(&jsonl(events)).unwrap();
+        assert_eq!(parsed.len(), 272);
+        assert_eq!(parsed[0].event_id, 1);
+        assert!(parsed.iter().any(|event| event.event_id == 3));
+    }
+
+    #[test]
+    fn raw_content_digests_are_stable_and_change_when_input_changes() {
+        let first = jsonl(observation_events());
+        let second = first.replace("0.92", "0.93");
+        let first_report = derive_fixture(&first, 100, 100).unwrap();
+        let second_report = derive_fixture(&second, 100, 100).unwrap();
+        assert_eq!(first_report.raw_session_sha256.len(), 64);
+        assert_eq!(first_report.raw_event_digests.len(), 12);
+        assert_ne!(
+            first_report.raw_session_sha256,
+            second_report.raw_session_sha256
+        );
+    }
+
+    #[test]
     fn raw_event_original_lines_are_retained_for_audit() {
         let raw = jsonl(observation_events());
         let events = parse_jsonl(&raw).unwrap();
@@ -786,5 +845,6 @@ mod tests {
         assert_eq!(events[0].schema_version, 1);
         assert_eq!(events[0].session_id, "session-a");
         assert_eq!(events[0].sequence, 1);
+        assert_eq!(events[0].raw_line_sha256.len(), 64);
     }
 }
