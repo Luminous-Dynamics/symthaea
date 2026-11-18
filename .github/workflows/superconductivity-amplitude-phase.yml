@@ -49,6 +49,16 @@ jobs:
             --out "$RUNNER_TEMP/sc-amplitude-phase-gl-receipt.json"
           cat "$RUNNER_TEMP/sc-amplitude-phase-gl-receipt.json"
 
+      - name: Run short complex-field Metropolis pilot
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-amplitude-phase-harness/Cargo.toml --bin sc_amplitude_phase_audit -- \
+            --schema data/schemas/superconductivity_amplitude_phase_instance_v0_1.schema.json \
+            --fixture data/research/superconductivity_amplitude_phase_fixture_v0_1.json \
+            --monte-carlo --warmup-sweeps 2 --measurement-sweeps 4 \
+            --thinning 1 --chains 2 --seed 17 \
+            --out "$RUNNER_TEMP/sc-amplitude-phase-mc-smoke-receipt.json"
+          cat "$RUNNER_TEMP/sc-amplitude-phase-mc-smoke-receipt.json"
+
       - name: Run Clippy
         run: cargo clippy --locked --manifest-path tools/superconductivity-amplitude-phase-harness/Cargo.toml --bin sc_amplitude_phase_audit -- -D warnings
 
@@ -63,6 +73,7 @@ jobs:
             sha256sum data/research/superconductivity_amplitude_phase_fixture_v0_1.json
             sha256sum tools/superconductivity-amplitude-phase-harness/Cargo.toml
             sha256sum tools/superconductivity-amplitude-phase-harness/src/main.rs
+            sha256sum tools/superconductivity-amplitude-phase-harness/src/sampling.rs
             if [ -f tools/superconductivity-amplitude-phase-harness/Cargo.lock ]; then
               sha256sum tools/superconductivity-amplitude-phase-harness/Cargo.lock
             else
@@ -80,3 +91,4 @@ jobs:
             tools/superconductivity-amplitude-phase-harness/Cargo.lock
             ${{ runner.temp }}/sc-amplitude-phase-environment.txt
             ${{ runner.temp }}/sc-amplitude-phase-gl-receipt.json
+            ${{ runner.temp }}/sc-amplitude-phase-mc-smoke-receipt.json
