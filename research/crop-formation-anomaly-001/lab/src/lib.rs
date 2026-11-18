@@ -9,6 +9,7 @@ pub mod decoder;
 pub mod event_split;
 pub mod geometry;
 pub mod grid;
+pub mod mechanics;
 pub mod plant_pose_3d;
 pub mod statistics;
 
@@ -28,13 +29,18 @@ pub use decoder::{
 pub use geometry::{
     Bounds2, GeometryDescriptor, GeometryError, Point2, SymmetryScore, describe,
 };
-pub use plant_pose_3d::{Point3, StemPose3DDescriptor, StemPose3DError, StemPoseSample, Vector3, describe_stem_pose_3d, describe_stem_pose_3d_about_center};
 pub use grid::{
     BinaryGrid, GridDecodeOutcome, GridDecoderManifest, GridDecoderSpec, GridError, GridTransform,
     ManifestError, NullGridResult,
     TraversalOrder, margin_preserving_shuffle, run_grid_tournament,
     standard_d4_ascii7_manifest,
 };
+pub use mechanics::{
+    cantilever_base_moment, cantilever_tip_load_flexural_rigidity, curvature_from_moment,
+    outer_fibre_bending_stress_pa, three_point_bend_flexural_rigidity,
+    three_point_bend_peak_moment, EllipticalHollowSection, MechanicsError, SectionProperties,
+};
+pub use plant_pose_3d::{Point3, StemPose3DDescriptor, StemPose3DError, StemPoseSample, Vector3, describe_stem_pose_3d, describe_stem_pose_3d_about_center};
 pub use statistics::{
     FamilyWiseMaxResult, binary_entropy, familywise_max_statistic_p_value,
     upper_tail_max_p_value, wilson_interval,
