@@ -260,7 +260,11 @@ impl Display for TaskPhaseError {
                 maximum_seconds,
             } => write!(
                 f,
-                "boost phase {phase_index} duration {requested_seconds}s exceeds local mode limit {maximum_seconds}s"
+                concat!(
+                    "boost phase ",
+                    "{phase_index} duration {requested_seconds}s exceeds local mode limit ",
+                    "{maximum_seconds}s"
+                )
             ),
             Self::ConsentOnNonBoostPhase { phase_index } => {
                 write!(f, "phase {phase_index} carries boost consent but is not a boost")
