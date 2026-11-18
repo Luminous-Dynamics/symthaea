@@ -1727,6 +1727,49 @@ mod tests {
     }
 
     #[derive(Deserialize)]
+    struct RevisionGraphFixture {
+        graph_id: String,
+        graph_revision: String,
+        nodes: Vec<EvidenceDependencyNodeFixture>,
+    }
+
+    #[derive(Deserialize)]
+    struct RevisionDiffFixture {
+        scenario_id: String,
+        prior_graph: RevisionGraphFixture,
+        current_graph: RevisionGraphFixture,
+        expected_changed_node_ids: Vec<String>,
+        expected_invalidated_node_ids: Vec<String>,
+        expected_preserved_evidence_node_ids: Vec<String>,
+        expected_change_reasons: BTreeMap<String, Vec<NodeChangeReason>>,
+    }
+
+    const SYNTHETIC_REVISION_DIFF: &str = include_str!(
+        "../../../../docs/research/built-environment/EVIDENCE_REVISION_DIFF_SYNTHETIC_V0.1.json"
+    );
+
+    fn graph_from_revision_fixture(fixture: RevisionGraphFixture) -> EvidenceDependencyGraph {
+        EvidenceDependencyGraph {
+            graph_id: fixture.graph_id,
+            graph_revision: fixture.graph_revision,
+            nodes: fixture
+                .nodes
+                .into_iter()
+                .map(|node| EvidenceDependencyNode {
+                    node_id: node.node_id,
+                    content_digest: blake3::hash(node.content_payload.as_bytes())
+                        .to_hex()
+                        .to_string(),
+                    depends_on: node.depends_on,
+                    evidence_receipt_digest: node
+                        .evidence_receipt_payload
+                        .map(|payload| blake3::hash(payload.as_bytes()).to_hex().to_string()),
+                })
+                .collect(),
+        }
+    }
+
+    #[derive(Deserialize)]
     struct EvidenceInvalidationCaseFixture {
         case_id: String,
         changed_node_ids: Vec<String>,
@@ -1938,6 +1981,31 @@ mod tests {
         let mut drifted = graph;
         drifted.nodes[1].content_digest = blake3::hash(b"style-b").to_hex().to_string();
         assert!(verify_invalidation_receipt(&drifted, &first, &changed).is_err());
+    }
+
+    #[test]
+    fn frozen_revision_diff_fixture_matches_derived_changes_and_invalidation() {
+        let fixture: RevisionDiffFixture =
+            serde_json::from_str(SYNTHETIC_REVISION_DIFF)
+                .expect("synthetic revision-diff fixture must deserialize");
+        let prior = graph_from_revision_fixture(fixture.prior_graph);
+        let current = graph_from_revision_fixture(fixture.current_graph);
+        let receipt = compute_revision_invalidation_receipt(&prior, &current)
+            .unwrap_or_else(|errors| panic!("{}: {errors:?}", fixture.scenario_id));
+
+        assert_eq!(receipt.changed_node_ids, fixture.expected_changed_node_ids);
+        assert_eq!(receipt.invalidated_node_ids, fixture.expected_invalidated_node_ids);
+        assert_eq!(
+            receipt.preserved_evidence.iter().map(|item| item.node_id.clone()).collect::<Vec<_>>(),
+            fixture.expected_preserved_evidence_node_ids
+        );
+        let reasons: BTreeMap<String, Vec<NodeChangeReason>> = receipt
+            .changes
+            .iter()
+            .map(|change| (change.node_id.clone(), change.reasons.clone()))
+            .collect();
+        assert_eq!(reasons, fixture.expected_change_reasons);
+        verify_revision_invalidation_receipt(&prior, &current, &receipt).unwrap();
     }
 
     #[test]
