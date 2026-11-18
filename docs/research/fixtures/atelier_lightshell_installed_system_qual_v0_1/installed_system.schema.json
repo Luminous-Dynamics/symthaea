@@ -172,7 +172,10 @@
         "tool_payload_digest",
         "mission_profile_ref",
         "environment_stratum_ref",
-        "matched_conditions_ref"
+        "matched_conditions_ref",
+        "incumbent_cover_ref",
+        "incumbent_session_ref",
+        "incumbent_cover_digest"
       ],
       "properties": {
         "baseline_session_ref": {
@@ -255,7 +258,8 @@
           "required_pose_set_ref",
           "required_pose_refs",
           "method_selection_ref",
-          "acceptance_rule_ref"
+          "acceptance_rule_ref",
+          "comparison_control"
         ],
         "properties": {
           "gate_id": {
@@ -420,7 +424,6 @@
           "tool_payload_digest",
           "environment_stratum_ref",
           "matched_conditions_ref",
-          "installed_garment_digest",
           "pose_ref",
           "joint_state_ref",
           "measured_value",
@@ -433,7 +436,8 @@
           "method_selection_ref",
           "fixture_revision_ref",
           "raw_data_digest",
-          "evidence_ref"
+          "evidence_ref",
+          "cover_digest"
         ],
         "properties": {
           "run_id": {
