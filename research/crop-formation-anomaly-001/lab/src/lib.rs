@@ -3,12 +3,14 @@
 //! The crate measures descriptive geometry and runs explicitly declared
 //! decoders. It does not infer authorship, origin, intent, or semantics.
 
+pub mod circle_layout;
 pub mod crop_flow;
 pub mod decoder;
 pub mod geometry;
 pub mod grid;
 pub mod statistics;
 
+pub use circle_layout::{CircleClassing, CircleContact, CircleLayout, CircleLayoutError, CircleRecord, class_circle_layout, count_centred_motifs, describe_circle_layout, parse_circle_csv, validate_circles};
 pub use crop_flow::{CropFlowDescriptor, CropFlowError, CropFlowSample, describe_crop_flow, describe_crop_flow_about_center};
 pub use decoder::{
     BitOrder, DecodeError, DecodeOutcome, DecoderSpec, PayloadEncoding, decode,
