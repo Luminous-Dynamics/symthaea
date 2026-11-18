@@ -11,6 +11,7 @@ use std::fmt::{Display, Formatter};
 
 pub mod pressure_curve;
 pub mod service_continuity;
+pub mod serviceability;
 pub mod spray_field;
 pub mod standard_methods;
 pub mod task_phase;
