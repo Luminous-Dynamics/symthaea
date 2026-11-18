@@ -302,7 +302,7 @@ struct EvaluationSummary {
     calibrate_count: usize,
     oracle_matches_when_selected: usize,
     oracle_match_rate_milli_when_selected: Option<u16>,
-    mean_realized_regret_milli_when_selected: Option<i64>,
+    mean_realized_net_utility_regret_milli_when_selected: Option<i64>,
 }
 
 fn architecture_estimate<'a>(input: &'a SelectorInput, architecture_id: &str) -> Option<&'a Estimate> {
@@ -409,7 +409,7 @@ fn evaluate_selector(
         } else {
             Some((oracle_matches * 1_000 / scored_count) as u16)
         },
-        mean_realized_regret_milli_when_selected: if scored_count == 0 {
+        mean_realized_net_utility_regret_milli_when_selected: if scored_count == 0 {
             None
         } else {
             Some(regret_total / scored_count as i64)
@@ -625,7 +625,24 @@ mod tests {
         assert_eq!(summary.fixture_count, 12);
         assert!(summary.calibrate_count > 0);
         assert!(summary.oracle_matches_when_selected > 0);
-        assert!(summary.mean_realized_regret_milli_when_selected.is_some());
+        assert!(summary.mean_realized_net_utility_regret_milli_when_selected.is_some());
+    }
+
+    #[test]
+    fn cost_adjusted_oracle_can_prefer_single_despite_higher_raw_team_quality() {
+        let set = fixtures();
+        let fixture = set.fixtures.iter()
+            .find(|fixture| fixture.id == "CS-007-team-gain-eaten-by-cost")
+            .expect("high coordination-cost fixture");
+        let single_quality = fixture.evaluation_only.realized_quality_milli_by_architecture["single"];
+        let team_quality = fixture.evaluation_only.realized_quality_milli_by_architecture["parallel_independent"];
+        assert!(team_quality > single_quality);
+        let decision = select_architecture(&fixture.input).expect("valid input");
+        assert_eq!(decision.decision, "SINGLE");
+        let summary = evaluate_selector(std::slice::from_ref(fixture), &[decision])
+            .expect("cost-adjusted oracle is valid");
+        assert_eq!(summary.oracle_matches_when_selected, 1);
+        assert_eq!(summary.mean_realized_net_utility_regret_milli_when_selected, Some(0));
     }
 
     #[test]
@@ -640,7 +657,7 @@ mod tests {
             .expect("valid evaluator fixture");
         assert_eq!(summary.calibrate_count, 1);
         assert_eq!(summary.oracle_matches_when_selected, 0);
-        assert_eq!(summary.mean_realized_regret_milli_when_selected, None);
+        assert_eq!(summary.mean_realized_net_utility_regret_milli_when_selected, None);
     }
 
     #[test]
@@ -654,7 +671,7 @@ mod tests {
         let decision = select_architecture(&fixture.input).expect("valid input");
         let error = evaluate_selector(std::slice::from_ref(&fixture), &[decision])
             .expect_err("oracle must be a maximum-quality option");
-        assert!(error.contains("not a maximum-quality option"));
+        assert!(error.contains("not a maximum-net-utility option"));
     }
 
     #[test]
