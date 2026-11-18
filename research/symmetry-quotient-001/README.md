@@ -79,9 +79,13 @@ The exact quotient above remains unchanged. A new, separately typed API explores
 
 For every group element and candidate, the compiler checks:
 - identical domain membership, admissibility, feasibility, constraint signature, boundary-condition identity and output-equivalence identity;
-- objective deviation from the deterministic canonical representative of the orbit no greater than the caller's declared tolerance.
+- the **full pairwise objective range within each orbit**, i.e. max(f)-min(f), no greater than the caller's declared tolerance. This enforces the issue's stated bound |f(g*x)-f(x)| <= epsilon for every action element and candidate, rather than checking only deviations from one representative.
 
-The certificate reports the **actual maximum orbit-to-representative deviation** (\varepsilon_*), not merely the requested tolerance (\varepsilon). It binds the objective unit/scale, optimization sense, tolerance, action and all orbit/member/inverse witnesses.
+The certificate reports two distinct quantities:
+- the **maximum pairwise orbit range** (the gate checked against the requested tolerance);
+- the **maximum orbit-to-representative deviation** (\varepsilon_*), which is the additive regret bound for selecting the best representative.
+
+It also binds canonical versioned bytes for the full original problem and action, including objective values, candidate identities, group table and permutations, alongside objective unit/scale, optimization sense, tolerance and every orbit/member/inverse witness. The byte encoding is replay identity, not a cryptographic digest or signature.
 
 If every orbit member is within \(\varepsilon_*\) of its feasible representative, selecting the best feasible representative yields:
 - minimization: (0 \le f(\hat x)-f(x^*) \le \varepsilon_*\);
@@ -111,7 +115,7 @@ Approximate objective tolerance never excuses changes to feasibility, admissibil
     cargo test --locked --manifest-path research/symmetry-quotient-001/Cargo.toml
     cargo clippy --locked --manifest-path research/symmetry-quotient-001/Cargo.toml --all-targets -- -D warnings
 
-The source tests include minimization, maximization, exact epsilon-zero parity, over-tolerance rejection, hard-semantic negative controls, forged certificate rejection and budget failure. The exact-head Rust 1.96 workflow remains the qualification authority.
+The source tests include minimization, maximization, exact epsilon-zero parity, over-tolerance rejection, hard-semantic negative controls, forged certificate rejection and budget failure. A three-member C3 adversarial orbit with objectives [10, 12, 8] ensures the compiler rejects pairwise range 4 at tolerance 2 even though both members are only 2 from the canonical representative; at tolerance 4 the certificate separately reports pairwise range 4 and representative regret bound 2. A uniform objective shift and a mutated action identity are rejected by full input-contract replay. The exact-head Rust 1.96 workflow remains the qualification authority.
 
 ### Claim boundary
 
