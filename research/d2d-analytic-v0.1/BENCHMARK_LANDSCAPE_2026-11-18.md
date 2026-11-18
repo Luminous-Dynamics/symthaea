@@ -14,7 +14,7 @@ The defensible opportunity for Symthaea + Symtropy + Mycelix is to evaluate a co
 
 > identify a knowledge gap → choose a discriminating experiment → seal predictions → execute an intervention → evaluate against independent outcomes → update a candidate model or skill → measure transfer, retention and cost.
 
-The novelty claim should remain a hypothesis until a literature and benchmark search confirms no equivalent integrated protocol. The practical target is to publish an unusually rigorous, reproducible benchmark of this loop.
+Do not claim that D2D is the first autonomous experiment-selection or closed-loop science system. Autonomous Science Bench 0.1 already evaluates agents that choose budgeted experiments, receive measurements, improve decisions, and submit models scored on designs that were never measured. The defensible D2D research question is narrower and more technical: can we integrate action-conditioned physical counterfactuals, certified uncertainty-bounded branch discrimination, prediction-before-reveal, decision utility, recurrent-memory retention, held-out transfer, and reproducible evidence into one benchmarked loop? Novelty must be established against these adjacent systems, not asserted from the architecture diagram.
 
 ## 1.1 Existing Luminous capabilities to reuse
 
@@ -49,7 +49,7 @@ A concrete downstream execution task is now open:
 
 For certified branch-separating contact experiments, use Symtropy #3406. Important status distinction: #3365, which provides the two-branch six-coordinate sensitivity witness used by #3406's P0 plan, is currently an open draft PR with no passing combined status reported in the audit. It is not yet a qualified main-branch dependency. The finite-step branch-tube owner #3386 remains distinct.
 
-HLB recurrent-learning continuity is another gate: Symthaea #1269 remains the canonical owner for portable, versioned HDC-LTC episode-state checkpoints. The current core NetworkStateSnapshot is only an in-memory scratch buffer and can partially skip mismatched dimensions during restore; D2D must not claim exact recurrent replay until #1269 is qualified.
+HLB recurrent-learning continuity is another gate: Symthaea #1269 remains the canonical owner for versioned HDC-LTC episode-state checkpointing. Draft PR #12757 adds an atomic in-memory restore API that records ordered layer sizes and validates topology, counts, dimensions, and finite state before mutation. It deliberately preserves the legacy best-effort scratch-buffer path for existing callers. The new API is not yet Rust-tested, is not serialized, and does not bind the recurrent state to learned-weight/optimizer identity. Portable checkpoints and fresh-process replay remain unqualified; do not claim them.
 
 The existing Symtropy manipulator-demo Monte Carlo example is not an acceptable D2D SOTA baseline as-is: its low-cost Adaptive arm is explicitly a proximity-keyed deterministic stand-in, not the actual cognitive policy, and its default comparison uses 100 s for two arms versus 40 s for the Φ arm. A future use must first be reworked into a matched-policy, matched-horizon protocol.
 
@@ -75,6 +75,14 @@ The existing Symtropy manipulator-demo Monte Carlo example is not an acceptable 
 
 Every number above is comparator context, not a reproduced Luminous result. Do not pool percentages from incompatible benchmarks.
 
+### 2.2 Version-aware frontier snapshot and benchmark coverage
+
+- **Cosmos Policy versioning matters.** NVIDIA's current Cosmos Policy results page reports 98.5% mean LIBERO success and 67.1% RoboCasa success for its displayed configuration. NVIDIA's Cosmos Cookbook separately reports a Predict2.5 configuration at 98.33% LIBERO and 71.1% RoboCasa, compared with its Predict2 entry at 98.5% and 67.1%. Preserve these as distinct published configuration rows; do not silently relabel the 71.1% result as the same model/configuration as the 67.1% page result. Any reproduction must pin the exact checkpoint, training demonstrations, tasks, evaluation code, action interface and seeds.
+- **The world-model/action gap is independently corroborated.** A separate 2026 survey maps 160 embodied-prediction benchmarks and reports that only 11 make an explicit VLA-versus-world-model contrast and only four turn prediction into executed action. This is a different corpus and methodology from the 130-benchmark world-model survey above; the two counts must not be added or treated as one dataset.
+- **Autonomous Science Bench is a direct comparator, not just inspiration.** Its v0.1 leaderboard covers six pilot campaigns, ten model-agent configurations and 180 trials (three trials per campaign/configuration). The top listed GPT-6 Astra + Codex configuration resolves 72.2% of trials at $190.23 and 557 agent-minutes; the authors caution that three trials per task make small leaderboard gaps non-significant, and the hardest campaign is solved in only five of 30 attempts. Its two gates explicitly separate discovery among measured designs from predictive ranking on unmeasured designs. D2D should adopt that discovery/learning separation while adding the physics/action and evidence-assurance dimensions.
+
+**Competitive interpretation:** we should not try to beat Cosmos on LIBERO/RoboCasa by citing a different small toy simulation. The first credible win is a matched, held-out experiment-design result: better decision quality per total resource cost than random, tuned Bayesian optimization/active learning, and the strongest reproducible model-based baseline—while maintaining calibrated uncertainty and complete branch accounting. Only then should the same frozen method be tested as a policy/world-model component on a named robotics benchmark.
+
 ## 3. The important research gaps
 
 The 2026 survey of 130 world-model benchmarks classifies evaluation by target, open- versus closed-loop protocol, prediction- versus outcome-level metrics, and data source. Its snapshot reports:
@@ -83,7 +91,7 @@ The 2026 survey of 130 world-model benchmarks classifies evaluation by target, o
 - Of 22 interactive-action-fidelity tracks, 3 include closed-loop protocols.
 - Functional-utility tracks are more often outcome-level and closed-loop, but there are only 15 tracks in that category.
 
-The gap is not that closed-loop world-model evaluation does not exist. It does. The gap is that the field still rarely joins all of the following in one benchmark:
+The gap is not that closed-loop world-model evaluation or autonomous experiment selection do not exist. They do. The 130-benchmark survey and the separate 160-benchmark embodied-prediction survey both indicate that prediction-to-action coverage remains sparse; Autonomous Science Bench demonstrates budgeted real-science campaigns with discovery and held-out-learning gates. The narrower gap D2D should test is whether physical action-counterfactual reliability and certified branch-separating experiment design can improve those campaigns' decisions while preserving recurrent capability, transfer and independently auditable evidence.
 
 1. The agent chooses which experiment to run.
 2. It commits predictions before seeing the result.
@@ -227,6 +235,9 @@ Use distributed-systems resilience as the second domain, where Symtropy can gene
 - [MIND — memory consistency and action control (arXiv:2602.08025)](https://arxiv.org/abs/2602.08025)
 - [XEWorld — held-out robot embodiment generalization (arXiv:2608.05799)](https://arxiv.org/abs/2608.05799)
 - [Autonomous Science Bench 0.1 — leaderboard](https://asb.open-ssi.org/leaderboard)
+- [Autonomous Science Bench — overview, six tasks, scoring gates and pilot caveats](https://asb.open-ssi.org/about)
+- [NVIDIA Cosmos Cookbook — Predict2.5 vs Predict2 benchmark tables](https://github.com/nvidia-cosmos/cosmos-cookbook/blob/main/docs/recipes/post_training/predict2/cosmos_policy/post_training.md)
+- [Do World Models Make Better Robots? — separate 160-benchmark survey (arXiv:2609.29669)](https://arxiv.org/abs/2609.29669)
 - [Google DeepMind Genie 4 — official announcement and limitations](https://deepmind.google/blog/genie-4-a-new-generation-of-world-simulation/)
 - [A Survey of World Model Benchmarks — 130-benchmark snapshot](https://world-model-benchmarks.github.io/World-Model-Benchmarks/)
 - [Robot Manipulation Benchmark Audit — CoRL 2026](https://ripl.github.io/manipulation_benchmark_audit/)
