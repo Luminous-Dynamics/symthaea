@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use broca_mace_policy::{
     decide, is_qualified, is_transfer_qualified, Action, Decision, Experience, Objective,
-    Policy, ProbeRequest, Query, Regime, Scope,
+    Policy, ProbeRequest, Query, Regime, Scope, NORMALIZED_UTILITY_SCALE,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -395,7 +395,7 @@ fn apply_environment_probe(
     case: &Case,
     request: ProbeRequest,
 ) -> Option<Vec<Experience>> {
-    let cost_micros = (PROBE_COST * f64::from(1_000_000_u32)).round() as u32;
+    let cost_micros = (PROBE_COST * f64::from(NORMALIZED_UTILITY_SCALE)).round() as u32;
     if request.scope != case.query.scope
         || request.actions != [Action::A, Action::B]
         || request.replicates_per_action != 2
@@ -740,6 +740,34 @@ mod tests {
             decide(Policy::InvariantTransport, &broken.memory, broken.query).action,
             None
         );
+    }
+
+    #[test]
+    fn environment_rejects_mismatched_or_underfunded_probe_requests() {
+        let cases = generated_worlds(1);
+        let item = cases
+            .iter()
+            .find(|case| case.family == "active_probe_when_target_unobserved")
+            .unwrap();
+        let request = decide(Policy::ActiveProbe, &item.memory, item.query)
+            .probe
+            .expect("active policy requests a probe");
+
+        let mut insufficient = request;
+        insufficient.max_cost_normalized_micros = 1;
+        assert!(apply_environment_probe(item, insufficient).is_none());
+
+        let mut wrong_scope = request;
+        wrong_scope.scope.objective = Objective::Cost;
+        assert!(apply_environment_probe(item, wrong_scope).is_none());
+
+        let mut unsupported_actions = request;
+        unsupported_actions.actions = [Action::B, Action::B];
+        assert!(apply_environment_probe(item, unsupported_actions).is_none());
+
+        let mut unsupported_replicates = request;
+        unsupported_replicates.replicates_per_action = 3;
+        assert!(apply_environment_probe(item, unsupported_replicates).is_none());
     }
 
     #[test]

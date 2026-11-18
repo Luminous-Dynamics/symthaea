@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use broca_mace_policy::{
     decide, is_qualified, is_transfer_qualified, Action, Decision, Experience, Objective,
-    Policy, ProbeRequest, Query, Regime, Scope,
+    Policy, ProbeRequest, Query, Regime, Scope, NORMALIZED_UTILITY_SCALE,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -324,7 +324,7 @@ fn apply_environment_probe(
     case: &Scenario,
     request: ProbeRequest,
 ) -> Option<Vec<Experience>> {
-    let cost_micros = (PROBE_COST * f64::from(1_000_000_u32)).round() as u32;
+    let cost_micros = (PROBE_COST * f64::from(NORMALIZED_UTILITY_SCALE)).round() as u32;
     if request.scope != case.session_b.scope
         || request.actions != [Action::A, Action::B]
         || request.replicates_per_action != 2
@@ -650,6 +650,37 @@ mod tests {
         assert_eq!(metrics.causal_overclaims, 0);
         assert_eq!(metrics.invalid_evidence_reuse, 0);
         assert_eq!(metrics.unsupported_a_reuse, 0);
+    }
+
+    #[test]
+    fn evaluator_rejects_probe_requests_outside_scope_or_cost_budget() {
+        let case = cases()
+            .into_iter()
+            .find(|item| item.name == "mechanism_break_after_regime_shift")
+            .expect("mechanism-break case exists");
+        let request = decide(
+            Policy::ActiveProbe,
+            &case.session_a,
+            case.session_b,
+        )
+        .probe
+        .expect("active policy requests a probe");
+
+        let mut underfunded = request;
+        underfunded.max_cost_normalized_micros = 1;
+        assert!(apply_environment_probe(&case, underfunded).is_none());
+
+        let mut wrong_scope = request;
+        wrong_scope.scope.objective = Objective::Cost;
+        assert!(apply_environment_probe(&case, wrong_scope).is_none());
+
+        let mut unsupported_actions = request;
+        unsupported_actions.actions = [Action::A, Action::A];
+        assert!(apply_environment_probe(&case, unsupported_actions).is_none());
+
+        let mut unsupported_replicates = request;
+        unsupported_replicates.replicates_per_action = 3;
+        assert!(apply_environment_probe(&case, unsupported_replicates).is_none());
     }
 
     #[test]

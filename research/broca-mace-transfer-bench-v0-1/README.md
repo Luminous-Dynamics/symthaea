@@ -106,7 +106,7 @@ Do not pool percentages across these tasks. Reproduce each official protocol sep
 - [#8265](https://github.com/Luminous-Dynamics/symthaea/issues/8265): claim identity versus similarity.
 - [#11816](https://github.com/Luminous-Dynamics/symthaea/issues/11816): evaluator and oracle independence.
 
-## Generated stress tranche (MACE v0.3 research)
+## Generated stress tranche (MACE v0.4 research)
 
 A second evaluator binary adds **256 deterministic clusters × 14 scenario families = 3,584 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, qualified negative experience, few-shot invariant transport, a mechanism-break negative control, and an unseen-target case that triggers active probing.
 
@@ -121,7 +121,7 @@ The candidate gate requires at least two unique event IDs as well as two declare
 
 This is a generated synthetic stress distribution—not an official MemoryArena/AMA-Bench adapter, learned-policy train/test split, sealed external oracle or real-world causal discovery. Source-family IDs vary to expose correlation/identity failures, but independence is not cryptographically attested. Bootstrap intervals quantify variation over these generated clusters only; they do not establish external validity. Session-C corrections are applied as observed source-state updates before the next decision.
 
-## Invariant transport experiment (MACE v0.3 research)
+## Invariant transport experiment (MACE v0.4 research)
 
 The candidate crate adds an `invariant_transport` policy alongside exact-scope `causal_qualified`. It may pool prior-regime experience only when the objective matches exactly, the target regime has evidence for both actions, a prior regime has at least two unique qualified events from two source families for each action, source/target families are disjoint, and per-action utility means remain within a fixed 0.12 tolerance.
 
@@ -135,8 +135,8 @@ See [MACE causal-memory benchmark portfolio](../../docs/research/MACE_CAUSAL_MEM
 
 ## Active probing / value-of-information experiment
 
-The `active_probe` policy tries exact-scope evidence first, then invariant transport. Only if both are unavailable does it set `requires_probe`. The evaluator then simulates four target-regime intervention observations (two independent source families per action), returns those observations to the candidate, and scores the second exact-scope decision.
+The `active_probe` policy tries exact-scope evidence first, then invariant transport. Only if both are unavailable does it emit a typed `ProbeRequest` containing the target scope, both actions, replicate count and maximum normalized-utility cost. The evaluator validates that request before simulating four target-regime intervention observations (two independent source families per action), returns those observations to the candidate, and scores the second exact-scope decision.
 
-A probe has a declared **0.12 normalized utility cost**. Reports include probe requests, successful resolutions and total probe cost; utility/regret and cluster-bootstrap comparisons use **net utility after that cost**. A generated positive control has useful prior-regime experience but no target-regime witness, allowing active probing to be compared with abstention/no-memory without granting free information.
+A probe has a declared **0.12 normalized utility cost** (120,000 units on a 1,000,000-unit scale; this is not USD). The typed request specifies target scope, both actions, two replicates per action, and a maximum normalized-cost budget. The evaluator rejects wrong-scope, unsupported-action, unsupported-replicate and under-budget requests. Reports include probe requests, successful resolutions and normalized probe cost; utility/regret and cluster-bootstrap comparisons use **net utility after that cost**. A generated positive control has useful prior-regime experience but no target-regime witness, allowing active probing to be compared with abstention/no-memory without granting free information.
 
 This is an environment-simulation result. The evaluator uses hidden scenario utilities to generate observations, but candidate policy code receives only the generated observations and query. The prototype does not yet model physical probe risk, safety constraints, experiment duration or real-world intervention cost.
