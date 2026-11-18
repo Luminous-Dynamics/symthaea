@@ -703,6 +703,61 @@ impl HdcLtcBridge {
         loss
     }
 
+    /// Evaluate loss from a historical snapshot using fail-closed recurrent-state restore.
+    ///
+    /// Unlike the legacy `eval_loss_from`, this method rejects any incompatible
+    /// snapshot rather than allowing best-effort partial restoration. It also
+    /// validates the live snapshot before running and returns its reusable
+    /// scratch buffer on every error path.
+    pub fn try_eval_loss_from(
+        &mut self,
+        start: &NetworkStateSnapshot,
+        input: &Array1<f32>,
+        target: &Array1<f32>,
+        dt: f32,
+    ) -> Result<f32> {
+        if start.dimension() != Some(self.config.hdc_dim) {
+            return Err(anyhow::anyhow!(
+                "historical HDC-LTC start dimension does not match bridge configuration"
+            ));
+        }
+
+        let hdc_input = self.project_to_hdc(input);
+        let mut live = std::mem::take(&mut self.eval_scratch);
+        self.network.snapshot_state_into(&mut live);
+
+        if let Err(error) = self.network.try_restore_state_from(&live) {
+            self.eval_scratch = live;
+            return Err(anyhow::anyhow!(
+                "live HDC-LTC evaluation snapshot is not restorable: {error:?}"
+            ));
+        }
+        if let Err(error) = self.network.try_restore_state_from(start) {
+            self.eval_scratch = live;
+            return Err(anyhow::anyhow!(
+                "historical HDC-LTC evaluation snapshot is incompatible: {error:?}"
+            ));
+        }
+
+        self.network.evolve_closed_form(dt, &hdc_input);
+        let hdc_output = self.network.output();
+        let output = self.project_from_hdc(&hdc_output);
+        let loss: f32 = output
+            .iter()
+            .zip(target.iter())
+            .map(|(o, t)| (o - t).powi(2))
+            .sum::<f32>()
+            / target.len() as f32;
+
+        let restore_result = self.network.try_restore_state_from(&live);
+        self.eval_scratch = live;
+        restore_result.map_err(|error| {
+            anyhow::anyhow!("failed to restore validated evaluation state: {error:?}")
+        })?;
+
+        Ok(loss)
+    }
+
     fn train_step_impl(
         &mut self,
         start: Option<&NetworkStateSnapshot>,
@@ -1060,6 +1115,76 @@ pub struct HdcLtcBridgeStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn predict_forward_preserves_recurrent_evolution_state_with_strict_restore() {
+        let config = HdcLtcBridgeConfig {
+            input_dim: 8,
+            output_dim: 8,
+            layer_sizes: vec![2, 3, 1],
+            hdc_dim: 256,
+            seed: 23,
+            ..Default::default()
+        };
+        let mut bridge = HdcLtcBridge::new(config);
+        let input = Array1::from_vec(vec![0.15; 8]);
+        bridge.step(&input, 0.02).unwrap();
+        let before = bridge.snapshot_evolution_state();
+
+        bridge.predict_forward(&input, 0.3).unwrap();
+
+        let after = bridge.snapshot_evolution_state();
+        assert!(
+            before.approx_eq(&after, 1e-7),
+            "predict_forward changed recurrent evolution state"
+        );
+    }
+
+    #[test]
+    fn strict_eval_loss_rejects_incompatible_topology_and_preserves_live_state() {
+        let source_config = HdcLtcBridgeConfig {
+            input_dim: 8,
+            output_dim: 8,
+            layer_sizes: vec![2, 3, 1],
+            hdc_dim: 256,
+            seed: 67,
+            ..Default::default()
+        };
+        let target_config = HdcLtcBridgeConfig {
+            layer_sizes: vec![3, 2, 1],
+            seed: 71,
+            ..source_config.clone()
+        };
+        let source = HdcLtcBridge::new(source_config);
+        let mut target = HdcLtcBridge::new(target_config);
+        let input = Array1::from_vec(vec![0.1; 8]);
+        let target_values = Array1::from_vec(vec![-0.1; 8]);
+        target.step(&input, 0.02).unwrap();
+
+        let incompatible = source.snapshot_evolution_state();
+        let before = target.snapshot_evolution_state();
+        assert!(
+            target
+                .try_eval_loss_from(&incompatible, &input, &target_values, 0.02)
+                .is_err()
+        );
+
+        let after = target.snapshot_evolution_state();
+        assert!(
+            before.approx_eq(&after, 0.0),
+            "rejected evaluation snapshot mutated live recurrent state"
+        );
+
+        let compatible = target.snapshot_evolution_state();
+        assert!(
+            target
+                .try_eval_loss_from(&compatible, &input, &target_values, 0.02)
+                .is_ok(),
+            "evaluation scratch buffer should be reusable after rejection"
+        );
+        let final_state = target.snapshot_evolution_state();
+        assert!(before.approx_eq(&final_state, 1e-7));
+    }
 
     #[test]
     fn strict_bridge_restore_round_trips_recurrent_evolution_state() {
