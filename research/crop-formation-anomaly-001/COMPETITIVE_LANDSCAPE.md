@@ -82,7 +82,7 @@ For the Zeals Knoll 2026 case, CCAT reports:
 
 Its predictive analysis is commendably nuanced: the radial-prior baseline reports 0.515 mean accuracy and 0.289 macro-F1; the pair/motif grammar reports 0.493 accuracy and 0.419 macro-F1. The source says radial position remains the strongest raw-accuracy predictor while local grammar helps recover minority/anchor classes, especially E. The 80 stratified masks hide 15 labels from the same 60-circle event. This is a useful **within-event transductive** diagnostic; it is not evidence of event-held-out generalization.
 
-CCAT's own [claim boundary](https://github.com/salahealer9/ccat-crop-circle-analysis-toolkit/blob/main/docs/CLAIM_BOUNDARY.md) explicitly disclaims symbolic meaning, authorship, physical construction method, intentional message, astronomical decoding and proof of construction according to the recovered grammar. Its [decoding protocol](https://github.com/salahealer9/ccat-crop-circle-analysis-toolkit/blob/main/docs/DECODING_PROTOCOL.md) usefully requires predeclared features, subsets, transformations, scores, null models, success/falsification criteria and preservation of negative results. CROP-INTEL should adopt those safeguards.
+CCAT's own [claim boundary](https://github.com/salahealer9/ccat-crop-circle-analysis-toolkit/blob/main/docs/CLAIM_BOUNDARY.md) explicitly disclaims symbolic meaning, authorship, physical construction method, intentional message, astronomical decoding and proof of construction according to the recovered grammar. Its [decoding protocol](https://github.com/salahealer9/ccat-crop-circle-analysis-toolkit/blob/main/docs/DECODING_PROTOCOL.md) usefully requires predeclared features, subsets, transformations, scores, null models, success/falsification criteria and preservation of negative results. The contact-tolerance sweep also tests seven thresholds from 30–60 px, runs 5,000 null trials per tolerance/model by default, and applies Benjamini–Hochberg correction across five metrics × seven tolerances separately per null model. CROP-INTEL should adopt and extend those safeguards, not imply they are absent.
 
 ### CROP-INTEL data interoperability and independent replay
 
@@ -94,7 +94,7 @@ The CROP-INTEL Rust reference lab now contains a separate circle-layout implemen
 
 ### Where to go beyond CCAT
 
-1. **Whole-pipeline multiplicity:** rerun centre estimation, radius/ring class counts, outer-boundary selection, contact thresholds and motif selection inside every null replicate. A post-hoc fixed-label shuffle cannot account for all preprocessing/model choices.
+1. **Broader model-family multiplicity:** build on CCAT's explicit 5-metric × 7-threshold BH correction. Extend the declared search family to any centre-estimation variants, radius/ring class counts, outer-boundary selection, and additional motif/model families that are actually explored. Preserve the distinction between CCAT's conditional label-shuffle nulls and a null that reruns upstream geometry selection.
 2. **Measurement uncertainty:** add independent digitization and uncertainty on each centre/radius; the current CSV does not supply these.
 3. **Event-held-out generalization:** keep every image and derivative of a formation in one split. Evaluate on entirely unseen formations rather than further masking labels on a single graph.
 4. **Matched controls:** include human-made, algorithmic, natural lodging and non-formation geometric patterns with comparable density, size and image conditions.
