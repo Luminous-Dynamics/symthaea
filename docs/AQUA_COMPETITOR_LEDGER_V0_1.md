@@ -276,7 +276,7 @@ The IOPSA notice is useful for clause identification but is not the controlled s
 
 ### SANS 10252-1:2018 Table 3 — low-pressure reference
 
-The accessible Edition 3.2 Table 3 gives a water-saving showerhead design flow of 10 L/min at 50–100 kPa, compared with the standard showerhead design flow of 15 L/min at 20–50 kPa. The table also gives basin / bath / bidet design references documented in the washstation benchmark. These are installation design values, not efficiency-label pass criteria and not a replacement for product-specific flow curves.
+The accessible Edition 3.2 Table 3 gives a water-saving showerhead design flow of 10 L/min at a design flow pressure of 50–100 kPa, compared with the standard showerhead design flow of 15 L/min at 20–50 kPa. Footnote (b) says these design-pressure values are used where a manufacturer's flow-pressure curve is unavailable. They are installation/design references—not product minimum operating-pressure ratings, efficiency-label pass criteria or a replacement for product-specific flow curves. The likely-maximum column is a demand-planning quantity defined by footnote (a), not an authorized product discharge limit.
 
 Primary accessible text: https://www.uj.ac.za/wp-content/uploads/2022/11/sans-10252-1-water-supply-and-drainage-for-buildings-part-1-water-supply-installations-for-buildings-2018.pdf (SANS 10252-1:2018 Edition 3.2, Table 3 and clause 5.3.3.2). The document itself states it is copyright-protected SABS material; use the controlled official copy for formal compliance interpretation.
 
