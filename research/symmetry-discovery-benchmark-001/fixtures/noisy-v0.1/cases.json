@@ -1,0 +1,482 @@
+{
+  "schema_version": "0.1.0",
+  "noise_benchmark_id": "LUMINOUS-SYMM-BOUNDED-OBSERVATION-001",
+  "coordinate_scale": 1000,
+  "coordinate_unit": "one coordinate unit is 0.001 of the source geometry unit",
+  "rule": "A group action remains possible only if every observed point can be bijectively matched to a transformed observed point with L-infinity residual <= 2*epsilon. No perfect matching is a sound falsification witness under the declared per-coordinate bounded error.",
+  "semantics": {
+    "compatible": "not ruled out by the measurement-error envelope; not proof of invariance",
+    "ruled_out": "no point permutation is compatible with the full declared coordinate-error envelope",
+    "candidate_promotion": "forbidden: compatibility never grants exact-symmetry status"
+  },
+  "cases": [
+    {
+      "noise_case_id": "NOISE-C1-SEED-01",
+      "base_case_id": "GENERATED-C1-01",
+      "expected_subgroup_label": "C1",
+      "epsilon_scaled": 5,
+      "observed_points": [
+        [
+          46.998,
+          -12.999
+        ]
+      ],
+      "expected_possible_elements": [
+        "e"
+      ],
+      "expected_ruled_out_elements": [
+        "fanti",
+        "fdiag",
+        "fx",
+        "fy",
+        "r180",
+        "r270",
+        "r90"
+      ],
+      "exact_stabilizer_elements": [
+        "e"
+      ],
+      "interpretation": "possible means not refuted by the bounded-error model; it is not proof of symmetry"
+    },
+    {
+      "noise_case_id": "NOISE-C2_FANTI-SEED-01",
+      "base_case_id": "GENERATED-C2_FANTI-01",
+      "expected_subgroup_label": "C2_FANTI",
+      "epsilon_scaled": 5,
+      "observed_points": [
+        [
+          5.001,
+          -45.002
+        ],
+        [
+          45.002,
+          -4.998
+        ]
+      ],
+      "expected_possible_elements": [
+        "e",
+        "fanti"
+      ],
+      "expected_ruled_out_elements": [
+        "fdiag",
+        "fx",
+        "fy",
+        "r180",
+        "r270",
+        "r90"
+      ],
+      "exact_stabilizer_elements": [
+        "e",
+        "fanti"
+      ],
+      "interpretation": "possible means not refuted by the bounded-error model; it is not proof of symmetry"
+    },
+    {
+      "noise_case_id": "NOISE-C2_FDIAG-SEED-01",
+      "base_case_id": "GENERATED-C2_FDIAG-01",
+      "expected_subgroup_label": "C2_FDIAG",
+      "epsilon_scaled": 5,
+      "observed_points": [
+        [
+          -9.998,
+          36.002
+        ],
+        [
+          35.999,
+          -10.001
+        ]
+      ],
+      "expected_possible_elements": [
+        "e",
+        "fdiag"
+      ],
+      "expected_ruled_out_elements": [
+        "fanti",
+        "fx",
+        "fy",
+        "r180",
+        "r270",
+        "r90"
+      ],
+      "exact_stabilizer_elements": [
+        "e",
+        "fdiag"
+      ],
+      "interpretation": "possible means not refuted by the bounded-error model; it is not proof of symmetry"
+    },
+    {
+      "noise_case_id": "NOISE-C2_FX-SEED-01",
+      "base_case_id": "GENERATED-C2_FX-01",
+      "expected_subgroup_label": "C2_FX",
+      "epsilon_scaled": 5,
+      "observed_points": [
+        [
+          -39.001,
+          -21.001
+        ],
+        [
+          -38.998,
+          20.998
+        ]
+      ],
+      "expected_possible_elements": [
+        "e",
+        "fx"
+      ],
+      "expected_ruled_out_elements": [
+        "fanti",
+        "fdiag",
+        "fy",
+        "r180",
+        "r270",
+        "r90"
+      ],
+      "exact_stabilizer_elements": [
+        "e",
+        "fx"
+      ],
+      "interpretation": "possible means not refuted by the bounded-error model; it is not proof of symmetry"
+    },
+    {
+      "noise_case_id": "NOISE-C2_FY-SEED-01",
+      "base_case_id": "GENERATED-C2_FY-01",
+      "expected_subgroup_label": "C2_FY",
+      "epsilon_scaled": 5,
+      "observed_points": [
+        [
+          -41.998,
+          -43.002
+        ],
+        [
+          41.998,
+          -42.998
+        ]
+      ],
+      "expected_possible_elements": [
+        "e",
+        "fy"
+      ],
+      "expected_ruled_out_elements": [
+        "fanti",
+        "fdiag",
+        "fx",
+        "r180",
+        "r270",
+        "r90"
+      ],
+      "exact_stabilizer_elements": [
+        "e",
+        "fy"
+      ],
+      "interpretation": "possible means not refuted by the bounded-error model; it is not proof of symmetry"
+    },
+    {
+      "noise_case_id": "NOISE-C2_R180-SEED-01",
+      "base_case_id": "GENERATED-C2_R180-01",
+      "expected_subgroup_label": "C2_R180",
+      "epsilon_scaled": 5,
+      "observed_points": [
+        [
+          -49.002,
+          -36.998
+        ],
+        [
+          49.001,
+          37.001
+        ]
+      ],
+      "expected_possible_elements": [
+        "e",
+        "r180"
+      ],
+      "expected_ruled_out_elements": [
+        "fanti",
+        "fdiag",
+        "fx",
+        "fy",
+        "r270",
+        "r90"
+      ],
+      "exact_stabilizer_elements": [
+        "e",
+        "r180"
+      ],
+      "interpretation": "possible means not refuted by the bounded-error model; it is not proof of symmetry"
+    },
+    {
+      "noise_case_id": "NOISE-C4-SEED-01",
+      "base_case_id": "GENERATED-C4-01",
+      "expected_subgroup_label": "C4",
+      "epsilon_scaled": 5,
+      "observed_points": [
+        [
+          -42.999,
+          -41.999
+        ],
+        [
+          -42.001,
+          43.002
+        ],
+        [
+          41.998,
+          -42.999
+        ],
+        [
+          43.001,
+          41.998
+        ]
+      ],
+      "expected_possible_elements": [
+        "e",
+        "r180",
+        "r270",
+        "r90"
+      ],
+      "expected_ruled_out_elements": [
+        "fanti",
+        "fdiag",
+        "fx",
+        "fy"
+      ],
+      "exact_stabilizer_elements": [
+        "e",
+        "r180",
+        "r270",
+        "r90"
+      ],
+      "interpretation": "possible means not refuted by the bounded-error model; it is not proof of symmetry"
+    },
+    {
+      "noise_case_id": "NOISE-D4-SEED-01",
+      "base_case_id": "GENERATED-D4-01",
+      "expected_subgroup_label": "D4",
+      "epsilon_scaled": 5,
+      "observed_points": [
+        [
+          -7.001,
+          -3.998
+        ],
+        [
+          -7.002,
+          4.001
+        ],
+        [
+          -3.999,
+          -7.002
+        ],
+        [
+          -3.998,
+          7.002
+        ],
+        [
+          3.999,
+          -7.001
+        ],
+        [
+          4.002,
+          6.998
+        ],
+        [
+          6.998,
+          -3.998
+        ],
+        [
+          7.001,
+          4.001
+        ]
+      ],
+      "expected_possible_elements": [
+        "e",
+        "fanti",
+        "fdiag",
+        "fx",
+        "fy",
+        "r180",
+        "r270",
+        "r90"
+      ],
+      "expected_ruled_out_elements": [],
+      "exact_stabilizer_elements": [
+        "e",
+        "fanti",
+        "fdiag",
+        "fx",
+        "fy",
+        "r180",
+        "r270",
+        "r90"
+      ],
+      "interpretation": "possible means not refuted by the bounded-error model; it is not proof of symmetry"
+    },
+    {
+      "noise_case_id": "NOISE-V4_AXIS-SEED-01",
+      "base_case_id": "GENERATED-V4_AXIS-01",
+      "expected_subgroup_label": "V4_AXIS",
+      "epsilon_scaled": 5,
+      "observed_points": [
+        [
+          -30.002,
+          -12.999
+        ],
+        [
+          -29.999,
+          12.998
+        ],
+        [
+          30.002,
+          -12.998
+        ],
+        [
+          29.999,
+          12.999
+        ]
+      ],
+      "expected_possible_elements": [
+        "e",
+        "fx",
+        "fy",
+        "r180"
+      ],
+      "expected_ruled_out_elements": [
+        "fanti",
+        "fdiag",
+        "r270",
+        "r90"
+      ],
+      "exact_stabilizer_elements": [
+        "e",
+        "fx",
+        "fy",
+        "r180"
+      ],
+      "interpretation": "possible means not refuted by the bounded-error model; it is not proof of symmetry"
+    },
+    {
+      "noise_case_id": "NOISE-V4_DIAG-SEED-01",
+      "base_case_id": "GENERATED-V4_DIAG-01",
+      "expected_subgroup_label": "V4_DIAG",
+      "epsilon_scaled": 5,
+      "observed_points": [
+        [
+          -33.999,
+          -1.002
+        ],
+        [
+          -0.998,
+          -33.998
+        ],
+        [
+          0.999,
+          33.999
+        ],
+        [
+          34.002,
+          0.998
+        ]
+      ],
+      "expected_possible_elements": [
+        "e",
+        "fanti",
+        "fdiag",
+        "r180"
+      ],
+      "expected_ruled_out_elements": [
+        "fx",
+        "fy",
+        "r270",
+        "r90"
+      ],
+      "exact_stabilizer_elements": [
+        "e",
+        "fanti",
+        "fdiag",
+        "r180"
+      ],
+      "interpretation": "possible means not refuted by the bounded-error model; it is not proof of symmetry"
+    },
+    {
+      "noise_case_id": "NOISE-NEAR-SYMMETRY-EPS-3",
+      "base_case_id": "D4-NEAR-SYMMETRY-BREAK-001",
+      "expected_subgroup_label": "C1",
+      "epsilon_scaled": 3,
+      "observed_points": [
+        [
+          0.998,
+          1.011
+        ],
+        [
+          -0.999,
+          0.998
+        ],
+        [
+          -0.998,
+          -0.998
+        ],
+        [
+          0.999,
+          -1.001
+        ]
+      ],
+      "expected_possible_elements": [
+        "e"
+      ],
+      "expected_ruled_out_elements": [
+        "fanti",
+        "fdiag",
+        "fx",
+        "fy",
+        "r180",
+        "r270",
+        "r90"
+      ],
+      "exact_stabilizer_elements": [
+        "e"
+      ],
+      "interpretation": "tight uncertainty excludes the near-reflection"
+    },
+    {
+      "noise_case_id": "NOISE-NEAR-SYMMETRY-EPS-5",
+      "base_case_id": "D4-NEAR-SYMMETRY-BREAK-001",
+      "expected_subgroup_label": "C1",
+      "epsilon_scaled": 5,
+      "observed_points": [
+        [
+          0.998,
+          1.011
+        ],
+        [
+          -0.999,
+          0.998
+        ],
+        [
+          -0.998,
+          -0.998
+        ],
+        [
+          0.999,
+          -1.001
+        ]
+      ],
+      "expected_possible_elements": [
+        "e",
+        "fx"
+      ],
+      "expected_ruled_out_elements": [
+        "fanti",
+        "fdiag",
+        "fy",
+        "r180",
+        "r270",
+        "r90"
+      ],
+      "exact_stabilizer_elements": [
+        "e"
+      ],
+      "interpretation": "wider uncertainty leaves a reflection possible but never promotes it to an exact symmetry"
+    }
+  ],
+  "claim_boundary": {
+    "established_by_fixture": "deterministic bounded-noise examples with known latent D4 stabilizers and declared coordinate error bounds",
+    "not_established": "probabilistic noise guarantees, physical measurement calibration, a continuous-group theorem, or an external learner benchmark"
+  }
+}

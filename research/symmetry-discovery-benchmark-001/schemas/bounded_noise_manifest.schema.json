@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/symmetry-discovery-benchmark-001/schemas/bounded_noise_manifest.schema.json",
+  "title": "Bounded coordinate-noise symmetry benchmark fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "noise_benchmark_id",
+    "coordinate_scale",
+    "coordinate_unit",
+    "rule",
+    "semantics",
+    "cases",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "noise_benchmark_id": {
+      "const": "LUMINOUS-SYMM-BOUNDED-OBSERVATION-001"
+    },
+    "coordinate_scale": {
+      "const": 1000
+    },
+    "coordinate_unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rule": {
+      "type": "string",
+      "minLength": 1
+    },
+    "semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compatible",
+        "ruled_out",
+        "candidate_promotion"
+      ],
+      "properties": {
+        "compatible": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ruled_out": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_promotion": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "noise_case_id",
+          "base_case_id",
+          "expected_subgroup_label",
+          "epsilon_scaled",
+          "observed_points",
+          "expected_possible_elements",
+          "expected_ruled_out_elements",
+          "exact_stabilizer_elements",
+          "interpretation"
+        ],
+        "properties": {
+          "noise_case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "base_case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_subgroup_label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "epsilon_scaled": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "observed_points": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "expected_possible_elements": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "expected_ruled_out_elements": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "exact_stabilizer_elements": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "interpretation": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "established_by_fixture",
+        "not_established"
+      ],
+      "properties": {
+        "established_by_fixture": {
+          "type": "string",
+          "minLength": 1
+        },
+        "not_established": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
