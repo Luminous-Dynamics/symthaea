@@ -263,3 +263,16 @@ The dry-side service spine is now paired with a fault/job manifest and evidence 
 ## Evidence corpus expansion — repairability and design for disassembly
 
 The source-classified evidence register now includes ISO 20887:2020 and EN 45554:2020 with scope limits preserved: ISO 20887 informs building/component design for disassembly but sets no numeric threshold; EN 45554's stated scope is energy-related products and is not assumed directly applicable to passive plumbing fixtures. See the 17-entry / 79-claim evidence register and issue #12844.
+
+
+## Boost qualification is product-category and method specific
+
+Aqua's task-selective-delivery work must distinguish:
+- UWL 2023 clause 12.1 boost-function testing;
+- EN 18021:2025 clause 8.3.2 for shower outlets;
+- EN 18021:2025 clause 10.3.8 for shower systems;
+- EN 18021:2025 clause 7.3.3 for taps.
+
+The accessible EN excerpt shows tap-specific numeric criteria in 7.3.3.4, but the full shower-outlet and shower-system acceptance text is not available in the public excerpt reviewed. Tap limits are therefore not transferred to showers. The controlled standard is required before a formal shower boost validator or conformity claim. The exact WaterBoost competitor SKU 28036000 also has manufacturer-declared regular/boosted flows that conflict in scope with its listed 4 L/min regulator/maximum; this remains an unresolved manufacturer-specification ambiguity, not a nonconformity finding.
+
+See [AQUA_METHOD_CROSSWALK_V0_1.md](AQUA_METHOD_CROSSWALK_V0_1.md), [#12798](https://github.com/Luminous-Dynamics/symthaea/issues/12798), and the expanded 17-entry / 80-claim evidence corpus.
