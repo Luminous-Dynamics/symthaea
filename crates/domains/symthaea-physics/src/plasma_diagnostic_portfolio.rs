@@ -780,8 +780,10 @@ pub struct DiagnosticPortfolioFrameResult {
     pub frame_time_ns: u64,
     pub active_sensor_ids: Vec<String>,
     pub sensor_evidence: Vec<DiagnosticFrameSensorEvidence>,
-    /// Design-time diagnosability of the declared complete sensor architecture.
+    /// Design-time diagnosability of the requested sensor architecture.
     pub structural_diagnosability: DiagnosabilityResult,
+    /// Diagnosability of only the sensors that produced admitted, in-domain categories in this frame.
+    pub current_available_sensor_diagnosability: DiagnosabilityResult,
     /// Worlds consistent with this frame's admitted categorical measurements.
     pub world_compatibility: Vec<WorldCompatibility>,
     pub compatible_world_ids: Vec<String>,
@@ -1004,6 +1006,14 @@ pub fn evaluate_observation_frame(
         .iter()
         .map(String::as_str)
         .collect();
+    let currently_available_sensor_ids: Vec<String> = sensor_evidence
+        .iter()
+        .filter(|item| active.contains(item.sensor_id.as_str()))
+        .filter(|item| matches!(item.observation, SensorObservation::Known(_)))
+        .map(|item| item.sensor_id.clone())
+        .collect();
+    let current_available_sensor_diagnosability =
+        diagnose(model, &currently_available_sensor_ids)?;
     let evidence_by_sensor: BTreeMap<&str, &SensorObservation> = sensor_evidence
         .iter()
         .map(|item| (item.sensor_id.as_str(), &item.observation))
@@ -1078,6 +1088,7 @@ pub fn evaluate_observation_frame(
         active_sensor_ids: structural_diagnosability.active_sensor_ids.clone(),
         sensor_evidence,
         structural_diagnosability,
+        current_available_sensor_diagnosability,
         world_compatibility,
         compatible_world_ids,
         compatible_decision_ids,
