@@ -406,6 +406,20 @@ fn validate_selection_method(
                     "A 3D spacer specimen requires an explicitly spacer-qualified airflow fixture and validation reference before test readiness.");
             }
         }
+        "ISO 25086-1" => {
+            if selection.test_family != "snagging" {
+                push(findings, "iso_25086_1_family_mismatch", format!("{path}.test_family"),
+                    "ISO 25086-1:2026 is a fabric snagging-resistance method.");
+            }
+            if !matches!(specimen.construction_class.as_str(), "woven_or_knit" | "3d_spacer") {
+                push(findings, "iso_25086_1_construction_out_of_scope", format!("{path}.specimen_id"),
+                    "ISO 25086-1:2026 applies to knitted and woven fabrics; this construction class is not admitted by the current metadata profile.");
+            }
+            if selection.selected_surface != "fabric_surface" || selection.fixture_class != "mace_snagging" {
+                push(findings, "iso_25086_1_fixture_or_surface_mismatch", path,
+                    "ISO 25086-1:2026 selection requires a fabric-surface Mace (spiked-ball) snagging fixture.");
+            }
+        }
         "ISO 6330" => {
             if selection.test_family != "cleaning_retention" {
                 push(findings, "iso_6330_family_mismatch", format!("{path}.test_family"),
@@ -538,6 +552,11 @@ fn known_standard(method_id: &str) -> Option<KnownStandard> {
             edition: "1995",
             family: "airflow",
             source: "https://www.iso.org/standard/16869.html",
+        }),
+        "ISO 25086-1" => Some(KnownStandard {
+            edition: "2026",
+            family: "snagging",
+            source: "https://www.iso.org/standard/88922.html",
         }),
         "ISO 6330" => Some(KnownStandard {
             edition: "2021",
@@ -741,6 +760,51 @@ mod tests {
         manifest["selections"][0]["acceptance_rule_ref"] = json!("COATED-ACCEPTANCE");
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|f| f.code == "ready_selection_fixture_scope_mismatch"));
+    }
+
+    #[test]
+    fn iso_25086_1_2026_admits_knit_snagging_method_profile() {
+        let mut manifest = base_manifest();
+        manifest["method_profiles"].push(json!({
+            "profile_id":"M-ISO-25086-1-2026","profile_kind":"international_standard",
+            "method_id":"ISO 25086-1","edition":"2026","test_family":"snagging",
+            "metadata_source_ref":"https://www.iso.org/standard/88922.html",
+            "metadata_state":"verified_current_metadata"
+        }));
+        manifest["selections"].push(json!({
+            "selection_id":"SEL-SNAG","specimen_id":"SP-UNCOATED","profile_id":"M-ISO-25086-1-2026",
+            "test_family":"snagging","selected_surface":"fabric_surface","fixture_class":"mace_snagging",
+            "fixture_ref":null,"fixture_revision":null,"fixture_validation_state":"pending","fixture_validation_ref":null,
+            "state":"proposed","execution_mode":"normative_unmodified","approved_deviation_ref":null,
+            "internal_method_validation_ref":null,"protocol_ref":null,"acceptance_rule_ref":null,"cleaning_profile":null
+        }));
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.is_valid(), "{:?}", report.findings);
+    }
+
+    #[test]
+    fn iso_25086_1_2026_rejects_nonwoven_nonknit_construction() {
+        let mut manifest = base_manifest();
+        manifest["specimens"].push(json!({
+            "specimen_id":"SP-COATED-NONKNIT","candidate_id":"C-01",
+            "construction_class":"coated_laminated","seam_geometry":"not_applicable","thickness_mm":1.0
+        }));
+        manifest["method_profiles"].push(json!({
+            "profile_id":"M-ISO-25086-1-2026","profile_kind":"international_standard",
+            "method_id":"ISO 25086-1","edition":"2026","test_family":"snagging",
+            "metadata_source_ref":"https://www.iso.org/standard/88922.html",
+            "metadata_state":"verified_current_metadata"
+        }));
+        manifest["selections"].push(json!({
+            "selection_id":"SEL-SNAG-OUT-OF-SCOPE","specimen_id":"SP-COATED-NONKNIT",
+            "profile_id":"M-ISO-25086-1-2026","test_family":"snagging",
+            "selected_surface":"fabric_surface","fixture_class":"mace_snagging",
+            "fixture_ref":null,"fixture_revision":null,"fixture_validation_state":"pending","fixture_validation_ref":null,
+            "state":"proposed","execution_mode":"normative_unmodified","approved_deviation_ref":null,
+            "internal_method_validation_ref":null,"protocol_ref":null,"acceptance_rule_ref":null,"cleaning_profile":null
+        }));
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "iso_25086_1_construction_out_of_scope"));
     }
 
     #[test]
