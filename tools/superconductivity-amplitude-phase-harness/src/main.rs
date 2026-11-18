@@ -708,6 +708,36 @@ mod tests {
     }
 
     #[test]
+    fn gauge_invariance_holds_for_nonuniform_complex_fields_and_nonzero_links() {
+        let (schema, fixture) = inputs();
+        let model = GlModel::from_bytes(&schema, &fixture).unwrap();
+        let fields: Vec<Complex> = (0..model.nodes.len())
+            .map(|index| {
+                let x = index as f64;
+                Complex {
+                    re: 0.7 + 0.11 * (0.4 * x).cos(),
+                    im: 0.13 * (0.7 * x).sin(),
+                }
+            })
+            .collect();
+        let links: Vec<f64> = (0..model.edges.len())
+            .map(|index| 0.21 * (index as f64 * 0.37).sin())
+            .collect();
+        let angles: Vec<f64> = (0..model.nodes.len())
+            .map(|index| 0.31 * (index as f64 + 1.0).cos())
+            .collect();
+        let initial = model.free_energy_for(&fields, &links).unwrap();
+        let (transformed_fields, transformed_links) =
+            model.gauge_transform(&fields, &links, &angles).unwrap();
+        let transformed = model
+            .free_energy_for(&transformed_fields, &transformed_links)
+            .unwrap();
+        assert!((initial.local - transformed.local).abs() < 1.0e-10);
+        assert!((initial.gradient - transformed.gradient).abs() < 1.0e-10);
+        assert!((initial.total - transformed.total).abs() < 1.0e-10);
+    }
+
+    #[test]
     fn zero_field_uniform_state_has_zero_gradient_energy() {
         let (schema, fixture) = inputs();
         let model = GlModel::from_bytes(&schema, &fixture).unwrap();
@@ -758,7 +788,7 @@ mod tests {
     }
 
     #[test]
-    fn nonuniform_complex_field_has_positive_gradient_energy() {
+    fn nonuniform_complex_field_has_exact_gradient_energy_for_one_suppressed_site() {
         let (schema, fixture) = inputs();
         let mut value: Value = serde_json::from_slice(&fixture).unwrap();
         value["graph"]["nodes"][0]["psi_real"] = json!(0.0);
@@ -768,7 +798,10 @@ mod tests {
         let energy = model
             .free_energy_for(&model.initial_fields(), &model.initial_gauge_phases())
             .unwrap();
-        assert!(energy.gradient > 0.0);
+        // One zero-amplitude site has four unit-coupling neighbours on the 4x4 torus.
+        assert!((energy.local - (-7.5)).abs() < 1.0e-12);
+        assert!((energy.gradient - 4.0).abs() < 1.0e-12);
+        assert!((energy.total - (-3.5)).abs() < 1.0e-12);
     }
 
     #[test]
