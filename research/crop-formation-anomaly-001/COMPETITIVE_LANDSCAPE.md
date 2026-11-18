@@ -66,7 +66,44 @@ Do not clone the catalogue or geolocator. Prefer a compatible research interface
 
 Symthaea should add a higher-level layer that can ingest *qualified* geometry and provenance, then test mathematical structure, candidate encodings, mechanism predictions and experiment value. It should never silently promote another project's candidate coordinate or catalogue assertion into ground truth.
 
-## 3. Adjacent industry and SOTA baselines
+## 3. Direct geometry-grammar comparator: CCAT v1.0.0
+
+[CCAT — Crop Circle Analysis Toolkit](https://github.com/salahealer9/ccat-crop-circle-analysis-toolkit) by Salah-Eddin Gherbi is the closest inspected public comparator for geometric construction-grammar recovery. Its v1.0.0 Zenodo release is [10.5281/zenodo.21527026](https://doi.org/10.5281/zenodo.21527026).
+
+For the Zeals Knoll 2026 case, CCAT reports:
+- 60 digitized circle centres/radii;
+- five radius classes A–E;
+- a near-regular 17-circle outer boundary;
+- radial organization of classes;
+- A–E adjacency enrichment and same-symbol contact suppression;
+- repeated A/B/E local motifs;
+- a fixed-scaffold generative grammar and an approximate coordinate-generation prototype;
+- a within-event masked-label predictive analysis.
+
+Its predictive analysis is commendably nuanced: the radial-prior baseline reports 0.515 mean accuracy and 0.289 macro-F1; the pair/motif grammar reports 0.493 accuracy and 0.419 macro-F1. The source says radial position remains the strongest raw-accuracy predictor while local grammar helps recover minority/anchor classes, especially E. The 80 stratified masks hide 15 labels from the same 60-circle event. This is a useful **within-event transductive** diagnostic; it is not evidence of event-held-out generalization.
+
+CCAT's own [claim boundary](https://github.com/salahealer9/ccat-crop-circle-analysis-toolkit/blob/main/docs/CLAIM_BOUNDARY.md) explicitly disclaims symbolic meaning, authorship, physical construction method, intentional message, astronomical decoding and proof of construction according to the recovered grammar. Its [decoding protocol](https://github.com/salahealer9/ccat-crop-circle-analysis-toolkit/blob/main/docs/DECODING_PROTOCOL.md) usefully requires predeclared features, subsets, transformations, scores, null models, success/falsification criteria and preservation of negative results. CROP-INTEL should adopt those safeguards.
+
+### CROP-INTEL data interoperability and independent replay
+
+The source project's `data/circles_drag_60.csv` is declared CC BY 4.0 in its [data licence](https://github.com/salahealer9/ccat-crop-circle-analysis-toolkit/blob/main/LICENSE-DATA.md). CROP-INTEL imports only that digitized geometry CSV, retains attribution and the original source Git blob SHA, and does not import the source photograph. The values are image-space pixels; the CSV carries no per-circle uncertainty, independent digitizer comparison or field-metric calibration.
+
+A separate exploratory calculation from the exact 60-row source CSV reproduced five radius classes, 66 proximity edges at the 45-pixel tangent-gap threshold, 12 A–E edges, and centred A–E–B / B–A–E / A–E–A motif counts of 10 / 10 / 8. This is a computational replay of already digitized geometry, **not** an independent observation of the field.
+
+The CROP-INTEL Rust reference lab now contains a separate circle-layout implementation and known-answer tests targeting those counts. The tests are authored but have not been compiled or executed. See [CCAT_REPLICATION.md](CCAT_REPLICATION.md) and the imported fixture's [attribution/limitations](datasets/ccat-zeals-knoll-2026/README.md).
+
+### Where to go beyond CCAT
+
+1. **Whole-pipeline multiplicity:** rerun centre estimation, radius/ring class counts, outer-boundary selection, contact thresholds and motif selection inside every null replicate. A post-hoc fixed-label shuffle cannot account for all preprocessing/model choices.
+2. **Measurement uncertainty:** add independent digitization and uncertainty on each centre/radius; the current CSV does not supply these.
+3. **Event-held-out generalization:** keep every image and derivative of a formation in one split. Evaluate on entirely unseen formations rather than further masking labels on a single graph.
+4. **Matched controls:** include human-made, algorithmic, natural lodging and non-formation geometric patterns with comparable density, size and image conditions.
+5. **Mechanism separation:** test geometry-generation hypotheses separately from plant deformation, field mechanics, authorship and semantic encoding.
+6. **Reproducible interoperability:** compare on the same attributed geometry fixture and publish all deviations, negative findings, uncertainty and claim ceilings.
+
+CCAT is a serious scientific baseline, not a straw man. We should acknowledge its geometric-grammar results, reuse its good preregistration principles, and compete on cross-event validity, independent measurement, complete pipeline calibration and causal evidence.
+
+## 4. Adjacent industry and SOTA baselines
 
 ### Optical remote-sensing computer vision
 
