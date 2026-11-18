@@ -184,4 +184,4 @@ An admitted record supports only application-specific non-microbiological soil-r
 
 ## Proposed fixture status
 
-The accompanying fixture is synthetic and proposed-only. It defines three planned cleaning cycles, two required claim gates and zero executed runs, inspections or measurements. All identities, chemistry, limits and method references are synthetic placeholders. They are not product requirements or physical results.
+The accompanying fixture is synthetic and proposed-only. It declares a required cycle horizon of three, defines three planned cleaning cycles and two required claim gates, and contains zero executed runs, inspections or measurements. All identities, chemistry, limits and method references are synthetic placeholders. They are not product requirements or physical results.
