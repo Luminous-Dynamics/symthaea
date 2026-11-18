@@ -1,0 +1,371 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sc_discovery_benchmark_v0_1.schema.json",
+  "title": "Superconductivity discovery benchmark manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "dataset",
+    "protocol",
+    "models",
+    "records",
+    "splits",
+    "predictions"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SC-DISCOVERY-OOD-BENCHMARK-0.1"
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "revision",
+        "data_status",
+        "description"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "data_status": {
+          "enum": [
+            "synthetic_fixture",
+            "curated_external"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_id",
+        "evaluation_evidence_class",
+        "reject_random_split",
+        "required_group_keys"
+      ],
+      "properties": {
+        "protocol_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evaluation_evidence_class": {
+          "enum": [
+            "measured",
+            "paper_reported",
+            "computed",
+            "synthetic_fixture"
+          ]
+        },
+        "reject_random_split": {
+          "const": true
+        },
+        "required_group_keys": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "family_id",
+              "prototype_id",
+              "source_id"
+            ]
+          }
+        }
+      }
+    },
+    "models": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "model_id",
+          "role",
+          "description"
+        ],
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "enum": [
+              "baseline",
+              "predictor"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "records": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "record_id",
+          "material_id",
+          "reduced_formula",
+          "family_id",
+          "prototype_id",
+          "source_id",
+          "publication_date",
+          "evidence_class",
+          "property",
+          "value",
+          "unit",
+          "pressure_gpa",
+          "measurement_temperature_k",
+          "field_t",
+          "field_orientation",
+          "sample_form",
+          "tc_criterion",
+          "method",
+          "specimen_id"
+        ],
+        "properties": {
+          "record_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "material_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reduced_formula": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prototype_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "publication_date": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          },
+          "evidence_class": {
+            "enum": [
+              "measured",
+              "paper_reported",
+              "computed",
+              "synthetic_fixture"
+            ]
+          },
+          "property": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": "number",
+            "minimum": 0
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pressure_gpa": {
+            "type": "number",
+            "minimum": 0
+          },
+          "measurement_temperature_k": {
+            "type": "number",
+            "minimum": 0
+          },
+          "field_t": {
+            "type": "number",
+            "minimum": 0
+          },
+          "field_orientation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sample_form": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tc_criterion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "method": {
+            "type": "string",
+            "minLength": 1
+          },
+          "specimen_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "splits": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "split_id",
+          "mode",
+          "property",
+          "unit",
+          "train_record_ids",
+          "calibration_record_ids",
+          "test_record_ids"
+        ],
+        "properties": {
+          "split_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mode": {
+            "enum": [
+              "group_holdout",
+              "temporal_holdout"
+            ]
+          },
+          "property": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "group_key": {
+            "enum": [
+              "family_id",
+              "prototype_id",
+              "source_id"
+            ]
+          },
+          "held_out_values": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "cutoff_date": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          },
+          "train_record_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "calibration_record_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "test_record_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "predictions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "prediction_id",
+          "split_id",
+          "record_id",
+          "model_id",
+          "property",
+          "abstained",
+          "predicted_value",
+          "lower",
+          "upper"
+        ],
+        "properties": {
+          "prediction_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "split_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "record_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "property": {
+            "type": "string",
+            "minLength": 1
+          },
+          "abstained": {
+            "type": "boolean"
+          },
+          "predicted_value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "lower": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "upper": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
