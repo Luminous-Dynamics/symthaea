@@ -558,20 +558,20 @@ fn assess_candidate(
     assessment.blocking_metrics.sort();
     assessment.blocking_metrics.dedup();
 
-    if candidate.process_capability_state == "not_capable"
-        || candidate.process_capability_state == "unknown"
-        || candidate.process_capability_state == "pending"
-        || (stage != "exploratory" && candidate.process_capability_state != "qualified")
-    {
-        assessment.disposition = "process_blocked".to_string();
-        return assessment;
-    }
     if definite_failure {
         assessment.disposition = "infeasible".to_string();
         return assessment;
     }
     if applicability_blocked {
         assessment.disposition = "applicability_blocked".to_string();
+        return assessment;
+    }
+    if candidate.process_capability_state == "not_capable"
+        || candidate.process_capability_state == "unknown"
+        || candidate.process_capability_state == "pending"
+        || (stage != "exploratory" && candidate.process_capability_state != "qualified")
+    {
+        assessment.disposition = "process_blocked".to_string();
         return assessment;
     }
     if missing {
@@ -851,6 +851,17 @@ mod tests {
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         let a = report.candidate_assessments.iter().find(|item| item.candidate_id == "A").unwrap();
         assert_eq!(a.disposition, "insufficient_evidence");
+    }
+
+    #[test]
+    fn a_demonstrated_hard_gate_failure_is_not_hidden_by_process_pending() {
+        let mut manifest = base_manifest();
+        manifest["candidates"][0]["process_capability_state"] = json!("pending");
+        manifest["candidates"][0]["properties"][0]["lower_bound"] = json!(85.0);
+        manifest["candidates"][0]["properties"][0]["upper_bound"] = json!(90.0);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        let a = report.candidate_assessments.iter().find(|item| item.candidate_id == "A").unwrap();
+        assert_eq!(a.disposition, "infeasible");
     }
 
     #[test]
