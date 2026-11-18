@@ -63,13 +63,14 @@ The setpoint tolerance and stabilization window must be preregistered from the t
 Freeze exact product, market variant, model, spray mode, accessory, hose, restrictor, installation and service age.
 
 Required reference set:
-- Hansgrohe Activera Select S 95 2jet EcoSmart, South African SKU 28087000. Manufacturer datasheet declares 0.5 bar minimum flow pressure and 6.5 L/min ImpactRain / 7.2 L/min Rain at 3 bar.
+- Hansgrohe Activera Select S shower system, South African SKU 28087000. Manufacturer datasheet declares 0.5 bar minimum flow pressure; 7.2 L/min Rain, 6.5 L/min ImpactRain and 8 L/min maximum system flow at 3 bar; maximum operating pressure 10 bar; ShowerTablet Select 360 thermostat.
+- Hansgrohe Activera Select S shower set, South African SKU 28048000. Product page declares 0.5–6 bar operating pressure, 7.2 L/min Rain, 6.5 L/min ImpactRain and 7.2 L/min maximum at 3 bar, function from 3 L/min.
 - Hansgrohe Raindance Select E 120 3jet PowderRain EcoSmart+, South African SKU 28729000. Datasheet declares 1.5 bar minimum flow pressure and 5.2–5.4 L/min modes at 3 bar.
 - Brondell Nebia Corre N400RO family. Manufacturer sheet declares 20–80 psi (approximately 138–552 kPa) inlet range and 1.2 gpm Super Saver / 1.5 gpm other modes.
 - Aqua passive reference geometry, exact revision and manufacturing digest.
 - Conventional pressure-compensating control, exact SKU / mode and local-market variant.
 
-At 50 / 75 / 100 kPa, the Activera's declared 0.5 bar minimum is a relevant in-range comparator. The Brondell 20 psi (approximately 138 kPa) lower bound is above these points; any lower-pressure exposure is out-of-declared-range exploratory research and cannot be scored as a normal supported operating point. The Raindance minimum is also above 50 / 75 / 100 kPa. Preserve these distinctions in all charts.
+At 50 / 75 / 100 kPa, both Activera variants' declared 0.5 bar minimum is a relevant in-range manufacturer comparator, subject to their other rated installation conditions. Keep 28087000's 10 bar maximum and integrated ShowerTablet separate from 28048000's 6 bar maximum and no ShowerTablet. The Brondell 20 psi (approximately 138 kPa) lower bound is above these points; any lower-pressure exposure is out-of-declared-range exploratory research and cannot be scored as a normal supported operating point. The Raindance minimum is also above 50 / 75 / 100 kPa. Preserve these distinctions in all charts.
 
 Manufacturer minimum-pressure claims are not independent evidence that useful service is maintained exactly at the stated minimum.
 
