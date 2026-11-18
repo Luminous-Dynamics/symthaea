@@ -646,6 +646,20 @@ mod tests {
     }
 
     #[test]
+    fn group_distribution_with_unknown_ambient_element_is_rejected() {
+        let mut submission = smoke_submission();
+        let distribution = submission.predictions[0]
+            .group_distribution
+            .as_mut()
+            .unwrap();
+        let identity_mass = distribution.remove("e").unwrap();
+        distribution.insert("invented-element".to_owned(), identity_mass);
+        assert!(run(submission)
+            .unwrap_err()
+            .contains("group_distribution keys do not match the D4 ambient group"));
+    }
+
+    #[test]
     fn point_mass_distribution_has_positive_w1_against_nontrivial_subgroup() {
         let oracle = Manifest::parse().unwrap();
         let distances = oracle
