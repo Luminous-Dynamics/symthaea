@@ -12,7 +12,7 @@ pub mod numeric;
 
 pub use numeric::{compress_i16, decompress_i16, NumericError, NumericTransform};
 
-pub use causal::{generate_fsm, generate_scm, FsmTrace, GeneratorError, ScmIntervention, ScmTrace};
+pub use causal::{e3_mechanism_splits, generate_fsm, generate_scm, generate_scm_with_config, FsmTrace, GeneratorError, ScmIntervention, ScmMechanismConfig, ScmResponse, ScmTrace};
 
 use std::fmt;
 
