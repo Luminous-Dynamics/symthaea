@@ -227,6 +227,41 @@
       "role": "reference_output",
       "case_scope": "without_spin_fluctuations",
       "required_for_replay": false
+    },
+    {
+      "path": "examples/Pb/withoutSF/Pb_ONCV_PBE-1.2.upf",
+      "git_blob_sha1": "829414f8145b4bd6631494099a82a337212f51ac",
+      "role": "pseudopotential",
+      "case_scope": "without_spin_fluctuations",
+      "required_for_replay": true
+    },
+    {
+      "path": "examples/Pb/withoutSF/scf.in",
+      "git_blob_sha1": "17f87aaf6de96af1a9a05f0af15030eabb949bec",
+      "role": "qe_input",
+      "case_scope": "without_spin_fluctuations",
+      "required_for_replay": true
+    },
+    {
+      "path": "examples/Pb/withoutSF/ph.in",
+      "git_blob_sha1": "660a8280c29a83eb83448147a52ca7237139dd61",
+      "role": "qe_input",
+      "case_scope": "without_spin_fluctuations",
+      "required_for_replay": true
+    },
+    {
+      "path": "examples/Pb/withoutSF/nscf.in",
+      "git_blob_sha1": "d026e3a7fbc535e7c8da6bf91b359a7ec58afe71",
+      "role": "qe_input",
+      "case_scope": "without_spin_fluctuations",
+      "required_for_replay": true
+    },
+    {
+      "path": "examples/Pb/withoutSF/twin.in",
+      "git_blob_sha1": "f7fe18a73b997e26f207a1e6c63f67cd967d36db",
+      "role": "qe_input",
+      "case_scope": "without_spin_fluctuations",
+      "required_for_replay": true
     }
   ],
   "replay_state": {
