@@ -17,6 +17,10 @@ pub struct AsKnownQuery {
     pub known_at_ms: i64,
 }
 
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 /// Raw outcome envelope. Trust-bearing fields are receipt IDs, not booleans.
 #[derive(Clone, Debug)]
 pub struct RawInteractionV1 {
@@ -46,6 +50,11 @@ pub struct RawInteractionV1 {
 pub struct VerifiedLineage {
     pub source_family: u16,
     pub source_root_id: u32,
+    pub acquisition_mode: String,
+    pub upstream_source_id: String,
+    pub source_artifact_digest: String,
+    pub transformation_digest: String,
+    pub issuer_id: String,
     pub receipt_digest: String,
 }
 
@@ -77,6 +86,7 @@ pub struct VerifiedRawEvent {
 pub struct VerifiedMeasurement {
     pub absolute_error_bound: f64,
     pub unit: String,
+    pub instrument_id: String,
     pub method_id: String,
     pub calibration_revision: String,
     pub valid_from_ms: i64,
@@ -155,8 +165,14 @@ pub struct EvidenceReceiptBundle {
     pub canonical_event_hash: String,
     pub authority_receipt_digest: String,
     pub lineage_digest: String,
+    pub source_acquisition_mode: String,
+    pub upstream_source_id: String,
+    pub source_artifact_digest: String,
+    pub transformation_digest: String,
+    pub source_issuer_id: String,
     pub calibration_digest: String,
     pub measurement_unit: String,
+    pub measurement_instrument_id: String,
     pub calibration_method_id: String,
     pub calibration_revision: String,
     pub causal_assessment_digest: String,
@@ -204,9 +220,7 @@ pub fn ingest_as_known(
     query: AsKnownQuery,
     verifier: &impl EvidenceVerifier,
 ) -> Result<IngestedExperience, IngestReject> {
-    if raw.payload_sha256.len() != 64
-        || !raw.payload_sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
-    {
+    if !is_sha256_hex(&raw.payload_sha256) {
         return Err(IngestReject::InvalidPayloadDigest);
     }
 
@@ -217,12 +231,9 @@ pub fn ingest_as_known(
         || event.session_id != raw.session_id
         || event.task_id != raw.task_id
         || event.payload_sha256 != raw.payload_sha256
-        || event.canonical_event_hash.len() != 64
-        || !event
-            .canonical_event_hash
-            .bytes()
-            .all(|byte| byte.is_ascii_hexdigit())
-        || event.authority_receipt_digest.is_empty()
+        || !is_sha256_hex(&event.canonical_event_hash)
+        || !is_sha256_hex(&event.authority_receipt_digest)
+        || !is_sha256_hex(&event.receipt_digest)
         || event.valid_from_ms != raw.valid_from_ms
         || event.valid_until_ms != raw.valid_until_ms
         || event.recorded_at_ms != raw.recorded_at_ms
@@ -281,8 +292,17 @@ pub fn ingest_as_known(
     if lineage.source_root_id == 0 {
         return Err(IngestReject::UnknownSourceRoot);
     }
-    if lineage.source_family == 0 || lineage.receipt_digest.is_empty() {
+    if lineage.source_family == 0 {
         return Err(IngestReject::UnknownSourceFamily);
+    }
+    if lineage.acquisition_mode.is_empty()
+        || lineage.upstream_source_id.is_empty()
+        || !is_sha256_hex(&lineage.source_artifact_digest)
+        || !is_sha256_hex(&lineage.transformation_digest)
+        || lineage.issuer_id.is_empty()
+        || !is_sha256_hex(&lineage.receipt_digest)
+    {
+        return Err(IngestReject::UnverifiedLineage);
     }
 
     let measurement = verifier
@@ -298,9 +318,10 @@ pub fn ingest_as_known(
         || !(0.0..=1.0).contains(&measurement.absolute_error_bound)
         || raw.utility_unit.is_empty()
         || measurement.unit != raw.utility_unit
+        || measurement.instrument_id.is_empty()
         || measurement.method_id.is_empty()
         || measurement.calibration_revision.is_empty()
-        || measurement.calibration_digest.is_empty()
+        || !is_sha256_hex(&measurement.calibration_digest)
         || measurement.valid_from_ms > raw.outcome_observed_at_ms
         || measurement
             .valid_until_ms
@@ -317,7 +338,7 @@ pub fn ingest_as_known(
             query.known_at_ms,
         )
         .ok_or(IngestReject::UnverifiedCausalAssessment)?;
-    if causal.assessment_digest.is_empty() {
+    if !is_sha256_hex(&causal.assessment_digest) {
         return Err(IngestReject::UnverifiedCausalAssessment);
     }
     let outcome = verifier
@@ -328,7 +349,7 @@ pub fn ingest_as_known(
             query.known_at_ms,
         )
         .ok_or(IngestReject::UnverifiedOutcome)?;
-    if outcome.outcome_digest.is_empty() {
+    if !is_sha256_hex(&outcome.outcome_digest) {
         return Err(IngestReject::UnverifiedOutcome);
     }
     if !outcome.reconciled {
@@ -359,8 +380,14 @@ pub fn ingest_as_known(
             canonical_event_hash: event.canonical_event_hash,
             authority_receipt_digest: event.authority_receipt_digest,
             lineage_digest: lineage.receipt_digest,
+            source_acquisition_mode: lineage.acquisition_mode,
+            upstream_source_id: lineage.upstream_source_id,
+            source_artifact_digest: lineage.source_artifact_digest,
+            transformation_digest: lineage.transformation_digest,
+            source_issuer_id: lineage.issuer_id,
             calibration_digest: measurement.calibration_digest,
             measurement_unit: measurement.unit,
+            measurement_instrument_id: measurement.instrument_id,
             calibration_method_id: measurement.method_id,
             calibration_revision: measurement.calibration_revision,
             causal_assessment_digest: causal.assessment_digest,
@@ -477,11 +504,11 @@ mod tests {
                 },
                 canonical_event_hash: "c".repeat(64),
                 authority_status: self.authority_status,
-                authority_receipt_digest: "authority-receipt-digest".into(),
+                authority_receipt_digest: "b".repeat(64),
                 valid_from_ms: raw.valid_from_ms,
                 valid_until_ms: raw.valid_until_ms,
                 recorded_at_ms: raw.recorded_at_ms,
-                receipt_digest: "raw-event-receipt-digest".into(),
+                receipt_digest: "a".repeat(64),
             })
         }
 
@@ -495,7 +522,12 @@ mod tests {
             self.lineage_valid.then(|| VerifiedLineage {
                 source_family: self.family_id,
                 source_root_id: self.root_id,
-                receipt_digest: "lineage-digest".into(),
+                acquisition_mode: "api".into(),
+                upstream_source_id: "bis:dataflow:private-credit".into(),
+                source_artifact_digest: "e".repeat(64),
+                transformation_digest: "f".repeat(64),
+                issuer_id: "did:key:source-ledger".into(),
+                receipt_digest: "d".repeat(64),
             })
         }
 
@@ -514,7 +546,8 @@ mod tests {
                 calibration_revision: "calibration-rev-1".into(),
                 valid_from_ms: 100,
                 valid_until_ms: Some(300),
-                calibration_digest: "calibration-digest".into(),
+                instrument_id: "sensor-17".into(),
+                calibration_digest: "1".repeat(64),
             })
         }
 
@@ -530,7 +563,7 @@ mod tests {
                 prediction_pre_registered: true,
                 confounders_controlled: true,
                 delayed_horizon_complete: self.delayed_complete,
-                assessment_digest: "causal-digest".into(),
+                assessment_digest: "2".repeat(64),
             })
         }
 
@@ -543,7 +576,7 @@ mod tests {
         ) -> Option<VerifiedOutcome> {
             Some(VerifiedOutcome {
                 reconciled: self.reconciled,
-                outcome_digest: "outcome-digest".into(),
+                outcome_digest: "3".repeat(64),
             })
         }
 
@@ -713,17 +746,22 @@ mod tests {
         assert_eq!(admitted.experience.source_root_id, 700);
         assert_eq!(admitted.experience.measurement_error_bound, 0.02);
         assert_eq!(admitted.as_known, query(180, 250));
-        assert_eq!(admitted.receipts.lineage_digest, "lineage-digest");
+        assert_eq!(admitted.receipts.lineage_digest, "d".repeat(64));
         assert_eq!(admitted.receipts.raw_event_digest, raw().payload_sha256);
         assert_eq!(admitted.receipts.canonical_event_hash, "c".repeat(64));
         assert_eq!(
             admitted.receipts.authority_receipt_digest,
-            "authority-receipt-digest"
+            "b".repeat(64)
         );
         assert_eq!(
             admitted.receipts.calibration_revision,
             "calibration-rev-1"
         );
+        assert_eq!(
+            admitted.receipts.upstream_source_id,
+            "bis:dataflow:private-credit"
+        );
+        assert_eq!(admitted.receipts.measurement_instrument_id, "sensor-17");
     }
 
     #[test]
@@ -764,6 +802,25 @@ mod tests {
         let b = ingest_as_known(&raw(), query(180, 250), &second).unwrap();
         assert_ne!(a.experience.source_family, b.experience.source_family);
         assert_eq!(a.experience.source_root_id, b.experience.source_root_id);
+    }
+
+    #[test]
+    fn source_lineage_profile_metadata_is_preserved_in_receipt_bundle() {
+        let admitted = ingest_as_known(
+            &raw(),
+            query(180, 250),
+            &TestVerifier::default(),
+        )
+        .expect("verified source profile should be retained");
+        assert_eq!(admitted.receipts.source_acquisition_mode, "api");
+        assert_eq!(
+            admitted.receipts.upstream_source_id,
+            "bis:dataflow:private-credit"
+        );
+        assert_eq!(
+            admitted.receipts.source_artifact_digest,
+            "e".repeat(64)
+        );
     }
 
     #[test]
