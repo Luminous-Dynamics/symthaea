@@ -1990,6 +1990,61 @@ mod tests {
         "properties":{"catalog_revision":{"type":"string"}}
     }"#;
 
+    fn wfg_reference_hypervolume(points: &[Vec<f64>], reference: &[f64]) -> f64 {
+        fn dominates_min(left: &[f64], right: &[f64]) -> bool {
+            let mut strict = false;
+            for (a, b) in left.iter().zip(right) {
+                if a > b {
+                    return false;
+                }
+                strict |= a < b;
+            }
+            strict
+        }
+
+        fn non_dominated(points: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+            let mut result = Vec::new();
+            for (index, point) in points.iter().enumerate() {
+                let dominated = points
+                    .iter()
+                    .enumerate()
+                    .any(|(other_index, other)| other_index != index && dominates_min(other, point));
+                let duplicate = points[..index].iter().any(|earlier| earlier == point);
+                if !dominated && !duplicate {
+                    result.push(point.clone());
+                }
+            }
+            result
+        }
+
+        if points.is_empty() {
+            return 0.0;
+        }
+        let mut sorted = non_dominated(points.to_vec());
+        sorted.sort_by(|left, right| right[0].total_cmp(&left[0]));
+
+        let mut total = 0.0;
+        for index in 0..sorted.len() {
+            let point = &sorted[index];
+            let inclusive = point
+                .iter()
+                .zip(reference)
+                .map(|(value, bound)| bound - value)
+                .product::<f64>();
+            let limits = sorted[index + 1..]
+                .iter()
+                .map(|other| {
+                    point.iter()
+                        .zip(other)
+                        .map(|(a, b)| a.max(b))
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
+            total += inclusive - wfg_reference_hypervolume(&limits, reference);
+        }
+        total
+    }
+
     fn synthetic_catalogue() -> Value {
         serde_json::json!({
             "catalog_revision":"HOME-EXPRESSION-CATALOG-0.2.0",
@@ -2726,6 +2781,57 @@ mod tests {
             exact_hypervolume(&[evaluation], &[3.0,4.0,3.0,4.0,7.0]).unwrap(),
             32.0
         );
+    }
+
+    #[test]
+    fn exact_dimension_sweep_matches_pinned_wfg_reference_on_two_to_five_dimensions() {
+        for dimensions in 2..=5 {
+            let reference = vec![1.0001; dimensions];
+            let mut evaluations = Vec::new();
+            for index in 0..5 {
+                let first = 0.1 + (index as f64 * 0.15);
+                let mut objectives = Vec::new();
+                for dimension in 0..dimensions {
+                    let value = if dimension == 0 {
+                        first
+                    } else {
+                        0.9 - (index as f64 * 0.15) + (dimension as f64 * 0.001)
+                    };
+                    objectives.push(OracleObjective {
+                        objective_id: format!("objective-{dimension}"),
+                        direction: ObjectiveDirection::Minimize,
+                        value,
+                    });
+                }
+                evaluations.push(OracleEvaluation {
+                    candidate_id: format!("front-{index}"),
+                    gate_state: GateState::Pass,
+                    objectives,
+                });
+            }
+
+            let dominated = OracleEvaluation {
+                candidate_id:"dominated".to_owned(),
+                gate_state:GateState::Pass,
+                objectives:(0..dimensions).map(|dimension| OracleObjective {
+                    objective_id:format!("objective-{dimension}"),
+                    direction:ObjectiveDirection::Minimize,
+                    value:0.99,
+                }).collect(),
+            };
+            evaluations.push(dominated);
+            let expected_points = evaluations
+                .iter()
+                .filter(|evaluation| evaluation.candidate_id != "dominated")
+                .map(|evaluation| evaluation.objectives.iter().map(|objective| objective.value).collect::<Vec<_>>())
+                .collect::<Vec<_>>();
+            let expected = wfg_reference_hypervolume(&expected_points, &reference);
+            let actual = exact_hypervolume(&evaluations, &reference).unwrap();
+            assert!(
+                (actual - expected).abs() < 1e-10,
+                "{dimensions}D sweep {actual} differs from WFG {expected}"
+            );
+        }
     }
 
     #[test]
