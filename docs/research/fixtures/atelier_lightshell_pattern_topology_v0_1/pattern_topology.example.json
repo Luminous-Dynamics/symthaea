@@ -1,0 +1,316 @@
+{
+  "schema_version": "0.1.0",
+  "topology_id": "LIGHTSHELL-TOPOLOGY-SYNTHETIC-001",
+  "state": "proposed",
+  "compiler_binding": {
+    "compiler_issue_ref": "https://github.com/Luminous-Dynamics/symthaea/issues/12710",
+    "compiler_revision": "b506162d14998177604610f6907bcea42a821df3",
+    "compilation_id": "ROBOT-GARMENT-COMPILER-SYNTHETIC-ELBOW-001",
+    "robot_id": "synthetic-elbow-robot",
+    "robot_article_revision": null,
+    "geometry_state": "synthetic_fixture",
+    "geometry_digest": null,
+    "geometry_units": "mm"
+  },
+  "interop_binding": {
+    "interop_issue_ref": "https://github.com/Luminous-Dynamics/symthaea/issues/11750",
+    "interop_contract_revision": "APPAREL-INTEROP-001-P0",
+    "sidecar_ref": "SYNTHETIC-PATTERN-SIDECAR-001",
+    "sidecar_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "source_artifacts": [
+    {
+      "artifact_id": "PATTERN-DXF-001",
+      "source_format": "dxf",
+      "format_version": "legacy-dxf-profile",
+      "artifact_ref": "SYNTHETIC-DXF-ARTIFACT",
+      "artifact_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "artifact_id": "KNITOUT-001",
+      "source_format": "knitout",
+      "format_version": "0.6",
+      "artifact_ref": "SYNTHETIC-KNITOUT-ARTIFACT",
+      "artifact_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "compiler_panels": [
+    {
+      "panel_id": "upper_arm_shell",
+      "zone_id": "upper_arm",
+      "coordinate_frame_ref": "robot_root"
+    },
+    {
+      "panel_id": "elbow_gusset",
+      "zone_id": "elbow",
+      "coordinate_frame_ref": "robot_root"
+    },
+    {
+      "panel_id": "forearm_shell",
+      "zone_id": "forearm",
+      "coordinate_frame_ref": "robot_root"
+    }
+  ],
+  "compiler_keepouts": [
+    {
+      "keepout_id": "service_connector_access",
+      "kind": "service_access",
+      "affected_zone_ids": [
+        "forearm"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "panel_id": "upper_arm_shell",
+      "zone_id": "upper_arm",
+      "compiler_panel_id": "upper_arm_shell",
+      "source_artifact_id": "PATTERN-DXF-001",
+      "source_piece_id": "UPPER-ARM-01",
+      "pattern_revision_ref": "PATTERN-REV-A",
+      "pattern_piece_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "surface_3d_ref": "SURFACE-UPPER-ARM-01",
+      "correspondence_ref": "MAP-UPPER-ARM-01",
+      "correspondence_state": "declared",
+      "coordinate_frame_ref": "robot_root",
+      "units": "mm",
+      "grain_direction": "warp",
+      "material_orientation_ref": "MATERIAL-ORIENTATION-UPPER"
+    },
+    {
+      "panel_id": "elbow_gusset",
+      "zone_id": "elbow",
+      "compiler_panel_id": "elbow_gusset",
+      "source_artifact_id": "PATTERN-DXF-001",
+      "source_piece_id": "ELBOW-GUSSET-01",
+      "pattern_revision_ref": "PATTERN-REV-A",
+      "pattern_piece_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "surface_3d_ref": "SURFACE-ELBOW-01",
+      "correspondence_ref": "MAP-ELBOW-01",
+      "correspondence_state": "declared",
+      "coordinate_frame_ref": "robot_root",
+      "units": "mm",
+      "grain_direction": "bias",
+      "material_orientation_ref": "MATERIAL-ORIENTATION-ELBOW"
+    },
+    {
+      "panel_id": "forearm_shell",
+      "zone_id": "forearm",
+      "compiler_panel_id": "forearm_shell",
+      "source_artifact_id": "PATTERN-DXF-001",
+      "source_piece_id": "FOREARM-01",
+      "pattern_revision_ref": "PATTERN-REV-A",
+      "pattern_piece_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "surface_3d_ref": "SURFACE-FOREARM-01",
+      "correspondence_ref": "MAP-FOREARM-01",
+      "correspondence_state": "declared",
+      "coordinate_frame_ref": "robot_root",
+      "units": "mm",
+      "grain_direction": "warp",
+      "material_orientation_ref": "MATERIAL-ORIENTATION-FOREARM"
+    }
+  ],
+  "boundary_edges": [
+    {
+      "edge_id": "upper-elbow-seam",
+      "panel_id": "upper_arm_shell",
+      "role": "seam",
+      "curve_ref": "CURVE-UPPER-ELBOW",
+      "length_mm": 80,
+      "length_tolerance_mm": 0.5
+    },
+    {
+      "edge_id": "gusset-upper-seam",
+      "panel_id": "elbow_gusset",
+      "role": "seam",
+      "curve_ref": "CURVE-GUSSET-UPPER",
+      "length_mm": 80.8,
+      "length_tolerance_mm": 0.5
+    },
+    {
+      "edge_id": "gusset-forearm-attach",
+      "panel_id": "elbow_gusset",
+      "role": "attachment",
+      "curve_ref": "CURVE-GUSSET-FOREARM",
+      "length_mm": 75,
+      "length_tolerance_mm": 0.5
+    },
+    {
+      "edge_id": "forearm-gusset-attach",
+      "panel_id": "forearm_shell",
+      "role": "attachment",
+      "curve_ref": "CURVE-FOREARM-GUSSET",
+      "length_mm": 75.5,
+      "length_tolerance_mm": 0.5
+    },
+    {
+      "edge_id": "forearm-service-opening",
+      "panel_id": "forearm_shell",
+      "role": "service_opening",
+      "curve_ref": "CURVE-SERVICE-OPENING",
+      "length_mm": 35,
+      "length_tolerance_mm": 0.5
+    }
+  ],
+  "connections": [
+    {
+      "connection_id": "SEAM-UPPER-GUSSET",
+      "connection_kind": "sewn_seam",
+      "edge_refs": [
+        "upper-elbow-seam",
+        "gusset-upper-seam"
+      ],
+      "construction_route_ref": "SEW-ROUTE-01",
+      "path_ref": "SEAM-PATH-UPPER-GUSSET",
+      "max_length_mismatch_mm": 1,
+      "construction_revision_ref": "SEAM-REV-A",
+      "interface_design_ref": null,
+      "retention_evidence_ref": null
+    },
+    {
+      "connection_id": "ATTACH-GUSSET-FOREARM",
+      "connection_kind": "removable_attachment",
+      "edge_refs": [
+        "gusset-forearm-attach",
+        "forearm-gusset-attach"
+      ],
+      "construction_route_ref": "ATTACH-ROUTE-01",
+      "path_ref": "ATTACH-PATH-GUSSET-FOREARM",
+      "max_length_mismatch_mm": 1,
+      "construction_revision_ref": "ATTACH-REV-A",
+      "interface_design_ref": "REMOVABLE-INTERFACE-DESIGN-01",
+      "retention_evidence_ref": null
+    }
+  ],
+  "articulation_features": [
+    {
+      "feature_id": "ELBOW-ARTICULATION-001",
+      "feature_kind": "gusset",
+      "zone_id": "elbow",
+      "joint_ref": "ROBOT-JOINT-ELBOW-REV-A",
+      "motion_envelope_ref": "JOINT-SWEEP-ENVELOPE-REV-A",
+      "affected_panel_ids": [
+        "upper_arm_shell",
+        "elbow_gusset",
+        "forearm_shell"
+      ],
+      "feature_region_ref": "ELBOW-FEATURE-REGION-01",
+      "test_plan_ref": null
+    }
+  ],
+  "service_features": [
+    {
+      "feature_id": "FOREARM-SERVICE-001",
+      "panel_id": "forearm_shell",
+      "keepout_ref": "service_connector_access",
+      "opening_edge_refs": [
+        "forearm-service-opening"
+      ],
+      "access_mode": "removable_panel",
+      "access_path_ref": "SERVICE-ACCESS-PATH-01",
+      "service_test_plan_ref": null
+    }
+  ],
+  "semantic_obligations": [
+    {
+      "semantic_id": "pattern_piece_identity",
+      "preservation_state": "native_preserved",
+      "source_location_ref": "DXF-PIECE-IDS",
+      "sidecar_location_ref": null,
+      "evidence_ref": "PIECE-ID-ROUNDTRIP-01",
+      "external_owner_ref": null,
+      "declared_out_of_scope": false,
+      "scope_disposition_ref": null
+    },
+    {
+      "semantic_id": "pattern_geometry_2d",
+      "preservation_state": "native_preserved",
+      "source_location_ref": "DXF-PIECE-GEOMETRY",
+      "sidecar_location_ref": null,
+      "evidence_ref": "GEOMETRY-ROUNDTRIP-01",
+      "external_owner_ref": null,
+      "declared_out_of_scope": false,
+      "scope_disposition_ref": null
+    },
+    {
+      "semantic_id": "seam_topology",
+      "preservation_state": "sidecar_preserved",
+      "source_location_ref": "PATTERN-SOURCE",
+      "sidecar_location_ref": "SIDECAR-SEAMS",
+      "evidence_ref": "SEAM-TOPOLOGY-ROUNDTRIP-01",
+      "external_owner_ref": null,
+      "declared_out_of_scope": false,
+      "scope_disposition_ref": null
+    },
+    {
+      "semantic_id": "correspondence_2d_3d",
+      "preservation_state": "sidecar_preserved",
+      "source_location_ref": "DXF-TO-SURFACE",
+      "sidecar_location_ref": "SIDECAR-MAPPINGS",
+      "evidence_ref": "CORRESPONDENCE-ROUNDTRIP-01",
+      "external_owner_ref": null,
+      "declared_out_of_scope": false,
+      "scope_disposition_ref": null
+    },
+    {
+      "semantic_id": "coordinate_frame_units",
+      "preservation_state": "native_preserved",
+      "source_location_ref": "PATTERN-UNITS",
+      "sidecar_location_ref": null,
+      "evidence_ref": "UNITS-FRAME-ROUNDTRIP-01",
+      "external_owner_ref": null,
+      "declared_out_of_scope": false,
+      "scope_disposition_ref": null
+    },
+    {
+      "semantic_id": "grain_direction",
+      "preservation_state": "native_preserved",
+      "source_location_ref": "PATTERN-GRAIN",
+      "sidecar_location_ref": null,
+      "evidence_ref": "GRAIN-ROUNDTRIP-01",
+      "external_owner_ref": null,
+      "declared_out_of_scope": false,
+      "scope_disposition_ref": null
+    },
+    {
+      "semantic_id": "material_orientation",
+      "preservation_state": "sidecar_preserved",
+      "source_location_ref": "MATERIAL-INTENT",
+      "sidecar_location_ref": "SIDECAR-ORIENTATION",
+      "evidence_ref": "ORIENTATION-ROUNDTRIP-01",
+      "external_owner_ref": null,
+      "declared_out_of_scope": false,
+      "scope_disposition_ref": null
+    },
+    {
+      "semantic_id": "knit_operation_semantics",
+      "preservation_state": "sidecar_preserved",
+      "source_location_ref": "KNITOUT-OPS",
+      "sidecar_location_ref": "SIDECAR-KNIT-SEMANTICS",
+      "evidence_ref": "KNITOUT-SEMANTICS-ROUNDTRIP-01",
+      "external_owner_ref": null,
+      "declared_out_of_scope": false,
+      "scope_disposition_ref": null
+    },
+    {
+      "semantic_id": "machine_capability",
+      "preservation_state": "external_owner_ref",
+      "source_location_ref": null,
+      "sidecar_location_ref": null,
+      "evidence_ref": null,
+      "external_owner_ref": "MFG-PROC-5686 / Symtropy textile process capability",
+      "declared_out_of_scope": false,
+      "scope_disposition_ref": null
+    },
+    {
+      "semantic_id": "assembly_operation",
+      "preservation_state": "sidecar_preserved",
+      "source_location_ref": "ASSEMBLY-ROUTE",
+      "sidecar_location_ref": "SIDECAR-ASSEMBLY",
+      "evidence_ref": "ASSEMBLY-ROUNDTRIP-01",
+      "external_owner_ref": null,
+      "declared_out_of_scope": false,
+      "scope_disposition_ref": null
+    }
+  ]
+}
