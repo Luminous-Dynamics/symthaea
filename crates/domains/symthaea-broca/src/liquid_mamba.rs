@@ -35,7 +35,7 @@ use crate::generator::{GenerationResult, GenerationStepLogits, GenerationTopLogi
 use crate::mamba::{MambaBackend, MambaWrapper};
 use crate::memory_bridge::MemoryBridge;
 use crate::projection::{HdcSsmProjection, LocalFepLayer, ProjectionGradientDiagnostics};
-use crate::temporal_projection::TemporalProjection;
+use crate::temporal_projection::{TemporalProjection, align_teacher_hidden_states};
 use crate::thought_chunk::{
     DynamicChunker, SimpleThoughtChunkDecoder, ThoughtChunk, ThoughtChunkDecoder, ThoughtChunkKind,
     ThoughtChunkSequence,
@@ -1215,38 +1215,95 @@ impl LiquidMambaGenerator {
         target_ids: &[u32],
         lr: f32,
     ) -> Result<f32> {
+        anyhow::ensure!(!target_ids.is_empty(), "teacher target sequence is empty");
+        anyhow::ensure!(
+            lr.is_finite() && lr >= 0.0,
+            "learning rate must be finite and non-negative"
+        );
+
+        // Teacher forcing always starts from a clean recurrent state, independent
+        // of a preceding sampled completion or another training example.
+        self.mamba.reset();
+
+        // Temporal projection emits N soft tokens, so its target must also be an
+        // N-step teacher trajectory. Never index one 768D teacher state as if it
+        // contained the flattened [N, 768] sequence.
+        let temporal_prediction = self
+            .temporal_proj
+            .as_ref()
+            .map(|tp| tp.project_to_ssm_sequence(thought_hv).concat());
+        let mut teacher_states = Vec::with_capacity(target_ids.len());
         let mut total_loss = 0.0;
         let mut prev_token = self.mamba.eos_token_id();
-        let num_tokens = target_ids.len();
+        let teacher_hidden_dim = self.mamba.d_model();
 
         for &target_id in target_ids {
-            // 1. Forward through teacher token to get "Observation" (ground truth)
+            // Logits predict target_id from the preceding teacher-forced prefix.
             let (logits, obs_ssm) = self.mamba.forward_with_state(prev_token)?;
+            anyhow::ensure!(
+                obs_ssm.len() == teacher_hidden_dim,
+                "teacher hidden state has dimension {}, expected {}",
+                obs_ssm.len(),
+                teacher_hidden_dim
+            );
+            anyhow::ensure!(
+                obs_ssm.iter().all(|value| value.is_finite()),
+                "teacher hidden state contains a non-finite value"
+            );
 
-            // 2. Local update for projection layer
-            let cost = if let Some(ref mut tp) = self.temporal_proj {
-                // Predictive Coding: update w_up to predict obs_ssm from thought_hv
-                // For simplicity, we use the current SSM state as the "Prediction"
-                // which leads to an immediate alignment update.
-                let pred_ssm = tp.project_to_ssm_sequence(thought_hv).concat();
-                tp.local_fep_update(&thought_hv.values, &pred_ssm, &obs_ssm, lr)
+            if temporal_prediction.is_some() {
+                teacher_states.push(obs_ssm);
             } else {
-                let pred_ssm = self.projection.project_to_ssm(thought_hv);
-                self.projection
-                    .local_fep_update(&thought_hv.values, &pred_ssm, &obs_ssm, lr)
-            };
-
-            // 3. Deduct thermodynamic cost
-            if let Some(ref mut ledger) = self.ledger {
-                ledger.deduct(cost);
+                // Spatial projection emits one vector and can be updated against
+                // each corresponding teacher-forced token state directly.
+                let prediction = self.projection.project_to_ssm(thought_hv);
+                let cost = self.projection.local_fep_update(
+                    &thought_hv.values,
+                    &prediction,
+                    &obs_ssm,
+                    lr,
+                );
+                if let Some(ref mut ledger) = self.ledger {
+                    ledger.deduct(cost);
+                }
             }
 
             prev_token = target_id;
             total_loss += crate::evaluation::cross_entropy_loss(&logits, target_id as usize);
         }
 
+        if let Some(prediction) = temporal_prediction {
+            let num_chunks = self
+                .temporal_proj
+                .as_ref()
+                .expect("temporal prediction requires a temporal projection")
+                .num_chunks();
+            let observation =
+                align_teacher_hidden_states(&teacher_states, num_chunks, teacher_hidden_dim)?;
+            anyhow::ensure!(
+                prediction.len() == observation.len(),
+                "aligned temporal prediction/observation shape mismatch: {} != {}",
+                prediction.len(),
+                observation.len()
+            );
+
+            let temporal_projection = self
+                .temporal_proj
+                .as_mut()
+                .expect("temporal prediction requires a temporal projection");
+            let cost = temporal_projection.local_fep_update(
+                &thought_hv.values,
+                &prediction,
+                &observation,
+                lr,
+            );
+            if let Some(ref mut ledger) = self.ledger {
+                ledger.deduct(cost);
+            }
+        }
+
         self.generation_count += 1;
-        Ok(total_loss / num_tokens as f32)
+        Ok(total_loss / target_ids.len() as f32)
     }
 
     /// Full training step for a single thought.
