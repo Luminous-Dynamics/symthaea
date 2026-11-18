@@ -284,7 +284,19 @@ mod tests {
         assert_eq!(first, second);
 
         let plan = KernelPlan::new(WordWidth::U64, 4, 4).unwrap();
-        assert!(plan.id().as_str().starts_with("sha256:"));
+        let width = (64u64).to_be_bytes();
+        let unroll = [4u8];
+        let accumulators = [4u8];
+        let expected = ContentId::derive(
+            GRAMMAR_DOMAIN,
+            [
+                first.as_str().as_bytes(),
+                width.as_slice(),
+                unroll.as_slice(),
+                accumulators.as_slice(),
+            ],
+        );
+        assert_eq!(plan.id(), expected);
     }
 
     #[test]
@@ -319,6 +331,25 @@ mod tests {
             assert!(!source.contains("_mm256"));
             assert!(!source.contains("_mm512"));
             assert!(!source.contains("std::arch"));
+        }
+    }
+
+    #[test]
+    fn renderer_emits_declared_unroll_count_and_accumulator_lanes() {
+        for plan in KernelPlan::all_v1() {
+            let source = plan.render_rust_source().unwrap();
+            assert_eq!(
+                source.matches(".count_ones();").count(),
+                usize::from(plan.unroll_factor)
+            );
+            for offset in 0..plan.unroll_factor {
+                assert!(source.contains(&format!("let left_{offset} =")));
+                assert!(source.contains(&format!("let right_{offset} =")));
+                assert!(source.contains(&format!(
+                    "word_index_{offset} % {}",
+                    plan.accumulator_count
+                )));
+            }
         }
     }
 
