@@ -328,6 +328,13 @@
         "null"
       ],
       "maxLength": 10000
+    },
+    "crop_flow_samples": {
+      "type": "array",
+      "description": "Measured, spatially located crop-flow directions. Retain individual observations; do not replace multimodal fields with a single arrow.",
+      "items": {
+        "$ref": "#/$defs/crop_flow_sample"
+      }
     }
   },
   "$defs": {
@@ -790,6 +797,144 @@
             "null"
           ],
           "maxLength": 2000
+        }
+      }
+    },
+    "crop_flow_sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_id",
+        "position",
+        "direction_rad",
+        "direction_reference",
+        "bend_magnitude",
+        "bend_unit",
+        "weight",
+        "weight_basis",
+        "method"
+      ],
+      "properties": {
+        "sample_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "parent_specimen_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "position": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x",
+            "y",
+            "coordinate_space",
+            "unit"
+          ],
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "coordinate_space": {
+              "enum": [
+                "field_local",
+                "image_pixel",
+                "geographic"
+              ]
+            },
+            "unit": {
+              "enum": [
+                "m",
+                "px",
+                "degree"
+              ]
+            },
+            "coordinate_reference_system": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 128
+            },
+            "position_uncertainty_m": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "direction_rad": {
+          "type": "number"
+        },
+        "direction_reference": {
+          "enum": [
+            "field_x_counterclockwise",
+            "true_north_clockwise",
+            "image_x_clockwise",
+            "image_x_counterclockwise",
+            "other_documented"
+          ]
+        },
+        "bend_magnitude": {
+          "type": "number",
+          "minimum": 0
+        },
+        "bend_unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0
+        },
+        "weight_basis": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "instrument_or_calibration": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 512
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "observer_blinding_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "raw_measurement_url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
         }
       }
     }
