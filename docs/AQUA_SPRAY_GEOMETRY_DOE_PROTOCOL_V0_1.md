@@ -24,7 +24,7 @@ The exact values and low / centre / high settings must be established from CAD, 
 | F5 | Manifold flow-path distribution | Candidate passive channel geometries | F1, F7 |
 | F6 | Outlet diameter distribution | Process-capable tolerance range | F4, F7 |
 | F7 | Passive pressure compensation | None / qualified commercial element / candidate passive concept | F5, F6 |
-| F8 | Cassette face / seal / retention geometry | Serviceable, manufacturable interface alternatives | F1, F5 |
+| F8 | Cassette face / seal / retention geometry | Serviceable, manufacturable interface alternatives | F1, F5 |\n| F9 | Passive feedback-channel / oscillator geometry (optional research arm) | No oscillator / single-feedback / double-feedback; feasible cavity and channel ratios from a defined design envelope | F1, F3, F5, F6 |
 
 Each factor entry must include: units, exact CAD parameter, physical rationale, manufacturable range, tolerance distribution, process route, material/finish, rated pressure/temperature constraints, and a digest of the source CAD / configuration. If a factor changes another dimension unintentionally, record the dependency rather than treating the variables as independent.
 
@@ -157,7 +157,7 @@ The first study should compare:
 - A3: passive fluidic / flow-shaping geometry only if it is manufacturable and measurable;
 - A4: fixed plus handheld delivery as separate task modes.
 
-Do not begin with powered variable zones until passive designs demonstrate a robust, maintainable advantage.
+Do not begin with powered variable zones until passive designs demonstrate a robust, maintainable advantage. A fluidic oscillator is a research hypothesis, not a shower-proven technology: a March 2026 review of wall-attachment oscillating jets reports double-feedback oscillation at Reynolds numbers around 220 in certain studied configurations, but those configurations are not showerheads and the threshold cannot be transferred directly. The study motivates a bounded test arm only. Source: Jaafarian et al., International Communications in Heat and Mass Transfer (2026), DOI 10.1016/j.icheatmasstransfer.2025.110243, https://www.sciencedirect.com/science/article/pii/S0735193325016690.
 
 ## 9. Evidence ownership
 
@@ -171,3 +171,22 @@ Do not begin with powered variable zones until passive designs demonstrate a rob
 ## 10. Claim ceiling
 
 This protocol defines experiment design, not physical performance. It authorizes no prototype procurement, pressurized article fabrication, human exposure, health/aerosol claim, standards certification, occupied installation or construction release.
+
+
+## 11. New passive-fluidics hypothesis — oscillating coverage without moving parts
+
+A potentially high-value concept is a passive fluidic oscillator that uses internal feedback geometry / wall attachment to sweep a coherent jet or distribute a flow pattern without a motor, solenoid, rotating faceplate or external power. This may allow a broad task-region pattern without permanently dividing a low-head supply into many small orifices.
+
+The research basis is adjacent, not direct: a March 2026 review compares cavity jets and single-/double-feedback wall-attachment oscillators. It reports that the reviewed double-feedback geometries could sustain oscillation at substantially lower Reynolds number (around Re ≈ 220) than the cavity-jet configurations discussed. This result is configuration-specific and from thermal/jet research, not a showerhead qualification. It does not establish suitable flow, pressure, droplet, aerosol, cleaning or user performance for Aqua.
+
+### Controlled investigation
+
+- Start with a non-oscillating fixed-orifice reference and a passive multi-nozzle reference.
+- Use existing Symtropy / specialist flow models to screen channel ratios and expected pressure loss; do not create a separate Aqua CFD solver.
+- Measure oscillation startup threshold, frequency, sweep angle, spatial deposition map, total flow, dynamic pressure drop and temporal stability.
+- Test 50 / 75 / 100 kPa only within component and apparatus ratings, then 140 / 150 / 300 kPa for the declared comparison purposes.
+- Challenge with measured hardness/scale, particle contamination, partial obstruction, orientation changes and post-clean requalification.
+- Characterize droplet-size and aerosol time series separately; do not assume sweeping improves exposure.
+- Reject any design whose oscillation becomes intermittent, asymmetric, noisy, hard to clean or unstable after fouling.
+
+**Falsification:** if the device needs more inlet pressure than the target installation can supply, or its pressure loss, aerosol profile, clogging or cleanability erases any useful coverage gain, it is not an Aqua breakthrough. A simple fixed passive manifold may remain superior.
