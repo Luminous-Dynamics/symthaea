@@ -831,7 +831,9 @@ mod tests {
             second.observe(symbol);
             let weights = first.expert_weights();
             assert_eq!(weights, second.expert_weights());
-            assert!(weights.iter().all(|&weight| weight > 0));
+            assert!(weights
+                .iter()
+                .all(|&weight| weight >= EXPERT_SHARE_TOTAL_WEIGHT / EXPERT_COUNT as u32));
             assert_eq!(
                 weights.iter().map(|&weight| weight as u64).sum::<u64>(),
                 EXPERT_MIXTURE_TOTAL_WEIGHT as u64
