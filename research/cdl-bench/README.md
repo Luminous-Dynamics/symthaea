@@ -16,7 +16,7 @@ dependencies.
   bursty, long runs and pseudo-random incompressible bytes.
 - E1 finite-state generator with evaluator-only latent state and noisy/aliased emissions.
 - E2 five-variable fixed-point structural causal generator with evaluator-only intervention manifests kept outside learner-visible observations.
-- E3 factorized SCM mechanism configurations with held-out combinations assembled from individually seen mechanism components; hidden configs remain evaluator-side.
+- E3 public development fixtures with held-out combinations assembled from individually seen mechanism components; metadata is not serialized into learner-visible streams. These fixed tuples are visible in source and are not a blind test split.
 - CLI file encode/decode and an E0 length comparison against installed
   Zstandard, Brotli, XZ and gzip commands.
 - SCM-specific typed-field, temporal-lag, oracle-parent, hybrid and
@@ -217,7 +217,7 @@ The same causal command also emits:
 - Two held-out configurations that recombine mechanism component values seen in the training configurations, while keeping the full configuration tuple unseen.
 - For each held-out configuration, a paired observational and `do(x1=20000)` trace with the same seed, so the intervention comparison is counterfactual while target/window/value remain evaluator-side.
 
-The hidden mechanism configuration and intervention manifest are retained in evaluator-side ScmTrace metadata and are not serialized into the learner-visible SCM2 observation stream. The CLI labels the paired held-out streams and verifies codec round trips; it does not yet train a mechanism learner or measure transfer. A generator unit test also checks that the upstream x0 remains invariant while descendants x2 and x4 respond to the x1 intervention in each held-out world. This is a dataset-generation fixture only.
+The mechanism configuration and intervention manifest are kept out of the learner-visible SCM2 stream (truth fields are crate-private). The fixed E3 combinations are public development fixtures, not a blind test set; a confirmatory result requires an externally controlled split and seed manifest. The CLI labels the paired held-out streams and verifies codec round trips; it does not yet train a mechanism learner or measure transfer. A generator unit test also checks that the upstream x0 remains invariant while descendants x2 and x4 respond to the x1 intervention in each held-out world. This is a dataset-generation fixture only.
 
 ## Plugging in a custom predictor
 
