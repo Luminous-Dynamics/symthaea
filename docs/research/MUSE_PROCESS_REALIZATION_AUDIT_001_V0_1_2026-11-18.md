@@ -102,7 +102,11 @@ Twenty-six new tests are present in `process_grammar.rs`:
 19. Reject a source cell containing a zero-duration event.
 20. Reject a shifted cycle boundary.
 21. Reject a missing melody event.
-22. Exercise a deterministic 4,096-case holdout: four process kinds × 256 seeds per kind × 2, 4, 8 and 16 bars.\n23. Reject a key change, tempo change and meter change against the plan-carried clock binding.\n24. Deserialize a legacy plan without clock binding, then refuse shared-clock verification.
+22. Exercise a deterministic 4,096-case holdout: four process kinds × 256 seeds per kind × 2, 4, 8 and 16 bars.
+23. Reject a score-key mutation against the plan-carried key.
+24. Reject a score-tempo mutation against the exact plan-carried f32 bits.
+25. Reject a score-meter mutation against the plan-carried meter.
+26. Deserialize a legacy plan without clock binding, then refuse shared-clock verification.
 
 Existing process tests remain in place. No test has been compiled or executed in the current environment. Do not describe these tests as passing.
 
@@ -115,7 +119,8 @@ Report separate measurements; do not collapse them into a single music-quality s
 | Deterministic positive fixtures | Exact plan-to-score audit acceptance | 100% |
 | Frozen adversarial fixtures | Invalid score rejection | 100%; zero false semantic accepts |
 | Expressive envelope | Bit-exact note-level velocity/intensity/emphasis profile adherence | 100% for the declared profile; unsupported/legacy profiles explicitly rejected |
-| Accompaniment contract | Harmony-clock and bass-anchor event correctness, role scope and unassigned identity | 100% deterministic fixtures; zero invented part identities accepted |\n| Shared score clock | Exact key, tempo bit-pattern and meter agreement | 100% exact match; mismatches and legacy unbound plans rejected |
+| Accompaniment contract | Harmony-clock and bass-anchor event correctness, role scope and unassigned identity | 100% deterministic fixtures; zero invented part identities accepted |
+| Shared score clock | Exact key, tempo bit-pattern and meter agreement | 100% exact match; mismatches and legacy unbound plans rejected |
 | Generated holdout cohort | Exact adherence across trajectory kinds, seeds, and bar counts | 100% for the pinned deterministic generator |
 | Mutation robustness | Detection rate by mutation class, plus false rejection rate | 100% detection on the frozen matrix; report every class separately |
 | Coverage | Accepted examples / all examples; abstentions by reason | Report explicitly; never hide abstentions in accuracy |
