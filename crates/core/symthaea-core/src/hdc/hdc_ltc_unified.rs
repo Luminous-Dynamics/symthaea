@@ -2143,12 +2143,17 @@ impl HdcLtcUnifiedNetwork {
         &mut self,
         snap: &NetworkStateSnapshot,
     ) -> Result<(), NetworkStateRestoreError> {
-        let expected_layer_sizes: Vec<usize> = self.layers.iter().map(Vec::len).collect();
-        if snap.layer_sizes != expected_layer_sizes {
+        if snap.layer_sizes.len() != self.layers.len()
+            || snap
+                .layer_sizes
+                .iter()
+                .zip(self.layers.iter())
+                .any(|(snapshot_size, layer)| *snapshot_size != layer.len())
+        {
             return Err(NetworkStateRestoreError::LayerShapeMismatch);
         }
 
-        let expected_neurons: usize = expected_layer_sizes.iter().sum();
+        let expected_neurons: usize = self.layers.iter().map(Vec::len).sum();
         if snap.neuron_states.len() != expected_neurons {
             return Err(NetworkStateRestoreError::NeuronCountMismatch);
         }
