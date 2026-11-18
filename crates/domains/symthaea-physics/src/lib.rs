@@ -53,6 +53,12 @@ pub mod nppad_validation;
 pub mod plasma_control;
 pub mod plasma_event_eval;
 pub mod plasma_cluster_bootstrap;
+pub use plasma_cluster_bootstrap::{
+    build_shot_cluster_bootstrap_plan, shot_cluster_bootstrap_indices,
+    verify_shot_cluster_bootstrap_plan, ShotClusterBootstrapError,
+    ShotClusterBootstrapPlan, ShotClusterBootstrapPlanBody,
+    SHOT_CLUSTER_BOOTSTRAP_RNG_ALGORITHM, SHOT_CLUSTER_BOOTSTRAP_SCHEMA,
+};
 pub mod plasma_hdc_encoder;
 pub mod threat;
 
