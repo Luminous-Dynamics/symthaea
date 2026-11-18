@@ -29,5 +29,30 @@
       "reviewer_assessment": null
     }
   ],
-  "notes": "Machine-readable schema example only. This record does not describe a real crop formation."
+  "notes": "Machine-readable schema example only. This record does not describe a real crop formation.",
+  "crop_flow_samples": [
+    {
+      "sample_id": "CFS-synthetic-001",
+      "parent_specimen_id": null,
+      "position": {
+        "x": 0,
+        "y": 0,
+        "coordinate_space": "field_local",
+        "unit": "m",
+        "coordinate_reference_system": "synthetic-local-x-east-y-north",
+        "position_uncertainty_m": 0
+      },
+      "direction_rad": 0,
+      "direction_reference": "field_x_counterclockwise",
+      "bend_magnitude": 0.25,
+      "bend_unit": "rad",
+      "weight": 1,
+      "weight_basis": "equal synthetic measurement weight",
+      "method": "synthetic known-answer crop-flow fixture",
+      "instrument_or_calibration": "none; generated synthetic observation",
+      "observed_at": null,
+      "observer_blinding_id": null,
+      "raw_measurement_url": null
+    }
+  ]
 }
