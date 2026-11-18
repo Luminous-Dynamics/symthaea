@@ -13,6 +13,59 @@ pub fn binary_entropy(ones: usize, total: usize) -> Option<f64> {
     Some(-p * p.log2() - (1.0 - p) * (1.0 - p).log2())
 }
 
+/// Family-wise max-statistic result over a frozen, equal-width test family.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FamilyWiseMaxResult {
+    pub family_size: usize,
+    pub null_replicate_count: usize,
+    pub observed_maximum: f64,
+    pub null_maxima: Vec<f64>,
+    pub adjusted_p_value: f64,
+}
+
+/// Compute an empirical family-wise p-value from the maximum statistic in
+/// every null replicate.
+///
+/// Each observed score and each null-row score must already use the same
+/// predeclared direction/scale, with larger meaning more extreme. The full
+/// search family must be rerun for every null replicate; unequal row widths
+/// are rejected rather than silently dropping tests. The plus-one correction
+/// prevents zero p-values with finite simulations. This function does not
+/// make an invalid null model exchangeable or repair unrecorded post-hoc search.
+pub fn familywise_max_statistic_p_value(
+    observed_statistics: &[f64],
+    null_statistics: &[Vec<f64>],
+) -> Option<FamilyWiseMaxResult> {
+    if observed_statistics.is_empty()
+        || null_statistics.is_empty()
+        || observed_statistics.iter().any(|value| !value.is_finite())
+        || null_statistics
+            .iter()
+            .any(|row| row.len() != observed_statistics.len()
+                || row.iter().any(|value| !value.is_finite()))
+    {
+        return None;
+    }
+
+    let observed_maximum = observed_statistics
+        .iter()
+        .copied()
+        .fold(f64::NEG_INFINITY, f64::max);
+    let null_maxima: Vec<f64> = null_statistics
+        .iter()
+        .map(|row| row.iter().copied().fold(f64::NEG_INFINITY, f64::max))
+        .collect();
+    let adjusted_p_value = upper_tail_max_p_value(observed_maximum, &null_maxima)?;
+
+    Some(FamilyWiseMaxResult {
+        family_size: observed_statistics.len(),
+        null_replicate_count: null_statistics.len(),
+        observed_maximum,
+        null_maxima,
+        adjusted_p_value,
+    })
+}
+
 /// One-sided empirical p-value for an observed maximum statistic.
 ///
 /// Each null value must be the maximum over the *same complete search family*
@@ -89,5 +142,53 @@ mod tests {
         assert_eq!(wilson_interval(2, 1, 1.96), None);
         assert_eq!(wilson_interval(0, 0, 1.96), None);
         assert_eq!(wilson_interval(2, 3, f64::NAN), None);
+    }
+
+    #[test]
+    fn familywise_max_statistic_uses_full_family_per_null_replicate() {
+        let observed = [0.2, 0.8, 0.5];
+        let nulls = vec![
+            vec![0.1, 0.4, 0.3],
+            vec![0.3, 0.7, 0.4],
+            vec![0.2, 0.9, 0.2],
+            vec![0.6, 0.6, 0.6],
+        ];
+        let result =
+            familywise_max_statistic_p_value(&observed, &nulls).expect("complete family");
+        assert_eq!(result.family_size, 3);
+        assert_eq!(result.null_replicate_count, 4);
+        assert!((result.observed_maximum - 0.8).abs() < 1.0e-12);
+        assert_eq!(result.null_maxima, vec![0.4, 0.7, 0.9, 0.6]);
+        assert_eq!(result.adjusted_p_value, 0.4);
+    }
+
+    #[test]
+    fn familywise_max_statistic_rejects_incomplete_or_non_finite_replicates() {
+        assert_eq!(
+            familywise_max_statistic_p_value(&[0.2, 0.8], &[vec![0.1]]),
+            None
+        );
+        assert_eq!(
+            familywise_max_statistic_p_value(&[0.2, f64::NAN], &[vec![0.1, 0.2]]),
+            None
+        );
+        assert_eq!(
+            familywise_max_statistic_p_value(&[], &[vec![0.1]]),
+            None
+        );
+        assert_eq!(
+            familywise_max_statistic_p_value(&[0.2], &[]),
+            None
+        );
+    }
+
+    #[test]
+    fn familywise_max_statistic_applies_plus_one_correction() {
+        let result = familywise_max_statistic_p_value(
+            &[0.99, 0.8],
+            &[vec![0.1, 0.2], vec![0.3, 0.4], vec![0.5, 0.6]],
+        )
+        .expect("valid null matrix");
+        assert_eq!(result.adjusted_p_value, 0.25);
     }
 }
