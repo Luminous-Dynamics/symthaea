@@ -195,6 +195,7 @@ impl PolicyBundle {
                     allowed_ports: vec![],
                     enabled: false,
                 },
+                forge: ForgeCapabilities::default(),
                 min_phi: 0.3,
             },
             budgets: Budgets {
@@ -211,6 +212,10 @@ pub struct Capabilities {
     pub shell: ShellCapabilities,
     pub filesystem: FilesystemCapabilities,
     pub network: NetworkCapabilities,
+    /// Explicit local permission for loading WASM modules through Forge.
+    /// This is not permission to deploy or commit a verified module.
+    #[serde(default)]
+    pub forge: ForgeCapabilities,
     /// Minimum Phi level required for any non-readonly action.
     #[serde(default = "default_min_phi")]
     pub min_phi: f64,
@@ -247,6 +252,14 @@ pub struct NetworkCapabilities {
     pub allowed_hosts: Vec<String>,
     pub allowed_ports: Vec<u16>,
     pub enabled: bool,
+}
+
+/// Explicit Forge/WASM execution policy. Default is fail-closed.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ForgeCapabilities {
+    /// Permit loading a module from the configured sandbox only.
+    #[serde(default)]
+    pub allow_wasm_execution: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -531,9 +544,13 @@ impl ActionIR {
             }
             ActionIR::ReadSensor { .. }
             | ActionIR::WriteServo { .. }
-            | ActionIR::SwarmGossip { .. }
-            | ActionIR::WasmSandbox { .. } => {
-                // HAL, Swarm, and Forge primitives are currently allowed by default if they pass the global Phi gate
+            | ActionIR::SwarmGossip { .. } => {
+                // HAL and Swarm implementations are placeholders; their future
+                // real-effect capabilities are specified separately in #545.
+            }
+            ActionIR::WasmSandbox { module_path, .. } => {
+                // Forge is never implicitly enabled by a Low risk label or Phi.
+                validate_wasm_module_path(module_path, policy, sandbox)?;
             }
             ActionIR::RunCommand {
                 program,
@@ -742,6 +759,10 @@ pub enum PolicyViolation {
         field: &'static str,
         value: f64,
     },
+    /// WASM/Forge execution was not explicitly enabled by policy.
+    ForgeExecutionDisabled,
+    /// A requested WASM module path is not a regular file inside the sandbox.
+    WasmModuleNotFile(PathBuf),
 }
 
 /// Reject malformed cognitive/policy scalars before they enter an ordered
@@ -755,6 +776,24 @@ fn validate_authority_scalar(
         return Err(PolicyViolation::InvalidNumericInput { field, value });
     }
     Ok(())
+}
+
+/// Check the explicit Forge policy and resolve a WASM module to its canonical
+/// in-sandbox path. Callers that execute the module must use this returned path.
+fn validate_wasm_module_path(
+    module_path: &Path,
+    policy: &PolicyBundle,
+    sandbox: &SandboxRoot,
+) -> Result<PathBuf, PolicyViolation> {
+    if !policy.capabilities.forge.allow_wasm_execution {
+        return Err(PolicyViolation::ForgeExecutionDisabled);
+    }
+
+    let canonical = sandbox.validate(module_path)?;
+    if !canonical.is_file() {
+        return Err(PolicyViolation::WasmModuleNotFile(canonical));
+    }
+    Ok(canonical)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1213,7 +1252,13 @@ impl SimpleExecutor {
                     {
                         use wasmtime::*;
                         let engine = Engine::default();
-                        let module = Module::from_file(&engine, module_path)
+                        // Revalidate at the use boundary and load the canonical path,
+                        // not the original input path (which may be a symlink or
+                        // have changed since the initial ActionIR validation).
+                        let canonical_module_path =
+                            validate_wasm_module_path(module_path, policy, sandbox)
+                                .map_err(ExecutionError::Policy)?;
+                        let module = Module::from_file(&engine, &canonical_module_path)
                             .map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
                         let mut store = Store::new(&engine, ());
                         let instance = Instance::new(&mut store, &module, &[])
@@ -2084,6 +2129,107 @@ mod authority_numeric_input_tests {
                 field: "capabilities.shell.min_phi",
                 ..
             })
+        ));
+    }
+}
+
+
+#[cfg(test)]
+mod forge_wasm_authority_tests {
+    use super::*;
+
+    fn wasm_action(path: PathBuf) -> ActionIR {
+        ActionIR::WasmSandbox {
+            module_path: path,
+            function_name: "verify".into(),
+            input_data: Vec::new(),
+        }
+    }
+
+    fn enable_forge(policy: &mut PolicyBundle) {
+        policy.capabilities.forge.allow_wasm_execution = true;
+    }
+
+    #[test]
+    fn restrictive_policy_disables_forge_by_default() {
+        let policy = PolicyBundle::restrictive();
+        assert!(!policy.capabilities.forge.allow_wasm_execution);
+    }
+
+    #[test]
+    fn wasm_module_inside_sandbox_requires_explicit_forge_permission() {
+        let sandbox = SandboxRoot::new("test_forge_explicit_permission").unwrap();
+        let module = sandbox.root().join("inside.wasm");
+        std::fs::write(&module, b"not executed by this validation test").unwrap();
+        let action = wasm_action(module);
+        let mut policy = PolicyBundle::restrictive();
+
+        assert!(matches!(
+            action.validate(&policy, &sandbox, 0.0),
+            Err(PolicyViolation::ForgeExecutionDisabled)
+        ));
+
+        enable_forge(&mut policy);
+        assert!(action.validate(&policy, &sandbox, 0.0).is_ok());
+    }
+
+    #[test]
+    fn wasm_module_absolute_path_outside_sandbox_is_rejected() {
+        let sandbox = SandboxRoot::new("test_forge_absolute_escape").unwrap();
+        let outside = sandbox.root().parent().unwrap().join("outside-forge-module.wasm");
+        std::fs::write(&outside, b"outside").unwrap();
+        let mut policy = PolicyBundle::restrictive();
+        enable_forge(&mut policy);
+
+        let result = wasm_action(outside.clone()).validate(&policy, &sandbox, 0.0);
+        let _ = std::fs::remove_file(&outside);
+        assert!(matches!(result, Err(PolicyViolation::SandboxEscape(_))));
+    }
+
+    #[test]
+    fn wasm_module_parent_traversal_is_rejected() {
+        let sandbox = SandboxRoot::new("test_forge_parent_traversal").unwrap();
+        let outside = sandbox.root().parent().unwrap().join("traversal-forge-module.wasm");
+        std::fs::write(&outside, b"outside").unwrap();
+        let mut policy = PolicyBundle::restrictive();
+        enable_forge(&mut policy);
+
+        let requested = sandbox.root().join("../traversal-forge-module.wasm");
+        let result = wasm_action(requested).validate(&policy, &sandbox, 0.0);
+        let _ = std::fs::remove_file(&outside);
+        assert!(matches!(result, Err(PolicyViolation::SandboxEscape(_))));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn wasm_module_symlink_to_outside_is_rejected() {
+        use std::os::unix::fs::symlink;
+
+        let sandbox = SandboxRoot::new("test_forge_symlink_escape").unwrap();
+        let outside = sandbox.root().parent().unwrap().join("symlink-forge-module.wasm");
+        let inside_link = sandbox.root().join("outside-link.wasm");
+        std::fs::write(&outside, b"outside").unwrap();
+        symlink(&outside, &inside_link).unwrap();
+
+        let mut policy = PolicyBundle::restrictive();
+        enable_forge(&mut policy);
+        let result = wasm_action(inside_link.clone()).validate(&policy, &sandbox, 0.0);
+
+        let _ = std::fs::remove_file(&inside_link);
+        let _ = std::fs::remove_file(&outside);
+        assert!(matches!(result, Err(PolicyViolation::SandboxEscape(_))));
+    }
+
+    #[test]
+    fn missing_wasm_module_is_rejected() {
+        let sandbox = SandboxRoot::new("test_forge_missing_module").unwrap();
+        let module = sandbox.root().join("missing.wasm");
+        let mut policy = PolicyBundle::restrictive();
+        enable_forge(&mut policy);
+
+        assert!(matches!(
+            wasm_action(module).validate(&policy, &sandbox, 0.0),
+            Err(PolicyViolation::WasmModuleNotFile(_))
         ));
     }
 }
