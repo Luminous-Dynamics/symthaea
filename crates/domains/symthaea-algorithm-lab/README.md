@@ -46,6 +46,12 @@ Criterion output is a measurement, not a promotion decision. Do not copy a timin
 No unit test contains a fixed latency threshold. Timing varies by CPU, power state, compiler/codegen, scheduler noise, and build environment; pretending a single repository-wide nanosecond cutoff is portable would turn noise into policy.
 
 The first benchmark is still a single-size microkernel test (16,384 bits). Before claiming algorithmic superiority, the next qualification stage must use multiple paired repetitions, randomized candidate order, separate warmup/measurement phases, and at least two target environments. Keep within-machine ranking separate from cross-machine performance; do not pool raw nanoseconds from different CPUs. Use the same fixed input corpus, baseline revision, compiler flags, Criterion settings, CPU governor/affinity policy, and background-load policy for all candidates in a comparison context.
+## Next research stage
+
+The eight implementations in this v1 pilot are human-authored hypotheses. The follow-on [AR-6B issue #12787](https://github.com/Luminous-Dynamics/symthaea/issues/12787) specifies the missing step: deterministic typed-kernel grammar, generated Rust source, isolated candidate compilation/execution, adaptive search policies, and operator/grammar-held-out evaluation. That stage must demonstrate a source-level candidate not present in this initial catalogue and reproduce any improvement against native SIMD.
+
+Use the existing #1352 capsule-bound bridge for candidate-independent evaluation context and the append-only/replication/observed-range owners (#1341/#1354). Keep this kernel microbenchmark separate from #6530's broader HDC work on fused operations, sparse representations, adaptive dimensions and event-driven dynamics, and from #5805/#7866's whole-workload HDC retrieval baselines.
+
 ## Authority boundary
 
 This crate can construct descriptions, correctness evidence, discovery proposals, and evaluation receipts. It cannot modify tracked source, invoke Git, commit, merge, activate a candidate, or make a candidate production-eligible.
