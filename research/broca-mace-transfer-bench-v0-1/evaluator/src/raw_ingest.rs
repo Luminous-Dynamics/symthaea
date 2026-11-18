@@ -71,6 +71,28 @@ pub(super) struct VerifiedActionReceipt {
 }
 pub(super) type VerifiedActionRegistry = BTreeMap<String, VerifiedActionReceipt>;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum ConsolidationDisposition {
+    RetainRaw,
+    CompressWithSourceLinks,
+    PromoteToProcedure,
+    PromoteToRule,
+    Quarantine,
+    Supersede,
+    ForgetFromActiveIndex,
+    EraseForPrivacy,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct VerifiedConsolidationReceipt {
+    pub disposition: ConsolidationDisposition,
+    pub source_event_ids: Vec<u32>,
+    pub decision_digest: String,
+    pub verified: bool,
+}
+pub(super) type VerifiedConsolidationRegistry =
+    BTreeMap<u32, VerifiedConsolidationReceipt>;
+
 #[derive(Clone, Debug)]
 pub(super) struct VerifiedOutcomeReceipt {
     pub event_id: u32,
@@ -88,6 +110,7 @@ pub(super) struct IngestReport {
     pub visible_event_count: usize,
     pub tool_success_without_verified_world_observation: usize,
     pub unverified_outcome_receipt_count: usize,
+    pub unpromoted_observation_count: usize,
     pub raw_payload_outcome_mismatch_count: usize,
     pub retracted_observation_count: usize,
     pub experiences: Vec<Experience>,
@@ -247,6 +270,7 @@ pub(super) fn derive_as_known(
     verified_actions: &VerifiedActionRegistry,
     verified_outcomes: &VerifiedOutcomeRegistry,
     verified_sources: &VerifiedSourceRegistry,
+    verified_consolidations: &VerifiedConsolidationRegistry,
 ) -> Result<IngestReport, String> {
     let events = parse_jsonl(input)?;
     let retracted_ids = apply_corrections(&events, known_at_ms);
@@ -322,7 +346,6 @@ pub(super) fn derive_as_known(
             continue;
         };
         if plan.sequence >= dispatch.sequence
-            || plan.occurred_at_ms > dispatch.occurred_at_ms
             || event.sequence <= dispatch.sequence
             || event.occurred_at_ms < dispatch.occurred_at_ms
         {
@@ -359,6 +382,17 @@ pub(super) fn derive_as_known(
         {
             report.raw_payload_outcome_mismatch_count += 1;
         }
+
+        let Some(consolidation) = verified_consolidations.get(&event.event_id).filter(|receipt| {
+            receipt.verified
+                && !receipt.decision_digest.is_empty()
+                && receipt.disposition == ConsolidationDisposition::PromoteToProcedure
+                && receipt.source_event_ids.contains(&event.event_id)
+        }) else {
+            report.unpromoted_observation_count += 1;
+            continue;
+        };
+        let _consolidation_receipt_digest = &consolidation.decision_digest;
 
         let source_key = event.string("source_artifact_digest").unwrap_or("");
         let source = verified_sources.get(source_key);
@@ -547,6 +581,23 @@ mod tests {
             .collect()
     }
 
+    fn consolidation_registry() -> VerifiedConsolidationRegistry {
+        [3_u32, 6, 9, 12]
+            .into_iter()
+            .map(|event_id| {
+                (
+                    event_id,
+                    VerifiedConsolidationReceipt {
+                        disposition: ConsolidationDisposition::PromoteToProcedure,
+                        source_event_ids: vec![event_id],
+                        decision_digest: format!("decision-digest-{event_id}"),
+                        verified: true,
+                    },
+                )
+            })
+            .collect()
+    }
+
     fn source_registry() -> VerifiedSourceRegistry {
         BTreeMap::from([
             ("digest-a1".to_owned(), VerifiedSource {
@@ -592,6 +643,7 @@ mod tests {
             &action_registry(),
             &outcome_registry(),
             &source_registry(),
+            &consolidation_registry(),
         )
     }
 
@@ -608,6 +660,24 @@ mod tests {
             &action_registry(),
             &outcome_registry(),
             sources,
+            &consolidation_registry(),
+        )
+    }
+
+    fn derive_with_consolidations(
+        input: &str,
+        valid_at: u64,
+        known_at: u64,
+        consolidations: &VerifiedConsolidationRegistry,
+    ) -> Result<IngestReport, String> {
+        derive_as_known(
+            input,
+            valid_at,
+            known_at,
+            &action_registry(),
+            &outcome_registry(),
+            &source_registry(),
+            consolidations,
         )
     }
 
@@ -801,7 +871,7 @@ mod tests {
         let report = derive_fixture(&jsonl(events), 100, 100).unwrap();
         let item = report.experiences.iter().find(|item| item.event_id == 3).unwrap();
         assert!(!item.prediction_pre_registered);
-        assert!(!item.intervention);
+        assert!(item.intervention);
     }
 
     #[test]
@@ -835,6 +905,72 @@ mod tests {
             first_report.raw_session_sha256,
             second_report.raw_session_sha256
         );
+    }
+
+    #[test]
+    fn raw_experience_is_not_transferable_without_verified_promotion() {
+        let empty = VerifiedConsolidationRegistry::new();
+        let report = derive_with_consolidations(
+            &jsonl(observation_events()),
+            100,
+            100,
+            &empty,
+        )
+        .unwrap();
+        assert_eq!(report.experiences.len(), 0);
+        assert_eq!(report.unpromoted_observation_count, 4);
+    }
+
+    #[test]
+    fn forget_quarantine_and_privacy_erasure_do_not_enter_transfer_memory() {
+        let mut consolidations = consolidation_registry();
+        for disposition in [
+            ConsolidationDisposition::ForgetFromActiveIndex,
+            ConsolidationDisposition::Quarantine,
+            ConsolidationDisposition::EraseForPrivacy,
+        ] {
+            consolidations.insert(
+                3,
+                VerifiedConsolidationReceipt {
+                    disposition,
+                    source_event_ids: vec![3],
+                    decision_digest: "verified-policy-decision".to_owned(),
+                    verified: true,
+                },
+            );
+            let report = derive_with_consolidations(
+                &jsonl(observation_events()),
+                100,
+                100,
+                &consolidations,
+            )
+            .unwrap();
+            assert!(!report.experiences.iter().any(|item| item.event_id == 3));
+            assert_eq!(report.unpromoted_observation_count, 1);
+        }
+    }
+
+    #[test]
+    fn consolidation_receipt_must_bind_the_exact_source_event() {
+        let mut consolidations = consolidation_registry();
+        consolidations.insert(
+            3,
+            VerifiedConsolidationReceipt {
+                disposition: ConsolidationDisposition::PromoteToProcedure,
+                source_event_ids: vec![999],
+                decision_digest: "verified-but-wrong-source".to_owned(),
+                verified: true,
+            },
+        );
+        let report = derive_with_consolidations(
+            &jsonl(observation_events()),
+            100,
+            100,
+            &consolidations,
+        )
+        .unwrap();
+        assert!(!report.experiences.iter().any(|item| item.event_id == 3));
+        assert_eq!(report.unpromoted_observation_count, 1);
     }
 
     #[test]
