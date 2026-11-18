@@ -649,6 +649,13 @@ mod tests {
         assert_eq!(receipt["status"], "pass");
         assert_eq!(receipt["observable_count"], 0);
         assert_eq!(receipt["coefficient_status_counts"]["not_identifiable"], 3);
+        assert_eq!(receipt["exportable_coefficient_count"], 0);
+        assert!(
+            receipt["basis_normalization_identifiability_demo"]["maximum_invariant_residual"]
+                .as_f64()
+                .unwrap()
+                < 1.0e-12
+        );
     }
 
     #[test]
@@ -739,6 +746,58 @@ mod tests {
             "source_reference":"https://doi.org/10.1103/lrhl-j9bt"
         }]);
         assert!(audit_mutated(fixture).is_ok());
+    }
+
+    #[test]
+    fn identified_coefficient_is_exported_with_basis_and_uncertainty() {
+        let (_, mut fixture) = inputs();
+        fixture["source_record"]["evidence_status"] = json!("independently_reproduced");
+        fixture["derived_observables"] = json!([{
+            "observable_id":"pair-susc",
+            "state_id":"method_summary_only",
+            "observable_kind":"quadratic_pair_susceptibility",
+            "value_kind":"scalar","value":1.0,"unit":"arb",
+            "tensor_axes":[],"isotropy_assumption":"not_applicable",
+            "uncertainty":0.1,"evidence_status":"independently_reproduced",
+            "measurement_or_derivation_method":"independent quadratic response calculation",
+            "source_artifact_digest":null,
+            "source_reference":"https://doi.org/10.1103/lrhl-j9bt",
+            "length_scale_definition":"not_applicable"
+        }]);
+        let coefficient = &mut fixture["effective_gl_coefficients"][0];
+        coefficient["status"] = json!("derived");
+        coefficient["value_kind"] = json!("scalar");
+        coefficient["value"] = json!(1.0);
+        coefficient["unit"] = json!("dimensionless_per_kelvin");
+        coefficient["basis_normalization"] = json!("psi_normalized_to_pair_susceptibility_v1");
+        coefficient["uncertainty_or_covariance"] = json!(0.05);
+        coefficient["supporting_observable_ids"] = json!(["pair-susc"]);
+        coefficient["derivation_method"] = json!("quadratic-free-energy-expansion");
+        let receipt = audit_mutated(fixture).unwrap();
+        assert_eq!(receipt["exportable_coefficient_count"], 1);
+        assert_eq!(
+            receipt["exportable_gl_coefficients"][0]["coefficient_id"],
+            "scalar_GL_a_slope"
+        );
+        assert_eq!(
+            receipt["exportable_gl_coefficients"][0]["basis_normalization"],
+            "psi_normalized_to_pair_susceptibility_v1"
+        );
+    }
+
+    #[test]
+    fn cross_mechanism_coefficient_promotion_is_rejected() {
+        let (_, mut fixture) = inputs();
+        let coefficient = &mut fixture["effective_gl_coefficients"][0];
+        coefficient["status"] = json!("derived");
+        coefficient["value_kind"] = json!("scalar");
+        coefficient["value"] = json!(1.0);
+        coefficient["unit"] = json!("arb");
+        coefficient["basis_normalization"] = json!("psi-v1");
+        coefficient["uncertainty_or_covariance"] = json!(0.1);
+        coefficient["model_family"] = json!("correlated_unconventional");
+        coefficient["supporting_observable_ids"] = json!(["not-present"]);
+        assert!(audit_mutated(fixture).is_err());
     }
 
     #[test]
