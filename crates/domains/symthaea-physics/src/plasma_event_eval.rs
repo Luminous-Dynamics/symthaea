@@ -1430,6 +1430,18 @@ mod tests {
             "luminous.plasma-observation-frame.v0.1"
         );
         assert_eq!(
+            manifest["synthetic_replay_interop"]["producer_commit"],
+            "70317a32958491acd8e0416639014d32e1f36b2c"
+        );
+        assert_eq!(
+            manifest["synthetic_replay_interop"]["frame_shot_id_namespace"],
+            "synthetic-shot:<scenario_id>"
+        );
+        assert_eq!(
+            manifest["synthetic_replay_interop"]["synthetic_identifiers_must_not_equal_physical_discharge_ids"],
+            true
+        );
+        assert_eq!(
             manifest["synthetic_replay_interop"]["physical_measurements"],
             false
         );
