@@ -42,10 +42,14 @@ jobs:
           root = Path("research/symmetry-discovery-benchmark-001")
           schema = json.loads((root / "schemas/case_manifest.schema.json").read_text())
           scorecard_schema = json.loads((root / "schemas/run_scorecard.schema.json").read_text())
+          proposal_schema = json.loads((root / "schemas/proposal_submission.schema.json").read_text())
           manifest = json.loads((root / "fixtures/v0.1/cases.json").read_text())
+          proposal_smoke = json.loads((root / "fixtures/v0.1/proposal_oracle_selftest.json").read_text())
           Draft202012Validator.check_schema(schema)
           Draft202012Validator(schema).validate(manifest)
           Draft202012Validator.check_schema(scorecard_schema)
+          Draft202012Validator.check_schema(proposal_schema)
+          Draft202012Validator(proposal_schema).validate(proposal_smoke)
           PY
       - name: Validate exact group axioms, point stabilizers and polynomial invariance
         run: python3 -I research/symmetry-discovery-benchmark-001/tools/validate_fixtures.py
@@ -61,3 +65,26 @@ jobs:
         run: cargo test --locked --manifest-path research/symmetry-discovery-benchmark-001/oracle/Cargo.toml
       - name: Strict Clippy for exact oracle
         run: cargo clippy --locked --manifest-path research/symmetry-discovery-benchmark-001/oracle/Cargo.toml --all-targets -- -D warnings
+      - name: Execute complete-split proposal audit smoke test (not a baseline)
+        run: |
+          cargo run --locked --manifest-path research/symmetry-discovery-benchmark-001/oracle/Cargo.toml --bin audit-proposals -- research/symmetry-discovery-benchmark-001/fixtures/v0.1/proposal_oracle_selftest.json > /tmp/symm-proposal-audit.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/symm-proposal-audit.json").read_text())
+          expected = {
+              "cases_in_scope": 300,
+              "predicted": 300,
+              "abstained": 0,
+              "exact_subgroup_matches": 300,
+              "false_promotions": 0,
+              "missed_symmetries": 0,
+              "invalid_group_proposals": 0,
+          }
+          if report["summary"] != expected:
+              raise SystemExit(f"proposal adapter smoke mismatch: {report['summary']!r}")
+          if len(report["cases"]) != 300:
+              raise SystemExit("proposal adapter omitted a frozen case")
+          print("SYMM_Q_PROPOSAL_ADAPTER_SMOKE_PASS: 300 cases; not a learner baseline")
+          PY
