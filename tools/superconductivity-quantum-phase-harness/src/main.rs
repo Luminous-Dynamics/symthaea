@@ -345,13 +345,54 @@ fn validate_instance(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
     if slices < 4 {
         return Err("imaginary_time_slices must be at least four".to_owned());
     }
-    let charge_cutoff = simulation
-        .get("max_abs_charge_state")
-        .and_then(Value::as_u64)
-        .ok_or_else(|| "max_abs_charge_state must be an integer".to_owned())?;
-    if charge_cutoff == 0 {
-        return Err("max_abs_charge_state must be nonzero".to_owned());
+    let imaginary_time_step = finite_number(
+        simulation
+            .get("imaginary_time_step")
+            .ok_or_else(|| "missing imaginary_time_step".to_owned())?,
+        "imaginary_time_step",
+    )?;
+    if imaginary_time_step <= 0.0
+        || !close_enough(slices as f64 * imaginary_time_step, 1.0 / temperature)
+    {
+        return Err(
+            "imaginary_time_slices * imaginary_time_step must equal beta = 1/temperature"
+                .to_owned(),
+        );
     }
+    let representation = required_text(simulation, "representation")?;
+    let cutoff = simulation
+        .get("charge_basis_cutoff")
+        .ok_or_else(|| "missing charge_basis_cutoff declaration".to_owned())?;
+    let cutoff_mode = required_text(cutoff, "mode")?;
+    let charge_cutoff = match representation {
+        "phase_path_integral" => {
+            if cutoff_mode != "not_applicable"
+                || !cutoff
+                    .get("max_abs_charge_state")
+                    .is_some_and(Value::is_null)
+            {
+                return Err(
+                    "phase_path_integral representation must declare no charge-basis cutoff"
+                        .to_owned(),
+                );
+            }
+            None
+        }
+        "integer_charge_basis" => {
+            if cutoff_mode != "symmetric_integer" {
+                return Err(
+                    "integer_charge_basis requires symmetric_integer truncation".to_owned(),
+                );
+            }
+            let value = cutoff
+                .get("max_abs_charge_state")
+                .and_then(Value::as_u64)
+                .filter(|value| *value > 0)
+                .ok_or_else(|| "integer charge basis requires a positive max_abs_charge_state".to_owned())?;
+            Some(value)
+        }
+        other => return Err(format!("unsupported quantum representation {other}")),
+    };
     simulation
         .get("random_seed")
         .and_then(Value::as_u64)
@@ -465,6 +506,9 @@ fn validate_instance(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
         "temperature": temperature,
         "temperature_unit": "coupling_energy_units",
         "imaginary_time_slices": slices,
+        "imaginary_time_step": imaginary_time_step,
+        "imaginary_time_beta": 1.0 / temperature,
+        "representation": representation,
         "charge_state_cutoff": charge_cutoff,
         "bath_mode": bath_mode,
         "external_flux_mode": flux_mode,
@@ -660,6 +704,32 @@ mod tests {
         let (_, mut fixture) = inputs();
         fixture["model"]["kind"] = json!("source_reproduction");
         fixture["model"]["source_model_id"] = Value::Null;
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn imaginary_time_slices_and_step_must_recover_beta() {
+        let (_, mut fixture) = inputs();
+        fixture["simulation"]["imaginary_time_step"] = json!(0.1);
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn phase_path_integral_must_not_claim_charge_basis_cutoff() {
+        let (_, mut fixture) = inputs();
+        fixture["simulation"]["charge_basis_cutoff"]["mode"] = json!("symmetric_integer");
+        fixture["simulation"]["charge_basis_cutoff"]["max_abs_charge_state"] = json!(4);
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn integer_charge_basis_requires_explicit_finite_cutoff() {
+        let (_, mut fixture) = inputs();
+        fixture["simulation"]["representation"] = json!("integer_charge_basis");
+        fixture["simulation"]["charge_basis_cutoff"]["mode"] = json!("symmetric_integer");
+        fixture["simulation"]["charge_basis_cutoff"]["max_abs_charge_state"] = json!(8);
+        assert!(audit_mutated(fixture).is_ok());
+        fixture["simulation"]["charge_basis_cutoff"]["max_abs_charge_state"] = Value::Null;
         assert!(audit_mutated(fixture).is_err());
     }
 }
