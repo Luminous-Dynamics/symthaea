@@ -51,7 +51,8 @@
         "dynamical_symmetry",
         "physical_coordinate_step_map_covariance",
         "proof_carrying_search_quotient",
-        "active_experiment_acquisition"
+        "active_experiment_acquisition",
+        "bounded_noise_symmetry_stabilizer"
       ]
     },
     "split": {
@@ -303,6 +304,64 @@
           },
           "abstention_reason": {
             "type": "string"
+          },
+          "uncertainty_result": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model",
+              "coordinate_scale",
+              "epsilon_scaled",
+              "possible_group_element_ids",
+              "ruled_out_group_element_ids",
+              "not_falsified_subgroup_candidates",
+              "hall_witness_count",
+              "exact_latent_subgroup_remained_possible"
+            ],
+            "properties": {
+              "model": {
+                "const": "bounded_coordinate_linf"
+              },
+              "coordinate_scale": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "epsilon_scaled": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "possible_group_element_ids": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "ruled_out_group_element_ids": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "not_falsified_subgroup_candidates": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "hall_witness_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "exact_latent_subgroup_remained_possible": {
+                "const": true
+              }
+            }
           }
         }
       }
