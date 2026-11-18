@@ -5,6 +5,7 @@
 //! JSON parsing is delegated to serde_json; all group, point-set and
 //! polynomial calculations use exact integer arithmetic.
 
+use serde::Serialize;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -12,7 +13,7 @@ type Matrix2 = [[i128; 2]; 2];
 type Point = (i128, i128);
 type Polynomial = BTreeMap<(u32, u32), i128>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum StabilizerWitnessV1 {
     PointPermutation {
         source_to_target: Vec<usize>,
@@ -45,7 +46,7 @@ pub struct StabilizerCertificateV1 {
     pub decisions: Vec<ElementDecisionV1>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum SubgroupAxiomViolationV1 {
     MissingIdentity { identity_element_id: String },
     MissingInverse {
@@ -59,7 +60,7 @@ pub enum SubgroupAxiomViolationV1 {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ProposalElementAuditV1 {
     pub element_id: String,
     pub proposed: bool,
@@ -69,7 +70,7 @@ pub struct ProposalElementAuditV1 {
     pub witness: StabilizerWitnessV1,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SubgroupProposalAuditV1 {
     pub case_id: String,
     pub proposed_elements: Vec<String>,
