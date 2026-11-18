@@ -61,6 +61,7 @@ pub enum CircleLayoutError {
     EmptyGrammarSpecId,
     DuplicateGrammarSpecId(String),
     InvalidGrammarSpec { spec_id: String },
+    EmptyNullEnsemble,
 }
 
 impl std::fmt::Display for CircleLayoutError {
@@ -107,6 +108,7 @@ impl std::fmt::Display for CircleLayoutError {
             Self::EmptyGrammarSpecId => write!(f, "grammar specification id must not be empty"),
             Self::DuplicateGrammarSpecId(id) => write!(f, "duplicate grammar specification id: {id}"),
             Self::InvalidGrammarSpec { spec_id } => write!(f, "invalid class count or tolerance in grammar specification {spec_id}"),
+            Self::EmptyNullEnsemble => write!(f, "null ensemble must contain at least one replicate seed"),
         }
     }
 }
@@ -244,6 +246,58 @@ impl CircleGrammarFamily {
         }
         Ok(outcomes)
     }
+}
+
+/// Conditional geometry null: radius values permuted over fixed circle centres.
+///
+/// This preserves the complete set of centre coordinates and the radius
+/// multiset, while breaking the association between a radius and its location.
+/// It tests radius-to-position association under an exchangeability null; it is
+/// not a universal natural/human formation null and does not preserve contacts.
+pub fn permute_circle_radii(
+    circles: &[CircleRecord],
+    seed: u64,
+) -> Result<Vec<CircleRecord>, CircleLayoutError> {
+    validate_circles(circles)?;
+    let mut radii: Vec<f64> = circles.iter().map(|circle| circle.radius).collect();
+    let mut rng = SensitivityRng::new(seed);
+
+    for upper in (1..radii.len()).rev() {
+        let selected = (rng.unit_interval() * (upper + 1) as f64) as usize;
+        radii.swap(upper, selected.min(upper));
+    }
+
+    Ok(circles
+        .iter()
+        .zip(radii)
+        .map(|(circle, radius)| CircleRecord {
+            id: circle.id,
+            center: circle.center,
+            radius,
+        })
+        .collect())
+}
+
+/// Run the entire frozen geometry family for every radius-permutation null seed.
+///
+/// Each returned replicate has exactly one result per family specification.
+/// The caller should extract a predeclared score from every spec in the same
+/// order and pass the observed score vector plus the null score matrix to
+/// `familywise_max_statistic_p_value`.
+pub fn run_radius_permutation_ensemble(
+    circles: &[CircleRecord],
+    family: &CircleGrammarFamily,
+    seeds: &[u64],
+) -> Result<Vec<Vec<CircleGrammarOutcome>>, CircleLayoutError> {
+    if seeds.is_empty() {
+        return Err(CircleLayoutError::EmptyNullEnsemble);
+    }
+    let mut replicates = Vec::with_capacity(seeds.len());
+    for seed in seeds {
+        let null_circles = permute_circle_radii(circles, *seed)?;
+        replicates.push(family.evaluate(&null_circles)?);
+    }
+    Ok(replicates)
 }
 
 /// Configuration for an explicitly hypothetical image-space measurement stress test.
@@ -1156,6 +1210,72 @@ mod tests {
         assert_eq!(
             family.evaluate(&circles),
             Err(CircleLayoutError::InvalidClassCount { requested: 3, available: 2 })
+        );
+    }
+
+    #[test]
+    fn radius_permutation_preserves_centres_and_radius_multiset() {
+        let circles = [
+            CircleRecord { id: 1, center: Point2::new(0.0, 0.0), radius: 1.0 },
+            CircleRecord { id: 2, center: Point2::new(3.0, 0.0), radius: 2.0 },
+            CircleRecord { id: 3, center: Point2::new(0.0, 4.0), radius: 3.0 },
+            CircleRecord { id: 4, center: Point2::new(4.0, 4.0), radius: 4.0 },
+            CircleRecord { id: 5, center: Point2::new(2.0, 2.0), radius: 5.0 },
+        ];
+        let permuted = permute_circle_radii(&circles, 20261118).expect("radius permutation");
+        let mut original_radii: Vec<f64> = circles.iter().map(|circle| circle.radius).collect();
+        let mut permuted_radii: Vec<f64> = permuted.iter().map(|circle| circle.radius).collect();
+        original_radii.sort_by(f64::total_cmp);
+        permuted_radii.sort_by(f64::total_cmp);
+
+        assert_eq!(original_radii, permuted_radii);
+        for (original, candidate) in circles.iter().zip(permuted.iter()) {
+            assert_eq!(original.id, candidate.id);
+            assert_eq!(original.center, candidate.center);
+        }
+        assert!(circles.iter().zip(permuted.iter()).any(|(a, b)| a.radius != b.radius));
+    }
+
+    #[test]
+    fn radius_permutation_ensemble_replays_complete_frozen_family() {
+        let circles = parse_circle_csv(CCAT_ZEALS_KNOLL).expect("valid CCAT fixture");
+        let family = CircleGrammarFamily::new(
+            "ccat-radius-null-family",
+            1,
+            vec![
+                CircleGrammarSpec { spec_id: "k4-t30".into(), radius_class_count: 4, tangent_gap_tolerance_px: 30.0 },
+                CircleGrammarSpec { spec_id: "k5-t45".into(), radius_class_count: 5, tangent_gap_tolerance_px: 45.0 },
+                CircleGrammarSpec { spec_id: "k6-t60".into(), radius_class_count: 6, tangent_gap_tolerance_px: 60.0 },
+            ],
+        )
+        .expect("frozen null family");
+        let seeds = [11, 22, 33, 44];
+        let first = run_radius_permutation_ensemble(&circles, &family, &seeds)
+            .expect("complete null ensemble");
+        let second = run_radius_permutation_ensemble(&circles, &family, &seeds)
+            .expect("replay null ensemble");
+
+        assert_eq!(first, second);
+        assert_eq!(first.len(), seeds.len());
+        assert!(first.iter().all(|replicate| replicate.len() == family.specifications().len()));
+    }
+
+    #[test]
+    fn radius_permutation_ensemble_rejects_empty_seed_list() {
+        let circles = parse_circle_csv(CCAT_ZEALS_KNOLL).expect("valid CCAT fixture");
+        let family = CircleGrammarFamily::new(
+            "one-spec",
+            1,
+            vec![CircleGrammarSpec {
+                spec_id: "k5-t45".into(),
+                radius_class_count: 5,
+                tangent_gap_tolerance_px: 45.0,
+            }],
+        )
+        .expect("valid family");
+        assert_eq!(
+            run_radius_permutation_ensemble(&circles, &family, &[]),
+            Err(CircleLayoutError::EmptyNullEnsemble)
         );
     }
 }
