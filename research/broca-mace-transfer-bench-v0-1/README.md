@@ -268,3 +268,9 @@ A fourth registry gates memory lifecycle. Only a verified `PromoteToProcedure` r
 These registries are test seams for future Symtropy/Mycelix integrations, not cryptographic implementations or live connectors. The current JSONL envelope is provider-neutral; native OpenAI Agents SDK and Anthropic Managed Agents adapters remain future work.
 
 Controls cover tool-success misattribution, forged action claims, tampered outcome payloads, missing execution/outcome/consolidation receipts, post-dispatch plans, late-arriving observations, bitemporal retraction, unknown source artifacts, malformed/duplicate/out-of-order events, invalid error bounds, valid-time boundaries, more than 256 later events without raw-history truncation, and content-digest replay.
+
+### Consolidation-producer status (2026-11-18)
+
+Draft [PR #12731](https://github.com/Luminous-Dynamics/symthaea/pull/12731) now emits a candidate-side `ConsolidationReceiptProposal` binding the selected disposition and policy ID/version to the exact source event IDs, fixture payload digests, source families and upstream roots. Its structural evaluator checks exact binding, duplicate IDs and minimum independent support; it rejects the frequency-only promotion over correlated echoes.
+
+This is a producer-side proposal with synthetic fixture digests, not a signed or cryptographically verified Mycelix receipt. MACE v0.7 in this PR still consumes injected test registries rather than PR #12731 output. The production adapter and independent verifier are specified in [#12846](https://github.com/Luminous-Dynamics/symthaea/issues/12846).
