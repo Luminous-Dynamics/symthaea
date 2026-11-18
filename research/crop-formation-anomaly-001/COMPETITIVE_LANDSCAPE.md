@@ -98,11 +98,11 @@ Use accepted statistical controls as baselines, not proprietary AI novelty:
 Crop lodging is the closest mature measurement domain for the biological and mechanical observables we need, even though its task is not crop-circle origin inference.
 
 Recent work already measures lodging by affected area, location, severity and stem angle:
-- Azizi et al. (2024), *Comprehensive wheat lodging detection after initial lodging using UAV RGB images*, reports a multi-task approach for ratio, location and angle and over 91% classification accuracy on its two declared states. These are the paper's own dataset/task results, not a crop-circle score.
-- Long et al. (2025), *Comprehensive wheat lodging detection under different UAV heights using machine/deep learning models*, explicitly evaluates how UAV height affects detection and proposes a MobileNetV3-M model.
-- A 2026 review, *Multi-scale lodging in rice and wheat*, connects field biomechanics with UAV spectral/photogrammetric products and LiDAR-derived stem inclination. It stresses that canopy posture and remote-sensing products are phenotypic proxies, not direct measurements of intrinsic properties such as flexural rigidity or breaking moment; mechanical ground-truth calibration is required.
-- A 2026 review of UAV sensing in gramineous crops covers lodging area identification, severity and angle, with supervised classification and semantic segmentation as major established approaches.
-- Ground-based LiDAR/UAV phenotyping has also been used to estimate plant height and lodging angle in field research, offering a stronger 3D comparator than overhead photographs alone.
+- Azizi et al. (2024), [*Comprehensive wheat lodging detection after initial lodging using UAV RGB images*](https://doi.org/10.1016/j.eswa.2023.121788), reports a multi-task approach for ratio, location and angle and over 91% classification accuracy on its two declared states. These are the paper's own dataset/task results, not a crop-circle score.
+- Long et al. (2025), [*Comprehensive wheat lodging detection under different UAV heights using machine/deep learning models*](https://doi.org/10.1016/j.compag.2025.109972), explicitly evaluates how UAV height affects detection and proposes a MobileNetV3-M model.
+- A 2026 review, [*Multi-scale lodging in rice and wheat: bridging biomechanical traits, phenotypic detection, and intelligent harvesting systems*](https://doi.org/10.3389/fpls.2026.1956108), connects field biomechanics with UAV spectral/photogrammetric products and LiDAR-derived stem inclination. It stresses that canopy posture and remote-sensing products are phenotypic proxies, not direct measurements of intrinsic properties such as flexural rigidity or breaking moment; mechanical ground-truth calibration is required.
+- A 2026 review of [UAV remote sensing in gramineous crops](https://doi.org/10.1016/j.inpa.2026.01.009) covers lodging area identification, severity and angle, with supervised classification and semantic segmentation as major established approaches.
+- Ground-based LiDAR phenotyping has also been used to estimate plant height and lodging angle in field research; see [the 2025 wheat LiDAR phenotyping study](https://doi.org/10.1080/07038992.2025.2516742), which offers a stronger 3D comparator than overhead photographs alone.
 
 ### Implication for CROP-INTEL
 
