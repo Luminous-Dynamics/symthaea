@@ -56,5 +56,40 @@
       ],
       "evidence_receipt_payload": "water-evaluation-receipt-a"
     }
+  ],
+  "expected_cases": [
+    {
+      "case_id": "STYLE-CHANGE",
+      "changed_node_ids": [
+        "style-intent"
+      ],
+      "invalidated_node_ids": [
+        "energy-evaluation",
+        "geometry",
+        "style-intent"
+      ],
+      "preserved_evidence_node_ids": [
+        "typology-intent",
+        "water-evaluation",
+        "water-policy"
+      ]
+    },
+    {
+      "case_id": "BRIEF-CHANGE",
+      "changed_node_ids": [
+        "resident-brief"
+      ],
+      "invalidated_node_ids": [
+        "energy-evaluation",
+        "geometry",
+        "resident-brief",
+        "style-intent",
+        "typology-intent"
+      ],
+      "preserved_evidence_node_ids": [
+        "water-evaluation",
+        "water-policy"
+      ]
+    }
   ]
 }
