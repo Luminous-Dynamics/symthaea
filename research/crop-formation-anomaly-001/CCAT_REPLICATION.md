@@ -117,13 +117,15 @@ The standalone dependency-free crate adds `circle_layout.rs` with:
 - quantile-initialized 1D k-means for radius and radial-band descriptors;
 - centred neighbour-pair motif counting.
 
+The Rust lab also exposes `audit_circle_measurement_sensitivity`: callers provide explicit centre/radius pixel perturbation bounds, class count, contact tolerance, replicate count and seed. The routine reruns centre estimation, clustering, contact graph and motif counts for every perturbed dataset, then reports sample spreads, radius-label agreement and exact baseline-signature fraction. It does not estimate measurement uncertainty; the bounds remain declared stress-test assumptions.
+
 The Rust test suite contains known-answer checks against the imported data for:
 - 60 records;
 - 66 contact edges at a 45-pixel threshold;
 - 12 A–E contacts;
 - A–E–B = 10, B–A–E = 10, A–E–A = 8.
 
-These tests have been authored but **not compiled or executed** in this environment. The numerical replay above was performed separately in Python. No CI pass or Rust execution is claimed.
+These tests have been authored but **not compiled or executed** in this environment. The numerical descriptive and NumPy perturbation replays above were performed separately in Python; the new Rust sensitivity routine is a deterministic project-native implementation but has not yet been executed, so its numerical output is not claimed to match the exploratory NumPy stream. No CI pass or Rust execution is claimed.
 
 ## 6. What the current comparison still cannot establish
 
