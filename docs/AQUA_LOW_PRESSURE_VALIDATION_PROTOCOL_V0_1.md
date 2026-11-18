@@ -189,3 +189,18 @@ These bounds represent declared measurement uncertainty, not a statistical confi
 Steady-state pressure-retention results do not establish performance during pressure steps, hot/cold supply disturbances, second-fixture demand, pump/regulator cycling or recovery. These event-driven conditions are separately preregistered in [AQUA_DYNAMIC_SUPPLY_TRANSIENT_PROTOCOL_V0_1.md](AQUA_DYNAMIC_SUPPLY_TRANSIENT_PROTOCOL_V0_1.md), tracked by [#12801](https://github.com/Luminous-Dynamics/symthaea/issues/12801).
 
 The steady-state pressure-invariant context digest must remain stable across the paired 150/300 kPa runs. For dynamic tests, the event script digest and time-series data are separately bound. Do not collapse transient overshoot, time outside the qualified envelope, temperature excursion, unserved service and safe-stop correctness into the steady-state flow-retention ratio.
+
+
+## 13. Test-method crosswalk and pressure datum
+
+The detailed source-classified crosswalk is in [AQUA_METHOD_CROSSWALK_V0_1.md](AQUA_METHOD_CROSSWALK_V0_1.md), tracked by [#12817](https://github.com/Luminous-Dynamics/symthaea/issues/12817).
+
+The new EN 18021:2025 method distinguishes shower outlets/sets from taps/shower systems. The accessible UNI summary lists a 0.5 bar dynamic-pressure lower limit for both categories, but different static maxima and recommended dynamic ranges:
+- outlets / sets: static up to 5 bar; recommended dynamic 1–3 bar; recommended water temperature 42°C;
+- taps / systems: static up to 10 bar; recommended dynamic 1–5 bar, with the table footnote describing the point-of-discharge measurement datum; recommended water temperature up to 65°C.
+
+The standard specifies laboratory type tests, not production QC. Full formal claims require the controlled standard and category-specific apparatus. Do not transfer Table 1 conditions to Table 2 products or vice versa.
+
+UWL 2023 pressure points are dynamic pressures applied to each inlet: P1 150 kPa +10/-0, P2 300 kPa +20/-0 (Type 1), and P3 10 kPa +2/-0 (Type 2). ETL's maximum-flow procedure additionally requires P2 at the faceplate centre. These are not interchangeable with a generic terminal fitting inlet or EN point-of-discharge reading. Aqua's current single-channel pressure_curve record supports only TerminalFittingInlet or PointOfDischarge and explicitly does not claim to reproduce the full UWL/ETL apparatus.
+
+The current generic paired 150/300 kPa flow-retention calculation is valid only when the same specimen, mode, method, protocol and pressure datum are used at both points. It is an engineering comparison, not proof of UWL/ETL conformity. UWL also includes P3=10 kPa for Type 2; Aqua's 50/75/100 kPa research points do not cover that method point.
