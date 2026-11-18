@@ -277,11 +277,7 @@ impl ManufacturingRouteManifest {
                 push(&mut findings, "process_review_profile_missing", format!("{path}.process_binding.process_profile_ref"),
                     "Process-review operations must bind a generic MFG-PROC process-profile candidate.");
             }
-            if self.state == "route_reviewed" {
-                if operation.process_binding.capability_state != "qualified" {
-                    push(&mut findings, "route_review_unqualified_operation", format!("{path}.process_binding.capability_state"),
-                        "Every operation must have qualified process capability before route review.");
-                }
+            if operation.process_binding.capability_state == "qualified" {
                 for (field, value) in [
                     ("machine_ref", operation.process_binding.machine_ref.as_deref()),
                     ("tool_ref", operation.process_binding.tool_ref.as_deref()),
@@ -291,10 +287,16 @@ impl ManufacturingRouteManifest {
                     ("process_profile_ref", operation.process_binding.process_profile_ref.as_deref()),
                 ] {
                     if value.is_none_or(is_blank) {
-                        push(&mut findings, "route_review_process_binding_incomplete", format!("{path}.process_binding.{field}"),
-                            "Qualified route review requires exact process profile, machine, tool, process/program revisions and capability evidence.");
+                        push(&mut findings, "qualified_process_binding_incomplete", format!("{path}.process_binding.{field}"),
+                            "A qualified process claim requires exact process profile, machine, tool, process/program revisions and capability evidence.");
                     }
                 }
+            }
+            if self.state == "route_reviewed"
+                && operation.process_binding.capability_state != "qualified"
+            {
+                push(&mut findings, "route_review_unqualified_operation", format!("{path}.process_binding.capability_state"),
+                    "Every operation must have qualified process capability before route review.");
             }
             if operation.output_component_refs.is_empty() {
                 push(&mut findings, "operation_without_outputs", format!("{path}.output_component_refs"),
@@ -310,7 +312,12 @@ impl ManufacturingRouteManifest {
                         format!("Component output {output} is already produced by operation {previous}; revisions must be distinct."));
                 }
             }
+            let mut unique_dependencies = HashSet::new();
             for dependency in &operation.dependencies {
+                if !unique_dependencies.insert(dependency.as_str()) {
+                    push(&mut findings, "duplicate_operation_dependency", format!("{path}.dependencies"),
+                        "An operation cannot list the same predecessor dependency more than once.");
+                }
                 if dependency == &operation.operation_id {
                     push(&mut findings, "self_dependency", format!("{path}.dependencies"),
                         "An operation cannot depend on itself.");
@@ -330,13 +337,18 @@ impl ManufacturingRouteManifest {
             }
             for input in &operation.input_component_refs {
                 if let Some(producer) = output_owner.get(input.as_str()) {
-                    if *producer == operation.operation_id {
+                    if *producer == operation.operation_id.as_str() {
                         push(&mut findings, "operation_consumes_own_output", format!("{path}.input_component_refs"),
                             "An operation cannot consume its own output.");
                     }
                 }
             }
+            let mut unique_topology_refs = HashSet::new();
             for topology_ref in &operation.topology_refs {
+                if !unique_topology_refs.insert((topology_ref.entity_kind.as_str(), topology_ref.entity_ref.as_str())) {
+                    push(&mut findings, "duplicate_operation_topology_reference", format!("{path}.topology_refs"),
+                        "A topology entity cannot be declared twice by one operation.");
+                }
                 if is_blank(&topology_ref.entity_ref) {
                     push(&mut findings, "blank_topology_reference", format!("{path}.topology_refs"),
                         "Topology reference identity must be non-empty.");
@@ -391,6 +403,18 @@ impl ManufacturingRouteManifest {
                 }
             }
             validate_operation_shape(operation, &path, &mut findings);
+            if operation.operation_kind == "rework" {
+                if let Some(predecessor) = operation.rework_of_component_ref.as_deref() {
+                    if !operation.input_component_refs.iter().any(|input| input == predecessor) {
+                        push(&mut findings, "rework_predecessor_not_consumed", format!("{path}.rework_of_component_ref"),
+                            "Rework must explicitly consume the exact predecessor component it claims to repair.");
+                    }
+                    if operation.output_component_refs.iter().any(|output| output == predecessor) {
+                        push(&mut findings, "rework_overwrites_predecessor", format!("{path}.output_component_refs"),
+                            "Rework must produce a new component identity and preserve the failed predecessor.");
+                    }
+                }
+            }
             validate_inspection_gate(operation, &path, self.state.as_str(), &mut findings);
         }
 
@@ -398,7 +422,7 @@ impl ManufacturingRouteManifest {
             let path = format!("operations[{index}]");
             for input in &operation.input_component_refs {
                 match output_owner.get(input.as_str()) {
-                    Some(producer) if *producer != operation.operation_id => {
+                    Some(producer) if *producer != operation.operation_id.as_str() => {
                         if !operation.dependencies.iter().any(|dependency| dependency == producer) {
                             push(&mut findings, "component_input_missing_dependency", format!("{path}.input_component_refs"),
                                 format!("Input component {input} is produced by {producer}, which must be an explicit predecessor dependency."));
@@ -992,6 +1016,35 @@ mod tests {
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.is_valid(), "{:?}", report.findings);
         assert!(report.can_enter_route_review());
+    }
+
+    #[test]
+    fn qualified_capability_claim_requires_all_exact_process_bindings_even_before_route_review() {
+        let mut manifest = base_manifest();
+        manifest["operations"][1]["process_binding"]["capability_state"] = json!("qualified");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "qualified_process_binding_incomplete"));
+    }
+
+    #[test]
+    fn rework_must_consume_the_exact_predecessor_it_names() {
+        let mut manifest = base_manifest();
+        manifest["operations"].push(operation(
+            "OP-REWORK",6,"rework",vec!["OP-ATTACH"],
+            vec![json!({"entity_kind":"panel","entity_ref":"forearm_shell"})],
+            vec!["COMP-ASSEMBLY-001"],vec!["COMP-ASSEMBLY-002"]
+        ));
+        manifest["operations"][6]["rework_of_component_ref"] = json!("SOME-OTHER-COMPONENT");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "rework_predecessor_not_consumed"));
+    }
+
+    #[test]
+    fn duplicate_operation_dependency_is_rejected() {
+        let mut manifest = base_manifest();
+        manifest["operations"][4]["dependencies"] = json!(["OP-FORM-UPPER","OP-FORM-UPPER","OP-CUT-GUSSET"]);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "duplicate_operation_dependency"));
     }
 
     #[test]
