@@ -182,6 +182,19 @@ The Rust oracle exposes the following reusable surface:
 
 The expected integration pattern is: fit/threshold a method using discovery and calibration only; freeze its source revision, configuration and threshold; emit one proposal or explicit abstention for every final-holdout ID; submit those proposals to the independent oracle; then validate the run scorecard against the same manifest and split digests. The oracle does not fit, tune or select the external method.
 
+
+## JSON proposal adapter and full-split smoke test
+
+The independent Rust oracle also ships a JSON CLI:
+
+    cargo run --locked --manifest-path research/symmetry-discovery-benchmark-001/oracle/Cargo.toml --bin audit-proposals -- submission.json
+
+The submission schema is `schemas/proposal_submission.schema.json`. A method identifies its version, source revision and configuration digest, chooses one exact track/split, and supplies exactly one row per frozen case. A row is either a proposed element set or an explicit abstention with a reason. Missing cases, duplicate IDs, unknown elements and incomplete split coverage are rejected; the denominator cannot be silently reduced.
+
+The audit output carries exact subgroup truth, element-wise proposal classifications, subgroup-axiom violations, and point/coefficient witnesses for each false promotion or missed symmetry. It is a post-hoc audit artifact; it must not be exposed to the model before its proposal submission is frozen.
+
+The repository includes `fixtures/v0.1/proposal_oracle_selftest.json`, an explicitly oracle-derived 300-case discovery smoke submission. The exact-head workflow runs the CLI and checks 300/300 exact matches, zero abstentions, zero false promotions, zero missed symmetries and zero invalid groups. **This is pipeline self-test data, not an external learner baseline or benchmark result.** Four Rust binary tests also exercise complete coverage, missing-case rejection, abstention accounting and unknown-element rejection.
+
 ## Machine-readable benchmark scorecards
 
 `schemas/run_scorecard.schema.json` defines the required record for every external comparator execution. It pins the protocol, case manifest, inputs, split and method configuration by SHA-256; records the baseline code revision and hardware/software environment; stores per-case outputs including abstentions, failures and out-of-domain cases; and requires explicit false-promotion, false-elimination, lift and verification accounting.
