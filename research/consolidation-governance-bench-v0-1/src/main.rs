@@ -1389,7 +1389,7 @@ fn evaluate(policy: Policy, cases: &[Scenario]) -> Metrics {
 }
 
 fn print_report(cases: &[Scenario]) {
-    println!("Synthetic consolidation governance benchmark v0.1");
+    println!("Synthetic consolidation governance benchmark v0.2");
     println!(
         "cases={}, policies={}, seed=not_applicable (fully deterministic)",
         cases.len(),

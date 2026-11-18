@@ -37,7 +37,7 @@ The v0.1 corpus contains eleven cases:
 10. Five independent supports for a reusable rule.
 11. A non-load-bearing item that may leave the active index without deleting its source payload.
 
-The candidate policy API receives only `Observation`. Evaluator-only `OracleTruth` is a separate type and is only consumed by the scoring/oracle functions. This is an architectural anti-leakage guard in the harness, not a substitute for a sealed external evaluator.
+The candidate policy API receives only `Observation`, now including exact source-event references: event ID, fixture payload digest, source family, upstream root, independently observed success, outcome verification, trust, retraction, scope and pre-registration state. Evaluator-only `OracleTruth` is a separate type and is only consumed by scoring/oracle functions. The source-event digests and provenance are synthetic fixture inputs, not authentic source receipts.
 
 ## Compared policies
 
@@ -59,6 +59,7 @@ The oracle is an evaluator-only upper bound. It is not a candidate policy and mu
 - Rare safety-detail losses.
 - Stale-source reuse.
 - Missed privacy erasure.
+- Promotion receipt proposals, structurally accepted proposals and rejected proposals.
 
 Utility, compute/storage cost and governance are separate columns. There is no weighted composite score.
 
@@ -69,9 +70,9 @@ The harness also tests a minimal in-memory projection model:
 
 These are logical fixture invariants only. They do not establish physical secure erasure, filesystem behavior, database recovery, or Mycelix authorization.
 
-## v0.1 expected properties
+## v0.2 fixture regression expectations
 
-The governed policy is intentionally constructed to match the symbolic oracle on these eleven transparent fixtures. The unit tests assert zero known governance failures and zero decision regret on this fixture. Its 100% agreement in this tiny synthetic suite is a regression property of the fixture, **not** an empirical performance claim or evidence that the policy generalizes.
+The governed policy is intentionally constructed to match the symbolic oracle on these eleven transparent fixtures. It derives promotion support from event-level source evidence rather than trusting aggregate source-family/success counts. The unit tests assert zero known governance failures and zero decision regret on this fixture. Its 100% agreement in this tiny synthetic suite is a regression property of the fixture, **not** an empirical performance claim or evidence that the policy generalizes.
 
 The less careful baselines are expected to expose distinct failures:
 - frequency-only promotion should fail on correlated duplicates, poison, domain shift, stale sources, rare details and privacy erasure;
@@ -82,7 +83,8 @@ The less careful baselines are expected to expose distinct failures:
 ## Limitations and next gates
 
 - Eleven hand-authored cases are insufficient for statistical claims.
-- The observation fields are idealized and do not yet consume the canonical bitemporal/evidence types from #9075, #8265, #6481 or #9177.
+- The observation fields and payload digests are synthetic fixture records and do not yet consume canonical bitemporal/evidence receipts from #9075, #8265, #6481 or #9177.
+- The receipt is a candidate proposal with exact source bindings and a deterministic fixture decision ID. It is not signed, cryptographically authenticated, or independently verified by Mycelix. Production must bind policy digest, authority/scope, valid/known time, source revision receipts, verifier signature and supersession lineage.
 - The evaluator is co-located for easy inspection; a serious benchmark must separately build, seal and control its oracle.
 - The policy is deterministic and hand-authored; there is no learned consolidation model.
 - Utility values are synthetic ordinal scores. They are not calibrated user utility or downstream task success.
@@ -100,7 +102,9 @@ Next steps should be owned by #9139 and its related work: grow source-held-out s
 - [#9016](https://github.com/Luminous-Dynamics/symthaea/issues/9016): subject, authority and audience boundaries.
 - [#11816](https://github.com/Luminous-Dynamics/symthaea/issues/11816): benchmark oracle independence.
 
-Do not add a competing memory store, evidence graph, receipt schema, policy engine, or global truth score.
+The v0.2 receipt proposal is the producer-side contract sketch for [#12846 — source-bound consolidation receipts for MACE transfer](https://github.com/Luminous-Dynamics/symthaea/issues/12846). The current validator checks exact input binding and minimum independent support; it is not a live Mycelix verifier.
+
+Do not add a competing memory store, evidence graph, receipt authority, policy engine, or global truth score.
 
 ## v0.2 source-bound receipt proposal
 
