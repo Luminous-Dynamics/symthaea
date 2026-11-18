@@ -303,6 +303,10 @@ impl CleanStateManifest {
                 push(&mut findings, "unsupported_metric_comparison", &path,
                     "Metric family and comparison mode are incompatible or outside the P0 vocabulary.");
             }
+            if !gate.hard_gate {
+                push(&mut findings, "p0_gate_must_be_noncompensable", format!("{path}.hard_gate"),
+                    "Every P0 required claim gate is non-compensable; use a separately scoped informational observation for non-gating metrics.");
+            }
             if is_blank(&gate.unit) || !gate.acceptance_limit.is_finite()
                 || gate.acceptance_limit < 0.0 || gate.minimum_replicates_per_cycle == 0
                 || is_blank(&gate.method_selection_ref)
@@ -733,6 +737,14 @@ fn validate_cleaning_process(
     if cycle.nozzle_ref.as_deref().is_some_and(is_blank) {
         push(findings, "blank_nozzle_reference", format!("{path}.nozzle_ref"),
             "Nozzle reference must be non-empty when supplied.");
+    }
+    if cycle.application_mode == "spray"
+        && (cycle.application_pressure_kpa.is_none()
+            || cycle.nozzle_ref.as_deref().is_none_or(is_blank)
+            || cycle.standoff_cm.is_none())
+    {
+        push(findings, "spray_parameters_incomplete", path,
+            "Spray cleaning requires measured pressure, nozzle identity and standoff.");
     }
     if state != "proposed" && cycle.robot_isolation_evidence_ref.as_deref().is_none_or(is_blank) {
         push(findings, "robot_isolation_evidence_missing", format!("{path}.robot_isolation_evidence_ref"),
@@ -1422,6 +1434,22 @@ mod tests {
         manifest["gates"][1]["applicability"] = json!("not_applicable");
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|f| f.code == "na_gate_without_owner_rationale"));
+    }
+
+    #[test]
+    fn p0_required_gates_must_be_noncompensable() {
+        let mut manifest = base_manifest();
+        manifest["gates"][0]["hard_gate"] = json!(false);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "p0_gate_must_be_noncompensable"));
+    }
+
+    #[test]
+    fn spray_cleaning_requires_pressure_nozzle_and_standoff() {
+        let mut manifest = base_manifest();
+        manifest["cycles"][0]["application_mode"] = json!("spray");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "spray_parameters_incomplete"));
     }
 
     #[test]
