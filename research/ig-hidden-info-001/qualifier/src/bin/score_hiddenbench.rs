@@ -64,7 +64,8 @@ struct ScoreReport {
     task_clustered_average_accuracy: ClusterSummary,
     task_clustered_majority_accuracy: ClusterSummary,
     full_profile_pre_average_accuracy: Option<f64>,
-    hidden_post_minus_full_pre_gap: Option<f64>,
+    official_gap_to_full_profile_pre: Option<f64>,
+    task_clustered_hidden_post_minus_full_pre_gap: Option<f64>,
     bootstrap_replicates: usize,
     bootstrap_seed: u64,
     claim_ceiling: &'static str,
@@ -377,7 +378,8 @@ fn score(
     };
 
     let mut full_profile_pre_average_accuracy = None;
-    let mut hidden_post_minus_full_pre_gap = None;
+    let mut official_gap_to_full_profile_pre = None;
+    let mut task_clustered_hidden_post_minus_full_pre_gap = None;
     if let Some(full_path) = full_results_path {
         let (full_json, full_runs) = load_run_records(full_path)?;
         let mut full_by_task = BTreeMap::<String, Vec<f64>>::new();
@@ -401,7 +403,9 @@ fn score(
         }
         let full_all: Vec<f64> = full_by_task.values().flatten().copied().collect();
         if !full_all.is_empty() {
-            full_profile_pre_average_accuracy = Some(mean(&full_all));
+            let full_pre_mean = mean(&full_all);
+            full_profile_pre_average_accuracy = Some(full_pre_mean);
+            official_gap_to_full_profile_pre = Some(average_accuracy.post - full_pre_mean);
         }
 
         let mut paired_gaps = Vec::new();
@@ -412,7 +416,7 @@ fn score(
             }
         }
         if !paired_gaps.is_empty() {
-            hidden_post_minus_full_pre_gap = Some(mean(&paired_gaps));
+            task_clustered_hidden_post_minus_full_pre_gap = Some(mean(&paired_gaps));
         }
         let _ = full_json;
     }
@@ -428,7 +432,8 @@ fn score(
         task_clustered_average_accuracy,
         task_clustered_majority_accuracy,
         full_profile_pre_average_accuracy,
-        hidden_post_minus_full_pre_gap,
+        official_gap_to_full_profile_pre,
+        task_clustered_hidden_post_minus_full_pre_gap,
         bootstrap_replicates: BOOTSTRAP_REPLICATES,
         bootstrap_seed: BOOTSTRAP_SEED,
         claim_ceiling: "Scored result-file metrics only. Interpret as model performance only when result provenance, prompts, task split, provider/model revision, budget, and run validity are independently qualified.",
