@@ -426,12 +426,17 @@ impl EngineeringManager {
     }
 
     pub fn dream_cycle(&mut self) {
-        let episodes = self.episodic_memory.get_top_episodes(10);
-        for ep in episodes {
-            self.semantic_memory.store(
-                ep.input.as_slice().to_vec(),
-                1.0 - ep.psi as f32,
-                Some(format!("Consolidated Wisdom")),
+        // Use the provenance-bearing episodic API so consolidation into semantic
+        // memory does not silently sever the source-class / producer-claim lineage.
+        // The claim remains descriptive metadata only; it is not source verification
+        // or permission to act.
+        let episodes = self.episodic_memory.get_top_episodes_with_provenance(10);
+        for record in episodes {
+            self.semantic_memory.store_with_provenance(
+                record.episode.input.as_slice().to_vec(),
+                1.0 - record.episode.psi as f32,
+                Some("Consolidated Wisdom".to_owned()),
+                record.graduation_provenance.clone(),
             );
         }
     }
