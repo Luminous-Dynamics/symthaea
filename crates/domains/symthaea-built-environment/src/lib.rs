@@ -1132,6 +1132,50 @@ pub struct InvalidationReceipt {
     pub receipt_digest: String,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum NodeChangeReason {
+    Added,
+    Removed,
+    ContentChanged,
+    DependenciesChanged,
+    EvidenceReceiptChanged,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NodeRevisionChange {
+    pub node_id: String,
+    pub reasons: Vec<NodeChangeReason>,
+    pub prior_content_digest: Option<String>,
+    pub current_content_digest: Option<String>,
+    pub prior_dependencies: Vec<String>,
+    pub current_dependencies: Vec<String>,
+    pub prior_evidence_receipt_digest: Option<String>,
+    pub current_evidence_receipt_digest: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EvidenceReceiptTransition {
+    pub node_id: String,
+    pub prior_receipt_digest: Option<String>,
+    pub current_receipt_digest: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RevisionInvalidationReceipt {
+    pub graph_id: String,
+    pub prior_revision: String,
+    pub new_revision: String,
+    pub prior_graph_digest: String,
+    pub current_graph_digest: String,
+    pub changes: Vec<NodeRevisionChange>,
+    pub changed_node_ids: Vec<String>,
+    pub invalidated_node_ids: Vec<String>,
+    pub invalidated_evidence: Vec<EvidenceReceiptTransition>,
+    pub preserved_evidence: Vec<EvidenceReceiptReference>,
+    pub receipt_digest: String,
+}
+
 fn is_blake3_digest(value: &str) -> bool {
     value.len() == 64
         && value
@@ -1355,6 +1399,222 @@ pub fn verify_invalidation_receipt(
     if actual != *expected {
         return Err(vec![
             "invalidation receipt does not match the current graph/change set".to_owned(),
+        ]);
+    }
+    Ok(())
+}
+
+fn dependency_graph_digest(graph: &EvidenceDependencyGraph) -> Result<String, Vec<String>> {
+    let canonical = canonical_dependency_graph(graph);
+    let bytes = serde_json::to_vec(&canonical)
+        .map_err(|error| vec![format!("cannot serialize dependency graph: {error}")])?;
+    Ok(blake3::hash(&bytes).to_hex().to_string())
+}
+
+/// Derive changed nodes directly from two adjacent graph revisions. Changes
+/// include additions, removals, content changes, dependency rewires and
+/// evidence-receipt changes. The invalidation closure follows the union of old
+/// and new dependency edges so removed prerequisites cannot leave stale
+/// downstream evidence active.
+pub fn compute_revision_invalidation_receipt(
+    prior_graph: &EvidenceDependencyGraph,
+    current_graph: &EvidenceDependencyGraph,
+) -> Result<RevisionInvalidationReceipt, Vec<String>> {
+    let (prior_canonical, prior_dependents) = validate_dependency_graph(prior_graph)?;
+    let (current_canonical, current_dependents) = validate_dependency_graph(current_graph)?;
+    let mut errors = Vec::new();
+    if prior_canonical.graph_id != current_canonical.graph_id {
+        errors.push("graph ID cannot change across a revision diff".to_owned());
+    }
+    if prior_canonical.graph_revision.trim().is_empty()
+        || current_canonical.graph_revision.trim().is_empty()
+    {
+        errors.push("both graph revisions are required".to_owned());
+    }
+    if prior_canonical.graph_revision == current_canonical.graph_revision {
+        errors.push("current graph revision must differ from prior graph revision".to_owned());
+    }
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+
+    let prior_nodes: BTreeMap<String, &EvidenceDependencyNode> = prior_canonical
+        .nodes
+        .iter()
+        .map(|node| (node.node_id.clone(), node))
+        .collect();
+    let current_nodes: BTreeMap<String, &EvidenceDependencyNode> = current_canonical
+        .nodes
+        .iter()
+        .map(|node| (node.node_id.clone(), node))
+        .collect();
+    let all_node_ids: BTreeSet<String> = prior_nodes
+        .keys()
+        .chain(current_nodes.keys())
+        .cloned()
+        .collect();
+
+    let mut changes = Vec::new();
+    for node_id in &all_node_ids {
+        let prior = prior_nodes.get(node_id).copied();
+        let current = current_nodes.get(node_id).copied();
+        let mut reasons = Vec::new();
+        match (prior, current) {
+            (None, Some(_)) => reasons.push(NodeChangeReason::Added),
+            (Some(_), None) => reasons.push(NodeChangeReason::Removed),
+            (Some(before), Some(after)) => {
+                if before.content_digest != after.content_digest {
+                    reasons.push(NodeChangeReason::ContentChanged);
+                }
+                let before_dependencies: BTreeSet<String> =
+                    before.depends_on.iter().cloned().collect();
+                let after_dependencies: BTreeSet<String> =
+                    after.depends_on.iter().cloned().collect();
+                if before_dependencies != after_dependencies {
+                    reasons.push(NodeChangeReason::DependenciesChanged);
+                }
+                if before.evidence_receipt_digest != after.evidence_receipt_digest {
+                    reasons.push(NodeChangeReason::EvidenceReceiptChanged);
+                }
+            }
+            (None, None) => unreachable!("node ID came from the union of graph node sets"),
+        }
+
+        if !reasons.is_empty() {
+            let mut prior_dependencies = prior
+                .map(|node| node.depends_on.clone())
+                .unwrap_or_default();
+            let mut current_dependencies = current
+                .map(|node| node.depends_on.clone())
+                .unwrap_or_default();
+            prior_dependencies.sort();
+            current_dependencies.sort();
+            changes.push(NodeRevisionChange {
+                node_id: node_id.clone(),
+                reasons,
+                prior_content_digest: prior.map(|node| node.content_digest.clone()),
+                current_content_digest: current.map(|node| node.content_digest.clone()),
+                prior_dependencies,
+                current_dependencies,
+                prior_evidence_receipt_digest: prior
+                    .and_then(|node| node.evidence_receipt_digest.clone()),
+                current_evidence_receipt_digest: current
+                    .and_then(|node| node.evidence_receipt_digest.clone()),
+            });
+        }
+    }
+
+    if changes.is_empty() {
+        return Err(vec![
+            "graph revision changed without node-level content, dependency or receipt changes"
+                .to_owned(),
+        ]);
+    }
+    changes.sort_by(|left, right| left.node_id.cmp(&right.node_id));
+    let changed_node_ids: Vec<String> =
+        changes.iter().map(|change| change.node_id.clone()).collect();
+    let changed: BTreeSet<String> = changed_node_ids.iter().cloned().collect();
+
+    // A consumer may rely on an edge that exists only in the prior graph or
+    // only in the current graph. Both relationships matter for invalidation.
+    let mut union_dependents: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for node_id in prior_nodes.keys().chain(current_nodes.keys()) {
+        union_dependents.entry(node_id.clone()).or_default();
+    }
+    for dependent_map in [&prior_dependents, &current_dependents] {
+        for (source, children) in dependent_map {
+            union_dependents
+                .entry(source.clone())
+                .or_default()
+                .extend(children.iter().cloned());
+        }
+    }
+
+    let mut invalidated = changed.clone();
+    let mut frontier = changed.clone();
+    while let Some(node_id) = frontier.pop_first() {
+        if let Some(children) = union_dependents.get(&node_id) {
+            for child in children {
+                if invalidated.insert(child.clone()) {
+                    frontier.insert(child.clone());
+                }
+            }
+        }
+    }
+
+    let mut invalidated_evidence = Vec::new();
+    for node_id in &invalidated {
+        let prior_receipt_digest = prior_nodes
+            .get(node_id)
+            .and_then(|node| node.evidence_receipt_digest.clone());
+        let current_receipt_digest = current_nodes
+            .get(node_id)
+            .and_then(|node| node.evidence_receipt_digest.clone());
+        if prior_receipt_digest.is_some() || current_receipt_digest.is_some() {
+            invalidated_evidence.push(EvidenceReceiptTransition {
+                node_id: node_id.clone(),
+                prior_receipt_digest,
+                current_receipt_digest,
+            });
+        }
+    }
+    invalidated_evidence.sort_by(|left, right| left.node_id.cmp(&right.node_id));
+
+    let mut preserved_evidence = Vec::new();
+    for (node_id, current) in &current_nodes {
+        if !invalidated.contains(node_id) {
+            if let Some(receipt_digest) = &current.evidence_receipt_digest {
+                preserved_evidence.push(EvidenceReceiptReference {
+                    node_id: node_id.clone(),
+                    receipt_digest: receipt_digest.clone(),
+                });
+            }
+        }
+    }
+    preserved_evidence.sort_by(|left, right| left.node_id.cmp(&right.node_id));
+
+    let prior_graph_digest = dependency_graph_digest(&prior_canonical)?;
+    let current_graph_digest = dependency_graph_digest(&current_canonical)?;
+    let mut receipt = RevisionInvalidationReceipt {
+        graph_id: current_canonical.graph_id.clone(),
+        prior_revision: prior_canonical.graph_revision.clone(),
+        new_revision: current_canonical.graph_revision.clone(),
+        prior_graph_digest,
+        current_graph_digest,
+        changes,
+        changed_node_ids,
+        invalidated_node_ids: invalidated.into_iter().collect(),
+        invalidated_evidence,
+        preserved_evidence,
+        receipt_digest: String::new(),
+    };
+    let payload = serde_json::to_vec(&(
+        &receipt.graph_id,
+        &receipt.prior_revision,
+        &receipt.new_revision,
+        &receipt.prior_graph_digest,
+        &receipt.current_graph_digest,
+        &receipt.changes,
+        &receipt.changed_node_ids,
+        &receipt.invalidated_node_ids,
+        &receipt.invalidated_evidence,
+        &receipt.preserved_evidence,
+    ))
+    .map_err(|error| vec![format!("cannot serialize revision invalidation receipt: {error}")])?;
+    receipt.receipt_digest = blake3::hash(&payload).to_hex().to_string();
+    Ok(receipt)
+}
+
+pub fn verify_revision_invalidation_receipt(
+    prior_graph: &EvidenceDependencyGraph,
+    current_graph: &EvidenceDependencyGraph,
+    expected: &RevisionInvalidationReceipt,
+) -> Result<(), Vec<String>> {
+    let actual = compute_revision_invalidation_receipt(prior_graph, current_graph)?;
+    if actual != *expected {
+        return Err(vec![
+            "revision invalidation receipt differs from the two supplied graph revisions"
+                .to_owned(),
         ]);
     }
     Ok(())
@@ -1678,6 +1938,90 @@ mod tests {
         let mut drifted = graph;
         drifted.nodes[1].content_digest = blake3::hash(b"style-b").to_hex().to_string();
         assert!(verify_invalidation_receipt(&drifted, &first, &changed).is_err());
+    }
+
+    #[test]
+    fn revision_diff_derives_changed_nodes_and_uses_union_of_edges() {
+        let prior = sample_dependency_graph();
+        let mut current = prior.clone();
+        current.graph_revision = "REV-B".to_owned();
+        let style = current.nodes.iter_mut()
+            .find(|node| node.node_id == "style-intent").unwrap();
+        style.content_digest = blake3::hash(b"style-b").to_hex().to_string();
+
+        let receipt = compute_revision_invalidation_receipt(&prior, &current).unwrap();
+        assert_eq!(receipt.changed_node_ids, vec!["style-intent".to_owned()]);
+        assert_eq!(
+            receipt.invalidated_node_ids,
+            vec![
+                "energy-evaluation".to_owned(),
+                "geometry".to_owned(),
+                "style-intent".to_owned()
+            ]
+        );
+        assert_eq!(
+            receipt.preserved_evidence.iter().map(|item| item.node_id.as_str()).collect::<Vec<_>>(),
+            vec!["typology-intent", "water-evaluation", "water-policy"]
+        );
+        verify_revision_invalidation_receipt(&prior, &current, &receipt).unwrap();
+    }
+
+    #[test]
+    fn revision_diff_detects_added_removed_rewired_and_receipt_changed_nodes() {
+        let prior = sample_dependency_graph();
+        let mut current = prior.clone();
+        current.graph_revision = "REV-B".to_owned();
+        current.nodes.push(EvidenceDependencyNode {
+            node_id: "material-spec".to_owned(),
+            content_digest: blake3::hash(b"material-v1").to_hex().to_string(),
+            depends_on: vec!["resident-brief".to_owned()],
+            evidence_receipt_digest: Some(blake3::hash(b"material-receipt").to_hex().to_string()),
+        });
+        let geometry = current.nodes.iter_mut()
+            .find(|node| node.node_id == "geometry").unwrap();
+        geometry.depends_on.push("material-spec".to_owned());
+
+        let water = current.nodes.iter_mut()
+            .find(|node| node.node_id == "water-policy").unwrap();
+        water.evidence_receipt_digest =
+            Some(blake3::hash(b"water-policy-receipt-v2").to_hex().to_string());
+
+        let receipt = compute_revision_invalidation_receipt(&prior, &current).unwrap();
+        assert_eq!(
+            receipt.changed_node_ids,
+            vec![
+                "geometry".to_owned(),
+                "material-spec".to_owned(),
+                "water-policy".to_owned()
+            ]
+        );
+        assert!(receipt.invalidated_node_ids.contains(&"energy-evaluation".to_owned()));
+        assert!(receipt.invalidated_node_ids.contains(&"water-evaluation".to_owned()));
+        assert!(receipt.invalidated_node_ids.contains(&"material-spec".to_owned()));
+
+        let mut removed = current.clone();
+        removed.graph_revision = "REV-C".to_owned();
+        removed.nodes.retain(|node| node.node_id != "material-spec");
+        let geometry = removed.nodes.iter_mut()
+            .find(|node| node.node_id == "geometry").unwrap();
+        geometry.depends_on.retain(|dependency| dependency != "material-spec");
+        let removed_receipt = compute_revision_invalidation_receipt(&current, &removed).unwrap();
+        assert!(removed_receipt.changed_node_ids.contains(&"material-spec".to_owned()));
+        assert!(removed_receipt.invalidated_node_ids.contains(&"geometry".to_owned()));
+        assert!(removed_receipt.invalidated_node_ids.contains(&"energy-evaluation".to_owned()));
+    }
+
+    #[test]
+    fn revision_diff_rejects_noop_revision_and_wrong_graph_identity() {
+        let prior = sample_dependency_graph();
+        let mut noop = prior.clone();
+        noop.graph_revision = "REV-B".to_owned();
+        assert!(compute_revision_invalidation_receipt(&prior, &noop).is_err());
+
+        let mut wrong_identity = prior.clone();
+        wrong_identity.graph_revision = "REV-B".to_owned();
+        wrong_identity.graph_id = "DIFFERENT-GRAPH".to_owned();
+        assert!(compute_revision_invalidation_receipt(&prior, &wrong_identity).is_err());
     }
 
     #[test]
