@@ -783,6 +783,82 @@ fn simulate(
     }))
 }
 
+fn ensemble_summary(values: &[f64]) -> Value {
+    let average = values.iter().sum::<f64>() / values.len() as f64;
+    let deviation = sample_standard_deviation(values);
+    let standard_error = deviation.map(|value| value / (values.len() as f64).sqrt());
+    json!({
+        "mean_across_independent_seeds": average,
+        "between_seed_sample_standard_deviation": deviation,
+        "between_seed_standard_error": standard_error,
+        "chain_count": values.len(),
+        "warning": "Between-seed dispersion does not correct within-chain autocorrelation or inadequate equilibration."
+    })
+}
+
+fn simulate_replicates(
+    model: &QxyModel,
+    warmup_sweeps: usize,
+    measurement_sweeps: usize,
+    base_seed: u64,
+    replicate_count: usize,
+) -> Result<Value, String> {
+    if replicate_count == 0 {
+        return Err("replicate_count must be at least one".to_owned());
+    }
+    let mut receipts = Vec::with_capacity(replicate_count);
+    for replicate in 0..replicate_count {
+        let seed = base_seed
+            .checked_add(replicate as u64)
+            .ok_or_else(|| "replicate seed range overflowed u64".to_owned())?;
+        receipts.push(simulate(
+            model,
+            warmup_sweeps,
+            measurement_sweeps,
+            seed,
+        )?);
+    }
+    if replicate_count == 1 {
+        return Ok(receipts.remove(0));
+    }
+
+    let numeric_values = |field: &str| -> Result<Vec<f64>, String> {
+        receipts
+            .iter()
+            .map(|receipt| {
+                receipt
+                    .get(field)
+                    .and_then(Value::as_f64)
+                    .ok_or_else(|| format!("replicate receipt missing numeric field {field}"))
+            })
+            .collect()
+    };
+
+    let action = numeric_values("mean_action_per_spacetime_site")?;
+    let stiffness = numeric_values("mean_finite_size_stiffness_source_normalization")?;
+    let vortices = numeric_values("mean_total_vortex_density")?;
+
+    Ok(json!({
+        "status": "pass",
+        "contract": "SC-QXY-INDEPENDENT-SEED-ENSEMBLE-0.1",
+        "source_model_id": "ponticelli-2026-qxy-2d-square-lattice-phase-representation",
+        "instance_id": model.instance_id,
+        "schema_sha256": model.schema_sha256,
+        "fixture_sha256": model.fixture_sha256,
+        "base_seed": base_seed,
+        "replicate_count": replicate_count,
+        "warmup_sweeps_per_chain": warmup_sweeps,
+        "measurement_sweeps_per_chain": measurement_sweeps,
+        "between_chain_summary": {
+            "action_per_spacetime_site": ensemble_summary(&action),
+            "finite_size_stiffness": ensemble_summary(&stiffness),
+            "total_vortex_density": ensemble_summary(&vortices)
+        },
+        "per_chain_receipts": receipts,
+        "claim_ceiling": "Independent-seed software ensemble only; between-seed dispersion is not an uncertainty-qualified thermodynamic result, source reproduction, or material observation."
+    }))
+}
+
 fn usage(program: &str) {
     eprintln!(
         "Usage: {program} --schema <schema.json> --fixture <source-qxy-instance.json> [--warmup-sweeps <n>] [--measurement-sweeps <n>] [--seed <n>] [--out <receipt.json>]"
@@ -804,12 +880,13 @@ fn main() {
     let mut warmup_sweeps = 2_usize;
     let mut measurement_sweeps = 3_usize;
     let mut seed = None;
+    let mut replicates = 1_usize;
     let mut index = 1;
 
     while index < args.len() {
         match args[index].as_str() {
             "--schema" | "--fixture" | "--out" | "--warmup-sweeps"
-            | "--measurement-sweeps" | "--seed" => {
+            | "--measurement-sweeps" | "--seed" | "--replicates" => {
                 if index + 1 >= args.len() {
                     usage(&args[0]);
                     process::exit(2);
@@ -836,6 +913,12 @@ fn main() {
                             eprintln!("seed must be unsigned integer");
                             process::exit(2);
                         }))
+                    }
+                    "--replicates" => {
+                        replicates = value.parse().unwrap_or_else(|_| {
+                            eprintln!("replicates must be an integer");
+                            process::exit(2);
+                        })
                     }
                     _ => unreachable!(),
                 }
@@ -864,8 +947,14 @@ fn main() {
         process::exit(1);
     });
     let run_seed = seed.unwrap_or(model.random_seed);
-    let receipt =
-        simulate(&model, warmup_sweeps, measurement_sweeps, run_seed).unwrap_or_else(|error| {
+    let receipt = simulate_replicates(
+        &model,
+        warmup_sweeps,
+        measurement_sweeps,
+        run_seed,
+        replicates,
+    )
+    .unwrap_or_else(|error| {
         eprintln!("SC-QXY-PIMC-FAIL: {error}");
         process::exit(1);
     });
@@ -1005,6 +1094,24 @@ mod tests {
         assert!(tau >= 0.5);
         let summary = sampling_summary(&values);
         assert!(summary["effective_sample_size_initial_positive_sequence"].as_f64().unwrap() <= 10.0);
+    }
+
+    #[test]
+    fn independent_seed_ensemble_is_reproducible() {
+        let (schema, fixture) = inputs();
+        let model = QxyModel::from_bytes(&schema, &fixture).unwrap();
+        let first = simulate_replicates(&model, 1, 2, 200, 3).unwrap();
+        let second = simulate_replicates(&model, 1, 2, 200, 3).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(first["replicate_count"], 3);
+        assert_eq!(first["per_chain_receipts"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn zero_replicate_ensemble_is_rejected() {
+        let (schema, fixture) = inputs();
+        let model = QxyModel::from_bytes(&schema, &fixture).unwrap();
+        assert!(simulate_replicates(&model, 1, 2, 10, 0).is_err());
     }
 
     #[test]
