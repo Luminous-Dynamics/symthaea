@@ -124,17 +124,26 @@ fn validate_input(input: &SelectorInput) -> Result<(), String> {
     Ok(())
 }
 
+fn scaled_penalty(value: u128, weight: u128) -> i64 {
+    (value.saturating_mul(weight) / 1_000).min(i64::MAX as u128) as i64
+}
+
 fn penalty(estimate: &Estimate, policy: &Policy) -> i64 {
-    let token_penalty = (estimate.token_cost as u128
-        * policy.token_penalty_milli_per_1000 as u128
-        / 1_000) as i64;
-    let latency_penalty = (estimate.latency_ms as u128
-        * policy.latency_penalty_milli_per_second as u128
-        / 1_000) as i64;
-    let risk_penalty = (estimate.risk_milli as u128
-        * policy.risk_penalty_milli_per_1000 as u128
-        / 1_000) as i64;
-    token_penalty + latency_penalty + risk_penalty
+    let token_penalty = scaled_penalty(
+        estimate.token_cost as u128,
+        policy.token_penalty_milli_per_1000 as u128,
+    );
+    let latency_penalty = scaled_penalty(
+        estimate.latency_ms as u128,
+        policy.latency_penalty_milli_per_second as u128,
+    );
+    let risk_penalty = scaled_penalty(
+        estimate.risk_milli as u128,
+        policy.risk_penalty_milli_per_1000 as u128,
+    );
+    token_penalty
+        .saturating_add(latency_penalty)
+        .saturating_add(risk_penalty)
 }
 
 fn utility_lower(estimate: &Estimate, policy: &Policy) -> i64 {
