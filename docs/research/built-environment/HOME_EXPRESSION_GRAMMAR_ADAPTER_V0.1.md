@@ -41,7 +41,7 @@ Resident grammar → identity/provenance validation → semantic compilation →
 
 HOME_EXPRESSION_DESIGN_PROBLEM_V0.1.schema.json defines source bindings, grammar input, authority classes, mapping state and generation permissions. HOME_EXPRESSION_DESIGN_PROBLEM_SYNTHETIC_V0.1.json demonstrates a problem with no owner-reviewed mappings and geometry generation blocked.
 
-HOME_EXPRESSION_CANDIDATE_SET_V0.1.schema.json defines lineage, generator identity, candidate provenance and claim ceilings. HOME_EXPRESSION_CANDIDATE_SET_SYNTHETIC_V0.1.json contains three illustrative search directions explicitly marked NOT_EXECUTED / NOT_GENERATED. They are not generated candidates and have no geometry or physical result.
+HOME_EXPRESSION_CANDIDATE_SET_V0.1.schema.json defines lineage, generator identity, candidate provenance and claim ceilings. Its illustrative validator also checks every candidate source-intent entry against the parent five-axis resident input, and requires an exact list of axes that remain UNDECIDED or CONFLICT_UNRESOLVED. A candidate cannot introduce a preferred courtyard when the resident left spatial typology undecided, or silently change PREFERRED to CONSIDERED. HOME_EXPRESSION_CANDIDATE_SET_SYNTHETIC_V0.1.json contains three illustrative search directions explicitly marked NOT_EXECUTED / NOT_GENERATED. They are not generated candidates and have no geometry or physical result.
 
 ## 4.1 Resident preference graph input
 
