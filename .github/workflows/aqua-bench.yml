@@ -27,6 +27,7 @@ on:
       - ".github/scripts/check-aqua-evidence-corpus.py"
       - "docs/research/aqua-evidence-corpus-v0.1.schema.json"
       - "docs/research/aqua-evidence-corpus-v0.1.json"
+      - "docs/research/AQUA_EVIDENCE_CORPUS_V0_1.md"
       - "docs/AQUA_*.md"
   workflow_dispatch:
 
