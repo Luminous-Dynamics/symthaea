@@ -5,7 +5,6 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "research/chaos-reference-suite/**"
-      - ".github/workflows/chaos-reference-suite.yml"
   push:
     branches:
       - "research/chaos-reference-suite-v0"
