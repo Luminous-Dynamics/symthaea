@@ -40,6 +40,7 @@ struct Measurement {
     action_per_spacetime_site: f64,
     stiffness: f64,
     vortex_density: f64,
+    current_correlation: Vec<f64>,
 }
 
 impl QxyModel {
@@ -552,6 +553,22 @@ fn measure(model: &QxyModel, phases: &[f64]) -> Measurement {
         spatial_sine += delta.sin();
     }
 
+    let l = model.lattice_linear_size;
+    let bonds_per_time_slice = 2 * l * l;
+    let mut current_by_imaginary_time = vec![0.0; model.imaginary_time_slices];
+    for (tau, slice_current) in current_by_imaginary_time.iter_mut().enumerate() {
+        let start = tau * bonds_per_time_slice;
+        let end = start + bonds_per_time_slice;
+        for (source, target) in &model.spatial_bonds[start..end] {
+            *slice_current += model.t * (phases[*source] - phases[*target]).sin();
+        }
+    }
+    let current_at_zero = current_by_imaginary_time[0];
+    let current_correlation: Vec<f64> = current_by_imaginary_time
+        .iter()
+        .map(|current| current_at_zero * current)
+        .collect();
+
     let mut spatial_action = 0.0;
     let mut total_action = 0.0;
     for (source, target) in &model.spatial_bonds {
@@ -569,7 +586,6 @@ fn measure(model: &QxyModel, phases: &[f64]) -> Measurement {
     let stiffness = (s_s - model.beta * current * current)
         / (2.0 * model.t * (model.lattice_linear_size.pow(2) as f64));
 
-    let l = model.lattice_linear_size;
     let mut total_vorticity = 0.0;
     for tau in 0..model.imaginary_time_slices {
         let base = tau * l * l;
@@ -594,6 +610,7 @@ fn measure(model: &QxyModel, phases: &[f64]) -> Measurement {
         action_per_spacetime_site: total_action / model.node_count as f64,
         stiffness,
         vortex_density,
+        current_correlation,
     }
 }
 
@@ -715,6 +732,9 @@ fn simulate(
     let mut action_values = Vec::with_capacity(measurement_sweeps);
     let mut stiffness_values = Vec::with_capacity(measurement_sweeps);
     let mut vortex_values = Vec::with_capacity(measurement_sweeps);
+    let mut current_correlation_samples: Vec<Vec<f64>> = (0..model.imaginary_time_slices)
+        .map(|_| Vec::with_capacity(measurement_sweeps))
+        .collect();
     for _ in 0..measurement_sweeps {
         let (clusters, cluster_sites, accepted, proposed) =
             sweep(model, &mut phases, &mut rng);
@@ -726,7 +746,22 @@ fn simulate(
         action_values.push(measured.action_per_spacetime_site);
         stiffness_values.push(measured.stiffness);
         vortex_values.push(measured.vortex_density);
+        for (tau_index, current_product) in measured.current_correlation.iter().enumerate() {
+            current_correlation_samples[tau_index].push(*current_product);
+        }
     }
+
+    let current_correlation_function: Vec<Value> = current_correlation_samples
+        .iter()
+        .enumerate()
+        .map(|(tau_index, samples)| {
+            json!({
+                "imaginary_time_index": tau_index,
+                "imaginary_time": tau_index as f64 * model.delta_tau,
+                "sampling": sampling_summary(samples)
+            })
+        })
+        .collect();
 
     let mean = |values: &[f64]| values.iter().sum::<f64>() / values.len() as f64;
     let mean_action = mean(&action_values);
@@ -773,6 +808,9 @@ fn simulate(
         "mean_action_per_spacetime_site": mean_action,
         "mean_finite_size_stiffness_source_normalization": mean_stiffness,
         "mean_total_vortex_density": mean_vortex_density,
+        "current_correlation_function_F_tau": current_correlation_function,
+        "current_correlation_definition": "F(tau)=<I(tau) I(0)>; I(tau)=t*sum_positive_spatial_bonds sin(phi_i(tau)-phi_j(tau))",
+        "current_correlation_sampling_note": "Fixed imaginary-time origin; correlator is averaged over independent QMC measurement configurations, not averaged over the imaginary-time origin.",
         "sampling_diagnostics": {
             "action_per_spacetime_site": sampling_summary(&action_values),
             "finite_size_stiffness": sampling_summary(&stiffness_values),
@@ -1039,6 +1077,8 @@ mod tests {
         let measured = measure(&model, &phases);
         assert!((measured.stiffness - 1.0).abs() < 1.0e-10);
         assert!(measured.vortex_density.abs() < 1.0e-12);
+        assert_eq!(measured.current_correlation.len(), model.imaginary_time_slices);
+        assert!(measured.current_correlation.iter().all(|value| value.abs() < 1.0e-12));
         let expected_action = -(2.0 * model.k_spatial + model.k_imaginary_time);
         assert!(
             (measured.action_per_spacetime_site - expected_action).abs() < 1.0e-10
