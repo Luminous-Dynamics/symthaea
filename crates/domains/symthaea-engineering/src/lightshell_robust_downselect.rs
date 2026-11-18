@@ -1130,9 +1130,17 @@ mod tests {
     #[test]
     fn bounded_hard_gate_requires_a_complete_interval() {
         let mut manifest = base_manifest();
+        manifest["requirements"][0]["metric_id"] = json!("temperature_delta_c");
+        manifest["requirements"][0]["unit"] = json!("degC");
         manifest["requirements"][0]["direction"] = json!("within_declared_band");
-        manifest["requirements"][0]["lower_limit"] = json!(50.0);
-        manifest["requirements"][0]["upper_limit"] = json!(80.0);
+        manifest["requirements"][0]["lower_limit"] = json!(2.0);
+        manifest["requirements"][0]["upper_limit"] = json!(6.0);
+        for candidate in manifest["candidates"].as_array_mut().unwrap() {
+            candidate["properties"][0]["metric_id"] = json!("temperature_delta_c");
+            candidate["properties"][0]["unit"] = json!("degC");
+            candidate["properties"][0]["lower_bound"] = json!(3.0);
+            candidate["properties"][0]["upper_bound"] = json!(4.0);
+        }
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.is_valid(), "{:?}", report.findings);
     }
