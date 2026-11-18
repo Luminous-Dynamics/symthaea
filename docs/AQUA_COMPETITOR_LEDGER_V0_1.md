@@ -1,7 +1,7 @@
 # Luminous Aqua — Competitor and Evidence Ledger v0.1
 
 **Status:** research baseline; not a certification, product specification, or claim of superiority  
-**Snapshot date:** 2026-11-17  
+**Snapshot date:** 2026-11-18  
 **Parent work:** [AQUA-BATHING-SERVICE-001 #12660](https://github.com/Luminous-Dynamics/symthaea/issues/12660)  
 **Purpose:** freeze current comparators, system boundaries, and falsifiable design targets before optimizing fixtures.
 
@@ -31,7 +31,7 @@ A feature-mode percentage is not a whole-service resource result. A sensor estim
 | Orbital Shower | Manufacturer says a long shower can use about 20 L | A second commercial recirculating-shower comparator | The public claim is not normalized here for exact duration, user task, startup, cleaning, purge or service life |
 | Shower drain-water heat recovery | 14-month in-situ study: 66% overall exchanger efficiency after fouling/unsteady effects; 52% overall system efficiency after showerhead-to-drain heat loss; fouling reduced nominal efficiency by 8% | A field-informed comparator for long-term, whole-system thermal recovery | Not a universal device efficiency; result depends on exchanger, geometry, water profile, fouling and installation |
 | CLASP South African sample / WRC 2025 synthesis | Pressure-compensating models averaged ~6.6 L/min at 300 kPa; fixed-orifice models ~24–27 L/min | A locally relevant market benchmark from a 19-product sample and later WRC summary | Not a 2026 exhaustive market census or an exact named-SKU result |
-| Hansgrohe Activera Select S 95 2jet EcoSmart, SKU 28087000 | Official SA datasheet: Rain 7.2 L/min and ImpactRain 6.5 L/min at 3 bar; 8 L/min regulator, 0.5 bar minimum flow pressure, FlexPower nozzle adjustment, SafetyStop at 40°C | Exact local-market pressure/flow/spray/temperature-control comparator | Manufacturer datasheet, not independent matched test; this exact SKU supersedes a loose family-level EcoSmart claim for the first physical comparator set |
+| Hansgrohe Activera Select S 95 2jet EcoSmart, SKU 28087000 | Official SA datasheet: Rain 7.2 L/min and ImpactRain 6.5 L/min at 3 bar; 8 L/min regulator, 0.5 bar minimum flow pressure, FlexPower nozzle adjustment, SafetyStop at 40°C | Exact local-market pressure/flow/spray/temperature-control comparator | Manufacturer datasheet, not independent matched test; retain as a wide-flow / low-minimum-pressure control |\n| Hansgrohe Raindance Select E 120 3jet PowderRain EcoSmart+, SKU 28729000 | Official SA datasheet: PowderRain 5.2 L/min, Rain 5.4 L/min and massage 5.2 L/min at 3 bar; maximum 6 L/min; minimum flow pressure 1.5 bar | Strong exact-SKU premium low-flow local comparator | Manufacturer datasheet, not independent matched test; reproduce each mode at matched pressures |\n| Brondell Nebia Corre, N400RO model family | Manufacturer sheet: 1.5 gpm (5.7 L/min) in three modes and 1.2 gpm (4.5 L/min) in Super Saver | Exact lower-flow commercial mode comparator | Manufacturer specification; pressure point and matched spray-field performance are not established by the sheet |
 | Consumer Reports 2026 test population | Publicly listed top-performing examples include 1.5–1.6 gpm (5.68–6.06 L/min) heads; tests include coverage, force, water use and temperature drop | Global independent consumer-lab comparator | Exact model/market variant and test protocol must be reproduced before head-to-head claims |
 
 ### Sources and evidence class
@@ -56,7 +56,7 @@ A feature-mode percentage is not a whole-service resource result. A sensor estim
 
 The CLASP report recommended that South Africa establish a showerhead SANS aligned with international performance methods; it proposed assessing flow at 150 and 300 kPa, with a maximum of 10 L/min at 300 kPa, and identified 4.5–6 L/min as a candidate highest-efficiency band for future WELS. WRC's 2025 reporting describes the national Water Efficiency Labelling Scheme as under development following stakeholder consultation in May 2025. These are programme proposals and development status, not proof of a published mandatory showerhead label or binding local flow limit as of this snapshot. Verify the current SABS catalogue and DWS/WELS publications before any compliance claim.
 
-The 2026 Consumer Reports results provide another useful performance comparator: shower coverage, force, flow, temperature drop and usability are assessed together. The highest-value research question for Aqua is therefore whether an integrated product can retain equivalent or better task outcome and coverage at 4.5 L/min, not whether it can merely meet a 6 L/min nameplate.
+The 2026 Consumer Reports results provide another useful performance comparator: shower coverage, force, flow, temperature drop and usability are assessed together. The highest-value research question for Aqua is whether an integrated product can retain equivalent or better task outcome, force distribution, coverage, temperature stability and post-fouling recovery at 4.5–5.5 L/min across a declared operating envelope. Brondell already specifies a 4.5 L/min mode; Aqua must compete on matched performance, robustness and all-in service rather than claim novelty from that flow number.
 
 ## 4. Reproducible arithmetic for the initial comparator
 
@@ -96,7 +96,7 @@ These are hypotheses to test, not achieved results or frozen engineering require
 
 The 18 L target intentionally sits below both the arithmetic KOHLER example including its stated Rapid Clean water (21.8 L) and the public Orbital long-shower claim (~20 L). This is only a target-setting comparison: a superiority claim requires equal test duration, use profile and full system boundary for each incumbent.
 
-The 6.0 L/min direct-flow target is 21% below the WaterSense 7.6 L/min maximum, but this alone is not a global SOTA claim: independent 2026 consumer testing lists showerheads at 1.5–1.6 gpm (5.68–6.06 L/min), and Hansgrohe advertises ≤6 L/min on some EcoSmart+ models. The 4.5 L/min stretch target is intended to move beyond those visible benchmarks while preserving pressure robustness and task quality; it must be validated rather than assumed.
+The 6.0 L/min direct-flow target is 21% below the WaterSense 7.6 L/min maximum, but this alone is not a global SOTA claim: independent 2026 consumer testing lists showerheads at 1.5–1.6 gpm (5.68–6.06 L/min), and Hansgrohe advertises ≤6 L/min on some EcoSmart+ models. The 4.5 L/min stretch point is already present in a commercial manufacturer specification. It is an aggressive test point, not a novelty claim. Aqua's differentiator must be demonstrably better task-region coverage, standard force/coverage endpoints, low-pressure behavior, temperature stability, scale tolerance, cleaning recovery and lifecycle burden under matched conditions.
 
 The 60% heat-recovery target is a stretch above the cited 52% in-situ system result. It is not a permissible design assumption. Test long-term fouling, service interval and parasitic losses before evaluating it.
 
@@ -229,3 +229,18 @@ Primary sources:
 3. **Make low-pressure operation a first-class differentiator.** Orbital's published 2 bar minimum system inlet pressure is materially above some household supply conditions. Verify on the exact regional installation; do not extrapolate from nominal pressure ratings.
 4. **Count system dependencies.** Recirculating products must be compared with electrical continuity, standby power, source pressure/flow, warm service-space requirements, consumables, cleaning, maintenance, downtime and service response—not only shower-session make-up water.
 5. **Measure serviceability rather than assuming simplicity.** A direct-flow design still needs scale-resistant nozzles, accessible strainers, reliable thermostatic mixing, backflow protection, safe temperatures and a proven cleaning/service path. Fewer parts are not automatically safer or easier to maintain.
+
+
+## 6. Comparator update — 2026-11-18
+
+The low-flow landscape has been expanded with two exact commercial references:
+
+- **Brondell Nebia Corre, model family N400RO:** manufacturer specification sheet lists 1.5 gpm in three modes and 1.2 gpm (approximately 4.5 L/min) in Super Saver mode. The published sheet does not establish matched Aqua bather-plane coverage/force at 300 kPa; this is a manufacturer-declared comparator, not an independent test. Source: https://www.brondell.com/content/Nebia_Corre_Fixed_Showerhead_Spec_Sheet_web_010623.pdf
+- **Hansgrohe Raindance Select E 120 3jet PowderRain EcoSmart+, SKU 28729000:** South African professional datasheet lists PowderRain 5.2 L/min, Rain 5.4 L/min and massage 5.2 L/min at 3 bar, maximum 6 L/min, and minimum flow pressure 1.5 bar. Source: https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28729000
+- **Consumer Reports 2026 ratings:** publicly listed independently measured examples include 1.4–1.6 gpm (approximately 5.3–6.1 L/min); exact model/mode and method must be frozen before a head-to-head replication. Sources: https://www.consumerreports.org/home-garden/showerheads/best-showerheads-of-the-year-a7580523069/ and https://www.consumerreports.org/home-garden/showerheads/c33121/
+
+### Revised spray-field research claim
+
+Aqua does not claim to invent the 4.5 L/min shower mode. The research challenge is to outperform the best matched incumbent on a multi-dimensional, preregistered result: pressure envelope, standardized spray-force and coverage, supplementary task-region deposition map, bather-plane temperature, scale/partial-blockage behavior, cleanability and whole-service resource burden.
+
+The supplementary spatial-map method and deterministic analysis helper are in [AQUA_SPRAY_FIELD_METROLOGY_PROTOCOL_V0_1.md](AQUA_SPRAY_FIELD_METROLOGY_PROTOCOL_V0_1.md). The new service continuity benchmark is [AQUA_ESSENTIAL_SERVICE_CONTINUITY_PROTOCOL_V0_1.md](AQUA_ESSENTIAL_SERVICE_CONTINUITY_PROTOCOL_V0_1.md).
