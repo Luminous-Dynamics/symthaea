@@ -49,12 +49,24 @@ pub struct VerifiedLineage {
     pub receipt_digest: String,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AuthorityStatus {
+    ReceiptAttested,
+    PendingReconciliation,
+    LegacyUnattested,
+    UnsafeUnattested,
+    Unknown,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerifiedRawEvent {
     pub event_id: u32,
     pub session_id: String,
     pub task_id: String,
     pub payload_sha256: String,
+    pub canonical_event_hash: String,
+    pub authority_status: AuthorityStatus,
+    pub authority_receipt_digest: String,
     pub valid_from_ms: i64,
     pub valid_until_ms: Option<i64>,
     pub recorded_at_ms: i64,
@@ -140,6 +152,8 @@ pub trait EvidenceVerifier {
 pub struct EvidenceReceiptBundle {
     pub raw_event_digest: String,
     pub raw_event_receipt_digest: String,
+    pub canonical_event_hash: String,
+    pub authority_receipt_digest: String,
     pub lineage_digest: String,
     pub calibration_digest: String,
     pub measurement_unit: String,
@@ -162,6 +176,7 @@ pub enum IngestReject {
     InvalidPayloadDigest,
     UnverifiedRawEvent,
     RawEventReceiptMismatch,
+    AuthorityNotAttested,
     RetractionStatusUnknown,
     NotValidAtRequestedTime,
     RecordedAfterKnownAt,
@@ -202,12 +217,21 @@ pub fn ingest_as_known(
         || event.session_id != raw.session_id
         || event.task_id != raw.task_id
         || event.payload_sha256 != raw.payload_sha256
+        || event.canonical_event_hash.len() != 64
+        || !event
+            .canonical_event_hash
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+        || event.authority_receipt_digest.is_empty()
         || event.valid_from_ms != raw.valid_from_ms
         || event.valid_until_ms != raw.valid_until_ms
         || event.recorded_at_ms != raw.recorded_at_ms
         || event.receipt_digest.is_empty()
     {
         return Err(IngestReject::RawEventReceiptMismatch);
+    }
+    if event.authority_status != AuthorityStatus::ReceiptAttested {
+        return Err(IngestReject::AuthorityNotAttested);
     }
     if event.valid_until_ms.is_some_and(|end| end <= event.valid_from_ms) {
         return Err(IngestReject::MalformedValidInterval);
@@ -332,6 +356,8 @@ pub fn ingest_as_known(
         receipts: EvidenceReceiptBundle {
             raw_event_digest: event.payload_sha256,
             raw_event_receipt_digest: event.receipt_digest,
+            canonical_event_hash: event.canonical_event_hash,
+            authority_receipt_digest: event.authority_receipt_digest,
             lineage_digest: lineage.receipt_digest,
             calibration_digest: measurement.calibration_digest,
             measurement_unit: measurement.unit,
@@ -406,6 +432,7 @@ mod tests {
         calibration_valid: bool,
         raw_event_valid: bool,
         raw_event_mismatch: bool,
+        authority_status: AuthorityStatus,
         retraction_status_known: bool,
     }
 
@@ -423,6 +450,7 @@ mod tests {
                 calibration_valid: true,
                 raw_event_valid: true,
                 raw_event_mismatch: false,
+                authority_status: AuthorityStatus::ReceiptAttested,
                 retraction_status_known: true,
             }
         }
@@ -447,6 +475,9 @@ mod tests {
                 } else {
                     raw.payload_sha256.clone()
                 },
+                canonical_event_hash: "c".repeat(64),
+                authority_status: self.authority_status,
+                authority_receipt_digest: "authority-receipt-digest".into(),
                 valid_from_ms: raw.valid_from_ms,
                 valid_until_ms: raw.valid_until_ms,
                 recorded_at_ms: raw.recorded_at_ms,
@@ -564,6 +595,31 @@ mod tests {
     }
 
     #[test]
+    fn only_receipt_attested_authority_status_is_admissible() {
+        for status in [
+            AuthorityStatus::PendingReconciliation,
+            AuthorityStatus::LegacyUnattested,
+            AuthorityStatus::UnsafeUnattested,
+            AuthorityStatus::Unknown,
+        ] {
+            let verifier = TestVerifier {
+                authority_status: status,
+                ..TestVerifier::default()
+            };
+            assert!(matches!(
+                ingest_as_known(&raw(), query(180, 250), &verifier),
+                Err(IngestReject::AuthorityNotAttested)
+            ));
+        }
+        assert!(ingest_as_known(
+            &raw(),
+            query(180, 250),
+            &TestVerifier::default()
+        )
+        .is_ok());
+    }
+
+    #[test]
     fn missing_or_mismatched_raw_event_receipt_is_rejected() {
         let missing = TestVerifier {
             raw_event_valid: false,
@@ -659,6 +715,11 @@ mod tests {
         assert_eq!(admitted.as_known, query(180, 250));
         assert_eq!(admitted.receipts.lineage_digest, "lineage-digest");
         assert_eq!(admitted.receipts.raw_event_digest, raw().payload_sha256);
+        assert_eq!(admitted.receipts.canonical_event_hash, "c".repeat(64));
+        assert_eq!(
+            admitted.receipts.authority_receipt_digest,
+            "authority-receipt-digest"
+        );
         assert_eq!(
             admitted.receipts.calibration_revision,
             "calibration-rev-1"
