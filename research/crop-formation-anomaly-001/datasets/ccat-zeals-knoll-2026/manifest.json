@@ -1,0 +1,37 @@
+{
+  "dataset_id": "CROP-INTEL-CCAT-ZEALS-KNOLL-2026-001",
+  "schema_version": "0.1.0",
+  "source_project": "CCAT v1.0.0: Geometric Construction Grammar of the Zeals Knoll Formation",
+  "source_author": "Salah-Eddin Gherbi",
+  "source_repository": "https://github.com/salahealer9/ccat-crop-circle-analysis-toolkit",
+  "source_file_path": "data/circles_drag_60.csv",
+  "source_git_blob_sha": "97e95ce39b8e5b0e1f663d3ab80c635add24222a",
+  "source_version": "v1.0.0",
+  "source_release_date": "2026-07-24",
+  "source_version_doi": "https://doi.org/10.5281/zenodo.21527026",
+  "source_concept_doi": "https://doi.org/10.5281/zenodo.21527025",
+  "data_license": "CC BY 4.0",
+  "data_license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "software_license": "MIT",
+  "formation_name": "Zeals Knoll 2026",
+  "source_reported_date": "2026-07-05",
+  "record_count": 60,
+  "columns": {
+    "id": "source circle identifier",
+    "x": "source image-space centre x coordinate; units reported as pixels by CCAT analyses",
+    "y": "source image-space centre y coordinate; units reported as pixels by CCAT analyses",
+    "radius": "source image-space circle radius; units reported as pixels by CCAT analyses"
+  },
+  "coordinate_status": "image_space_only",
+  "source_photo_included": false,
+  "independent_reconstruction": false,
+  "uncertainty_columns_present": false,
+  "known_limitations": [
+    "One formation only; not a representative crop-formation sample.",
+    "Image-space coordinates and radii, not field-local metres or georeferenced coordinates.",
+    "No per-circle measurement uncertainty or independent annotation comparison is supplied in this CSV.",
+    "The source photograph is not included and has separate copyright or permission requirements.",
+    "The CSV is a digitized geometric reconstruction, not evidence of authorship, formation mechanism, semantic encoding, or extraordinary origin."
+  ],
+  "attribution": "Salah-Eddin Gherbi, CCAT v1.0.0, https://doi.org/10.5281/zenodo.21527026; source repository and file linked above. Dataset redistributed under CC BY 4.0."
+}
