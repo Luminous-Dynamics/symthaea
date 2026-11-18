@@ -354,7 +354,7 @@ impl<'a> ArithmeticDecoder<'a> {
         for symbol in 0..SYMBOLS {
             let cumulative_low = cdf[symbol] as u64;
             let cumulative_high = cdf[symbol + 1] as u64;
-            if scaled >= cumulative_low && (scaled as u64) < cumulative_high {
+            if (scaled as u64) >= cumulative_low && (scaled as u64) < cumulative_high {
                 selected = Some((symbol as u8, cumulative_low, cumulative_high));
                 break;
             }
@@ -450,6 +450,10 @@ pub fn compress_with_predictor<P: BytePredictor>(
     input: &[u8],
     predictor: &mut P,
 ) -> Result<Vec<u8>, CodecError> {
+    let model_id = predictor.model_id();
+    if model_id < 2 {
+        return Err(CodecError::UnsupportedModel(model_id));
+    }
     let mut coder = ArithmeticEncoder::new();
 
     for &symbol in input {
@@ -471,7 +475,7 @@ pub fn compress_with_predictor<P: BytePredictor>(
     );
     frame.extend_from_slice(MAGIC);
     frame.extend_from_slice(&VERSION.to_le_bytes());
-    frame.push(predictor.model_id());
+    frame.push(model_id);
     frame.push(0);
     frame.extend_from_slice(&raw_len.to_le_bytes());
     frame.extend_from_slice(&payload_len.to_le_bytes());
@@ -502,11 +506,15 @@ pub fn decompress_with_predictor<P: BytePredictor>(
     if version != VERSION {
         return Err(CodecError::UnsupportedVersion(version));
     }
+    let supplied_model = predictor.model_id();
+    if supplied_model < 2 {
+        return Err(CodecError::UnsupportedModel(supplied_model));
+    }
     let frame_model = frame[6];
-    if frame_model != predictor.model_id() {
+    if frame_model != supplied_model {
         return Err(CodecError::PredictorMismatch {
             frame_model,
-            supplied_model: predictor.model_id(),
+            supplied_model,
         });
     }
     if frame[7] != 0 {
