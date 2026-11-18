@@ -168,3 +168,10 @@ It only counts a routine job as a non-destructive qualified repair when:
 Unknown access and pending/failed/unknown requalification remain visible and do not count as successes. A zero routine-job denominator yields an undefined fraction, not 0%. The evaluator reports median technician and downtime minutes and tool count, but does not calculate lifecycle cost or water/energy/environmental totals. Those remain with Symtropy and Mycelix.
 
 Sixteen unit tests are authored; no current-head test or Clippy pass is claimed.
+
+
+## Repairability evidence and post-repair qualification
+
+The new dependency-free serviceability module validates repair-job observations and summarizes a frozen cohort. It keeps destructive finish removal, unknown access, failed/pending repair and missing return-to-service evidence visible. A job only counts as a qualified non-destructive routine repair when access is non-destructive, the post-repair function check passes, an independent device-authority receipt exists, and any required Mycelix water-quality or metrology receipt exists.
+
+The module reports medians and counts, not lifecycle cost or resource totals. It leaves canonical cost/resource/environmental accounting with Symtropy and Mycelix. The protocol and frozen job manifest are in docs/AQUA_REPAIRABILITY_SERVICEABILITY_PROTOCOL_V0_1.md and issue #12844.
