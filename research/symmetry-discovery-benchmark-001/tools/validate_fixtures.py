@@ -261,7 +261,7 @@ def main():
     print(f"group={ambient['group_id']} order={len(element_ids)} products={len(product_table)} inverse_witnesses={len(inverses)}")
     for case_id, stabilizer in results:
         print(f"{case_id}: {','.join(stabilizer)}")
-    print(f"generated_exact_cases={len(generated)}; families=5; cases_per_family=30")
+    print(f"generated_exact_cases={len(generated)}; families=10; cases_per_family=30")
     print("benchmark_status=fixture_validation_only; external_baseline_runs=not_started")
 
 
