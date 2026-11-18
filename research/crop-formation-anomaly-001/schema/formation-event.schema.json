@@ -342,6 +342,13 @@
       "items": {
         "$ref": "#/$defs/stem_pose_3d_sample"
       }
+    },
+    "stem_mechanical_samples": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/stem_mechanical_sample"
+      },
+      "description": "Controlled stem mechanical test observations. Raw curves and protocol metadata are retained separately from derived model quantities."
     }
   },
   "$defs": {
@@ -1085,6 +1092,229 @@
           "format": "uri"
         }
       }
+    },
+    "stem_mechanical_sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_id",
+        "test_type",
+        "protocol_id",
+        "force_displacement_curve",
+        "sheath_state",
+        "failure_mode",
+        "loading_axis_reference",
+        "method"
+      ],
+      "properties": {
+        "sample_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "parent_specimen_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "test_type": {
+          "enum": [
+            "three_point_bending",
+            "cantilever_tip_load",
+            "rind_puncture",
+            "other"
+          ]
+        },
+        "protocol_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "support_span_m": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "cantilever_length_m": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "loading_rate_m_s": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "force_displacement_curve": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "force_n",
+              "displacement_m"
+            ],
+            "properties": {
+              "force_n": {
+                "type": "number"
+              },
+              "displacement_m": {
+                "type": "number"
+              },
+              "time_s": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "derived_flexural_rigidity_nm2": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "derived_peak_moment_nm": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "moisture_mass_fraction": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "moisture_method": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 512
+        },
+        "temperature_c": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "sheath_state": {
+          "enum": [
+            "present",
+            "removed",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "failure_mode": {
+          "enum": [
+            "none",
+            "stem_bend",
+            "stem_break",
+            "root_failure",
+            "local_buckle",
+            "other",
+            "unknown"
+          ]
+        },
+        "loading_axis_reference": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "instrument_or_calibration": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 512
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "observer_blinding_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "raw_measurement_url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "test_type": {
+                "const": "three_point_bending"
+              }
+            },
+            "required": [
+              "test_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "support_span_m": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "test_type": {
+                "const": "cantilever_tip_load"
+              }
+            },
+            "required": [
+              "test_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "cantilever_length_m": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }
