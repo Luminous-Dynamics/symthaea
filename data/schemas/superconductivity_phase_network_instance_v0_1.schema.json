@@ -124,8 +124,7 @@
               "source",
               "target",
               "coupling_energy",
-              "gauge_link_phase_rad",
-              "periodic_image_shift"
+              "gauge_link_phase_rad"
             ],
             "properties": {
               "edge_id": {
