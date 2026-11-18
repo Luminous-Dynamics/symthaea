@@ -611,11 +611,11 @@ pub struct NumericCategoryBand {
 /// Explicit mapping from one directly measured observation channel to one
 /// categorical portfolio sensor. The category schema digest identifies the
 /// mapping content; it is not a signature or proof of calibration authenticity.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DiagnosticCategoryRule {
     pub sensor_id: String,
     pub channel_id: String,
+    pub diagnostic_system_id: String,
     pub category_schema_id: String,
     pub category_schema_sha256: String,
     pub requirement: crate::plasma_observability::DecisionChannelRequirement,
@@ -626,6 +626,7 @@ impl DiagnosticCategoryRule {
     fn validate(&self) -> Result<(), DiagnosticPortfolioError> {
         non_empty(&self.sensor_id, "category sensor_id")?;
         non_empty(&self.channel_id, "category channel_id")?;
+        non_empty(&self.diagnostic_system_id, "category diagnostic_system_id")?;
         non_empty(&self.category_schema_id, "category_schema_id")?;
         if !valid_sha256(&self.category_schema_sha256) {
             return Err(DiagnosticPortfolioError::new(
@@ -729,7 +730,7 @@ impl From<crate::plasma_observability::AbstentionReason> for PortfolioEvidenceBl
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "reason", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum DiagnosticUnknownReason {
     EvidenceGateBlocked {
         reason: PortfolioEvidenceBlockReason,
@@ -868,6 +869,12 @@ pub fn evaluate_observation_frame(
                     rule.channel_id
                 ))
             })?;
+        if channel.diagnostic_system_id != rule.diagnostic_system_id {
+            return Err(DiagnosticPortfolioError::new(format!(
+                "channel {} is bound to diagnostic system {}, expected {}",
+                rule.channel_id, channel.diagnostic_system_id, rule.diagnostic_system_id
+            )));
+        }
 
         let gate = frame
             .evaluate_decision_requirements(std::slice::from_ref(&rule.requirement))
@@ -1125,6 +1132,7 @@ mod tests {
             rules.push(DiagnosticCategoryRule {
                 sensor_id: sensor.sensor_id.clone(),
                 channel_id: channel_id.clone(),
+                diagnostic_system_id: format!("system-{}", sensor.sensor_id),
                 category_schema_id: format!("category-map-{}", sensor.sensor_id),
                 category_schema_sha256: "b".repeat(64),
                 requirement: DecisionChannelRequirement {
@@ -1273,7 +1281,10 @@ mod tests {
             .expect("density sensor evidence");
         assert_eq!(density.observation, SensorObservation::Known("H".to_owned()));
         assert_eq!(density.source_id.as_deref(), Some("source-gen_current"));
-        assert_eq!(density.source_digest.as_deref(), Some("a".repeat(64).as_str()));
+        assert!(density
+            .source_digest
+            .as_ref()
+            .is_some_and(|digest| digest == &"a".repeat(64)));
         assert_eq!(density.calibration_revision.as_deref(), Some("rev-1"));
     }
 
