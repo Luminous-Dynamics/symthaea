@@ -9,6 +9,7 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+pub mod service_continuity;
 pub mod spray_field;
 
 pub const CONTRACT_VERSION: &str = "0.1.0";
