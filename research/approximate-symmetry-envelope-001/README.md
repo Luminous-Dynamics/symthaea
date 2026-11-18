@@ -1,6 +1,6 @@
 # Approximate symmetry error envelope reference v0.1
 
-First executable slice for [SYMM-ERROR-ENVELOPE-001 #127xx](https://github.com/Luminous-Dynamics/symthaea/issues/127xx).
+First executable slice for [SYMM-ERROR-ENVELOPE-001 #12830](https://github.com/Luminous-Dynamics/symthaea/issues/127xx).
 
 ## Paradigm shift
 
@@ -39,7 +39,7 @@ An `epsilon_lift_candidate` requires all of the following:
 
 Otherwise the report abstains or remains unresolved. Even a fully exact zero-defect result is only an equivariance candidate; another complete task verifier must qualify boundary/initial conditions, admissible sets, objectives, constraints and outputs before any exact quotient operation. This crate never grants hard-prune authority.
 
-The input contains the numerical bounds, but **does not prove they are true**. A later independent qualification layer must derive defect, Lipschitz and boundary bounds from interval analysis, analytic bounds, validated numerics or conservative physical measurements.
+The input binds explicit state/objective/constraint unit IDs and evidence IDs for the defect, Lipschitz and domain bounds. Those IDs make assumptions traceable but **do not prove the referenced evidence is valid**. A later independent qualification layer must derive defect, Lipschitz and boundary bounds from interval analysis, analytic bounds, validated numerics or conservative physical measurements.
 
 ## Reproduction
 
