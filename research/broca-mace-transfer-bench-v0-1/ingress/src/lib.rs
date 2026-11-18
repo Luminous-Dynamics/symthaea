@@ -249,6 +249,7 @@ pub enum IngestReject {
     UnverifiedRawEvent,
     RawEventReceiptMismatch,
     AuthorityNotAttested,
+    AuthorityReceiptPredatesOutcome,
     RetractionStatusUnknown,
     SupersededAsKnown(u32),
     NotValidAtRequestedTime,
@@ -304,6 +305,9 @@ pub fn ingest_as_known(
     }
     if event.authority_status != AuthorityStatus::ReceiptAttested {
         return Err(IngestReject::AuthorityNotAttested);
+    }
+    if event.received_at_ms < raw.outcome_observed_at_ms {
+        return Err(IngestReject::AuthorityReceiptPredatesOutcome);
     }
     if event.valid_until_ms.is_some_and(|end| end <= event.valid_from_ms) {
         return Err(IngestReject::MalformedValidInterval);
@@ -1033,6 +1037,7 @@ mod tests {
         calibration_valid: bool,
         raw_event_valid: bool,
         raw_event_mismatch: bool,
+        raw_event_received_at_ms: i64,
         authority_receipt_variant: bool,
         authority_status: AuthorityStatus,
         retraction_status_known: bool,
@@ -1066,6 +1071,7 @@ mod tests {
                 calibration_valid: true,
                 raw_event_valid: true,
                 raw_event_mismatch: false,
+                raw_event_received_at_ms: 220,
                 authority_receipt_variant: false,
                 authority_status: AuthorityStatus::ReceiptAttested,
                 retraction_status_known: true,
@@ -1110,7 +1116,7 @@ mod tests {
                 valid_from_ms: raw.valid_from_ms,
                 valid_until_ms: raw.valid_until_ms,
                 occurred_at_ms: raw.occurred_at_ms,
-                received_at_ms: 220,
+                received_at_ms: self.raw_event_received_at_ms,
                 receipt_digest: "a".repeat(64),
             })
         }
@@ -2012,6 +2018,18 @@ mod tests {
             "bis:dataflow:private-credit"
         );
         assert_eq!(admitted.receipts.measurement_instrument_id, "sensor-17");
+    }
+
+    #[test]
+    fn authority_receipt_cannot_predate_the_outcome_it_attests() {
+        let verifier = TestVerifier {
+            raw_event_received_at_ms: 199,
+            ..TestVerifier::default()
+        };
+        assert_eq!(
+            ingest_as_known(&raw(), query(180, 250), &verifier).err(),
+            Some(IngestReject::AuthorityReceiptPredatesOutcome)
+        );
     }
 
     #[test]
