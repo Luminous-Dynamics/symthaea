@@ -414,7 +414,7 @@ pub fn diagnose(
 pub fn minimal_sufficient_sensor_sets(
     model: &DiagnosticPortfolioModel,
 ) -> Result<Vec<Vec<String>>, DiagnosticPortfolioError> {
-    model.validate()?;
+    let context = DiagnosabilityContext::new(model)?;
     let sensor_ids = model.sorted_sensor_ids();
     ensure_exact_enumeration_size(sensor_ids.len())?;
     let subset_count = 1_u64 << sensor_ids.len();
@@ -425,7 +425,7 @@ pub fn minimal_sufficient_sensor_sets(
         if sufficient.iter().any(|prior| is_subset(prior, &subset)) {
             continue;
         }
-        if diagnose(model, &subset)?.diagnosable {
+        if context.diagnose(&subset)?.diagnosable {
             sufficient.push(subset);
         }
     }
@@ -438,7 +438,8 @@ pub fn minimal_sensor_cut_sets(
     model: &DiagnosticPortfolioModel,
     baseline_active_sensor_ids: &[String],
 ) -> Result<Vec<Vec<String>>, DiagnosticPortfolioError> {
-    let baseline = diagnose(model, baseline_active_sensor_ids)?;
+    let context = DiagnosabilityContext::new(model)?;
+    let baseline = context.diagnose(baseline_active_sensor_ids)?;
     if !baseline.diagnosable {
         return Err(DiagnosticPortfolioError::new(
             "minimum sensor-cut analysis requires a diagnosable baseline",
@@ -460,7 +461,7 @@ pub fn minimal_sensor_cut_sets(
             .filter(|sensor_id| !removed_set.contains(sensor_id.as_str()))
             .cloned()
             .collect();
-        if !diagnose(model, &remaining)?.diagnosable {
+        if !context.diagnose(&remaining)?.diagnosable {
             cuts.push(removed);
         }
     }
@@ -473,7 +474,8 @@ pub fn minimal_common_mode_cut_sets(
     model: &DiagnosticPortfolioModel,
     baseline_active_sensor_ids: &[String],
 ) -> Result<Vec<Vec<String>>, DiagnosticPortfolioError> {
-    let baseline = diagnose(model, baseline_active_sensor_ids)?;
+    let context = DiagnosabilityContext::new(model)?;
+    let baseline = context.diagnose(baseline_active_sensor_ids)?;
     if !baseline.diagnosable {
         return Err(DiagnosticPortfolioError::new(
             "common-mode cut analysis requires a diagnosable baseline",
@@ -514,7 +516,7 @@ pub fn minimal_common_mode_cut_sets(
             })
             .cloned()
             .collect();
-        if !diagnose(model, &remaining)?.diagnosable {
+        if !context.diagnose(&remaining)?.diagnosable {
             cuts.push(lost_groups);
         }
     }
@@ -535,7 +537,7 @@ pub fn minimum_cost_sufficient_portfolio(
     model: &DiagnosticPortfolioModel,
     resource_budget: u64,
 ) -> Result<Option<CostedSufficientPortfolio>, DiagnosticPortfolioError> {
-    model.validate()?;
+    let context = DiagnosabilityContext::new(model)?;
     let sensor_ids = model.sorted_sensor_ids();
     ensure_exact_enumeration_size(sensor_ids.len())?;
     let resource_unit = model
@@ -560,7 +562,7 @@ pub fn minimum_cost_sufficient_portfolio(
     let subset_count = 1_u64 << sensor_ids.len();
     for mask in 0..subset_count {
         let subset = subset_for_mask(&sensor_ids, mask);
-        if !diagnose(model, &subset)?.diagnosable {
+        if !context.diagnose(&subset)?.diagnosable {
             continue;
         }
         let mut total_cost = 0_u64;
