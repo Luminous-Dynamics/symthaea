@@ -1,0 +1,642 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:lightshell-asbuilt-metrology:0.1.0",
+  "title": "Atelier Lightshell As-Built Metrology and Conformance",
+  "description": "Admits datum-controlled physical measurement evidence with registration and uncertainty guard bands. Not a scanner, CAD registration engine, product release or safety certification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "inspection_id",
+    "state",
+    "article",
+    "feature_catalog",
+    "measurement_session",
+    "observations",
+    "engineering_review",
+    "evidence_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "inspection_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "proposed",
+        "measured",
+        "adjudicated"
+      ]
+    },
+    "article": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "manufactured_article_ref",
+        "component_revision_ref",
+        "route_ref",
+        "route_revision_ref",
+        "route_digest",
+        "topology_ref",
+        "topology_revision_ref",
+        "topology_digest",
+        "robot_id",
+        "robot_article_revision",
+        "geometry_digest",
+        "material_lot_ref",
+        "process_revision_ref",
+        "treatment_state"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manufactured_article_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "component_revision_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "route_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "route_revision_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "route_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        },
+        "topology_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "topology_revision_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "topology_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        },
+        "robot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robot_article_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "geometry_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        },
+        "material_lot_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "process_revision_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "treatment_state": {
+          "enum": [
+            "as_manufactured",
+            "after_cleaning",
+            "after_flex",
+            "after_mission_replay",
+            "after_repair"
+          ]
+        }
+      }
+    },
+    "feature_catalog": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "feature_ref",
+          "feature_kind",
+          "nominal_geometry_ref",
+          "nominal_revision_ref",
+          "mandatory",
+          "required_metric_ids",
+          "minimum_coverage_fraction",
+          "acceptance_rule_ref",
+          "required_pose_refs",
+          "required_pose_set_ref"
+        ],
+        "properties": {
+          "feature_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "feature_kind": {
+            "enum": [
+              "panel",
+              "connection",
+              "articulation_feature",
+              "service_feature",
+              "garment_landmark"
+            ]
+          },
+          "nominal_geometry_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nominal_revision_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mandatory": {
+            "type": "boolean"
+          },
+          "required_metric_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "panel_surface_deviation_mm",
+                "seam_path_deviation_mm",
+                "edge_length_error_mm",
+                "service_opening_position_error_mm",
+                "attachment_position_error_mm",
+                "joint_clearance_mm",
+                "garment_landmark_deviation_mm",
+                "post_cleaning_dimensional_change_pct"
+              ]
+            }
+          },
+          "minimum_coverage_fraction": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "acceptance_rule_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required_pose_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required_pose_set_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "measurement_session": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "session_id",
+            "instrument_kind",
+            "instrument_ref",
+            "calibration_ref",
+            "calibration_revision_ref",
+            "calibration_state",
+            "method_ref",
+            "protocol_ref",
+            "fixture_ref",
+            "fixture_revision_ref",
+            "reference_artifact_ref",
+            "environment_ref",
+            "start_time",
+            "end_time",
+            "raw_data_digest",
+            "parser_revision_ref",
+            "coordinate_frame_ref",
+            "registration_method",
+            "datum_scheme_ref",
+            "transform_ref",
+            "registration_evidence_ref",
+            "holdout_datum_refs",
+            "excluded_roi_feature_refs",
+            "maximum_holdout_residual_mm",
+            "observed_holdout_residual_mm",
+            "registration_uncertainty_mm",
+            "uncertainty_budget_ref",
+            "uncertainty_budget_includes_registration",
+            "coverage_fraction",
+            "occlusion_fraction",
+            "missing_data_fraction",
+            "gap_disposition_ref",
+            "operator_ref",
+            "fit_datum_refs",
+            "holdout_datum_residuals"
+          ],
+          "properties": {
+            "session_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "instrument_kind": {
+              "enum": [
+                "structured_light_3d",
+                "laser_3d",
+                "photogrammetry",
+                "contact_probe",
+                "dimensional_fixture"
+              ]
+            },
+            "instrument_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "calibration_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "calibration_revision_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "calibration_state": {
+              "enum": [
+                "valid",
+                "expired",
+                "unknown"
+              ]
+            },
+            "method_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "protocol_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fixture_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fixture_revision_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reference_artifact_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "start_time": {
+              "type": "string",
+              "minLength": 1
+            },
+            "end_time": {
+              "type": "string",
+              "minLength": 1
+            },
+            "raw_data_digest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-fA-F]{64}$"
+            },
+            "parser_revision_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "coordinate_frame_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "registration_method": {
+              "enum": [
+                "datum_based_locked",
+                "fiducial_based_locked",
+                "validated_transform_chain"
+              ]
+            },
+            "datum_scheme_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "transform_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "registration_evidence_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "holdout_datum_refs": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "excluded_roi_feature_refs": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "maximum_holdout_residual_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "observed_holdout_residual_mm": {
+              "type": "number",
+              "minimum": 0
+            },
+            "registration_uncertainty_mm": {
+              "type": "number",
+              "minimum": 0
+            },
+            "uncertainty_budget_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uncertainty_budget_includes_registration": {
+              "const": true
+            },
+            "coverage_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "occlusion_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "missing_data_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "gap_disposition_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "operator_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fit_datum_refs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "holdout_datum_residuals": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "datum_ref",
+                  "residual_mm",
+                  "expanded_uncertainty_mm"
+                ],
+                "properties": {
+                  "datum_ref": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "residual_mm": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "expanded_uncertainty_mm": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "measurement_id",
+          "feature_ref",
+          "metric_id",
+          "unit",
+          "measured_value",
+          "expanded_uncertainty",
+          "lower_limit",
+          "upper_limit",
+          "coverage_fraction",
+          "measurement_origin",
+          "method_selection_ref",
+          "raw_data_slice_ref",
+          "uncertainty_budget_ref",
+          "measurement_evidence_ref",
+          "pose_ref",
+          "joint_state_ref"
+        ],
+        "properties": {
+          "measurement_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "feature_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metric_id": {
+            "enum": [
+              "panel_surface_deviation_mm",
+              "seam_path_deviation_mm",
+              "edge_length_error_mm",
+              "service_opening_position_error_mm",
+              "attachment_position_error_mm",
+              "joint_clearance_mm",
+              "garment_landmark_deviation_mm",
+              "post_cleaning_dimensional_change_pct"
+            ]
+          },
+          "unit": {
+            "enum": [
+              "mm",
+              "%"
+            ]
+          },
+          "measured_value": {
+            "type": "number"
+          },
+          "expanded_uncertainty": {
+            "type": "number",
+            "minimum": 0
+          },
+          "lower_limit": {
+            "type": "number"
+          },
+          "upper_limit": {
+            "type": "number"
+          },
+          "coverage_fraction": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "measurement_origin": {
+            "enum": [
+              "physical_measurement",
+              "synthetic_fixture",
+              "simulation",
+              "supplier_claim"
+            ]
+          },
+          "method_selection_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "raw_data_slice_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uncertainty_budget_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "measurement_evidence_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pose_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "joint_state_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "engineering_review": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "disposition",
+            "reviewer_ref",
+            "reviewed_at",
+            "review_record_ref"
+          ],
+          "properties": {
+            "disposition": {
+              "enum": [
+                "accept",
+                "reject",
+                "hold"
+              ]
+            },
+            "reviewer_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reviewed_at": {
+              "type": "string",
+              "minLength": 1
+            },
+            "review_record_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "evidence_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "physical_measurements_require_current_calibration",
+        "datum_registration_must_exclude_test_roi",
+        "independent_holdout_datums_required",
+        "registration_uncertainty_included_in_measurement_budget",
+        "missing_coverage_never_passes",
+        "guard_banded_acceptance_required",
+        "engineering_adjudication_required",
+        "as_built_acceptance_is_not_product_release"
+      ],
+      "properties": {
+        "physical_measurements_require_current_calibration": {
+          "const": true
+        },
+        "datum_registration_must_exclude_test_roi": {
+          "const": true
+        },
+        "independent_holdout_datums_required": {
+          "const": true
+        },
+        "registration_uncertainty_included_in_measurement_budget": {
+          "const": true
+        },
+        "missing_coverage_never_passes": {
+          "const": true
+        },
+        "guard_banded_acceptance_required": {
+          "const": true
+        },
+        "engineering_adjudication_required": {
+          "const": true
+        },
+        "as_built_acceptance_is_not_product_release": {
+          "const": true
+        }
+      }
+    }
+  }
+}

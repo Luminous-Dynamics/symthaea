@@ -1,0 +1,94 @@
+{
+  "schema_version": "0.1.0",
+  "inspection_id": "LIGHTSHELL-ASBUILT-SYNTHETIC-001",
+  "state": "proposed",
+  "article": {
+    "candidate_id": "ELBOW-CANDIDATE-001",
+    "manufactured_article_ref": "SYNTHETIC-ARTICLE-001",
+    "component_revision_ref": "GARMENT-COMPONENT-REV-A",
+    "route_ref": "LIGHTSHELL-ROUTE-12800",
+    "route_revision_ref": "ROUTE-REV-A",
+    "route_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "topology_ref": "LIGHTSHELL-TOPOLOGY-12785",
+    "topology_revision_ref": "TOPOLOGY-REV-A",
+    "topology_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "robot_id": "SYNTHETIC-ROBOT-001",
+    "robot_article_revision": "ROBOT-REV-A",
+    "geometry_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "material_lot_ref": "LOT-001",
+    "process_revision_ref": "PROCESS-REV-A",
+    "treatment_state": "as_manufactured"
+  },
+  "feature_catalog": [
+    {
+      "feature_ref": "forearm_panel",
+      "feature_kind": "panel",
+      "nominal_geometry_ref": "CAD-PANEL-001",
+      "nominal_revision_ref": "CAD-REV-A",
+      "mandatory": true,
+      "minimum_coverage_fraction": 0.95,
+      "acceptance_rule_ref": "PANEL-ACCEPTANCE-01",
+      "required_pose_refs": [],
+      "required_metrics": [
+        {
+          "metric_id": "panel_surface_deviation_mm",
+          "unit": "mm",
+          "lower_limit": 0,
+          "upper_limit": 1
+        }
+      ],
+      "required_pose_set_ref": null
+    },
+    {
+      "feature_ref": "elbow_seam",
+      "feature_kind": "connection",
+      "nominal_geometry_ref": "SEAM-CURVE-001",
+      "nominal_revision_ref": "TOPOLOGY-REV-A",
+      "mandatory": true,
+      "minimum_coverage_fraction": 0.98,
+      "acceptance_rule_ref": "SEAM-ACCEPTANCE-01",
+      "required_pose_refs": [],
+      "required_metrics": [
+        {
+          "metric_id": "seam_path_deviation_mm",
+          "unit": "mm",
+          "lower_limit": 0,
+          "upper_limit": 2
+        }
+      ],
+      "required_pose_set_ref": null
+    },
+    {
+      "feature_ref": "forearm_service_opening",
+      "feature_kind": "service_feature",
+      "nominal_geometry_ref": "SERVICE-OPENING-001",
+      "nominal_revision_ref": "TOPOLOGY-REV-A",
+      "mandatory": false,
+      "minimum_coverage_fraction": 0.95,
+      "acceptance_rule_ref": "SERVICE-OPENING-ACCEPTANCE-01",
+      "required_pose_refs": [],
+      "required_metrics": [
+        {
+          "metric_id": "service_opening_position_error_mm",
+          "unit": "mm",
+          "lower_limit": 0,
+          "upper_limit": 2
+        }
+      ],
+      "required_pose_set_ref": null
+    }
+  ],
+  "measurement_session": null,
+  "observations": [],
+  "engineering_review": null,
+  "evidence_policy": {
+    "physical_measurements_require_current_calibration": true,
+    "datum_registration_must_exclude_test_roi": true,
+    "independent_holdout_datums_required": true,
+    "registration_uncertainty_included_in_measurement_budget": true,
+    "missing_coverage_never_passes": true,
+    "guard_banded_acceptance_required": true,
+    "engineering_adjudication_required": true,
+    "as_built_acceptance_is_not_product_release": true
+  }
+}
