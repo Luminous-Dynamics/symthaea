@@ -593,6 +593,7 @@ impl SemanticMemory {
     /// Clear all entries
     pub fn clear(&mut self) {
         self.entries.clear();
+        self.graduation_provenance.clear();
         self.write_pos = 0;
         self.wrapped = false;
     }
@@ -771,6 +772,99 @@ mod tests {
 
         assert_eq!(mem.stats.total_queries, 2);
         assert_eq!(mem.stats.semantic_misses, 1);
+    }
+
+    #[test]
+    fn provenance_tracks_semantic_ring_slots_and_evicted_entry() {
+        let mut mem = SemanticMemory::new(2);
+        let first = GraduationProvenance {
+            source: crate::coordinator::MemorySource::ActionFeedback,
+            verification_claimed: true,
+        };
+        let second = GraduationProvenance {
+            source: crate::coordinator::MemorySource::WebResearch,
+            verification_claimed: false,
+        };
+        let third = GraduationProvenance {
+            source: crate::coordinator::MemorySource::UserInteraction,
+            verification_claimed: false,
+        };
+
+        assert!(mem
+            .store_with_provenance(vec![1.0, 0.0], 0.1, None, Some(first))
+            .is_none());
+        assert!(mem
+            .store_with_provenance(vec![0.0, 1.0], 0.2, None, Some(second))
+            .is_none());
+
+        let evicted = mem
+            .store_with_provenance(vec![1.0, 0.0], 0.3, None, Some(third))
+            .expect("third write must evict the first semantic entry");
+        assert_eq!(
+            evicted.graduation_provenance.unwrap().source,
+            crate::coordinator::MemorySource::ActionFeedback
+        );
+
+        let slot_zero = mem.get_with_provenance(0).unwrap();
+        let slot_one = mem.get_with_provenance(1).unwrap();
+        assert_eq!(
+            slot_zero.graduation_provenance.unwrap().source,
+            crate::coordinator::MemorySource::UserInteraction
+        );
+        assert_eq!(
+            slot_one.graduation_provenance.unwrap().source,
+            crate::coordinator::MemorySource::WebResearch
+        );
+
+        let matches = mem.find_similar_with_provenance(&[1.0, 0.0], 1);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(
+            matches[0].0.graduation_provenance.as_ref().unwrap().source,
+            crate::coordinator::MemorySource::UserInteraction
+        );
+    }
+
+    #[test]
+    fn legacy_semantic_store_marks_lineage_absent_and_clear_removes_parallel_slots() {
+        let mut mem = SemanticMemory::new(2);
+        mem.store(vec![1.0, 0.0], 0.1, None);
+        assert!(mem.get_with_provenance(0).unwrap().graduation_provenance.is_none());
+
+        mem.store_with_provenance(
+            vec![0.0, 1.0],
+            0.2,
+            None,
+            Some(GraduationProvenance {
+                source: crate::coordinator::MemorySource::ActionFeedback,
+                verification_claimed: false,
+            }),
+        );
+        mem.clear();
+        assert!(mem.is_empty());
+        assert!(mem.graduation_provenance.is_empty());
+        assert!(mem.store_with_provenance(
+            vec![1.0, 0.0],
+            0.3,
+            None,
+            Some(GraduationProvenance {
+                source: crate::coordinator::MemorySource::WebResearch,
+                verification_claimed: false,
+            }),
+        ).is_none());
+        assert_eq!(
+            mem.get_with_provenance(0).unwrap().graduation_provenance.unwrap().source,
+            crate::coordinator::MemorySource::WebResearch
+        );
+    }
+
+    #[test]
+    fn zero_capacity_semantic_memory_rejects_store_without_dividing_by_zero() {
+        let mut mem = SemanticMemory::new(0);
+        assert!(mem
+            .store_with_provenance(vec![1.0], 0.1, None, None)
+            .is_none());
+        assert!(mem.is_empty());
+        assert_eq!(mem.stats.total_stored, 0);
     }
 
     #[test]
