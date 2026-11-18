@@ -1,9 +1,9 @@
-# CDL-Bench SCM context ablations v1.1
+# CDL-Bench SCM context ablations v1.2
 
 **Date:** 2026-11-18  
 **Status:** implementation added to the research branch; Rust compiler execution and arithmetic-coded size measurements pending  
-**Scope:** SCM1 five-channel, fixed-point i16 traces only  
-**Revision note:** this version supersedes the earlier unsmoothed conditional-histogram diagnostic. The implementation and exploratory Python model now use additive field-plus-context frequency interpolation; numbers below refer only to that revised model.
+**Scope:** learner-visible SCM2 five-channel, fixed-point i16 traces only  
+**Revision note:** this version supersedes the prior SCM1/SCM2 draft calculations. SCM2 removes intervention metadata from learner-visible bytes; the implementation and exploratory Python model use additive field-plus-context frequency interpolation. Numbers below use the 16-byte label-free SCM2 header.
 
 ## Research question
 
@@ -19,7 +19,7 @@ The first three are implemented as separate predictor arms. The fourth remains f
 
 ## Implemented predictor arms
 
-All custom predictors implement the shared `BytePredictor` interface and use the same arithmetic coder, frame format, checksums, and decoder-synchronous symbol updates. The SCM1 header is 33 bytes; records follow as five signed i16 values in topological order, each little-endian.
+All custom predictors implement the shared `BytePredictor` interface and use the same arithmetic coder, frame format, checksums, and decoder-synchronous symbol updates. The learner-visible SCM2 header is 16 bytes: magic, version, zero flags, fixed variable count, and sequence length. It contains no intervention target, boundary, forced value or mechanism parameters. Records follow as five signed i16 values in topological order, each little-endian. The intervention manifest and mechanism configuration remain in evaluator-only `ScmTrace` fields.
 
 | Frame arm | Model ID | Information used |
 |---|---:|---|
@@ -37,21 +37,21 @@ Each predictor starts from deterministic state for each stream. Predictor state 
 
 ## Preliminary independent diagnostic
 
-An independent Python translation of the deterministic SCM generator and the **revised additive base-plus-context frequency updates** was evaluated on the two E3 held-out mechanism combinations, 10 explicit seeds per combination, and paired observational / `do(x1=20000)` traces using the same seed and exogenous noise: 40 streams total, 4,096 steps each, and 40,993 bytes per SCM1 stream. The seed set was `0xCA55_A1 + seed_index + 200` for `seed_index = 0..9`.
+An independent Python translation of the deterministic SCM generator and the **revised additive base-plus-context frequency updates** was evaluated on the two E3 held-out mechanism combinations, 10 explicit seeds per combination, and paired observational / `do(x1=20000)` traces using the same seed and exogenous noise: 40 streams total, 4,096 steps each, and 40,976 bytes per SCM2 stream. The intervention target/window/value are not serialized into the stream; paired treatment labels are held only in the evaluator's scoring manifest. The seed set was `0xCA55_A1 + seed_index + 200` for `seed_index = 0..9`.
 
 The diagnostic is cumulative prequential ideal code length:
 `sum_t log2(total_frequency_t / observed_symbol_frequency_t)`,
-including the 33-byte SCM header. It measures probabilities emitted by the Python translation. It is **not** the output size of the Rust arithmetic coder.
+including the 16-byte SCM2 schema/length header. It measures probabilities emitted by the Python translation. It is **not** the output size of the Rust arithmetic coder.
 
 | Model | Mean ideal bits / input byte |
 |---|---:|
-| Order-0 | 7.53021 |
-| Order-1 | 7.70201 |
-| Typed field/lane | 7.02415 |
-| Temporal lag | 6.95033 |
-| Parent oracle | 6.97402 |
-| Parent + lag hybrid | 6.96230 |
-| Shuffled-parent negative control | 6.98863 |
+| Order-0 | 7.53074 |
+| Order-1 | 7.70285 |
+| Typed field/lane | 7.02518 |
+| Temporal lag | 6.95134 |
+| Parent oracle | 6.97503 |
+| Parent + lag hybrid | 6.96331 |
+| Shuffled-parent negative control | 6.98965 |
 
 The temporal-lag model is the strongest of these current context arms overall. Relative to lag, mean paired ideal-code-cost ratios across the 20 (mechanism, seed) groups were:
 
@@ -61,7 +61,7 @@ The temporal-lag model is the strongest of these current context arms overall. R
 | Parent + lag hybrid | +0.1722% | +0.1570% to +0.1875% |
 | Shuffled-parent | +0.5511% | +0.5278% to +0.5743% |
 
-The intervention split is the critical result:
+The intervention split is the critical result. SCM2 does not expose the intervention descriptor or boundary through the learner-visible header:
 
 | Context arm vs lag | Observational relative cost | Interventional relative cost |
 |---|---:|---:|
@@ -81,7 +81,7 @@ This is a useful falsification result, not a causal-compression win. It suggests
 
 ### Evidence boundary
 
-The independent Python calculation mirrors the deterministic generator and histogram updates but is not compiler-backed execution of the Rust implementation. Rust compilation, unit tests, rustfmt, actual arithmetic-coded frame lengths, throughput, memory, energy and external-codec comparisons remain unverified. No SOTA result or deployed-size reduction is claimed. The earlier unsmoothed-context percentages are superseded and must not be combined with this table.
+The independent Python calculation mirrors the deterministic generator, SCM2 record layout and histogram updates but is not compiler-backed execution of the Rust implementation. Rust compilation, unit tests, rustfmt, actual arithmetic-coded frame lengths, throughput, memory, energy and external-codec comparisons remain unverified. No SOTA result or deployed-size reduction is claimed. The earlier unsmoothed-context percentages are superseded and must not be combined with this table.
 
 ## Hypotheses and falsification
 
@@ -123,7 +123,7 @@ The 5% threshold is a future success gate, not a result. If a learned mechanism 
 
 ## Files
 
-- `research/cdl-bench/src/scm_predictor.rs`: field, parent-oracle, lag, hybrid and shuffled-parent predictors.
+- `research/cdl-bench/src/scm_predictor.rs`: field, parent-oracle, lag, hybrid and shuffled-parent predictors over the label-free SCM2 record layout.
 - `research/cdl-bench/src/main.rs`: causal CLI round-trip and frame-size comparisons.
 - `research/cdl-bench/src/lib.rs`: module and public predictor exports.
 - `research/cdl-bench/README.md`: usage, accounting and interpretation boundaries.
