@@ -132,6 +132,7 @@ pub struct SourceBindings {
     pub sol_atlas_pr_head_sha: String,
     pub catalogue_revision: String,
     pub catalogue_blob_sha: String,
+    pub catalogue_schema_blob_sha: String,
     pub grammar_schema_blob_sha: String,
     pub conformance_corpus_blob_sha: String,
     pub conformance_corpus_schema_blob_sha: String,
@@ -290,6 +291,7 @@ pub struct DesignProblem {
 pub struct CatalogueVocabulary {
     pub catalogue_revision: String,
     pub catalogue_blob_sha: String,
+    pub catalogue_schema_blob_sha: String,
     pub style_sources: BTreeMap<String, BTreeSet<String>>,
     pub spatial_typology_ids: BTreeSet<String>,
     pub material_tectonic_ids: BTreeSet<String>,
@@ -334,6 +336,26 @@ impl CatalogueVocabulary {
             collect_ids(&value, "environmental_strategy_intent_catalog", "option_id")?;
         vocabulary.experience_package_ids =
             collect_ids(&value, "experience_catalog", "package_id")?;
+        Ok(vocabulary)
+    }
+
+    /// Load and bind both the catalogue and its interpretation schema from the
+    /// exact caller-supplied bytes. A problem validated with this vocabulary
+    /// must carry matching Git blob SHAs for both objects.
+    pub fn from_catalogue_sources(
+        catalogue_source: &str,
+        catalogue_schema_source: &str,
+    ) -> Result<Self, String> {
+        let schema: Value = serde_json::from_str(catalogue_schema_source)
+            .map_err(|error| format!("catalogue schema JSON is invalid: {error}"))?;
+        if schema.get("$schema").and_then(Value::as_str)
+            != Some("https://json-schema.org/draft/2020-12/schema")
+        {
+            return Err("catalogue schema must use JSON Schema Draft 2020-12".to_owned());
+        }
+        let mut vocabulary = Self::from_catalogue_json(catalogue_source)?;
+        vocabulary.catalogue_schema_blob_sha =
+            git_blob_sha1(catalogue_schema_source.as_bytes());
         Ok(vocabulary)
     }
 
@@ -631,12 +653,18 @@ pub fn validate_design_problem(
     if problem.source_bindings.catalogue_blob_sha != vocabulary.catalogue_blob_sha {
         errors.push("catalogue blob SHA does not match the exact loaded catalogue bytes".to_owned());
     }
+    if problem.source_bindings.catalogue_schema_blob_sha
+        != vocabulary.catalogue_schema_blob_sha
+    {
+        errors.push("catalogue schema blob SHA does not match the exact loaded schema bytes".to_owned());
+    }
     if !problem.source_bindings.sol_atlas_pr.starts_with("https://github.com/Luminous-Dynamics/sol-atlas-leptos/pull/") {
         errors.push("Sol-Atlas source must be an explicit PR URL".to_owned());
     }
     for (name, digest) in [
         ("sol_atlas_pr_head_sha", problem.source_bindings.sol_atlas_pr_head_sha.as_str()),
         ("catalogue_blob_sha", problem.source_bindings.catalogue_blob_sha.as_str()),
+        ("catalogue_schema_blob_sha", problem.source_bindings.catalogue_schema_blob_sha.as_str()),
         ("grammar_schema_blob_sha", problem.source_bindings.grammar_schema_blob_sha.as_str()),
         ("conformance_corpus_blob_sha", problem.source_bindings.conformance_corpus_blob_sha.as_str()),
         ("conformance_corpus_schema_blob_sha", problem.source_bindings.conformance_corpus_schema_blob_sha.as_str()),
@@ -1381,6 +1409,12 @@ pub fn worst_case_objectives(
 mod tests {
     use super::*;
 
+    const SYNTHETIC_CATALOGUE_SCHEMA: &str = r#"{
+        "$schema":"https://json-schema.org/draft/2020-12/schema",
+        "type":"object",
+        "properties":{"catalog_revision":{"type":"string"}}
+    }"#;
+
     fn synthetic_catalogue() -> Value {
         serde_json::json!({
             "catalog_revision":"HOME-EXPRESSION-CATALOG-0.2.0",
@@ -1401,12 +1435,19 @@ mod tests {
         // Unit tests use a deliberately minimal vocabulary fixture. Bind its
         // exact Git blob digest rather than pretending it is the full upstream
         // Sol-Atlas catalogue.
-        problem.source_bindings.catalogue_blob_sha = vocabulary().catalogue_blob_sha;
+        let vocabulary = vocabulary();
+        problem.source_bindings.catalogue_blob_sha = vocabulary.catalogue_blob_sha;
+        problem.source_bindings.catalogue_schema_blob_sha =
+            vocabulary.catalogue_schema_blob_sha;
         problem
     }
 
     fn vocabulary() -> CatalogueVocabulary {
-        CatalogueVocabulary::from_catalogue_json(&synthetic_catalogue().to_string()).unwrap()
+        CatalogueVocabulary::from_catalogue_sources(
+            &synthetic_catalogue().to_string(),
+            SYNTHETIC_CATALOGUE_SCHEMA,
+        )
+        .unwrap()
     }
 
     #[derive(Deserialize)]
@@ -1734,7 +1775,7 @@ mod tests {
     #[test]
     fn exact_source_bindings_require_lowercase_git_sha_shapes() {
         let mut problem = parsed_problem();
-        problem.source_bindings.catalogue_blob_sha = "NOT_A_GIT_SHA".to_owned();
+        problem.source_bindings.catalogue_schema_blob_sha = "NOT_A_GIT_SHA".to_owned();
         assert!(validate_design_problem(&problem, &vocabulary()).is_err());
     }
 
