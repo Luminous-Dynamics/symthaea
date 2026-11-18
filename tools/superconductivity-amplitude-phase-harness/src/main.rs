@@ -133,8 +133,8 @@ impl GlModel {
         if schema.get("$schema").and_then(Value::as_str) != Some(DIALECT) {
             return Err(format!("schema must declare {DIALECT}"));
         }
-        let validator =
-            validator_for(&schema).map_err(|error| format!("schema compilation failed: {error}"))?;
+        let validator = validator_for(&schema)
+            .map_err(|error| format!("schema compilation failed: {error}"))?;
         if let Some(error) = validator.iter_errors(&fixture).next() {
             return Err(format!(
                 "amplitude-phase schema validation failed: {} at {}",
@@ -157,11 +157,9 @@ impl GlModel {
             .get("model")
             .ok_or_else(|| "missing model".to_owned())?;
         if required_text(model_value, "kind")? != "static_classical_lattice_gl"
-            || required_text(model_value, "free_energy_unit")?
-                != "dimensionless_lattice_energy"
+            || required_text(model_value, "free_energy_unit")? != "dimensionless_lattice_energy"
             || required_text(model_value, "order_parameter_unit")? != "dimensionless"
-            || required_text(model_value, "gauge_convention")?
-                != "psi_i_minus_exp_iAij_psi_j"
+            || required_text(model_value, "gauge_convention")? != "psi_i_minus_exp_iAij_psi_j"
         {
             return Err("unsupported GL model or unit convention".to_owned());
         }
@@ -359,8 +357,7 @@ impl GlModel {
                     return Err(format!("edge {id} image shift on non-periodic axis {axis}"));
                 }
                 image_shift.push(shift);
-                let displacement = nodes[target].position[axis]
-                    + shift as f64 * box_lengths[axis]
+                let displacement = nodes[target].position[axis] + shift as f64 * box_lengths[axis]
                     - nodes[source].position[axis];
                 squared_distance += displacement * displacement;
             }
@@ -416,9 +413,7 @@ impl GlModel {
         let thermal = fixture
             .get("thermal")
             .ok_or_else(|| "missing thermal declaration".to_owned())?;
-        if required_text(thermal, "temperature_unit")?
-            != "dimensionless_GL_temperature"
-        {
+        if required_text(thermal, "temperature_unit")? != "dimensionless_GL_temperature" {
             return Err("unsupported GL temperature unit".to_owned());
         }
         let temperature = finite_number(
@@ -447,7 +442,11 @@ impl GlModel {
         })
     }
 
-    fn free_energy_for(&self, fields: &[Complex], gauge_phases: &[f64]) -> Result<FreeEnergy, String> {
+    fn free_energy_for(
+        &self,
+        fields: &[Complex],
+        gauge_phases: &[f64],
+    ) -> Result<FreeEnergy, String> {
         if fields.len() != self.nodes.len() {
             return Err("complex-field count must equal node count".to_owned());
         }
@@ -497,7 +496,9 @@ impl GlModel {
             || !candidate.re.is_finite()
             || !candidate.im.is_finite()
         {
-            return Err("site-energy update has invalid links or non-finite candidate field".to_owned());
+            return Err(
+                "site-energy update has invalid links or non-finite candidate field".to_owned(),
+            );
         }
 
         let node = &self.nodes[site];
@@ -505,7 +506,8 @@ impl GlModel {
         let original_rho_squared = original.norm_sqr();
         let candidate_rho_squared = candidate.norm_sqr();
         let mut delta = node.a * (candidate_rho_squared - original_rho_squared)
-            + 0.5 * node.b
+            + 0.5
+                * node.b
                 * (candidate_rho_squared * candidate_rho_squared
                     - original_rho_squared * original_rho_squared);
 
@@ -520,8 +522,8 @@ impl GlModel {
             } else {
                 fields[edge.source].sub(candidate.rotate(*gauge_phase))
             };
-            delta += edge.coupling
-                * (candidate_difference.norm_sqr() - original_difference.norm_sqr());
+            delta +=
+                edge.coupling * (candidate_difference.norm_sqr() - original_difference.norm_sqr());
         }
         if !delta.is_finite() {
             return Err("local GL energy difference is non-finite".to_owned());
@@ -555,10 +557,7 @@ impl GlModel {
             }
 
             for alpha in 0..self.dimension {
-                current[alpha] += 2.0
-                    * edge.coupling
-                    * z_imag
-                    * normalized_displacement[alpha];
+                current[alpha] += 2.0 * edge.coupling * z_imag * normalized_displacement[alpha];
                 for beta in 0..self.dimension {
                     diamagnetic[alpha][beta] += 2.0
                         * edge.coupling
@@ -570,10 +569,7 @@ impl GlModel {
         }
 
         if current.iter().any(|value| !value.is_finite())
-            || diamagnetic
-                .iter()
-                .flatten()
-                .any(|value| !value.is_finite())
+            || diamagnetic.iter().flatten().any(|value| !value.is_finite())
         {
             return Err("twist-response estimator produced non-finite components".to_owned());
         }
@@ -701,8 +697,7 @@ impl GlModel {
                     grid[x * ny + y_next].unwrap(),
                 ];
                 let low_amplitude = corners.iter().any(|index| {
-                    fields[*index].norm_sqr().sqrt()
-                        <= self.amplitude_threshold.max(f64::EPSILON)
+                    fields[*index].norm_sqr().sqrt() <= self.amplitude_threshold.max(f64::EPSILON)
                 });
                 if low_amplitude {
                     diagnostics.skipped_low_amplitude_plaquettes += 1;
@@ -854,8 +849,7 @@ fn audit_and_evaluate(schema: &[u8], fixture: &[u8]) -> Result<Value, String> {
         .collect();
     let (transformed_fields, transformed_links) =
         model.gauge_transform(&fields, &links, &gauge_angles)?;
-    let transformed_energy =
-        model.free_energy_for(&transformed_fields, &transformed_links)?;
+    let transformed_energy = model.free_energy_for(&transformed_fields, &transformed_links)?;
     let gauge_residual = (energy.total - transformed_energy.total).abs();
     if gauge_residual > 1.0e-9 {
         return Err(format!(
@@ -881,9 +875,15 @@ fn main() {
                 monte_carlo = true;
                 index += 1;
             }
-            "--schema" | "--fixture" | "--out" | "--warmup-sweeps"
-            | "--measurement-sweeps" | "--thinning" | "--proposal-scale"
-            | "--chains" | "--seed" => {
+            "--schema"
+            | "--fixture"
+            | "--out"
+            | "--warmup-sweeps"
+            | "--measurement-sweeps"
+            | "--thinning"
+            | "--proposal-scale"
+            | "--chains"
+            | "--seed" => {
                 if index + 1 >= args.len() {
                     usage(&args[0]);
                     process::exit(2);
@@ -894,16 +894,18 @@ fn main() {
                     "--fixture" => fixture_path = Some(PathBuf::from(value)),
                     "--out" => output_path = Some(PathBuf::from(value)),
                     "--warmup-sweeps" => {
-                        sampling_overrides.warmup_sweeps = Some(value.parse().unwrap_or_else(|_| {
-                            eprintln!("warmup-sweeps must be an integer");
-                            process::exit(2);
-                        }))
+                        sampling_overrides.warmup_sweeps =
+                            Some(value.parse().unwrap_or_else(|_| {
+                                eprintln!("warmup-sweeps must be an integer");
+                                process::exit(2);
+                            }))
                     }
                     "--measurement-sweeps" => {
-                        sampling_overrides.measurement_sweeps = Some(value.parse().unwrap_or_else(|_| {
-                            eprintln!("measurement-sweeps must be an integer");
-                            process::exit(2);
-                        }))
+                        sampling_overrides.measurement_sweeps =
+                            Some(value.parse().unwrap_or_else(|_| {
+                                eprintln!("measurement-sweeps must be an integer");
+                                process::exit(2);
+                            }))
                     }
                     "--thinning" => {
                         sampling_overrides.thinning = Some(value.parse().unwrap_or_else(|_| {
@@ -912,16 +914,18 @@ fn main() {
                         }))
                     }
                     "--proposal-scale" => {
-                        sampling_overrides.proposal_scale = Some(value.parse().unwrap_or_else(|_| {
-                            eprintln!("proposal-scale must be numeric");
-                            process::exit(2);
-                        }))
+                        sampling_overrides.proposal_scale =
+                            Some(value.parse().unwrap_or_else(|_| {
+                                eprintln!("proposal-scale must be numeric");
+                                process::exit(2);
+                            }))
                     }
                     "--chains" => {
-                        sampling_overrides.independent_chains = Some(value.parse().unwrap_or_else(|_| {
-                            eprintln!("chains must be an integer");
-                            process::exit(2);
-                        }))
+                        sampling_overrides.independent_chains =
+                            Some(value.parse().unwrap_or_else(|_| {
+                                eprintln!("chains must be an integer");
+                                process::exit(2);
+                            }))
                     }
                     "--seed" => {
                         sampling_overrides.random_seed = Some(value.parse().unwrap_or_else(|_| {
@@ -951,19 +955,18 @@ fn main() {
     };
     let schema_bytes = read(&schema_path);
     let fixture_bytes = read(&fixture_path);
-    let mut receipt = audit_and_evaluate(&schema_bytes, &fixture_bytes)
-        .unwrap_or_else(|error| {
-            eprintln!("SC-AMPLITUDE-PHASE-FAIL: {error}");
-            process::exit(1);
-        });
+    let mut receipt = audit_and_evaluate(&schema_bytes, &fixture_bytes).unwrap_or_else(|error| {
+        eprintln!("SC-AMPLITUDE-PHASE-FAIL: {error}");
+        process::exit(1);
+    });
 
     if monte_carlo {
         let model = GlModel::from_bytes(&schema_bytes, &fixture_bytes).unwrap_or_else(|error| {
             eprintln!("SC-AMPLITUDE-PHASE-FAIL: {error}");
             process::exit(1);
         });
-        let sampling_receipt =
-            sampling::run(&model, &fixture_bytes, sampling_overrides).unwrap_or_else(|error| {
+        let sampling_receipt = sampling::run(&model, &fixture_bytes, sampling_overrides)
+            .unwrap_or_else(|error| {
                 eprintln!("SC-AMPLITUDE-PHASE-MC-FAIL: {error}");
                 process::exit(1);
             });
@@ -1003,16 +1006,18 @@ mod tests {
         let (schema, bytes) = inputs();
         let mut fixture: Value = serde_json::from_slice(&bytes).unwrap();
         mutation(&mut fixture);
-        GlModel::from_bytes(&schema, &serde_json::to_vec(&fixture).unwrap())
-            .map(|model| {
-                let energy = model
-                    .free_energy_for(&model.initial_fields(), &model.initial_gauge_phases())
-                    .unwrap();
-                model.receipt(energy, 0.0, model.vortex_diagnostics(
-                    &model.initial_fields(),
-                    &model.initial_gauge_phases(),
-                ).unwrap())
-            })
+        GlModel::from_bytes(&schema, &serde_json::to_vec(&fixture).unwrap()).map(|model| {
+            let energy = model
+                .free_energy_for(&model.initial_fields(), &model.initial_gauge_phases())
+                .unwrap();
+            model.receipt(
+                energy,
+                0.0,
+                model
+                    .vortex_diagnostics(&model.initial_fields(), &model.initial_gauge_phases())
+                    .unwrap(),
+            )
+        })
     }
 
     #[test]
@@ -1089,42 +1094,52 @@ mod tests {
 
     #[test]
     fn negative_quartic_coefficient_is_rejected() {
-        assert!(mutate_fixture(|fixture| {
-            fixture["graph"]["nodes"][0]["b_coefficient"] = json!(-1.0);
-        })
-        .is_err());
+        assert!(
+            mutate_fixture(|fixture| {
+                fixture["graph"]["nodes"][0]["b_coefficient"] = json!(-1.0);
+            })
+            .is_err()
+        );
     }
 
     #[test]
     fn unresolved_edge_endpoint_is_rejected() {
-        assert!(mutate_fixture(|fixture| {
-            fixture["graph"]["edges"][0]["target"] = json!("missing-node");
-        })
-        .is_err());
+        assert!(
+            mutate_fixture(|fixture| {
+                fixture["graph"]["edges"][0]["target"] = json!("missing-node");
+            })
+            .is_err()
+        );
     }
 
     #[test]
     fn periodic_bond_geometry_is_checked() {
-        assert!(mutate_fixture(|fixture| {
-            fixture["graph"]["edges"][6]["periodic_image_shift"] = json!([0, 0]);
-        })
-        .is_err());
+        assert!(
+            mutate_fixture(|fixture| {
+                fixture["graph"]["edges"][6]["periodic_image_shift"] = json!([0, 0]);
+            })
+            .is_err()
+        );
     }
 
     #[test]
     fn duplicate_node_identity_is_rejected() {
-        assert!(mutate_fixture(|fixture| {
-            fixture["graph"]["nodes"][1]["node_id"] = json!("n0_0");
-        })
-        .is_err());
+        assert!(
+            mutate_fixture(|fixture| {
+                fixture["graph"]["nodes"][1]["node_id"] = json!("n0_0");
+            })
+            .is_err()
+        );
     }
 
     #[test]
     fn zero_link_field_declaration_rejects_hidden_flux() {
-        assert!(mutate_fixture(|fixture| {
-            fixture["graph"]["edges"][0]["gauge_link_phase_rad"] = json!(0.3);
-        })
-        .is_err());
+        assert!(
+            mutate_fixture(|fixture| {
+                fixture["graph"]["edges"][0]["gauge_link_phase_rad"] = json!(0.3);
+            })
+            .is_err()
+        );
     }
 
     #[test]
@@ -1133,8 +1148,7 @@ mod tests {
         let mut value: Value = serde_json::from_slice(&fixture).unwrap();
         value["graph"]["nodes"][0]["psi_real"] = json!(0.0);
         value["graph"]["nodes"][0]["psi_imag"] = json!(0.0);
-        let model =
-            GlModel::from_bytes(&schema, &serde_json::to_vec(&value).unwrap()).unwrap();
+        let model = GlModel::from_bytes(&schema, &serde_json::to_vec(&value).unwrap()).unwrap();
         let energy = model
             .free_energy_for(&model.initial_fields(), &model.initial_gauge_phases())
             .unwrap();
@@ -1212,11 +1226,8 @@ mod tests {
             .map(|index| 0.27 * (index as f64 + 0.7).cos())
             .collect();
         let before = model.twist_response(&fields, &links).unwrap();
-        let (fields_after, links_after) =
-            model.gauge_transform(&fields, &links, &angles).unwrap();
-        let after = model
-            .twist_response(&fields_after, &links_after)
-            .unwrap();
+        let (fields_after, links_after) = model.gauge_transform(&fields, &links, &angles).unwrap();
+        let after = model.twist_response(&fields_after, &links_after).unwrap();
         for alpha in 0..model.dimension {
             assert!((before.current[alpha] - after.current[alpha]).abs() < 1.0e-10);
             for beta in 0..model.dimension {
@@ -1277,7 +1288,10 @@ mod tests {
                 let x = node.position[0] - 1.5;
                 let y = node.position[1] - 1.5;
                 let angle = y.atan2(x);
-                Complex { re: angle.cos(), im: angle.sin() }
+                Complex {
+                    re: angle.cos(),
+                    im: angle.sin(),
+                }
             })
             .collect();
         let links = model.initial_gauge_phases();
@@ -1305,8 +1319,7 @@ mod tests {
         let mut value: Value = serde_json::from_slice(&fixture).unwrap();
         value["graph"]["nodes"][0]["psi_real"] = json!(0.0);
         value["graph"]["nodes"][0]["psi_imag"] = json!(0.0);
-        let model =
-            GlModel::from_bytes(&schema, &serde_json::to_vec(&value).unwrap()).unwrap();
+        let model = GlModel::from_bytes(&schema, &serde_json::to_vec(&value).unwrap()).unwrap();
         let vortices = model
             .vortex_diagnostics(&model.initial_fields(), &model.initial_gauge_phases())
             .unwrap()
