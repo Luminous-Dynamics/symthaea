@@ -17,6 +17,7 @@ pub use geometry::{
 };
 pub use grid::{
     BinaryGrid, GridDecodeOutcome, GridDecoderManifest, GridDecoderSpec, GridError, GridTransform,
+    ManifestError,
     TraversalOrder, run_grid_tournament,
 };
 pub use statistics::{wilson_interval, binary_entropy, upper_tail_max_p_value};
