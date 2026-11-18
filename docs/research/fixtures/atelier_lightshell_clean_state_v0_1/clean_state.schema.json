@@ -49,8 +49,8 @@
       "required": [
         "candidate_id", "garment_generation_ref", "manufactured_article_ref",
         "installed_article_digest", "robot_id", "robot_serial", "firmware_revision",
-        "robot_configuration_digest", "mission_profile_ref", "topology_digest",
-        "asbuilt_inspection_ref", "cleaning_mode", "zones"
+        "robot_configuration_digest", "mission_profile_ref", "topology_digest", "topology_sample_map_ref",
+        "topology_sample_map_digest", "asbuilt_inspection_ref", "cleaning_mode", "zones"
       ],
       "properties": {
         "candidate_id": { "type": "string", "minLength": 1 },
@@ -63,6 +63,8 @@
         "robot_configuration_digest": { "$ref": "#/$defs/digest" },
         "mission_profile_ref": { "type": "string", "minLength": 1 },
         "topology_digest": { "$ref": "#/$defs/digest" },
+        "topology_sample_map_ref": { "type": "string", "minLength": 1 },
+        "topology_sample_map_digest": { "$ref": "#/$defs/digest" },
         "asbuilt_inspection_ref": { "type": "string", "minLength": 1 },
         "cleaning_mode": { "enum": ["installed_in_place", "removed_module"] },
         "zones": {
