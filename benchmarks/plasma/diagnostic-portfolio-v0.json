@@ -260,6 +260,9 @@
       "compatible_decision_set",
       "frame_decision_identified_ambiguous_or_no_compatible_world"
     ],
-    "claim_ceiling": "FRAME_DECISION_IDENTIFICATION_ONLY_FOR_DECLARED_CATEGORICAL_MODEL_NOT_PHYSICAL_OBSERVABILITY"
+    "claim_ceiling": "FRAME_DECISION_IDENTIFICATION_ONLY_FOR_DECLARED_CATEGORICAL_MODEL_NOT_PHYSICAL_OBSERVABILITY",
+    "distinguishes_nominal_architecture_diagnosability_from_current_frame_available_sensor_diagnosability": true,
+    "frame_decision_uses_only_worlds_consistent_with_admitted_categories": true,
+    "current_available_sensor_set_includes_only_direct_measured_in_domain_categories": true
   }
 }
