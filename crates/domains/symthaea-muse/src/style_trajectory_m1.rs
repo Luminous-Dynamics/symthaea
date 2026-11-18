@@ -456,8 +456,24 @@ pub fn verify_classical_to_minimalism_m1_receipt_v1(
 
     let expected_styles = [Style::Classical, Style::Minimalism];
     let expected_ids = [CLASSICAL_SEGMENT_ID, MINIMALISM_SEGMENT_ID];
+    if result.plan.segments.len() != 2 {
+        return Err(StyleTrajectoryM1Error::ReceiptTransitionMismatch);
+    }
     for (index, segment) in result.segments.iter().enumerate() {
         if segment.style != expected_styles[index] || segment.segment_id != expected_ids[index] {
+            return Err(StyleTrajectoryM1Error::ReceiptSegmentIdentityMismatch {
+                segment_index: index,
+            });
+        }
+        let expected_catalogue_id = catalogue_id_for_style(segment.style)?;
+        let expected_style_ref = format!("catalog-style:{expected_catalogue_id}");
+        let expected_profile_sha = style_profile_sha256_v1(segment.style)
+            .map_err(StyleTrajectoryM1Error::Admission)?;
+        let planned_segment = &result.plan.segments[index];
+        if planned_segment.structural_owner_ref != expected_style_ref
+            || planned_segment.profile_ref != expected_style_ref
+            || planned_segment.profile_sha256 != expected_profile_sha
+        {
             return Err(StyleTrajectoryM1Error::ReceiptSegmentIdentityMismatch {
                 segment_index: index,
             });
@@ -1229,8 +1245,19 @@ mod tests {
     fn m1_receipt_reconstructs_composed_score_and_rejects_score_mutation() {
         let mut result =
             realize_classical_to_minimalism_m1(m1_intent(M1_SHARED_AROUSAL)).unwrap();
-        result.segments[1].score.notes[0].pitch =
-            Pitch::from_midi(result.segments[1].score.notes[0].pitch.midi().wrapping_add(1));
+        let harmony_index = result.segments[1]
+            .score
+            .notes
+            .iter()
+            .position(|note| note.role == VoiceRole::Harmony)
+            .expect("Minimalism fixture must contain a harmony-clock note");
+        let harmony_midi = result.segments[1].score.notes[harmony_index].pitch.midi();
+        let mutated_midi = if harmony_midi < 127 {
+            harmony_midi + 1
+        } else {
+            harmony_midi - 1
+        };
+        result.segments[1].score.notes[harmony_index].pitch = Pitch::from_midi(mutated_midi);
         result.segments[1].segment_score_sha256 =
             score_sha256(&result.segments[1].score).unwrap();
         result.segments[1].evidence_sha256 =
