@@ -1250,6 +1250,18 @@ mod tests {
             manifest["claim_ceiling"],
             "FINITE_SYMBOLIC_DECISION_SUFFICIENCY_ONLY_NO_PHYSICAL_OBSERVABILITY_OR_SENSOR_RELIABILITY_CLAIM"
         );
+        assert_eq!(
+            manifest["frame_bridge_contract"]["only_direct_measured_values_can_become_known_categories"],
+            true
+        );
+        assert_eq!(
+            manifest["frame_bridge_contract"]["synthetic_unavailable_invalid_delayed_degraded_values_remain_unknown"],
+            true
+        );
+        assert_eq!(
+            manifest["frame_bridge_contract"]["category_labels_must_exist_in_declared_world_signatures"],
+            true
+        );
 
         let model = reference_model();
         let all = all_sensor_ids(&model);
