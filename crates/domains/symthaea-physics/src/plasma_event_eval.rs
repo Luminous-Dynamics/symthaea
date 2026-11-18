@@ -1417,6 +1417,34 @@ mod tests {
             "luminous.plasma-event-evaluation.v0.1"
         );
         assert_eq!(manifest["benchmark_id"], "PLASMA-EVENT-EVAL-001");
+        assert_eq!(
+            manifest["synthetic_replay_interop"]["producer_pull_request"],
+            5905
+        );
+        assert_eq!(
+            manifest["synthetic_replay_interop"]["producer_schema"],
+            "luminous.plasma-synthetic-observation-export.v0.1"
+        );
+        assert_eq!(
+            manifest["synthetic_replay_interop"]["observation_frame_schema"],
+            "luminous.plasma-observation-frame.v0.1"
+        );
+        assert_eq!(
+            manifest["synthetic_replay_interop"]["physical_measurements"],
+            false
+        );
+        assert_eq!(
+            manifest["synthetic_replay_interop"]["allowed_observation_statuses"],
+            serde_json::json!(["synthetic", "unavailable", "invalid"])
+        );
+        assert_eq!(
+            manifest["synthetic_replay_interop"]["forbidden_observation_statuses"],
+            serde_json::json!(["measured", "delayed", "degraded"])
+        );
+        assert_eq!(
+            manifest["synthetic_replay_interop"]["hashes_are_authentication"],
+            false
+        );
         assert_eq!(manifest["population_and_split_contract"]["test_is_read_only"], true);
         assert_eq!(
             manifest["population_and_split_contract"]["split_tracks"]["tokamark_temporal_transfer"]["use_for_primary_temporal_generalization"],
