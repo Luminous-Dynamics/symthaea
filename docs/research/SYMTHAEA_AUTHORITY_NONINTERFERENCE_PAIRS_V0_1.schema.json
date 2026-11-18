@@ -1,0 +1,357 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/SYMTHAEA_AUTHORITY_NONINTERFERENCE_PAIRS_V0_1.schema.json",
+  "title": "Symthaea authority non-interference paired profile manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile_id",
+    "title",
+    "status",
+    "synthetic",
+    "created_utc_date",
+    "purpose",
+    "upstream_contract",
+    "formal_contract",
+    "pure_pair_families",
+    "composition_families",
+    "pairs",
+    "non_goals"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea.authority-noninterference-profile.v0.1"
+    },
+    "profile_id": {
+      "const": "SYMTHAEA-AUTH-NI-001"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "const": "synthetic-development-manifest-not-run"
+    },
+    "synthetic": {
+      "const": true
+    },
+    "created_utc_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "upstream_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suite_id",
+        "scenario_schema_version",
+        "scenario_source",
+        "scenario_count_at_mapping",
+        "oracle_source",
+        "scorecard",
+        "effect_boundary",
+        "schema_policy"
+      ],
+      "properties": {
+        "suite_id": {
+          "const": "LARP-AGENT-AUTHZ-001"
+        },
+        "scenario_schema_version": {
+          "const": "lise.agent-authorization-scenarios.v0.1"
+        },
+        "scenario_source": {
+          "type": "string"
+        },
+        "scenario_count_at_mapping": {
+          "type": "integer",
+          "const": 28
+        },
+        "oracle_source": {
+          "type": "string"
+        },
+        "scorecard": {
+          "type": "string"
+        },
+        "effect_boundary": {
+          "type": "string"
+        },
+        "schema_policy": {
+          "type": "string"
+        }
+      }
+    },
+    "formal_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frozen_authority_projection",
+        "cognitive_only_inputs",
+        "authority_ceiling",
+        "effective_action_bound",
+        "metamorphic_rule",
+        "estimator_rule"
+      ],
+      "properties": {
+        "frozen_authority_projection": {
+          "type": "string"
+        },
+        "cognitive_only_inputs": {
+          "type": "string"
+        },
+        "authority_ceiling": {
+          "type": "string"
+        },
+        "effective_action_bound": {
+          "type": "string"
+        },
+        "metamorphic_rule": {
+          "type": "string"
+        },
+        "estimator_rule": {
+          "type": "string"
+        }
+      }
+    },
+    "pure_pair_families": {
+      "type": "array",
+      "const": [
+        "S1",
+        "S2",
+        "S3",
+        "S4"
+      ]
+    },
+    "composition_families": {
+      "type": "array",
+      "const": [
+        "S5",
+        "S6",
+        "S7",
+        "S8"
+      ]
+    },
+    "pairs": {
+      "type": "array",
+      "minItems": 16,
+      "items": {
+        "$ref": "#/$defs/pair"
+      }
+    },
+    "non_goals": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pair_id",
+        "family",
+        "evaluation_class",
+        "pure_noninterference_denominator",
+        "title",
+        "upstream_scenario_refs",
+        "frozen_authority_projection",
+        "intervention",
+        "must_not_change",
+        "permitted_caution_dispositions",
+        "expected_property",
+        "oracle_ownership",
+        "notes"
+      ],
+      "properties": {
+        "pair_id": {
+          "type": "string",
+          "pattern": "^S[1-8]-[A-Z0-9-]+$"
+        },
+        "family": {
+          "enum": [
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S5",
+            "S6",
+            "S7",
+            "S8"
+          ]
+        },
+        "evaluation_class": {
+          "enum": [
+            "pure_cognitive_metamorphic",
+            "composition_control"
+          ]
+        },
+        "pure_noninterference_denominator": {
+          "type": "boolean"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "upstream_scenario_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^A[0-9]{2}$"
+          }
+        },
+        "frozen_authority_projection": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "scenario_id",
+            "field_paths"
+          ],
+          "properties": {
+            "scenario_id": {
+              "type": "string",
+              "pattern": "^A[0-9]{2}$"
+            },
+            "field_paths": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "intervention": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "signal",
+            "profile",
+            "baseline_label",
+            "perturbed_label"
+          ],
+          "properties": {
+            "signal": {
+              "type": "string",
+              "minLength": 1
+            },
+            "profile": {
+              "type": "string",
+              "minLength": 1
+            },
+            "baseline_label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "perturbed_label": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "must_not_change": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "permitted_caution_dispositions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "no_additional_caution",
+              "hold",
+              "defer",
+              "review",
+              "reduce_scope"
+            ]
+          }
+        },
+        "expected_property": {
+          "type": "string",
+          "minLength": 1
+        },
+        "oracle_ownership": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "evaluation_class": {
+                "const": "pure_cognitive_metamorphic"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "pure_noninterference_denominator": {
+                "const": true
+              },
+              "frozen_authority_projection": {
+                "type": "object"
+              },
+              "family": {
+                "enum": [
+                  "S1",
+                  "S2",
+                  "S3",
+                  "S4"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "evaluation_class": {
+                "const": "composition_control"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "pure_noninterference_denominator": {
+                "const": false
+              },
+              "frozen_authority_projection": {
+                "type": "null"
+              },
+              "family": {
+                "enum": [
+                  "S5",
+                  "S6",
+                  "S7",
+                  "S8"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
