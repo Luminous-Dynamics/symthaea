@@ -1744,12 +1744,11 @@ pub fn verify_approximate_certificate(
     certificate: &ApproximateQuotientCertificateV1,
     budget: QualificationBudgetV1,
 ) -> Result<ApproximateVerificationReceiptV1, ApproximateQuotientErrorV1> {
-    let replayed = compile_approximate_quotient(problem, action, contract, budget)?;
-    let ApproximateCompileOutcomeV1::Authorized(expected) = replayed else {
-        let ApproximateCompileOutcomeV1::Blocked(violation) = replayed else {
-            unreachable!()
-        };
-        return Err(ApproximateQuotientErrorV1::Blocked(violation));
+    let expected = match compile_approximate_quotient(problem, action, contract, budget)? {
+        ApproximateCompileOutcomeV1::Authorized(expected) => expected,
+        ApproximateCompileOutcomeV1::Blocked(violation) => {
+            return Err(ApproximateQuotientErrorV1::Blocked(violation));
+        }
     };
     if *certificate != expected {
         return Err(ApproximateQuotientErrorV1::CertificateMismatch);
@@ -2207,11 +2206,11 @@ mod tests {
                 .map(|orbit| orbit.representative_id.clone())
                 .collect::<Vec<_>>()
         );
-        assert_ne!(
+        assert_eq!(
             approximate.pruning_authority,
             ApproximatePruningAuthorityV1::ExactFeasibilityWithBoundedAdditiveObjectiveDeviation
         );
-        assert_ne!(
+        assert_eq!(
             exact.pruning_authority,
             PruningAuthorityV1::ExactFiniteGroupAndExactTaskSemanticPreservation
         );
