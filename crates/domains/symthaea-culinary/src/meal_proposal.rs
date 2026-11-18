@@ -254,7 +254,6 @@ pub enum MealProposalViolationCodeV1 {
     MissingFactUnitOrBasis,
     MissingFactMarket,
     InvalidAllergenFactScope,
-    UnknownFactReference,
     DuplicateUncertainty,
     ClaimCeilingMismatch,
 }
