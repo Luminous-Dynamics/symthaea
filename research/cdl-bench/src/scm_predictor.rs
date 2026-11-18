@@ -49,17 +49,21 @@ impl StructuredState {
         let lane = (offset % BYTE_LANES as u64) as usize;
         let context = match conditioning {
             1 => self.parent_context(variable, lane),
-            2 => (self.previous_record[variable * BYTE_LANES + lane] >> 6) as usize,
+            2 => Self::value_bucket(&self.previous_record, variable),
             3 => self.hybrid_context(variable, lane),
             _ => 0,
         };
         &self.contexts[variable][lane][context]
     }
 
-    fn parent_context(&self, variable: usize, lane: usize) -> usize {
-        let bucket = |parent: usize| -> usize {
-            (self.current_record[parent * BYTE_LANES + lane] >> 6) as usize
-        };
+    fn value_bucket(record: &[u8; SCM_VARIABLES * BYTE_LANES], variable: usize) -> usize {
+        let offset = variable * BYTE_LANES;
+        let value = i16::from_le_bytes([record[offset], record[offset + 1]]) as i32;
+        (((value + 32_768) * 4) / 65_536) as usize
+    }
+
+    fn parent_context(&self, variable: usize, _lane: usize) -> usize {
+        let bucket = |parent: usize| Self::value_bucket(&self.current_record, parent);
 
         // Each parent byte is quantized to four coarse bins. Parents are
         // earlier in the serialized topological order, so both encoder and
@@ -79,7 +83,7 @@ impl StructuredState {
         // reserve two additional bits for the previous same-field byte.
         // This caps the combined context space at 16 bins.
         let parent_bucket = |parent: usize| -> usize {
-            (self.current_record[parent * BYTE_LANES + lane] >> 7) as usize
+            (Self::value_bucket(&self.current_record, parent) >> 1) as usize
         };
         let parents = match variable {
             0 => 0,
@@ -89,7 +93,7 @@ impl StructuredState {
             4 => parent_bucket(1) | (parent_bucket(3) << 1),
             _ => 0,
         };
-        let lag = (self.previous_record[variable * BYTE_LANES + lane] >> 6) as usize;
+        let lag = Self::value_bucket(&self.previous_record, variable);
         (parents << 2) | lag
     }
 
@@ -120,7 +124,7 @@ impl StructuredState {
             let lane = (offset % BYTE_LANES as u64) as usize;
             let context = match conditioning {
                 1 => self.parent_context(variable, lane),
-                2 => (self.previous_record[variable * BYTE_LANES + lane] >> 6) as usize,
+                2 => Self::value_bucket(&self.previous_record, variable),
                 3 => self.hybrid_context(variable, lane),
                 _ => 0,
             };
