@@ -8,8 +8,7 @@
 //! from a test set, or authorize machine actions.
 
 use crate::plasma_observability::{
-    BlockedChannel, CalibrationIdentity, DecisionChannelRequirement, DecisionInputGate,
-    PlasmaObservationFrame, PLASMA_OBSERVATION_SCHEMA,
+    BlockedChannel, DecisionChannelRequirement, DecisionInputGate, PlasmaObservationFrame,
 };
 use crate::plasma_cluster_bootstrap::{
     ShotClusterBootstrapPlan, SHOT_CLUSTER_BOOTSTRAP_RNG_ALGORITHM,
@@ -2075,7 +2074,7 @@ mod tests {
         );
         assert_eq!(
             fixture["observation_frame_schema"],
-            PLASMA_OBSERVATION_SCHEMA
+            crate::plasma_observability::PLASMA_OBSERVATION_SCHEMA
         );
         assert_eq!(fixture["physical_measurements"], false);
 
@@ -2100,7 +2099,7 @@ mod tests {
                 expected_units: "10^20 m^-3".to_owned(),
                 max_age_ns: 1_000_000,
                 allowed_source_ids: vec!["direct-source".to_owned()],
-                calibration: CalibrationIdentity {
+                calibration: crate::plasma_observability::CalibrationIdentity {
                     calibration_id: "direct-calibration".to_owned(),
                     calibration_revision: "rev-1".to_owned(),
                 },
