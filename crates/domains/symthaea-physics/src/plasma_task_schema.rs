@@ -398,14 +398,40 @@ mod tests {
     #[test]
     fn duplicate_descriptor_ids_are_rejected_but_signal_role_reuse_is_explicit() {
         let mut schema = group6_schema();
-        let mut past_ip = schema.context_signals[0].clone();
-        past_ip.descriptor_id = "past-ip-segment".to_owned();
-        schema.context_signals[0].descriptor_id = "anchor-ip-segment".to_owned();
-        schema.context_signals.push(past_ip);
-        schema.validate().expect("same signal ID may appear as separate descriptors");
+        let mut future_ip_target = schema.context_signals[0].clone();
+        future_ip_target.descriptor_id = "future-ip-target".to_owned();
+        future_ip_target.role = PlasmaSignalRole::PlasmaResponseTarget;
+        future_ip_target.temporal_support.start_offset_ns = 0;
+        future_ip_target.temporal_support.end_offset_ns = 25_000_000;
+        future_ip_target.evidence_admission = None;
+        schema.target_signals.push(future_ip_target);
+        schema.validate().expect("same signal ID may appear as context and target");
 
-        schema.context_signals[1].descriptor_id = schema.context_signals[0].descriptor_id.clone();
+        schema.target_signals[1].descriptor_id = schema.target_signals[0].descriptor_id.clone();
         assert!(schema.validate().is_err());
+    }
+
+    #[test]
+    fn frozen_group6_single_channel_schema_deserializes_and_validates() {
+        let manifest: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../benchmarks/plasma/task-schema-v0.json"
+        ))
+        .expect("task schema manifest should parse");
+        let value = manifest["example_schemas"]["group6_task_6_3_single_plasma_current"].clone();
+        let schema: PlasmaTaskSchema =
+            serde_json::from_value(value).expect("Group 6 schema should deserialize");
+        schema.validate().expect("Group 6 schema should validate");
+        assert_eq!(schema.task_id, "task_6-3");
+        assert_eq!(schema.context_signals[0].native_shape, vec![400]);
+        assert_eq!(
+            schema.context_signals[0].temporal_support.sample_interval_ns,
+            Some(250_000)
+        );
+        assert_eq!(
+            schema.context_signals[0].temporal_support.start_offset_ns,
+            -100_000_000
+        );
+        assert_eq!(schema.target_signals[0].role, PlasmaSignalRole::DisruptionRiskTarget);
     }
 
     #[test]
@@ -423,7 +449,7 @@ mod tests {
     #[test]
     fn manifest_pins_schema_contract_and_temporal_causality() {
         let manifest: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../benchmarks/plasma/event-eval-v0.json"
+            "../../../../benchmarks/plasma/task-schema-v0.json"
         ))
         .expect("event evaluation manifest");
         let contract = &manifest["schema_conditioned_task_contract"];
