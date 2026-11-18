@@ -417,3 +417,148 @@ mod tests {
         assert_eq!(assessment.reasons.len(), 4);
     }
 }
+
+
+#[cfg(test)]
+mod exhaustive_state_space_tests {
+    use super::*;
+
+    #[test]
+    fn all_57_600_input_combinations_preserve_continuity_invariants() {
+        let water_states = [
+            WaterUseQualification::QualifiedForIntendedUse,
+            WaterUseQualification::Unknown,
+            WaterUseQualification::Stale,
+            WaterUseQualification::Revoked,
+            WaterUseQualification::WrongUseClass,
+        ];
+        let protection_states = [
+            LocalProtectionState::Qualified,
+            LocalProtectionState::Tripped,
+            LocalProtectionState::Unavailable,
+            LocalProtectionState::Unknown,
+        ];
+        let evidence_states = [
+            EvidenceFreshness::Current,
+            EvidenceFreshness::Missing,
+            EvidenceFreshness::Stale,
+            EvidenceFreshness::Contradictory,
+            EvidenceFreshness::Revoked,
+        ];
+        let pressure_states = [
+            PressureEnvelopeState::InsideQualifiedEnvelope,
+            PressureEnvelopeState::BelowQualifiedMinimum,
+            PressureEnvelopeState::AboveQualifiedMaximum,
+            PressureEnvelopeState::Unknown,
+        ];
+        let drain_states = [
+            DrainPathState::Clear,
+            DrainPathState::Blocked,
+            DrainPathState::Unknown,
+        ];
+        let leak_states = [LeakState::Clear, LeakState::Detected, LeakState::Unknown];
+        let capabilities = [
+            LocalServiceCapability::FullServiceQualified,
+            LocalServiceCapability::ReducedServiceQualified,
+            LocalServiceCapability::ManualOnlyQualified,
+            LocalServiceCapability::NoQualifiedService,
+        ];
+        let digital_states = [
+            DigitalExperienceState::Available,
+            DigitalExperienceState::Unavailable,
+        ];
+
+        let mut combinations = 0_usize;
+
+        for water_use in water_states {
+            for local_protection in protection_states {
+                for critical_evidence in evidence_states {
+                    for pressure in pressure_states {
+                        for drain in drain_states {
+                            for leak in leak_states {
+                                for local_capability in capabilities {
+                                    for digital_experience in digital_states {
+                                        for requalification_required in [false, true] {
+                                            let observation = ContinuityObservation {
+                                                water_use,
+                                                local_protection,
+                                                critical_evidence,
+                                                pressure,
+                                                drain,
+                                                leak,
+                                                local_capability,
+                                                digital_experience,
+                                                requalification_required,
+                                            };
+                                            let assessment = assess_continuity(observation);
+
+                                            let hard_fault = water_use
+                                                != WaterUseQualification::QualifiedForIntendedUse
+                                                || local_protection
+                                                    != LocalProtectionState::Qualified
+                                                || critical_evidence != EvidenceFreshness::Current
+                                                || pressure
+                                                    != PressureEnvelopeState::InsideQualifiedEnvelope
+                                                || drain != DrainPathState::Clear
+                                                || leak != LeakState::Clear;
+
+                                            let expected_mode = if hard_fault {
+                                                ContinuityMode::IsolatedStop
+                                            } else if requalification_required {
+                                                ContinuityMode::RecoveryPending
+                                            } else {
+                                                match local_capability {
+                                                    LocalServiceCapability::FullServiceQualified => {
+                                                        ContinuityMode::QualifiedFull
+                                                    }
+                                                    LocalServiceCapability::ReducedServiceQualified => {
+                                                        ContinuityMode::QualifiedReduced
+                                                    }
+                                                    LocalServiceCapability::ManualOnlyQualified => {
+                                                        ContinuityMode::ManualOnly
+                                                    }
+                                                    LocalServiceCapability::NoQualifiedService => {
+                                                        ContinuityMode::IsolatedStop
+                                                    }
+                                                }
+                                            };
+
+                                            assert_eq!(
+                                                assessment.mode,
+                                                expected_mode,
+                                                "unexpected mode for state combination {combinations}"
+                                            );
+                                            assert_eq!(
+                                                assessment.recommendations_available,
+                                                digital_experience
+                                                    == DigitalExperienceState::Available
+                                            );
+                                            assert_eq!(
+                                                assessment.is_service_admitted(),
+                                                matches!(
+                                                    expected_mode,
+                                                    ContinuityMode::QualifiedFull
+                                                        | ContinuityMode::QualifiedReduced
+                                                        | ContinuityMode::ManualOnly
+                                                )
+                                            );
+                                            if hard_fault {
+                                                assert_ne!(
+                                                    assessment.mode,
+                                                    ContinuityMode::RecoveryPending
+                                                );
+                                            }
+                                            combinations += 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        assert_eq!(combinations, 57_600);
+    }
+}
