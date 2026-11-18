@@ -18,8 +18,8 @@ pub enum StabilizerWitnessV1 {
         source_to_target: Vec<usize>,
     },
     MovedPoint {
-        source: Point,
-        transformed: Point,
+        source: (i128, i128),
+        transformed: (i128, i128),
     },
     PolynomialIdentity {
         transformed_terms: Vec<((u32, u32), i128)>,
@@ -388,22 +388,21 @@ impl Manifest {
             }
         }
         let label = string_field(case, "expected_subgroup_label")?;
-        let expected_members: BTreeSet<String> = match label.as_str() {
-            "D4" => ["e", "r90", "r180", "r270", "fx", "fy", "fdiag", "fanti"],
-            "C4" => ["e", "r90", "r180", "r270"],
-            "C2_R180" => ["e", "r180"],
-            "C2_FX" => ["e", "fx"],
-            "C2_FY" => ["e", "fy"],
-            "C2_FDIAG" => ["e", "fdiag"],
-            "C2_FANTI" => ["e", "fanti"],
-            "V4_AXIS" => ["e", "r180", "fx", "fy"],
-            "V4_DIAG" => ["e", "r180", "fdiag", "fanti"],
-            "C1" => ["e"],
+        let expected_ids: &[&str] = match label.as_str() {
+            "D4" => &["e", "r90", "r180", "r270", "fx", "fy", "fdiag", "fanti"],
+            "C4" => &["e", "r90", "r180", "r270"],
+            "C2_R180" => &["e", "r180"],
+            "C2_FX" => &["e", "fx"],
+            "C2_FY" => &["e", "fy"],
+            "C2_FDIAG" => &["e", "fdiag"],
+            "C2_FANTI" => &["e", "fanti"],
+            "V4_AXIS" => &["e", "r180", "fx", "fy"],
+            "V4_DIAG" => &["e", "r180", "fdiag", "fanti"],
+            "C1" => &["e"],
             _ => return Err(format!("unknown fixture subgroup label: {label}")),
-        }
-        .into_iter()
-        .map(str::to_owned)
-        .collect();
+        };
+        let expected_members: BTreeSet<String> =
+            expected_ids.iter().map(|id| (*id).to_owned()).collect();
         if set != expected_members {
             return Err(format!(
                 "subgroup label {label} does not match its canonical D4 subgroup: {set:?}"
