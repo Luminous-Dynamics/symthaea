@@ -50,15 +50,16 @@ All constants below are reference checks for specified textbook models, not pred
 | Control | Reference behaviour | Required gate |
 |---|---|---|
 | 1D finite-range XY chain | No finite-temperature long-range phase order in the thermodynamic limit | A finite-size crossover must not be reported as a nonzero thermodynamic transition |
-| 2D square-lattice classical XY, nearest-neighbour \(J=1\) | BKT transition near \(T_{BKT}/J\simeq0.8929\) | Recover logarithmic finite-size behaviour and the helicity-modulus universal jump |
-| 3D simple-cubic classical XY, nearest-neighbour \(J=1\) | \(K_c=J/(k_BT_c)\simeq0.45420\), or \(k_BT_c/J\simeq2.2017\) | Recover a finite-size scaling crossing / critical behaviour consistent with the reference model |
+| 2D square-lattice classical XY, nearest-neighbour \(J=1\) | Best precision reference located: \(T_{BKT}/J=0.892943(2)\) from tensor-network level spectroscopy; HOTRG reports \(0.89290(5)\) | Reproduce published precision; compare TNR/level spectroscopy, HOTRG and Monte Carlo, reporting finite-bond-dimension and finite-size systematics |
+| 3D simple-cubic classical XY, nearest-neighbour \(J=1\) | \(K_c=J/(k_BT_c)=0.45420(2)\) (Gottlob & Hasenbusch, 1993), equivalently \(k_BT_c/J\approx2.2017\) | Recover critical coupling with finite-size scaling and controlled corrections to scaling |
 
 The 2D helicity-modulus jump is \(\Upsilon(T_{BKT}^{-})=2k_BT_{BKT}/\pi\), using the conventional normalization. The implementation must document the twist direction and geometric normalization used for \(\Upsilon\).
 
 Reference sources:
-- Chung, *Essential finite-size effect in the two-dimensional XY model*, Phys. Rev. B 60 (1999), https://doi.org/10.1103/PhysRevB.60.11761.
-- Hasenbusch and Gottlob, *Critical behaviour of the 3D XY-model: a Monte Carlo study*, Physica A 201 (1993), https://doi.org/10.1016/0378-4371(93)90131-M.
-- Li and Teitel, *Finite-size scaling study of the three-dimensional classical XY model*, Phys. Rev. B 40 (1989), https://doi.org/10.1103/PhysRevB.40.9122.
+- Ueda & Oshikawa, *Resolving the Berezinskii-Kosterlitz-Thouless transition in the two-dimensional XY model with tensor-network-based level spectroscopy*, Phys. Rev. B 104, 165132 (2021), https://doi.org/10.1103/PhysRevB.104.165132. Reports \(0.892943(2)\) and removes leading logarithmic corrections through level spectroscopy.
+- Yu et al., *Tensor renormalization group study of the classical XY model on the square lattice*, Phys. Rev. E 89, 013308 (2014), https://doi.org/10.1103/PhysRevE.89.013308. An independent HOTRG comparison reports \(0.8921(19)\).
+- Gottlob & Hasenbusch, *Critical behaviour of the 3D XY-model: a Monte Carlo study*, Physica A 201 (1993), https://doi.org/10.1016/0378-4371(93)90131-M. Reports \(K_c=0.45420(2)\) using single-cluster Monte Carlo.
+- Hasenbusch, *Eliminating leading and subleading corrections to scaling in the three-dimensional XY universality class*, Phys. Rev. B 112, 184512 (2025), https://doi.org/10.1103/1d4g-483z. A modern correction-to-scaling methodology comparator, not the same nearest-neighbour model.
 
 ## Topology and disorder families
 
