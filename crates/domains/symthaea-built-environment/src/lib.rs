@@ -765,6 +765,7 @@ pub struct ConceptCandidateReceipt {
     pub candidate_state: String,
     pub interpretation: String,
     pub source_intents: Vec<CandidateSourceIntent>,
+    pub unresolved_intent_axes: Vec<String>,
     pub parameter_deltas: Vec<Value>,
     pub geometry_ref: Option<String>,
     pub hard_gate_state: String,
@@ -816,6 +817,96 @@ pub fn replay_matches(expected: &ReplayReceipt, actual: &ReplayReceipt) -> bool 
 /// Validate the illustrative candidate-set receipt without promoting it to a
 /// generated set. Executable generation requires a later, reviewed authority
 /// bridge and a separately qualified design/geometry provider.
+fn expected_resident_source_preference(
+    problem: &DesignProblem,
+    axis: &str,
+    option_id: &str,
+) -> Option<&'static str> {
+    let axes = &problem.input.axis_intent;
+    match axis {
+        "spatial_typology" => axes
+            .spatial_typology
+            .entries
+            .iter()
+            .find(|entry| entry.option_id == option_id)
+            .map(|entry| match entry.preference {
+                Preference::Preferred => "PREFERRED",
+                Preference::Considered => "CONSIDERED",
+                Preference::Avoided => "AVOIDED",
+                Preference::Undecided => "UNDECIDED",
+            }),
+        "architectural_expression" => axes
+            .architectural_expression
+            .entries
+            .iter()
+            .find(|entry| entry.option_id == option_id)
+            .map(|entry| match entry.role {
+                ExpressionRole::Primary => "PRIMARY",
+                ExpressionRole::Secondary => "SECONDARY",
+                ExpressionRole::Accent => "ACCENT",
+                ExpressionRole::ReferenceOnly => "REFERENCE_ONLY",
+                ExpressionRole::Avoid => "AVOID",
+                ExpressionRole::Acceptable => "ACCEPTABLE",
+                ExpressionRole::Undecided => "UNDECIDED",
+            }),
+        "material_tectonic_intent" => axes
+            .material_tectonic_intent
+            .entries
+            .iter()
+            .find(|entry| entry.option_id == option_id)
+            .map(|entry| match entry.preference {
+                Preference::Preferred => "PREFERRED",
+                Preference::Considered => "CONSIDERED",
+                Preference::Avoided => "AVOIDED",
+                Preference::Undecided => "UNDECIDED",
+            }),
+        "environmental_strategy_intent" => axes
+            .environmental_strategy_intent
+            .entries
+            .iter()
+            .find(|entry| entry.option_id == option_id)
+            .map(|entry| match entry.preference {
+                Preference::Preferred => "PREFERRED",
+                Preference::Considered => "CONSIDERED",
+                Preference::Avoided => "AVOIDED",
+                Preference::Undecided => "UNDECIDED",
+            }),
+        "experience_programme" => axes
+            .experience_programme
+            .entries
+            .iter()
+            .find(|entry| entry.option_id == option_id)
+            .map(|entry| match entry.preference {
+                Preference::Preferred => "PREFERRED",
+                Preference::Considered => "CONSIDERED",
+                Preference::Avoided => "AVOIDED",
+                Preference::Undecided => "UNDECIDED",
+            }),
+        _ => None,
+    }
+}
+
+fn explicitly_unresolved_intent_axes(problem: &DesignProblem) -> BTreeSet<String> {
+    let axes = &problem.input.axis_intent;
+    let mut unresolved = BTreeSet::new();
+    if matches!(axes.spatial_typology.state, AxisState::Undecided | AxisState::ConflictUnresolved) {
+        unresolved.insert("SPATIAL_TYPOLOGY".to_owned());
+    }
+    if matches!(axes.architectural_expression.state, AxisState::Undecided | AxisState::ConflictUnresolved) {
+        unresolved.insert("ARCHITECTURAL_EXPRESSION".to_owned());
+    }
+    if matches!(axes.material_tectonic_intent.state, AxisState::Undecided | AxisState::ConflictUnresolved) {
+        unresolved.insert("MATERIAL_AND_TECTONIC_INTENT".to_owned());
+    }
+    if matches!(axes.environmental_strategy_intent.state, AxisState::Undecided | AxisState::ConflictUnresolved) {
+        unresolved.insert("ENVIRONMENTAL_STRATEGY_INTENT".to_owned());
+    }
+    if matches!(axes.experience_programme.state, ExperienceState::Undecided | ExperienceState::ConflictUnresolved) {
+        unresolved.insert("EXPERIENCE_AND_PROGRAMME".to_owned());
+    }
+    unresolved
+}
+
 pub fn validate_illustrative_candidate_set(
     receipt: &CandidateSetReceipt,
     problem: &DesignProblem,
@@ -880,6 +971,18 @@ pub fn validate_illustrative_candidate_set(
             ));
         }
 
+        let expected_unresolved = explicitly_unresolved_intent_axes(problem);
+        let actual_unresolved: BTreeSet<String> =
+            candidate.unresolved_intent_axes.iter().cloned().collect();
+        if actual_unresolved.len() != candidate.unresolved_intent_axes.len()
+            || actual_unresolved != expected_unresolved
+        {
+            errors.push(format!(
+                "candidate {} does not preserve the parent's explicitly unresolved intent axes",
+                candidate.candidate_id
+            ));
+        }
+
         for source in &candidate.source_intents {
             let known = match source.axis.as_str() {
                 "spatial_typology" => vocabulary.spatial_typology_ids.contains(&source.option_id),
@@ -905,6 +1008,17 @@ pub fn validate_illustrative_candidate_set(
                     "candidate {} contains unsupported source preference {}",
                     candidate.candidate_id, source.preference
                 ));
+            }
+            match expected_resident_source_preference(problem, &source.axis, &source.option_id) {
+                None => errors.push(format!(
+                    "candidate {} invents source intent {}:{} that is absent or undecided in the parent problem",
+                    candidate.candidate_id, source.axis, source.option_id
+                )),
+                Some(expected) if expected != source.preference => errors.push(format!(
+                    "candidate {} changes resident source preference {}:{} from {} to {}",
+                    candidate.candidate_id, source.axis, source.option_id, expected, source.preference
+                )),
+                Some(_) => {}
             }
         }
     }
@@ -2115,6 +2229,30 @@ mod tests {
         let mut stale = receipt;
         stale.source_problem_revision = "STALE-REVISION".to_owned();
         assert!(validate_illustrative_candidate_set(&stale, &problem, &vocabulary).is_err());
+    }
+
+    #[test]
+    fn illustrative_candidates_cannot_invent_or_rewrite_resident_intent() {
+        let problem = parsed_problem();
+        let vocabulary = vocabulary();
+        let receipt: CandidateSetReceipt =
+            serde_json::from_str(SYNTHETIC_CANDIDATE_SET).unwrap();
+
+        let mut invented = receipt.clone();
+        invented.candidates[0].source_intents.push(CandidateSourceIntent {
+            axis:"spatial_typology".to_owned(),
+            option_id:"COURTYARD".to_owned(),
+            preference:"PREFERRED".to_owned(),
+        });
+        assert!(validate_illustrative_candidate_set(&invented, &problem, &vocabulary).is_err());
+
+        let mut hidden = receipt.clone();
+        hidden.candidates[0].unresolved_intent_axes.clear();
+        assert!(validate_illustrative_candidate_set(&hidden, &problem, &vocabulary).is_err());
+
+        let mut rewritten = receipt;
+        rewritten.candidates[0].source_intents[0].preference = "CONSIDERED".to_owned();
+        assert!(validate_illustrative_candidate_set(&rewritten, &problem, &vocabulary).is_err());
     }
 
     #[test]
