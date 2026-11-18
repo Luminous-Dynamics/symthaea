@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use broca_mace_policy::{
     decide, is_qualified, is_transfer_qualified, Action, Decision, Experience, Objective,
-    Policy, Query, Regime, Scope,
+    Policy, ProbeRequest, Query, Regime, Scope,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -391,7 +391,19 @@ fn generated_worlds(clusters: u64) -> Vec<Case> {
 
 const PROBE_COST: f64 = 0.12;
 
-fn apply_environment_probe(case: &Case) -> Option<Vec<Experience>> {
+fn apply_environment_probe(
+    case: &Case,
+    request: ProbeRequest,
+) -> Option<Vec<Experience>> {
+    let cost_micros = (PROBE_COST * f64::from(1_000_000_u32)).round() as u32;
+    if request.scope != case.query.scope
+        || request.actions != [Action::A, Action::B]
+        || request.replicates_per_action != 2
+        || cost_micros > request.max_cost_normalized_micros
+    {
+        return None;
+    }
+
     let max_event = case
         .memory
         .iter()
@@ -410,9 +422,10 @@ fn apply_environment_probe(case: &Case) -> Option<Vec<Experience>> {
     first_family.checked_add(3)?;
 
     let mut memory = case.memory.clone();
-    for (action_index, action) in [Action::A, Action::B].into_iter().enumerate() {
-        for replicate in 0..2_u32 {
-            let offset = (action_index as u32) * 2 + replicate;
+    for (action_index, action) in request.actions.into_iter().enumerate() {
+        for replicate in 0..u32::from(request.replicates_per_action) {
+            let offset =
+                (action_index as u32) * u32::from(request.replicates_per_action) + replicate;
             let noise = if replicate == 0 { -0.01 } else { 0.01 };
             let observed = (case.truth.utility(action) + noise).clamp(0.0, 1.0);
             memory.push(exp(
@@ -432,11 +445,11 @@ fn simulate(
     case: &Case,
 ) -> (Decision, Vec<Experience>, f64, bool, bool) {
     let initial = decide(policy, &case.memory, case.query);
-    if !initial.requires_probe {
+    let Some(request) = initial.probe else {
         return (initial, case.memory.clone(), 0.0, false, false);
-    }
+    };
 
-    let Some(memory) = apply_environment_probe(case) else {
+    let Some(memory) = apply_environment_probe(case, request) else {
         return (Decision::abstain(), case.memory.clone(), 0.0, true, false);
     };
     let final_decision = decide(Policy::CausalQualified, &memory, case.query);
@@ -610,7 +623,7 @@ fn report(cases: &[Case]) {
         concat!(
             "policy,accuracy_pct,mean_utility,mean_regret,abstentions,",
             "overclaims,invalid_refs,unsupported_A,probe_requests,",
-            "probe_resolved,probe_cost"
+            "probe_resolved,probe_cost_normalized_utility"
         )
     );
     for policy in Policy::ALL {
