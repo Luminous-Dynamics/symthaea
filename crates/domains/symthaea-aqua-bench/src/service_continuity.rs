@@ -508,10 +508,12 @@ mod exhaustive_state_space_tests {
                                                 ContinuityMode::RecoveryPending
                                             } else {
                                                 match local_capability {
-                                                    LocalServiceCapability::FullServiceQualified => {
+                                                    LocalServiceCapability::FullServiceQualified
+                                                    => {
                                                         ContinuityMode::QualifiedFull
                                                     }
-                                                    LocalServiceCapability::ReducedServiceQualified => {
+                                                    LocalServiceCapability::ReducedServiceQualified
+                                                    => {
                                                         ContinuityMode::QualifiedReduced
                                                     }
                                                     LocalServiceCapability::ManualOnlyQualified => {
@@ -526,7 +528,8 @@ mod exhaustive_state_space_tests {
                                             assert_eq!(
                                                 assessment.mode,
                                                 expected_mode,
-                                                "unexpected mode for state combination {combinations}"
+                                                "unexpected mode for state combination \
+                                                {combinations}"
                                             );
                                             assert_eq!(
                                                 assessment.recommendations_available,
