@@ -13,7 +13,7 @@
       "oracle": "BrowserSafetyPolicy denies under default profile",
       "negative_control_required": true,
       "source_coverage": "source-present",
-      "source_test": "evaluate_url_denies_private_ip_literals",
+      "source_test": "default_blocks_non_web_schemes_and_local_targets",
       "execution_status": "not_run",
       "execution_evidence": null
     },

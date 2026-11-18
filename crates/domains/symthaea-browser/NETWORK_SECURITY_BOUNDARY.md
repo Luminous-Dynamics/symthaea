@@ -48,12 +48,12 @@ The target policy should:
 - observe metadata only by default, never browser payloads/cookies/credentials.
 
 Nixward's current contracts are the intended foundation:
-- `network_covenant.rs`: workload identities and owner-authorized capabilities;
+- `network_covenant.rs`: schema-v2 workload identities, owner-authorized capabilities, and explicit address scopes for hostname destinations (public-unicast-only or exact approved CIDRs);
 - `network_enforcement.rs`: cgroup-BPF rule compilation and target proof;
 - `network_runtime_lab.rs`: isolated runtime acceptance;
 - `network_telemetry.rs`: privacy-preserving metadata evidence.
 
-The current Nixward network code explicitly leaves hostname rules unresolved until a DNS/resolution covenant exists. The proposed bridge is tracked in [Nixward PR #162](https://github.com/Luminous-Dynamics/nixward/pull/162). That proposal is currently scoped first to Prism's exact HTTP hop. Browser integration needs a resolver-proxy path that supplies Chromium's actual DNS answers to the same enforcement authority; a separate Nixward resolution that Chromium never consumes would not establish DNS/socket consistency.
+The current Nixward network code explicitly leaves hostname rules unresolved until a DNS/resolution covenant exists. The proposed bridge is tracked in [Nixward PR #162](https://github.com/Luminous-Dynamics/nixward/pull/162). Its parent capability schema now binds an explicit `AddressScopePolicy`, and the resolution-lease model checks both the parent scope digest and every resolved address. This closes the policy-representation gap, not the runtime broker gap: the PR still does not implement a trusted resolver, signed lease issuer, BPF map writer or automatic activation. The proposal is initially scoped to Prism's exact HTTP hop. Browser integration needs a resolver-proxy path that supplies Chromium's actual DNS answers to the same enforcement authority; a separate Nixward resolution that Chromium never consumes would not establish DNS/socket consistency.
 
 ## 4. LAN access is a separate, explicit profile
 
@@ -88,14 +88,14 @@ The isolated browser-network test environment should expose local fake services 
 | BROW-EGR-011 | Browser process moves cgroups or a second process shares the cgroup | Identity mismatch/rebinding fails closed; policy does not silently follow |
 | BROW-EGR-012 | Nixward broker, resolver proxy or BPF attach restarts/fails | No fail-open route; reconcile unknown map state before any new grant |
 
-Every case needs a negative control proving that the security boundary is actually exercised. Record both application navigation events and independently observed kernel socket-admission events. A kernel connect hook records an attempted/admitted socket operation; it does not prove completed TCP or TLS. If the test needs connection completion, use the fake listener as a separate oracle.
+Every case needs a negative control proving that the security boundary is actually exercised. A parent hostname capability must never derive its address scope from the resolver result or from Symthaea's recommendation; the owner-approved Nixward scope is the upper bound. Record both application navigation events and independently observed kernel socket-admission events. A kernel connect hook records an attempted/admitted socket operation; it does not prove completed TCP or TLS. If the test needs connection completion, use the fake listener as a separate oracle.
 
 ## 6. Integration sequence
 
 1. **Clarify the code contract:** keep `evaluate_url` explicitly labelled as URL preflight, not SSRF/network enforcement.
 2. **Create isolated workload identity:** map each browser service/guest to a Nixward `WorkloadIdentity` and cgroup binding.
 3. **Add trusted DNS path:** force Chromium DNS through the configured resolver/proxy; reject alternate resolver channels; deliver the actual observed A/AAAA set to the Nixward enforcement broker.
-4. **Enforce at the cgroup:** atomic generation of exact IP/port sets with monotonic expiry; explicit TCP/UDP protocol decisions.
+4. **Enforce at the cgroup:** atomically stage exact IP/port sets under the owner-bound parent address scope, with monotonic expiry; v1 TCP first, UDP/QUIC only through a separate explicit profile.
 5. **Correlate evidence:** action receipt, resolver snapshot, kernel socket metadata and browser network event share an opaque session/navigation ID. Do not store page payloads by default.
 6. **Qualify in a disposable NixOS VM:** execute BROW-EGR-001..012 with IPv4/IPv6, redirects, subresources, service workers, WebSockets, UDP and DNS-rebinding fixtures.
 7. **Keep profiles separate:** public browser, explicit LAN browser, and server-side Prism public-web each have different authority and resolver policy.
