@@ -90,12 +90,16 @@ def diagnose(
         for right in worlds[i + 1 :]:
             if left.decision == right.decision:
                 continue
-            indistinguishable = all(
-                output_maps[sensor_id][left.world_id]
-                == output_maps[sensor_id][right.world_id]
+            # UNKNOWN is not a categorical result. If either world leaves
+            # this sensor uninformative, the sensor cannot separate the pair.
+            separated = any(
+                output_maps[sensor_id][left.world_id] != "UNKNOWN"
+                and output_maps[sensor_id][right.world_id] != "UNKNOWN"
+                and output_maps[sensor_id][left.world_id]
+                != output_maps[sensor_id][right.world_id]
                 for sensor_id in active
             )
-            if indistinguishable:
+            if not separated:
                 unresolved.append((left.world_id, right.world_id))
     return DiagnosabilityResult(not unresolved, tuple(unresolved))
 
@@ -246,6 +250,23 @@ def self_test() -> None:
     unknown_result = diagnose(worlds, sensors, ["failed_diag", "tie_aux"])
     assert not unknown_result.diagnosable
     assert unknown_result.unresolved_cross_decision_pairs
+
+    # UNKNOWN paired with a known value is still not a separating observation.
+    unknown_vs_known = Sensor(
+        "unknown_vs_known",
+        "diag_unknown",
+        (
+            ("healthy_closed", "UNKNOWN"),
+            ("failed_closed", "F"),
+            ("healthy_open", "OPEN"),
+            ("failed_open", "F"),
+        ),
+    )
+    unknown_pair_result = diagnose(
+        worlds, [unknown_vs_known, *sensors], ["unknown_vs_known"]
+    )
+    assert not unknown_pair_result.diagnosable
+    assert ("healthy_closed", "failed_closed") in unknown_pair_result.unresolved_cross_decision_pairs
 
     # Each individual path has redundancy in the baseline.
     for sensor_id in ("gen_current", "gen_vibration", "tie_aux", "tie_optical"):
