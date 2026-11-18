@@ -83,7 +83,7 @@ impl ApproximateSymmetryInputV1 {
             self.one_step_equivariance_defect,
             self.step_lipschitz_scaled,
             u128::from(self.horizon_steps),
-            u128::from(self.domain_invariance_verified),
+            if self.domain_invariance_verified { 1 } else { 0 },
             self.domain_boundary_margin,
             self.objective_lipschitz_scaled,
             self.direct_objective_defect,
@@ -440,7 +440,7 @@ mod tests {
     #[test]
     fn insufficient_objective_gap_blocks_ranking_claim() {
         let mut input = fixture();
-        input.objective_gap = Some(input.objective_error_bound_placeholder());
+        input.objective_gap = Some(82);
         let receipt =
             qualify_approximate_symmetry(&input, EnvelopeBudgetV1::default()).unwrap();
         assert_eq!(receipt.report.objective_order, DecisionStabilityV1::Unresolved);
