@@ -32,8 +32,7 @@ impl Matrix2 {
         if !determinant.is_finite() || determinant <= 1.0e-12 {
             return Err("posterior precision matrix is not positive definite".to_owned());
         }
-        let numerator = self.m11 * target[0] * target[0]
-            - 2.0 * self.m01 * target[0] * target[1]
+        let numerator = self.m11 * target[0] * target[0] - 2.0 * self.m01 * target[0] * target[1]
             + self.m00 * target[1] * target[1];
         let variance = numerator / determinant;
         if !variance.is_finite() || variance < -1.0e-10 {
@@ -159,8 +158,8 @@ impl Instance {
         if schema.get("$schema").and_then(Value::as_str) != Some(DIALECT) {
             return Err(format!("schema must declare {DIALECT}"));
         }
-        let validator =
-            validator_for(&schema).map_err(|error| format!("schema compilation failed: {error}"))?;
+        let validator = validator_for(&schema)
+            .map_err(|error| format!("schema compilation failed: {error}"))?;
         if let Some(error) = validator.iter_errors(&fixture).next() {
             return Err(format!(
                 "capability-plan schema validation failed: {} at {}",
@@ -205,7 +204,10 @@ impl Instance {
             finite_number(&target_values[0], "target_direction[0]")?,
             finite_number(&target_values[1], "target_direction[1]")?,
         ];
-        if target_direction.iter().all(|value| value.abs() <= f64::EPSILON) {
+        if target_direction
+            .iter()
+            .all(|value| value.abs() <= f64::EPSILON)
+        {
             return Err("target_direction must not be the zero vector".to_owned());
         }
 
@@ -426,8 +428,7 @@ impl Instance {
                 let Some(trial_plan) = self.plan_from_indices(&trial)? else {
                     continue;
                 };
-                let marginal_gain =
-                    trial_plan.variance_reduction - current_plan.variance_reduction;
+                let marginal_gain = trial_plan.variance_reduction - current_plan.variance_reduction;
                 let ratio = marginal_gain / action.cost as f64;
                 if marginal_gain <= 1.0e-12 {
                     continue;
@@ -527,10 +528,12 @@ fn audit_and_plan(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, St
         .actions
         .iter()
         .filter(|action| !action.eligible)
-        .map(|action| json!({
-            "action_id": action.id,
-            "exclusion_reason": action.exclusion_reason
-        }))
+        .map(|action| {
+            json!({
+                "action_id": action.id,
+                "exclusion_reason": action.exclusion_reason
+            })
+        })
         .collect();
 
     Ok(json!({
@@ -614,8 +617,8 @@ fn main() {
         usage(&args[0]);
         process::exit(2);
     };
-    let receipt = audit_and_plan(&read(&schema_path), &read(&fixture_path))
-        .unwrap_or_else(|error| {
+    let receipt =
+        audit_and_plan(&read(&schema_path), &read(&fixture_path)).unwrap_or_else(|error| {
             eprintln!("SC-CAPABILITY-PLAN-FAIL: {error}");
             process::exit(1);
         });
@@ -642,10 +645,11 @@ mod tests {
             root.join("data/schemas/superconductivity_capability_experiment_plan_v0_1.schema.json"),
         )
         .unwrap();
-        let fixture = fs::read(
-            root.join("data/research/superconductivity_capability_experiment_plan_fixture_v0_1.json"),
-        )
-        .unwrap();
+        let fixture =
+            fs::read(root.join(
+                "data/research/superconductivity_capability_experiment_plan_fixture_v0_1.json",
+            ))
+            .unwrap();
         (schema, fixture)
     }
 
@@ -663,9 +667,7 @@ mod tests {
         assert_eq!(receipt["exact_oracle"]["enumerated_subsets"], 128);
         let oracle = &receipt["exact_oracle"]["plan"];
         assert_eq!(oracle["cost_units"], 5);
-        assert!(
-            (oracle["target_variance_reduction"].as_f64().unwrap() - 1.6).abs() < 1.0e-12
-        );
+        assert!((oracle["target_variance_reduction"].as_f64().unwrap() - 1.6).abs() < 1.0e-12);
         let ids: Vec<&str> = oracle["ordered_action_ids"]
             .as_array()
             .unwrap()
@@ -713,9 +715,20 @@ mod tests {
         let greedy_ids = receipt["greedy_baseline"]["plan"]["ordered_action_ids"]
             .as_array()
             .unwrap();
-        assert!(!oracle_ids.iter().any(|value| value == "unreviewed_high_field"));
-        assert!(!greedy_ids.iter().any(|value| value == "unreviewed_high_field"));
-        assert_eq!(receipt["excluded_actions"][0]["exclusion_reason"], "Missing independent safety and facility qualification");
+        assert!(
+            !oracle_ids
+                .iter()
+                .any(|value| value == "unreviewed_high_field")
+        );
+        assert!(
+            !greedy_ids
+                .iter()
+                .any(|value| value == "unreviewed_high_field")
+        );
+        assert_eq!(
+            receipt["excluded_actions"][0]["exclusion_reason"],
+            "Missing independent safety and facility qualification"
+        );
     }
 
     #[test]
@@ -734,26 +747,32 @@ mod tests {
 
     #[test]
     fn asymmetric_information_matrix_is_rejected() {
-        assert!(mutated_fixture(|fixture| {
-            fixture["actions"][0]["information_matrix"] = json!([[1.0, 0.1], [0.2, 1.0]]);
-        })
-        .is_err());
+        assert!(
+            mutated_fixture(|fixture| {
+                fixture["actions"][0]["information_matrix"] = json!([[1.0, 0.1], [0.2, 1.0]]);
+            })
+            .is_err()
+        );
     }
 
     #[test]
     fn non_positive_definite_prior_is_rejected() {
-        assert!(mutated_fixture(|fixture| {
-            fixture["prior_precision"] = json!([[1.0, 2.0], [2.0, 1.0]]);
-        })
-        .is_err());
+        assert!(
+            mutated_fixture(|fixture| {
+                fixture["prior_precision"] = json!([[1.0, 2.0], [2.0, 1.0]]);
+            })
+            .is_err()
+        );
     }
 
     #[test]
     fn capability_action_cannot_claim_direct_information() {
-        assert!(mutated_fixture(|fixture| {
-            fixture["actions"][1]["information_matrix"] = json!([[1.0, 0.0], [0.0, 0.0]]);
-        })
-        .is_err());
+        assert!(
+            mutated_fixture(|fixture| {
+                fixture["actions"][1]["information_matrix"] = json!([[1.0, 0.0], [0.0, 0.0]]);
+            })
+            .is_err()
+        );
     }
 
     #[test]
