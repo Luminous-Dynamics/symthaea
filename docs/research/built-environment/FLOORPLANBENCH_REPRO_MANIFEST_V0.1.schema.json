@@ -1,0 +1,282 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/built-environment/FLOORPLANBENCH_REPRO_MANIFEST_V0.1.schema.json",
+  "title": "FloorPlanBench reproduction manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "manifest_id",
+    "maturity",
+    "benchmark",
+    "source_files",
+    "metric_contract",
+    "synthetic_task_normalization",
+    "reproduction_status",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "manifest_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "maturity": {
+      "const": "SYNTHETIC_NOT_EXECUTED"
+    },
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "repository",
+        "pinned_commit",
+        "license",
+        "representation",
+        "validator",
+        "task_count",
+        "complexity_tiers",
+        "seeds_per_task",
+        "evaluation_equivalent_budget_per_run",
+        "canonical_run_count",
+        "methods"
+      ],
+      "properties": {
+        "name": {
+          "const": "FloorPlanBench"
+        },
+        "repository": {
+          "type": "string",
+          "format": "uri"
+        },
+        "pinned_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "license": {
+          "const": "MIT"
+        },
+        "representation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "validator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_count": {
+          "const": 28
+        },
+        "complexity_tiers": {
+          "const": [
+            "small",
+            "medium",
+            "large",
+            "realistic"
+          ]
+        },
+        "seeds_per_task": {
+          "const": 10
+        },
+        "evaluation_equivalent_budget_per_run": {
+          "const": 50000
+        },
+        "canonical_run_count": {
+          "const": 1960
+        },
+        "methods": {
+          "const": [
+            "random",
+            "greedy",
+            "sa",
+            "sa-seeded",
+            "nsga2",
+            "cp",
+            "gradient"
+          ]
+        }
+      }
+    },
+    "source_files": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "git_blob_sha1"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "git_blob_sha1": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          }
+        }
+      }
+    },
+    "metric_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dominance_objectives",
+        "raw_objective_inventory",
+        "normalized_space",
+        "hypervolume_reference_point",
+        "hypervolume_method",
+        "cross_task_hypervolume_comparison"
+      ],
+      "properties": {
+        "dominance_objectives": {
+          "const": [
+            "efficiency",
+            "circulation",
+            "daylight",
+            "privacy",
+            "carbon"
+          ]
+        },
+        "raw_objective_inventory": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "objective_id",
+              "direction",
+              "unit",
+              "headline",
+              "definition"
+            ],
+            "properties": {
+              "objective_id": {
+                "enum": [
+                  "efficiency",
+                  "adjacency",
+                  "circulation",
+                  "compactness",
+                  "daylight",
+                  "privacy",
+                  "exposure",
+                  "accessibility",
+                  "carbon"
+                ]
+              },
+              "direction": {
+                "enum": [
+                  "MINIMIZE",
+                  "MAXIMIZE"
+                ]
+              },
+              "unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "headline": {
+                "type": "boolean"
+              },
+              "definition": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "normalized_space": {
+          "const": "MINIMIZATION_VECTOR_0_TO_1"
+        },
+        "hypervolume_reference_point": {
+          "const": [
+            1.0001,
+            1.0001,
+            1.0001,
+            1.0001,
+            1.0001
+          ]
+        },
+        "hypervolume_method": {
+          "const": "EXACT_WFG_REFERENCE_IMPLEMENTATION"
+        },
+        "cross_task_hypervolume_comparison": {
+          "const": "PROHIBITED_WITHOUT_RECONCILING_TASK_LEVEL_NORMALIZATION_REFERENCES"
+        }
+      }
+    },
+    "synthetic_task_normalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "task_program_digest",
+        "normalization_rules"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_program_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "normalization_rules": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "objective_id",
+              "direction",
+              "lower_bound",
+              "upper_bound",
+              "formula"
+            ],
+            "properties": {
+              "objective_id": {
+                "enum": [
+                  "efficiency",
+                  "circulation",
+                  "daylight",
+                  "privacy",
+                  "carbon"
+                ]
+              },
+              "direction": {
+                "enum": [
+                  "MINIMIZE",
+                  "MAXIMIZE"
+                ]
+              },
+              "lower_bound": {
+                "type": "number"
+              },
+              "upper_bound": {
+                "type": "number"
+              },
+              "formula": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "reproduction_status": {
+      "const": "NOT_RUN"
+    },
+    "claim_ceiling": {
+      "const": "PINNED_BENCHMARK_PROTOCOL_AND_SYNTHETIC_NORMALIZATION_EXAMPLE_ONLY_NO_REPRODUCED_BENCHMARK_RESULT"
+    }
+  }
+}
