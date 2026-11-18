@@ -743,6 +743,58 @@ mod tests {
             .collect()
     }
 
+    /// Equal-prior mutual information for two Gaussian outcome models with
+    /// equal variance, computed by deterministic Simpson quadrature.
+    ///
+    /// This is a small exact-family comparator for the binary-hypothesis
+    /// analytic fixture, not a general Bayesian experimental-design engine.
+    fn equal_prior_gaussian_eig_bits(mean_gap: f64, noise_std: f64) -> f64 {
+        const INTERVALS: usize = 4000;
+        const LOWER: f64 = -9.0;
+        const UPPER: f64 = 9.0;
+        let delta = mean_gap.abs() / noise_std;
+        let step = (UPPER - LOWER) / INTERVALS as f64;
+        let normalizer = (2.0 * std::f64::consts::PI).sqrt();
+        let ln_two = 2.0_f64.ln();
+        let mut weighted_sum = 0.0;
+
+        for index in 0..=INTERVALS {
+            let z = LOWER + index as f64 * step;
+            let log_likelihood_ratio = delta * z - 0.5 * delta * delta;
+            let log_one_plus_ratio = if log_likelihood_ratio > 40.0 {
+                log_likelihood_ratio
+            } else {
+                log_one_plus_ratio(log_likelihood_ratio)
+            };
+            let density = (-0.5 * z * z).exp() / normalizer;
+            let integrand = density * (ln_two - log_one_plus_ratio);
+            let weight = if index == 0 || index == INTERVALS {
+                1.0
+            } else if index % 2 == 0 {
+                2.0
+            } else {
+                4.0
+            };
+            weighted_sum += weight * integrand;
+        }
+
+        (weighted_sum * step / 3.0) / ln_two
+    }
+
+    fn log_one_plus_ratio(log_ratio: f64) -> f64 {
+        log_ratio.exp().ln_1p()
+    }
+
+    fn predicted_gap(model: &AgentModel, experiment: &ExperimentDesign) -> f64 {
+        let low = model
+            .predict_terminal_velocity(&model.hypotheses()[0], experiment)
+            .unwrap();
+        let high = model
+            .predict_terminal_velocity(&model.hypotheses()[1], experiment)
+            .unwrap();
+        (high - low).abs()
+    }
+
     #[test]
     fn selects_most_discriminating_experiment_within_budget() {
         let selected = model(&[0.1, 0.8])
@@ -762,6 +814,71 @@ mod tests {
         let backward = model.select_experiment(&reversed, 5).unwrap();
         assert_eq!(forward.experiment.id(), backward.experiment.id());
         assert_eq!(forward.experiment.steps(), backward.experiment.steps());
+    }
+
+    #[test]
+    fn selector_is_compared_with_eig_separation_cost_and_random_baselines() {
+        let model = model(&[0.1, 0.8]);
+        let candidates = vec![
+            ExperimentDesign::new("short-noisy", 1.0, 0.0, 0.1, 1, 0.15).unwrap(),
+            ExperimentDesign::new("medium-precise", 1.0, 0.0, 0.1, 2, 0.05).unwrap(),
+            ExperimentDesign::new("long-noisy", 1.0, 0.0, 0.1, 5, 0.20).unwrap(),
+        ];
+        let budget = 5;
+
+        // The shipped selector is the declared discrimination/noise/cost
+        // heuristic. It is not relabelled as Bayesian EIG.
+        let heuristic = model.select_experiment(&candidates, budget).unwrap();
+        assert_eq!(heuristic.experiment.id(), "medium-precise");
+
+        // Strongest raw separation ignores observation noise and cost.
+        let max_separation = candidates
+            .iter()
+            .max_by(|left, right| {
+                predicted_gap(&model, left)
+                    .total_cmp(&predicted_gap(&model, right))
+            })
+            .unwrap();
+        assert_eq!(max_separation.id(), "long-noisy");
+
+        // Cheapest admissible experiment is a resource-minimal control.
+        let cheapest = candidates
+            .iter()
+            .min_by_key(|candidate| candidate.steps())
+            .unwrap();
+        assert_eq!(cheapest.id(), "short-noisy");
+
+        // For this equal-prior, two-hypothesis Gaussian observation family,
+        // use numerical quadrature of the exact mutual-information integral.
+        // This is the principled comparator for this fixture's assumptions.
+        let eig_scores: Vec<f64> = candidates
+            .iter()
+            .map(|candidate| {
+                equal_prior_gaussian_eig_bits(
+                    predicted_gap(&model, candidate),
+                    candidate.sensor_noise_std(),
+                )
+            })
+            .collect();
+        let eig_best_index = eig_scores
+            .iter()
+            .enumerate()
+            .max_by(|left, right| left.1.total_cmp(right.1))
+            .unwrap()
+            .0;
+        assert_eq!(candidates[eig_best_index].id(), "medium-precise");
+
+        // Uniform-random selection's expected EIG across this same finite
+        // candidate set is the arithmetic mean, not a lucky random draw.
+        let uniform_random_expected_eig =
+            eig_scores.iter().sum::<f64>() / eig_scores.len() as f64;
+        assert!(eig_scores[eig_best_index] > uniform_random_expected_eig);
+        assert!(uniform_random_expected_eig > 0.0);
+
+        // All strategies see the same candidate set and rollout budget.
+        assert!(candidates
+            .iter()
+            .all(|candidate| candidate.steps() <= budget));
     }
 
     #[test]
