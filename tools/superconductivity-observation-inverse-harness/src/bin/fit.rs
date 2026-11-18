@@ -134,8 +134,7 @@ fn conjugate_posterior(
         if !observation.uncertainty.is_finite() || observation.uncertainty <= 0.0 {
             return Err("calibration uncertainty must be positive and finite".to_owned());
         }
-        if observation.h.iter().any(|value| !value.is_finite())
-            || !observation.observed.is_finite()
+        if observation.h.iter().any(|value| !value.is_finite()) || !observation.observed.is_finite()
         {
             return Err("calibration row contains non-finite values".to_owned());
         }
@@ -193,7 +192,9 @@ fn fit_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Strin
         .get("model_target")
         .ok_or_else(|| "missing model_target".to_owned())?;
     if required_text(model_target, "model_family")? != "lattice_ginzburg_landau" {
-        return Err("initial conjugate fitter is restricted to lattice_ginzburg_landau targets".to_owned());
+        return Err(
+            "initial conjugate fitter is restricted to lattice_ginzburg_landau targets".to_owned(),
+        );
     }
     let parameter_names = model_target
         .get("target_parameters")
@@ -267,11 +268,10 @@ fn fit_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Strin
             .get("conditions")
             .ok_or_else(|| "observation missing conditions".to_owned())?;
         let timestamp = required_text(conditions, "measurement_timestamp")?;
-        if timestamp.len() != 20
-            || !timestamp.ends_with('Z')
-            || timestamp < pre_registered_at
-        {
-            return Err("split must be preregistered before every UTC observation timestamp".to_owned());
+        if timestamp.len() != 20 || !timestamp.ends_with('Z') || timestamp < pre_registered_at {
+            return Err(
+                "split must be preregistered before every UTC observation timestamp".to_owned(),
+            );
         }
     }
 
@@ -305,7 +305,9 @@ fn fit_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Strin
         }
         heldout_order.push(id.to_owned());
         if calibration_set.contains(id) {
-            return Err(format!("observation {id} appears in calibration and holdout"));
+            return Err(format!(
+                "observation {id} appears in calibration and holdout"
+            ));
         }
         let observation = observation_by_id
             .get(id)
@@ -317,10 +319,14 @@ fn fit_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Strin
             .iter()
             .any(|modality| calibration_modalities.contains(modality))
     {
-        return Err("heldout modality must be exactly one modality absent from calibration".to_owned());
+        return Err(
+            "heldout modality must be exactly one modality absent from calibration".to_owned(),
+        );
     }
     if calibration_set.len() + heldout_set.len() != observation_by_id.len() {
-        return Err("calibration and heldout sets must cover every observation exactly once".to_owned());
+        return Err(
+            "calibration and heldout sets must cover every observation exactly once".to_owned(),
+        );
     }
 
     let mut calibration_data_rows = Vec::with_capacity(calibration_set.len());
@@ -340,7 +346,9 @@ fn fit_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Strin
             &format!("observation {id} uncertainty"),
         )?;
         if uncertainty <= 0.0 {
-            return Err(format!("observation {id} uncertainty must be positive for Gaussian fitting"));
+            return Err(format!(
+                "observation {id} uncertainty must be positive for Gaussian fitting"
+            ));
         }
         let h = observation_operator(observation)?;
         let weight = 1.0 / (uncertainty * uncertainty);
@@ -359,22 +367,15 @@ fn fit_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Strin
         }));
     }
 
-    let posterior = conjugate_posterior(
-        prior_mean,
-        prior_precision,
-        &calibration_data_rows,
-    )?;
+    let posterior = conjugate_posterior(prior_mean, prior_precision, &calibration_data_rows)?;
     let posterior_mean = posterior.mean;
     let posterior_covariance = posterior.covariance;
-    let posterior_precision = calibration_data_rows.iter().fold(
-        prior_precision,
-        |precision, row| {
-            precision.add_information(
-                row.h,
-                1.0 / (row.uncertainty * row.uncertainty),
-            )
-        },
-    );
+    let posterior_precision =
+        calibration_data_rows
+            .iter()
+            .fold(prior_precision, |precision, row| {
+                precision.add_information(row.h, 1.0 / (row.uncertainty * row.uncertainty))
+            });
 
     let mut predictive_rows = Vec::with_capacity(heldout_set.len());
     let mut total_log_predictive_density = 0.0;
@@ -394,7 +395,9 @@ fn fit_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Strin
             &format!("heldout observation {id} uncertainty"),
         )?;
         if measurement_uncertainty <= 0.0 {
-            return Err(format!("heldout observation {id} uncertainty must be positive"));
+            return Err(format!(
+                "heldout observation {id} uncertainty must be positive"
+            ));
         }
         let h = observation_operator(observation)?;
         let predicted_mean = h[0] * posterior_mean[0] + h[1] * posterior_mean[1];
@@ -402,7 +405,9 @@ fn fit_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, Strin
         let predictive_variance =
             measurement_uncertainty * measurement_uncertainty + epistemic_variance;
         if !predictive_variance.is_finite() || predictive_variance <= 0.0 {
-            return Err(format!("heldout observation {id} predictive variance is invalid"));
+            return Err(format!(
+                "heldout observation {id} predictive variance is invalid"
+            ));
         }
         let residual = observed - predicted_mean;
         let standardized_residual = residual / predictive_variance.sqrt();
@@ -558,11 +563,10 @@ fn main() {
         usage(&args[0]);
         process::exit(2);
     };
-    let receipt = fit_dataset(&read(&schema_path), &read(&fixture_path))
-        .unwrap_or_else(|error| {
-            eprintln!("SC-OBSERVATION-INVERSE-FIT-FAIL: {error}");
-            process::exit(1);
-        });
+    let receipt = fit_dataset(&read(&schema_path), &read(&fixture_path)).unwrap_or_else(|error| {
+        eprintln!("SC-OBSERVATION-INVERSE-FIT-FAIL: {error}");
+        process::exit(1);
+    });
     let rendered = serde_json::to_string_pretty(&receipt)
         .expect("serializing inverse-fit receipt should not fail");
     if let Some(path) = output_path {
@@ -582,13 +586,16 @@ mod tests {
 
     fn inputs() -> (Vec<u8>, Value) {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let schema = fs::read(
-            root.join("data/schemas/superconductivity_observation_inverse_instance_v0_1.schema.json"),
-        )
-        .unwrap();
+        let schema =
+            fs::read(root.join(
+                "data/schemas/superconductivity_observation_inverse_instance_v0_1.schema.json",
+            ))
+            .unwrap();
         let fixture: Value = serde_json::from_slice(
-            &fs::read(root.join("data/research/superconductivity_observation_inverse_fixture_v0_1.json"))
-                .unwrap(),
+            &fs::read(
+                root.join("data/research/superconductivity_observation_inverse_fixture_v0_1.json"),
+            )
+            .unwrap(),
         )
         .unwrap();
         (schema, fixture)
@@ -604,16 +611,29 @@ mod tests {
         let (schema, fixture) = inputs();
         let receipt = fit_dataset(&schema, &serde_json::to_vec(&fixture).unwrap()).unwrap();
         assert_eq!(receipt["calibration"]["observation_count"], 2);
-        assert!(
-            (receipt["posterior"]["mean"][0].as_f64().unwrap() - 0.91981258).abs()
-                < 1.0e-5
+        assert!((receipt["posterior"]["mean"][0].as_f64().unwrap() - 0.91981258).abs() < 1.0e-5);
+        assert_eq!(
+            receipt["heldout_predictive_evaluation"]["heldout_observations_used_in_posterior"],
+            false
         );
-        assert_eq!(receipt["heldout_predictive_evaluation"]["heldout_observations_used_in_posterior"], false);
-        assert_eq!(receipt["heldout_predictive_evaluation"]["observation_count"], 1);
+        assert_eq!(
+            receipt["heldout_predictive_evaluation"]["observation_count"],
+            1
+        );
         let prediction = &receipt["heldout_predictive_evaluation"]["rows"][0];
         assert_eq!(prediction["used_in_posterior"], false);
-        assert!(prediction["log_predictive_density"].as_f64().unwrap().is_finite());
-        assert!(prediction["predictive_standard_deviation"].as_f64().unwrap() > 0.0);
+        assert!(
+            prediction["log_predictive_density"]
+                .as_f64()
+                .unwrap()
+                .is_finite()
+        );
+        assert!(
+            prediction["predictive_standard_deviation"]
+                .as_f64()
+                .unwrap()
+                > 0.0
+        );
     }
 
     #[test]
@@ -659,7 +679,8 @@ mod tests {
 
         let (_, fixture) = inputs();
         let model_target = &fixture["model_target"];
-        let prior_mean = parse_vector2(&model_target["parameter_prior_mean"], "prior_mean").unwrap();
+        let prior_mean =
+            parse_vector2(&model_target["parameter_prior_mean"], "prior_mean").unwrap();
         let prior_precision = parse_precision(
             &model_target["parameter_prior_precision"],
             "prior_precision",
@@ -712,8 +733,7 @@ mod tests {
             for template in &calibration_templates {
                 let h = observation_operator(template).unwrap();
                 let sigma = template["standard_uncertainty"].as_f64().unwrap();
-                let observed = h[0] * truth[0] + h[1] * truth[1]
-                    + sigma * normal_sample(&mut rng);
+                let observed = h[0] * truth[0] + h[1] * truth[1] + sigma * normal_sample(&mut rng);
                 calibration_rows.push(CalibrationRow {
                     h,
                     observed,
@@ -725,8 +745,7 @@ mod tests {
 
             let posterior_l00 = posterior.covariance.a.sqrt();
             let posterior_l10 = posterior.covariance.b / posterior_l00;
-            let posterior_l11 =
-                (posterior.covariance.d - posterior_l10 * posterior_l10).sqrt();
+            let posterior_l11 = (posterior.covariance.d - posterior_l10 * posterior_l10).sqrt();
             let mut rank0 = 0_usize;
             let mut rank1 = 0_usize;
             for _ in 0..posterior_draw_count {
@@ -743,11 +762,9 @@ mod tests {
                     rank1 += 1;
                 }
             }
-            let bin0 = ((rank0 as f64 / (posterior_draw_count + 1) as f64)
-                * rank_bin_count as f64)
+            let bin0 = ((rank0 as f64 / (posterior_draw_count + 1) as f64) * rank_bin_count as f64)
                 .floor() as usize;
-            let bin1 = ((rank1 as f64 / (posterior_draw_count + 1) as f64)
-                * rank_bin_count as f64)
+            let bin1 = ((rank1 as f64 / (posterior_draw_count + 1) as f64) * rank_bin_count as f64)
                 .floor() as usize;
             rank_histograms[0][bin0.min(rank_bin_count - 1)] += 1;
             rank_histograms[1][bin1.min(rank_bin_count - 1)] += 1;
