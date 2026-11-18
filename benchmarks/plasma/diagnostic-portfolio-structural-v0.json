@@ -1,0 +1,281 @@
+{
+  "schema_version": "luminous.plasma-diagnostic-portfolio.v0.1",
+  "catalogue_id": "PLASMA-PORTFOLIO-STRUCTURAL-SYNTHETIC-001",
+  "machine_id": "synthetic-mast-like",
+  "regime_id": "synthetic-disruption-review",
+  "claim_ceiling": "SYNTHETIC_STRUCTURAL_DECISION_DIAGNOSABILITY_ONLY_NO_PHYSICAL_SENSOR_OR_RELIABILITY_CLAIM",
+  "worlds": [
+    {
+      "world_id": "nominal_density_quiet_mhd",
+      "decision_id": "NO_REVIEW"
+    },
+    {
+      "world_id": "high_density_quiet_mhd",
+      "decision_id": "REVIEW"
+    },
+    {
+      "world_id": "nominal_density_active_mhd",
+      "decision_id": "REVIEW"
+    },
+    {
+      "world_id": "high_density_active_mhd",
+      "decision_id": "REVIEW"
+    }
+  ],
+  "candidates": [
+    {
+      "diagnostic_system_id": "interferometer-acquisition-a",
+      "canonical_quantity": "line-integrated electron density",
+      "units": "synthetic-density-unit",
+      "machine_ids": [
+        "synthetic-mast-like"
+      ],
+      "regime_ids": [
+        "synthetic-disruption-review"
+      ],
+      "sampling_rate_hz": null,
+      "measurement_latency_ns": null,
+      "lifecycle_cost_usd": null,
+      "calibration_dependency_ids": [
+        "synthetic-interferometer-calibration-a"
+      ],
+      "assumption_reference": "synthetic structural fixture; not a physical MAST diagnostic claim",
+      "sensor": {
+        "sensor_id": "interferometer_density_a",
+        "common_mode_group": "kinetics-trigger-a",
+        "outcomes": [
+          {
+            "world_id": "nominal_density_quiet_mhd",
+            "observation": {
+              "kind": "known",
+              "value": "DENSITY_NOMINAL"
+            }
+          },
+          {
+            "world_id": "high_density_quiet_mhd",
+            "observation": {
+              "kind": "known",
+              "value": "DENSITY_HIGH"
+            }
+          },
+          {
+            "world_id": "nominal_density_active_mhd",
+            "observation": {
+              "kind": "known",
+              "value": "DENSITY_NOMINAL"
+            }
+          },
+          {
+            "world_id": "high_density_active_mhd",
+            "observation": {
+              "kind": "known",
+              "value": "DENSITY_HIGH"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "diagnostic_system_id": "thomson-acquisition-b",
+      "canonical_quantity": "electron density profile",
+      "units": "synthetic-density-unit",
+      "machine_ids": [
+        "synthetic-mast-like"
+      ],
+      "regime_ids": [
+        "synthetic-disruption-review"
+      ],
+      "sampling_rate_hz": null,
+      "measurement_latency_ns": null,
+      "lifecycle_cost_usd": null,
+      "calibration_dependency_ids": [
+        "synthetic-thomson-calibration-b"
+      ],
+      "assumption_reference": "synthetic structural fixture; independence is assumed only for this fixture",
+      "sensor": {
+        "sensor_id": "thomson_density_b",
+        "common_mode_group": "thomson-calibration-chain-b",
+        "outcomes": [
+          {
+            "world_id": "nominal_density_quiet_mhd",
+            "observation": {
+              "kind": "known",
+              "value": "DENSITY_NOMINAL"
+            }
+          },
+          {
+            "world_id": "high_density_quiet_mhd",
+            "observation": {
+              "kind": "known",
+              "value": "DENSITY_HIGH"
+            }
+          },
+          {
+            "world_id": "nominal_density_active_mhd",
+            "observation": {
+              "kind": "known",
+              "value": "DENSITY_NOMINAL"
+            }
+          },
+          {
+            "world_id": "high_density_active_mhd",
+            "observation": {
+              "kind": "known",
+              "value": "DENSITY_HIGH"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "diagnostic_system_id": "mirnov-digitizer-a",
+      "canonical_quantity": "magnetic fluctuation signature",
+      "units": "synthetic-magnetic-unit",
+      "machine_ids": [
+        "synthetic-mast-like"
+      ],
+      "regime_ids": [
+        "synthetic-disruption-review"
+      ],
+      "sampling_rate_hz": null,
+      "measurement_latency_ns": null,
+      "lifecycle_cost_usd": null,
+      "calibration_dependency_ids": [
+        "synthetic-magnetic-calibration-a"
+      ],
+      "assumption_reference": "synthetic structural fixture; not a measured MHD signature model",
+      "sensor": {
+        "sensor_id": "mirnov_mhd_a",
+        "common_mode_group": "magnetics-digitizer-a",
+        "outcomes": [
+          {
+            "world_id": "nominal_density_quiet_mhd",
+            "observation": {
+              "kind": "known",
+              "value": "MHD_QUIET"
+            }
+          },
+          {
+            "world_id": "high_density_quiet_mhd",
+            "observation": {
+              "kind": "known",
+              "value": "MHD_QUIET"
+            }
+          },
+          {
+            "world_id": "nominal_density_active_mhd",
+            "observation": {
+              "kind": "known",
+              "value": "MHD_ACTIVE"
+            }
+          },
+          {
+            "world_id": "high_density_active_mhd",
+            "observation": {
+              "kind": "known",
+              "value": "MHD_ACTIVE"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "diagnostic_system_id": "flux-loop-acquisition-b",
+      "canonical_quantity": "magnetic flux signature",
+      "units": "synthetic-magnetic-unit",
+      "machine_ids": [
+        "synthetic-mast-like"
+      ],
+      "regime_ids": [
+        "synthetic-disruption-review"
+      ],
+      "sampling_rate_hz": null,
+      "measurement_latency_ns": null,
+      "lifecycle_cost_usd": null,
+      "calibration_dependency_ids": [
+        "synthetic-flux-calibration-b"
+      ],
+      "assumption_reference": "synthetic structural fixture; independence is assumed only for this fixture",
+      "sensor": {
+        "sensor_id": "flux_loop_mhd_b",
+        "common_mode_group": "flux-loop-chain-b",
+        "outcomes": [
+          {
+            "world_id": "nominal_density_quiet_mhd",
+            "observation": {
+              "kind": "known",
+              "value": "MHD_QUIET"
+            }
+          },
+          {
+            "world_id": "high_density_quiet_mhd",
+            "observation": {
+              "kind": "known",
+              "value": "MHD_QUIET"
+            }
+          },
+          {
+            "world_id": "nominal_density_active_mhd",
+            "observation": {
+              "kind": "known",
+              "value": "MHD_ACTIVE"
+            }
+          },
+          {
+            "world_id": "high_density_active_mhd",
+            "observation": {
+              "kind": "known",
+              "value": "MHD_ACTIVE"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "diagnostic_system_id": "imaging-diagnostic-bus",
+      "canonical_quantity": "image-derived context",
+      "units": "not-applicable",
+      "machine_ids": [
+        "synthetic-mast-like"
+      ],
+      "regime_ids": [
+        "synthetic-disruption-review"
+      ],
+      "sampling_rate_hz": null,
+      "measurement_latency_ns": null,
+      "lifecycle_cost_usd": null,
+      "calibration_dependency_ids": [],
+      "assumption_reference": "synthetic uninformative control; no image interpretation claimed",
+      "sensor": {
+        "sensor_id": "unknown_imaging_control",
+        "common_mode_group": "imaging-bus",
+        "outcomes": [
+          {
+            "world_id": "nominal_density_quiet_mhd",
+            "observation": {
+              "kind": "unknown"
+            }
+          },
+          {
+            "world_id": "high_density_quiet_mhd",
+            "observation": {
+              "kind": "unknown"
+            }
+          },
+          {
+            "world_id": "nominal_density_active_mhd",
+            "observation": {
+              "kind": "unknown"
+            }
+          },
+          {
+            "world_id": "high_density_active_mhd",
+            "observation": {
+              "kind": "unknown"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
