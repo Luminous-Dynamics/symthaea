@@ -27,6 +27,7 @@
 //!
 //! Formula: `semantic_lr_factor = 0.5 + avg_similar_error` (range 0.5 to ~1.5)
 
+use crate::episodic_replay::GraduationProvenance;
 use serde::{Deserialize, Serialize};
 
 /// A single entry in semantic memory
@@ -47,6 +48,20 @@ pub struct SemanticEntry {
 
     /// Confidence in the HDC encoding (optional, for weighted retrieval)
     pub encoding_confidence: f32,
+}
+
+/// Version of the provenance-bearing semantic replay envelope.
+pub const PROVENANCED_SEMANTIC_ENTRY_SCHEMA_VERSION: u16 = 1;
+
+/// Semantic entry plus source-class / producer-claim lineage.
+///
+/// The envelope is serializable, but SemanticMemory remains an in-memory ring
+/// buffer. The producer claim is not an independent verifier receipt or permit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProvenancedSemanticEntry {
+    pub schema_version: u16,
+    pub entry: SemanticEntry,
+    pub graduation_provenance: Option<GraduationProvenance>,
 }
 
 impl SemanticEntry {
@@ -126,6 +141,9 @@ pub struct SemanticMemory {
     /// Maximum number of entries (ring buffer size)
     max_entries: usize,
 
+    /// Parallel lineage slots; indices always match `entries`.
+    graduation_provenance: Vec<Option<GraduationProvenance>>,
+
     /// Current write position in ring buffer
     write_pos: usize,
 
@@ -150,6 +168,7 @@ impl SemanticMemory {
     pub fn new(max_entries: usize) -> Self {
         Self {
             entries: Vec::with_capacity(max_entries),
+            graduation_provenance: Vec::with_capacity(max_entries),
             max_entries,
             write_pos: 0,
             wrapped: false,
@@ -183,6 +202,46 @@ impl SemanticMemory {
         category: Option<String>,
     ) -> Option<SemanticEntry> {
         let timestamp = self.stats.total_stored;
+        self.store_with_timestamp_and_provenance(hdc, error, category, timestamp, None)
+            .map(|evicted| evicted.entry)
+    }
+
+    /// Store an entry together with source lineage received from episodic promotion.
+    ///
+    /// The verification bit remains a producer claim. It does not affect the
+    /// semantic similarity score, learning-rate factor, source trust, or action authority.
+    pub fn store_with_provenance(
+        &mut self,
+        hdc: Vec<f32>,
+        error: f32,
+        category: Option<String>,
+        graduation_provenance: Option<GraduationProvenance>,
+    ) -> Option<ProvenancedSemanticEntry> {
+        let timestamp = self.stats.total_stored;
+        self.store_with_timestamp_and_provenance(
+            hdc,
+            error,
+            category,
+            timestamp,
+            graduation_provenance,
+        )
+    }
+
+    /// Store with timestamp explicitly provided and optional source lineage.
+    ///
+    /// Returns the evicted entry and its prior lineage when the ring buffer wraps.
+    pub fn store_with_timestamp_and_provenance(
+        &mut self,
+        hdc: Vec<f32>,
+        error: f32,
+        category: Option<String>,
+        timestamp: u64,
+        graduation_provenance: Option<GraduationProvenance>,
+    ) -> Option<ProvenancedSemanticEntry> {
+        if self.max_entries == 0 {
+            return None;
+        }
+
         let entry = SemanticEntry {
             hdc_vector: hdc,
             timestamp,
@@ -192,15 +251,22 @@ impl SemanticMemory {
         };
 
         let evicted = if self.entries.len() < self.max_entries {
-            // Buffer not full yet: just push
             self.entries.push(entry);
+            self.graduation_provenance.push(graduation_provenance);
             None
         } else {
-            // Ring buffer full: capture evicted entry before overwriting
-            let old = std::mem::replace(&mut self.entries[self.write_pos], entry);
+            let old_entry = std::mem::replace(&mut self.entries[self.write_pos], entry);
+            let old_provenance = std::mem::replace(
+                &mut self.graduation_provenance[self.write_pos],
+                graduation_provenance,
+            );
             self.stats.evictions += 1;
             self.wrapped = true;
-            Some(old)
+            Some(ProvenancedSemanticEntry {
+                schema_version: PROVENANCED_SEMANTIC_ENTRY_SCHEMA_VERSION,
+                entry: old_entry,
+                graduation_provenance: old_provenance,
+            })
         };
 
         self.write_pos = (self.write_pos + 1) % self.max_entries;
@@ -208,9 +274,7 @@ impl SemanticMemory {
         evicted
     }
 
-    /// Store with timestamp explicitly provided.
-    ///
-    /// Returns the evicted entry if the ring buffer was full.
+    /// Legacy timestamped store. Lineage is explicitly absent for this caller.
     pub fn store_with_timestamp(
         &mut self,
         hdc: Vec<f32>,
@@ -218,27 +282,8 @@ impl SemanticMemory {
         category: Option<String>,
         timestamp: u64,
     ) -> Option<SemanticEntry> {
-        let entry = SemanticEntry {
-            hdc_vector: hdc,
-            timestamp,
-            category,
-            prediction_error: error,
-            encoding_confidence: 1.0,
-        };
-
-        let evicted = if self.entries.len() < self.max_entries {
-            self.entries.push(entry);
-            None
-        } else {
-            let old = std::mem::replace(&mut self.entries[self.write_pos], entry);
-            self.stats.evictions += 1;
-            self.wrapped = true;
-            Some(old)
-        };
-
-        self.write_pos = (self.write_pos + 1) % self.max_entries;
-        self.stats.total_stored += 1;
-        evicted
+        self.store_with_timestamp_and_provenance(hdc, error, category, timestamp, None)
+            .map(|evicted| evicted.entry)
     }
 
     /// Find semantically similar past entries
@@ -307,6 +352,22 @@ impl SemanticMemory {
         similarities
     }
 
+    /// Find semantically similar entries with lineage preserved.
+    pub fn find_similar_with_provenance(
+        &mut self,
+        query: &[f32],
+        top_k: usize,
+    ) -> Vec<(ProvenancedSemanticEntry, f32)> {
+        let matches = self.find_similar(query, top_k);
+        matches
+            .into_iter()
+            .filter_map(|(index, similarity)| {
+                self.get_with_provenance(index)
+                    .map(|entry| (entry, similarity))
+            })
+            .collect()
+    }
+
     /// Get entries by their indices
     ///
     /// # Arguments
@@ -326,6 +387,26 @@ impl SemanticMemory {
     /// Get a single entry by index
     pub fn get(&self, index: usize) -> Option<&SemanticEntry> {
         self.entries.get(index)
+    }
+
+    /// Get a semantic entry with its optional episodic source lineage.
+    pub fn get_with_provenance(&self, index: usize) -> Option<ProvenancedSemanticEntry> {
+        Some(ProvenancedSemanticEntry {
+            schema_version: PROVENANCED_SEMANTIC_ENTRY_SCHEMA_VERSION,
+            entry: self.entries.get(index)?.clone(),
+            graduation_provenance: self.graduation_provenance.get(index)?.clone(),
+        })
+    }
+
+    /// Get multiple indexed entries with their corresponding lineage records.
+    pub fn get_context_with_provenance(
+        &self,
+        indices: &[usize],
+    ) -> Vec<ProvenancedSemanticEntry> {
+        indices
+            .iter()
+            .filter_map(|&index| self.get_with_provenance(index))
+            .collect()
     }
 
     /// Compute the average prediction error of similar entries
