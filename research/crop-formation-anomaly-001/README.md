@@ -139,7 +139,7 @@ The public sources located so far do not establish a recognized, community-wide 
 - **Mycelix/evidence layer:** source assertions, immutable evidence IDs, custody/transfer events, signatures and reproducible receipts. Provenance does not establish truth.
 - **Sol-Atlas / geospatial tools:** map alignment, field context, remote-sensing provenance and rights-aware imagery handling where appropriate.
 
-Reuse the existing Symthaea falsification/power reference and open-world work rather than implementing a duplicate statistical framework. The branch now includes a small dependency-free Rust reference crate for calibrated point-set geometry, explicit binary-grid transforms, raw-bit decoder attempts, and simple statistical helpers. It is not a production image-analysis pipeline and has not yet been compiled or executed.
+Reuse the existing Symthaea falsification/power reference and open-world work rather than implementing a duplicate statistical framework. The branch now includes a dependency-free Rust reference lab for calibrated point-set and circle geometry, 2D crop-flow and 3D stem-pose statistics, frozen circle-grammar families, conditional radius-permutation nulls, event-grouped validation splits, family-wise max-statistic evaluation, explicit binary-grid transforms and raw-byte decoder attempts. It is not a production image-analysis pipeline and has not yet been compiled or executed.
 
 ## Work packages
 
@@ -185,7 +185,7 @@ Reuse the existing Symthaea falsification/power reference and open-world work ra
 - Hafdi (uploaded March 2026), [The Mathematics of Crop Circles and Their Applications to Complex Problems](https://www.researchgate.net/publication/403159866_The_Mathematics_of_Crop_Circles_and_Their_Applications_to_Complex_Problems_Geometry_Number_Theory_Encoding_and_Engineering_Implications_of_Agrarian_Formations) — exploratory manuscript; claims and decodings require independent verification.
 
 ---
-**Current result:** the programme, benchmark, data model, schemas, field protocol, competitive audit, attributed CCAT geometry fixture and standalone Rust reference lab are committed. A separate Python replay of the published CCAT CSV reproduced key descriptive geometry counts. The 44 Rust unit tests are authored but not compiled or executed. No source photograph has been imported; no real formation has been independently re-digitized, classified by origin, semantically decoded, field-sampled, or causally explained.
+**Current result:** the programme, benchmark, data model, schemas, field protocol, competitive audit, attributed CCAT geometry fixture and standalone Rust reference lab are committed. A separate Python replay of the published CCAT CSV reproduced key descriptive geometry counts. The 69 Rust unit tests are authored but not compiled or executed. No source photograph has been imported; no real formation has been independently re-digitized, classified by origin, semantically decoded, field-sampled, or causally explained.
 
 
 ## Research extensions and implementation
