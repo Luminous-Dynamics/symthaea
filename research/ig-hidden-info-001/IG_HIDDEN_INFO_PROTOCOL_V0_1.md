@@ -20,6 +20,12 @@ Related, separate phenomena:
 
 Do not pool these phenomena into a single “social influence” label.
 
+## Public result-file reproduction
+
+The publisher's result archive is available from the MIT-licensed `YuxuanLi1225/HiddenBench-results` dataset. The source file paths, revision, byte sizes and run counts for the GPT-4.1 hidden manual/adapted, hidden generated and full-profile files are catalogued in `external/hiddenbench/PUBLIC_RESULT_SOURCE_MANIFEST_V0_1.json`.
+
+The original complete comparison uses two hidden-profile files (8+57 tasks) and one full-profile file (65 tasks). The Rust scorer accepts the two hidden files as separate positional inputs and the full file via `--full`; it rejects combining hidden files whose declared model or profile differs. The published result files are not currently vendored or claimed as reproduced.
+
 ## Official HiddenBench corpus pin and reproduction constraints
 
 The upstream open-source release is pinned at `Yassellee/HiddenBench_ICML` commit `3be6ca16973e4fb751ffc0dfb7eb11f2d28335d1`. The exact `data/benchmark.json` Git blob SHA is `918366d953ecfe7e86a0e8cf7906cf757f574012`; its exact bytes and upstream MIT license are vendored under `external/hiddenbench/`.
