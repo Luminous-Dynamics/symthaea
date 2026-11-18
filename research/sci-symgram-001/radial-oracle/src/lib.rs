@@ -223,14 +223,22 @@ fn anisotropic_oscillator(k1: i128, k2: i128) -> [Polynomial; 4] {
     [v1, v2, x1.scale(-k1), x2.scale(-k2)]
 }
 
-fn infinitesimal_rotation_residuals(vector_field: &[Polynomial; 4]) -> [Polynomial; 4] {
+fn rotation_generator_action() -> [Polynomial; 4] {
     let x1 = Polynomial::variable(0);
     let x2 = Polynomial::variable(1);
     let v1 = Polynomial::variable(2);
     let v2 = Polynomial::variable(3);
 
     // A z for A = diag(J, J), J = [[0, -1], [1, 0]].
-    let generator_action = [x2.scale(-1), x1, v2.scale(-1), v1];
+    [x2.scale(-1), x1, v2.scale(-1), v1]
+}
+
+fn scalar_is_rotation_invariant(expression: &Polynomial) -> bool {
+    expression.along(&rotation_generator_action()).is_zero()
+}
+
+fn infinitesimal_rotation_residuals(vector_field: &[Polynomial; 4]) -> [Polynomial; 4] {
+    let generator_action = rotation_generator_action();
 
     // A F(z), using the same block generator.
     let generator_on_field = [
@@ -323,6 +331,32 @@ pub fn qualify_radial_case(
     })
 }
 
+/// Exact invariance status for the outputs used by the radial-force fixture.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ObservableInvarianceReport {
+    pub radius_squared_invariant: bool,
+    pub radial_velocity_invariant: bool,
+    pub speed_squared_invariant: bool,
+    pub signed_angular_momentum_invariant: bool,
+    pub absolute_x1_invariant: bool,
+}
+
+/// Check which declared scalar outputs are invariant under the SO(2) action.
+///
+/// Absolute external-frame coordinates must not be reconstructed from the
+/// orbit invariants; the output is deliberately expected to be non-invariant.
+pub fn qualify_radial_observables() -> ObservableInvarianceReport {
+    let (a, b, c, angular_momentum) = invariant_polynomials();
+    let absolute_x1 = Polynomial::variable(0);
+    ObservableInvarianceReport {
+        radius_squared_invariant: scalar_is_rotation_invariant(&a),
+        radial_velocity_invariant: scalar_is_rotation_invariant(&b),
+        speed_squared_invariant: scalar_is_rotation_invariant(&c),
+        signed_angular_momentum_invariant: scalar_is_rotation_invariant(&angular_momentum),
+        absolute_x1_invariant: scalar_is_rotation_invariant(&absolute_x1),
+    }
+}
+
 /// Returns whether an oscillator with diagonal stiffness (k1, k2) is
 /// infinitesimally SO(2)-equivariant. Unequal stiffness must be rejected.
 pub fn anisotropic_oscillator_is_rotation_equivariant(k1: i128, k2: i128) -> bool {
@@ -382,6 +416,16 @@ mod tests {
                 assert!(report.all_exact_checks_pass(), "{report:?}");
             }
         }
+    }
+
+    #[test]
+    fn invariant_outputs_pass_but_absolute_orientation_is_rejected() {
+        let report = qualify_radial_observables();
+        assert!(report.radius_squared_invariant, "{report:?}");
+        assert!(report.radial_velocity_invariant, "{report:?}");
+        assert!(report.speed_squared_invariant, "{report:?}");
+        assert!(report.signed_angular_momentum_invariant, "{report:?}");
+        assert!(!report.absolute_x1_invariant, "{report:?}");
     }
 
     #[test]
