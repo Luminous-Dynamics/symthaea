@@ -224,3 +224,42 @@ Sampling protocol is part of the fixture: RNG seed, warmup sweeps, measurement s
 The multi-chain receipt preserves every chain/seed and reports between-chain dispersion. This does not replace within-chain autocorrelation checks or prove equilibration. The current CI pilot uses two short chains only to test determinism, update plumbing and receipt structure. It is not a thermodynamic measurement.
 
 The sampler uses a fixed proposal scale and is intentionally simple. It is a baseline, not a claim of state-of-the-art mixing. The next algorithmic comparison should include adaptive-but-frozen-after-warmup Metropolis, overrelaxation or hybrid Monte Carlo where mathematically appropriate, and replica exchange near suspected first-order regimes. Compare effective independent samples per CPU-second at matched acceptance, observable error and system size. Do not judge samplers by acceptance rate alone.
+
+
+### Gauge-invariant twist response and helicity modulus
+
+The GL model now differentiates its link functional with respect to a global boundary twist. For each oriented bond, define
+
+\[
+A_{ij}(\boldsymbol\theta)=A_{ij}
++\sum_\mu \theta_\mu\frac{\Delta x_{ij,\mu}}{L_\mu}.
+\]
+
+The configuration-level derivatives are recorded as
+
+\[
+J_\mu=\frac{\partial F}{\partial\theta_\mu}
+=2\sum_{\langle ij\rangle}K_{ij}\,
+\operatorname{Im}(\psi_i^*e^{iA_{ij}}\psi_j)
+\frac{\Delta x_{ij,\mu}}{L_\mu},
+\]
+
+\[
+D_{\mu\nu}=\frac{\partial^2 F}{\partial\theta_\mu\partial\theta_\nu}
+=2\sum_{\langle ij\rangle}K_{ij}\,
+\operatorname{Re}(\psi_i^*e^{iA_{ij}}\psi_j)
+\frac{\Delta x_{ij,\mu}\Delta x_{ij,\nu}}{L_\mu L_\nu}.
+\]
+
+For a thermal ensemble, the twist free-energy Hessian is estimated as
+
+\[
+\Upsilon_{\mu\nu}
+=\langle D_{\mu\nu}\rangle
+-\frac{\langle J_\mu J_\nu\rangle-
+\langle J_\mu\rangle\langle J_\nu\rangle}{T}.
+\]
+
+The code preserves the raw twist-response tensor in the per-chain receipt and aggregates it across independent seeds. Its normalization is the second derivative with respect to the declared total twist vector; it is not silently converted into a three-dimensional superfluid density or material penetration depth. For the uniform 4×4, zero-field, \(|\psi|=1,K=1\) fixture, the bare diamagnetic twist curvature is \(2\) along each axis and zero off-diagonal. A gauge-transformation test verifies that both current and diamagnetic tensors are invariant.
+
+The current Metropolis pilot reports a finite-chain helicity-modulus estimate from sample means/covariances. It does not yet have blocked jackknife uncertainties or finite-size scaling. For BKT classification, compare the size-dependent helicity-modulus crossing/jump and vortex behaviour; do not enforce a universal jump where strong amplitude fluctuations may drive a first-order transition.
