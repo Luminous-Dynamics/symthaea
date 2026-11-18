@@ -133,3 +133,21 @@ A synthetic result is not a physical performance result. A simulation is bounded
 ## 10. Claim ceiling
 
 This protocol does not establish a COP, heat-recovery rate, efficiency, energy savings, economic payback, hygiene outcome, product superiority, building approval or procurement/construction authority. All values are hypotheses until tested on exact configurations with independent measurement.
+
+
+## 11. South African hot-water hygiene and delivery-temperature boundaries
+
+The IOPSA notice for SANS 10252-1:2018 Edition 3.2 quotes clause 7.1.2 as requiring conditions that are as far as possible unfavorable to Legionella development in the cited stored-water installations; it further quotes a stored-hot-water provision of at least 55 °C with 60 °C reached for at least one hour per day. The same notice quotes clause 7.5.1.4.2 on terminal fitting discharge temperature (maximum 60 °C unless otherwise required, with thermostatic mixers potentially required to achieve a lower delivery temperature).
+
+Source: https://www.iopsa.org/news/7216337
+
+This is an industry-association summary, not the controlled SABS standard. Confirm the current controlled text, exact scope, amendments and project applicability with SABS and the responsible professional.
+
+For Aqua engineering, keep these as separate boundaries:
+- storage / source-side temperature-time regimen;
+- distribution and return temperature / residence-time profile;
+- point-of-use mixing and terminal delivery temperature;
+- actual water-quality and biofilm assessment;
+- purchased energy and storage / distribution losses.
+
+Do not raise the user-delivery temperature to satisfy a storage-side hygiene regimen. Do not treat a tank reaching a specified temperature as proof that the entire installation, shower branch, hose, head or aerosol exposure is microbiologically controlled. Do not use an assumed pasteurization cycle as a substitute for Mycelix / competent water-quality assessment and wet-path hygiene evidence. The DHW optimizer must account for any required source-side thermal regimen and its energy burden without overriding independent anti-scald protection.
