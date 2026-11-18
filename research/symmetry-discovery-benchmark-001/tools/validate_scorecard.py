@@ -18,7 +18,6 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = ROOT / "fixtures" / "v0.1" / "cases.json"
 DEFAULT_SCHEMA = ROOT / "schemas" / "run_scorecard.schema.json"
-DEFAULT_PROTOCOL = ROOT / "README.md"
 
 
 class ScorecardError(ValueError):
@@ -37,6 +36,20 @@ def canonical_json(value: Any) -> bytes:
 
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def protocol_bundle_bytes(root: Path) -> bytes:
+    """Length-prefixed digest input for README and every benchmark schema."""
+    paths = [root / "README.md", *sorted((root / "schemas").glob("*.json"))]
+    payload = bytearray(b"luminous.symmetry_benchmark_protocol.v1\\0")
+    for path in paths:
+        relative = path.relative_to(root).as_posix().encode("utf-8")
+        content = path.read_bytes()
+        payload.extend(len(relative).to_bytes(8, "little"))
+        payload.extend(relative)
+        payload.extend(len(content).to_bytes(8, "little"))
+        payload.extend(content)
+    return bytes(payload)
 
 
 def expected_hashes(
@@ -297,6 +310,10 @@ def self_test(manifest: dict[str, Any], manifest_bytes: bytes, protocol_bytes: b
     wrong_digest["input_digest_sha256"] = "f" * 64
     must_reject(wrong_digest, "mutated input digest")
 
+    wrong_protocol = json.loads(json.dumps(scorecard))
+    wrong_protocol["protocol_digest_sha256"] = "f" * 64
+    must_reject(wrong_protocol, "mutated protocol/schema bundle digest")
+
     unsafe_prune = json.loads(json.dumps(scorecard))
     unsafe_prune["verification"]["unverified_hard_prune_count"] = 1
     must_reject(unsafe_prune, "unverified hard prune")
@@ -311,13 +328,12 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--schema", type=Path, default=DEFAULT_SCHEMA)
-    parser.add_argument("--protocol", type=Path, default=DEFAULT_PROTOCOL)
     parser.add_argument("--scorecard", type=Path)
     parser.add_argument("--self-test", action="store_true")
     arguments = parser.parse_args()
 
     manifest_bytes = arguments.manifest.read_bytes()
-    protocol_bytes = arguments.protocol.read_bytes()
+    protocol_bytes = protocol_bundle_bytes(ROOT)
     schema = json.loads(arguments.schema.read_text(encoding="utf-8"))
     manifest = json.loads(manifest_bytes)
     if arguments.self_test:
