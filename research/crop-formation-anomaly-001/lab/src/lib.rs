@@ -21,5 +21,6 @@ pub use grid::{
     BinaryGrid, GridDecodeOutcome, GridDecoderManifest, GridDecoderSpec, GridError, GridTransform,
     ManifestError, NullGridResult,
     TraversalOrder, margin_preserving_shuffle, run_grid_tournament,
+    standard_d4_ascii7_manifest,
 };
 pub use statistics::{wilson_interval, binary_entropy, upper_tail_max_p_value};
