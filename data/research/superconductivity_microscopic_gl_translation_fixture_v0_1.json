@@ -126,12 +126,12 @@
       "basis_normalization": "not specified",
       "temperature_regime": "near-Tc GL expansion not extracted",
       "field_regime": "finite-q pair response is part of the reported method, but the q expansion, normalization and tensor outputs have not been extracted",
-      "status": "constrained",
+      "status": "not_identifiable",
       "derivation_method": "Finite-momentum pair response is a candidate source for gradient information; no K value is encoded until the full response and field normalization are reconstructed.",
       "supporting_observable_ids": [],
       "uncertainty_or_covariance": null,
       "model_family": "conventional_electron_phonon",
-      "non_identifiability_reason": "Finite-q framework is reported, but no quantitative K tensor or normalization is present in this metadata fixture.",
+      "non_identifiability_reason": "The paper method includes finite-q response, but the abstract-level source record does not contain quantitative q-dependence, field normalization or a fitted gradient expansion from which K can be extracted.",
       "state_id": "method_summary_only"
     }
   ],
