@@ -248,3 +248,8 @@ AQS-1 now has a task-phase software contract for PREPARE, BASE_DELIVERY, OPTIONA
 The UWL 2023 Clause 12.1 boost test is incorporated as a method-specific evidence contract. It checks regular flow Qreg, boosted Qboost, flow-control closure, reopening without boost and post-close Qmax; UWL requires Qmax = Qreg, Qboost < 2 x Qreg and Qreg listed on the scheme label. Aqua's validator preserves separate hot/cold Type 1 P2 inlet pressure and uncertainty. It does not certify product conformity.
 
 See [AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md](AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md), [AQUA_METHOD_CROSSWALK_V0_1.md](AQUA_METHOD_CROSSWALK_V0_1.md), and [#12798](https://github.com/Luminous-Dynamics/symthaea/issues/12798).
+
+
+## Repairability as a measured product property
+
+The dry-side service spine is now paired with a fault/job manifest and evidence contract. A routine repair counts as non-destructive only after the part is accessed without finish removal, the post-repair functional check passes, and all required independent device, water-quality and metrology gates are complete. See [AQUA_REPAIRABILITY_SERVICEABILITY_PROTOCOL_V0_1.md](AQUA_REPAIRABILITY_SERVICEABILITY_PROTOCOL_V0_1.md) and [#12844](https://github.com/Luminous-Dynamics/symthaea/issues/12844). ISO 20887:2020 informs design-for-disassembly decisions; it sets no universal numeric repairability performance threshold.
