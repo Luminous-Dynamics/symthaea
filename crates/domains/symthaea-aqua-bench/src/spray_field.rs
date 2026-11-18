@@ -494,6 +494,11 @@ fn valid_spray_field_summary(summary: &SprayFieldSummary) -> bool {
     let coefficient_valid = summary
         .target_deposition_coefficient_of_variation
         .is_none_or(|value| value.is_finite() && value >= 0.0);
+    let coefficient_presence_valid =
+        (summary.mean_target_deposition_mg_per_cm2 == 0.0
+            && summary.target_deposition_coefficient_of_variation.is_none())
+            || (summary.mean_target_deposition_mg_per_cm2 > 0.0
+                && summary.target_deposition_coefficient_of_variation.is_some());
     let derived_values_valid = summary.total_mapped_mass_mg > 0.0
         && summary.target_area_cm2 > 0.0
         && approximately_equal(
@@ -514,6 +519,7 @@ fn valid_spray_field_summary(summary: &SprayFieldSummary) -> bool {
         && areas_valid
         && mass_valid
         && coefficient_valid
+        && coefficient_presence_valid
         && derived_values_valid
 }
 
