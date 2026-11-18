@@ -107,28 +107,26 @@ impl AlarmPolicyConfig {
         Ok(())
     }
 
-    /// SHA-256 over the exact policy ID, validation receipt, thresholds,
-    /// persistence settings and warning interval. Threshold floats are
-    /// represented by their IEEE-754 bit patterns for canonical identity.
+    /// SHA-256 over length-prefixed fields. Length-prefixing prevents
+    /// delimiter characters inside caller-provided identifiers from creating
+    /// ambiguous policy encodings. Floating-point thresholds use their exact
+    /// IEEE-754 bit patterns.
     pub fn policy_config_sha256(&self) -> String {
-        let canonical = format!(
-            "luminous.plasma-alarm-policy.v0.2\\n{}\\n{}\\n{}\\n{:016x}\\n{:016x}\\n{}\\n{}\\n{}",
-            self.policy_id,
-            self.score_scale_id,
-            self.validation_receipt_sha256,
-            self.trigger_threshold.to_bits(),
-            self.clear_threshold.to_bits(),
-            self.trigger_persistence_windows,
-            self.clear_persistence_windows,
-            self.required_warning_ns,
-        );
-        let digest = Sha256::digest(canonical.as_bytes());
-        let mut encoded = String::with_capacity(64);
-        for byte in digest {
-            use std::fmt::Write as _;
-            let _ = write!(&mut encoded, "{byte:02x}");
-        }
-        encoded
+        let mut canonical = Vec::new();
+        let mut append = |field: &[u8]| {
+            canonical.extend_from_slice(&(field.len() as u64).to_be_bytes());
+            canonical.extend_from_slice(field);
+        };
+        append(b"luminous.plasma-alarm-policy.v0.3");
+        append(self.policy_id.as_bytes());
+        append(self.score_scale_id.as_bytes());
+        append(self.validation_receipt_sha256.as_bytes());
+        append(format!("{:016x}", self.trigger_threshold.to_bits()).as_bytes());
+        append(format!("{:016x}", self.clear_threshold.to_bits()).as_bytes());
+        append(self.trigger_persistence_windows.to_string().as_bytes());
+        append(self.clear_persistence_windows.to_string().as_bytes());
+        append(self.required_warning_ns.to_string().as_bytes());
+        sha256_hex(&canonical)
     }
 }
 
@@ -624,6 +622,8 @@ pub struct ShotAlarmEvaluation {
     pub event_detected: bool,
     pub false_alarm_events: usize,
     pub lead_time_ns: Option<u64>,
+    /// Shot exposure from time zero to t_cut or observation end.
+    pub exposure_duration_ns: u64,
 }
 
 /// Scores timestamps already emitted by the online policy. Event references
@@ -648,6 +648,11 @@ pub fn score_shot_alarms(
 
     match outcome {
         ShotReferenceOutcome::Disruptive { t_cut_ns } => {
+            if t_cut_ns == 0 {
+                return Err(PlasmaEventEvalError::new(
+                    "disruptive-shot exposure duration must be positive",
+                ));
+            }
             if alarm_times_ns.iter().any(|time| *time > t_cut_ns) {
                 return Err(PlasmaEventEvalError::new(
                     "disruptive-shot alarm trace extends beyond t_cut_ns",
@@ -669,11 +674,17 @@ pub fn score_shot_alarms(
                 event_detected: lead_time_ns.is_some(),
                 false_alarm_events: 0,
                 lead_time_ns,
+                exposure_duration_ns: t_cut_ns,
             })
         }
         ShotReferenceOutcome::NonDisruptive {
             observation_end_ns,
         } => {
+            if observation_end_ns == 0 {
+                return Err(PlasmaEventEvalError::new(
+                    "non-disruptive observation exposure duration must be positive",
+                ));
+            }
             if alarm_times_ns
                 .iter()
                 .any(|time| *time > observation_end_ns)
@@ -692,6 +703,7 @@ pub fn score_shot_alarms(
                 event_detected: false,
                 false_alarm_events: alarm_times_ns.len(),
                 lead_time_ns: None,
+                exposure_duration_ns: observation_end_ns,
             })
         }
     }
@@ -710,12 +722,16 @@ pub struct AlarmEvaluationSummary {
     pub missed_disruptions: usize,
     pub false_alarm_shots: usize,
     pub false_alarm_events: usize,
+    pub total_non_disruptive_exposure_ns: u128,
     /// None when there are no disruptive shots.
     pub event_tpr: Option<f64>,
     /// None when there are no non-disruptive shots.
     pub false_alarm_shot_rate: Option<f64>,
     /// None when there are no non-disruptive shots.
     pub false_alarms_per_non_disruptive_shot: Option<f64>,
+    /// False-alarm episodes divided by accumulated non-disruptive exposure in hours.
+    /// None when the negative cohort has no exposure.
+    pub false_alarms_per_non_disruptive_hour: Option<f64>,
     pub mean_warning_time_ns: Option<f64>,
     pub event_tpr_wilson_95: Option<RateConfidenceInterval>,
     pub false_alarm_shot_rate_wilson_95: Option<RateConfidenceInterval>,
@@ -779,12 +795,23 @@ pub fn summarize_alarm_evaluations(
     let mut detected_disruptions = 0usize;
     let mut false_alarm_shots = 0usize;
     let mut false_alarm_events = 0usize;
+    let mut total_non_disruptive_exposure_ns = 0u128;
     let mut warning_times_ns = Vec::new();
 
     for evaluation in evaluations {
         if evaluation.shot_id.trim().is_empty() || !shot_ids.insert(&evaluation.shot_id) {
             return Err(PlasmaEventEvalError::new(
                 "shot IDs must be non-empty and unique in one evaluation cohort",
+            ));
+        }
+        if evaluation.policy_id.trim().is_empty()
+            || !valid_sha256(&evaluation.validation_receipt_sha256)
+            || !valid_sha256(&evaluation.policy_config_sha256)
+            || evaluation.required_warning_ns == 0
+            || evaluation.exposure_duration_ns == 0
+        {
+            return Err(PlasmaEventEvalError::new(
+                "shot evaluation has incomplete policy identity or exposure metadata",
             ));
         }
         match (
@@ -828,6 +855,8 @@ pub fn summarize_alarm_evaluations(
             }
         } else {
             non_disruptive_shots += 1;
+            total_non_disruptive_exposure_ns = total_non_disruptive_exposure_ns
+                .saturating_add(u128::from(evaluation.exposure_duration_ns));
             if evaluation.event_detected || evaluation.lead_time_ns.is_some() {
                 return Err(PlasmaEventEvalError::new(
                     "non-disruptive shot cannot be marked as an event detection",
@@ -862,6 +891,7 @@ pub fn summarize_alarm_evaluations(
         missed_disruptions,
         false_alarm_shots,
         false_alarm_events,
+        total_non_disruptive_exposure_ns,
         event_tpr: (disruptive_shots > 0)
             .then_some(detected_disruptions as f64 / disruptive_shots as f64),
         event_tpr_wilson_95: wilson_interval(detected_disruptions, disruptive_shots),
@@ -873,6 +903,10 @@ pub fn summarize_alarm_evaluations(
         ),
         false_alarms_per_non_disruptive_shot: (non_disruptive_shots > 0)
             .then_some(false_alarm_events as f64 / non_disruptive_shots as f64),
+        false_alarms_per_non_disruptive_hour: (total_non_disruptive_exposure_ns > 0).then_some(
+            false_alarm_events as f64
+                / (total_non_disruptive_exposure_ns as f64 / 3_600_000_000_000.0),
+        ),
         mean_warning_time_ns,
         warning_time_p05_ns: nearest_rank_quantile(&warning_times_ns, 0.05),
         warning_time_p10_ns: nearest_rank_quantile(&warning_times_ns, 0.10),
@@ -1085,6 +1119,17 @@ mod tests {
         let mut changed_validation = original;
         changed_validation.validation_receipt_sha256 = "b".repeat(64);
         assert_ne!(digest, changed_validation.policy_config_sha256());
+    }
+
+    #[test]
+    fn policy_digest_is_unambiguous_when_identifiers_contain_delimiters() {
+        let mut first = config();
+        first.policy_id = "alpha\\nbeta".to_owned();
+        first.score_scale_id = "gamma".to_owned();
+        let mut second = config();
+        second.policy_id = "alpha".to_owned();
+        second.score_scale_id = "beta\\ngamma".to_owned();
+        assert_ne!(first.policy_config_sha256(), second.policy_config_sha256());
     }
 
     #[test]
@@ -1311,6 +1356,22 @@ mod tests {
     }
 
     #[test]
+    fn false_alarm_rate_is_normalized_by_negative_shot_exposure() {
+        let negative = score_shot_alarms(
+            "one-hour-negative",
+            ShotReferenceOutcome::NonDisruptive {
+                observation_end_ns: 3_600_000_000_000,
+            },
+            &[10, 20],
+            &config(),
+        )
+        .expect("negative shot");
+        let summary = summarize_alarm_evaluations(&[negative]).expect("summary");
+        assert_eq!(summary.total_non_disruptive_exposure_ns, 3_600_000_000_000);
+        assert_eq!(summary.false_alarms_per_non_disruptive_hour, Some(2.0));
+    }
+
+    #[test]
     fn cohort_refuses_to_mix_frozen_policy_identities() {
         let mut other = config();
         other.policy_id = "different-frozen-policy-v2".to_owned();
@@ -1345,6 +1406,8 @@ mod tests {
         assert_eq!(summary.false_alarm_shot_rate, None);
         assert_eq!(summary.false_alarm_shot_rate_wilson_95, None);
         assert_eq!(summary.false_alarms_per_non_disruptive_shot, None);
+        assert_eq!(summary.false_alarms_per_non_disruptive_hour, None);
+        assert_eq!(summary.total_non_disruptive_exposure_ns, 0);
     }
 
     #[test]
