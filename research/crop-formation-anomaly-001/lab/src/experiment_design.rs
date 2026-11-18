@@ -8,6 +8,8 @@ pub enum ExperimentDesignError {
     EmptyPrior,
     InvalidPrior(&'static str),
     InvalidOutcomeMatrix(&'static str),
+    InvalidAction(&'static str),
+    DuplicateActionId,
 }
 
 /// Tolerance used only to validate caller-supplied probability normalization.
@@ -130,11 +132,211 @@ pub fn expected_information_gain_bits(
     Ok(information_gain.max(0.0))
 }
 
+
+/// A proposed measurement action with caller-supplied predictive outcomes.
+///
+/// Cost units must be comparable across all actions in one ranking (for
+/// example, staff-hours or a preregistered normalized budget unit). Hard gates
+/// are external authorization/feasibility decisions, not probabilities.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExperimentAction {
+    pub action_id: String,
+    pub cost_units: f64,
+    pub hard_gates_passed: bool,
+    pub ineligibility_reason: Option<String>,
+    pub conditional_outcome_probabilities: Vec<Vec<f64>>,
+}
+
+/// Ranked information value for one action. Ineligible actions are retained,
+/// but have no information score and are always placed after eligible actions.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExperimentActionScore {
+    pub action_id: String,
+    pub eligible: bool,
+    pub expected_information_gain_bits: Option<f64>,
+    pub cost_units: f64,
+    pub bits_per_cost_unit: Option<f64>,
+    pub ineligibility_reason: Option<String>,
+}
+
+/// Score and rank candidate actions by expected information gain per common
+/// cost unit. Hard-gate-failing actions are retained unscored. This routine
+/// does not itself determine whether permission, safety, ethics or legal gates
+/// pass; the caller must supply that disposition from the relevant authority.
+pub fn rank_experiment_actions(
+    prior_probabilities: &[f64],
+    actions: &[ExperimentAction],
+) -> Result<Vec<ExperimentActionScore>, ExperimentDesignError> {
+    let mut seen_ids = std::collections::HashSet::new();
+    let mut scores = Vec::with_capacity(actions.len());
+
+    for action in actions {
+        if action.action_id.trim().is_empty() {
+            return Err(ExperimentDesignError::InvalidAction(
+                "action identifier must not be empty",
+            ));
+        }
+        if !seen_ids.insert(action.action_id.as_str()) {
+            return Err(ExperimentDesignError::DuplicateActionId);
+        }
+        if !action.cost_units.is_finite() || action.cost_units <= 0.0 {
+            return Err(ExperimentDesignError::InvalidAction(
+                "cost must be finite and positive",
+            ));
+        }
+
+        if action.hard_gates_passed {
+            let gain = expected_information_gain_bits(
+                prior_probabilities,
+                &action.conditional_outcome_probabilities,
+            )?;
+            scores.push(ExperimentActionScore {
+                action_id: action.action_id.clone(),
+                eligible: true,
+                expected_information_gain_bits: Some(gain),
+                cost_units: action.cost_units,
+                bits_per_cost_unit: Some(gain / action.cost_units),
+                ineligibility_reason: None,
+            });
+        } else {
+            let reason = action
+                .ineligibility_reason
+                .as_deref()
+                .map(str::trim)
+                .filter(|reason| !reason.is_empty())
+                .ok_or(ExperimentDesignError::InvalidAction(
+                    "ineligible actions require a reason",
+                ))?;
+            scores.push(ExperimentActionScore {
+                action_id: action.action_id.clone(),
+                eligible: false,
+                expected_information_gain_bits: None,
+                cost_units: action.cost_units,
+                bits_per_cost_unit: None,
+                ineligibility_reason: Some(reason.to_string()),
+            });
+        }
+    }
+
+    scores.sort_by(|left, right| match (left.bits_per_cost_unit, right.bits_per_cost_unit) {
+        (Some(left_value), Some(right_value)) => right_value
+            .total_cmp(&left_value)
+            .then_with(|| left.action_id.cmp(&right.action_id)),
+        (Some(_), None) => std::cmp::Ordering::Less,
+        (None, Some(_)) => std::cmp::Ordering::Greater,
+        (None, None) => left.action_id.cmp(&right.action_id),
+    });
+
+    Ok(scores)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     const EPS: f64 = 1.0e-9;
+
+
+    #[test]
+    fn action_ranking_uses_information_gain_per_common_cost_unit() {
+        let actions = vec![
+            ExperimentAction {
+                action_id: "perfect-expensive".into(),
+                cost_units: 2.0,
+                hard_gates_passed: true,
+                ineligibility_reason: None,
+                conditional_outcome_probabilities: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            },
+            ExperimentAction {
+                action_id: "partial-cheap".into(),
+                cost_units: 0.1,
+                hard_gates_passed: true,
+                ineligibility_reason: None,
+                conditional_outcome_probabilities: vec![vec![0.8, 0.2], vec![0.2, 0.8]],
+            },
+        ];
+        let ranking = rank_experiment_actions(&[0.5, 0.5], &actions).unwrap();
+        assert_eq!(ranking[0].action_id, "partial-cheap");
+        assert_eq!(ranking[1].action_id, "perfect-expensive");
+    }
+
+    #[test]
+    fn hard_gate_failure_is_visible_but_never_scored() {
+        let actions = vec![
+            ExperimentAction {
+                action_id: "not-permitted".into(),
+                cost_units: 0.01,
+                hard_gates_passed: false,
+                ineligibility_reason: Some("landowner permission not granted".into()),
+                conditional_outcome_probabilities: Vec::new(),
+            },
+            ExperimentAction {
+                action_id: "eligible".into(),
+                cost_units: 1.0,
+                hard_gates_passed: true,
+                ineligibility_reason: None,
+                conditional_outcome_probabilities: vec![vec![1.0], vec![1.0]],
+            },
+        ];
+        let ranking = rank_experiment_actions(&[0.5, 0.5], &actions).unwrap();
+        assert_eq!(ranking[0].action_id, "eligible");
+        assert_eq!(ranking[1].action_id, "not-permitted");
+        assert!(!ranking[1].eligible);
+        assert!(ranking[1].expected_information_gain_bits.is_none());
+        assert_eq!(
+            ranking[1].ineligibility_reason.as_deref(),
+            Some("landowner permission not granted")
+        );
+    }
+
+    #[test]
+    fn action_ranking_rejects_duplicate_identifiers() {
+        let action = ExperimentAction {
+            action_id: "duplicate".into(),
+            cost_units: 1.0,
+            hard_gates_passed: true,
+            ineligibility_reason: None,
+            conditional_outcome_probabilities: vec![vec![1.0], vec![1.0]],
+        };
+        assert_eq!(
+            rank_experiment_actions(&[0.5, 0.5], &[action.clone(), action]),
+            Err(ExperimentDesignError::DuplicateActionId)
+        );
+    }
+
+    #[test]
+    fn action_ranking_rejects_invalid_costs() {
+        let action = ExperimentAction {
+            action_id: "bad-cost".into(),
+            cost_units: 0.0,
+            hard_gates_passed: false,
+            ineligibility_reason: Some("not permitted".into()),
+            conditional_outcome_probabilities: Vec::new(),
+        };
+        assert_eq!(
+            rank_experiment_actions(&[0.5, 0.5], &[action]),
+            Err(ExperimentDesignError::InvalidAction(
+                "cost must be finite and positive"
+            ))
+        );
+    }
+
+    #[test]
+    fn ineligible_action_requires_explanation() {
+        let action = ExperimentAction {
+            action_id: "blocked".into(),
+            cost_units: 1.0,
+            hard_gates_passed: false,
+            ineligibility_reason: None,
+            conditional_outcome_probabilities: Vec::new(),
+        };
+        assert_eq!(
+            rank_experiment_actions(&[0.5, 0.5], &[action]),
+            Err(ExperimentDesignError::InvalidAction(
+                "ineligible actions require a reason"
+            ))
+        );
+    }
 
     #[test]
     fn perfect_binary_discriminator_provides_one_bit() {
