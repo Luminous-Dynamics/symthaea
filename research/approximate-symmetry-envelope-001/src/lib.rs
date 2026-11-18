@@ -9,6 +9,8 @@
 
 use std::fmt;
 
+pub mod affine;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EnvelopeBudgetV1 {
     pub max_horizon_steps: u32,
