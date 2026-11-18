@@ -104,7 +104,7 @@
       "required_pose_refs": [],
       "method_selection_ref": "METHOD-GATE-AIRFLOW",
       "acceptance_rule_ref": "RULE-GATE-AIRFLOW",
-      "comparison_control": "baseline_uncovered"
+      "comparison_control": "incumbent_cover"
     }
   ],
   "runs": [],
