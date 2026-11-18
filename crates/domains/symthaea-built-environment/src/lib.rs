@@ -302,7 +302,7 @@ pub struct CatalogueVocabulary {
 impl CatalogueVocabulary {
     /// Parse shared option IDs from the exact caller-pinned catalogue bytes.
     /// The list itself is never copied into this crate or another UI module.
-    pub fn from_catalogue_json(source: &str) -> Result<Self, String> {
+    fn from_catalogue_json(source: &str) -> Result<Self, String> {
         let value: Value = serde_json::from_str(source)
             .map_err(|error| format!("catalogue JSON is invalid: {error}"))?;
         let mut vocabulary = Self {
