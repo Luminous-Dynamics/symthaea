@@ -74,8 +74,9 @@ pub use plasma_hdc_encoder::{
 
 pub use plasma_event_eval::{
     AlarmAbstentionReason, AlarmEvaluationSummary, AlarmPolicyConfig, AlarmPolicyUpdate,
-    OnlinePlasmaAlarmPolicy, PlasmaEventEvalError, RateConfidenceInterval,
-    ShotAlarmEvaluation, ShotReferenceOutcome, score_shot_alarms, summarize_alarm_evaluations,
+    OnlinePlasmaAlarmPolicy, PlasmaEventEvalError, RateConfidenceInterval, RiskScoreEvidence,
+    ShotAlarmEvaluation, ShotReferenceOutcome, observation_frame_sha256, score_shot_alarms,
+    summarize_alarm_evaluations,
 };
 
 pub use plasma_control::{
