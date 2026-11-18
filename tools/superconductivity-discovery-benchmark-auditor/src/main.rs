@@ -183,6 +183,8 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
             || normalized == "source_paper_id"
             || normalized == "source_date"
             || normalized == "material_state_id"
+            || normalized == "family_id"
+            || normalized == "family_hypothesis"
         {
             return Err(format!(
                 "target leakage: target property {target_property} appears in available features"
@@ -589,6 +591,16 @@ mod tests {
                 .as_array_mut()
                 .unwrap()
                 .push(json!("source_id"));
+        });
+    }
+
+    #[test]
+    fn family_identity_cannot_be_a_prediction_feature() {
+        rejects_mutation(|fixture| {
+            fixture["task"]["available_features"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!("family_id"));
         });
     }
 
