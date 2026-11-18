@@ -16,7 +16,9 @@
     "secondary_order_fields",
     "stability_gates",
     "source_references",
-    "claim_ceiling"
+    "claim_ceiling",
+    "thermal",
+    "sampling"
   ],
   "properties": {
     "contract": {
@@ -467,6 +469,66 @@
     },
     "claim_ceiling": {
       "const": "Synthetic multicomponent order-parameter basis and coupling declaration only; no equilibrium, PDW identification, stable superconductivity, Tc, or experimental result is established."
+    },
+    "thermal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "temperature",
+        "temperature_unit"
+      ],
+      "properties": {
+        "temperature": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "temperature_unit": {
+          "const": "dimensionless_GL_temperature"
+        }
+      }
+    },
+    "sampling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "random_seed",
+        "warmup_sweeps",
+        "measurement_sweeps",
+        "thinning",
+        "proposal_scale",
+        "independent_chains"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "single_component_site_metropolis"
+        },
+        "random_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warmup_sweeps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "measurement_sweeps": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "thinning": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "proposal_scale": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "independent_chains": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        }
+      }
     }
   }
 }
