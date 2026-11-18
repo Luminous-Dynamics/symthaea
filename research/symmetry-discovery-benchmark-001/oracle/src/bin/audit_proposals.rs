@@ -616,6 +616,7 @@ mod tests {
         let prediction = &mut submission.predictions[0];
         prediction.disposition = DispositionV1::Abstained;
         prediction.proposed_elements.clear();
+        prediction.group_distribution = None;
         prediction.abstention_reason = Some("synthetic adapter abstention test".to_owned());
         let report = run(submission).unwrap();
         assert_eq!(report.summary.cases_in_scope, 300);
