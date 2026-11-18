@@ -628,7 +628,8 @@ mod tests {
     fn duplicate_assessment_domain_is_rejected() {
         let profile = profile(QualificationClaim::FunctionalService);
         let mut record = record("candidate-01", &profile, AssessmentOutcome::Pass);
-        record.assessments.push(record.assessments[0].clone());
+        let first_assessment = record.assessments[0].clone();
+        record.assessments.push(first_assessment);
         assert!(matches!(
             record.validate(&profile),
             Err(ServiceQualificationError::DuplicateDomain { .. })
