@@ -1023,6 +1023,9 @@ mod tests {
             .map(|index| 0.23 * (index as f64 + 1.0).sin())
             .collect();
         let before = model.vortex_diagnostics(&fields, &links).unwrap().unwrap();
+        assert_eq!(before.positive_charge, 2);
+        assert_eq!(before.negative_charge, 2);
+        assert_eq!(before.absolute_charge_sum, 4);
         let (transformed_fields, transformed_links) =
             model.gauge_transform(&fields, &links, &angles).unwrap();
         let after = model
