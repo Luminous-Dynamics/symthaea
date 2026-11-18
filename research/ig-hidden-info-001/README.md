@@ -42,12 +42,15 @@ cargo run --manifest-path research/ig-hidden-info-001/qualifier/Cargo.toml --bin
 # Reproduce the official average-vote and strict-majority score fields
 cargo run --manifest-path research/ig-hidden-info-001/qualifier/Cargo.toml --bin score_hiddenbench -- \
   research/ig-hidden-info-001/external/hiddenbench/benchmark.json \
-  path/to/hidden-profile-results.json
+  path/to/hidden-manual-adapted-results.json \
+  path/to/hidden-generated-results.json
 
 # Add the full-profile pre-discussion comparison
 cargo run --manifest-path research/ig-hidden-info-001/qualifier/Cargo.toml --bin score_hiddenbench -- \
   research/ig-hidden-info-001/external/hiddenbench/benchmark.json \
-  path/to/hidden-profile-results.json --full path/to/full-profile-results.json
+  path/to/hidden-manual-adapted-results.json \
+  path/to/hidden-generated-results.json \
+  --full path/to/full-profile-results.json
 ```
 
 The scorer supports the upstream result shapes (`metadata -> runs` and legacy `conditions -> runs`). It reports the official per-run average and strict-majority accuracy fields, then adds task-clustered paired bootstrap intervals (10,000 resamples, pinned seed). It distinguishes the official run-weighted Hidden-post minus Full-pre gap from the task-paired gap. A small evaluator-only smoke result is checked in at `fixtures/HIDDENBENCH_SCORE_SMOKE_V0_1.json`; it is not model evidence.
