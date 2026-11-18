@@ -194,7 +194,7 @@ impl AudioRingBuffer {
         self.write_pos = 0;
     }
 
-    /// Total samples written in the current stream segment.
+    /// Total samples written since the last buffer reset.
     pub fn total_written(&self) -> u64 {
         self.write_pos
     }
