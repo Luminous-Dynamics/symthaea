@@ -497,19 +497,32 @@ impl SemanticMemory {
     }
 
     /// Find semantically similar entries with lineage preserved.
+    ///
+    /// This compatibility method returns an empty result for invalid queries.
+    /// Use `try_find_similar_with_provenance` to retain the validation error.
     pub fn find_similar_with_provenance(
         &mut self,
         query: &[f32],
         top_k: usize,
     ) -> Vec<(ProvenancedSemanticEntry, f32)> {
-        let matches = self.find_similar(query, top_k);
-        matches
+        self.try_find_similar_with_provenance(query, top_k)
+            .unwrap_or_default()
+    }
+
+    /// Validated provenance-preserving similarity query.
+    pub fn try_find_similar_with_provenance(
+        &mut self,
+        query: &[f32],
+        top_k: usize,
+    ) -> Result<Vec<(ProvenancedSemanticEntry, f32)>, SemanticMemoryInputError> {
+        let matches = self.try_find_similar(query, top_k)?;
+        Ok(matches
             .into_iter()
             .filter_map(|(index, similarity)| {
                 self.get_with_provenance(index)
                     .map(|entry| (entry, similarity))
             })
-            .collect()
+            .collect())
     }
 
     /// Get entries by their indices
@@ -1079,6 +1092,35 @@ mod tests {
     }
 
 
+
+
+    #[test]
+    fn provenance_query_preserves_validation_errors() {
+        let mut mem = SemanticMemory::new(2);
+        mem.store_with_provenance(
+            vec![1.0, 0.0],
+            0.1,
+            None,
+            Some(GraduationProvenance {
+                source: crate::coordinator::MemorySource::WebResearch,
+                verification_claimed: false,
+            }),
+        );
+
+        assert!(matches!(
+            mem.try_find_similar_with_provenance(&[1.0], 1),
+            Err(SemanticMemoryInputError::DimensionMismatch {
+                expected: 2,
+                actual: 1
+            })
+        ));
+        let valid = mem.try_find_similar_with_provenance(&[1.0, 0.0], 1).unwrap();
+        assert_eq!(valid.len(), 1);
+        assert_eq!(
+            valid[0].0.graduation_provenance.as_ref().unwrap().source,
+            crate::coordinator::MemorySource::WebResearch
+        );
+    }
 
     #[test]
     fn compute_similar_error_averages_large_finite_errors_without_overflow() {
