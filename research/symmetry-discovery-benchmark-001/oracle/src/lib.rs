@@ -632,6 +632,15 @@ impl Manifest {
         let cases = field(&self.root, "cases")?
             .as_array()
             .ok_or_else(|| "cases must be an array".to_owned())?;
+        let split_contract = field(&self.root, "split_contract")?;
+        let split_ids = [
+            string_field(split_contract, "discovery_split_id")?,
+            string_field(split_contract, "calibration_split_id")?,
+            string_field(split_contract, "final_holdout_split_id")?,
+        ];
+        if split_ids.iter().collect::<BTreeSet<_>>().len() != 3 {
+            return Err("discovery, calibration and final-holdout split IDs must be distinct".to_owned());
+        }
         let mut ids = BTreeSet::new();
         let mut structural_count = 0;
         let mut regression_count = 0;
@@ -900,6 +909,50 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn forged_point_and_polynomial_witnesses_are_rejected() {
+        let manifest = manifest();
+        let cases = field(&manifest.root, "cases").unwrap().as_array().unwrap();
+
+        let point_case = cases
+            .iter()
+            .find(|case| string_field(case, "case_id").unwrap() == "C4-CHIRAL-ORBIT-001")
+            .unwrap();
+        let mut point_certificate = manifest.structural_certificate(point_case).unwrap();
+        manifest.verify_certificate(point_case, &point_certificate).unwrap();
+        if let StabilizerWitnessV1::MovedPoint { transformed, .. } =
+            &mut point_certificate.decisions[0].witness
+        {
+            transformed.0 += 1;
+        } else {
+            panic!("expected rejected element with a moved-point witness");
+        }
+        assert!(manifest.verify_certificate(point_case, &point_certificate).is_err());
+
+        let polynomial_case = cases
+            .iter()
+            .find(|case| string_field(case, "case_id").unwrap() == "D4-REGRESSION-C4-001")
+            .unwrap();
+        let mut polynomial_certificate = manifest.polynomial_certificate(polynomial_case).unwrap();
+        manifest
+            .verify_certificate(polynomial_case, &polynomial_certificate)
+            .unwrap();
+        if let StabilizerWitnessV1::PolynomialCoefficientMismatch {
+            transformed_coefficient,
+            ..
+        } = &mut polynomial_certificate.decisions[0].witness
+        {
+            *transformed_coefficient += 1;
+        } else {
+            panic!("expected rejected polynomial action with a coefficient witness");
+        }
+        assert!(
+            manifest
+                .verify_certificate(polynomial_case, &polynomial_certificate)
+                .is_err()
+        );
     }
 
     #[test]
