@@ -163,7 +163,7 @@ For mechanics, align masses, constraints, constitutive/contact models, integrato
 
 ## Artifacts and reproducibility
 
-- `fixtures/v0.1/cases.json`: five hand-authored exact controls plus 300 deterministic generated point-set instances (30 each for all ten distinct D4 subgroups: D4, C4, five order-two subgroups, two Klein-four subgroups, and C1).
+- `fixtures/v0.1/cases.json`: five hand-authored sanity controls plus 900 deterministic generated point-set instances (90 per each of the ten distinct D4 subgroups). Each subgroup family has 30 independent structures in discovery, 30 in calibration, and 30 in final holdout; all hand-authored controls are `fixture_sanity` only.
 - `schemas/case_manifest.schema.json`: manifest validation.
 - Future accepted run: baseline source/version, input and split digests, hardware/software record, raw predictions, verifier receipts, all failures, and scorecard.
 - Never label a target as achieved from fixture unit tests alone.
@@ -191,19 +191,19 @@ The deterministic corpus is regenerated from the manifest's D4 matrices using xo
 
     python3 -I research/symmetry-discovery-benchmark-001/tools/generate_d4_pointsets.py --write
 
-The validator checks that the frozen 300 generated cases exactly match the generator output before computing their stabilizers. The workflow runs these checks against the exact triggering revision and is guarded against draft PR execution. This is fixture qualification only; no external learner baseline is run by it.
+The validator checks that all 900 frozen generated cases exactly match the seeded generator output before computing their stabilizers, then enforces 30 cases per subgroup family in each of the three evaluation splits. The workflow runs these checks against the exact triggering revision and is guarded against draft PR execution. This is fixture qualification only; no external learner baseline is run by it.
 
 
 ## Fixture arithmetic preflight (independent, not CI)
 
 An independent deterministic replay of the current v0.1 manifest checked:
-- all 300 generated point sets reproduce byte-for-byte from the declared seeds/attempt sequence and are unique;
+- all 900 generated point sets reproduce byte-for-byte from the declared seeds/attempt sequence, are unique, and are stratified 30/30/30 per subgroup family across discovery/calibration/final holdout;
 - each generated set's exact D4 stabilizer equals its declared target subgroup (D4, C4, half-turn C2, reflection C2 or C1);
 - the D4 matrix multiplication table is closed and every element has a two-sided inverse;
 - the three hand-authored geometric labels (D4, C4, C1) match exact point-set stabilizers;
 - the D4 and C4 polynomial targets have exactly their declared stabilizers under symbolic integer expansion.
 
-This is a local fixture arithmetic preflight only. The exact-head CI fixture validator, full baseline adapters, holdout splits and benchmark runs remain separate gates. No accuracy or performance result is inferred from these fixture checks.
+This is a local fixture arithmetic preflight only. The exact-head CI fixture validator, full baseline adapters, and final-holdout benchmark execution remain separate gates. No accuracy or performance result is inferred from these fixture checks.
 
 
 ## Independent Rust exact oracle
@@ -214,13 +214,20 @@ In addition to the Python exact-rational fixture verifier and deterministic gene
 - all 64 multiplication-table entries match matrix multiplication;
 - identity, two-sided inverses and associativity;
 - every declared target is a subgroup with the correct order/label, including all five reflection/half-turn order-two subgroups and both non-cyclic Klein-four subgroups;
-- all 303 structural fixtures have exactly the declared unordered point-set stabilizer;
+- all 903 structural fixtures have exactly the declared unordered point-set stabilizer;
 - both regression fixtures have exactly the declared polynomial invariance subgroup, using checked integer coefficient expansion.
 
 The fixture workflow now runs both implementations on the exact triggering PR head: Python/Fraction validates the rational JSON and seeded generator, then pinned Rust 1.96 runs format, locked tests and strict Clippy. The two oracles use separate code paths; agreement is stronger than repeating one implementation twice.
 
 The Rust target is still fixture validation only. It does not run LieFlow, SymFP, the COLT learner, or external physics/active-acquisition baselines, and the corpus is not a held-out external benchmark result.
 
+
+
+## Frozen data split (v0.2)
+
+The generated point-set corpus now contains 90 instances per exact D4 subgroup family, stratified with a deterministic permutation of generator indices. Each family contributes 30 distinct structures to discovery, 30 to calibration, and 30 to final holdout. Five hand-authored controls are isolated as `fixture_sanity` and cannot enter a reported test metric. The assignment is frozen in each case manifest, so model selection and threshold calibration cannot silently consume final-holdout instances.
+
+This corpus split validates bookkeeping and leakage resistance; it does not itself guarantee statistical power. For learned baseline claims, publish per-family confidence intervals and add independent generator seeds/families before claiming external generalization.
 
 ## Exact fixture oracle status (2026-11-18)
 
