@@ -24,7 +24,8 @@ The exact values and low / centre / high settings must be established from CAD, 
 | F5 | Manifold flow-path distribution | Candidate passive channel geometries | F1, F7 |
 | F6 | Outlet diameter distribution | Process-capable tolerance range | F4, F7 |
 | F7 | Passive pressure compensation | None / qualified commercial element / candidate passive concept | F5, F6 |
-| F8 | Cassette face / seal / retention geometry | Serviceable, manufacturable interface alternatives | F1, F5 |\n| F9 | Passive feedback-channel / oscillator geometry (optional research arm) | No oscillator / single-feedback / double-feedback; feasible cavity and channel ratios from a defined design envelope | F1, F3, F5, F6 |
+| F8 | Cassette face / seal / retention geometry | Serviceable, manufacturable interface alternatives | F1, F5 |
+| F9 | Passive feedback-channel / oscillator geometry (optional research arm) | No oscillator / single-feedback / double-feedback; feasible cavity and channel ratios from a defined design envelope | F1, F3, F5, F6 |
 
 Each factor entry must include: units, exact CAD parameter, physical rationale, manufacturable range, tolerance distribution, process route, material/finish, rated pressure/temperature constraints, and a digest of the source CAD / configuration. If a factor changes another dimension unintentionally, record the dependency rather than treating the variables as independent.
 
