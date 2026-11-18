@@ -121,7 +121,17 @@
       "instrument_or_calibration": "none; generated synthetic observation",
       "observed_at": null,
       "observer_blinding_id": null,
-      "raw_measurement_url": null
+      "raw_measurement_url": null,
+      "cross_section": {
+        "geometry_model": "elliptical_annulus",
+        "outer_semi_axis_x_m": 0.004,
+        "outer_semi_axis_y_m": 0.003,
+        "inner_semi_axis_x_m": 0.002,
+        "inner_semi_axis_y_m": 0.001,
+        "orientation_rad": 0,
+        "measurement_method": "synthetic known-answer caliper measurements",
+        "section_location": "mid-internode"
+      }
     }
   ]
 }
