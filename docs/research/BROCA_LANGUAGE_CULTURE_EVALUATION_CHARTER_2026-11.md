@@ -302,3 +302,62 @@ Do not collapse these tracks into one league score. A model can win language cor
 ---
 
 **Decision rule:** the next paradigm shift is only real when it changes an independently measured outcome. Symthaea should be ambitious in its hypotheses and unusually strict about its evidence.
+
+
+## 9. Execution update — 2026-11-18 (source changes, tests pending)
+
+### Teacher-target and temporal supervision
+The research branch now changes `broca_projection_train` to encode each supplied `target_text` with the Mamba teacher tokenizer. It rejects empty/whitespace-only targets and zero-token encodings. Cached `TrainingPair::target_ids` are not reused because they can belong to Broca's independent BPE vocabulary.
+
+The local FEP temporal path now:
+- starts teacher forcing from a reset Mamba state;
+- records one teacher hidden state per target position;
+- aligns the teacher trajectory to the temporal projection chunk count using endpoint-preserving linear interpolation;
+- validates every teacher state's dimension and finiteness;
+- checks that prediction and observation lengths match before chunk updates;
+- rejects empty target sequences.
+
+This interpolation is a **shape-alignment hypothesis**, not a validated semantic alignment. It preserves first/last teacher states and samples intermediate states evenly. The benchmark work must determine whether this is useful compared with alternatives such as average pooling, learned monotonic alignment, cross-attention, or a global pooled target. It must not be described as established temporal correspondence.
+
+Regression coverage authored:
+- target text is the actual text passed to the teacher tokenizer;
+- whitespace-only and empty tokenizer outputs fail closed;
+- one-chunk and one-token alignment;
+- 64-chunk output shape and endpoint preservation;
+- a reversed-time negative control;
+- malformed/non-finite trajectories;
+- offline mock-backend local-FEP temporal integration and empty-target rejection.
+
+### Original Broca literary/philosophy seed
+Added `data/evals/broca-literary-philosophy-seed-v1.jsonl` with six original-authored, CC0-1.0 development fixtures: three literary interpretation cases and three philosophical argument cases.
+
+Added the Rust CLI `broca-culture-eval` and registered it in `Cargo.toml`.
+
+Example dataset-only validation:
+
+```bash
+cargo run -p symthaea-broca --bin broca-culture-eval -- \
+  --dataset crates/domains/symthaea-broca/data/evals/broca-literary-philosophy-seed-v1.jsonl
+```
+
+Example scored predictions:
+
+```bash
+cargo run -p symthaea-broca --bin broca-culture-eval -- \
+  --dataset crates/domains/symthaea-broca/data/evals/broca-literary-philosophy-seed-v1.jsonl \
+  --predictions predictions.jsonl --output report.json
+```
+
+The scorer reports exact quote grounding, gold evidence-anchor recall, claim-ID precision/recall/F1, acceptable interpretation coverage, and ambiguity accuracy. These are **structural checks only**. They do not measure prose quality, originality, truth, or expert philosophical adequacy. Six cases are a smoke-test seed, not a benchmark population, and must not be used for SOTA claims.
+
+### Updated industry comparison reference
+The live Conceptual Reasoning Index page, retrieved 2026-11-18, currently lists Claude Opus 5.5 at 77.9, GPT-6 Astra at 73.8, and Gemini 4 Argon at 72.3, followed by Muse Wonder at 67.7. These are live leaderboard snapshot values, not immutable benchmark releases. CRI evaluates expert-rated conceptual argument quality (LMCA), selected logical-consistency constraints (ACCoRD), and decision-theory cases (DTBench). A Broca comparison must pin the exact prompt, model version, benchmark data release, token/effort budget, refusals, and confidence intervals before drawing conclusions.
+
+### Current evidence status
+- Source changes and tests have been authored on the research branch.
+- No Rust compilation, formatter, unit test, integration test, training run, or SOTA comparison has been completed in this environment.
+- The latest GitHub Actions workflow runs exposed for the branch report `skipped` for CI, Broca Measurements, Broca Feature Matrix, and Symthaea Benchmark Suite. `skipped` is not pass evidence.
+- The branch is currently two commits behind `main`; the upstream movement is unrelated to Broca, but the PR base/mergeability must be refreshed before merging.
+- The temporal-alignment issue remains open until exact-head tests execute and a reviewer accepts the alignment objective.
+
+No benchmark score or quality improvement is claimed by these changes.
