@@ -632,9 +632,6 @@ impl DiagnosticCategoryRule {
                 "category schema digest must be 64 lowercase hexadecimal characters",
             ));
         }
-        self.requirement
-            .validate()
-            .map_err(|error| DiagnosticPortfolioError::new(error.message))?;
         if self.requirement.channel_id != self.channel_id {
             return Err(DiagnosticPortfolioError::new(
                 "category rule channel_id must match its decision requirement",
@@ -697,11 +694,45 @@ fn valid_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PortfolioEvidenceBlockReason {
+    SyntheticNotMeasurement,
+    Unavailable,
+    Invalid,
+    Delayed,
+    Degraded,
+    WrongUnits,
+    Stale,
+    UnapprovedSource,
+    CalibrationMismatch,
+}
+
+impl From<crate::plasma_observability::AbstentionReason> for PortfolioEvidenceBlockReason {
+    fn from(reason: crate::plasma_observability::AbstentionReason) -> Self {
+        match reason {
+            crate::plasma_observability::AbstentionReason::SyntheticNotMeasurement => {
+                Self::SyntheticNotMeasurement
+            }
+            crate::plasma_observability::AbstentionReason::Unavailable => Self::Unavailable,
+            crate::plasma_observability::AbstentionReason::Invalid => Self::Invalid,
+            crate::plasma_observability::AbstentionReason::Delayed => Self::Delayed,
+            crate::plasma_observability::AbstentionReason::Degraded => Self::Degraded,
+            crate::plasma_observability::AbstentionReason::WrongUnits => Self::WrongUnits,
+            crate::plasma_observability::AbstentionReason::Stale => Self::Stale,
+            crate::plasma_observability::AbstentionReason::UnapprovedSource => Self::UnapprovedSource,
+            crate::plasma_observability::AbstentionReason::CalibrationMismatch => {
+                Self::CalibrationMismatch
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "reason", rename_all = "snake_case", deny_unknown_fields)]
 pub enum DiagnosticUnknownReason {
     EvidenceGateBlocked {
-        reason: crate::plasma_observability::AbstentionReason,
+        reason: PortfolioEvidenceBlockReason,
     },
     OutsideDeclaredCategoryDomain,
 }
@@ -724,13 +755,38 @@ pub struct DiagnosticFrameSensorEvidence {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct WorldCompatibility {
+    pub world_id: String,
+    pub decision_id: String,
+    pub compatible: bool,
+    /// Active, directly measured sensor IDs that contradict this world.
+    pub contradictory_sensor_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
+pub enum FrameDecisionDisposition {
+    Identified { decision_id: String },
+    Ambiguous { decision_ids: Vec<String> },
+    NoCompatibleWorld,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DiagnosticPortfolioFrameResult {
     pub shot_id: String,
     pub frame_id: String,
     pub frame_time_ns: u64,
     pub active_sensor_ids: Vec<String>,
     pub sensor_evidence: Vec<DiagnosticFrameSensorEvidence>,
-    pub diagnosability: DiagnosabilityResult,
+    /// Design-time diagnosability of the declared complete sensor architecture.
+    pub structural_diagnosability: DiagnosabilityResult,
+    /// Worlds consistent with this frame's admitted categorical measurements.
+    pub world_compatibility: Vec<WorldCompatibility>,
+    pub compatible_world_ids: Vec<String>,
+    pub compatible_decision_ids: Vec<String>,
+    /// A decision is identified only if every compatible world requires it.
+    pub frame_decision: FrameDecisionDisposition,
 }
 
 /// Evaluate a real observation frame against declared categorical sensor
@@ -832,7 +888,7 @@ pub fn evaluate_observation_frame(
                     channel_id: rule.channel_id.clone(),
                     observation: SensorObservation::Unknown,
                     unknown_reason: Some(DiagnosticUnknownReason::EvidenceGateBlocked {
-                        reason: blocked.reason,
+                        reason: blocked.reason.into(),
                     }),
                     source_id: None,
                     source_digest: None,
@@ -887,7 +943,7 @@ pub fn evaluate_observation_frame(
 
         // A direct-measurement category must never be sourced from a non-measured frame status.
         if !matches!(
-            channel.disposition,
+            &channel.disposition,
             crate::plasma_observability::ObservationDisposition::Measured { .. }
         ) && !matches!(evidence.observation, SensorObservation::Unknown)
         {
@@ -912,47 +968,90 @@ pub fn evaluate_observation_frame(
         }
     }
 
-    let observation_by_sensor: BTreeMap<&str, &SensorObservation> = sensor_evidence
+    let structural_diagnosability = diagnose(model, active_sensor_ids)?;
+    let active: BTreeSet<&str> = structural_diagnosability
+        .active_sensor_ids
+        .iter()
+        .map(String::as_str)
+        .collect();
+    let evidence_by_sensor: BTreeMap<&str, &SensorObservation> = sensor_evidence
         .iter()
         .map(|item| (item.sensor_id.as_str(), &item.observation))
         .collect();
-    let observed_model = DiagnosticPortfolioModel {
-        schema_version: model.schema_version.clone(),
-        model_id: model.model_id.clone(),
-        decision_catalogue_id: model.decision_catalogue_id.clone(),
-        resource_unit: model.resource_unit.clone(),
-        worlds: model.worlds.clone(),
-        sensors: model
-            .sensors
-            .iter()
-            .map(|sensor| DiagnosticSensor {
-                sensor_id: sensor.sensor_id.clone(),
-                common_mode_groups: sensor.common_mode_groups.clone(),
-                resource_cost: sensor.resource_cost,
-                resource_unit: sensor.resource_unit.clone(),
-                observations: model
-                    .worlds
-                    .iter()
-                    .map(|world| SensorWorldObservation {
-                        world_id: world.world_id.clone(),
-                        observation: observation_by_sensor
-                            .get(sensor.sensor_id.as_str())
-                            .copied()
-                            .cloned()
-                            .unwrap_or(SensorObservation::Unknown),
-                    })
-                    .collect(),
-            })
-            .collect(),
+    let model_sensor_index = model.sensor_index();
+
+    let mut world_compatibility = Vec::with_capacity(model.worlds.len());
+    let mut compatible_world_ids = Vec::new();
+    let mut compatible_decisions = BTreeSet::new();
+
+    for world in &model.worlds {
+        let mut contradictory_sensor_ids = Vec::new();
+        for sensor_id in &active {
+            let observed = evidence_by_sensor.get(sensor_id).copied().ok_or_else(|| {
+                DiagnosticPortfolioError::new("validated frame sensor evidence disappeared")
+            })?;
+            let SensorObservation::Known(observed_category) = observed else {
+                // UNKNOWN cannot eliminate a world.
+                continue;
+            };
+            let sensor = model_sensor_index.get(sensor_id).copied().ok_or_else(|| {
+                DiagnosticPortfolioError::new("validated model sensor disappeared")
+            })?;
+            let expected = sensor
+                .observations
+                .iter()
+                .find(|item| item.world_id == world.world_id)
+                .map(|item| &item.observation)
+                .ok_or_else(|| {
+                    DiagnosticPortfolioError::new(
+                        "validated model world signature disappeared",
+                    )
+                })?;
+            match expected {
+                SensorObservation::Known(expected_category)
+                    if expected_category != observed_category =>
+                {
+                    contradictory_sensor_ids.push((*sensor_id).to_owned());
+                }
+                SensorObservation::Known(_) | SensorObservation::Unknown => {}
+            }
+        }
+
+        let compatible = contradictory_sensor_ids.is_empty();
+        if compatible {
+            compatible_world_ids.push(world.world_id.clone());
+            compatible_decisions.insert(world.decision_id.clone());
+        }
+        world_compatibility.push(WorldCompatibility {
+            world_id: world.world_id.clone(),
+            decision_id: world.decision_id.clone(),
+            compatible,
+            contradictory_sensor_ids,
+        });
+    }
+
+    let compatible_decision_ids: Vec<String> = compatible_decisions.into_iter().collect();
+    let frame_decision = match compatible_decision_ids.as_slice() {
+        [decision_id] => FrameDecisionDisposition::Identified {
+            decision_id: decision_id.clone(),
+        },
+        [] => FrameDecisionDisposition::NoCompatibleWorld,
+        decision_ids => FrameDecisionDisposition::Ambiguous {
+            decision_ids: decision_ids.to_vec(),
+        },
     };
-    let diagnosability = diagnose(&observed_model, active_sensor_ids)?;
+
     Ok(DiagnosticPortfolioFrameResult {
         shot_id: frame.shot_id.clone(),
         frame_id: frame.frame_id.clone(),
         frame_time_ns: frame.frame_time_ns,
-        active_sensor_ids: diagnosability.active_sensor_ids.clone(),
+        active_sensor_ids: structural_diagnosability.active_sensor_ids.clone(),
         sensor_evidence,
-        diagnosability,
+        structural_diagnosability,
+        world_compatibility,
+        compatible_world_ids,
+        compatible_decision_ids,
+        frame_decision,
     })
 }
 
