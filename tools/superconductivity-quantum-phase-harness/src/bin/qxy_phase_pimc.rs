@@ -629,16 +629,56 @@ fn lag_one_autocorrelation(values: &[f64]) -> Option<f64> {
     Some(lag_covariance / total_variance)
 }
 
+fn integrated_autocorrelation_time(values: &[f64]) -> Option<f64> {
+    if values.len() < 6 {
+        return None;
+    }
+    let average = values.iter().sum::<f64>() / values.len() as f64;
+    let centered: Vec<f64> = values.iter().map(|value| value - average).collect();
+    let variance = centered.iter().map(|value| value * value).sum::<f64>();
+    if variance <= f64::EPSILON {
+        return None;
+    }
+
+    let rho = |lag: usize| -> f64 {
+        let covariance = centered
+            .iter()
+            .zip(centered.iter().skip(lag))
+            .map(|(left, right)| left * right)
+            .sum::<f64>();
+        covariance / variance
+    };
+
+    // Initial-positive-sequence estimate: add autocorrelation pairs until
+    // the first non-positive pair. Short chains remain only diagnostic.
+    let mut sum_pairs = 0.0;
+    let mut lag = 1;
+    while lag + 1 < values.len() / 2 {
+        let pair_sum = rho(lag) + rho(lag + 1);
+        if !pair_sum.is_finite() || pair_sum <= 0.0 {
+            break;
+        }
+        sum_pairs += pair_sum;
+        lag += 2;
+    }
+    Some((0.5 + sum_pairs).max(0.5))
+}
+
 fn sampling_summary(values: &[f64]) -> Value {
     let average = values.iter().sum::<f64>() / values.len() as f64;
     let standard_deviation = sample_standard_deviation(values);
     let iid_standard_error = standard_deviation
         .map(|deviation| deviation / (values.len() as f64).sqrt());
+    let integrated_tau = integrated_autocorrelation_time(values);
+    let effective_sample_size =
+        integrated_tau.map(|tau| (values.len() as f64 / (2.0 * tau)).min(values.len() as f64));
     json!({
         "mean": average,
         "sample_standard_deviation": standard_deviation,
         "iid_standard_error_not_autocorrelation_corrected": iid_standard_error,
         "lag_one_autocorrelation": lag_one_autocorrelation(values),
+        "integrated_autocorrelation_time_initial_positive_sequence": integrated_tau,
+        "effective_sample_size_initial_positive_sequence": effective_sample_size,
         "sample_count": values.len(),
         "warning": "These short-chain diagnostics do not establish equilibration or an autocorrelation-corrected uncertainty."
     })
@@ -955,6 +995,16 @@ mod tests {
     fn sampling_diagnostics_do_not_invent_standard_error_for_one_sample() {
         assert!(sample_standard_deviation(&[1.0]).is_none());
         assert!(lag_one_autocorrelation(&[1.0, 1.0]).is_none());
+        assert!(integrated_autocorrelation_time(&[1.0, 2.0, 3.0, 4.0, 5.0]).is_none());
+    }
+
+    #[test]
+    fn integrated_autocorrelation_estimator_detects_persistent_series() {
+        let values = [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0];
+        let tau = integrated_autocorrelation_time(&values).unwrap();
+        assert!(tau >= 0.5);
+        let summary = sampling_summary(&values);
+        assert!(summary["effective_sample_size_initial_positive_sequence"].as_f64().unwrap() <= 10.0);
     }
 
     #[test]
