@@ -84,6 +84,15 @@
       "test_family": "cleaning_retention",
       "metadata_source_ref": "https://www.iso.org/standard/75934.html",
       "metadata_state": "verified_current_metadata"
+    },
+    {
+      "profile_id": "M-ISO-25086-1-2026",
+      "profile_kind": "international_standard",
+      "method_id": "ISO 25086-1",
+      "edition": "2026",
+      "test_family": "snagging",
+      "metadata_source_ref": "https://www.iso.org/standard/88922.html",
+      "metadata_state": "verified_current_metadata"
     }
   ],
   "selections": [
@@ -188,6 +197,25 @@
         "drying_procedure_ref": "ISO6330-DRY-REF-01",
         "cycles": 5
       }
+    },
+    {
+      "selection_id": "SEL-SNAG-KNIT",
+      "specimen_id": "SP-UNCOATED",
+      "profile_id": "M-ISO-25086-1-2026",
+      "test_family": "snagging",
+      "selected_surface": "fabric_surface",
+      "fixture_class": "mace_snagging",
+      "fixture_ref": null,
+      "fixture_revision": null,
+      "fixture_validation_state": "pending",
+      "fixture_validation_ref": null,
+      "state": "proposed",
+      "execution_mode": "normative_unmodified",
+      "approved_deviation_ref": null,
+      "internal_method_validation_ref": null,
+      "protocol_ref": null,
+      "acceptance_rule_ref": null,
+      "cleaning_profile": null
     }
   ],
   "evidence_policy": {
