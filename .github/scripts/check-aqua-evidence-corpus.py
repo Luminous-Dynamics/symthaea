@@ -108,8 +108,8 @@ def main() -> None:
                 claim["parameter"] == "flow_rate"
                 and claim["conditions"]["pressure_kpa"] is None
                 and "pressure" not in " ".join(claim["conditions"]["unknown_conditions"]).lower()
-                and claim["conditions"]["pressure_range_kpa"] is None
-                and not claim["conditions"]["pressure_points_kpa"]
+                and claim["conditions"].get("pressure_range_kpa") is None
+                and not claim["conditions"].get("pressure_points_kpa", [])
             ):
                 fail(
                     f"{location}: flow-rate claim must state its pressure condition "
