@@ -100,7 +100,7 @@ These are examples, not a universal mandatory list. The application and design o
 
 For every required gate × zone × sample location × cleaning cycle, collect at least the declared replicate count. A missing location, unknown topology reference or insufficient replicate count makes that gate insufficient evidence. Not-applicable requires an owner and rationale; an unobserved hotspot cannot be silently excluded.
 
-Report the worst supported location-level bound for each gate and keep location-level results visible. **Do not average a clean surface result with a failed seam or fastener pocket.** The purpose is to prevent a high-performing open surface from masking a contamination trap.
+The validator returns a `SampleLocationAssessment` for each required gate × zone × sample location × cycle, including disposition, observation count, passing replicate count and worst-case bound. It also returns a gate-level worst-case summary across those location records. **Do not average a clean surface result with a failed seam or fastener pocket.** The purpose is to prevent a high-performing open surface from masking a contamination trap.
 
 ## Assay controls and uncertainty
 
@@ -177,6 +177,7 @@ Protocol integrity targets:
 - 100% of physical cycles bind exact article generation, zone, material lot, cleaning chemistry batch, method and raw process evidence;
 - 100% of measured gates bind current calibration, LOD/LOQ, uncertainty, controls and raw-data evidence;
 - 100% of required gate/zone/topology-sample-location/cycle combinations meet the pre-registered replicate minimum;
+- every output preserves per-location disposition and worst-case bound so hotspot-level nonpasses remain visible;
 - 100% required gate/zone/cycle combinations meet replicate minima;
 - zero false passes on assay controls, uncertainty-boundary, stale identity, missing-data and hard-gate adversarial tests;
 - zero hidden non-passing claims behind averaged performance scores;
