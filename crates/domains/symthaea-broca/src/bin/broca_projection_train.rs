@@ -353,9 +353,7 @@ fn main() {
                 }
             };
 
-            // Do not let the just-generated sample's recurrent state leak into the
-            // teacher-forced target pass or across training examples.
-            r#gen.mamba_mut().reset();
+            // local_fep_distill resets recurrent state before its teacher-forced pass.
             if let Err(e) = r#gen.local_fep_distill(&thought_hv, &target_ids, lr) {
                 eprintln!("Teacher-forced distillation failed at sample {i}: {e}");
                 process::exit(1);
