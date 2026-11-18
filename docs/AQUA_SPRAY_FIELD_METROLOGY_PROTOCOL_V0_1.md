@@ -48,13 +48,16 @@ The matrix should distinguish local research points from WaterSense comparabilit
 
 | Point | Purpose | Admission |
 |---:|---|---|
+| 50 kPa | Lower SANS Table 3 design-pressure boundary for a water-saving showerhead (10 L/min design flow); Aqua low-head research point | Measure dynamic pressure at the fitting inlet; report service quality separately; do not assume every device is rated here |
+| 75 kPa | Midpoint in the SANS Table 3 50–100 kPa design-pressure range; Aqua low-head research point | Same datum, instrumentation and declared tolerance as 50 / 100 kPa |
+| 100 kPa | Upper SANS Table 3 design-pressure boundary for a water-saving showerhead (10 L/min design flow); Aqua low-head research point | Measure dynamic pressure at the fitting inlet; do not confuse with static service pressure |
 | 140 kPa | EPA / WaterSense spray-force reference point (20 psi nominal) | Use the method's actual tolerance and flowing-pressure definition |
-| 150 kPa | South African low-pressure robustness point used in Aqua research | Measure dynamic pressure at the defined inlet reference |
+| 150 kPa | Existing Aqua South African low-pressure robustness point | Measure dynamic pressure at the defined inlet reference |
 | 300 kPa | South African comparator point and nominal 3 bar manufacturer point | Exact pressure trace and regulator behavior recorded |
 | 310 kPa | EPA / WaterSense flow-test reference point (45 psi nominal) | Retain as a distinct declared point; do not relabel 300 kPa as 310 kPa |
 | 550 kPa | EPA / WaterSense high-pressure flow-test reference point (80 psi nominal) | Test only if every test-article component and installation is rated for it; otherwise mark not tested / not comparable at this point |
 
-The pressure points are not interchangeable. A unit tested only at 150 and 300 kPa has useful local engineering evidence but has not completed the full WaterSense pressure matrix. Never apply a pressure beyond the lowest rated component or approved test fixture envelope.
+The pressure points are not interchangeable. The SANS Table 3 50–100 kPa range is a building-installation design reference for the listed water-saving showerhead design flow, not a product performance pass criterion or universal guaranteed operating envelope. Clause 5.3.3.2 also states a 10 L/min maximum discharge while Table 3's likely maximum column reads 12 L/min; this apparent conflict requires SABS interpretation. A unit tested only at 150 and 300 kPa has useful local engineering evidence but does not establish useful task performance at 50–100 kPa or complete the WaterSense pressure matrix. Never apply a pressure beyond the lowest rated component or approved test fixture envelope.
 
 ### Standard endpoints
 
@@ -236,3 +239,10 @@ This is a preregistration and data-analysis protocol. It does not demonstrate sp
 The 2025 Building and Environment shower-aerosol study indicates that hot-shower aerosol generation is dynamic, with a prominent early-session peak. For any future exposure study, sample startup, the first 1–2 minutes, steady operation and decay after shutoff separately. Preserve particle-size bins and the exact room/ventilation/water-temperature configuration. Do not extrapolate from the article's test rigs to Aqua devices or claim lower exposure without independently measured, replicated data.
 
 Source: https://doi.org/10.1016/j.buildenv.2025.112825
+
+
+### Low-head research hypothesis
+
+The 50 / 75 / 100 kPa points are added because the SANS 10252-1:2018 Edition 3.2 Table 3 lists a 50–100 kPa design flow pressure for its water-saving showerhead row. This is a reason to test low-head behavior, not evidence that commercial heads are required or guaranteed to deliver a satisfactory bath at every value. Define actual task success, standard endpoints, flow and uncertainty at each point. Compare the exact Hansgrohe Activera 28087000 (manufacturer-declared 0.5 bar minimum) and Brondell Nebia Corre (manufacturer-declared 20–80 psi range) at matched dynamic pressure points where the component ratings and method allow.
+
+The exact South African pressure datum must be dynamic pressure measured at the fitting inlet under flow. Record static pressure, upstream residual pressure and dynamic pressure separately. If a second fixture is drawing simultaneously, record that condition as a separate concurrent-demand block rather than mixing it with single-fixture results.
