@@ -376,7 +376,7 @@ fn encode_jsonl_frame<Request: Serialize>(
             limit: maximum,
         });
     }
-    frame.push(b'\\n');
+    frame.push(b'\n');
     let digest = sha256_frame(&frame);
     Ok((frame, digest))
 }
@@ -389,7 +389,7 @@ fn decode_jsonl_frame<Response: DeserializeOwned>(
     let digest = sha256_frame(frame);
     while frame
         .last()
-        .is_some_and(|byte| *byte == b'\\n' || *byte == b'\\r')
+        .is_some_and(|byte| *byte == b'\n' || *byte == b'\r')
     {
         frame.pop();
     }
@@ -567,6 +567,71 @@ impl std::error::Error for ProcessError {}
 mod tests {
     use super::*;
     use std::io::Cursor;
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    struct GenericRequest {
+        protocol: String,
+        action_catalogue: Vec<String>,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    struct GenericResponse {
+        action_id: String,
+        evidence_prefix: String,
+    }
+
+    #[test]
+    fn generic_jsonl_codec_round_trips_domain_specific_types_and_hashes_delimiters() {
+        let request = GenericRequest {
+            protocol: "symtropy-joint-world-v0".to_owned(),
+            action_catalogue: vec!["measure".to_owned(), "calibrate".to_owned()],
+        };
+        let (request_frame, request_digest) =
+            encode_jsonl_frame(&request, DEFAULT_MAX_FRAME_BYTES).unwrap();
+        assert!(request_frame.ends_with(b"\n"));
+        assert_eq!(request_digest, sha256_frame(&request_frame));
+
+        let response = GenericResponse {
+            action_id: "calibrate".to_owned(),
+            evidence_prefix: "sha256:0123456789abcdef".to_owned(),
+        };
+        let response_payload = serde_json::to_vec(&response).unwrap();
+        let mut response_frame = response_payload.clone();
+        response_frame.push(b'\n');
+        let response_digest = sha256_frame(&response_frame);
+        let (decoded, actual_digest) =
+            decode_jsonl_frame::<GenericResponse>(&mut response_frame).unwrap();
+
+        assert_eq!(decoded, response);
+        assert_eq!(actual_digest, response_digest);
+        assert_ne!(actual_digest, sha256_frame(&response_payload));
+    }
+
+    #[test]
+    fn generic_jsonl_codec_enforces_limits_and_rejects_bad_responses() {
+        let request = GenericRequest {
+            protocol: "v0".to_owned(),
+            action_catalogue: vec!["a".repeat(128)],
+        };
+        assert!(matches!(
+            encode_jsonl_frame(&request, 8),
+            Err(ProcessError::FrameTooLarge {
+                direction: "input",
+                limit: 8
+            })
+        ));
+
+        let mut blank = vec![b'\n'];
+        assert!(matches!(
+            decode_jsonl_frame::<GenericResponse>(&mut blank),
+            Err(ProcessError::Protocol(_))
+        ));
+        let mut malformed = b"{not-json}\n".to_vec();
+        assert!(matches!(
+            decode_jsonl_frame::<GenericResponse>(&mut malformed),
+            Err(ProcessError::MalformedResponse(_))
+        ));
+    }
 
     #[test]
     fn frame_limits_reject_zero_and_unbounded_values() {
