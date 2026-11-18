@@ -6,7 +6,7 @@ Qualify the installed robot + garment configuration, not the textile coupon in i
 
 ## Industry state of practice
 
-ASP Protection is a mature incumbent: its public material describes robot-specific CAD design, manufacturing controls, on-robot assembly, real-cycle validation, repair/maintenance and protective solutions for over 1,000 robot models from more than 90 brands. This is a real integration benchmark, not a paper-only cover supplier. https://www.asp-protection.eu/ https://www.asp-protection.eu/the-company/
+ASP Protection is a mature incumbent: it reports protection solutions for more than 1,000 robot models across more than 90 brands, and describes robot-specific CAD design, manufacturing controls, on-robot assembly, real-life-cycle validation, repair and maintenance. This is a real integration benchmark, not a paper-only cover supplier. https://www.asp-protection.eu/ https://www.asp-protection.eu/the-company/
 
 ASP's food-sector products already combine washable/cleanable fabrics, sealed seams, chemical/high-pressure-wash resistance, serviceability and pressurized/ventilated configurations to prevent condensation. https://www.asp-protection.eu/protective-covers/protective-cover-for-the-food-industry/ https://www.asp-protection.eu/protective-covers/ventilation-for-protective-robot-cover/
 
