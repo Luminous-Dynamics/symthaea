@@ -351,3 +351,50 @@ The comparison must not claim that Symthaea beats Mamba because a hand-built syn
 A credible near-term target is not universal byte-compression superiority. It is a repeatable Pareto advantage on a tightly specified family of interventional multi-sensor streams: total bits, adaptation observations/bits, memory, latency and exact or bounded-error fidelity all reported separately.
 
 **Evidence boundary:** the figures above are the cited authors' reported results and have not been independently reproduced by CDL-Bench.
+
+
+## 10. Adjacent causal-compression and causal-representation work
+
+The novelty claim must be narrower than “causal compression” or “causal time-series learning.” Both areas have active 2026 work.
+
+### 10.1 CSCProv — causal-semantic provenance graph reduction for security
+
+CSCProv (published 17 September 2026) compresses provenance graphs by aggregating nodes only when structural dependency patterns and behavioural semantics remain consistent. It introduces a Causal-Semantic Consistency metric and reports up to 30× graph reduction on DARPA Transparent Computing Engagement 3 while preserving attack-critical dependencies; it reports downstream detection-time reductions of 32.7–48.3%.
+
+This is graph summarization for security analytics, not a lossless byte-stream codec. It nevertheless establishes an important design principle: compressibility must be constrained by preservation of task-critical causal paths.
+
+CDL-Bench security extension should therefore preserve attack-propagation dependencies, not merely byte equality or generic graph similarity, when evaluating compressed audit/provenance views.
+
+Reference:
+- https://link.springer.com/article/10.1186/s42400-026-00648-6
+
+### 10.2 CDTS² — causally disentangled time-series representations
+
+CDTS² (Applied Sciences, 10 September 2026) separates trend and seasonality representations, uses HSIC regularization and a causal-discovery objective, and evaluates counterfactual prediction under time-varying confounding. The paper reports RMSE improvements of 11.6% on a tumor-growth dataset and 17.1% on CityLearn under severe confounding, plus improved interventional-robustness and disentanglement metrics.
+
+This is causal representation learning and counterfactual forecasting, not a byte-level compression system. It is a useful representation/model baseline for CDL's causal-transfer track. It also suggests that simply splitting latent vectors into trend and seasonality is not sufficient; we should test whether interventions on one factor leave unrelated factor representations invariant.
+
+Reference:
+- https://www.mdpi.com/2076-3417/16/18/8993
+
+### 10.3 MDL-guided regime-specific causal discovery
+
+A 2026 industrial time-series diagnostic protocol for non-stationary processes uses an MDL objective to jointly identify change points and regime-specific graph structure, then estimates interventional effects with ancestral support gating. Its evaluation uses the Tennessee Eastman process benchmark.
+
+This is directly relevant to CDL's regime segmentation and causal mechanism validity domains. A mechanism should not be treated as globally stable if the generator or real process has changed regime.
+
+Reference:
+- https://onlinelibrary.wiley.com/doi/10.1155/int/3436744
+
+### 10.4 Revised novelty boundary
+
+The proposed CDL contribution should be described as a research hypothesis with these combined requirements:
+
+1. Actual data coding: emit a deterministic bitstream and reconstruct the exact source or satisfy a separately declared pointwise error bound.
+2. Typed multichannel semantics: maintain units, channel identity, timing, missingness and provenance.
+3. Causal mechanism reuse: factorize mechanisms and test unseen combinations rather than only new seeds.
+4. Intervention-aware residual coding: after an intervention do(X=x), update affected descendants while preserving independent mechanisms; encode the remaining residual.
+5. Decoder synchronization: every predictor/model update must be reproducible from the frame and decoded prefix, including numerical execution configuration when necessary.
+6. Application-critical invariants: in a security graph, preserve attack paths; in a physical system, preserve safety-critical event and extrema constraints; in energy telemetry, preserve declared peak/error requirements.
+
+The combination may be differentiated, but it is not proven novel or superior merely because the pieces are assembled. A formal related-work review and matched implementation comparisons are required before making a publication or SOTA claim.
