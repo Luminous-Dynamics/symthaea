@@ -44,24 +44,39 @@ pub enum HdcLabError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum HammingCandidate {
     BytePopcount,
+    U32Popcount,
     U64Popcount,
     U64Unrolled4,
+    U64Lanes4,
+    U64Lanes8,
+    U128Popcount,
     NativeSimd,
 }
 
 impl HammingCandidate {
-    pub const ALL: [Self; 4] = [
+    /// Bounded first-generation grammar over word width and reduction structure.
+    ///
+    /// These are implementation hypotheses, not a claim that this list is exhaustive.
+    pub const ALL: [Self; 8] = [
         Self::BytePopcount,
+        Self::U32Popcount,
         Self::U64Popcount,
         Self::U64Unrolled4,
+        Self::U64Lanes4,
+        Self::U64Lanes8,
+        Self::U128Popcount,
         Self::NativeSimd,
     ];
 
     pub const fn name(self) -> &'static str {
         match self {
             Self::BytePopcount => "byte-popcount",
+            Self::U32Popcount => "u32-popcount",
             Self::U64Popcount => "u64-popcount",
             Self::U64Unrolled4 => "u64-unrolled-4",
+            Self::U64Lanes4 => "u64-independent-accumulators-4",
+            Self::U64Lanes8 => "u64-independent-accumulators-8",
+            Self::U128Popcount => "u128-popcount",
             Self::NativeSimd => "native-simd",
         }
     }
@@ -114,8 +129,12 @@ pub fn oracle_distance(a: &BinaryHV, b: &BinaryHV) -> u32 {
 pub fn candidate_distance(candidate: HammingCandidate, a: &BinaryHV, b: &BinaryHV) -> u32 {
     match candidate {
         HammingCandidate::BytePopcount => byte_popcount(a, b),
+        HammingCandidate::U32Popcount => u32_popcount(a, b),
         HammingCandidate::U64Popcount => u64_popcount(a, b),
         HammingCandidate::U64Unrolled4 => u64_unrolled_4(a, b),
+        HammingCandidate::U64Lanes4 => u64_independent_accumulators_4(a, b),
+        HammingCandidate::U64Lanes8 => u64_independent_accumulators_8(a, b),
+        HammingCandidate::U128Popcount => u128_popcount(a, b),
         HammingCandidate::NativeSimd => a.hamming_distance(b),
     }
 }
@@ -127,15 +146,35 @@ fn byte_popcount(a: &BinaryHV, b: &BinaryHV) -> u32 {
         .sum()
 }
 
+fn u32_popcount(a: &BinaryHV, b: &BinaryHV) -> u32 {
+    a.0.chunks_exact(4)
+        .zip(b.0.chunks_exact(4))
+        .map(|(left, right)| {
+            let left_word = u32::from_ne_bytes(left.try_into().expect("four-byte chunk"));
+            let right_word = u32::from_ne_bytes(right.try_into().expect("four-byte chunk"));
+            (left_word ^ right_word).count_ones()
+        })
+        .sum()
+}
+
 fn u64_popcount(a: &BinaryHV, b: &BinaryHV) -> u32 {
     a.0.chunks_exact(8)
         .zip(b.0.chunks_exact(8))
         .map(|(left, right)| {
-            let mut left_word = [0u8; 8];
-            let mut right_word = [0u8; 8];
-            left_word.copy_from_slice(left);
-            right_word.copy_from_slice(right);
-            (u64::from_le_bytes(left_word) ^ u64::from_le_bytes(right_word)).count_ones()
+            let left_word = u64::from_ne_bytes(left.try_into().expect("eight-byte chunk"));
+            let right_word = u64::from_ne_bytes(right.try_into().expect("eight-byte chunk"));
+            (left_word ^ right_word).count_ones()
+        })
+        .sum()
+}
+
+fn u128_popcount(a: &BinaryHV, b: &BinaryHV) -> u32 {
+    a.0.chunks_exact(16)
+        .zip(b.0.chunks_exact(16))
+        .map(|(left, right)| {
+            let left_word = u128::from_ne_bytes(left.try_into().expect("sixteen-byte chunk"));
+            let right_word = u128::from_ne_bytes(right.try_into().expect("sixteen-byte chunk"));
+            (left_word ^ right_word).count_ones()
         })
         .sum()
 }
@@ -154,6 +193,42 @@ fn u64_unrolled_4(a: &BinaryHV, b: &BinaryHV) -> u32 {
         }
     }
     total
+}
+
+/// Four independent population-count accumulators reduce the dependency chain while
+/// retaining portable u64 operations and safe byte-to-word conversion.
+fn u64_independent_accumulators_4(a: &BinaryHV, b: &BinaryHV) -> u32 {
+    let mut accumulators = [0u32; 4];
+    for base in (0..BinaryHV::BYTES).step_by(32) {
+        for lane in 0..4 {
+            let start = base + lane * 8;
+            let end = start + 8;
+            let left_word =
+                u64::from_ne_bytes(a.0[start..end].try_into().expect("eight-byte chunk"));
+            let right_word =
+                u64::from_ne_bytes(b.0[start..end].try_into().expect("eight-byte chunk"));
+            accumulators[lane] += (left_word ^ right_word).count_ones();
+        }
+    }
+    accumulators.into_iter().sum()
+}
+
+/// Eight independent population-count accumulators are a distinct reduction hypothesis.
+/// Their larger live accumulator set may help or hurt depending on the target microarchitecture.
+fn u64_independent_accumulators_8(a: &BinaryHV, b: &BinaryHV) -> u32 {
+    let mut accumulators = [0u32; 8];
+    for base in (0..BinaryHV::BYTES).step_by(64) {
+        for lane in 0..8 {
+            let start = base + lane * 8;
+            let end = start + 8;
+            let left_word =
+                u64::from_ne_bytes(a.0[start..end].try_into().expect("eight-byte chunk"));
+            let right_word =
+                u64::from_ne_bytes(b.0[start..end].try_into().expect("eight-byte chunk"));
+            accumulators[lane] += (left_word ^ right_word).count_ones();
+        }
+    }
+    accumulators.into_iter().sum()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -215,7 +290,7 @@ impl HammingCorrectnessEvidence {
         canonical_seeds.sort_unstable();
         canonical_seeds.dedup();
         if canonical_seeds != self.seeds
-            || self.cases_checked != 4 + 2 * self.seeds.len() as u64
+            || self.cases_checked != 8 + 2 * self.seeds.len() as u64
             || self.passed != self.first_mismatch.is_none()
         {
             return Err(HdcLabError::InvalidCorrectnessEvidence);
@@ -272,11 +347,40 @@ pub fn verify_candidate(
     let mut cases_checked = 0u64;
     let mut first_mismatch = None;
 
+    let zero = BinaryHV::zero();
+    let ones = BinaryHV::ones();
+
+    let mut one_low_bit = BinaryHV::zero();
+    one_low_bit.0[0] = 0x01;
+
+    let mut one_high_bit = BinaryHV::zero();
+    one_high_bit.0[BinaryHV::BYTES - 1] = 0x80;
+
+    let mut word_boundary_bits = BinaryHV::zero();
+    word_boundary_bits.0[7] = 0x80;
+    word_boundary_bits.0[8] = 0x01;
+
+    let mut alternating = BinaryHV::zero();
+    let mut inverse_alternating = BinaryHV::zero();
+    for (index, (left, right)) in alternating
+        .0
+        .iter_mut()
+        .zip(inverse_alternating.0.iter_mut())
+        .enumerate()
+    {
+        *left = if index % 2 == 0 { 0x55 } else { 0xAA };
+        *right = !*left;
+    }
+
     let edge_cases = [
-        ("zero-zero", BinaryHV::zero(), BinaryHV::zero()),
-        ("ones-ones", BinaryHV::ones(), BinaryHV::ones()),
-        ("zero-ones", BinaryHV::zero(), BinaryHV::ones()),
-        ("ones-zero", BinaryHV::ones(), BinaryHV::zero()),
+        ("zero-zero", zero, zero),
+        ("ones-ones", ones, ones),
+        ("zero-ones", zero, ones),
+        ("ones-zero", ones, zero),
+        ("zero-one-low-bit", zero, one_low_bit),
+        ("zero-one-high-bit", zero, one_high_bit),
+        ("word-boundary-bits", zero, word_boundary_bits),
+        ("alternating-complement", alternating, inverse_alternating),
     ];
 
     for (label, left, right) in edge_cases {
@@ -374,8 +478,8 @@ pub fn pilot_run(
         &problem,
         DiscoveryPolicy::default(),
         ContentId::derive(
-            "symthaea.generator.v1",
-            [b"hdc-hamming-enumeration".as_slice()],
+            "symthaea.generator.v2",
+            [b"hdc-hamming-word-width-and-reduction-grammar-v2".as_slice()],
         ),
         baseline_revision,
         SearchBudget::new(
@@ -482,7 +586,7 @@ mod tests {
                 candidate.name(),
                 evidence.first_mismatch()
             );
-            assert_eq!(evidence.cases_checked(), 4 + seeds.len() as u64 * 2);
+            assert_eq!(evidence.cases_checked(), 8 + seeds.len() as u64 * 2);
             assert!(evidence.validate().is_ok());
         }
     }
