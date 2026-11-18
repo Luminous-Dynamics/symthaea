@@ -272,7 +272,8 @@
         "mapping_rule_ids",
         "unresolved_conflicts",
         "preserved_undecided_axes",
-        "no_inference_rule"
+        "no_inference_rule",
+        "mapping_rules"
       ],
       "properties": {
         "compiler_version": {
@@ -409,6 +410,75 @@
         "no_inference_rule": {
           "type": "string",
           "minLength": 1
+        },
+        "mapping_rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mapping_rule_id",
+              "source_axis",
+              "source_option_id",
+              "target_parameter",
+              "mapping_version",
+              "scope",
+              "source_ref",
+              "owner_reviewer",
+              "review_state"
+            ],
+            "properties": {
+              "mapping_rule_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_axis": {
+                "enum": [
+                  "SPATIAL_TYPOLOGY",
+                  "ARCHITECTURAL_EXPRESSION",
+                  "MATERIAL_AND_TECTONIC_INTENT",
+                  "ENVIRONMENTAL_STRATEGY_INTENT",
+                  "EXPERIENCE_AND_PROGRAMME"
+                ]
+              },
+              "source_option_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "target_parameter": {
+                "type": "string",
+                "minLength": 1
+              },
+              "mapping_version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scope": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "owner_reviewer": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "review_state": {
+                "enum": [
+                  "DRAFT",
+                  "OWNER_REVIEW",
+                  "APPROVED",
+                  "REJECTED"
+                ]
+              }
+            }
+          }
         }
       }
     },
