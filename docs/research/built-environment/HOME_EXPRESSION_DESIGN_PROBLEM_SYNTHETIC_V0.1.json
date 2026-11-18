@@ -1,0 +1,112 @@
+{
+  "schema_version": "0.1.0",
+  "problem_id": "SYNTH-HOME-EXPRESSION-DESIGN-PROBLEM-001",
+  "maturity": "SYNTHETIC_NOT_EVALUATED",
+  "source_bindings": {
+    "sol_atlas_pr": "https://github.com/Luminous-Dynamics/sol-atlas-leptos/pull/935",
+    "sol_atlas_pr_head_sha": "42caacb8b3e00f87fcf46c0dd8ceae87763aa1d6",
+    "catalogue_revision": "HOME-EXPRESSION-CATALOG-0.2.0",
+    "catalogue_blob_sha": "d784b285a706068aeba7bf7a88bdb857ed2053cc",
+    "grammar_schema_blob_sha": "661c2c5a96e13c7678b80714bdb9e59d787c5a7f",
+    "conformance_corpus_blob_sha": "61ff73fca82af4905bb9d5dd2a020bfaf438e94f",
+    "conformance_corpus_schema_blob_sha": "918ab3b936b45528360a705975f3f50328aea293"
+  },
+  "input": {
+    "grammar_id": "SYNTH-HIGHVELD-GRAMMAR-001",
+    "design_revision_ref": "SYNTH-HV-GRAMMAR-REV-0",
+    "source_fixture_ref": "docs/research/home-expression/HOME_ARCHITECTURAL_GRAMMAR_SYNTHETIC_HIGHVELD_V0.2.json",
+    "resident_statement": "Synthetic example only: a sheltered, calm home with a strong relationship to landscape and a small private sky-watching space.",
+    "context_state": "UNKNOWN",
+    "context_refs": {
+      "site": null,
+      "climate": null,
+      "jurisdiction": null
+    },
+    "axis_intent": {
+      "spatial_typology": {
+        "state": "UNDECIDED",
+        "entries": []
+      },
+      "architectural_expression": {
+        "state": "INTENT_SELECTED",
+        "entries": [
+          {
+            "option_id": "HIGHVELD_STONE_TIMBER_CONTEMPORARY",
+            "role": "PRIMARY",
+            "resident_selected": true,
+            "blend_weight_pct": 100,
+            "source_refs": []
+          },
+          {
+            "option_id": "CAPE_GEORGIAN_INFLUENCE",
+            "role": "REFERENCE_ONLY",
+            "resident_selected": true,
+            "source_refs": [
+              "https://repository.up.ac.za/server/api/core/bitstreams/fc087af1-69b5-4f2f-9e74-9ed9fe58716e/content"
+            ]
+          }
+        ]
+      },
+      "material_tectonic_intent": {
+        "state": "INTENT_ONLY_NOT_EVALUATED",
+        "entries": [
+          {
+            "option_id": "STONE_MASONRY",
+            "preference": "PREFERRED"
+          },
+          {
+            "option_id": "TIMBER",
+            "preference": "CONSIDERED"
+          }
+        ]
+      },
+      "environmental_strategy_intent": {
+        "state": "INTENT_ONLY_NOT_EVALUATED",
+        "entries": [
+          {
+            "option_id": "EXTERNAL_SHADING",
+            "preference": "PREFERRED"
+          },
+          {
+            "option_id": "CROSS_VENTILATION",
+            "preference": "CONSIDERED"
+          },
+          {
+            "option_id": "THERMAL_MASS",
+            "preference": "CONSIDERED"
+          }
+        ]
+      },
+      "experience_programme": {
+        "state": "OPTIONAL_IDEAS_ONLY",
+        "entries": [
+          {
+            "option_id": "PRIVATE_OBSERVATORY",
+            "preference": "CONSIDERED"
+          }
+        ]
+      }
+    }
+  },
+  "compilation": {
+    "compiler_version": "NOT_IMPLEMENTED",
+    "state": "INTENT_PARSED_NOT_COMPILED_TO_GEOMETRY",
+    "hard_requirements": [],
+    "authority_constraints": [],
+    "mapping_state": "NO_OWNER_REVIEWED_MAPPING",
+    "mapping_rule_ids": [],
+    "unresolved_conflicts": [],
+    "preserved_undecided_axes": [
+      "SPATIAL_TYPOLOGY"
+    ],
+    "no_inference_rule": "NEVER_PROMOTE_RESIDENT_EXPRESSION_OR_PREFERENCE_TO_GEOMETRY_MATERIAL_ASSEMBLY_PHYSICAL_PERFORMANCE_OR_AUTHORITY_REQUIREMENT"
+  },
+  "generation_permissions": {
+    "symbolic_candidate_generation": "REQUIRES_REVIEWED_MAPPING_RULES",
+    "geometry_generation": "BLOCKED_PENDING_SYMTROPY_GEOMETRY_PROVIDER_AND_OWNER_REVIEW",
+    "physical_evaluation": "BLOCKED_PENDING_EXACT_REALIZED_GEOMETRY_AND_QUALIFIED_SOLVER_INPUTS",
+    "certification": "PROHIBITED"
+  },
+  "decision_state": "NO_RESIDENT_CHOICE_OR_DESIGN_APPROVAL_RECORDED",
+  "claim_ceiling": "INTENT_ONLY_NO_GEOMETRY_COST_PERFORMANCE_CODE_OR_PROFESSIONAL_APPROVAL"
+}
