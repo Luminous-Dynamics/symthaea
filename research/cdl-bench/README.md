@@ -144,5 +144,6 @@ tolerance, entropy coder, context-bootstrap and resource accounting.
 The same causal command also emits:
 - Three training SCM configurations.
 - Two held-out configurations that recombine mechanism component values seen in the training configurations, while keeping the full configuration tuple unseen.
+- For each held-out configuration, a paired observational and `do(x1=20000)` trace with the same seed, so the intervention comparison is counterfactual.
 
-The hidden mechanism configuration is retained in the evaluator-side ScmTrace metadata and is not serialized into the learner-visible observation stream. The CLI labels the held-out streams and verifies codec round trips; it does not yet train a mechanism learner or measure transfer. This is a dataset-generation fixture only.
+The hidden mechanism configuration is retained in the evaluator-side ScmTrace metadata and is not serialized into the learner-visible observation stream. The CLI labels the paired held-out streams and verifies codec round trips; it does not yet train a mechanism learner or measure transfer. A generator unit test also checks that the upstream x0 remains invariant while descendants x2 and x4 respond to the x1 intervention in each held-out world. This is a dataset-generation fixture only.
