@@ -39,7 +39,7 @@ fn entropy_bits(probabilities: &[f64]) -> f64 {
     probabilities
         .iter()
         .filter(|probability| **probability > 0.0)
-        .map(|probability| -probability * probability.log2())
+        .map(|probability| -*probability * probability.log2())
         .sum()
 }
 
@@ -60,8 +60,13 @@ pub fn expected_information_gain_bits(
     if prior_probabilities.is_empty() {
         return Err(ExperimentDesignError::EmptyPrior);
     }
-    validate_probability_distribution(prior_probabilities, "prior probabilities")
-        .map_err(|_| ExperimentDesignError::InvalidPrior("prior must be finite, nonnegative and sum to one"))?;
+    validate_probability_distribution(prior_probabilities, "prior probabilities").map_err(
+        |_| {
+            ExperimentDesignError::InvalidPrior(
+                "prior must be finite, nonnegative and sum to one",
+            )
+        },
+    )?;
 
     if conditional_outcome_probabilities.len() != prior_probabilities.len() {
         return Err(ExperimentDesignError::InvalidOutcomeMatrix(
