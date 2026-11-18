@@ -234,3 +234,8 @@ See [AQUA_POWER_COUPLED_SHOWER_DWHR_BENCHMARK_V0_1.md](AQUA_POWER_COUPLED_SHOWER
 ## Formal shower test-method alignment
 
 The Aqua evidence chain now records test-method datums explicitly. EN 18021:2025, UWL 2023, UK ETL, WaterSense and South African SANS references use distinct product categories and pressure conditions. The generic pressure_curve helper rejects cross-datum comparisons, but does not represent UWL's separate hot/cold inlet channels or ETL's faceplate-centre pressure channel. See [AQUA_METHOD_CROSSWALK_V0_1.md](AQUA_METHOD_CROSSWALK_V0_1.md) and [#12817](https://github.com/Luminous-Dynamics/symthaea/issues/12817). No certification or standards conformity is claimed.
+
+
+## Method-specific pressure evidence contracts
+
+The pressure/flow evidence layer is split by the actual measurement method. The generic pressure_curve module admits one explicit terminal-inlet or point-of-discharge channel and rejects cross-datum comparisons. The separate standard_methods module represents UWL hot/cold inlet channels and ETL's faceplate-centre P2 pressure, with separate measurement and calibration receipts. Neither module by itself constitutes a full standard-method test or certification. See [AQUA_METHOD_CROSSWALK_V0_1.md](AQUA_METHOD_CROSSWALK_V0_1.md).
