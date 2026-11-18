@@ -352,6 +352,12 @@ impl PressureFlowObservation {
         self.validate()?;
         Ok(match &self.product_declared_range {
             None => ProductPressureRangeStatus::NotDeclared,
+            Some(range) if range.pressure_datum.is_none() => {
+                ProductPressureRangeStatus::DeclaredDatumNotSpecified
+            }
+            Some(range) if range.pressure_datum != Some(self.pressure_datum) => {
+                ProductPressureRangeStatus::DeclaredDatumMismatch
+            }
             Some(range) => {
                 let lower =
                     self.dynamic_pressure_kpa - self.dynamic_pressure_uncertainty_kpa;
@@ -417,6 +423,9 @@ pub fn validate_matched_pressure_comparison(
             return Err(PressureRunError::ContextMismatch { field });
         }
     }
+    if control.pressure_datum != candidate.pressure_datum {
+        return Err(PressureRunError::PressureDatumMismatch);
+    }
     if control.pressure_setpoint_kpa != candidate.pressure_setpoint_kpa {
         return Err(PressureRunError::PressureTargetMismatch);
     }
@@ -458,6 +467,7 @@ mod tests {
             pressure_setpoint_kpa: 100.0,
             setpoint_tolerance_kpa: 5.0,
             dynamic_pressure_kpa: pressure_kpa,
+            pressure_datum: PressureMeasurementDatum::TerminalFittingInlet,
             dynamic_pressure_uncertainty_kpa: 1.0,
             static_supply_pressure_kpa: Some(180.0),
             upstream_residual_pressure_kpa: Some(130.0),
@@ -521,6 +531,7 @@ mod tests {
         run.product_declared_range = Some(DeclaredProductPressureRange {
             minimum_kpa: Some(138.0),
             maximum_kpa: Some(552.0),
+            pressure_datum: Some(PressureMeasurementDatum::TerminalFittingInlet),
             source_sha256: digest('e'),
         });
         assert_eq!(run.validate(), Ok(()));
@@ -545,6 +556,7 @@ mod tests {
         run.product_declared_range = Some(DeclaredProductPressureRange {
             minimum_kpa: Some(50.0),
             maximum_kpa: Some(500.0),
+            pressure_datum: Some(PressureMeasurementDatum::TerminalFittingInlet),
             source_sha256: digest('e'),
         });
         assert_eq!(
@@ -632,6 +644,7 @@ mod tests {
         run.product_declared_range = Some(DeclaredProductPressureRange {
             minimum_kpa: Some(50.0),
             maximum_kpa: None,
+            pressure_datum: Some(PressureMeasurementDatum::TerminalFittingInlet),
             source_sha256: digest('e'),
         });
 
@@ -648,6 +661,7 @@ mod tests {
         run.product_declared_range = Some(DeclaredProductPressureRange {
             minimum_kpa: None,
             maximum_kpa: Some(150.0),
+            pressure_datum: Some(PressureMeasurementDatum::TerminalFittingInlet),
             source_sha256: digest('e'),
         });
 
@@ -664,6 +678,7 @@ mod tests {
         run.product_declared_range = Some(DeclaredProductPressureRange {
             minimum_kpa: None,
             maximum_kpa: None,
+            pressure_datum: Some(PressureMeasurementDatum::TerminalFittingInlet),
             source_sha256: digest('e'),
         });
 
@@ -705,6 +720,7 @@ mod tolerance_tests {
             pressure_setpoint_kpa: 100.0,
             setpoint_tolerance_kpa: 5.0,
             dynamic_pressure_kpa: 100.0,
+            pressure_datum: PressureMeasurementDatum::TerminalFittingInlet,
             dynamic_pressure_uncertainty_kpa: 1.0,
             static_supply_pressure_kpa: Some(180.0),
             upstream_residual_pressure_kpa: Some(130.0),
@@ -760,6 +776,7 @@ pub enum PressureRetentionError {
     InvalidRequiredRetentionFraction,
     SameRunCompared,
     PressurePointsNotStrictlyOrdered,
+    PressureDatumMismatch,
     PressureIntervalsNotSeparated,
     SpecimenMismatch,
     ProductVariantMismatch,
@@ -787,6 +804,9 @@ impl Display for PressureRetentionError {
             }
             Self::PressurePointsNotStrictlyOrdered => {
                 write!(f, "low-pressure setpoint must be lower than high-pressure setpoint")
+            }
+            Self::PressureDatumMismatch => {
+                write!(f, "pressure-retention observations use different measurement datums")
             }
             Self::PressureIntervalsNotSeparated => {
                 write!(
@@ -851,6 +871,7 @@ impl Error for PressureRetentionError {}
 /// observations, not requested targets alone.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FlowRetentionComparison {
+    pub pressure_datum: PressureMeasurementDatum,
     pub low_pressure_setpoint_kpa: f64,
     pub high_pressure_setpoint_kpa: f64,
     pub low_pressure_measured_kpa: f64,
@@ -906,6 +927,9 @@ pub fn compare_flow_retention(
     }
     if low_pressure.pressure_setpoint_kpa >= high_pressure.pressure_setpoint_kpa {
         return Err(PressureRetentionError::PressurePointsNotStrictlyOrdered);
+    }
+    if low_pressure.pressure_datum != high_pressure.pressure_datum {
+        return Err(PressureRetentionError::PressureDatumMismatch);
     }
     if low_pressure.specimen_id != high_pressure.specimen_id {
         return Err(PressureRetentionError::SpecimenMismatch);
@@ -976,6 +1000,7 @@ pub fn compare_flow_retention(
     };
 
     Ok(FlowRetentionComparison {
+        pressure_datum: low_pressure.pressure_datum,
         low_pressure_setpoint_kpa: low_pressure.pressure_setpoint_kpa,
         high_pressure_setpoint_kpa: high_pressure.pressure_setpoint_kpa,
         low_pressure_measured_kpa: low_pressure.dynamic_pressure_kpa,
@@ -1015,6 +1040,7 @@ mod retention_tests {
             pressure_setpoint_kpa: pressure_kpa,
             setpoint_tolerance_kpa: 5.0,
             dynamic_pressure_kpa: pressure_kpa,
+            pressure_datum: PressureMeasurementDatum::TerminalFittingInlet,
             dynamic_pressure_uncertainty_kpa: 1.0,
             static_supply_pressure_kpa: Some(350.0),
             upstream_residual_pressure_kpa: Some(pressure_kpa + 15.0),
@@ -1189,6 +1215,7 @@ mod retention_tests {
         high.product_declared_range = Some(DeclaredProductPressureRange {
             minimum_kpa: Some(50.0),
             maximum_kpa: Some(500.0),
+            pressure_datum: Some(PressureMeasurementDatum::TerminalFittingInlet),
             source_sha256: digest('e'),
         });
         assert_eq!(
