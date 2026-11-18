@@ -14,6 +14,22 @@ The original MIT-licensed [HiddenBench-results dataset](https://huggingface.co/d
 
 The exact source paths, run counts, byte sizes, dataset revision and intended CLI arrangement are pinned in [PUBLIC_RESULT_SOURCE_MANIFEST_V0_1.json](external/hiddenbench/PUBLIC_RESULT_SOURCE_MANIFEST_V0_1.json). The result payloads have not yet been downloaded or independently re-scored in this branch. A publication-reproduction stage should fetch and hash these exact files, score them with the official Python scorer and the new Rust scorer, then explain any discrepancy. Only after that should model API re-runs begin.
 
+## 0a. The baseline ladder: coordination must earn its compute
+
+Mohammadabadi, *More Agents, More Samples, or More Thinking? Untangling Coordination, Ensembling, and Test-Time Compute in Multi-Agent LLMs* (arXiv:2611.17610, submitted 13 November 2026), synthesizes nine empirical evaluations, 516 unique configurations and a six-dimensional resource vector. It reports that comparisons to a single greedy pass can confound coordination with sample multiplicity and test-time compute; against sample-count- or resource-matched baselines, the synthesis finds multi-agent accuracy differences averaging -0.042 and 74% of comparable contrasts at or below baseline. It argues that positive returns require partitioned evidence, external verification or genuine error diversity. This is a synthesis/preprint, not a replacement for task-specific reproductions. https://arxiv.org/abs/2611.17610
+
+Every Symthaea campaign therefore uses this baseline ladder, with all comparisons paired on the same tasks/seeds/backbone:
+1. **Single greedy pass:** reference point only; not sufficient to claim coordination gain.
+2. **Single-agent best-of-N / self-consistency:** same number of generated samples, same total token budget and same answer-selection/evaluation budget.
+3. **Independent parallel agents with no communication:** same sample count and independent private outputs, then the same aggregation/selection rule.
+4. **Communication with identical evidence:** isolates coordination overhead from genuinely new information; positive gains are not assumed.
+5. **Communication with partitioned evidence:** tests discovery of information unavailable to any one agent initially.
+6. **External verification:** a separately budgeted tool/program/ground-truth check; compare with and without communication.
+7. **Cross-model / error-diverse agents:** count all provider calls and test whether error diversity, rather than team size, explains gains.
+8. **Full resource-matched architecture:** equalize total input/output tokens, model calls, tool calls, context windows, wall-clock/deadline and measured money; report remaining non-matched dimensions explicitly.
+
+The primary causal question is not "does a team beat one greedy pass?" It is **does communication improve verified outcomes beyond an equally resourced single-agent sampling/verification strategy, and under which information-structure conditions?**
+
 ## 1. Direct scientific comparator
 
 | Work | What it establishes in its own setup | Required use in this programme |
@@ -34,6 +50,16 @@ The exact source paths, run counts, byte sizes, dataset revision and intended CL
 | [Meta-Moderator, Findings EMNLP 2026](https://aclanthology.org/2026.findings-emnlp.1250/) | Separately trained meta-cognitive controller monitors debate utility, controls further deliberation and adjudicates. Reports improvements across five benchmarks and transfer. | Use as the strongest adaptive-moderation comparator where weights/data/harness are available. Match compute spent on the moderator and count its training/data and inference cost. |
 | [MultiAgentBench, ACL 2025](https://aclanthology.org/2025.acl-long.421/) | Task completion plus collaboration/competition metrics across star, chain, tree and graph coordination protocols. | Use as a transfer benchmark after the Hidden Profile tasks; it is not a replacement or direct score equivalent for hidden-information discovery. |
 | [MAST / MAST-Data, NeurIPS 2025](https://proceedings.neurips.cc/paper_files/paper/2025/hash/b1041e52d3be19f0a9bc491657488e4a-Abstract-Datasets_and_Benchmarks_Track.html) | 1,600+ annotated traces from seven multi-agent frameworks; 14 failure modes grouped into system design, inter-agent misalignment and task verification. | Use its failure taxonomy for post-hoc trace annotation and compare whether Symthaea reduces failure rates on held-out task families. It is a reliability taxonomy, not a single accuracy baseline. |
+
+## 2a. Communication-efficiency and evaluator reliability comparators
+
+| Work | Published result in its own setup | Required Symthaea treatment |
+|---|---|---|
+| [MessageSieve / EMNLP 2026](https://aclanthology.org/2026.emnlp-main.2179/) | Training-free, per-message pruning before prompt assembly; reports 19–49% fewer evaluation tokens and +2.59 points on Gemini 3.1 Flash-Lite / +4.10 on Qwen3-8B versus dense Full-MAS. | Direct comparator for #12805. Reproduce its state-card/message-instance decisions; measure evidence-root and negative/minority evidence recall, not token reduction alone. |
+| [AgentJudgeBench / EMNLP 2026](https://aclanthology.org/2026.emnlp-main.659/) | 3,808 workflow-DAG instances, six topologies, three difficulty tiers; judge alignment worsens with task difficulty, and hard no-ground-truth cases cluster around 77–82% across tested judges. Rubrics help up to 6.5 pp but not uniformly. | Use as an evaluator-reliability stress test. Prefer programmatic ground truth for structured outcomes and report human adjudication separately. |
+| [Nine Judges, Two Effective Votes](https://arxiv.org/abs/2605.29800) | Nine frontier judges from seven model families provided about two independent votes' worth of information in tested settings because errors were correlated. | Compose with #9431. Measure error correlation/effective sample size; preserve strongest-single-judge and independent-family controls. Never certify by panel size alone. |
+
+These results mean the benchmark itself needs an evaluation-integrity layer. A large judge panel cannot repair a benchmark with weak references, shared model failure modes or task-dependent over-anchoring.
 
 ## 3. Industry orchestration baselines
 
@@ -69,12 +95,14 @@ The confirmatory comparison should include, where exact implementations/artifact
 2. Independent agents, private information — no-communication baseline.
 3. Original HiddenBench 15-round sequential discussion — historical reproduction.
 4. Published HiddenBench structured communication protocol — direct method baseline.
-5. Round-robin evidence sharing — simple transparent control.
-6. Free-MAD — consensus-free trajectory decision.
-7. Meta-Moderator — learned adaptive moderator.
-8. Microsoft Agent Framework Magentic / group chat or equivalent orchestrator.
-9. OpenAI Agents SDK manager-as-tools / handoff pattern.
-10. Symthaea evidence-directed protocol — information inventory, targeted evidence request, verified delivery, typed evidence matrix, independent integration audit and bounded stop.
+5. Single-agent best-of-N / self-consistency and independent parallel sampling at the same total sample/token budget.
+6. Round-robin evidence sharing — simple transparent control.
+7. Free-MAD — consensus-free trajectory decision.
+8. Meta-Moderator — learned adaptive moderator.
+9. MessageSieve — message-instance communication pruning.
+10. Microsoft Agent Framework Magentic / group chat or equivalent orchestrator.
+11. OpenAI Agents SDK manager-as-tools / handoff pattern.
+12. Symthaea evidence-directed protocol — information inventory, targeted evidence request, verified delivery, typed evidence matrix, independent integration audit and bounded stop.
 
 Every method must be compared at:
 - same task, agent count, initial private evidence allocation and answer options;
