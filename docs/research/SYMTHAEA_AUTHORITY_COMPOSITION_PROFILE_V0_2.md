@@ -212,6 +212,9 @@ Reuse Symthaea's canonical benchmark run receipts (#10314), source-only task cus
 | #11638 | F5 selected/resolved/loaded identity | Skill attestation system |
 | #11647 | S8 crash and reconciliation schedules | Journal/WAL broker |
 | #4155 | Exact-head static/behavioral qualification that Φ cannot cross authority boundaries | Repository-wide Φ authority auditor |
+| #4198/#4219 | Consolidate raw-WASM execution and canonical sandbox path/resource limits | Raw-WASM runtime policy / shared executor |
+| #4304 | Execute adversarial bounded-WASM corpus on the public ActionIR path | Runtime adversarial oracle |
+| #4312 | Require explicit runtime capability and module/export policy before raw-WASM invocation | Forge runtime permission policy |
 | #5439 with #5401/#5402/#545/#560/#565 | Main ActionIR/MotorOutput scalar demotion to monotonic caution, estimator census, explicit capability, exact-action admission and numeric fail-closed behavior | Main action/motor authority kernel and estimator inventory |
 | #1276 with #1274/#1272 | Separate cognitive readiness, plant safety, ethical constraints, goal-directed authority and cognition-independent local fallback | Embodiment v2 and plant-safety supervisor |
 | #669/#594 | Bounded physical actuation capability and downstream execution evidence | Actuation capability and execution receipt |
@@ -240,6 +243,30 @@ A further migration constraint is important for the benchmark: #5439 only remove
 The deeper research opportunity is **authority continuity across cognitive and governance layers**: a proof-backed memory may inform a proposal, a high-Φ collective may coordinate work, and a high-reputation agent may be selected as a delegate, but none of these states can create the grant that permits a consequential effect. Any quorum authority must be a specific, versioned, policy-issued authorization with independently verified membership, action scope, epoch and effect-boundary enforcement.
 
 Consensus is not proof of truth, semantic correctness, independence or safe action. DHT replication is not proof of freshness. A signature is not proof that the named principal was authorized at effect time.
+
+## 11A. ActionIR effect-surface map
+
+Source-reviewed against Symthaea main at the PR base head. This is an integration checklist, not a claim that every listed adapter is currently implemented or hardware-backed.
+
+| ActionIR family | Exact authority subject to bind | Independent restrictions / evidence | Current owner boundary |
+|---|---|---|---|
+| ReadFile / ListDirectory | Principal, tenant/workspace, canonical path/resource, operation and permitted fields | Canonical sandbox containment, read scope, data classification and evidence provenance | #4593 legacy file-effect migration; #544 exhaustive input/action screening |
+| WriteFile / DeleteFile / CreateDirectory | Principal, exact canonical target, operation, content/target digest and bounded budget | Path sandbox, allowed roots, byte/count budgets, atomic/unknown outcome and post-effect observation | #4593 repaired V2 action authority; #560 exact post-wisdom action identity |
+| RunCommand | Principal, exact executable, argument vector, environment overrides, working directory, resource scope and operation digest | Program allow/block list, environment allowlist, process/resource limits, no shell-string interpolation, real-process observation | #4593 legacy process-effect migration; #10064 untrusted-code isolation where applicable; #560 exact action |
+| ReadSensor | Principal, device/sensor identity, channel/data-class scope and purpose | Sensor freshness, calibration, missingness and provenance; observation is not authority to actuate | #545 explicit HAL/sensor capability; #1276/#1274 plant observation/safety boundary |
+| WriteServo | Principal, actuator/effector ID and generation, channel, bounded parameter/range, task/purpose, use/time envelope and revocation | Independent interlocks, plant envelope, watchdog/deadline, current typed observations, controller-local fallback, actual execution evidence | #669 bounded actuation capability; #1276/#1274 plant safety and fallback; #594 execution evidence |
+| SwarmGossip | Principal/workload, network/destination/topic, payload class/size, purpose and use budget | Network enabled/route allowlist, identity, fan-out and rate limits, privacy/declassification policy; consensus is not permission | #545 explicit swarm/network capability; #4143 collective-Φ non-authority; #11619 cumulative disclosure |
+| WasmSandbox | Principal, exact module content identity/path, export/ABI, invocation arguments, runtime profile and operation | Canonical path inside sandbox, explicit Forge/runtime capability, fuel/memory/table/instance limits, no ambient imports/WASI, exact result and real-vs-simulated evidence | #545 authority/path; #4198/#4219 bounded raw-WASM consolidation; #4304 adversarial runtime qualification; #4312 explicit runtime capability; #610 exact result semantics |
+| Sequence | Each child action's exact subject, grant and operation; sequence order and aggregate exposure | No authority union from siblings; validate the final resolved sequence; partial/unknown outcomes per child; one child's approval cannot cover a substituted child | #544 exhaustive admission; #560 exact final action; #4593 effect boundary |
+| NoOp | No effect grant required | Must not be used to disguise collateral or unobserved effects in the surrounding trajectory | Mycelix LARP/LISE scorecard observes all effects, not just primary tool calls |
+
+**Non-equivalences for this map:**
+
+- A local path allowlist, command allowlist, resource budget, motor confidence or Phi caution score is a restriction/PEP control, not a positive owner-issued grant.
+- A simulated action result is not evidence that a real effect did not happen; #4593 documents the legacy mode mismatch for filesystem operations.
+- A physical capability says an actuator can perform an action; it does not prove the action is safe for the current plant state or authorized for the current principal/task.
+- A WASM runtime compiled into the binary is not permission to execute every module; path containment, explicit caller authority, resource bounds and result semantics are separate gates.
+- A multi-action sequence is not one indivisible authorization unless its exact ordered content and aggregate exposure are explicitly bound; preserve partial outcomes.
 
 ## 12. Implementation plan
 
