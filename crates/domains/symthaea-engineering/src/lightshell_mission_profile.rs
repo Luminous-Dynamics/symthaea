@@ -159,7 +159,7 @@ impl ValidationReport {
     /// True only when at least one lifetime-equivalence claim passed structural
     /// evidence admission. This is not an engineering validation of the model.
     pub fn has_admitted_lifetime_equivalence_claim(&self) -> bool {
-        self.is_valid() && self.lifetime_equivalence_claim_count > 0
+        self.is_valid() && self.manifest_preregistered && self.lifetime_equivalence_claim_count > 0
     }
 }
 
@@ -847,6 +847,22 @@ mod tests {
         manifest["observations"][0]["p99"] = json!(60.0);
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|f| f.code == "exposure_quantiles_not_monotone"));
+    }
+
+    #[test]
+    fn lifetime_equivalence_requires_preregistered_profile_and_correlation() {
+        let mut manifest = base_manifest();
+        make_reviewed_source(&mut manifest);
+        manifest["state"] = json!("preregistered");
+        manifest["test_blocks"][0]["state"] = json!("preregistered");
+        manifest["test_blocks"][0]["acceleration_mode"] = json!("validated");
+        manifest["test_blocks"][0]["acceleration_model_ref"] = json!("ACCEL-MODEL-VALIDATION-01");
+        manifest["test_blocks"][0]["correlation_evidence_ref"] = json!("FIELD-LAB-CORRELATION-01");
+        manifest["test_blocks"][0]["lifetime_equivalence_claim"] = json!(true);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.is_valid(), "{:?}", report.findings);
+        assert!(report.has_admitted_lifetime_equivalence_claim());
+        assert_eq!(report.lifetime_equivalence_claim_count, 1);
     }
 
     #[test]
