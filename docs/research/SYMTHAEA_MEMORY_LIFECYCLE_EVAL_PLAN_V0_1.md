@@ -167,3 +167,51 @@ A result is not "better than SOTA" merely because it beats one number in one ben
 7. downstream task improvement on interdependent multi-session tasks.
 
 Until these conditions are met, report implementation, structural checks, synthetic tests, official benchmark runs and independently reproduced results as separate evidence levels.
+
+
+## 9. November 2026 benchmark update: state validity is now a first-class metric
+
+The earlier LongMemEval-v1 / Redis reference in §3 is a **separate protocol** from LongMemEval-V2. Do not compare their percentages as though they were the same test.
+
+### Current public reference points
+
+- **LongMemEval-V2**: 451 questions, five abilities (static state recall, dynamic state tracking, workflow knowledge, environment gotchas and premise awareness), histories up to 500 trajectories / 115M tokens, and both accuracy and query latency. The published page reports AgentRunbook-C at **74.9% small / 70.1% medium** with **108.3s / 139.9s** latency; Codex is reported at **69.9% / 68.7%** with **177.2s / 185.8s**. These are benchmark-page reported values, not Symthaea measurements or an independent reproduction. [LongMemEval-V2 benchmark and results](https://xiaowu0162.github.io/longmemeval-v2/).
+- **STALE**: 400 expert-validated implicit-conflict scenarios and 1,200 probes over state resolution, premise resistance and implicit policy adaptation. The initial paper reports that the best evaluated model reaches **55.2% overall**. Treat that as the paper's evaluation snapshot, not a permanent leaderboard ceiling. [Chao et al., arXiv:2605.06527](https://arxiv.org/abs/2605.06527).
+- **STALE follow-on**: a later 2026 preprint reports strict single-query VTA at **0.736 vs 0.686** for its locked predecessor, while its matched control is **0.692** and its authors explicitly bound the external generalization claim. This is useful evidence that verified transition assembly and post-generation state-to-draft auditing matter; it is not proof that one generic architecture solves memory staleness. [Sun and He, arXiv:2608.01619](https://arxiv.org/abs/2608.01619).
+- **Memory Trust Gap**: a September 2026 preprint separates benefit tasks, where memory is required, from safety tasks, where an authoritative live tool has the correct state. It reports stale-value reliance of 0.92–1.00 across its model-size series in the benefit suite and capability-dependent net harm in the safety suite. This motivates testing memory against a no-memory control, not just measuring whether the model can repeat a stored fact. [Hu and Ramachandran, arXiv:2609.01852](https://arxiv.org/abs/2609.01852).
+
+### New paradigm: state-to-action consistency, not just state retrieval
+
+A memory system can correctly retrieve or expose a new fact while a planner still acts on an obsolete dependency. Therefore evaluate the complete chain:
+
+`observation → candidate transition → provenance/chronology check → state resolution → dependent-memory invalidation → plan audit → action gate`
+
+The current branch does **not** implement that full chain. Its source-class / producer-claim envelope is only lineage pass-through; it has no source-event identity, independent semantic supersession, dependency graph, descendant invalidation, persistent ledger or actuation gate. These belong to the #9075 / #9139 / #11816 / #12846 owner contracts.
+
+### Deterministic regression matrix to add as owner work lands
+
+| Failure family | Adversarial construction | Required result |
+|---|---|---|
+| Explicit correction | “I moved from A to B” after a prior A fact | B is current; A remains historical only |
+| Implicit conflict | New apartment / employer / device implies a prior location / employer / device is obsolete without explicit negation | Candidate transition is surfaced for adjudication; old dependent plan is not silently reused |
+| False premise | Question asserts the superseded value as current | Resist premise; explain uncertainty or ask |
+| Temporal duality | Fact valid at V, learned at later T; late-arriving correction changes as-known state | Queries at (V,T) return only information knowable at T |
+| Dependency propagation | Changed source fact supports a procedure, preference or plan | All registered descendants become stale pending requalification |
+| Contradictory sources | Two independent roots disagree or share a hidden common root | Preserve conflict; do not count correlated copies as independent corroboration |
+| Retraction / consent withdrawal | Source is retracted after semantic consolidation | Block descendants pending invalidation; active-index deletion is not misreported as secure erasure |
+| Poisoned numeric representation | NaN, infinity, zero-norm vector, wrong dimension or malformed similarity threshold | Reject before mutation; do not contaminate ranking or learning-rate state |
+| Stale action under live authority | Memory says X; an authorized live source says Y | Y governs the current operation; log memory conflict; never use memory as an authority grant |
+| Missing lineage | Legacy memory has no source event / receipt | Mark unknown; never upgrade absence into verification |
+
+### Preregistered next thresholds
+
+These are proposed targets, not observed outcomes:
+
+1. **Semantic admission boundary (current code increment):** 100% rejection of empty, zero-norm, non-finite and dimension-mismatched HDC vectors; 100% rejection of non-finite prediction errors and invalid similarity thresholds; zero mutation of entries, provenance slots or stored-count statistics on rejected writes; 100% finite similarity scores for accepted finite inputs.
+2. **STALE:** first reproduce the official baseline and scorer. Then target at least 85% strict accuracy **in each** of state resolution, premise resistance and implicit policy adaptation, with no category below 80%; publish a paired confidence interval and false-transition / false-invalidation rate. Stretch target: 90% in each category.
+3. **LongMemEval-V2:** reach parity with the published AgentRunbook-C reference (74.9% small / 70.1% medium) under the same reader, memory budget, dataset revision and LAFS protocol; then target +5 absolute points while improving the accuracy-latency frontier. Never use the V1 86.5% result as a V2 comparator.
+4. **Memory Trust Gap:** require memory benefit over no-memory on the Benefit suite and **zero net harm** versus no-memory on the Safety suite across model sizes and memory-label / recency ablations. Report stale-reliance rate separately from answer accuracy.
+5. **MemoryArena:** retain the existing +10 percentage-point target over the strongest matched non-governed baseline, with no increase in unauthorized side effects, stale-use or task-family worst-case failure.
+6. **Operational envelope:** report p50/p95/p99 query latency, ingest/update/rollback/invalidation latency, bytes retained, model/tool calls and total cost. Optimize the accuracy-latency-storage frontier; a higher answer score obtained by unbounded context or tool use is not a fair win.
+
+The pass condition is a vector of independently reported outcomes, not a weighted average that allows better recall to conceal stale actions, privacy failures or authority violations.
