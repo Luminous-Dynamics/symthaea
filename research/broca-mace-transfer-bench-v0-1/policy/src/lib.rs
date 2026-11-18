@@ -66,15 +66,17 @@ pub enum Policy {
     ScopeAware,
     CausalQualified,
     InvariantTransport,
+    ActiveProbe,
 }
 
 impl Policy {
-    pub const ALL: [Policy; 4] = [
+    pub const ALL: [Policy; 6] = [
         Policy::NoMemory,
         Policy::FrequencyOnly,
         Policy::ScopeAware,
         Policy::CausalQualified,
         Policy::InvariantTransport,
+        Policy::ActiveProbe,
     ];
 
     pub fn name(self) -> &'static str {
@@ -84,6 +86,7 @@ impl Policy {
             Self::ScopeAware => "scope_aware",
             Self::CausalQualified => "causal_qualified",
             Self::InvariantTransport => "invariant_transport",
+            Self::ActiveProbe => "active_probe",
         }
     }
 }
@@ -93,6 +96,8 @@ pub struct Decision {
     pub action: Option<Action>,
     pub causal_claim: Option<Action>,
     pub evidence_ids: Vec<u32>,
+    /// Request a bounded environment probe before committing to a downstream action.
+    pub requires_probe: bool,
 }
 
 impl Decision {
@@ -100,11 +105,21 @@ impl Decision {
         Self::default()
     }
 
+    pub fn request_probe() -> Self {
+        Self {
+            action: None,
+            causal_claim: None,
+            evidence_ids: Vec::new(),
+            requires_probe: true,
+        }
+    }
+
     fn choose(action: Action, evidence_ids: Vec<u32>) -> Self {
         Self {
             action: Some(action),
             causal_claim: None,
             evidence_ids,
+            requires_probe: false,
         }
     }
 }
@@ -117,6 +132,7 @@ pub fn decide(policy: Policy, memory: &[Experience], query: Query) -> Decision {
         Policy::ScopeAware => scope_aware_policy(memory, query),
         Policy::CausalQualified => causal_qualified_policy(memory, query),
         Policy::InvariantTransport => invariant_transport_policy(memory, query),
+        Policy::ActiveProbe => active_probe_policy(memory, query),
     }
 }
 
@@ -339,7 +355,22 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
         action: Some(action),
         causal_claim: (difference >= 0.05).then_some(action),
         evidence_ids,
+        requires_probe: false,
     }
+}
+
+fn active_probe_policy(memory: &[Experience], query: Query) -> Decision {
+    let exact = causal_qualified_policy(memory, query);
+    if exact.action.is_some() {
+        return exact;
+    }
+
+    let transported = invariant_transport_policy(memory, query);
+    if transported.action.is_some() {
+        return transported;
+    }
+
+    Decision::request_probe()
 }
 
 #[cfg(test)]
@@ -510,6 +541,49 @@ mod tests {
             decide(Policy::InvariantTransport, &memory, query).action,
             None
         );
+    }
+
+    #[test]
+    fn active_probe_is_requested_only_after_exact_and_transport_paths_fail() {
+        let memory = vec![
+            sample(
+                1,
+                10,
+                Action::A,
+                0.9,
+                Scope {
+                    regime: Regime::Baseline,
+                    objective: Objective::Quality,
+                },
+            ),
+        ];
+        let query = Query {
+            scope: Scope {
+                regime: Regime::Shifted,
+                objective: Objective::Quality,
+            },
+        };
+        let decision = decide(Policy::ActiveProbe, &memory, query);
+        assert_eq!(decision.action, None);
+        assert!(decision.requires_probe);
+        assert!(decision.evidence_ids.is_empty());
+    }
+
+    #[test]
+    fn active_probe_uses_exact_scope_memory_without_probe() {
+        let scope = Scope {
+            regime: Regime::Baseline,
+            objective: Objective::Quality,
+        };
+        let memory = vec![
+            sample(1, 10, Action::A, 0.9, scope),
+            sample(2, 11, Action::A, 0.9, scope),
+            sample(3, 20, Action::B, 0.3, scope),
+            sample(4, 21, Action::B, 0.3, scope),
+        ];
+        let decision = decide(Policy::ActiveProbe, &memory, Query { scope });
+        assert_eq!(decision.action, Some(Action::A));
+        assert!(!decision.requires_probe);
     }
 
     #[test]
