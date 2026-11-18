@@ -1,0 +1,711 @@
+{
+  "schema_version": 1,
+  "protocol_id": "IG-HIDDEN-INFO-001",
+  "fixtures": [
+    {
+      "id": "HIF-001-complete-transfer",
+      "evidence_catalog": [
+        {
+          "atom_id": "E1",
+          "decisive": true
+        },
+        {
+          "atom_id": "E2",
+          "decisive": true
+        },
+        {
+          "atom_id": "E3",
+          "decisive": true
+        }
+      ],
+      "required_decisive_atoms": [
+        "E1",
+        "E2",
+        "E3"
+      ],
+      "agents": [
+        {
+          "agent_id": "A",
+          "initial_evidence_atoms": [
+            "E1"
+          ]
+        },
+        {
+          "agent_id": "B",
+          "initial_evidence_atoms": [
+            "E2"
+          ]
+        },
+        {
+          "agent_id": "C",
+          "initial_evidence_atoms": [
+            "E3"
+          ]
+        }
+      ],
+      "decision_agent_id": "A",
+      "deliveries": [
+        {
+          "sequence": 1,
+          "from_agent_id": "B",
+          "to_agent_id": "A",
+          "evidence_atom_id": "E2",
+          "delivered": true
+        },
+        {
+          "sequence": 2,
+          "from_agent_id": "C",
+          "to_agent_id": "A",
+          "evidence_atom_id": "E3",
+          "delivered": true
+        }
+      ],
+      "final": {
+        "status": "complete",
+        "cited_evidence_atoms": [
+          "E1",
+          "E2",
+          "E3"
+        ],
+        "answer_correct": true
+      },
+      "expected": {
+        "disposition": "qualified",
+        "decision_coverage_milli": 1000,
+        "cited_decisive_milli": 1000,
+        "provenance_violations": 0,
+        "duplicate_delivery_events": 0
+      }
+    },
+    {
+      "id": "HIF-002-no-communication",
+      "evidence_catalog": [
+        {
+          "atom_id": "E1",
+          "decisive": true
+        },
+        {
+          "atom_id": "E2",
+          "decisive": true
+        },
+        {
+          "atom_id": "E3",
+          "decisive": true
+        }
+      ],
+      "required_decisive_atoms": [
+        "E1",
+        "E2",
+        "E3"
+      ],
+      "agents": [
+        {
+          "agent_id": "A",
+          "initial_evidence_atoms": [
+            "E1"
+          ]
+        },
+        {
+          "agent_id": "B",
+          "initial_evidence_atoms": [
+            "E2"
+          ]
+        },
+        {
+          "agent_id": "C",
+          "initial_evidence_atoms": [
+            "E3"
+          ]
+        }
+      ],
+      "decision_agent_id": "A",
+      "deliveries": [],
+      "final": {
+        "status": "complete",
+        "cited_evidence_atoms": [
+          "E1"
+        ],
+        "answer_correct": false
+      },
+      "expected": {
+        "disposition": "qualified",
+        "decision_coverage_milli": 333,
+        "cited_decisive_milli": 333,
+        "provenance_violations": 0,
+        "duplicate_delivery_events": 0
+      }
+    },
+    {
+      "id": "HIF-003-chain-relay",
+      "evidence_catalog": [
+        {
+          "atom_id": "E1",
+          "decisive": true
+        },
+        {
+          "atom_id": "E2",
+          "decisive": true
+        },
+        {
+          "atom_id": "E3",
+          "decisive": true
+        }
+      ],
+      "required_decisive_atoms": [
+        "E1",
+        "E2",
+        "E3"
+      ],
+      "agents": [
+        {
+          "agent_id": "A",
+          "initial_evidence_atoms": [
+            "E1"
+          ]
+        },
+        {
+          "agent_id": "B",
+          "initial_evidence_atoms": [
+            "E2"
+          ]
+        },
+        {
+          "agent_id": "C",
+          "initial_evidence_atoms": [
+            "E3"
+          ]
+        }
+      ],
+      "decision_agent_id": "A",
+      "deliveries": [
+        {
+          "sequence": 1,
+          "from_agent_id": "C",
+          "to_agent_id": "B",
+          "evidence_atom_id": "E3",
+          "delivered": true
+        },
+        {
+          "sequence": 2,
+          "from_agent_id": "B",
+          "to_agent_id": "A",
+          "evidence_atom_id": "E3",
+          "delivered": true
+        },
+        {
+          "sequence": 3,
+          "from_agent_id": "B",
+          "to_agent_id": "A",
+          "evidence_atom_id": "E2",
+          "delivered": true
+        }
+      ],
+      "final": {
+        "status": "complete",
+        "cited_evidence_atoms": [
+          "E1",
+          "E2",
+          "E3"
+        ],
+        "answer_correct": true
+      },
+      "expected": {
+        "disposition": "qualified",
+        "decision_coverage_milli": 1000,
+        "cited_decisive_milli": 1000,
+        "provenance_violations": 0,
+        "duplicate_delivery_events": 0
+      }
+    },
+    {
+      "id": "HIF-004-duplicate-does-not-inflate",
+      "evidence_catalog": [
+        {
+          "atom_id": "E1",
+          "decisive": true
+        },
+        {
+          "atom_id": "E2",
+          "decisive": true
+        }
+      ],
+      "required_decisive_atoms": [
+        "E1",
+        "E2"
+      ],
+      "agents": [
+        {
+          "agent_id": "A",
+          "initial_evidence_atoms": [
+            "E1"
+          ]
+        },
+        {
+          "agent_id": "B",
+          "initial_evidence_atoms": [
+            "E2"
+          ]
+        }
+      ],
+      "decision_agent_id": "A",
+      "deliveries": [
+        {
+          "sequence": 1,
+          "from_agent_id": "B",
+          "to_agent_id": "A",
+          "evidence_atom_id": "E2",
+          "delivered": true
+        },
+        {
+          "sequence": 2,
+          "from_agent_id": "B",
+          "to_agent_id": "A",
+          "evidence_atom_id": "E2",
+          "delivered": true
+        }
+      ],
+      "final": {
+        "status": "complete",
+        "cited_evidence_atoms": [
+          "E1",
+          "E2"
+        ],
+        "answer_correct": true
+      },
+      "expected": {
+        "disposition": "qualified",
+        "decision_coverage_milli": 1000,
+        "cited_decisive_milli": 1000,
+        "provenance_violations": 0,
+        "duplicate_delivery_events": 1
+      }
+    },
+    {
+      "id": "HIF-005-failed-delivery-is-not-knowledge",
+      "evidence_catalog": [
+        {
+          "atom_id": "E1",
+          "decisive": true
+        }
+      ],
+      "required_decisive_atoms": [
+        "E1"
+      ],
+      "agents": [
+        {
+          "agent_id": "A",
+          "initial_evidence_atoms": []
+        },
+        {
+          "agent_id": "B",
+          "initial_evidence_atoms": [
+            "E1"
+          ]
+        }
+      ],
+      "decision_agent_id": "A",
+      "deliveries": [
+        {
+          "sequence": 1,
+          "from_agent_id": "B",
+          "to_agent_id": "A",
+          "evidence_atom_id": "E1",
+          "delivered": false
+        }
+      ],
+      "final": {
+        "status": "abstain",
+        "cited_evidence_atoms": [],
+        "answer_correct": null
+      },
+      "expected": {
+        "disposition": "qualified",
+        "decision_coverage_milli": 0,
+        "cited_decisive_milli": 0,
+        "provenance_violations": 0,
+        "duplicate_delivery_events": 0
+      }
+    },
+    {
+      "id": "HIF-006-sender-cannot-mint-evidence",
+      "evidence_catalog": [
+        {
+          "atom_id": "E1",
+          "decisive": true
+        },
+        {
+          "atom_id": "E2",
+          "decisive": true
+        }
+      ],
+      "required_decisive_atoms": [
+        "E1",
+        "E2"
+      ],
+      "agents": [
+        {
+          "agent_id": "A",
+          "initial_evidence_atoms": []
+        },
+        {
+          "agent_id": "B",
+          "initial_evidence_atoms": [
+            "E1"
+          ]
+        }
+      ],
+      "decision_agent_id": "A",
+      "deliveries": [
+        {
+          "sequence": 1,
+          "from_agent_id": "B",
+          "to_agent_id": "A",
+          "evidence_atom_id": "E2",
+          "delivered": true
+        }
+      ],
+      "final": {
+        "status": "abstain",
+        "cited_evidence_atoms": [],
+        "answer_correct": null
+      },
+      "expected": {
+        "disposition": "reject",
+        "decision_coverage_milli": 0,
+        "cited_decisive_milli": 0,
+        "provenance_violations": 1,
+        "duplicate_delivery_events": 0
+      }
+    },
+    {
+      "id": "HIF-007-unknown-recipient",
+      "evidence_catalog": [
+        {
+          "atom_id": "E1",
+          "decisive": true
+        },
+        {
+          "atom_id": "E2",
+          "decisive": true
+        }
+      ],
+      "required_decisive_atoms": [
+        "E1",
+        "E2"
+      ],
+      "agents": [
+        {
+          "agent_id": "A",
+          "initial_evidence_atoms": [
+            "E1"
+          ]
+        },
+        {
+          "agent_id": "B",
+          "initial_evidence_atoms": [
+            "E2"
+          ]
+        }
+      ],
+      "decision_agent_id": "A",
+      "deliveries": [
+        {
+          "sequence": 1,
+          "from_agent_id": "B",
+          "to_agent_id": "Z",
+          "evidence_atom_id": "E2",
+          "delivered": true
+        }
+      ],
+      "final": {
+        "status": "complete",
+        "cited_evidence_atoms": [
+          "E1"
+        ],
+        "answer_correct": false
+      },
+      "expected": {
+        "disposition": "reject",
+        "decision_coverage_milli": 500,
+        "cited_decisive_milli": 500,
+        "provenance_violations": 1,
+        "duplicate_delivery_events": 0
+      }
+    },
+    {
+      "id": "HIF-008-out-of-order-event",
+      "evidence_catalog": [
+        {
+          "atom_id": "E1",
+          "decisive": true
+        },
+        {
+          "atom_id": "E2",
+          "decisive": true
+        },
+        {
+          "atom_id": "E3",
+          "decisive": true
+        }
+      ],
+      "required_decisive_atoms": [
+        "E1",
+        "E2",
+        "E3"
+      ],
+      "agents": [
+        {
+          "agent_id": "A",
+          "initial_evidence_atoms": [
+            "E1"
+          ]
+        },
+        {
+          "agent_id": "B",
+          "initial_evidence_atoms": [
+            "E2"
+          ]
+        },
+        {
+          "agent_id": "C",
+          "initial_evidence_atoms": [
+            "E3"
+          ]
+        }
+      ],
+      "decision_agent_id": "A",
+      "deliveries": [
+        {
+          "sequence": 2,
+          "from_agent_id": "B",
+          "to_agent_id": "A",
+          "evidence_atom_id": "E2",
+          "delivered": true
+        },
+        {
+          "sequence": 1,
+          "from_agent_id": "C",
+          "to_agent_id": "A",
+          "evidence_atom_id": "E3",
+          "delivered": true
+        }
+      ],
+      "final": {
+        "status": "complete",
+        "cited_evidence_atoms": [
+          "E1",
+          "E2"
+        ],
+        "answer_correct": false
+      },
+      "expected": {
+        "disposition": "reject",
+        "decision_coverage_milli": 666,
+        "cited_decisive_milli": 666,
+        "provenance_violations": 1,
+        "duplicate_delivery_events": 0
+      }
+    },
+    {
+      "id": "HIF-009-missing-post-measurement",
+      "evidence_catalog": [
+        {
+          "atom_id": "E1",
+          "decisive": true
+        },
+        {
+          "atom_id": "E2",
+          "decisive": true
+        }
+      ],
+      "required_decisive_atoms": [
+        "E1",
+        "E2"
+      ],
+      "agents": [
+        {
+          "agent_id": "A",
+          "initial_evidence_atoms": [
+            "E1"
+          ]
+        },
+        {
+          "agent_id": "B",
+          "initial_evidence_atoms": [
+            "E2"
+          ]
+        }
+      ],
+      "decision_agent_id": "A",
+      "deliveries": [],
+      "final": null,
+      "expected": {
+        "disposition": "incomplete",
+        "decision_coverage_milli": 500,
+        "cited_decisive_milli": null,
+        "provenance_violations": 0,
+        "duplicate_delivery_events": 0
+      }
+    },
+    {
+      "id": "HIF-010-unsupported-citation",
+      "evidence_catalog": [
+        {
+          "atom_id": "E1",
+          "decisive": true
+        },
+        {
+          "atom_id": "E2",
+          "decisive": true
+        }
+      ],
+      "required_decisive_atoms": [
+        "E1",
+        "E2"
+      ],
+      "agents": [
+        {
+          "agent_id": "A",
+          "initial_evidence_atoms": [
+            "E1"
+          ]
+        },
+        {
+          "agent_id": "B",
+          "initial_evidence_atoms": [
+            "E2"
+          ]
+        }
+      ],
+      "decision_agent_id": "A",
+      "deliveries": [],
+      "final": {
+        "status": "complete",
+        "cited_evidence_atoms": [
+          "E1",
+          "E2"
+        ],
+        "answer_correct": false
+      },
+      "expected": {
+        "disposition": "reject",
+        "decision_coverage_milli": 500,
+        "cited_decisive_milli": 500,
+        "provenance_violations": 1,
+        "duplicate_delivery_events": 0
+      }
+    },
+    {
+      "id": "HIF-011-irrelevant-evidence-not-decisive",
+      "evidence_catalog": [
+        {
+          "atom_id": "E1",
+          "decisive": true
+        },
+        {
+          "atom_id": "NOISE",
+          "decisive": false
+        }
+      ],
+      "required_decisive_atoms": [
+        "E1"
+      ],
+      "agents": [
+        {
+          "agent_id": "A",
+          "initial_evidence_atoms": [
+            "NOISE"
+          ]
+        },
+        {
+          "agent_id": "B",
+          "initial_evidence_atoms": [
+            "E1"
+          ]
+        }
+      ],
+      "decision_agent_id": "A",
+      "deliveries": [
+        {
+          "sequence": 1,
+          "from_agent_id": "B",
+          "to_agent_id": "A",
+          "evidence_atom_id": "E1",
+          "delivered": true
+        }
+      ],
+      "final": {
+        "status": "complete",
+        "cited_evidence_atoms": [
+          "E1"
+        ],
+        "answer_correct": true
+      },
+      "expected": {
+        "disposition": "qualified",
+        "decision_coverage_milli": 1000,
+        "cited_decisive_milli": 1000,
+        "provenance_violations": 0,
+        "duplicate_delivery_events": 0
+      }
+    },
+    {
+      "id": "HIF-012-minority-held-correct-fact",
+      "evidence_catalog": [
+        {
+          "atom_id": "E1",
+          "decisive": true
+        },
+        {
+          "atom_id": "DISTRACTOR",
+          "decisive": false
+        }
+      ],
+      "required_decisive_atoms": [
+        "E1"
+      ],
+      "agents": [
+        {
+          "agent_id": "DECIDER",
+          "initial_evidence_atoms": [
+            "DISTRACTOR"
+          ]
+        },
+        {
+          "agent_id": "MINORITY",
+          "initial_evidence_atoms": [
+            "E1"
+          ]
+        },
+        {
+          "agent_id": "PEER",
+          "initial_evidence_atoms": []
+        }
+      ],
+      "decision_agent_id": "DECIDER",
+      "deliveries": [
+        {
+          "sequence": 1,
+          "from_agent_id": "MINORITY",
+          "to_agent_id": "DECIDER",
+          "evidence_atom_id": "E1",
+          "delivered": true
+        }
+      ],
+      "final": {
+        "status": "complete",
+        "cited_evidence_atoms": [
+          "E1"
+        ],
+        "answer_correct": true
+      },
+      "expected": {
+        "disposition": "qualified",
+        "decision_coverage_milli": 1000,
+        "cited_decisive_milli": 1000,
+        "provenance_violations": 0,
+        "duplicate_delivery_events": 0
+      }
+    }
+  ]
+}
