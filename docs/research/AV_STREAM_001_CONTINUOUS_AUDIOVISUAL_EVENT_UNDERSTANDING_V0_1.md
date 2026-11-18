@@ -284,7 +284,7 @@ These are research targets, not achieved results or industry standards.
 2. The online producer is causal: no future frame, reference transcript, hidden label or unavailable modality input.
 3. Any audio/frame loss is accounted and creates an explicit discontinuity; no false temporal continuity.
 4. At minimum compare A1, A3 and A4 before claiming a Symthaea advantage; add A2/A5 where resource boundaries can be matched.
-5. An HDC/CfC or hybrid win must appear on at least two preregistered task strata, with paired uncertainty intervals excluding zero and no material regression on the declared primary task.
+5. A quality win target is at least 5 absolute percentage points on at least two preregistered task strata, with paired 95% confidence intervals excluding zero and no more than 2 absolute points of regression on the declared overall primary score. A pilot and power analysis may revise the threshold before confirmatory runs, never after seeing confirmatory labels.
 6. A candidate efficiency win is at least 25% lower measured compute or peak memory at a preregistered non-inferiority margin initially set to 1 absolute task-score point; revise only with a documented pilot/power analysis.
 7. Report every stratum, including failures, unsupported modalities and NOT_EVALUATED cases. No global SOTA claim from one favorable slice.
 
