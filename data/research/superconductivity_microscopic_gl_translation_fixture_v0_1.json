@@ -59,7 +59,10 @@
         "energy_cutoff_unit": "per-material cutoff in Ry; not extracted",
         "phonon_treatment": "DFPT",
         "spin_orbit_included": null,
-        "provenance_note": "Method-level summary only. Exact settings belong to the separately versioned arXiv:2603.05123v2 material fixtures; no numeric outputs or code version are inferred here."
+        "provenance_note": "Method-level summary only. Exact settings belong to the separately versioned arXiv:2603.05123v2 material fixtures; no numeric outputs or code version are inferred here. Public SCTK upstream main head inspected 2026-11-18: 4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33; not asserted to be the exact revision used for this paper calculation.",
+        "upstream_code_repository": "https://github.com/mitsuaki1987/sctk",
+        "inspected_upstream_commit": "4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33",
+        "upstream_snapshot_relation": "inspected_current_upstream_not_asserted_as_paper_revision"
       }
     }
   ],
