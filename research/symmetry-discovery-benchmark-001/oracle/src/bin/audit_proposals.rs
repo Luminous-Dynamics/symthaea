@@ -330,3 +330,63 @@ fn main() -> ExitCode {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn smoke_submission() -> SubmissionV1 {
+        serde_json::from_str(include_str!(
+            "../../../fixtures/v0.1/proposal_oracle_selftest.json"
+        ))
+        .expect("frozen proposal smoke submission parses")
+    }
+
+    #[test]
+    fn complete_discovery_submission_is_audited_against_every_frozen_case() {
+        let report = run(smoke_submission()).expect("complete proposal submission audits");
+        assert_eq!(report.summary.cases_in_scope, 300);
+        assert_eq!(report.summary.predicted, 300);
+        assert_eq!(report.summary.abstained, 0);
+        assert_eq!(report.summary.exact_subgroup_matches, 300);
+        assert_eq!(report.summary.false_promotions, 0);
+        assert_eq!(report.summary.missed_symmetries, 0);
+        assert_eq!(report.summary.invalid_group_proposals, 0);
+        assert_eq!(report.cases.len(), 300);
+    }
+
+    #[test]
+    fn incomplete_submission_is_rejected_instead_of_shrinking_the_denominator() {
+        let mut submission = smoke_submission();
+        submission.predictions.pop();
+        let error = run(submission).unwrap_err();
+        assert!(error.contains("submission coverage mismatch"));
+        assert!(error.contains("missing=1"));
+    }
+
+    #[test]
+    fn explicit_abstention_is_counted_and_does_not_become_a_false_negative() {
+        let mut submission = smoke_submission();
+        let prediction = &mut submission.predictions[0];
+        prediction.disposition = DispositionV1::Abstained;
+        prediction.proposed_elements.clear();
+        prediction.abstention_reason = Some("synthetic adapter abstention test".to_owned());
+        let report = run(submission).unwrap();
+        assert_eq!(report.summary.cases_in_scope, 300);
+        assert_eq!(report.summary.predicted, 299);
+        assert_eq!(report.summary.abstained, 1);
+        assert_eq!(report.summary.exact_subgroup_matches, 299);
+        assert_eq!(report.summary.false_promotions, 0);
+        assert_eq!(report.summary.missed_symmetries, 0);
+    }
+
+    #[test]
+    fn unknown_proposed_group_elements_fail_closed() {
+        let mut submission = smoke_submission();
+        submission.predictions[0].proposed_elements[0] = "invented-element".to_owned();
+        assert!(run(submission)
+            .unwrap_err()
+            .contains("unknown D4 element invented-element"));
+    }
+}
