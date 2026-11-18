@@ -197,3 +197,10 @@ The Agent Memory Challenge Cycle 2 official page, checked on November 18, 2026, 
 The synthetic `source_root_id` and `measurement_error_bound` fields are not trust anchors. Mycelix's FIN-SYS source profile provides a useful existing pattern: multiple publications reusing one upstream BIS/IMF series count as one provenance family. Production MACE should consume equivalent verified lineage receipts, including acquisition mechanism, artifact digest, source family, upstream series/root, transformation and supersession history.
 
 A measurement-error bound must be tied to an identified sensor/method, units, calibration revision, operating interval and evidence record. It must not be an agent-editable confidence claim. This connects MACE to the bitemporal source-event ledger (#9075) and independent evaluator provenance (#11816).
+
+
+### Raw-native and bitemporal coverage
+
+MACE v0.6 adds a provider-neutral JSONL ingestion path that derives experiences from pre-registration, dispatch, tool-result, world-observation and correction events. It evaluates state as of `(valid_at, known_at)`, preserving late-arriving observations and delayed retractions without rewriting prior knowledge states.
+
+This closes part of the raw-native gap identified by TimlMemBench, but it is not yet a provider-native parser for OpenAI/Anthropic logs or an end-to-end integration with #12731. Future adapters must retain provider raw bytes, map them to the interchange envelope, then run consolidation and MACE transfer without bypassing provenance. Mycelix verification remains an injected source-registry seam; no signature verification is claimed in this crate.
