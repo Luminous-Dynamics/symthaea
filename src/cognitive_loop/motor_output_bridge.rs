@@ -276,15 +276,22 @@ impl MotorOutputBridge {
 
         // 1. Check minimum cognitive-caution threshold.
         let policy_min_phi = self.policy.capabilities.min_phi;
-        let min_phi = self
-            .min_phi_override
-            .map(|override_min| override_min.max(policy_min_phi))
-            .unwrap_or(policy_min_phi);
-        if !min_phi.is_finite() || !(0.0..=1.0).contains(&min_phi) {
+        if !policy_min_phi.is_finite() || !(0.0..=1.0).contains(&policy_min_phi) {
             return MotorOutputResult::skipped(
-                "Invalid configured min_phi: expected a finite value in [0, 1]",
+                "Invalid policy min_phi: expected a finite value in [0, 1]",
             );
         }
+        let min_phi = match self.min_phi_override {
+            Some(override_min)
+                if !override_min.is_finite() || !(0.0..=1.0).contains(&override_min) =>
+            {
+                return MotorOutputResult::skipped(
+                    "Invalid min_phi_override: expected a finite value in [0, 1]",
+                );
+            }
+            Some(override_min) => override_min.max(policy_min_phi),
+            None => policy_min_phi,
+        };
         if current_phi < min_phi {
             return MotorOutputResult::skipped(&format!(
                 "Phi {current_phi:.3} below motor output threshold {min_phi:.3}"
@@ -896,7 +903,7 @@ mod authority_numeric_input_tests {
 
         let result = bridge.execute(&[0.0], 0.8, 0.8, &MotorActionRequest::default());
         assert!(!result.success);
-        assert!(result.error.unwrap().contains("Invalid configured min_phi"));
+        assert!(result.error.unwrap().contains("Invalid min_phi_override"));
     }
 
     #[test]
@@ -925,6 +932,18 @@ mod authority_numeric_input_tests {
             .error
             .unwrap()
             .contains("below motor output threshold 0.800"));
+    }
+
+
+    #[test]
+    fn motor_bridge_rejects_invalid_policy_caution_floor_before_override() {
+        let mut bridge = MotorOutputBridge::with_defaults().unwrap();
+        bridge.policy.capabilities.min_phi = f64::NAN;
+        bridge.min_phi_override = Some(0.9);
+
+        let result = bridge.execute(&[0.0], 0.8, 0.95, &MotorActionRequest::default());
+        assert!(!result.success);
+        assert!(result.error.unwrap().contains("Invalid policy min_phi"));
     }
 
 }
