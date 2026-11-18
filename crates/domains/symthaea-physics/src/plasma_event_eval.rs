@@ -1342,6 +1342,42 @@ mod tests {
         assert_eq!(manifest["benchmark_id"], "PLASMA-EVENT-EVAL-001");
         assert_eq!(manifest["population_and_split_contract"]["test_is_read_only"], true);
         assert_eq!(
+            manifest["population_and_split_contract"]["split_tracks"]["tokamark_temporal_transfer"]["use_for_primary_temporal_generalization"],
+            true
+        );
+        assert_eq!(
+            manifest["population_and_split_contract"]["split_tracks"]["tokamark_random_split"]["use_as_secondary_only"],
+            true
+        );
+        assert_eq!(
+            manifest["reference_benchmarks"]["gen_toka_group6"]["test_shots"],
+            933
+        );
+        assert_eq!(
+            manifest["reference_benchmarks"]["gen_toka_group6"]["test_windows"],
+            39967
+        );
+        assert_eq!(
+            manifest["reference_benchmarks"]["gen_toka_group6"]["common_f1_threshold"],
+            0.4
+        );
+        assert_eq!(
+            manifest["reference_benchmarks"]["gen_toka_group6"]["macro_average"]["gentoka_f1"],
+            0.5726
+        );
+        assert_eq!(
+            manifest["reference_benchmarks"]["gen_toka_group6"]["macro_average"]["gentoka_auroc"],
+            0.9049
+        );
+        assert_eq!(
+            manifest["reference_benchmarks"]["gen_toka_group6"]["macro_average"]["tokamind_auroc"],
+            0.9069
+        );
+        assert_eq!(
+            manifest["reference_benchmarks"]["published_toka_mark_robustness"]["published_alarm_evaluation"]["false_alarm_rate"],
+            "undefined_not_computable"
+        );
+        assert_eq!(
             manifest["online_policy_contract"]["test_threshold_optimization"],
             false
         );
