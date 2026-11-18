@@ -133,5 +133,61 @@
         "section_location": "mid-internode"
       }
     }
+  ],
+  "root_anchorage_samples": [
+    {
+      "sample_id": "RAS-synthetic-001",
+      "parent_specimen_id": "SPEC-synthetic-beam-001",
+      "protocol_id": "synthetic-root-support-calibration-v1",
+      "coordinate_frame": "synthetic-local-x-east-y-north-z-up",
+      "loading_direction": "transverse +x",
+      "force_translation_curve": [
+        {
+          "force_n": 0,
+          "translation_m": 0,
+          "time_s": 0
+        },
+        {
+          "force_n": 10,
+          "translation_m": 0.01,
+          "time_s": 10
+        },
+        {
+          "force_n": 20,
+          "translation_m": 0.02,
+          "time_s": 20
+        }
+      ],
+      "moment_rotation_curve": [
+        {
+          "moment_nm": 0,
+          "rotation_rad": 0,
+          "time_s": 0
+        },
+        {
+          "moment_nm": 1,
+          "rotation_rad": 0.05,
+          "time_s": 10
+        },
+        {
+          "moment_nm": 2,
+          "rotation_rad": 0.1,
+          "time_s": 20
+        }
+      ],
+      "derived_translational_stiffness_n_per_m": 1000,
+      "derived_rotational_stiffness_nm_per_rad": 20,
+      "root_plate_major_axis_m": 0.08,
+      "root_plate_minor_axis_m": 0.06,
+      "soil_water_mass_fraction": 0.2,
+      "soil_bulk_density_kg_m3": 1200,
+      "failure_mode": "none",
+      "failure_moment_nm": null,
+      "method": "synthetic known-answer linear root-support spring fixture; no physical specimen",
+      "instrument_or_calibration": "none; generated synthetic observation",
+      "observed_at": null,
+      "observer_blinding_id": null,
+      "raw_measurement_url": null
+    }
   ]
 }
