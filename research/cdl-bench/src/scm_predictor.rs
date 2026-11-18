@@ -225,8 +225,8 @@ impl BytePredictor for ScmFieldPredictor {
     }
 }
 
-/// Oracle-topology SCM model: conditions each field/lane histogram on coarse
-/// same-timestep parent bytes from the fixed SCM graph. Model ID 3.
+/// Oracle-topology SCM model: conditions each field/lane distribution on coarse
+/// same-timestep parent i16 values from the fixed SCM graph. Model ID 3.
 ///
 /// This supplies the graph to the compressor. It must be reported as an
 /// oracle-structure control, never as learned causal discovery or transfer.
@@ -267,9 +267,9 @@ impl BytePredictor for ScmParentPredictor {
     }
 }
 
-/// Noncausal temporal baseline: conditions each variable/lane on the same
-/// variable/lane in the preceding timestep. Model ID 4. This control has
-/// temporal context but does not inspect other variables or use the SCM graph.
+/// Noncausal temporal baseline: conditions each variable/lane on the previous
+/// timestep's reconstructed full i16 value for that variable. Model ID 4.
+/// This control has temporal context but does not inspect other variables or graph structure.
 pub struct ScmLagPredictor {
     state: StructuredState,
 }
@@ -503,7 +503,7 @@ mod tests {
     }
 
     #[test]
-    fn field_parent_lag_and_hybrid_predictors_have_distinct_stable_ids() {
+    fn all_scm_predictors_have_distinct_stable_ids() {
         assert_eq!(ScmFieldPredictor::default().model_id(), 2);
         assert_eq!(ScmParentPredictor::default().model_id(), 3);
         assert_eq!(ScmLagPredictor::default().model_id(), 4);
