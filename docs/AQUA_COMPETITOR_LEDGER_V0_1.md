@@ -348,3 +348,17 @@ The associated peer-reviewed evidence corpus now includes:
 - October 2026 DWHR coupling study: global DHW COP up to 6.3 experimentally and 8.0 in simulation in its studied configurations; mixer-side unbalanced DWHR gave the best tested overall topology, while some configurations increased static loss and reduced heat-pump COP.
 
 Aqua's response is a new complete-system workstream, [#12816](https://github.com/Luminous-Dynamics/symthaea/issues/12816), and the [power-coupled shower / DWHR benchmark](AQUA_POWER_COUPLED_SHOWER_DWHR_BENCHMARK_V0_1.md). No study value is promoted to an Aqua result or universal target.
+
+
+## 16. Current functional-performance method references — EN 18021:2025 and UWL 2023
+
+EN 18021:2025 is a current European laboratory type-test standard for taps, shower outlets, shower sets and shower systems (in force from 2 July 2025 in the UNI catalogue). It is not production QC. Its scope distinguishes PN5 shower outlets/sets from PN10 taps/systems; it excludes shower taps alone and bath-filling functions. Its accessible summary gives outlets/sets a 0.5 bar dynamic operating lower limit, 5 bar static maximum, and 1–3 bar recommended dynamic range (42°C recommended outlet temperature). Taps/systems have a separate table: 0.5 bar dynamic lower limit, 10 bar static maximum, recommended 1–5 bar dynamic (the table footnote describes measurement at point of discharge), 65°C recommended. The full controlled standard is required for formal test methods.
+
+Sources:
+- [UNI official catalogue — EN 18021:2025](https://store.uni.com/en/en-18021-2025)
+- [SIS national adoption listing](https://www.sis.se/en/produkter/testing/ss-en-180212025/)
+- [BS EN 18021:2025 listing](https://tienda.aenor.com/p/norma-bsi-bs-en-18021-2025-000000000030479514)
+
+UWL 2023 applies P1/P2/P3 as dynamic pressures **to each inlet**: 150 kPa +10/-0 and 300 kPa +20/-0 for Type 1; 10 kPa +2/-0 for Type 2. ETL also requires P2 at the centre of the faceplate for its maximum-flow procedure. These method datums cannot be collapsed into one upstream or terminal-inlet gauge point. The complete crosswalk is in [AQUA_METHOD_CROSSWALK_V0_1.md](AQUA_METHOD_CROSSWALK_V0_1.md), tracked by [#12817](https://github.com/Luminous-Dynamics/symthaea/issues/12817).
+
+Aqua's generic pressure retention helper is now explicit about pressure datum and rejects cross-datum comparisons. It supports general terminal-fitting-inlet or point-of-discharge engineering channels only. It does not model the UWL simultaneous inlet channels or ETL faceplate-centre P2 and therefore cannot produce an ETL/UWL compliance claim.
