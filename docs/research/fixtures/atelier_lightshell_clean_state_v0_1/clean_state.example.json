@@ -191,5 +191,6 @@
       "observations": []
     }
   ],
-  "independent_review": null
+  "independent_review": null,
+  "required_cycle_count": 3
 }
