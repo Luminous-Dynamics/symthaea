@@ -133,7 +133,15 @@
         "provenance_violations": 0,
         "matrix_decision_consistent": true,
         "decision_correct": true
-      }
+      },
+      "required_decisive_evidence_ids": [
+        "EA1",
+        "EA2",
+        "EB1",
+        "EB2",
+        "EC1",
+        "EC2"
+      ]
     },
     {
       "id": "IF-002-surfaced-but-not-integrated",
@@ -258,7 +266,15 @@
         "provenance_violations": 0,
         "matrix_decision_consistent": false,
         "decision_correct": false
-      }
+      },
+      "required_decisive_evidence_ids": [
+        "EA1",
+        "EA2",
+        "EB1",
+        "EB2",
+        "EC1",
+        "EC2"
+      ]
     },
     {
       "id": "IF-003-duplicate-row-does-not-inflate",
@@ -330,7 +346,11 @@
         "provenance_violations": 0,
         "matrix_decision_consistent": true,
         "decision_correct": true
-      }
+      },
+      "required_decisive_evidence_ids": [
+        "EA",
+        "EB"
+      ]
     },
     {
       "id": "IF-004-polarity-reversal",
@@ -394,7 +414,11 @@
         "provenance_violations": 0,
         "matrix_decision_consistent": true,
         "decision_correct": false
-      }
+      },
+      "required_decisive_evidence_ids": [
+        "EA",
+        "EB"
+      ]
     },
     {
       "id": "IF-005-source-attribution-mismatch",
@@ -458,7 +482,11 @@
         "provenance_violations": 1,
         "matrix_decision_consistent": true,
         "decision_correct": true
-      }
+      },
+      "required_decisive_evidence_ids": [
+        "EA",
+        "EB"
+      ]
     },
     {
       "id": "IF-006-fabricated-evidence-row",
@@ -522,7 +550,11 @@
         "provenance_violations": 1,
         "matrix_decision_consistent": true,
         "decision_correct": true
-      }
+      },
+      "required_decisive_evidence_ids": [
+        "EA",
+        "EB"
+      ]
     },
     {
       "id": "IF-007-wrong-candidate-mapping",
@@ -586,7 +618,11 @@
         "provenance_violations": 0,
         "matrix_decision_consistent": true,
         "decision_correct": false
-      }
+      },
+      "required_decisive_evidence_ids": [
+        "EA",
+        "EB"
+      ]
     },
     {
       "id": "IF-008-negative-evidence-omitted",
@@ -677,7 +713,13 @@
         "provenance_violations": 0,
         "matrix_decision_consistent": true,
         "decision_correct": false
-      }
+      },
+      "required_decisive_evidence_ids": [
+        "EA",
+        "EB1",
+        "EB2",
+        "EC"
+      ]
     },
     {
       "id": "IF-009-valid-tie-abstention",
@@ -741,7 +783,11 @@
         "provenance_violations": 0,
         "matrix_decision_consistent": true,
         "decision_correct": true
-      }
+      },
+      "required_decisive_evidence_ids": [
+        "EA",
+        "EB"
+      ]
     },
     {
       "id": "IF-010-correct-minority-evidence",
@@ -805,7 +851,11 @@
         "provenance_violations": 0,
         "matrix_decision_consistent": true,
         "decision_correct": true
-      }
+      },
+      "required_decisive_evidence_ids": [
+        "EA",
+        "EB"
+      ]
     },
     {
       "id": "IF-011-partial-surfacing-abstain",
@@ -901,8 +951,16 @@
         "duplicate_matrix_rows": 0,
         "provenance_violations": 0,
         "matrix_decision_consistent": false,
-        "decision_correct": false
-      }
+        "decision_correct": true
+      },
+      "required_decisive_evidence_ids": [
+        "EA1",
+        "EA2",
+        "EB1",
+        "EB2",
+        "EC1",
+        "EC2"
+      ]
     },
     {
       "id": "IF-012-unknown-entity-in-matrix",
@@ -949,7 +1007,10 @@
         "provenance_violations": 1,
         "matrix_decision_consistent": false,
         "decision_correct": false
-      }
+      },
+      "required_decisive_evidence_ids": [
+        "EA"
+      ]
     }
   ]
 }
