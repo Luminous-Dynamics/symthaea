@@ -1636,11 +1636,58 @@ pub fn design_shared_bias_probe_set(
     )
 }
 
+/// Replay the deterministic greedy set-cover implementation and reject any
+/// modified or forged receipt. This verifies reproducibility, not optimality.
+pub fn verify_bounded_noise_probe_design_receipt(
+    problem: &BoundedNoiseProblemV1,
+    receipt: &ProbeDesignReceiptV1,
+) -> Result<(), NoiseErrorV1> {
+    let replayed = design_bounded_noise_probe_set(problem)?;
+    if *receipt != replayed {
+        return Err(NoiseErrorV1::ReceiptMismatch);
+    }
+    Ok(())
+}
+
+pub fn verify_persistent_noise_probe_design_receipt(
+    problem: &PersistentNoiseProblemV1,
+    receipt: &ProbeDesignReceiptV1,
+) -> Result<(), NoiseErrorV1> {
+    let replayed = design_persistent_noise_probe_set(problem)?;
+    if *receipt != replayed {
+        return Err(NoiseErrorV1::ReceiptMismatch);
+    }
+    Ok(())
+}
+
+pub fn verify_bounded_interval_probe_design_receipt(
+    problem: &BoundedIntervalProblemV1,
+    receipt: &ProbeDesignReceiptV1,
+) -> Result<(), NoiseErrorV1> {
+    let replayed = design_bounded_interval_probe_set(problem)?;
+    if *receipt != replayed {
+        return Err(NoiseErrorV1::ReceiptMismatch);
+    }
+    Ok(())
+}
+
+pub fn verify_shared_bias_probe_design_receipt(
+    problem: &SharedAdditiveBiasProblemV1,
+    receipt: &ProbeDesignReceiptV1,
+) -> Result<(), NoiseErrorV1> {
+    let replayed = design_shared_bias_probe_set(problem)?;
+    if *receipt != replayed {
+        return Err(NoiseErrorV1::ReceiptMismatch);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use symmetry_active_experiment_reference::{
-        ActiveExperimentProblemV1, ExperimentProbeV1, replay_observations,
+        ActiveExperimentProblemV1, ExperimentProbeV1, compile_active_experiment,
+        replay_observations,
     };
 
     fn bounded_fixture() -> BoundedNoiseProblemV1 {
@@ -1885,6 +1932,100 @@ mod tests {
         assert_eq!(receipt.covered_obligations, receipt.required_obligations);
         assert!(receipt.complete_pairwise_separation);
         assert_eq!(receipt.selected_cost, 3);
+    }
+
+    #[test]
+    fn static_probe_basis_cost_is_compared_with_adaptive_minimax_cost_on_same_d4_problem() {
+        let deterministic = ActiveExperimentProblemV1 {
+            problem_id: "d4-adaptive-versus-static-probe-basis-v1".to_owned(),
+            hypotheses: vec![
+                "D4-H-A".to_owned(),
+                "D4-H-B".to_owned(),
+                "D4-H-C".to_owned(),
+                "D4-H-D".to_owned(),
+            ],
+            probes: vec![
+                ExperimentProbeV1 {
+                    probe_id: "p-balanced-first".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                    outcomes: vec![0, 0, 1, 1],
+                },
+                ExperimentProbeV1 {
+                    probe_id: "p-separate-ab".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                    outcomes: vec![0, 1, 0, 0],
+                },
+                ExperimentProbeV1 {
+                    probe_id: "p-separate-cd".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                    outcomes: vec![0, 0, 1, 0],
+                },
+            ],
+        };
+        let bounded = BoundedNoiseProblemV1::from_deterministic(&deterministic).unwrap();
+        let static_design = design_bounded_noise_probe_set(&bounded).unwrap();
+        let adaptive = compile_active_experiment(&deterministic, Default::default()).unwrap();
+
+        assert_eq!(static_design.selected_probe_ids.len(), 3);
+        assert_eq!(static_design.selected_cost, 3);
+        assert!(static_design.complete_pairwise_separation);
+        assert!(!static_design.optimality_certified);
+        assert_eq!(adaptive.root_worst_case_cost, 2);
+        assert!(static_design.selected_cost > adaptive.root_worst_case_cost);
+
+        verify_bounded_noise_probe_design_receipt(&bounded, &static_design).unwrap();
+        let mut forged = static_design.clone();
+        forged.selected_cost = 2;
+        assert_eq!(
+            verify_bounded_noise_probe_design_receipt(&bounded, &forged),
+            Err(NoiseErrorV1::ReceiptMismatch)
+        );
+    }
+
+    #[test]
+    fn every_noise_aware_static_design_receipt_replays_or_rejects_mutation() {
+        let bounded = bounded_fixture();
+        let bounded_receipt = design_bounded_noise_probe_set(&bounded).unwrap();
+        verify_bounded_noise_probe_design_receipt(&bounded, &bounded_receipt).unwrap();
+
+        let persistent = persistent_fixture();
+        let persistent_receipt = design_persistent_noise_probe_set(&persistent).unwrap();
+        verify_persistent_noise_probe_design_receipt(&persistent, &persistent_receipt).unwrap();
+
+        let numeric = BoundedIntervalProblemV1 {
+            problem_id: "numeric-probe-receipt-v1".to_owned(),
+            quantity_unit_id: "millimetre-integer".to_owned(),
+            hypothesis_ids: vec!["A".to_owned(), "B".to_owned()],
+            probes: vec![NoiseProbeV1 {
+                probe_id: "p0".to_owned(),
+                cost: 1,
+                admissible: true,
+            }],
+            predicted_intervals_by_hypothesis: vec![
+                vec![FixedIntervalV1::new(0, 1).unwrap()],
+                vec![FixedIntervalV1::new(2, 3).unwrap()],
+            ],
+        };
+        let numeric_receipt = design_bounded_interval_probe_set(&numeric).unwrap();
+        verify_bounded_interval_probe_design_receipt(&numeric, &numeric_receipt).unwrap();
+
+        let shared_bias = SharedAdditiveBiasProblemV1 {
+            problem_id: "shared-bias-probe-receipt-v1".to_owned(),
+            quantity_unit_id: "millimetre-integer".to_owned(),
+            hypothesis_ids: vec!["A".to_owned(), "B".to_owned()],
+            probes: vec![NoiseProbeV1 {
+                probe_id: "p0".to_owned(),
+                cost: 1,
+                admissible: true,
+            }],
+            nominal_predictions_by_hypothesis: vec![vec![0], vec![1]],
+            global_bias_interval: FixedIntervalV1::new(-100, 100).unwrap(),
+        };
+        let bias_receipt = design_shared_bias_probe_set(&shared_bias).unwrap();
+        verify_shared_bias_probe_design_receipt(&shared_bias, &bias_receipt).unwrap();
     }
 
     #[test]
