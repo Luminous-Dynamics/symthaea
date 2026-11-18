@@ -619,6 +619,20 @@ mod tests {
     }
 
     #[test]
+    fn prediction_for_training_record_is_rejected() {
+        let (schema, mut fixture) = inputs();
+        fixture["predictions"][0]["record_id"] = Value::String("syn-al-tc".to_owned());
+        assert!(audit(&schema, &serde_json::to_vec(&fixture).unwrap()).is_err());
+    }
+
+    #[test]
+    fn prediction_property_must_match_split_target() {
+        let (schema, mut fixture) = inputs();
+        fixture["predictions"][0]["property"] = Value::String("Hc2".to_owned());
+        assert!(audit(&schema, &serde_json::to_vec(&fixture).unwrap()).is_err());
+    }
+
+    #[test]
     fn random_row_split_cannot_be_enabled() {
         let (schema, mut fixture) = inputs();
         fixture["protocol"]["reject_random_split"] = Value::Bool(false);
