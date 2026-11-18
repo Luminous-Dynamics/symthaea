@@ -1271,6 +1271,114 @@
             "null"
           ],
           "format": "uri"
+        },
+        "cross_section": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "geometry_model",
+            "outer_semi_axis_x_m",
+            "outer_semi_axis_y_m",
+            "inner_semi_axis_x_m",
+            "inner_semi_axis_y_m",
+            "orientation_rad",
+            "measurement_method"
+          ],
+          "properties": {
+            "geometry_model": {
+              "enum": [
+                "elliptical_solid",
+                "elliptical_annulus",
+                "other",
+                "unknown"
+              ]
+            },
+            "outer_semi_axis_x_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "outer_semi_axis_y_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "inner_semi_axis_x_m": {
+              "type": "number",
+              "minimum": 0
+            },
+            "inner_semi_axis_y_m": {
+              "type": "number",
+              "minimum": 0
+            },
+            "orientation_rad": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "measurement_method": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "section_location": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 128
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "geometry_model": {
+                    "const": "elliptical_solid"
+                  }
+                },
+                "required": [
+                  "geometry_model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "inner_semi_axis_x_m": {
+                    "const": 0
+                  },
+                  "inner_semi_axis_y_m": {
+                    "const": 0
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "geometry_model": {
+                    "const": "elliptical_annulus"
+                  }
+                },
+                "required": [
+                  "geometry_model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "inner_semi_axis_x_m": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "inner_semi_axis_y_m": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                }
+              }
+            }
+          ]
         }
       },
       "allOf": [
@@ -1291,7 +1399,10 @@
                 "type": "number",
                 "exclusiveMinimum": 0
               }
-            }
+            },
+            "required": [
+              "support_span_m"
+            ]
           }
         },
         {
@@ -1311,7 +1422,10 @@
                 "type": "number",
                 "exclusiveMinimum": 0
               }
-            }
+            },
+            "required": [
+              "cantilever_length_m"
+            ]
           }
         }
       ]
