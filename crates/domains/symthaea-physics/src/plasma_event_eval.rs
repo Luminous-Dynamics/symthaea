@@ -114,6 +114,9 @@ pub struct AlarmPolicyConfig {
     pub policy_id: String,
     /// Identity of the numeric scale shared by thresholds and model score evidence.
     pub score_scale_id: String,
+    /// Inclusive numeric bounds for the declared score scale.
+    pub score_min: f64,
+    pub score_max: f64,
     /// SHA-256 content identity for the frozen validation/calibration receipt.
     pub validation_receipt_sha256: String,
     /// Exact model artifact, training split, calibration and uncertainty method
@@ -137,6 +140,18 @@ impl AlarmPolicyConfig {
         }
         if self.score_scale_id.trim().is_empty() {
             return Err(PlasmaEventEvalError::new("score_scale_id must be non-empty"));
+        }
+        if !self.score_min.is_finite()
+            || !self.score_max.is_finite()
+            || self.score_min >= self.score_max
+            || self.trigger_threshold < self.score_min
+            || self.trigger_threshold > self.score_max
+            || self.clear_threshold < self.score_min
+            || self.clear_threshold > self.score_max
+        {
+            return Err(PlasmaEventEvalError::new(
+                "score bounds and alarm thresholds must be finite, ordered and inside the declared score domain",
+            ));
         }
         if self.validation_receipt_sha256.len() != 64
             || !self.validation_receipt_sha256.bytes().all(|byte| {
@@ -184,9 +199,11 @@ impl AlarmPolicyConfig {
             canonical.extend_from_slice(&(field.len() as u64).to_be_bytes());
             canonical.extend_from_slice(field);
         };
-        append(b"luminous.plasma-alarm-policy.v0.5");
+        append(b"luminous.plasma-alarm-policy.v0.6");
         append(self.policy_id.as_bytes());
         append(self.score_scale_id.as_bytes());
+        append(format!("{:016x}", self.score_min.to_bits()).as_bytes());
+        append(format!("{:016x}", self.score_max.to_bits()).as_bytes());
         append(self.validation_receipt_sha256.as_bytes());
         append(self.risk_model.model_id.as_bytes());
         append(self.risk_model.model_revision.as_bytes());
@@ -330,9 +347,11 @@ impl RiskScoreEvidence {
             || !self.upper_bound.is_finite()
             || self.lower_bound > self.estimate
             || self.estimate > self.upper_bound
+            || self.lower_bound < policy.score_min
+            || self.upper_bound > policy.score_max
         {
             return Err(PlasmaEventEvalError::new(
-                "risk estimate and interval bounds must be finite and ordered",
+                "risk estimate and interval bounds must be finite, ordered and inside the frozen score domain",
             ));
         }
         if self.score_scale_id != policy.score_scale_id {
@@ -1162,6 +1181,14 @@ impl PlasmaEventEvaluationReceiptBody {
                 "dataset revision, model identity and hardware metadata must be non-empty",
             ));
         }
+        if self.model_id != self.policy.risk_model.model_id
+            || self.model_revision != self.policy.risk_model.model_revision
+            || self.model_artifact_sha256 != self.policy.risk_model.model_artifact_sha256
+        {
+            return Err(PlasmaEventEvalError::new(
+                "evaluation receipt header model identity does not match its frozen alarm policy model binding",
+            ));
+        }
         for (digest, field) in [
             (self.shot_split_sha256.as_str(), "shot_split_sha256"),
             (self.preprocessing_sha256.as_str(), "preprocessing_sha256"),
@@ -1277,6 +1304,8 @@ mod tests {
         AlarmPolicyConfig {
             policy_id: "fixed-test-policy-v1".to_owned(),
             score_scale_id: "normalized-risk-0-1-v1".to_owned(),
+            score_min: 0.0,
+            score_max: 1.0,
             validation_receipt_sha256: "a".repeat(64),
             risk_model: RiskModelBinding {
                 model_id: "symthaea-plasma-risk".to_owned(),
@@ -1560,11 +1589,15 @@ mod tests {
         );
         assert_eq!(
             manifest["online_policy_contract"]["risk_score_contract"]["policy_config_digest_schema"],
-            "luminous.plasma-alarm-policy.v0.5"
+            "luminous.plasma-alarm-policy.v0.6"
         );
         assert_eq!(
             manifest["online_policy_contract"]["policy_config_digest_schema"],
-            "luminous.plasma-alarm-policy.v0.5"
+            "luminous.plasma-alarm-policy.v0.6"
+        );
+        assert_eq!(
+            manifest["online_policy_contract"]["score_domain"],
+            serde_json::json!({"minimum": 0.0, "maximum": 1.0, "inclusive": true})
         );
         assert_eq!(
             manifest["online_policy_contract"]["risk_score_contract"]["exact_model_and_calibration_binding_required"],
@@ -1755,6 +1788,55 @@ mod tests {
             .content_sha256()
             .expect("re-seal tampered content");
         assert!(receipt.verify().is_err());
+    }
+
+    #[test]
+    fn evaluation_receipt_header_model_must_match_policy_model_binding() {
+        let negative = score_shot_alarms(
+            "negative",
+            ShotReferenceOutcome::NonDisruptive {
+                observation_end_ns: 100,
+            },
+            &[],
+            &config(),
+        )
+        .expect("negative");
+        let args = (
+            "f".repeat(40),
+            "tokamark-v1@frozen-revision".to_owned(),
+            "a".repeat(64),
+            "b".repeat(64),
+            "symthaea-plasma-risk".to_owned(),
+            "model-rev-1".to_owned(),
+            "c".repeat(64),
+            42,
+            "cpu-x86_64-rust-1.96".to_owned(),
+            config(),
+            vec![negative.clone()],
+        );
+        let mut wrong_model = args.clone();
+        wrong_model.4 = "another-model".to_owned();
+        assert!(PlasmaEventEvaluationReceipt::build(
+            wrong_model.0, wrong_model.1, wrong_model.2, wrong_model.3,
+            wrong_model.4, wrong_model.5, wrong_model.6, wrong_model.7,
+            wrong_model.8, wrong_model.9, wrong_model.10,
+        ).is_err());
+
+        let mut wrong_revision = args.clone();
+        wrong_revision.5 = "another-revision".to_owned();
+        assert!(PlasmaEventEvaluationReceipt::build(
+            wrong_revision.0, wrong_revision.1, wrong_revision.2, wrong_revision.3,
+            wrong_revision.4, wrong_revision.5, wrong_revision.6, wrong_revision.7,
+            wrong_revision.8, wrong_revision.9, wrong_revision.10,
+        ).is_err());
+
+        let mut wrong_artifact = args;
+        wrong_artifact.6 = "d".repeat(64);
+        assert!(PlasmaEventEvaluationReceipt::build(
+            wrong_artifact.0, wrong_artifact.1, wrong_artifact.2, wrong_artifact.3,
+            wrong_artifact.4, wrong_artifact.5, wrong_artifact.6, wrong_artifact.7,
+            wrong_artifact.8, wrong_artifact.9, wrong_artifact.10,
+        ).is_err());
     }
 
     #[test]
@@ -2226,6 +2308,32 @@ mod tests {
         assert_eq!(summary.false_alarms_per_non_disruptive_shot, None);
         assert_eq!(summary.false_alarms_per_non_disruptive_hour, None);
         assert_eq!(summary.total_non_disruptive_exposure_ns, 0);
+    }
+
+    #[test]
+    fn score_domain_rejects_out_of_range_thresholds_and_uncertainty_bounds() {
+        let mut invalid_policy = config();
+        invalid_policy.trigger_threshold = 1.01;
+        assert!(invalid_policy.validate().is_err());
+        invalid_policy = config();
+        invalid_policy.score_min = 1.0;
+        assert!(invalid_policy.validate().is_err());
+
+        let (frame, requirements) =
+            observation_frame(measured_disposition(10), 10);
+        let mut policy = OnlinePlasmaAlarmPolicy::new(config()).expect("valid policy");
+        policy.reset_for_shot("shot-1").expect("shot");
+        let out_of_range = risk_evidence(&frame, 0.95, 0.9, 1.01);
+        assert!(policy
+            .update_from_frame(&frame, &requirements, Some(out_of_range))
+            .is_err());
+        assert_eq!(policy.last_window_end_ns, None);
+
+        let below_range = risk_evidence(&frame, 0.05, -0.01, 0.1);
+        assert!(policy
+            .update_from_frame(&frame, &requirements, Some(below_range))
+            .is_err());
+        assert_eq!(policy.last_window_end_ns, None);
     }
 
     #[test]
