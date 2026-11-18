@@ -191,7 +191,7 @@ Reuse the existing Symthaea falsification/power reference and open-world work ra
 
 - [Competitive landscape and SOTA positioning](COMPETITIVE_LANDSCAPE.md) — archives, exact-field geolocation, remote-sensing baselines and a matched comparison strategy.
 - [Active experiment selection](EXPERIMENT_SELECTION.md) — expected information gain, statistical power, cost, feasibility and model-misspecification safeguards.
-- [Standalone Rust reference lab](lab/README.md) — dependency-free geometry and crop-flow descriptors, explicit binary-grid/7-bit decoding, complete decoder-attempt logging, row/column-margin-preserving grid null generation, maximum-statistic calibration helper, entropy and Wilson intervals.
+- [Standalone Rust reference lab](lab/README.md) — dependency-free geometry and crop-flow descriptors, explicit binary-grid D4 × traversal × bit-order decoder family, 7-bit decoding and complete attempt logging, row/column-margin-preserving grid null generation, maximum-statistic calibration helper, entropy and Wilson intervals.
 
 The current reference crate includes crop-flow circular statistics as well as geometry and grid decoding. It preserves per-sample direction and does not force a single mean direction when the resultant is near zero.
 
