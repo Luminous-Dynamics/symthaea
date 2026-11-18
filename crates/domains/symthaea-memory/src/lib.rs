@@ -26,7 +26,8 @@ pub use coordinator::{
 };
 pub use episodic_replay::{
     Episode, EpisodicMemory, EpisodicMemoryStats, EpisodicReplayConfig, GraduationProvenance,
-    ProvenancedEpisode, ReplaySessionResult, bath_cosine_similarity,
+    PROVENANCED_EPISODE_SCHEMA_VERSION, ProvenancedEpisode, ReplaySessionResult,
+    bath_cosine_similarity,
 };
 #[allow(deprecated)]
 pub use hippocampus::{
