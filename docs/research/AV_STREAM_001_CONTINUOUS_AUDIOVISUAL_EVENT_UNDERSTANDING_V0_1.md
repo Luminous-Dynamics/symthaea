@@ -184,6 +184,12 @@ The native Symthaea lexical baseline is currently far behind established ASR. It
 
 The 2026 ASR landscape includes strong encoder/transducer and speech-language-model systems. NVIDIA's published nine-test-set comparison in its 26.10 performance documentation reports 4.78% average WER for Nemotron Transcribe FP8, 4.94% for Qwen3-ASR-1.7B and 6.66% for Whisper large-v3 under that specific protocol. Those figures are not universal WERs and should not be transplanted to South African languages or Symthaea's own cohort. They are evidence that the lexical baseline is already strong and the comparison must be matched.
 
+For **streaming** recognition, include NVIDIA Nemotron 3.5 ASR Streaming as a separate comparator: NVIDIA describes a 0.6B cache-aware FastConformer-RNNT model with a 40-language/locale profile and automatic language detection. Its language set must be checked against each South African target profile rather than inferred from the “40 languages” label. Model card: https://build.nvidia.com/nvidia/nemotron-asr-streaming/modelcard
+
+For **joint audio/video streaming**, include a current Qwen Omni Realtime API arm where terms, region and session behavior permit. Alibaba's documentation updated 2026-11-12 lists Qwen Omni Realtime models accepting text, streaming audio and visual input and returning text/audio over WebSocket, WebRTC or AOQ. Qwen's published model family also reports real-time audiovisual response capability. Treat latency and SOTA statements as vendor claims until independently reproduced under the same scenario and resource boundary. API docs: https://www.alibabacloud.com/help/en/model-studio/omni-realtime-api ; Qwen3-Omni model card: https://huggingface.co/Qwen/Qwen3-Omni-30B-A3B-Thinking
+
+Industry parity therefore requires two distinct comparisons: (1) streaming ASR quality/latency, and (2) joint audio-video perception/response. A strong ASR model is not by itself a video-understanding baseline, and an end-to-end real-time API is not a fair on-device baseline unless its server-side compute and network boundary are reported.
+
 Sources:
 - NVIDIA Speech NIM ASR performance: https://docs.nvidia.com/nim/speech/26.10.0/reference/performances/asr/performance.html
 - Open ASR Leaderboard: https://huggingface.co/spaces/hf-audio/open_asr_leaderboard (confirm the live leaderboard revision at run time)
