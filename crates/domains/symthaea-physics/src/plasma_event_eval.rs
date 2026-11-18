@@ -1042,6 +1042,14 @@ mod tests {
             PLASMA_RISK_SCORE_EVIDENCE_SCHEMA
         );
         assert_eq!(
+            manifest["online_policy_contract"]["risk_score_contract"]["threshold_scale_identity"],
+            "risk evidence score_scale_id must exactly match frozen policy score_scale_id"
+        );
+        assert_eq!(
+            manifest["online_policy_contract"]["risk_score_contract"]["policy_config_digest_schema"],
+            "luminous.plasma-alarm-policy.v0.2"
+        );
+        assert_eq!(
             manifest["online_policy_contract"]["event_labels_available_online"],
             false
         );
