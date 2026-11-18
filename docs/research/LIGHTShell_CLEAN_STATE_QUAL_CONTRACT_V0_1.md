@@ -83,6 +83,25 @@ Each repeated cycle binds:
 
 For removed-module cleaning, preserve exact removal and reinstallation inspection records. A cleaning pass does not authorize motion or return-to-service. The robot owner and safety authority remain responsible for isolation and any later operation.
 
+## Topology-linked cleanability sampling
+
+A zone-level average is not enough to establish cleanability. Residual soil can concentrate at seam allowances, overlaps, folds, fastener pockets, sensor carriers, vent lips and drainage interfaces while the accessible panel face appears clean.
+
+Use the existing pattern-topology (#12785), manufacturing-route (#12800) and as-built metrology (#12802) identities to bind an explicit set of sample-location references to each zone. Do not introduce a second geometry or sampling-location registry.
+
+For each required claim gate, freeze its required sample-location references before the first cycle. Typical locations to consider, where physically present, include:
+- accessible panel face / representative surface;
+- seam edge, seam intersection, overlap, fold or gusset root;
+- closure, attachment, fastener pocket or captive hardware interface;
+- sensor tile/carrier, cable exit or encapsulation boundary;
+- vent lip, drain path, recessed interface or other soil-retention feature.
+
+These are examples, not a universal mandatory list. The application and design owners must select locations based on the exact assembled topology and declared soil/cleaning challenge. Every reference must resolve to the exact zone's topology-owned sample map.
+
+For every required gate × zone × sample location × cleaning cycle, collect at least the declared replicate count. A missing location, unknown topology reference or insufficient replicate count makes that gate insufficient evidence. Not-applicable requires an owner and rationale; an unobserved hotspot cannot be silently excluded.
+
+Report the worst supported location-level bound for each gate and keep location-level results visible. **Do not average a clean surface result with a failed seam or fastener pocket.** The purpose is to prevent a high-performing open surface from masking a contamination trap.
+
 ## Assay controls and uncertainty
 
 Soil/cleaner-residue methods require:
@@ -157,9 +176,11 @@ Every executed cycle has a documented post-clean inspection. Unresolved residue 
 Protocol integrity targets:
 - 100% of physical cycles bind exact article generation, zone, material lot, cleaning chemistry batch, method and raw process evidence;
 - 100% of measured gates bind current calibration, LOD/LOQ, uncertainty, controls and raw-data evidence;
+- 100% of required gate/zone/topology-sample-location/cycle combinations meet the pre-registered replicate minimum;
 - 100% required gate/zone/cycle combinations meet replicate minima;
 - zero false passes on assay controls, uncertainty-boundary, stale identity, missing-data and hard-gate adversarial tests;
-- zero hidden non-passing claims behind averaged performance scores.
+- zero hidden non-passing claims behind averaged performance scores;
+- zero false acceptance when a required seam, fastener, sensor, vent or drain hotspot is omitted or under-sampled.
 
 Performance benchmarks to publish:
 - residual-soil fraction by soil class and zone vs cycle count;
@@ -184,4 +205,4 @@ An admitted record supports only application-specific non-microbiological soil-r
 
 ## Proposed fixture status
 
-The accompanying fixture is synthetic and proposed-only. It declares a required cycle horizon of three, defines three planned cleaning cycles and two required claim gates, and contains zero executed runs, inspections or measurements. All identities, chemistry, limits and method references are synthetic placeholders. They are not product requirements or physical results.
+The accompanying fixture is synthetic and proposed-only. It declares a required cycle horizon of three, defines three planned cleaning cycles, two required claim gates and three topology-linked sample locations (surface center, seam edge and fastener pocket), and contains zero executed runs, inspections or measurements. All identities, chemistry, limits and method references are synthetic placeholders. They are not product requirements or physical results.
