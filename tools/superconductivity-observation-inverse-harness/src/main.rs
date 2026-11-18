@@ -396,12 +396,12 @@ mod tests {
     #[test]
     fn holdout_modality_cannot_appear_in_calibration() {
         let (_, mut fixture) = inputs();
-        fixture["split"]["calibration_observation_ids"] = json!([
-            "obs-amplitude-001",
-            "obs-heat-capacity-001",
-            "obs-vorticity-001"
-        ]);
-        fixture["split"]["heldout_observation_ids"] = json!([]);
+        fixture["observations"][2]["modality"] =
+            json!("heat_capacity");
+        fixture["split"]["calibration_observation_ids"] =
+            json!(["obs-amplitude-001", "obs-vorticity-001"]);
+        fixture["split"]["heldout_observation_ids"] =
+            json!(["obs-heat-capacity-001"]);
         assert!(audit_mutated(fixture).is_err());
     }
 
