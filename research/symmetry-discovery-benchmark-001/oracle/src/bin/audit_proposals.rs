@@ -67,6 +67,9 @@ struct CaseAuditV1 {
     exact_subgroup_match: Option<bool>,
     proposal_audit: Option<SubgroupProposalAuditV1>,
     group_distribution: Option<BTreeMap<String, f64>>,
+    target_subgroup_probability_mass: Option<f64>,
+    outside_subgroup_probability_mass: Option<f64>,
+    group_distribution_entropy_nats: Option<f64>,
     wasserstein_1_d4_word_metric: Option<f64>,
 }
 
@@ -80,6 +83,8 @@ struct SummaryV1 {
     missed_symmetries: usize,
     invalid_group_proposals: usize,
     distribution_cases: usize,
+    mean_target_subgroup_probability_mass: Option<f64>,
+    mean_group_distribution_entropy_nats: Option<f64>,
     mean_wasserstein_1_d4_word_metric: Option<f64>,
 }
 
@@ -433,6 +438,8 @@ fn run(submission: SubmissionV1) -> Result<AuditReportV1, String> {
     let mut missed_symmetries = 0usize;
     let mut invalid_group_proposals = 0usize;
     let mut distribution_cases = 0usize;
+    let mut target_mass_sum = 0.0_f64;
+    let mut entropy_sum = 0.0_f64;
     let mut wasserstein_sum = 0.0_f64;
 
     for case_id in &expected_case_ids {
@@ -458,25 +465,38 @@ fn run(submission: SubmissionV1) -> Result<AuditReportV1, String> {
                 proposed.sort();
                 let exact_subgroup_match = proposed == exact_stabilizer;
                 exact_subgroup_matches += if exact_subgroup_match { 1 } else { 0 };
-                let wasserstein_1 = if let Some(distribution) = &prediction.group_distribution {
-                    let distribution_ids: BTreeSet<String> =
-                        distribution.keys().cloned().collect();
-                    if distribution_ids != ambient_ids {
-                        return Err(format!(
-                            "case {case_id} group_distribution keys do not match the D4 ambient group"
-                        ));
-                    }
-                    distribution_cases += 1;
-                    let score = wasserstein_1_d4(
-                        distribution,
-                        &exact_stabilizer,
-                        &word_metric,
-                    )?;
-                    wasserstein_sum += score;
-                    Some(score)
-                } else {
-                    None
-                };
+                let (target_mass, outside_mass, entropy, wasserstein_1) =
+                    if let Some(distribution) = &prediction.group_distribution {
+                        let distribution_ids: BTreeSet<String> =
+                            distribution.keys().cloned().collect();
+                        if distribution_ids != ambient_ids {
+                            return Err(format!(
+                                "case {case_id} group_distribution keys do not match the D4 ambient group"
+                            ));
+                        }
+                        distribution_cases += 1;
+                        let target_mass = exact_stabilizer
+                            .iter()
+                            .map(|element_id| distribution[element_id])
+                            .sum::<f64>();
+                        let outside_mass = (1.0 - target_mass).max(0.0);
+                        let entropy = distribution
+                            .values()
+                            .filter(|mass| **mass > 0.0)
+                            .map(|mass| -mass * mass.ln())
+                            .sum::<f64>();
+                        let score = wasserstein_1_d4(
+                            distribution,
+                            &exact_stabilizer,
+                            &word_metric,
+                        )?;
+                        target_mass_sum += target_mass;
+                        entropy_sum += entropy;
+                        wasserstein_sum += score;
+                        (Some(target_mass), Some(outside_mass), Some(entropy), Some(score))
+                    } else {
+                        (None, None, None, None)
+                    };
                 cases.push(CaseAuditV1 {
                     case_id: case_id.clone(),
                     disposition: DispositionV1::Predicted,
@@ -485,6 +505,9 @@ fn run(submission: SubmissionV1) -> Result<AuditReportV1, String> {
                     exact_subgroup_match: Some(exact_subgroup_match),
                     proposal_audit: Some(audit),
                     group_distribution: prediction.group_distribution.clone(),
+                    target_subgroup_probability_mass: target_mass,
+                    outside_subgroup_probability_mass: outside_mass,
+                    group_distribution_entropy_nats: entropy,
                     wasserstein_1_d4_word_metric: wasserstein_1,
                 });
             }
@@ -498,6 +521,9 @@ fn run(submission: SubmissionV1) -> Result<AuditReportV1, String> {
                     exact_subgroup_match: None,
                     proposal_audit: None,
                     group_distribution: None,
+                    target_subgroup_probability_mass: None,
+                    outside_subgroup_probability_mass: None,
+                    group_distribution_entropy_nats: None,
                     wasserstein_1_d4_word_metric: None,
                 });
             }
@@ -520,6 +546,16 @@ fn run(submission: SubmissionV1) -> Result<AuditReportV1, String> {
             missed_symmetries,
             invalid_group_proposals,
             distribution_cases,
+            mean_target_subgroup_probability_mass: if distribution_cases == 0 {
+                None
+            } else {
+                Some(target_mass_sum / distribution_cases as f64)
+            },
+            mean_group_distribution_entropy_nats: if distribution_cases == 0 {
+                None
+            } else {
+                Some(entropy_sum / distribution_cases as f64)
+            },
             mean_wasserstein_1_d4_word_metric: if distribution_cases == 0 {
                 None
             } else {
@@ -628,6 +664,34 @@ mod tests {
         assert_eq!(report.summary.distribution_cases, 299);
         assert_eq!(
             report.summary.mean_wasserstein_1_d4_word_metric,
+            Some(0.0)
+        );
+    }
+
+    #[test]
+    fn distribution_report_separates_target_mass_entropy_and_transport() {
+        let report = run(smoke_submission()).unwrap();
+        assert_eq!(
+            report.summary.mean_target_subgroup_probability_mass,
+            Some(1.0)
+        );
+        assert!(
+            report
+                .summary
+                .mean_group_distribution_entropy_nats
+                .unwrap()
+                .is_finite()
+        );
+        assert_eq!(
+            report.cases[0].target_subgroup_probability_mass,
+            Some(1.0)
+        );
+        assert_eq!(
+            report.cases[0].outside_subgroup_probability_mass,
+            Some(0.0)
+        );
+        assert_eq!(
+            report.cases[0].wasserstein_1_d4_word_metric,
             Some(0.0)
         );
     }
