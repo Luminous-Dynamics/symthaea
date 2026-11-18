@@ -1003,7 +1003,7 @@ pub fn summarize_alarm_evaluations(
             let expected_false_alarms = evaluation
                 .alarm_times_ns
                 .len()
-                .saturating_sub(usize::from(expected_lead_time_ns.is_some()));
+                .saturating_sub(if expected_lead_time_ns.is_some() { 1 } else { 0 });
             if evaluation.false_alarm_events != expected_false_alarms {
                 return Err(PlasmaEventEvalError::new(
                     "disruptive shot false-alarm count does not match alarm episodes outside the single matched warning",
