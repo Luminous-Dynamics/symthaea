@@ -170,7 +170,21 @@ Primary endpoints must be declared in advance. Secondary endpoints include histo
 
 No field result is qualified by software-only tests. Independent laboratory replication is mandatory before generalizing across formations.
 
-## 3. Baselines and industry comparison
+## 3. Direct geometry-grammar baseline: CCAT
+
+Use the attributed [CCAT Zeals Knoll 2026 fixture](datasets/ccat-zeals-knoll-2026/README.md) and [replication protocol](CCAT_REPLICATION.md) as a first fixed-input reference.
+
+Separate:
+- **Exact descriptive replay:** match source-defined five-class quantile-initialized k-means, five radial bands, arithmetic-mean centre, 45-pixel absolute tangent-gap contact threshold and centred motif counting. Report discrepancies.
+- **Pipeline-level null evaluation:** repeat every selected preprocessing and model-selection step inside each null replicate. Do not freeze a post-hoc selected graph or label assignment while testing only one downstream statistic.
+- **Within-event transductive masking:** report as a separate diagnostic track, not event-held-out generalization.
+- **Event-held-out evaluation:** split by formation, not circle/image. All photographs/derivatives of one event remain in one partition.
+- **Independent digitization:** if source imagery rights permit, compare at least two independent circle annotations and propagate centre/radius uncertainty.
+- **Causal/semantic claims:** geometric grammar remains a geometry claim; authorship, mechanism and semantic payload require separate evidence.
+
+The source CCAT result is useful but single-event. Its radial baseline had higher mean accuracy than the pair/motif model, while the latter had higher macro-F1 and improved minority-class/anchor recovery. Use both metrics and per-class performance; do not promote one aggregate score.
+
+## 4. Baselines and industry comparison
 
 The initial competitive landscape is fragmented; no recognized standardized crop-formation leaderboard was found in the public research reviewed for this programme.
 
