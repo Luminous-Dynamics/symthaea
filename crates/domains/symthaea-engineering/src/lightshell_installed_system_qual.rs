@@ -1124,7 +1124,7 @@ mod tests {
     fn installed_run_must_bind_exact_garment_digest() {
         let mut manifest = base_manifest();
         make_measured(&mut manifest);
-        manifest["runs"][1]["installed_garment_digest"] = json!(format!("sha256:{}", "9".repeat(64)));
+        manifest["runs"][1]["cover_digest"] = json!(format!("sha256:{}", "9".repeat(64)));
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|f| f.code == "installed_run_garment_digest_mismatch"));
     }
@@ -1154,6 +1154,40 @@ mod tests {
         manifest["runs"].as_array_mut().unwrap().retain(|run| run["condition"] != "baseline_uncovered" || run["gate_id"] != "GATE-AIRFLOW");
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert_eq!(report.gate_assessments.iter().find(|g| g.gate_id == "GATE-AIRFLOW").unwrap().disposition, "insufficient_evidence");
+    }
+
+    #[test]
+    fn incumbent_cover_is_a_valid_matched_control_condition() {
+        let mut manifest = base_manifest();
+        make_measured(&mut manifest);
+        manifest["gates"][1]["comparison_control"] = json!("incumbent_cover");
+        manifest["runs"][2]["condition"] = json!("incumbent_cover");
+        manifest["runs"][2]["cover_digest"] = json!(format!("sha256:{}", "f".repeat(64)));
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.is_valid(), "{:?}", report.findings);
+        let current = report.gate_assessments.iter().find(|g| g.gate_id == "GATE-CURRENT").unwrap();
+        assert_eq!(current.disposition, "pass");
+        assert_eq!(current.paired_comparison_count, 1);
+    }
+
+    #[test]
+    fn incumbent_cover_run_must_match_exact_comparator_digest() {
+        let mut manifest = base_manifest();
+        make_measured(&mut manifest);
+        manifest["gates"][1]["comparison_control"] = json!("incumbent_cover");
+        manifest["runs"][2]["condition"] = json!("incumbent_cover");
+        manifest["runs"][2]["cover_digest"] = json!(format!("sha256:{}", "9".repeat(64)));
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "incumbent_run_cover_digest_mismatch"));
+    }
+
+    #[test]
+    fn incumbent_comparison_requires_exact_product_session_and_digest() {
+        let mut manifest = base_manifest();
+        manifest["gates"][1]["comparison_control"] = json!("incumbent_cover");
+        manifest["baseline_context"]["incumbent_cover_digest"] = json!(null);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "incumbent_comparator_binding_missing"));
     }
 
     #[test]
