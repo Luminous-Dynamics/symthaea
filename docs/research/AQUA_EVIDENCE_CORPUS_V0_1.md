@@ -1,8 +1,8 @@
 # Luminous Aqua — Evidence Corpus v0.1
 
 **Snapshot:** 2026-11-18  
-**Entries:** 11  
-**Claims:** 55
+**Entries:** 13  
+**Claims:** 67
 
 > Source-classified evidence register. Manufacturer declarations, standards/programme criteria, local installation references, independent market samples and peer-reviewed results are kept distinct. Values marked unknown have not been inferred. This corpus is not a product certification or evidence of Aqua performance.
 
@@ -360,6 +360,9 @@
 | `uk.etl.showers.maximum-flow.ubf` | maximum_rated_flow | 10.6 L/min | standard_or_programme_criterion | declared | mode=Shower head / shower valve / shower system; with UBF; method=UK ETL Showers section 1.3.2; unknown: exact UWL test output for a selected commercial product, product-specific test report; Non-domestic ETL eligibility criterion. UBF means user-behaviour feature. | context_only: Higher maximum flow allowance is conditional on defined user-behaviour features; it is not a blanket efficiency advantage. | [UK Department for Energy Security and Net Zero — Energy Technology List](https://etl.energysecurity.gov.uk/products/showers/showers); official_standard_or_programme; date not stated |
 | `uk.etl.showers.pressure-independence.minimum-flow` | minimum_flow_fraction | 60 % of rated maximum | standard_or_programme_criterion | declared | mode=Same exact shower product category and declared configuration; pressure points=150, 300 kPa; method=UK ETL Showers section 1.4.3.2; Unified Water Label scheme January 2023; datum=3 bar reference and 1.5 bar lower pressure; unknown: product-specific specimen result, test uncertainty and sample size for a chosen model, exact UWL test report; Only applies where 3 bar reference flow is <=8.0 L/min and the non-domestic ETL category applies. | eligible_as_matched_test_reference: Useful 1.5 bar / 3 bar pressure-independence comparator only when the ETL product, reference-flow and Unified Water Label method conditions apply. | [UK Department for Energy Security and Net Zero — Energy Technology List](https://etl.energysecurity.gov.uk/products/showers/showers); official_standard_or_programme; date not stated |
 | `uk.etl.showers.spray-coverage.method` | spray_coverage_criteria | Spray coverage tested using the Unified Water Label procedure published January 2023. | standard_or_programme_criterion | declared | mode=Shower heads and shower systems; method=UK ETL Showers section 1.4.3.3; Unified Water Label scheme January 2023; unknown: individual product spray-coverage outcome, complete test report for selected SKU; Use the scheme's controlled method; the ETL summary page does not reproduce all UWL procedures. | context_only: A standards/method reference, not evidence that any particular product passed the spray-coverage procedure. | [UK Department for Energy Security and Net Zero — Energy Technology List](https://etl.energysecurity.gov.uk/products/showers/showers); official_standard_or_programme; date not stated |
+| `uk.etl.electric.maximum-flow.standard` | maximum_rated_flow | 4.5 L/min | standard_or_programme_criterion | declared | mode=Standard maximum available flow for electric showers; method=UK ETL Showers criteria section 1.3.2; updated 15 September 2026; unknown: product-specific test report, whole-system energy result for any Aqua implementation; Non-domestic UK ETL pathway. The 9 L/min allowance requires power modulation, stable output temperature and ETL-compliant wastewater heat recovery; 10.6 L/min additionally requires UBF. | context_only: Current non-domestic electric-shower programme pathway; not South African law, domestic certification or evidence of Aqua performance. | [UK Department for Energy Security and Net Zero — Energy Technology List](https://etl.energysecurity.gov.uk/products/showers/showers); official_standard_or_programme; date not stated |
+| `uk.etl.electric.maximum-flow.with-dwhr` | maximum_rated_flow | 9 L/min | standard_or_programme_criterion | declared | mode=Maximum available flow where electric input is modulated to minimize electricity and maintain stable output temperature with ETL-compliant wastewater heat recovery; method=UK ETL Showers criteria section 1.3.2; updated 15 September 2026; unknown: product-specific test report, whole-system energy result for any Aqua implementation; Non-domestic UK ETL pathway. The 9 L/min allowance requires power modulation, stable output temperature and ETL-compliant wastewater heat recovery; 10.6 L/min additionally requires UBF. | eligible_as_matched_test_reference: Current non-domestic electric-shower programme pathway; not South African law, domestic certification or evidence of Aqua performance. | [UK Department for Energy Security and Net Zero — Energy Technology List](https://etl.energysecurity.gov.uk/products/showers/showers); official_standard_or_programme; date not stated |
+| `uk.etl.electric.maximum-flow.with-dwhr-and-ubf` | maximum_rated_flow | 10.6 L/min | standard_or_programme_criterion | declared | mode=Maximum available flow where the qualifying DWHR/power-modulation pathway also includes user-behaviour features; method=UK ETL Showers criteria section 1.3.2; updated 15 September 2026; unknown: product-specific test report, whole-system energy result for any Aqua implementation; Non-domestic UK ETL pathway. The 9 L/min allowance requires power modulation, stable output temperature and ETL-compliant wastewater heat recovery; 10.6 L/min additionally requires UBF. | eligible_as_matched_test_reference: Current non-domestic electric-shower programme pathway; not South African law, domestic certification or evidence of Aqua performance. | [UK Department for Energy Security and Net Zero — Energy Technology List](https://etl.energysecurity.gov.uk/products/showers/showers); official_standard_or_programme; date not stated |
 
 **Limitations — `uk.etl.showers.maximum-flow.no-ubf`:**
 - Not a South African legal limit or a domestic product certification.
@@ -376,6 +379,87 @@
 
 **Limitations — `uk.etl.showers.spray-coverage.method`:**
 - Aqua's spatial deposition map remains supplementary and is not a substitute for the UWL method.
+
+**Limitations — `uk.etl.electric.maximum-flow.standard`:**
+- Programme ceiling / eligibility condition, not a measured product result or guaranteed useful-task flow.
+- Do not apply the 9 L/min pathway without compliant wastewater heat recovery, power modulation and stable output temperature.
+
+**Limitations — `uk.etl.electric.maximum-flow.with-dwhr`:**
+- Programme ceiling / eligibility condition, not a measured product result or guaranteed useful-task flow.
+- Do not apply the 9 L/min pathway without compliant wastewater heat recovery, power modulation and stable output temperature.
+
+**Limitations — `uk.etl.electric.maximum-flow.with-dwhr-and-ubf`:**
+- Programme ceiling / eligibility condition, not a measured product result or guaranteed useful-task flow.
+- Do not apply the 9 L/min pathway without compliant wastewater heat recovery, power modulation and stable output temperature.
+- The 10.6 L/min pathway additionally requires a qualifying user-behaviour feature.
+
+## In situ experimental and theoretical studies of the performance and the fouling impact of shower greywater heat recovery systems
+
+- **Entry ID:** `shower-dwhr-fouling-study-2025`
+- **Subject type:** research_study
+- **Manufacturer / publisher:** Not applicable / not stated
+- **SKU:** Not applicable / not stated
+- **Market:** 14-month in-situ commercial shower DWHR study
+- **Revision:** Energy and Buildings 331 (2025), 115341
+
+| Claim ID | Parameter | Canonical value | Evidence class | Result class | Conditions / unknowns | Comparison status | Source |
+|---|---|---|---|---|---|---|---|
+| `dhwr.2025.field-duration` | field_study_duration | 14 months | peer_reviewed_study_result | measured | mode=Study-specific shower DWHR configuration; task=Domestic hot-water / shower service; method=Study-specific in-situ measurement and/or validated model; unknown: full rig and site conditions must be taken from the paper, not transferable to another climate, topology or exchanger; The article highlights a 14-month in-situ study. | context_only: Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee. | [Bouvenot and Beaudet, Energy and Buildings](https://doi.org/10.1016/j.enbuild.2025.115341); peer_reviewed_article; 2025-03-15 |
+| `dhwr.2025.overall-exchanger-efficiency` | overall_heat_exchanger_efficiency | 66 % | peer_reviewed_study_result | measured | mode=Study-specific shower DWHR configuration; task=Domestic hot-water / shower service; method=Study-specific in-situ measurement and/or validated model; unknown: full rig and site conditions must be taken from the paper, not transferable to another climate, topology or exchanger; Study-specific overall exchanger efficiency including fouling and unsteady effects. | context_only: Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee. | [Bouvenot and Beaudet, Energy and Buildings](https://doi.org/10.1016/j.enbuild.2025.115341); peer_reviewed_article; 2025-03-15 |
+| `dhwr.2025.fouling-reduction` | fouling_nominal_efficiency_reduction | 8 % | peer_reviewed_study_result | measured | mode=Study-specific shower DWHR configuration; task=Domestic hot-water / shower service; method=Study-specific in-situ measurement and/or validated model; unknown: full rig and site conditions must be taken from the paper, not transferable to another climate, topology or exchanger; The paper reports a fouling-related reduction in nominal exchanger efficiency. | context_only: Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee. | [Bouvenot and Beaudet, Energy and Buildings](https://doi.org/10.1016/j.enbuild.2025.115341); peer_reviewed_article; 2025-03-15 |
+| `dhwr.2025.overall-system-efficiency` | overall_dhwr_system_efficiency | 52 % | peer_reviewed_study_result | measured | mode=Study-specific shower DWHR configuration; task=Domestic hot-water / shower service; method=Study-specific in-situ measurement and/or validated model; unknown: full rig and site conditions must be taken from the paper, not transferable to another climate, topology or exchanger; Study-specific system efficiency includes heat losses from showerhead to drain. | context_only: Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee. | [Bouvenot and Beaudet, Energy and Buildings](https://doi.org/10.1016/j.enbuild.2025.115341); peer_reviewed_article; 2025-03-15 |
+
+**Limitations — `dhwr.2025.field-duration`:**
+- Do not transfer the numerical result to an Aqua design without matched whole-system testing.
+- Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary.
+
+**Limitations — `dhwr.2025.overall-exchanger-efficiency`:**
+- Do not transfer the numerical result to an Aqua design without matched whole-system testing.
+- Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary.
+
+**Limitations — `dhwr.2025.fouling-reduction`:**
+- Do not transfer the numerical result to an Aqua design without matched whole-system testing.
+- Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary.
+
+**Limitations — `dhwr.2025.overall-system-efficiency`:**
+- Do not transfer the numerical result to an Aqua design without matched whole-system testing.
+- Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary.
+
+## Optimal coupling of shower drain water heat recovery systems with domestic electrical and heat pump storage water heaters
+
+- **Entry ID:** `shower-dhwr-system-coupling-study-2026`
+- **Subject type:** research_study
+- **Manufacturer / publisher:** Not applicable / not stated
+- **SKU:** Not applicable / not stated
+- **Market:** Study-specific domestic hot-water systems
+- **Revision:** Energy and Buildings 368 (2026), 117761; published 1 October 2026
+
+| Claim ID | Parameter | Canonical value | Evidence class | Result class | Conditions / unknowns | Comparison status | Source |
+|---|---|---|---|---|---|---|---|
+| `dhwr.2026.global-cop-experimental` | global_dhw_cop | 6.3 COP | peer_reviewed_study_result | measured | mode=Study-specific shower DWHR configuration; task=Domestic hot-water / shower service; method=Study-specific in-situ measurement and/or validated model; unknown: full rig and site conditions must be taken from the paper, not transferable to another climate, topology or exchanger; Study-reported experimental best-case global DHW COP; configuration and boundary are paper-specific. | context_only: Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee. | [Bouvenot and Beaudet, Energy and Buildings](https://doi.org/10.1016/j.enbuild.2026.117761); peer_reviewed_article; 2026-10-01 |
+| `dhwr.2026.global-cop-simulation` | global_dhw_cop | 8 COP | peer_reviewed_study_result | modelled | mode=Study-specific shower DWHR configuration; task=Domestic hot-water / shower service; method=Study-specific in-situ measurement and/or validated model; unknown: full rig and site conditions must be taken from the paper, not transferable to another climate, topology or exchanger; Study-reported simulated result, not a measured field result. | context_only: Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee. | [Bouvenot and Beaudet, Energy and Buildings](https://doi.org/10.1016/j.enbuild.2026.117761); peer_reviewed_article; 2026-10-01 |
+| `dhwr.2026.heat-pump-cop-penalty` | heat_pump_cop_reduction | 15 % | peer_reviewed_study_result | measured | mode=Study-specific shower DWHR configuration; task=Domestic hot-water / shower service; method=Study-specific in-situ measurement and/or validated model; unknown: full rig and site conditions must be taken from the paper, not transferable to another climate, topology or exchanger; 15% is the lower endpoint of a reported 15–20% effect in some configurations, not a universal penalty. | context_only: Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee. | [Bouvenot and Beaudet, Energy and Buildings](https://doi.org/10.1016/j.enbuild.2026.117761); peer_reviewed_article; 2026-10-01 |
+| `dhwr.2026.best-coupling-topology` | preferred_dhwr_coupling_topology | Unbalanced DWHR connected to the shower mixer performed best in the tested overall system configurations. | peer_reviewed_study_result | measured | mode=Study-specific heat-pump/storage and DWHR topologies; task=Shower DHW service; method=Study-specific validated numerical/experimental model; unknown: not transferable without matched topology/system testing; The best overall system topology was not necessarily the topology with the highest component recovery efficiency. | context_only: Study-specific whole-system topology finding; not a universal ranking or Aqua result. | [Bouvenot and Beaudet, Energy and Buildings](https://doi.org/10.1016/j.enbuild.2026.117761); peer_reviewed_article; 2026-10-01 |
+| `dhwr.2026.model-validation` | model_validation_cv_rmse | 7 % | peer_reviewed_study_result | measured | mode=Study-specific shower DWHR configuration; task=Domestic hot-water / shower service; method=Study-specific in-situ measurement and/or validated model; unknown: full rig and site conditions must be taken from the paper, not transferable to another climate, topology or exchanger; Study-reported model validation result; not Aqua model accuracy. | context_only: Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee. | [Bouvenot and Beaudet, Energy and Buildings](https://doi.org/10.1016/j.enbuild.2026.117761); peer_reviewed_article; 2026-10-01 |
+
+**Limitations — `dhwr.2026.global-cop-experimental`:**
+- Do not transfer the numerical result to an Aqua design without matched whole-system testing.
+- Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary.
+
+**Limitations — `dhwr.2026.global-cop-simulation`:**
+- Do not transfer the numerical result to an Aqua design without matched whole-system testing.
+- Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary.
+
+**Limitations — `dhwr.2026.heat-pump-cop-penalty`:**
+- Do not transfer the numerical result to an Aqua design without matched whole-system testing.
+- Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary.
+
+**Limitations — `dhwr.2026.best-coupling-topology`:**
+- Do not assume mixer-side DWHR always wins; receiver, storage, standby and dynamic losses matter.
+
+**Limitations — `dhwr.2026.model-validation`:**
+- Do not transfer the numerical result to an Aqua design without matched whole-system testing.
+- Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary.
 
 ---
 
