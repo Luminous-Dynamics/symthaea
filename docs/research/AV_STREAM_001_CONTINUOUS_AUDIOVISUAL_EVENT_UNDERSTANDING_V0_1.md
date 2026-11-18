@@ -205,7 +205,7 @@ Benchmark suites are complementary. Report their native protocol and do not blen
 |---|---|---|
 | OmniEchoBench / OmniEcho (2026) | Spatial audio-visual perception and sound-guided navigation; 197 real scenes, 2,972 QA pairs and 900 navigation samples in the paper | Primary spatial audiovisual grounding anchor |
 | Video-MME-v2 (2026) | Robustness/faithfulness, visual aggregation, temporal modeling and multimodal reasoning | Offline long-video robustness anchor; not online latency evidence |
-| EgoSchema | 3-minute egocentric video QA over 5,000+ curated questions | Long-horizon event/memory anchor |
+| StreamingBench | Streaming-video evaluation across 18 tasks, 900 videos and 4,500 QA pairs, with questions introduced at multiple points in each stream | Direct online-causality anchor; re-run current models because the published leaderboard is dated 2024–2025 |\n| EgoSchema | 3-minute egocentric video QA over 5,000+ curated questions | Long-horizon event/memory anchor |
 | DCASE 2026 Task 3 | Semantic acoustic imaging and sound-event localization/detection from spatial audio and audiovisual scenes | Audio event/localization and audiovisual comparison |
 | LOCATA | Multi-array/moving-source localization with tracking ground truth | Spatial audio localization/temporal tracking |
 | Video-MME (CVPR 2025) | Broad short-to-long video analysis with audio/subtitle ablations | Established video baseline |
@@ -215,7 +215,7 @@ Benchmark suites are complementary. Report their native protocol and do not blen
 Research references:
 - OmniEcho: https://arxiv.org/abs/2609.23407
 - Video-MME-v2: https://arxiv.org/abs/2604.05015
-- EgoSchema: https://egoschema.github.io/
+- StreamingBench: https://streamingbench.github.io/\n- EgoSchema: https://egoschema.github.io/
 - DCASE 2026 Task 3: https://dcase.community/challenge2026/task-semantic-acoustic-imaging-for-sound-event-localization-and-detection-from-spatial-audio-and-audiovisual-scenes
 - LOCATA: https://www.locata.lms.tf.fau.de/datasets/
 - Video-MME: https://video-mme.github.io/
