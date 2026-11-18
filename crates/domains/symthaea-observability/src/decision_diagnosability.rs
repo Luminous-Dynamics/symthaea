@@ -156,11 +156,6 @@ impl DiagnosabilityModel {
                 "at least two distinct decision classes are required",
             ));
         }
-        if self.sensors.len() > MAX_EXACT_SENSOR_COUNT {
-            return Err(DiagnosabilityError::new(format!(
-                "exact sensor enumeration supports at most {MAX_EXACT_SENSOR_COUNT} sensors",
-            )));
-        }
 
         let mut sensor_ids = BTreeSet::new();
         for sensor in &self.sensors {
@@ -290,6 +285,7 @@ impl DiagnosabilityModel {
         &self,
     ) -> Result<Vec<SensorSet>, DiagnosabilityError> {
         self.validate()?;
+        self.validate_exact_enumeration(self.sensors.len())?;
         let sensor_ids = self.sorted_sensor_ids();
         let mut minimal = Vec::<Vec<String>>::new();
 
@@ -319,6 +315,7 @@ impl DiagnosabilityModel {
         baseline_active_ids: &[&str],
     ) -> Result<Vec<SensorCutSet>, DiagnosabilityError> {
         let baseline = self.canonical_baseline(baseline_active_ids)?;
+        self.validate_exact_enumeration(baseline.len())?;
         let baseline_refs: Vec<&str> = baseline.iter().map(String::as_str).collect();
         if !self.diagnose(&baseline_refs)?.diagnosable {
             return Err(DiagnosabilityError::new(
@@ -360,6 +357,7 @@ impl DiagnosabilityModel {
         baseline_active_ids: &[&str],
     ) -> Result<Vec<CommonModeCutSet>, DiagnosabilityError> {
         let baseline = self.canonical_baseline(baseline_active_ids)?;
+        self.validate_exact_enumeration(baseline.len())?;
         let baseline_refs: Vec<&str> = baseline.iter().map(String::as_str).collect();
         if !self.diagnose(&baseline_refs)?.diagnosable {
             return Err(DiagnosabilityError::new(
@@ -413,6 +411,18 @@ impl DiagnosabilityModel {
                 lost_common_mode_groups,
             })
             .collect())
+    }
+
+    fn validate_exact_enumeration(
+        &self,
+        count: usize,
+    ) -> Result<(), DiagnosabilityError> {
+        if count > MAX_EXACT_SENSOR_COUNT {
+            return Err(DiagnosabilityError::new(format!(
+                "exact subset enumeration supports at most {MAX_EXACT_SENSOR_COUNT} items",
+            )));
+        }
+        Ok(())
     }
 
     fn sorted_sensor_ids(&self) -> Vec<String> {
@@ -707,6 +717,26 @@ mod tests {
                 .is_err(),
             "an undiagnosable baseline must not produce cut sets"
         );
+    }
+
+    #[test]
+    fn diagnosis_scales_beyond_the_exact_subset_search_bound() {
+        let mut model = fixture();
+        let template = model.sensors[0].clone();
+        let additional = MAX_EXACT_SENSOR_COUNT + 1 - model.sensors.len();
+        for index in 0..additional {
+            let mut extra = template.clone();
+            extra.sensor_id = format!("extra-{index:02}");
+            extra.common_mode_group = format!("extra-group-{index:02}");
+            model.sensors.push(extra);
+        }
+        let active: Vec<&str> = model
+            .sensors
+            .iter()
+            .map(|sensor| sensor.sensor_id.as_str())
+            .collect();
+        assert!(model.diagnose(&active).expect("diagnose large set").diagnosable);
+        assert!(model.minimal_sufficient_sensor_sets().is_err());
     }
 
     #[test]
