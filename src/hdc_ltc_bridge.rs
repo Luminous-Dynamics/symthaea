@@ -31,8 +31,8 @@ use serde::{Deserialize, Serialize};
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::hdc_ltc_unified::{
-    HdcLtcUnifiedNetwork, NetworkStateSnapshot, UnifiedActivation, UnifiedConfig,
-    UnifiedNetworkConfig,
+    HdcLtcUnifiedNetwork, NetworkStateRestoreError, NetworkStateSnapshot, UnifiedActivation,
+    UnifiedConfig, UnifiedNetworkConfig,
 };
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
@@ -844,8 +844,29 @@ impl HdcLtcBridge {
     }
 
     /// Restore evolution state captured by [`snapshot_evolution_state`].
+    ///
+    /// This legacy best-effort method is retained for backwards compatibility.
+    /// It can silently skip incompatible snapshot entries; use
+    /// [`try_restore_evolution_state`] for counterfactual isolation, episode
+    /// forks, and other callers that require all-or-nothing restoration.
     pub fn restore_evolution_state(&mut self, snap: &NetworkStateSnapshot) {
         self.network.restore_state_from(snap);
+    }
+
+    /// Restore recurrent evolution state with complete validation before mutation.
+    ///
+    /// Unlike [`restore_evolution_state`], this method rejects incompatible
+    /// layer topology, vector dimensions, cardinalities, or non-finite state
+    /// without partially changing the live network.
+    ///
+    /// This is an in-memory episode-state operation, not a durable checkpoint.
+    /// It does not bind the snapshot to learned parameters or optimizer state;
+    /// use the HDC-R2 learner snapshot contract for complete learner persistence.
+    pub fn try_restore_evolution_state(
+        &mut self,
+        snap: &NetworkStateSnapshot,
+    ) -> std::result::Result<(), NetworkStateRestoreError> {
+        self.network.try_restore_state_from(snap)
     }
 
     /// Inject state into the network (matches CfCNetwork::inject)
@@ -1014,6 +1035,63 @@ pub struct HdcLtcBridgeStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn strict_bridge_restore_round_trips_recurrent_evolution_state() {
+        let config = HdcLtcBridgeConfig {
+            input_dim: 8,
+            output_dim: 8,
+            layer_sizes: vec![2, 3, 1],
+            hdc_dim: 256,
+            seed: 31,
+            ..Default::default()
+        };
+        let mut bridge = HdcLtcBridge::new(config);
+        let input = Array1::from_vec(vec![0.25; 8]);
+        bridge.step(&input, 0.02).unwrap();
+
+        let expected = bridge.snapshot_evolution_state();
+        bridge.step(&input, 0.07).unwrap();
+        bridge.try_restore_evolution_state(&expected).unwrap();
+
+        let restored = bridge.snapshot_evolution_state();
+        assert!(
+            expected.approx_eq(&restored, 1e-7),
+            "strict bridge restore did not restore recurrent state and clocks"
+        );
+    }
+
+    #[test]
+    fn strict_bridge_restore_rejects_same_total_different_topology_atomically() {
+        let source_config = HdcLtcBridgeConfig {
+            input_dim: 8,
+            output_dim: 8,
+            layer_sizes: vec![2, 3, 1],
+            hdc_dim: 256,
+            seed: 41,
+            ..Default::default()
+        };
+        let target_config = HdcLtcBridgeConfig {
+            layer_sizes: vec![3, 2, 1],
+            seed: 41,
+            ..source_config.clone()
+        };
+        let source = HdcLtcBridge::new(source_config);
+        let mut target = HdcLtcBridge::new(target_config);
+
+        let incompatible = source.snapshot_evolution_state();
+        let before = target.snapshot_evolution_state();
+        assert_eq!(
+            target.try_restore_evolution_state(&incompatible),
+            Err(NetworkStateRestoreError::LayerShapeMismatch)
+        );
+
+        let after = target.snapshot_evolution_state();
+        assert!(
+            before.approx_eq(&after, 0.0),
+            "rejected bridge restore mutated recurrent evolution state"
+        );
+    }
 
     /// The d^-1.9 bind-chain annihilation (probe_signal_scale, 2026-07-18)
     /// must never silently return: after real steps on a unit-norm input, the
