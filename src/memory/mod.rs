@@ -35,7 +35,8 @@ pub mod semantic_memory {
 
 // Re-export key types
 pub use episodic_replay::{
-    Episode, EpisodicMemory, EpisodicMemoryStats, EpisodicReplayConfig, ReplaySessionResult,
+    Episode, EpisodicMemory, EpisodicMemoryStats, EpisodicReplayConfig, GraduationProvenance,
+    ProvenancedEpisode, ReplaySessionResult,
 };
 #[allow(deprecated)]
 pub use hippocampus::{
