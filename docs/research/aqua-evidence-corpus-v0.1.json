@@ -741,12 +741,6 @@
           "conditions": {
             "mode": null,
             "pressure_kpa": null,
-            "pressure_range_kpa": {
-              "kind": "range",
-              "minimum": 133,
-              "maximum": 557,
-              "unit": "kPa"
-            },
             "temperature_c": null,
             "duration_min": null,
             "task": null,
@@ -755,9 +749,16 @@
             "pressure_datum": null,
             "unknown_conditions": [
               "individual three-point results",
-              "applicable current edition of referenced ASME/CSA method"
+              "applicable current edition of referenced ASME/CSA method",
+              "individual maximum-flow result at each tested pressure"
             ],
-            "notes": null
+            "notes": null,
+            "pressure_points_kpa": [
+              140,
+              310,
+              550
+            ],
+            "pressure_tolerance_kpa": 7
           },
           "source": {
             "url": "https://nepis.epa.gov/Exe/ZyPURL.cgi?Dockey=P100VLRA.txt",
@@ -798,7 +799,8 @@
             "unknown_conditions": [
               "sample statistic and tolerance details in the specification"
             ],
-            "notes": null
+            "notes": null,
+            "pressure_tolerance_kpa": 7
           },
           "source": {
             "url": "https://nepis.epa.gov/Exe/ZyPURL.cgi?Dockey=P100VLRA.txt",
@@ -830,12 +832,6 @@
           "conditions": {
             "mode": null,
             "pressure_kpa": null,
-            "pressure_range_kpa": {
-              "kind": "range",
-              "minimum": 303,
-              "maximum": 557,
-              "unit": "kPa"
-            },
             "temperature_c": null,
             "duration_min": null,
             "task": null,
@@ -845,7 +841,12 @@
             "unknown_conditions": [
               "separate results at 310 and 550 kPa"
             ],
-            "notes": null
+            "notes": null,
+            "pressure_points_kpa": [
+              310,
+              550
+            ],
+            "pressure_tolerance_kpa": 7
           },
           "source": {
             "url": "https://nepis.epa.gov/Exe/ZyPURL.cgi?Dockey=P100VLRA.txt",
@@ -884,7 +885,8 @@
             "sample_count": null,
             "pressure_datum": null,
             "unknown_conditions": [],
-            "notes": null
+            "notes": null,
+            "pressure_tolerance_kpa": 7
           },
           "source": {
             "url": "https://nepis.epa.gov/Exe/ZyPURL.cgi?Dockey=P100VLRA.txt",
@@ -923,7 +925,8 @@
             "sample_count": null,
             "pressure_datum": null,
             "unknown_conditions": [],
-            "notes": null
+            "notes": null,
+            "pressure_tolerance_kpa": 7
           },
           "source": {
             "url": "https://nepis.epa.gov/Exe/ZyPURL.cgi?Dockey=P100VLRA.txt",
@@ -1025,7 +1028,7 @@
             "url": "https://www.mosselbay.gov.za/storage/documents/cb942e034d7e086691fa18d41a15b553.pdf",
             "publisher": "SABS (publicly accessible copy hosted by Mossel Bay Municipality)",
             "source_type": "official_standard_or_programme",
-            "published_on": "2018-01-01",
+            "published_on": null,
             "accessed_on": "2026-11-18",
             "document_sha256": null
           },
@@ -1104,7 +1107,7 @@
             "url": "https://www.mosselbay.gov.za/storage/documents/cb942e034d7e086691fa18d41a15b553.pdf",
             "publisher": "SABS (publicly accessible copy hosted by Mossel Bay Municipality)",
             "source_type": "official_standard_or_programme",
-            "published_on": "2018-01-01",
+            "published_on": null,
             "accessed_on": "2026-11-18",
             "document_sha256": null
           },
@@ -1142,7 +1145,7 @@
             "url": "https://www.mosselbay.gov.za/storage/documents/cb942e034d7e086691fa18d41a15b553.pdf",
             "publisher": "SABS (publicly accessible copy hosted by Mossel Bay Municipality)",
             "source_type": "official_standard_or_programme",
-            "published_on": "2018-01-01",
+            "published_on": null,
             "accessed_on": "2026-11-18",
             "document_sha256": null
           },
@@ -1180,7 +1183,7 @@
             "url": "https://www.mosselbay.gov.za/storage/documents/cb942e034d7e086691fa18d41a15b553.pdf",
             "publisher": "SABS (publicly accessible copy hosted by Mossel Bay Municipality)",
             "source_type": "official_standard_or_programme",
-            "published_on": "2018-01-01",
+            "published_on": null,
             "accessed_on": "2026-11-18",
             "document_sha256": null
           },
@@ -1371,7 +1374,7 @@
             "url": "https://www.mdpi.com/2073-4441/11/12/2446",
             "publisher": "Water journal / van de Griend et al.",
             "source_type": "peer_reviewed_article",
-            "published_on": "2019-12-01",
+            "published_on": null,
             "accessed_on": "2026-11-18",
             "document_sha256": null
           },
@@ -1415,7 +1418,7 @@
             "url": "https://www.mdpi.com/2073-4441/11/12/2446",
             "publisher": "Water journal / van de Griend et al.",
             "source_type": "peer_reviewed_article",
-            "published_on": "2019-12-01",
+            "published_on": null,
             "accessed_on": "2026-11-18",
             "document_sha256": null
           },
