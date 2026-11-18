@@ -2391,6 +2391,131 @@ mod tests {
     }
 
     #[test]
+    fn negative_exposure_false_alarm_bootstrap_resamples_whole_shots_deterministically() {
+        let policy = config();
+        let evaluations = vec![
+            score_shot_alarms(
+                "positive",
+                ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
+                &[20, 90],
+                &policy,
+            ).expect("positive shot"),
+            score_shot_alarms(
+                "negative-a",
+                ShotReferenceOutcome::NonDisruptive {
+                    observation_end_ns: 3_600_000_000_000,
+                },
+                &[10],
+                &policy,
+            ).expect("negative shot"),
+            score_shot_alarms(
+                "negative-b",
+                ShotReferenceOutcome::NonDisruptive {
+                    observation_end_ns: 3_600_000_000_000,
+                },
+                &[],
+                &policy,
+            ).expect("negative shot"),
+            score_shot_alarms(
+                "negative-c",
+                ShotReferenceOutcome::NonDisruptive {
+                    observation_end_ns: 7_200_000_000_000,
+                },
+                &[20, 30],
+                &policy,
+            ).expect("negative shot"),
+        ];
+        let shot_ids = evaluations
+            .iter()
+            .map(|evaluation| evaluation.shot_id.clone())
+            .collect::<Vec<_>>();
+        let plan = crate::plasma_cluster_bootstrap::build_shot_cluster_bootstrap_plan(
+            "tokamark-test-revision",
+            &shot_ids,
+            1234,
+            500,
+        ).expect("bootstrap plan");
+
+        let first = bootstrap_false_alarms_per_non_disruptive_hour(
+            &plan,
+            &shot_ids,
+            &evaluations,
+        ).expect("bootstrap should complete");
+        let second = bootstrap_false_alarms_per_non_disruptive_hour(
+            &plan,
+            &shot_ids,
+            &evaluations,
+        ).expect("bootstrap should be deterministic");
+        assert_eq!(first, second);
+        let interval = first.expect("at least 95% of replicates retain negative exposure");
+        assert_eq!(interval.requested_replicates, 500);
+        assert!(interval.valid_replicates >= 475);
+        assert_eq!(interval.plan_sha256, plan.plan_sha256);
+        assert_eq!(interval.rng_algorithm, SHOT_CLUSTER_BOOTSTRAP_RNG_ALGORITHM);
+        assert!(interval.lower <= interval.upper);
+        assert_eq!(interval.confidence_level, 0.95);
+    }
+
+    #[test]
+    fn negative_exposure_bootstrap_refuses_order_mismatch_and_empty_negative_cohort() {
+        let policy = config();
+        let negative = score_shot_alarms(
+            "negative",
+            ShotReferenceOutcome::NonDisruptive {
+                observation_end_ns: 100,
+            },
+            &[10],
+            &policy,
+        ).expect("negative shot");
+        let evaluations = vec![negative];
+        let shot_ids = vec!["negative".to_owned()];
+        let plan = crate::plasma_cluster_bootstrap::build_shot_cluster_bootstrap_plan(
+            "dataset",
+            &shot_ids,
+            7,
+            20,
+        ).expect("plan");
+        assert!(bootstrap_false_alarms_per_non_disruptive_hour(
+            &plan,
+            &["different-shot".to_owned()],
+            &evaluations,
+        ).is_err());
+
+        let positives = vec![
+            score_shot_alarms(
+                "positive-a",
+                ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
+                &[20],
+                &policy,
+            ).expect("positive"),
+            score_shot_alarms(
+                "positive-b",
+                ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
+                &[20],
+                &policy,
+            ).expect("positive"),
+        ];
+        let positive_ids = positives
+            .iter()
+            .map(|evaluation| evaluation.shot_id.clone())
+            .collect::<Vec<_>>();
+        let positive_plan = crate::plasma_cluster_bootstrap::build_shot_cluster_bootstrap_plan(
+            "dataset",
+            &positive_ids,
+            7,
+            20,
+        ).expect("positive-only plan");
+        assert_eq!(
+            bootstrap_false_alarms_per_non_disruptive_hour(
+                &positive_plan,
+                &positive_ids,
+                &positives,
+            ).expect("empty negative cohort is not an error"),
+            None
+        );
+    }
+
+    #[test]
     fn cohort_refuses_to_mix_frozen_policy_identities() {
         let mut other = config();
         other.policy_id = "different-frozen-policy-v2".to_owned();
