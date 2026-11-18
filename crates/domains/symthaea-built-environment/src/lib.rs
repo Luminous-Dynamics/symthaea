@@ -654,26 +654,29 @@ pub fn validate_design_problem(
     validate_experience_axis(&axes.experience_programme, &vocabulary.experience_package_ids, &mut errors);
     validate_compilation(&problem.compilation, input, vocabulary, &mut errors);
 
-    if problem.compilation.state == CompilationState::ReadyForCandidateGeneration
-        && problem.compilation.mapping_state != MappingState::Qualified
+    if problem.compilation.mapping_state == MappingState::Qualified {
+        errors.push("mapping QUALIFIED is unsupported until Mycelix authority receipts are cryptographically verified".to_owned());
+    }
+    if problem.compilation.state == CompilationState::ReadyForCandidateGeneration {
+        errors.push("candidate generation is disabled in v0.1 until reviewed mappings and an authority verifier exist".to_owned());
+    }
+    if problem.generation_permissions.symbolic_candidate_generation
+        != SymbolicGenerationPermission::RequiresReviewedMappingRules
     {
-        errors.push("READY_FOR_CANDIDATE_GENERATION requires QUALIFIED mapping state".to_owned());
+        errors.push("symbolic candidate generation must remain closed in v0.1".to_owned());
+    }
+    if problem.generation_permissions.geometry_generation
+        != GeometryGenerationPermission::BlockedPendingSymtropyGeometryProviderAndOwnerReview
+    {
+        errors.push("geometry generation must remain blocked until the Symtropy provider contract is qualified".to_owned());
+    }
+    if problem.generation_permissions.physical_evaluation
+        != PhysicalEvaluationPermission::BlockedPendingExactRealizedGeometryAndQualifiedSolverInputs
+    {
+        errors.push("physical evaluation must remain blocked until exact geometry and qualified solver inputs exist".to_owned());
     }
     if problem.generation_permissions.certification != CertificationPermission::Prohibited {
         errors.push("certification must remain PROHIBITED".to_owned());
-    }
-    if problem.generation_permissions.geometry_generation
-        == GeometryGenerationPermission::AllowedWithQualifiedGeometryProvider
-        && problem.compilation.mapping_state != MappingState::Qualified
-    {
-        errors.push("geometry permission requires qualified mapping".to_owned());
-    }
-    if problem.generation_permissions.physical_evaluation
-        == PhysicalEvaluationPermission::AllowedWithQualifiedSolverInputs
-        && problem.generation_permissions.geometry_generation
-            != GeometryGenerationPermission::AllowedWithQualifiedGeometryProvider
-    {
-        errors.push("physical evaluation permission requires geometry permission".to_owned());
     }
     if problem.claim_ceiling != INTENT_ONLY_CLAIM_CEILING {
         errors.push("claim_ceiling exceeds the intent-only contract".to_owned());
@@ -1189,6 +1192,24 @@ mod tests {
         let problem = parsed_problem();
         assert!(!symbolic_candidate_generation_allowed(&problem));
         assert_eq!(problem.compilation.mapping_state, MappingState::NoOwnerReviewedMapping);
+    }
+
+    #[test]
+    fn future_mapping_and_permission_flags_cannot_open_generation_in_v01() {
+        let mut problem = parsed_problem();
+        problem.compilation.mapping_state = MappingState::Qualified;
+        assert!(validate_design_problem(&problem, &vocabulary()).is_err());
+        assert!(!symbolic_candidate_generation_allowed(&problem));
+
+        let mut geometry = parsed_problem();
+        geometry.generation_permissions.geometry_generation =
+            GeometryGenerationPermission::AllowedWithQualifiedGeometryProvider;
+        assert!(validate_design_problem(&geometry, &vocabulary()).is_err());
+
+        let mut physics = parsed_problem();
+        physics.generation_permissions.physical_evaluation =
+            PhysicalEvaluationPermission::AllowedWithQualifiedSolverInputs;
+        assert!(validate_design_problem(&physics, &vocabulary()).is_err());
     }
 
     #[test]
