@@ -104,8 +104,8 @@ impl QxyModel {
             .as_f64()
             .filter(|value| value.is_finite() && *value > 0.0)
             .ok_or_else(|| "invalid y box length".to_owned())?;
-        if (lx - ly).abs() > 1.0e-10 || (lx - lx.round()).abs() > 1.0e-10 || lx < 2.0 {
-            return Err("QXY source pilot requires an equal-integer periodic L x L square".to_owned());
+        if (lx - ly).abs() > 1.0e-10 || (lx - lx.round()).abs() > 1.0e-10 || lx < 3.0 {
+            return Err("QXY source pilot requires an equal-integer periodic L x L square with L >= 3".to_owned());
         }
         let l = lx as usize;
 
@@ -833,5 +833,43 @@ mod tests {
         value["charging"]["offset_charges"][0] = json!(0.25);
         let mutated = serde_json::to_vec(&value).unwrap();
         assert!(QxyModel::from_bytes(&schema, &mutated).is_err());
+    }
+
+    #[test]
+    fn malformed_parallel_bond_topology_is_rejected() {
+        let (schema, fixture) = inputs();
+        let mut value: Value = serde_json::from_slice(&fixture).unwrap();
+        value["graph"]["edges"][1]["source"] = value["graph"]["edges"][0]["source"].clone();
+        value["graph"]["edges"][1]["target"] = value["graph"]["edges"][0]["target"].clone();
+        let mutated = serde_json::to_vec(&value).unwrap();
+        assert!(QxyModel::from_bytes(&schema, &mutated).is_err());
+    }
+
+    #[test]
+    fn source_model_rejects_nonuniform_josephson_energy() {
+        let (schema, fixture) = inputs();
+        let mut value: Value = serde_json::from_slice(&fixture).unwrap();
+        value["graph"]["edges"][0]["josephson_energy"] = json!(1.1);
+        let mutated = serde_json::to_vec(&value).unwrap();
+        assert!(QxyModel::from_bytes(&schema, &mutated).is_err());
+    }
+
+    #[test]
+    fn model_seed_is_used_when_no_cli_override_is_supplied() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let schema = fs::read(
+            root.join("data/schemas/superconductivity_quantum_phase_instance_v0_1.schema.json"),
+        )
+        .unwrap();
+        let mut fixture: Value = serde_json::from_slice(
+            &fs::read(
+                root.join("data/research/superconductivity_quantum_phase_QXY_smoke_fixture_v0_1.json"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        fixture["simulation"]["random_seed"] = json!(1234);
+        let model = QxyModel::from_bytes(&schema, &serde_json::to_vec(&fixture).unwrap()).unwrap();
+        assert_eq!(model.random_seed, 1234);
     }
 }
