@@ -1,0 +1,268 @@
+{
+  "schema_version": "luminous.plasma-diagnostic-portfolio-benchmark.v0.1",
+  "benchmark_id": "PLASMA-DIAG-PORTFOLIO-001",
+  "evidence_class": "SYNTHETIC_STRUCTURAL_REFERENCE",
+  "physical_measurements": false,
+  "claim_ceiling": "FINITE_SYMBOLIC_DECISION_SUFFICIENCY_ONLY_NO_PHYSICAL_OBSERVABILITY_OR_SENSOR_RELIABILITY_CLAIM",
+  "resource_costs_are_synthetic_test_values": true,
+  "model": {
+    "schema_version": "luminous.plasma-diagnostic-portfolio.v0.1",
+    "model_id": "synthetic-plasma-decisions-v0",
+    "decision_catalogue_id": "synthetic-proceed-block-v0",
+    "resource_unit": "synthetic_resource_unit",
+    "worlds": [
+      {
+        "world_id": "healthy_closed",
+        "decision_id": "PROCEED"
+      },
+      {
+        "world_id": "failed_closed",
+        "decision_id": "BLOCK"
+      },
+      {
+        "world_id": "healthy_open",
+        "decision_id": "BLOCK"
+      },
+      {
+        "world_id": "failed_open",
+        "decision_id": "BLOCK"
+      }
+    ],
+    "sensors": [
+      {
+        "sensor_id": "gen_current",
+        "common_mode_groups": [
+          "gen_electrical"
+        ],
+        "resource_cost": 2,
+        "resource_unit": "synthetic_resource_unit",
+        "observations": [
+          {
+            "world_id": "healthy_closed",
+            "observation": {
+              "known": "H"
+            }
+          },
+          {
+            "world_id": "failed_closed",
+            "observation": {
+              "known": "F"
+            }
+          },
+          {
+            "world_id": "healthy_open",
+            "observation": {
+              "known": "H"
+            }
+          },
+          {
+            "world_id": "failed_open",
+            "observation": {
+              "known": "F"
+            }
+          }
+        ]
+      },
+      {
+        "sensor_id": "gen_vibration",
+        "common_mode_groups": [
+          "gen_mechanical"
+        ],
+        "resource_cost": 1,
+        "resource_unit": "synthetic_resource_unit",
+        "observations": [
+          {
+            "world_id": "healthy_closed",
+            "observation": {
+              "known": "H"
+            }
+          },
+          {
+            "world_id": "failed_closed",
+            "observation": {
+              "known": "F"
+            }
+          },
+          {
+            "world_id": "healthy_open",
+            "observation": {
+              "known": "H"
+            }
+          },
+          {
+            "world_id": "failed_open",
+            "observation": {
+              "known": "F"
+            }
+          }
+        ]
+      },
+      {
+        "sensor_id": "tie_aux",
+        "common_mode_groups": [
+          "switch_aux"
+        ],
+        "resource_cost": 4,
+        "resource_unit": "synthetic_resource_unit",
+        "observations": [
+          {
+            "world_id": "healthy_closed",
+            "observation": {
+              "known": "C"
+            }
+          },
+          {
+            "world_id": "failed_closed",
+            "observation": {
+              "known": "C"
+            }
+          },
+          {
+            "world_id": "healthy_open",
+            "observation": {
+              "known": "O"
+            }
+          },
+          {
+            "world_id": "failed_open",
+            "observation": {
+              "known": "O"
+            }
+          }
+        ]
+      },
+      {
+        "sensor_id": "tie_optical",
+        "common_mode_groups": [
+          "optical"
+        ],
+        "resource_cost": 3,
+        "resource_unit": "synthetic_resource_unit",
+        "observations": [
+          {
+            "world_id": "healthy_closed",
+            "observation": {
+              "known": "C"
+            }
+          },
+          {
+            "world_id": "failed_closed",
+            "observation": {
+              "known": "C"
+            }
+          },
+          {
+            "world_id": "healthy_open",
+            "observation": {
+              "known": "O"
+            }
+          },
+          {
+            "world_id": "failed_open",
+            "observation": {
+              "known": "O"
+            }
+          }
+        ]
+      },
+      {
+        "sensor_id": "failed_diag",
+        "common_mode_groups": [
+          "diag_bus"
+        ],
+        "resource_cost": 1,
+        "resource_unit": "synthetic_resource_unit",
+        "observations": [
+          {
+            "world_id": "healthy_closed",
+            "observation": "unknown"
+          },
+          {
+            "world_id": "failed_closed",
+            "observation": "unknown"
+          },
+          {
+            "world_id": "healthy_open",
+            "observation": "unknown"
+          },
+          {
+            "world_id": "failed_open",
+            "observation": "unknown"
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "diagnosable_with_all_sensors": true,
+    "minimal_sufficient_sensor_sets": [
+      [
+        "gen_current",
+        "tie_aux"
+      ],
+      [
+        "gen_current",
+        "tie_optical"
+      ],
+      [
+        "gen_vibration",
+        "tie_aux"
+      ],
+      [
+        "gen_vibration",
+        "tie_optical"
+      ]
+    ],
+    "minimal_sensor_cut_sets": [
+      [
+        "gen_current",
+        "gen_vibration"
+      ],
+      [
+        "tie_aux",
+        "tie_optical"
+      ]
+    ],
+    "minimal_common_mode_cut_sets": [
+      [
+        "gen_electrical",
+        "gen_mechanical"
+      ],
+      [
+        "optical",
+        "switch_aux"
+      ]
+    ],
+    "minimum_cost_sufficient_portfolio_at_budget_4": {
+      "sensor_ids": [
+        "gen_vibration",
+        "tie_optical"
+      ],
+      "total_resource_cost": 4,
+      "resource_unit": "synthetic_resource_unit"
+    }
+  },
+  "frame_bridge_contract": {
+    "schema_version": "luminous.plasma-diagnostic-frame-portfolio-bridge.v0.1",
+    "requires_exactly_one_category_rule_per_candidate_sensor": true,
+    "category_rules_require_channel_and_diagnostic_system_binding": true,
+    "category_bands_are_lower_inclusive_upper_exclusive": true,
+    "category_gaps_produce_unknown": true,
+    "category_labels_must_exist_in_declared_world_signatures": true,
+    "decision_channel_requirements_are_checked_by_plasma_observability_gate": true,
+    "only_direct_measured_values_can_become_known_categories": true,
+    "synthetic_unavailable_invalid_delayed_degraded_values_remain_unknown": true,
+    "source_and_calibration_provenance_is_preserved_for_known_categories": true,
+    "distinguishable_outputs": [
+      "structural_diagnosability",
+      "frame_time_world_compatibility",
+      "compatible_world_set",
+      "compatible_decision_set",
+      "frame_decision_identified_ambiguous_or_no_compatible_world"
+    ],
+    "claim_ceiling": "FRAME_DECISION_IDENTIFICATION_ONLY_FOR_DECLARED_CATEGORICAL_MODEL_NOT_PHYSICAL_OBSERVABILITY",
+    "distinguishes_nominal_architecture_diagnosability_from_current_frame_available_sensor_diagnosability": true,
+    "frame_decision_uses_only_worlds_consistent_with_admitted_categories": true,
+    "current_available_sensor_set_includes_only_direct_measured_in_domain_categories": true
+  }
+}
