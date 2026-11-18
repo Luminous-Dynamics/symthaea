@@ -1262,8 +1262,8 @@ mod tests {
         assert!((wrap_to_pi(0.0)).abs() < 1.0e-12);
         assert!((wrap_to_pi(3.0 * PI) + PI).abs() < 1.0e-12);
         assert!((wrap_to_pi(-3.0 * PI) + PI).abs() < 1.0e-12);
-        assert!(wrap_to_pi(PI).abs() - PI < 1.0e-12);
-        assert!(wrap_to_pi(-PI).abs() - PI < 1.0e-12);
+        assert!((wrap_to_pi(PI).abs() - PI).abs() < 1.0e-12);
+        assert!((wrap_to_pi(-PI).abs() - PI).abs() < 1.0e-12);
     }
 
     #[test]
