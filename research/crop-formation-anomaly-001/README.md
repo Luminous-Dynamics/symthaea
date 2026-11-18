@@ -1,6 +1,6 @@
 # CROP-INTEL-001 — Crop-formation structure, information, and physical anomaly research
 
-**Status:** proposed research programme; initial protocol only  
+**Status:** active research programme with an early standalone Rust reference lab; field and external scientific validation not yet performed  
 **Branch:** research/crop-formation-anomaly-001  
 **Claim ceiling:** no formation has been adjudicated by this work; no non-human origin, unknown physical mechanism, or encoded semantic message is established.
 
@@ -119,6 +119,7 @@ These are discovery sources, not ground truth:
 - [Crop Decoder](https://cropdecoder.com/formations/) currently lists 2,982 formations from 35 countries and links records to source archives. Treat it as a cross-archive discovery index; entity deduplication and source completeness still need auditing.
 - [FEEDIT field geometry archive](https://www.feedit.info/) reports 11 parametric formations, 1,195 geometric elements and machine-readable geometry in metres under CC BY-SA 4.0. It is a valuable small geometry seed corpus, not a representative sample of all formations. Referenced aerial photographs have separate rights.
 - [MYTbrain/crop-circle-atlas](https://github.com/MYTbrain/crop-circle-atlas) is an important external engineering baseline: provenance-first catalogue reconciliation, geolocation review, bounded image registration, SIFT/RANSAC proposals, metric checkpoints, and rights-gated map outputs. Its README explicitly limits its reported benchmark to synthetic mathematics and internal pipeline QA; do not promote those numbers into real-world crop-circle geolocation performance. This programme does not claim affiliation with that project.
+- [CCAT v1.0.0](https://github.com/salahealer9/ccat-crop-circle-analysis-toolkit) is a direct geometry-grammar comparator with an attributed 60-circle Zeals Knoll fixture, fixed-scaffold generative models and within-event masked prediction. Its own claim boundary disclaims symbolic meaning and origin. CROP-INTEL imports only the CC BY 4.0 geometry CSV, not the source photograph; see [the replay audit](CCAT_REPLICATION.md).
 
 The public sources located so far do not establish a recognized, community-wide crop-circle benchmark or leaderboard. Therefore, do not claim "state of the art" by comparing one private score with an unrelated paper. First publish a transparent benchmark with frozen inputs and baselines.
 
@@ -184,7 +185,7 @@ Reuse the existing Symthaea falsification/power reference and open-world work ra
 - Hafdi (uploaded March 2026), [The Mathematics of Crop Circles and Their Applications to Complex Problems](https://www.researchgate.net/publication/403159866_The_Mathematics_of_Crop_Circles_and_Their_Applications_to_Complex_Problems_Geometry_Number_Theory_Encoding_and_Engineering_Implications_of_Agrarian_Formations) — exploratory manuscript; claims and decodings require independent verification.
 
 ---
-**Current result:** research programme specification committed. No cases classified; no data ingestion, image processing, code execution, field sampling, or scientific replication claimed.
+**Current result:** the programme, benchmark, data model, schemas, field protocol, competitive audit, attributed CCAT geometry fixture and standalone Rust reference lab are committed. A separate Python replay of the published CCAT CSV reproduced key descriptive geometry counts. The 44 Rust unit tests are authored but not compiled or executed. No source photograph has been imported; no real formation has been independently re-digitized, classified by origin, semantically decoded, field-sampled, or causally explained.
 
 
 ## Research extensions and implementation
@@ -198,4 +199,4 @@ Reuse the existing Symthaea falsification/power reference and open-world work ra
 
 The current reference crate includes crop-flow circular, radial and tangential statistics as well as geometry and grid decoding. It preserves per-sample direction and does not force a single mean direction when the resultant is near zero.
 
-The Rust lab is an initial reference implementation, not a production image pipeline. It currently accepts calibrated 2D point sets, preconstructed binary grids, and bit sequences; it does not read aerial images, infer crop masks from photographs, classify formation origin, or infer semantic meaning. Its unit tests have been authored but **not executed** in this environment because no Rust toolchain is installed. Do not treat the crate as compiled or qualified until `cargo fmt`, `cargo test` and `cargo clippy` run on the exact head.
+The Rust lab is an initial reference implementation, not a production image pipeline. It accepts calibrated 2D point sets, digitized circle CSVs, measured crop-flow samples, preconstructed binary grids and bit sequences. It does not read aerial images, infer crop masks from photographs, classify formation origin or infer semantic meaning. It contains 44 authored unit tests, but they have **not been compiled or executed** in this environment because no Rust toolchain is installed. Do not treat the crate as compiled or qualified until `cargo fmt`, `cargo test` and `cargo clippy` run on the exact head.
