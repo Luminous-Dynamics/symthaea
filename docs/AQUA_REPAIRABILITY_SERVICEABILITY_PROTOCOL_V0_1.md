@@ -54,6 +54,8 @@ The manifest is frozen before comparative trials. A job can be marked not applic
 
 ## 4. Observation contract
 
+Disassembly depth is defined as the count of ordered disassembly actions from the initial service access to the target component, using the frozen job instructions. It is not the number of parts removed. Record these separately: (a) disassembly depth, (b) distinct components physically removed, and (c) fastener/connector separations. This avoids treating one large removable assembly and several nested access steps as equivalent jobs.
+
 Each repair run binds to:
 - exact product variant, specimen and hardware/configuration digest;
 - fault manifest, job profile, method/protocol and replicate identifiers;
@@ -174,7 +176,7 @@ The Rust evaluator now records three distinct spare-availability states rather t
 
 For routine jobs it reports each count separately and computes an availability fraction only over the known Available + NotAvailable subset. Unknown observations do not silently become unavailable or available. If no known observations exist, the fraction is undefined.
 
-The cohort also reports unique spare-part IDs and median disassembly depth separately from technician time and downtime. These are descriptive serviceability measures; they are not lifecycle cost, repair-probability, circularity or environmental-impact calculations.
+The cohort also reports unique spare-part IDs and median disassembly depth, distinct components removed and fastener/connector separations separately from technician time and downtime. These are descriptive serviceability measures; they are not lifecycle cost, repair-probability, circularity or environmental-impact calculations.
 
 ## 11. Partial repair records versus qualified return
 
