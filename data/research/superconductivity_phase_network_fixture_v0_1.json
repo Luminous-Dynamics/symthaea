@@ -425,7 +425,10 @@
       0,
       1
     ],
-    "twist_angle_rad": 0
+    "twist_angles_rad": [
+      0,
+      0
+    ]
   },
   "coupling_budget": {
     "normalization": "sum_edge_couplings_divided_by_node_count",
