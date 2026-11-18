@@ -834,6 +834,18 @@ fn ensemble_summary(values: &[f64]) -> Value {
     })
 }
 
+fn numeric_field_values(receipts: &[Value], field: &str) -> Result<Vec<f64>, String> {
+    receipts
+        .iter()
+        .map(|receipt| {
+            receipt
+                .get(field)
+                .and_then(Value::as_f64)
+                .ok_or_else(|| format!("replicate receipt missing numeric field {field}"))
+        })
+        .collect()
+}
+
 fn simulate_replicates(
     model: &QxyModel,
     warmup_sweeps: usize,
@@ -860,22 +872,10 @@ fn simulate_replicates(
         return Ok(receipts.remove(0));
     }
 
-    let numeric_values = |field: &str| -> Result<Vec<f64>, String> {
-        receipts
-            .iter()
-            .map(|receipt| {
-                receipt
-                    .get(field)
-                    .and_then(Value::as_f64)
-                    .ok_or_else(|| format!("replicate receipt missing numeric field {field}"))
-            })
-            .collect()
-    };
-
-    let action = numeric_values("mean_action_per_spacetime_site")?;
-    let stiffness = numeric_values("mean_finite_size_stiffness_source_normalization")?;
-    let vortices = numeric_values("mean_total_vortex_density")?;
-    drop(numeric_values);
+    let action = numeric_field_values(&receipts, "mean_action_per_spacetime_site")?;
+    let stiffness =
+        numeric_field_values(&receipts, "mean_finite_size_stiffness_source_normalization")?;
+    let vortices = numeric_field_values(&receipts, "mean_total_vortex_density")?;
 
     let mut current_correlation_between_chains = Vec::with_capacity(model.imaginary_time_slices);
     for tau_index in 0..model.imaginary_time_slices {
