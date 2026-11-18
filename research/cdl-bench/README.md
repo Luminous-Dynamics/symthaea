@@ -86,11 +86,13 @@ headline compression ratio.
 - An observational five-variable structural causal trace.
 - A paired trace with `do(x1=20000)` active on the middle half of the stream.
 
-The command checks exact codec round-trips and reports framed lengths for the
-order-0/order-1 models, plus Zstandard when installed. It is **not** yet a
-causal predictor comparison: it tests generator reproducibility and coding
-plumbing only. The finite-state latent labels remain evaluator-side; the
-serialized SCM stream includes the intervention manifest and observed i16 values.
+The command checks exact codec round-trips and reports framed lengths for
+the order-0/order-1 models, the typed field/lane model and the known-parent
+oracle model, plus Zstandard when installed. The parent model receives the
+correct SCM graph by construction; it is a topology-aware coding control, not a
+learned causal predictor. The finite-state latent labels remain evaluator-side;
+the serialized SCM stream includes the intervention manifest and observed i16
+values. No causal-transfer result is implied.
 
 ## Typed numerical i16 pipeline
 
