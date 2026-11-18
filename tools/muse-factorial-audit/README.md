@@ -67,7 +67,7 @@ This is **not yet** the composer execution adapter. A later adapter must:
 5. Feed complete scalar metric blocks to `estimate_block`.
 6. Keep generation errors, categorical outputs, not-applicable channels and missing metrics explicit.
 
-The case generator and contrast engine are ready to be connected; no composer output, causal effect or musical-quality result is asserted by this repository addition.
+The source-pinned composer example now connects the case manifest to symbolic score output. Its code and tests are authored but remain uncompiled and unexecuted until the root workspace repair lands. No composer output, causal effect or musical-quality result is asserted by this repository addition.
 
 ## Evidence labels
 
@@ -94,7 +94,7 @@ Missing, failed, and not-applicable values are never imputed as zero.
 
 ## Composer execution adapter
 
-The next stage is the source-pinned symbolic composer adapter. It validates the
+The source-pinned symbolic composer adapter is now authored. It validates the
 complete frozen case manifest, invokes each style's canonical grammar-plan
 composition path, hashes each serialized score, and emits 18 symbolic metrics.
 See [COMPOSER_ADAPTER.md](COMPOSER_ADAPTER.md) for the exact run commands,
