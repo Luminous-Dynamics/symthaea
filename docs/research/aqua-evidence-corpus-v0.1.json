@@ -3545,6 +3545,120 @@
           ]
         }
       ]
+    },
+    {
+      "entry_id": "iso-20887-2020-design-for-disassembly",
+      "subject": {
+        "type": "standard",
+        "id": "iso.20887.2020",
+        "name": "ISO 20887:2020 — Design for disassembly and adaptability",
+        "manufacturer": null,
+        "sku": null,
+        "market": "International; buildings, civil engineering works and constituent parts",
+        "revision": "Edition 1; reviewed and confirmed 2025"
+      },
+      "claims": [
+        {
+          "claim_id": "iso.20887.2020.design-for-disassembly-scope",
+          "parameter": "design_for_disassembly_scope",
+          "original_value": "Provides principles and strategies for design for disassembly and adaptability for buildings, civil engineering works and their constituent parts, including guidance on measuring performance; it does not set specific numeric performance levels.",
+          "canonical_value": {
+            "kind": "text",
+            "text": "Building/civil-engineering design-for-disassembly and adaptability principles with performance-measurement guidance; no universal numeric levels."
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "ISO 20887:2020, Edition 1; ISO catalogue review confirmation 2025",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "No universal numeric repairability / disassembly threshold",
+              "AQS-specific component requirements and acceptance levels"
+            ],
+            "notes": "Current version confirmed by ISO in 2025; applies to buildings, civil engineering works and constituent parts."
+          },
+          "source": {
+            "url": "https://www.iso.org/standard/69370.html",
+            "publisher": "International Organization for Standardization (ISO)",
+            "source_type": "official_standard_or_programme",
+            "published_on": "2020-01-01",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Design-for-disassembly principles guide the AQS service-spine and component access design; the standard supplies no product-specific numeric pass/fail threshold."
+          },
+          "limitations": [
+            "Not a showerhead, plumbing fixture or bathroom product certification.",
+            "Does not set a universal numeric disassembly or repairability threshold.",
+            "Aqua-specific job manifests and measured trials are still required."
+          ]
+        }
+      ]
+    },
+    {
+      "entry_id": "en-45554-2020-repair-reuse-upgrade",
+      "subject": {
+        "type": "standard",
+        "id": "en.45554.2020",
+        "name": "EN 45554:2020 — Assessment of ability to repair, reuse and upgrade energy-related products",
+        "manufacturer": null,
+        "sku": null,
+        "market": "European standard; energy-related products",
+        "revision": "2020 edition"
+      },
+      "claims": [
+        {
+          "claim_id": "en.45554.2020.repair-assessment-scope",
+          "parameter": "repairability_assessment_scope",
+          "original_value": "Provides generic methods to assess the ability of energy-related products to be repaired, reused or upgraded; relevant criteria include disassembly depth, fasteners/connectors, tools and support availability.",
+          "canonical_value": {
+            "kind": "text",
+            "text": "Generic repair/reuse/upgrade assessment methods for energy-related products, with criteria such as disassembly depth, fasteners/connectors, tools and support."
+          },
+          "evidence_class": "standard_or_programme_criterion",
+          "result_class": "declared",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "EN 45554:2020",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "Direct product-group applicability to passive plumbing fixtures",
+              "Aqua-specific repairability score or numeric thresholds"
+            ],
+            "notes": "Use relevant methods as design inspiration only unless product-group applicability is confirmed."
+          },
+          "source": {
+            "url": "https://www.nen.nl/en/nen-en-45554-2020-en-270440",
+            "publisher": "Royal Netherlands Standardization Institute (NEN)",
+            "source_type": "official_standard_or_programme",
+            "published_on": "2020-01-01",
+            "accessed_on": "2026-11-18",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Methodological reference for repair-job factors; its stated scope is energy-related products, so direct application to passive plumbing fixtures is not assumed."
+          },
+          "limitations": [
+            "The stated scope is energy-related products; it is not automatically applicable to passive plumbing fixtures.",
+            "It is not an Aqua product repairability result or a universal repairability score.",
+            "Aqua must establish a product-specific fault/job manifest and measured acceptance method."
+          ]
+        }
+      ]
     }
   ],
   "change_log": [
@@ -3567,6 +3681,10 @@
     {
       "date": "2026-11-18",
       "change": "Added UWL 2023 boost-function definition and clause 12.1 test criteria; linked method-specific Rust validation."
+    },
+    {
+      "date": "2026-11-18",
+      "change": "Added ISO 20887:2020 and EN 45554:2020 as context-only standards references for design for disassembly and repairability-method concepts; direct fixture applicability and numeric thresholds remain unclaimed."
     }
   ]
 }
