@@ -253,3 +253,8 @@ See [AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md](AQUA_TASK_SELECTIVE_DELIVERY
 ## Repairability as a measured product property
 
 The dry-side service spine is now paired with a fault/job manifest and evidence contract. A routine repair counts as non-destructive only after the part is accessed without finish removal, the post-repair functional check passes, and all required independent device, water-quality and metrology gates are complete. See [AQUA_REPAIRABILITY_SERVICEABILITY_PROTOCOL_V0_1.md](AQUA_REPAIRABILITY_SERVICEABILITY_PROTOCOL_V0_1.md) and [#12844](https://github.com/Luminous-Dynamics/symthaea/issues/12844). ISO 20887:2020 informs design-for-disassembly decisions; it sets no universal numeric repairability performance threshold.
+
+
+## Repairability as a measured product property
+
+The dry-side service spine is now paired with a fault/job manifest and evidence contract. A routine repair counts as non-destructive only after the part is accessed without finish removal, the post-repair functional check passes, and all required independent device, water-quality and metrology gates are complete. See [AQUA_REPAIRABILITY_SERVICEABILITY_PROTOCOL_V0_1.md](AQUA_REPAIRABILITY_SERVICEABILITY_PROTOCOL_V0_1.md) and [#12844](https://github.com/Luminous-Dynamics/symthaea/issues/12844). ISO 20887:2020 informs design-for-disassembly decisions; it sets no universal numeric repairability performance threshold.
