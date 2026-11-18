@@ -328,3 +328,23 @@ Aqua research targets for exact 150 / 300 kPa paired runs:
 - 80%: proposed Aqua stretch hypothesis, measured conservative bound.
 
 Do not apply these percentages indiscriminately to a product or mode outside the ETL's scope. Flow retention does not establish task quality, comfort, spray force, coverage, hygiene or certification. The paired exact-point comparison is implemented in `symthaea-aqua-bench::pressure_curve::compare_flow_retention` and reports central ratio plus measurement-uncertainty bounds; it does not interpolate a curve or produce a confidence interval over specimens.
+
+
+## 15. UK ETL 2025/26 electric-shower / DWHR integration pathway
+
+The UK ETL published its 2025/26 annual criteria update on 15 September 2026. The current non-domestic electric-shower criteria specify:
+- standard maximum available flow: 4.5 L/min;
+- conditional maximum up to 9 L/min when electrical input is modulated to minimize electricity while maintaining stable output temperature with an ETL-compliant wastewater heat-recovery system;
+- conditional maximum up to 10.6 L/min where the qualifying DWHR / power-modulation system also includes a user-behaviour feature.
+
+This is a non-domestic UK programme pathway, not South African law or domestic product certification. It does not prove a particular product achieves useful task quality or energy savings. The full system must be assessed, including heater input, recovered heat at the actual receiver, fouling, static/standby loss, parasitics, pressure, outlet-temperature stability and completed-task outcomes.
+
+Sources:
+- [Current ETL shower criteria](https://etl.energysecurity.gov.uk/products/showers/showers), sections 1.1–1.4
+- [2025/26 Annual Research Programme update, 15 September 2026](https://etl.energysecurity.gov.uk/news-events/news/202526-annual-research-programme-updated-criteria-now-live)
+
+The associated peer-reviewed evidence corpus now includes:
+- 2025, 14-month DWHR fouling study: 66% overall exchanger efficiency after fouling / unsteady effects and 52% system efficiency after showerhead-to-drain losses (study-specific).
+- October 2026 DWHR coupling study: global DHW COP up to 6.3 experimentally and 8.0 in simulation in its studied configurations; mixer-side unbalanced DWHR gave the best tested overall topology, while some configurations increased static loss and reduced heat-pump COP.
+
+Aqua's response is a new complete-system workstream, [#12816](https://github.com/Luminous-Dynamics/symthaea/issues/12816), and the [power-coupled shower / DWHR benchmark](AQUA_POWER_COUPLED_SHOWER_DWHR_BENCHMARK_V0_1.md). No study value is promoted to an Aqua result or universal target.
