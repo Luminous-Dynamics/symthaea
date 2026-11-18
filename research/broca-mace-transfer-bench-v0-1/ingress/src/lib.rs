@@ -430,6 +430,7 @@ pub struct IngestBatch {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum IngestBatchReject {
     ConflictingPayloadForEvent(u32),
+    ConflictingReceiptForEvent(u32),
     EventRejected(u32, IngestReject),
 }
 
@@ -441,22 +442,27 @@ pub fn ingest_batch_as_known(
     verifier: &impl EvidenceVerifier,
 ) -> Result<IngestBatch, IngestBatchReject> {
     let mut digests = BTreeMap::<u32, &str>::new();
+    let mut receipt_bundles = BTreeMap::<u32, EvidenceReceiptBundle>::new();
     let mut duplicate_event_ids = Vec::new();
     let mut admitted = Vec::new();
 
     for raw in raw_events {
-        if let Some(existing) = digests.get(&raw.event_id) {
-            if *existing != raw.payload_sha256.as_str() {
+        let ingested = ingest_as_known(raw, query, verifier)
+            .map_err(|reason| IngestBatchReject::EventRejected(raw.event_id, reason))?;
+        if let Some(existing_digest) = digests.get(&raw.event_id) {
+            if *existing_digest != raw.payload_sha256.as_str() {
                 return Err(IngestBatchReject::ConflictingPayloadForEvent(
                     raw.event_id,
                 ));
+            }
+            if receipt_bundles.get(&raw.event_id) != Some(&ingested.receipts) {
+                return Err(IngestBatchReject::ConflictingReceiptForEvent(raw.event_id));
             }
             duplicate_event_ids.push(raw.event_id);
             continue;
         }
         digests.insert(raw.event_id, raw.payload_sha256.as_str());
-        let ingested = ingest_as_known(raw, query, verifier)
-            .map_err(|reason| IngestBatchReject::EventRejected(raw.event_id, reason))?;
+        receipt_bundles.insert(raw.event_id, ingested.receipts.clone());
         admitted.push(ingested);
     }
 
@@ -486,6 +492,7 @@ mod tests {
         calibration_valid: bool,
         raw_event_valid: bool,
         raw_event_mismatch: bool,
+        authority_receipt_variant: bool,
         authority_status: AuthorityStatus,
         retraction_status_known: bool,
     }
@@ -506,6 +513,7 @@ mod tests {
                 calibration_valid: true,
                 raw_event_valid: true,
                 raw_event_mismatch: false,
+                authority_receipt_variant: false,
                 authority_status: AuthorityStatus::ReceiptAttested,
                 retraction_status_known: true,
             }
@@ -533,7 +541,11 @@ mod tests {
                 },
                 canonical_event_hash: "c".repeat(64),
                 authority_status: self.authority_status,
-                authority_receipt_digest: "b".repeat(64),
+                authority_receipt_digest: if self.authority_receipt_variant {
+                    "9".repeat(64)
+                } else {
+                    "b".repeat(64)
+                },
                 valid_from_ms: raw.valid_from_ms,
                 valid_until_ms: raw.valid_until_ms,
                 occurred_at_ms: raw.occurred_at_ms,
@@ -773,6 +785,133 @@ mod tests {
         .expect("identical duplicate deliveries are idempotent");
         assert_eq!(batch.admitted.len(), 1);
         assert_eq!(batch.duplicate_event_ids, vec![42]);
+    }
+
+    #[test]
+    fn duplicate_event_requires_identical_verified_receipt_bundle() {
+        struct AlternatingVerifier {
+            calls: std::cell::Cell<u32>,
+        }
+
+        impl EvidenceVerifier for AlternatingVerifier {
+            fn verify_raw_event(
+                &self,
+                _receipt_id: &str,
+                raw: &RawInteractionV1,
+                _known_at_ms: i64,
+            ) -> Option<VerifiedRawEvent> {
+                let call = self.calls.get();
+                self.calls.set(call + 1);
+                Some(VerifiedRawEvent {
+                    event_id: raw.event_id,
+                    session_id: raw.session_id.clone(),
+                    task_id: raw.task_id.clone(),
+                    payload_sha256: raw.payload_sha256.clone(),
+                    canonical_event_hash: "c".repeat(64),
+                    authority_status: AuthorityStatus::ReceiptAttested,
+                    authority_receipt_digest: if call == 0 {
+                        "b".repeat(64)
+                    } else {
+                        "9".repeat(64)
+                    },
+                    valid_from_ms: raw.valid_from_ms,
+                    valid_until_ms: raw.valid_until_ms,
+                    occurred_at_ms: raw.occurred_at_ms,
+                    received_at_ms: 220,
+                    receipt_digest: "a".repeat(64),
+                })
+            }
+
+            fn verify_lineage(
+                &self,
+                _receipt_id: &str,
+                _event_id: u32,
+                _scope: Scope,
+                _known_at_ms: i64,
+            ) -> Option<VerifiedLineage> {
+                Some(VerifiedLineage {
+                    source_family: 7,
+                    source_root_id: 700,
+                    acquisition_mode: "api".into(),
+                    upstream_source_id: "bis:dataflow:private-credit".into(),
+                    source_artifact_digest: "e".repeat(64),
+                    transformation_digest: "f".repeat(64),
+                    issuer_id: "did:key:source-ledger".into(),
+                    receipt_digest: "d".repeat(64),
+                })
+            }
+
+            fn verify_measurement(
+                &self,
+                _receipt_id: &str,
+                expected_unit: &str,
+                _scope: Scope,
+                _observed_at_ms: i64,
+                _known_at_ms: i64,
+            ) -> Option<VerifiedMeasurement> {
+                Some(VerifiedMeasurement {
+                    absolute_error_bound: 0.02,
+                    unit: expected_unit.into(),
+                    method_id: "utility-method-v1".into(),
+                    calibration_revision: "calibration-rev-1".into(),
+                    valid_from_ms: 100,
+                    valid_until_ms: Some(300),
+                    instrument_id: "sensor-17".into(),
+                    calibration_digest: "1".repeat(64),
+                })
+            }
+
+            fn verify_causal_assessment(
+                &self,
+                _receipt_id: &str,
+                _event_id: u32,
+                _scope: Scope,
+                _known_at_ms: i64,
+            ) -> Option<VerifiedCausalAssessment> {
+                Some(VerifiedCausalAssessment {
+                    intervention_confirmed: true,
+                    prediction_pre_registered: true,
+                    confounders_controlled: true,
+                    delayed_horizon_complete: true,
+                    assessment_digest: "2".repeat(64),
+                })
+            }
+
+            fn verify_outcome(
+                &self,
+                _receipt_id: &str,
+                _event_id: u32,
+                _observed_at_ms: i64,
+                _known_at_ms: i64,
+            ) -> Option<VerifiedOutcome> {
+                Some(VerifiedOutcome {
+                    reconciled: true,
+                    outcome_digest: "3".repeat(64),
+                })
+            }
+
+            fn lifecycle_status_as_of(
+                &self,
+                _event_id: u32,
+                _known_at_ms: i64,
+            ) -> Option<SourceLifecycleStatus> {
+                Some(SourceLifecycleStatus::Active)
+            }
+        }
+
+        let verifier = AlternatingVerifier {
+            calls: std::cell::Cell::new(0),
+        };
+        assert_eq!(
+            ingest_batch_as_known(
+                &[raw(), raw()],
+                query(180, 250),
+                &verifier,
+            )
+            .err(),
+            Some(IngestBatchReject::ConflictingReceiptForEvent(42))
+        );
+        assert_eq!(verifier.calls.get(), 2);
     }
 
     #[test]
