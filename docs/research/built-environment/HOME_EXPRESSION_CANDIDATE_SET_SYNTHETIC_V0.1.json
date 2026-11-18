@@ -1,0 +1,85 @@
+{
+  "schema_version": "0.1.0",
+  "candidate_set_id": "SYNTH-HOME-EXPRESSION-CANDIDATE-SET-001",
+  "maturity": "ILLUSTRATIVE_NOT_EXECUTED",
+  "source_problem_id": "SYNTH-HOME-EXPRESSION-DESIGN-PROBLEM-001",
+  "source_problem_revision": "SYNTH-HV-GRAMMAR-REV-0",
+  "source_catalogue_revision": "HOME-EXPRESSION-CATALOG-0.2.0",
+  "generation_status": "EXAMPLE_ONLY_NOT_EXECUTED",
+  "generator": {
+    "name": "NOT_IMPLEMENTED",
+    "version": null,
+    "build_digest": null,
+    "method": "NOT_SELECTED",
+    "seed": null,
+    "replay_status": "NOT_RUN"
+  },
+  "candidate_count": 3,
+  "candidates": [
+    {
+      "candidate_id": "SYNTH-CONCEPT-COURTYARD-SHADE-001",
+      "candidate_state": "ILLUSTRATIVE_NOT_GENERATED",
+      "interpretation": "Explore a courtyard-led concept with external shading as the leading environmental question.",
+      "source_intents": [
+        {
+          "axis": "spatial_typology",
+          "option_id": "COURTYARD",
+          "preference": "PREFERRED"
+        },
+        {
+          "axis": "environmental_strategy_intent",
+          "option_id": "EXTERNAL_SHADING",
+          "preference": "PREFERRED"
+        }
+      ],
+      "parameter_deltas": [],
+      "geometry_ref": null,
+      "hard_gate_state": "UNKNOWN_NOT_EVALUATED",
+      "physical_evaluation_state": "NOT_EVALUATED",
+      "pareto_state": "NOT_EVALUATED",
+      "resident_choice_state": "NOT_RECORDED"
+    },
+    {
+      "candidate_id": "SYNTH-CONCEPT-COURTYARD-VENTILATION-002",
+      "candidate_state": "ILLUSTRATIVE_NOT_GENERATED",
+      "interpretation": "Explore the same resident-stated spatial direction while investigating cross-ventilation; no airflow or climate result is implied.",
+      "source_intents": [
+        {
+          "axis": "spatial_typology",
+          "option_id": "COURTYARD",
+          "preference": "PREFERRED"
+        },
+        {
+          "axis": "environmental_strategy_intent",
+          "option_id": "CROSS_VENTILATION",
+          "preference": "CONSIDERED"
+        }
+      ],
+      "parameter_deltas": [],
+      "geometry_ref": null,
+      "hard_gate_state": "UNKNOWN_NOT_EVALUATED",
+      "physical_evaluation_state": "NOT_EVALUATED",
+      "pareto_state": "NOT_EVALUATED",
+      "resident_choice_state": "NOT_RECORDED"
+    },
+    {
+      "candidate_id": "SYNTH-CONCEPT-EXPERIENCE-OPTIONAL-003",
+      "candidate_state": "ILLUSTRATIVE_NOT_GENERATED",
+      "interpretation": "Retain the observatory as an optional programme question without assuming area, structure, energy, cost or feasibility.",
+      "source_intents": [
+        {
+          "axis": "experience_programme",
+          "option_id": "PRIVATE_OBSERVATORY",
+          "preference": "CONSIDERED"
+        }
+      ],
+      "parameter_deltas": [],
+      "geometry_ref": null,
+      "hard_gate_state": "UNKNOWN_NOT_EVALUATED",
+      "physical_evaluation_state": "NOT_EVALUATED",
+      "pareto_state": "NOT_EVALUATED",
+      "resident_choice_state": "NOT_RECORDED"
+    }
+  ],
+  "claim_ceiling": "CONCEPTUAL_INTENT_DERIVATIVES_ONLY_NO_GEOMETRY_COST_PERFORMANCE_OR_FEASIBILITY"
+}
