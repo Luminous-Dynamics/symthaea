@@ -53,6 +53,7 @@ pub struct FeatureSpec {
     pub nominal_revision_ref: String,
     pub mandatory: bool,
     pub required_metrics: Vec<FeatureMetricRequirement>,
+    pub required_pose_refs: Vec<String>,
     pub minimum_coverage_fraction: f64,
     pub acceptance_rule_ref: String,
 }
@@ -121,6 +122,8 @@ pub struct FeatureMeasurement {
     pub feature_ref: String,
     pub metric_id: String,
     pub unit: String,
+    pub pose_ref: Option<String>,
+    pub joint_state_ref: Option<String>,
     pub measured_value: f64,
     pub expanded_uncertainty: f64,
     pub lower_limit: f64,
@@ -167,6 +170,7 @@ pub struct FeatureAssessment {
     pub measurement_id: String,
     pub feature_ref: String,
     pub metric_id: String,
+    pub pose_ref: Option<String>,
     pub measured_lower_bound: f64,
     pub measured_upper_bound: f64,
     pub disposition: String,
@@ -260,6 +264,23 @@ impl AsBuiltInspectionManifest {
                 push(&mut findings, "invalid_feature_coverage_requirement", format!("{path}.minimum_coverage_fraction"),
                     "Minimum feature coverage must be finite and within (0, 1].");
             }
+            let requires_pose_coverage = feature.required_metrics.iter()
+                .any(|metric| metric.metric_id == "joint_clearance_mm");
+            let mut pose_refs = HashSet::new();
+            for pose_ref in &feature.required_pose_refs {
+                if is_blank(pose_ref) || !pose_refs.insert(pose_ref.as_str()) {
+                    push(&mut findings, "duplicate_or_blank_required_pose", format!("{path}.required_pose_refs"),
+                        "Required robot pose references must be non-empty and unique.");
+                }
+            }
+            if requires_pose_coverage && feature.required_pose_refs.is_empty() {
+                push(&mut findings, "joint_clearance_pose_set_missing", format!("{path}.required_pose_refs"),
+                    "A joint-clearance requirement must enumerate the approved robot poses to be inspected.");
+            }
+            if !requires_pose_coverage && !feature.required_pose_refs.is_empty() {
+                push(&mut findings, "pose_set_without_joint_clearance_metric", format!("{path}.required_pose_refs"),
+                    "Pose coverage is currently supported only for joint-clearance requirements.");
+            }
             let mut metrics = HashSet::new();
             for (metric_index, metric) in feature.required_metrics.iter().enumerate() {
                 if !metrics.insert(metric.metric_id.as_str()) {
@@ -310,9 +331,13 @@ impl AsBuiltInspectionManifest {
                 push(&mut findings, "duplicate_measurement_id", format!("{path}.measurement_id"),
                     "Measurement IDs must be unique.");
             }
-            if !feature_metric_pairs.insert((observation.feature_ref.as_str(), observation.metric_id.as_str())) {
-                push(&mut findings, "duplicate_feature_metric_measurement", format!("{path}.feature_ref/metric_id"),
-                    "A feature/metric pair may appear only once in this P0 inspection manifest.");
+            if !feature_metric_pairs.insert((
+                observation.feature_ref.as_str(),
+                observation.metric_id.as_str(),
+                observation.pose_ref.as_deref(),
+            )) {
+                push(&mut findings, "duplicate_feature_metric_measurement", format!("{path}.feature_ref/metric_id/pose_ref"),
+                    "A feature/metric/pose tuple may appear only once in this P0 inspection manifest.");
             }
             let Some(feature) = features.get(observation.feature_ref.as_str()).copied() else {
                 push(&mut findings, "measurement_unknown_feature", format!("{path}.feature_ref"),
@@ -327,6 +352,18 @@ impl AsBuiltInspectionManifest {
             if !metric_unit_matches(&observation.metric_id, &observation.unit) {
                 push(&mut findings, "measurement_unit_mismatch", format!("{path}.unit"),
                     "Measurement unit does not match the canonical as-built metric unit.");
+            }
+            if observation.metric_id == "joint_clearance_mm" {
+                if is_blank_option(&observation.pose_ref) || is_blank_option(&observation.joint_state_ref) {
+                    push(&mut findings, "joint_clearance_pose_binding_missing", format!("{path}.pose_ref/joint_state_ref"),
+                        "Joint-clearance measurements must bind an approved pose and exact joint-state record.");
+                } else if !feature.required_pose_refs.iter().any(|pose| Some(pose.as_str()) == observation.pose_ref.as_deref()) {
+                    push(&mut findings, "joint_clearance_pose_not_required", format!("{path}.pose_ref"),
+                        "Joint-clearance observation pose is not in the feature's frozen required pose set.");
+                }
+            } else if observation.pose_ref.is_some() || observation.joint_state_ref.is_some() {
+                push(&mut findings, "unexpected_pose_binding", format!("{path}.pose_ref/joint_state_ref"),
+                    "Pose and joint-state references are only valid for joint-clearance measurements.");
             }
             if !observation.measured_value.is_finite()
                 || !observation.expanded_uncertainty.is_finite()
@@ -407,10 +444,17 @@ impl AsBuiltInspectionManifest {
             } else {
                 "uncertainty_blocked"
             };
+            if self.measurement_session.as_ref().is_some_and(|session|
+                observation.expanded_uncertainty < session.registration_uncertainty_mm)
+            {
+                push(&mut findings, "feature_uncertainty_omits_registration_component", format!("{path}.expanded_uncertainty"),
+                    "Feature expanded uncertainty cannot be smaller than the declared registration uncertainty contribution.");
+            }
             assessments.push(FeatureAssessment {
                 measurement_id: observation.measurement_id.clone(),
                 feature_ref: observation.feature_ref.clone(),
                 metric_id: observation.metric_id.clone(),
+                pose_ref: observation.pose_ref.clone(),
                 measured_lower_bound: lower,
                 measured_upper_bound: upper,
                 disposition: disposition.to_string(),
@@ -420,7 +464,18 @@ impl AsBuiltInspectionManifest {
         if self.state == "measured" || self.state == "adjudicated" {
             for feature in self.feature_catalog.iter().filter(|feature| feature.mandatory) {
                 for metric in &feature.required_metrics {
-                    if !self.observations.iter().any(|observation|
+                    if metric.metric_id == "joint_clearance_mm" {
+                        for pose_ref in &feature.required_pose_refs {
+                            if !self.observations.iter().any(|observation|
+                                observation.feature_ref == feature.feature_ref
+                                    && observation.metric_id == metric.metric_id
+                                    && observation.pose_ref.as_deref() == Some(pose_ref.as_str()))
+                            {
+                                push(&mut findings, "mandatory_pose_measurement_missing", "observations",
+                                    format!("Mandatory feature {} is missing joint-clearance measurement at pose {}.", feature.feature_ref, pose_ref));
+                            }
+                        }
+                    } else if !self.observations.iter().any(|observation|
                         observation.feature_ref == feature.feature_ref && observation.metric_id == metric.metric_id)
                     {
                         push(&mut findings, "mandatory_feature_measurement_missing", "observations",
@@ -483,10 +538,20 @@ impl AsBuiltInspectionManifest {
             && self.engineering_review.as_ref().is_some_and(|review| review.disposition == "accept")
             && findings.is_empty()
             && self.feature_catalog.iter().filter(|feature| feature.mandatory).all(|feature|
-                feature.required_metrics.iter().all(|metric| assessments.iter().any(|assessment|
-                    assessment.feature_ref == feature.feature_ref
-                        && assessment.metric_id == metric.metric_id
-                        && assessment.disposition == "pass")));
+                feature.required_metrics.iter().all(|metric| {
+                    if metric.metric_id == "joint_clearance_mm" {
+                        feature.required_pose_refs.iter().all(|pose_ref| assessments.iter().any(|assessment|
+                            assessment.feature_ref == feature.feature_ref
+                                && assessment.metric_id == metric.metric_id
+                                && assessment.pose_ref.as_deref() == Some(pose_ref.as_str())
+                                && assessment.disposition == "pass"))
+                    } else {
+                        assessments.iter().any(|assessment|
+                            assessment.feature_ref == feature.feature_ref
+                                && assessment.metric_id == metric.metric_id
+                                && assessment.disposition == "pass")
+                    }
+                }));
 
         ValidationReport {
             findings,
@@ -590,13 +655,13 @@ fn validate_session(
         push(findings, "registration_method_not_admitted", "measurement_session.registration_method",
             "Unconstrained best-fit/ICP registration is not admitted for acceptance; use locked datum/fiducial or a validated transform chain.");
     }
-    if session.fit_datum_refs.is_empty() {
+    if session.fit_datum_refs.is_empty() || session.fit_datum_refs.iter().any(|datum| is_blank(datum)) {
         push(findings, "registration_fit_datums_missing", "measurement_session.fit_datum_refs",
-            "Registration requires explicit datum identities used to compute the transform.");
+            "Registration requires non-empty explicit datum identities used to compute the transform.");
     }
-    if session.holdout_datum_refs.is_empty() {
+    if session.holdout_datum_refs.is_empty() || session.holdout_datum_refs.iter().any(|datum| is_blank(datum)) {
         push(findings, "independent_holdout_datums_missing", "measurement_session.holdout_datum_refs",
-            "Registration requires at least one independent hold-out datum not used to compute the transform.");
+            "Registration requires at least one non-empty independent hold-out datum not used to compute the transform.");
     }
     let fit_datums: HashSet<&str> = session.fit_datum_refs.iter().map(String::as_str).collect();
     if fit_datums.len() != session.fit_datum_refs.len() {
@@ -806,8 +871,8 @@ mod tests {
                 "treatment_state":"as_manufactured"
             },
             "feature_catalog":[
-                {"feature_ref":"forearm_panel","feature_kind":"panel","nominal_geometry_ref":"CAD-PANEL-001","nominal_revision_ref":"CAD-REV-A","mandatory":true,"required_metrics":[{"metric_id":"panel_surface_deviation_mm","unit":"mm","lower_limit":0.0,"upper_limit":1.0}],"minimum_coverage_fraction":0.95,"acceptance_rule_ref":"PANEL-ACCEPTANCE-01"},
-                {"feature_ref":"elbow_seam","feature_kind":"connection","nominal_geometry_ref":"SEAM-CURVE-001","nominal_revision_ref":"TOPOLOGY-REV-A","mandatory":true,"required_metrics":[{"metric_id":"seam_path_deviation_mm","unit":"mm","lower_limit":0.0,"upper_limit":2.0}],"minimum_coverage_fraction":0.98,"acceptance_rule_ref":"SEAM-ACCEPTANCE-01"}
+                {"feature_ref":"forearm_panel","feature_kind":"panel","nominal_geometry_ref":"CAD-PANEL-001","nominal_revision_ref":"CAD-REV-A","mandatory":true,"required_metrics":[{"metric_id":"panel_surface_deviation_mm","unit":"mm","lower_limit":0.0,"upper_limit":1.0}],"required_pose_refs":[],"minimum_coverage_fraction":0.95,"acceptance_rule_ref":"PANEL-ACCEPTANCE-01"},
+                {"feature_ref":"elbow_seam","feature_kind":"connection","nominal_geometry_ref":"SEAM-CURVE-001","nominal_revision_ref":"TOPOLOGY-REV-A","mandatory":true,"required_metrics":[{"metric_id":"seam_path_deviation_mm","unit":"mm","lower_limit":0.0,"upper_limit":2.0}],"required_pose_refs":[],"minimum_coverage_fraction":0.98,"acceptance_rule_ref":"SEAM-ACCEPTANCE-01"}
             ],
             "measurement_session":null,
             "observations":[],
