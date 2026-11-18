@@ -15,7 +15,7 @@ NIST's building digitization work identifies semantic interoperability and machi
 
 ## 2. Pinned upstream snapshot
 
-Sol-Atlas PR #935 head at authoring time: 73730cbcc2b02e2ef045bd6c068cf59e4b4f41df.
+Sol-Atlas PR #935 head at authoring time: 6f0e2846930d3c05b48a5a4fb2f5a75a139d212c.
 
 Catalogue HOME-EXPRESSION-CATALOG-0.2.0 blob SHA: 0ba1af38685636c51d19fa399dee315d648585a6.
 Catalogue JSON Schema v0.2 blob SHA: fd995c652c690ecdd54f24b3b5d7b8ed695d7288.
@@ -96,3 +96,6 @@ Until mapping rules and downstream owner interfaces are accepted, generation is 
 8. Run consented resident/architect trials only when the upstream interface becomes an explicitly authorized, privacy-reviewed channel.
 
 Claim boundary: this is an adapter contract, not evidence that Symthaea currently generates buildable homes or has an architectural capability benchmark result.
+
+
+The Rust adapter now contains a deterministic exact Pareto-front oracle and a separate exact hypervolume function. Hypervolume is computed over PASS-only fronts, supports any objective dimension and mixed minimize/maximize directions, rejects malformed PASS receipts, and requires a manifest-pinned reference point and explicit unit/normalization bounds. Regression tests include a hand-computed 2D union, mixed directions, invalid reference points and the five-objective FloorPlanBench shape. This is a metric implementation, not a FloorPlanBench reproduction.
