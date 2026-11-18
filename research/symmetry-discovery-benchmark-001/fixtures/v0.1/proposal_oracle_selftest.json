@@ -1,0 +1,2744 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "LUMINOUS-SYMM-QUALIFIED-DISCOVERY-001",
+  "benchmark_track": "exact_finite_structural_stabilizer",
+  "split": "discovery",
+  "method": {
+    "name": "exact-manifest-target-smoke-test-not-a-baseline",
+    "version": "0.1.0",
+    "source_revision": "self-test-only",
+    "configuration_digest_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "predictions": [
+    {
+      "case_id": "GENERATED-D4-01",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-04",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-06",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-09",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-11",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-16",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-21",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-23",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-26",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-28",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-33",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-38",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-40",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-43",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-45",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-48",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-50",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-55",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-57",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-60",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-62",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-65",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-67",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-72",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-74",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-77",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-79",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-82",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-84",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-D4-89",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-01",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-04",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-06",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-09",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-11",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-16",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-21",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-23",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-26",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-28",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-33",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-38",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-40",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-43",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-45",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-48",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-50",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-55",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-57",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-60",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-62",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-65",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-67",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-72",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-74",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-77",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-79",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-82",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-84",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C4-89",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-01",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-04",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-06",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-09",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-11",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-16",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-21",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-23",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-26",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-28",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-33",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-38",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-40",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-43",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-45",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-48",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-50",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-55",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-57",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-60",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-62",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-65",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-67",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-72",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-74",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-77",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-79",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-82",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-84",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_R180-89",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-01",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-04",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-06",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-09",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-11",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-16",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-21",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-23",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-26",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-28",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-33",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-38",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-40",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-43",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-45",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-48",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-50",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-55",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-57",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-60",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-62",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-65",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-67",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-72",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-74",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-77",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-79",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-82",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-84",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FX-89",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-01",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-04",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-06",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-09",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-11",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-16",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-21",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-23",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-26",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-28",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-33",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-38",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-40",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-43",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-45",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-48",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-50",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-55",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-57",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-60",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-62",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-65",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-67",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-72",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-74",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-77",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-79",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-82",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-84",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FY-89",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-01",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-04",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-06",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-09",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-11",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-16",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-21",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-23",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-26",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-28",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-33",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-38",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-40",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-43",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-45",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-48",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-50",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-55",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-57",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-60",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-62",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-65",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-67",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-72",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-74",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-77",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-79",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-82",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-84",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FDIAG-89",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-01",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-04",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-06",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-09",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-11",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-16",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-21",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-23",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-26",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-28",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-33",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-38",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-40",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-43",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-45",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-48",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-50",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-55",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-57",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-60",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-62",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-65",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-67",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-72",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-74",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-77",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-79",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-82",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-84",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C2_FANTI-89",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-01",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-04",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-06",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-09",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-11",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-16",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-21",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-23",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-26",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-28",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-33",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-38",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-40",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-43",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-45",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-48",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-50",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-55",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-57",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-60",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-62",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-65",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-67",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-72",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-74",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-77",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-79",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-82",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-84",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_AXIS-89",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-01",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-04",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-06",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-09",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-11",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-16",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-21",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-23",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-26",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-28",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-33",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-38",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-40",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-43",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-45",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-48",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-50",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-55",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-57",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-60",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-62",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-65",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-67",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-72",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-74",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-77",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-79",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-82",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-84",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-V4_DIAG-89",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-01",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-04",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-06",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-09",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-11",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-16",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-21",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-23",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-26",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-28",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-33",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-38",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-40",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-43",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-45",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-48",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-50",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-55",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-57",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-60",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-62",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-65",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-67",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-72",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-74",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-77",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-79",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-82",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-84",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    },
+    {
+      "case_id": "GENERATED-C1-89",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ]
+    }
+  ]
+}
