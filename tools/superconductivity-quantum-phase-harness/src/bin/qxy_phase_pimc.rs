@@ -597,6 +597,53 @@ fn measure(model: &QxyModel, phases: &[f64]) -> Measurement {
     }
 }
 
+fn sample_standard_deviation(values: &[f64]) -> Option<f64> {
+    if values.len() < 2 {
+        return None;
+    }
+    let average = values.iter().sum::<f64>() / values.len() as f64;
+    let variance = values
+        .iter()
+        .map(|value| (value - average).powi(2))
+        .sum::<f64>()
+        / (values.len() - 1) as f64;
+    Some(variance.sqrt())
+}
+
+fn lag_one_autocorrelation(values: &[f64]) -> Option<f64> {
+    if values.len() < 3 {
+        return None;
+    }
+    let average = values.iter().sum::<f64>() / values.len() as f64;
+    let total_variance = values
+        .iter()
+        .map(|value| (value - average).powi(2))
+        .sum::<f64>();
+    if total_variance <= f64::EPSILON {
+        return None;
+    }
+    let lag_covariance = values
+        .windows(2)
+        .map(|pair| (pair[0] - average) * (pair[1] - average))
+        .sum::<f64>();
+    Some(lag_covariance / total_variance)
+}
+
+fn sampling_summary(values: &[f64]) -> Value {
+    let average = values.iter().sum::<f64>() / values.len() as f64;
+    let standard_deviation = sample_standard_deviation(values);
+    let iid_standard_error = standard_deviation
+        .map(|deviation| deviation / (values.len() as f64).sqrt());
+    json!({
+        "mean": average,
+        "sample_standard_deviation": standard_deviation,
+        "iid_standard_error_not_autocorrelation_corrected": iid_standard_error,
+        "lag_one_autocorrelation": lag_one_autocorrelation(values),
+        "sample_count": values.len(),
+        "warning": "These short-chain diagnostics do not establish equilibration or an autocorrelation-corrected uncertainty."
+    })
+}
+
 fn simulate(
     model: &QxyModel,
     warmup_sweeps: usize,
@@ -686,6 +733,12 @@ fn simulate(
         "mean_action_per_spacetime_site": mean_action,
         "mean_finite_size_stiffness_source_normalization": mean_stiffness,
         "mean_total_vortex_density": mean_vortex_density,
+        "sampling_diagnostics": {
+            "action_per_spacetime_site": sampling_summary(&action_values),
+            "finite_size_stiffness": sampling_summary(&stiffness_values),
+            "total_vortex_density": sampling_summary(&vortex_values),
+            "uncertainty_status": "iid_standard_errors_are_diagnostic_only_and_do_not_correct_for_markov_chain_autocorrelation"
+        },
         "claim_ceiling": "Small synthetic QXY path-integral smoke result only; no source reproduction, thermodynamic-limit BKT/QCP estimate, critical exponent, conductivity spectrum, measured Tc or material result."
     }))
 }
@@ -884,6 +937,24 @@ mod tests {
             format!("{:x}", Sha256::digest(&schema))
         );
         assert!(!model.instance_id.is_empty());
+    }
+
+    #[test]
+    fn sampling_diagnostics_report_variance_and_lag_one_dependence() {
+        let values = [1.0, -1.0, 1.0, -1.0, 1.0, -1.0];
+        let deviation = sample_standard_deviation(&values).unwrap();
+        let rho = lag_one_autocorrelation(&values).unwrap();
+        assert!(deviation > 0.0);
+        assert!(rho < -0.5);
+        let summary = sampling_summary(&values);
+        assert_eq!(summary["sample_count"], 6);
+        assert!(summary["iid_standard_error_not_autocorrelation_corrected"].is_number());
+    }
+
+    #[test]
+    fn sampling_diagnostics_do_not_invent_standard_error_for_one_sample() {
+        assert!(sample_standard_deviation(&[1.0]).is_none());
+        assert!(lag_one_autocorrelation(&[1.0, 1.0]).is_none());
     }
 
     #[test]
