@@ -49,8 +49,19 @@ jobs:
             --out "$RUNNER_TEMP/sc-observation-inverse-receipt.json"
           cat "$RUNNER_TEMP/sc-observation-inverse-receipt.json"
 
+      - name: Fit only calibration observations and score held-out modality
+        run: |
+          cargo test --locked --manifest-path tools/superconductivity-observation-inverse-harness/Cargo.toml --bin sc_observation_inverse_fit
+          cargo run --locked --manifest-path tools/superconductivity-observation-inverse-harness/Cargo.toml --bin sc_observation_inverse_fit -- \
+            --schema data/schemas/superconductivity_observation_inverse_instance_v0_1.schema.json \
+            --fixture data/research/superconductivity_observation_inverse_fixture_v0_1.json \
+            --out "$RUNNER_TEMP/sc-observation-inverse-fit-receipt.json"
+          cat "$RUNNER_TEMP/sc-observation-inverse-fit-receipt.json"
+
       - name: Run Clippy
-        run: cargo clippy --locked --manifest-path tools/superconductivity-observation-inverse-harness/Cargo.toml --bin sc_observation_inverse_audit -- -D warnings
+        run: |
+          cargo clippy --locked --manifest-path tools/superconductivity-observation-inverse-harness/Cargo.toml --bin sc_observation_inverse_audit -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-observation-inverse-harness/Cargo.toml --bin sc_observation_inverse_fit -- -D warnings
 
       - name: Record exact-run identity
         if: always()
@@ -63,6 +74,7 @@ jobs:
             sha256sum data/research/superconductivity_observation_inverse_fixture_v0_1.json
             sha256sum tools/superconductivity-observation-inverse-harness/Cargo.toml
             sha256sum tools/superconductivity-observation-inverse-harness/src/main.rs
+            sha256sum tools/superconductivity-observation-inverse-harness/src/bin/fit.rs
             if [ -f tools/superconductivity-observation-inverse-harness/Cargo.lock ]; then
               sha256sum tools/superconductivity-observation-inverse-harness/Cargo.lock
             else
@@ -80,3 +92,4 @@ jobs:
             tools/superconductivity-observation-inverse-harness/Cargo.lock
             ${{ runner.temp }}/sc-observation-inverse-environment.txt
             ${{ runner.temp }}/sc-observation-inverse-receipt.json
+            ${{ runner.temp }}/sc-observation-inverse-fit-receipt.json
