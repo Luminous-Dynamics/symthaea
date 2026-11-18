@@ -10,6 +10,10 @@
 use crate::plasma_observability::{
     BlockedChannel, DecisionChannelRequirement, DecisionInputGate, PlasmaObservationFrame,
 };
+use crate::plasma_cluster_bootstrap::{
+    ShotClusterBootstrapPlan, SHOT_CLUSTER_BOOTSTRAP_RNG_ALGORITHM,
+    shot_cluster_bootstrap_indices, verify_shot_cluster_bootstrap_plan,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -886,6 +890,20 @@ pub struct RateConfidenceInterval {
     pub upper: f64,
 }
 
+/// Shot-cluster percentile interval for false-alarm episodes per hour of
+/// accumulated non-disruptive discharge exposure.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExposureBootstrapInterval {
+    pub lower: f64,
+    pub upper: f64,
+    pub confidence_level: f64,
+    pub requested_replicates: usize,
+    pub valid_replicates: usize,
+    pub plan_sha256: String,
+    pub rng_algorithm: String,
+}
+
 /// Wilson score interval for a binomial per-shot rate. Returns None for an
 /// empty denominator cohort rather than inventing a zero rate or interval.
 fn wilson_interval(successes: usize, trials: usize) -> Option<RateConfidenceInterval> {
@@ -913,6 +931,91 @@ fn nearest_rank_quantile(sorted_values: &[u64], quantile: f64) -> Option<u64> {
     let rank = (quantile * sorted_values.len() as f64).ceil() as usize;
     let index = rank.saturating_sub(1).min(sorted_values.len() - 1);
     sorted_values.get(index).copied()
+}
+
+/// Calculates a 95% percentile interval for false-alarm episodes per hour
+/// of negative-shot exposure. The bootstrap resamples whole shots with
+/// replacement and includes all windows/episodes from each sampled shot.
+///
+/// The caller supplies the exact ordered shot IDs used to build the plan and
+/// one post-hoc evaluation per shot in the same order. Replicates with no
+/// negative exposure are undefined; the function refuses to report an interval
+/// when fewer than 95% of requested replicates are valid.
+pub fn bootstrap_false_alarms_per_non_disruptive_hour(
+    plan: &ShotClusterBootstrapPlan,
+    shot_ids: &[String],
+    evaluations: &[ShotAlarmEvaluation],
+) -> Result<Option<ExposureBootstrapInterval>, PlasmaEventEvalError> {
+    verify_shot_cluster_bootstrap_plan(plan, &plan.body.dataset_revision_id, shot_ids)
+        .map_err(|error| PlasmaEventEvalError::new(error.message))?;
+    if shot_ids.len() != evaluations.len() {
+        return Err(PlasmaEventEvalError::new(
+            "bootstrap shot IDs and per-shot evaluations must have identical lengths",
+        ));
+    }
+    for (shot_id, evaluation) in shot_ids.iter().zip(evaluations) {
+        if shot_id != &evaluation.shot_id {
+            return Err(PlasmaEventEvalError::new(
+                "bootstrap shot ID order must exactly match per-shot evaluation order",
+            ));
+        }
+    }
+    summarize_alarm_evaluations(evaluations)?;
+
+    let mut replicate_rates = Vec::with_capacity(plan.body.replicate_count);
+    for replicate_index in 0..plan.body.replicate_count {
+        let indices = shot_cluster_bootstrap_indices(plan, shot_ids, replicate_index)
+            .map_err(|error| PlasmaEventEvalError::new(error.message))?;
+        let mut false_alarm_events = 0u128;
+        let mut negative_exposure_ns = 0u128;
+        for index in indices {
+            let evaluation = &evaluations[index];
+            if !evaluation.disruptive {
+                false_alarm_events = false_alarm_events
+                    .checked_add(evaluation.false_alarm_events as u128)
+                    .ok_or_else(|| {
+                        PlasmaEventEvalError::new("bootstrap false-alarm count overflow")
+                    })?;
+                negative_exposure_ns = negative_exposure_ns
+                    .checked_add(u128::from(evaluation.exposure_duration_ns))
+                    .ok_or_else(|| {
+                        PlasmaEventEvalError::new("bootstrap negative exposure overflow")
+                    })?;
+            }
+        }
+        if negative_exposure_ns > 0 {
+            let exposure_hours = negative_exposure_ns as f64 / 3_600_000_000_000.0;
+            let rate = false_alarm_events as f64 / exposure_hours;
+            if !rate.is_finite() {
+                return Err(PlasmaEventEvalError::new(
+                    "bootstrap false-alarm rate is non-finite",
+                ));
+            }
+            replicate_rates.push(rate);
+        }
+    }
+
+    let required_valid = (plan.body.replicate_count * 95).div_ceil(100);
+    if replicate_rates.len() < required_valid {
+        return Ok(None);
+    }
+    replicate_rates.sort_by(f64::total_cmp);
+    let lower_index = ((replicate_rates.len() as f64 * 0.025).ceil() as usize)
+        .saturating_sub(1)
+        .min(replicate_rates.len() - 1);
+    let upper_index = ((replicate_rates.len() as f64 * 0.975).ceil() as usize)
+        .saturating_sub(1)
+        .min(replicate_rates.len() - 1);
+
+    Ok(Some(ExposureBootstrapInterval {
+        lower: replicate_rates[lower_index],
+        upper: replicate_rates[upper_index],
+        confidence_level: 0.95,
+        requested_replicates: plan.body.replicate_count,
+        valid_replicates: replicate_rates.len(),
+        plan_sha256: plan.plan_sha256.clone(),
+        rng_algorithm: SHOT_CLUSTER_BOOTSTRAP_RNG_ALGORITHM.to_owned(),
+    }))
 }
 
 /// Aggregates fixed-policy shot outcomes; it does not select or tune thresholds.
