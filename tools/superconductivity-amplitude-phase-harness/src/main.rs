@@ -1,3 +1,5 @@
+mod sampling;
+
 use jsonschema::validator_for;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -727,7 +729,7 @@ fn read(path: &PathBuf) -> Vec<u8> {
 
 fn usage(program: &str) {
     eprintln!(
-        "Usage: {program} --schema <schema.json> --fixture <gl-instance.json> [--out <receipt.json>]"
+        "Usage: {program} --schema <schema.json> --fixture <gl-instance.json> [--monte-carlo] [--warmup-sweeps <n>] [--measurement-sweeps <n>] [--thinning <n>] [--proposal-scale <x>] [--chains <n>] [--seed <n>] [--out <receipt.json>]"
     );
 }
 
@@ -762,20 +764,64 @@ fn main() {
     let mut schema_path = None;
     let mut fixture_path = None;
     let mut output_path = None;
+    let mut monte_carlo = false;
+    let mut sampling_overrides = sampling::SamplingOverrides::default();
     let mut index = 1;
 
     while index < args.len() {
         match args[index].as_str() {
-            "--schema" | "--fixture" | "--out" => {
+            "--monte-carlo" => {
+                monte_carlo = true;
+                index += 1;
+            }
+            "--schema" | "--fixture" | "--out" | "--warmup-sweeps"
+            | "--measurement-sweeps" | "--thinning" | "--proposal-scale"
+            | "--chains" | "--seed" => {
                 if index + 1 >= args.len() {
                     usage(&args[0]);
                     process::exit(2);
                 }
-                let path = PathBuf::from(&args[index + 1]);
+                let value = &args[index + 1];
                 match args[index].as_str() {
-                    "--schema" => schema_path = Some(path),
-                    "--fixture" => fixture_path = Some(path),
-                    "--out" => output_path = Some(path),
+                    "--schema" => schema_path = Some(PathBuf::from(value)),
+                    "--fixture" => fixture_path = Some(PathBuf::from(value)),
+                    "--out" => output_path = Some(PathBuf::from(value)),
+                    "--warmup-sweeps" => {
+                        sampling_overrides.warmup_sweeps = Some(value.parse().unwrap_or_else(|_| {
+                            eprintln!("warmup-sweeps must be an integer");
+                            process::exit(2);
+                        }))
+                    }
+                    "--measurement-sweeps" => {
+                        sampling_overrides.measurement_sweeps = Some(value.parse().unwrap_or_else(|_| {
+                            eprintln!("measurement-sweeps must be an integer");
+                            process::exit(2);
+                        }))
+                    }
+                    "--thinning" => {
+                        sampling_overrides.thinning = Some(value.parse().unwrap_or_else(|_| {
+                            eprintln!("thinning must be an integer");
+                            process::exit(2);
+                        }))
+                    }
+                    "--proposal-scale" => {
+                        sampling_overrides.proposal_scale = Some(value.parse().unwrap_or_else(|_| {
+                            eprintln!("proposal-scale must be numeric");
+                            process::exit(2);
+                        }))
+                    }
+                    "--chains" => {
+                        sampling_overrides.independent_chains = Some(value.parse().unwrap_or_else(|_| {
+                            eprintln!("chains must be an integer");
+                            process::exit(2);
+                        }))
+                    }
+                    "--seed" => {
+                        sampling_overrides.random_seed = Some(value.parse().unwrap_or_else(|_| {
+                            eprintln!("seed must be an unsigned integer");
+                            process::exit(2);
+                        }))
+                    }
                     _ => unreachable!(),
                 }
                 index += 2;
@@ -796,11 +842,27 @@ fn main() {
         usage(&args[0]);
         process::exit(2);
     };
-    let receipt = audit_and_evaluate(&read(&schema_path), &read(&fixture_path))
+    let schema_bytes = read(&schema_path);
+    let fixture_bytes = read(&fixture_path);
+    let mut receipt = audit_and_evaluate(&schema_bytes, &fixture_bytes)
         .unwrap_or_else(|error| {
             eprintln!("SC-AMPLITUDE-PHASE-FAIL: {error}");
             process::exit(1);
         });
+
+    if monte_carlo {
+        let model = GlModel::from_bytes(&schema_bytes, &fixture_bytes).unwrap_or_else(|error| {
+            eprintln!("SC-AMPLITUDE-PHASE-FAIL: {error}");
+            process::exit(1);
+        });
+        let sampling_receipt =
+            sampling::run(&model, &fixture_bytes, sampling_overrides).unwrap_or_else(|error| {
+                eprintln!("SC-AMPLITUDE-PHASE-MC-FAIL: {error}");
+                process::exit(1);
+            });
+        receipt["monte_carlo_pilot"] = sampling_receipt;
+    }
+
     let rendered = serde_json::to_string_pretty(&receipt)
         .expect("serializing the GL audit receipt should not fail");
     if let Some(path) = output_path {
