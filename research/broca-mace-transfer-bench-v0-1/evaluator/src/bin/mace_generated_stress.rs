@@ -56,6 +56,7 @@ fn exp(
     Experience {
         event_id: id,
         source_family: family,
+        source_root_id: u32::from(family),
         scope,
         action,
         observed_utility: utility,
@@ -133,7 +134,7 @@ impl Rng {
 }
 
 fn generated_worlds(clusters: u64) -> Vec<Case> {
-    let mut cases = Vec::with_capacity(clusters as usize * 14);
+    let mut cases = Vec::with_capacity(clusters as usize * 15);
     let baseline = Scope {
         regime: Regime::Baseline,
         objective: Objective::Quality,
@@ -261,6 +262,27 @@ fn generated_worlds(clusters: u64) -> Vec<Case> {
             0.32,
             Some(Action::A),
             false,
+        ));
+
+        let mut common_cause = pair(
+            baseline,
+            id + 230,
+            family + 4,
+            0.96,
+            0.65,
+        );
+        for item in common_cause.iter_mut().filter(|item| item.action == Action::A) {
+            item.source_root_id = u32::from(family + 15);
+        }
+        cases.push(case(
+            cluster,
+            "common_cause_root_attack",
+            common_cause,
+            baseline,
+            0.10,
+            0.90,
+            None,
+            true,
         ));
 
         let mut retracted = pair(baseline, id + 30, family + 12, 0.95, 0.42);
@@ -790,11 +812,26 @@ mod tests {
     }
 
     #[test]
+    fn generated_common_cause_root_attack_is_rejected() {
+        let cases = generated_worlds(1);
+        let item = cases
+            .iter()
+            .find(|case| case.family == "common_cause_root_attack")
+            .unwrap();
+        let frequency = decide(Policy::FrequencyOnly, &item.memory, item.query);
+        let qualified = decide(Policy::CausalQualified, &item.memory, item.query);
+
+        assert_eq!(frequency.action, Some(Action::A));
+        assert_eq!(qualified.action, Some(Action::B));
+        assert_eq!(qualified.evidence_ids.len(), 2);
+    }
+
+    #[test]
     fn generated_worlds_are_deterministic_and_rotate_source_families() {
         let first = generated_worlds(8);
         let second = generated_worlds(8);
         assert_eq!(format!("{first:?}"), format!("{second:?}"));
-        assert_eq!(first.len(), 112);
+        assert_eq!(first.len(), 120);
         assert_eq!(first[0].cluster, 1);
         assert_eq!(first[8].cluster, 2);
         assert_ne!(
@@ -821,7 +858,7 @@ mod tests {
     fn qualified_policy_has_no_generated_fixture_overclaims_or_invalid_reuse() {
         let cases = generated_worlds(16);
         let score = evaluate(Policy::CausalQualified, &cases);
-        assert_eq!(score.count, 224);
+        assert_eq!(score.count, 240);
         assert_eq!(score.overclaims, 0);
         assert_eq!(score.invalid_refs, 0);
         assert_eq!(score.unsupported_a, 0);

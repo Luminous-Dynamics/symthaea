@@ -31,7 +31,7 @@ This is a stronger compile-time boundary than placing the oracle in another Rust
 
 ## Scenario families
 
-The deterministic fixed corpus includes fifteen two-session cases:
+The deterministic fixed corpus includes sixteen two-session cases:
 
 1. Identified interventional effect transfer.
 2. Confounded observational association decoy.
@@ -48,6 +48,7 @@ The deterministic fixed corpus includes fifteen two-session cases:
 13. Positive control in a shifted regime.
 14. Few-shot invariant-effect transport into a shifted regime.
 15. Mechanism-break negative control after a regime shift.
+16. Common-cause attack: two source-family labels share one upstream root.
 
 ## Compared policies
 
@@ -112,7 +113,7 @@ Do not pool percentages across these tasks. Reproduce each official protocol sep
 
 ## Generated stress tranche (MACE v0.4 research)
 
-A second evaluator binary adds **256 deterministic clusters × 14 scenario families = 3,584 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, qualified negative experience, few-shot invariant transport, a mechanism-break negative control, and an unseen-target case that triggers active probing.
+A second evaluator binary adds **256 deterministic clusters × 14 scenario families = 3,840 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, a shared-common-root attack, qualified negative experience, few-shot invariant transport, a mechanism-break negative control, and an unseen-target case that triggers active probing.
 
 Run it independently:
 
@@ -121,7 +122,7 @@ cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p 
 cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-evaluator --bin mace_generated_stress
 ```
 
-The candidate gate requires at least two unique event IDs as well as two declared source families; every repeated event ID is excluded from its qualified evidence set, even when assigned multiple family labels. The runner reports aggregate metrics for all policies and per-family metrics for both exact-scope causal memory and invariant transport. It also reports paired utility lift versus no-memory with a deterministic **cluster-bootstrap 95% interval**, resampling world clusters rather than individual scenarios, and a Session-B / Session-C known-retraction recovery control.
+The candidate gate requires unique event IDs, at least two declared source families and at least two distinct nonzero source-root IDs. Different family labels cannot turn a shared upstream source into independent evidence. Root IDs are candidate-visible claims in this prototype; trusted lineage attestation must come from the source ledger. The runner reports aggregate metrics for all policies and per-family metrics for both exact-scope causal memory and invariant transport. It also reports paired utility lift versus no-memory with a deterministic **cluster-bootstrap 95% interval**, resampling world clusters rather than individual scenarios, and a Session-B / Session-C known-retraction recovery control.
 
 This is a generated synthetic stress distribution—not an official MemoryArena/AMA-Bench adapter, learned-policy train/test split, sealed external oracle or real-world causal discovery. Source-family IDs vary to expose correlation/identity failures, but independence is not cryptographically attested. Bootstrap intervals quantify variation over these generated clusters only; they do not establish external validity. Session-C corrections are applied as observed source-state updates before the next decision.
 

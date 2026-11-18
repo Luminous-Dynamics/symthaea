@@ -42,6 +42,8 @@ pub struct Scope {
 pub struct Experience {
     pub event_id: u32,
     pub source_family: u16,
+    /// Claimed upstream provenance root; zero means unknown and is inadmissible.
+    pub source_root_id: u32,
     pub scope: Scope,
     pub action: Action,
     pub observed_utility: f64,
@@ -194,6 +196,7 @@ fn scope_aware_policy(memory: &[Experience], query: Query) -> Decision {
 
 pub fn is_qualified(item: &Experience, query: Query) -> bool {
     item.scope == query.scope
+        && item.source_root_id != 0
         && item.observed_utility.is_finite()
         && (0.0..=1.0).contains(&item.observed_utility)
         && item.intervention
@@ -208,6 +211,7 @@ pub fn is_qualified(item: &Experience, query: Query) -> bool {
 #[derive(Clone, Debug, Default)]
 struct QualifiedGroup {
     source_families: BTreeSet<u16>,
+    source_roots: BTreeSet<u32>,
     source_events: BTreeSet<u32>,
     sum: f64,
     count: usize,
@@ -220,13 +224,14 @@ impl QualifiedGroup {
             return;
         }
         self.source_families.insert(item.source_family);
+        self.source_roots.insert(item.source_root_id);
         self.sum += item.observed_utility;
         self.count += 1;
         self.evidence_ids.push(item.event_id);
     }
 
     fn independent_support(&self) -> usize {
-        self.source_families.len()
+        self.source_roots.len()
     }
 
     fn mean(&self) -> f64 {
@@ -239,6 +244,7 @@ impl QualifiedGroup {
 
     fn is_qualified(&self) -> bool {
         self.independent_support() >= 2
+            && self.source_families.len() >= 2
             && self.source_events.len() >= 2
             && self.count >= 2
     }
@@ -287,6 +293,7 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
 /// separately by the invariant-transport policy.
 pub fn is_transfer_qualified(item: &Experience, query: Query) -> bool {
     item.scope.objective == query.scope.objective
+        && item.source_root_id != 0
         && item.observed_utility.is_finite()
         && (0.0..=1.0).contains(&item.observed_utility)
         && item.intervention
@@ -334,7 +341,9 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
                 continue;
             }
 
-            if !source.source_families.is_disjoint(&target.source_families) {
+            if !source.source_families.is_disjoint(&target.source_families)
+                || !source.source_roots.is_disjoint(&target.source_roots)
+            {
                 return None;
             }
 
@@ -348,6 +357,9 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
             pooled
                 .source_families
                 .extend(source.source_families.iter().copied());
+            pooled
+                .source_roots
+                .extend(source.source_roots.iter().copied());
             pooled
                 .source_events
                 .extend(source.source_events.iter().copied());
@@ -405,6 +417,7 @@ mod tests {
         Experience {
             event_id: id,
             source_family: family,
+            source_root_id: u32::from(family),
             scope,
             action,
             observed_utility: utility,
@@ -609,6 +622,64 @@ mod tests {
         let decision = decide(Policy::ActiveProbe, &memory, Query { scope });
         assert_eq!(decision.action, Some(Action::A));
         assert!(decision.probe.is_none());
+    }
+
+    #[test]
+    fn different_source_families_from_one_common_root_are_not_independent() {
+        let scope = Scope {
+            regime: Regime::Baseline,
+            objective: Objective::Quality,
+        };
+        let mut a1 = sample(20, 10, Action::A, 0.99, scope);
+        let mut a2 = sample(21, 11, Action::A, 0.99, scope);
+        a1.source_root_id = 700;
+        a2.source_root_id = 700;
+        let b1 = sample(22, 20, Action::B, 0.65, scope);
+        let b2 = sample(23, 21, Action::B, 0.68, scope);
+        let memory = vec![a1, a2, b1, b2];
+
+        assert_eq!(
+            decide(Policy::FrequencyOnly, &memory, Query { scope }).action,
+            Some(Action::A)
+        );
+        let qualified = decide(Policy::CausalQualified, &memory, Query { scope });
+        assert_eq!(qualified.action, Some(Action::B));
+        assert_eq!(qualified.evidence_ids, vec![22, 23]);
+    }
+
+    #[test]
+    fn unknown_source_root_is_not_qualified() {
+        let scope = Scope {
+            regime: Regime::Baseline,
+            objective: Objective::Quality,
+        };
+        let mut item = sample(30, 10, Action::A, 0.9, scope);
+        item.source_root_id = 0;
+        assert!(!is_qualified(&item, Query { scope }));
+    }
+
+    #[test]
+    fn invariant_transport_rejects_shared_common_root_across_regimes() {
+        let mut memory = vec![
+            transport_case(10, 10, Regime::Baseline, Action::A, 0.92),
+            transport_case(11, 11, Regime::Baseline, Action::A, 0.90),
+            transport_case(12, 20, Regime::Baseline, Action::B, 0.32),
+            transport_case(13, 21, Regime::Baseline, Action::B, 0.34),
+            transport_case(14, 30, Regime::Shifted, Action::A, 0.91),
+            transport_case(15, 31, Regime::Shifted, Action::B, 0.33),
+        ];
+        memory[4].source_root_id = 10;
+        memory[5].source_root_id = 20;
+        let query = Query {
+            scope: Scope {
+                regime: Regime::Shifted,
+                objective: Objective::Quality,
+            },
+        };
+        assert_eq!(
+            decide(Policy::InvariantTransport, &memory, query).action,
+            None
+        );
     }
 
     #[test]

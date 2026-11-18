@@ -55,6 +55,7 @@ fn experience(
     Experience {
         event_id,
         source_family,
+        source_root_id: u32::from(source_family),
         scope,
         action,
         observed_utility,
@@ -168,6 +169,11 @@ fn cases() -> Vec<Scenario> {
         experience(121, 2, baseline_quality, Action::B, 0.70),
     ];
     let shifted_identified = valid_pair(shifted_quality, 130, 0.89, 0.30);
+
+    let mut common_cause = valid_pair(baseline_quality, 160, 0.96, 0.65);
+    for item in common_cause.iter_mut().filter(|item| item.action == Action::A) {
+        item.source_root_id = 700;
+    }
 
     vec![
         scenario(
@@ -303,6 +309,15 @@ fn cases() -> Vec<Scenario> {
             Query { scope: shifted_quality },
             0.0,
             1.0,
+            None,
+            true,
+        ),
+        scenario(
+            "common_cause_root_attack",
+            common_cause,
+            Query { scope: baseline_quality },
+            0.10,
+            0.90,
             None,
             true,
         ),
