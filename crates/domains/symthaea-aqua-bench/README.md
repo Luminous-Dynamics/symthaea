@@ -68,6 +68,7 @@ The adapter remains deliberately small: it binds paired Aqua test runs to equiva
 - `docs/AQUA_SPRAY_FIELD_METROLOGY_PROTOCOL_V0_1.md`
 - `docs/AQUA_SPRAY_GEOMETRY_DOE_PROTOCOL_V0_1.md`
 - `docs/AQUA_BOUNDED_BATHING_SERVICE_COMPILER_V0_1.md`
+- `docs/AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md` — base-flow / explicit boost task phases and matched complete-task benchmark.
 - `docs/AQUA_ESSENTIAL_SERVICE_CONTINUITY_PROTOCOL_V0_1.md`
 - `docs/AQUA_WASHSTATION_BENCHMARK_V0_1.md` — South African SANS Table 3 fixture-specific flow and design-pressure references.
 - `docs/AQUA_LOW_PRESSURE_VALIDATION_PROTOCOL_V0_1.md` — pressure datum, 50–550 kPa test matrix, comparator eligibility and unoccupied validation sequence.
