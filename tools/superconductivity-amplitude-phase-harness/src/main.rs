@@ -652,10 +652,7 @@ impl GlModel {
                     let to = corners[(side + 1) % 4];
                     let key = (from.min(to), from.max(to));
                     let Some(edge_index) = edge_lookup.get(&key).copied() else {
-                        return Err(format!(
-                            "missing GL edge for plaquette link {} -> {}",
-                            self.nodes[from].id, self.nodes[to].id
-                        ));
+                        return Ok(None);
                     };
                     let edge = &self.edges[edge_index];
                     let signed_gauge = if edge.source == from && edge.target == to {
