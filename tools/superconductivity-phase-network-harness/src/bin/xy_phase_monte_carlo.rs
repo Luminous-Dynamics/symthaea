@@ -718,4 +718,22 @@ mod tests {
         let mutated = serde_json::to_vec(&value).unwrap();
         assert!(Network::from_bytes(&schema, &mutated).is_err());
     }
+
+    #[test]
+    fn finite_size_fixture_ladder_resolves_8x8_and_16x16_graphs() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
+        let schema = fs::read(
+            root.join("data/schemas/superconductivity_phase_network_instance_v0_1.schema.json"),
+        )
+        .unwrap();
+        for (filename, expected_nodes, expected_edges) in [
+            ("superconductivity_phase_network_square_8x8_fixture_v0_1.json", 64, 128),
+            ("superconductivity_phase_network_square_16x16_fixture_v0_1.json", 256, 512),
+        ] {
+            let fixture = fs::read(root.join("data/research").join(filename)).unwrap();
+            let network = Network::from_bytes(&schema, &fixture).unwrap();
+            assert_eq!(network.node_count, expected_nodes);
+            assert_eq!(network.edges.len(), expected_edges);
+        }
+    }
 }
