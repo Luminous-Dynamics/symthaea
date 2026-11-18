@@ -126,3 +126,75 @@ This is a coarse-grained GL research model. It does not calculate microscopic el
 - Quantum phase-only rotor baseline: #12779.
 - Synthesis protocol → realized phase / microstructure: #12671.
 - Application-specific translation: #12651.
+
+
+## Executable input auditor and static free-energy evaluator
+
+The initial Rust binary is `sc_amplitude_phase_audit` under `tools/superconductivity-amplitude-phase-harness`. It is deliberately an evaluator for a supplied synthetic complex field, not a thermal sampler or minimizer.
+
+For the declared link convention, it evaluates:
+
+\[
+F_{\mathrm{local}}=\sum_i\left[a_i|\psi_i|^2+\frac{b_i}{2}|\psi_i|^4\right],
+\qquad
+F_{\mathrm{gradient}}=\sum_{\langle ij\rangle}K_{ij}|\psi_i-e^{iA_{ij}}\psi_j|^2.
+\]
+
+The receipt includes both terms, their total, the mean amplitude, graph/boundary metadata, and SHA-256 hashes of the exact schema and fixture. The parser rejects non-finite fields, non-positive quartic or gradient coefficients, duplicate IDs/bonds, unresolved endpoints, inconsistent periodic-image geometry, and hidden nonzero gauge links under a zero-field declaration.
+
+### Gauge invariance
+
+The implementation tests the transformation
+
+\[
+\psi_i' = e^{i\chi_i}\psi_i,
+\qquad
+A_{ij}'=A_{ij}+\chi_i-\chi_j.
+\]
+
+It requires the free-energy residual to be below \(10^{-9}\) dimensionless lattice-energy units. The unit tests exercise both the uniform fixture and nonuniform complex fields with nonzero background links. A wrong-sign transformation is a negative control and must change the energy.
+
+### Amplitude-aware plaquette winding
+
+For complete 2D rectangular integer-coordinate grids, it evaluates a gauge-invariant integer plaquette winding. With a stored oriented link \(A_{ij}\), the oriented covariant phase difference is
+
+\[
+\delta_{ij}^{\mathrm{cov}}=
+\operatorname{wrap}(\arg\psi_j-\arg\psi_i+A_{ij}).
+\]
+
+The integer winding is recovered by subtracting the oriented plaquette link flux:
+
+\[
+q_p=\operatorname{round}\left[
+\frac{\sum_{(ij)\in\partial p}\delta_{ij}^{\mathrm{cov}}
+-\sum_{(ij)\in\partial p}A_{ij}}{2\pi}
+\right].
+\]
+
+This convention is consistent with the link term \(|\psi_i-e^{iA_{ij}}\psi_j|^2\) and the gauge transformation above. It is not a field-theoretic continuum magnetic flux density. Plaquettes touching a site with \(|\psi_i|\le\max(\epsilon_{\mathrm{core}},\epsilon_{\mathrm{machine}})\) are marked skipped: the phase at a zero-amplitude core is undefined. The receipt reports positive and negative integer charge, absolute charge sum, valid plaquettes and skipped low-amplitude plaquettes separately.
+
+The synthetic 4×4 periodic phase-winding fixture control generates compensating periodic images: two positive and two negative unit plaquette charges. The same winding counts must survive a local gauge transformation. Suppressing one site to zero amplitude must skip the four adjacent plaquettes rather than invent a phase.
+
+### Exact synthetic checks
+
+For the committed 4×4 uniform fixture, \(a=-1\), \(b=1\), \(|\psi|=1\), and \(K=1\) with zero link field:
+- local potential energy is \(-8\);
+- gradient energy is \(0\);
+- total static free energy is \(-8\).
+
+If one site is set to \(\psi=0\), its local contribution changes by \(+0.5\), while its four incident unit-coupling links contribute gradient energy \(+4\), giving local \(-7.5\), gradient \(+4\), total \(-3.5\).
+
+These are algebraic/software controls, not measured material energies.
+
+### Current limitations
+
+Not implemented or qualified:
+- thermal Metropolis / hybrid Monte Carlo sampling of the full complex field;
+- equilibration, autocorrelation, independent-chain error estimates and finite-size scaling;
+- thermodynamic integration of constrained vortex free energy;
+- BKT versus first-order phase-transition classification;
+- self-consistent Maxwell screening or a magnetic-field minimizer;
+- dynamics, noise, fluctuation-dissipation and conductivity.
+
+The current vortex output is a phase-winding count with an explicit amplitude threshold. It does not yet estimate vortex-core free energy, distinguish bound from unbound pairs, or classify the transition.
