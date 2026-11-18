@@ -115,6 +115,30 @@ Table 3 is an installation design-demand reference:
 
 Use the controlled SABS publication and confirm project applicability with the responsible professional before a compliance decision. An IOPSA notice is a secondary summary, not the controlled standard.
 
+
+### 2.6 EN 18021:2025 — boost-function category separation
+
+The standard's contents identify distinct functional-test clauses for:
+- **7.3.3:** boost function for taps;
+- **8.3.2:** boost function for shower outlets;
+- **10.3.8:** boost function for shower systems.
+
+The standard defines a boost function as a device outside the primary flow control that temporarily raises flow on deliberate user action and automatically cancels the increase when flow is interrupted or the deliberate action stops. It notes that boost may also change spray appearance without creating a separate mode because it auto-returns.
+
+The accessible excerpt exposes the tap-specific acceptance text in 7.3.3.4: automatic return after flow control off; Qcheck < 1.2 × Qeco; and, for recorded boost flows above 8 L/min, Qboost < 2 × Qeco. **These are tap-clause requirements only in the accessible text. Do not transfer them to shower outlets under 8.3.2 or shower systems under 10.3.8.** The full controlled shower-specific criteria need to be checked before implementation or conformity claims.
+
+This creates a crucial benchmark rule for Aqua:
+- the UWL 2023 boost procedure in clause 12.1 remains its own test method and acceptance wording;
+- EN 18021 tap boost tests, shower-outlet boost tests and shower-system boost tests must be kept as distinct product/method arms;
+- the UK ETL's user-behaviour features (UBFs) are a separate concept intended to reduce total water / duration. A hold-to-boost function is not automatically an ETL UBF;
+- product-marketing statements (such as a temporary boost button) do not establish a successful UWL or EN 18021 test.
+
+The Hansgrohe Activera WaterBoost 28036000 remains a high-value exact comparator but its published values conflict in scope: 2.9 L/min regular Rain/ImpactRain, boosted ImpactRain 6.6 L/min and Rain 9.4 L/min, while the same product information lists a 4 L/min regulator / maximum and a minimum flow pressure of 0.8 bar. Treat these as manufacturer declarations with unresolved scope, not a finding of standard nonconformity. Obtain written manufacturer clarification and run the exact specimen/mode under the controlled method before comparing it as qualified.
+
+Accessible standard preview / contents and definition: https://standards.theiteh.com/catalog/standards/sist/c6238aba-f737-415e-b3d0-019504256f48/sist-en-18021-2025  
+Official national catalogue entry: https://store.uni.com/en/en-18021-2025
+
+
 ## 3. Aqua engineering pressure points
 
 Aqua's current low-pressure protocol uses 50 / 75 / 100 kPa as research points motivated by the local SANS design-flow reference and the EN 18021:2025 lower operating-pressure range. These are not automatic pass points for every product.
