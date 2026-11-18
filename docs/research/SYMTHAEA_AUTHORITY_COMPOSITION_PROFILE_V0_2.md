@@ -270,6 +270,15 @@ Source-reviewed against Symthaea main at the PR base head. This is an integratio
 - A WASM runtime compiled into the binary is not permission to execute every module; path containment, explicit caller authority, resource bounds and result semantics are separate gates.
 - A multi-action sequence is not one indivisible authorization unless its exact ordered content and aggregate exposure are explicitly bound; preserve partial outcomes.
 
+### Current source-migration increments
+
+The profile is connected to two narrow source-level migrations now under draft review:
+
+- [#12822 — malformed cognitive scalars and action selectors](https://github.com/Luminous-Dynamics/symthaea/pull/12822), linked to #565. It rejects non-finite/out-of-range Phi and confidence values before ordered comparisons and requires an exact finite-integer action selector. This is a fail-closed input repair, not the full #5439 scalar-to-caution migration or an authorization kernel.
+- [#12825 — collective Phi becomes cognition-only](https://github.com/Luminous-Dynamics/symthaea/pull/12825), linked to #4143. It replaces the authority-named delegation type/API with `CollectiveCognitiveInfluence`, preserves the blended cognitive estimate, and removes the unused swarm `effective_phi()` wrapper.
+
+Both are source migrations awaiting Rust format/check/test/Clippy and exact-head review. No CI or compile pass is claimed. #4155 remains the independent exact-head static/behavioral qualification owner; these PRs are candidate evidence inputs, not proof that the repository-wide theorem already passes.
+
 ## 12. Implementation plan
 
 **Phase A — profile fixtures:** author eight paired Symthaea-specific cognitive-authority non-interference cases. Each changes exactly one internal signal (Φ, reputation, memory provenance/freshness, evidence confidence, skill version, or swarm consensus) while pinning principal, mandate, grant, policy and operation. Define the expected decision and final environment state independently.
