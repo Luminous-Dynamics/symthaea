@@ -399,8 +399,12 @@ fn evaluate(policy: Policy, scenarios: &[Scenario]) -> Metrics {
         let (decision, memory, probe_cost, probe_requested, probe_resolved) =
             simulate(policy, case);
         metrics.decisions += 1;
-        metrics.probe_requests += u32::from(probe_requested);
-        metrics.probe_resolved += u32::from(probe_resolved);
+        if probe_requested {
+            metrics.probe_requests += 1;
+        }
+        if probe_resolved {
+            metrics.probe_resolved += 1;
+        }
         metrics.probe_cost_micros += (probe_cost * 1_000_000.0).round() as u32;
 
         let action = match decision.action {

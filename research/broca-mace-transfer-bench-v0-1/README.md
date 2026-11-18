@@ -108,7 +108,7 @@ Do not pool percentages across these tasks. Reproduce each official protocol sep
 
 ## Generated stress tranche (MACE v0.3 research)
 
-A second evaluator binary adds **256 deterministic clusters × 13 scenario families = 3,328 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, qualified negative experience, few-shot invariant transport and a mechanism-break negative control.
+A second evaluator binary adds **256 deterministic clusters × 14 scenario families = 3,584 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, qualified negative experience, few-shot invariant transport, a mechanism-break negative control, and an unseen-target case that triggers active probing.
 
 Run it independently:
 
@@ -132,3 +132,11 @@ This is a transparent empirical-invariance heuristic, not a general transportabi
 ## Benchmark portfolio
 
 See [MACE causal-memory benchmark portfolio](../../docs/research/MACE_CAUSAL_MEMORY_BENCHMARK_PORTFOLIO.md) for the current industry comparison, matched-protocol SOTA targets, paradigm shifts, and qualification gates. External benchmark scores remain separate; internal synthetic scores are not SOTA claims.
+
+## Active probing / value-of-information experiment
+
+The `active_probe` policy tries exact-scope evidence first, then invariant transport. Only if both are unavailable does it set `requires_probe`. The evaluator then simulates four target-regime intervention observations (two independent source families per action), returns those observations to the candidate, and scores the second exact-scope decision.
+
+A probe has a declared **0.12 normalized utility cost**. Reports include probe requests, successful resolutions and total probe cost; utility/regret and cluster-bootstrap comparisons use **net utility after that cost**. A generated positive control has useful prior-regime experience but no target-regime witness, allowing active probing to be compared with abstention/no-memory without granting free information.
+
+This is an environment-simulation result. The evaluator uses hidden scenario utilities to generate observations, but candidate policy code receives only the generated observations and query. The prototype does not yet model physical probe risk, safety constraints, experiment duration or real-world intervention cost.
