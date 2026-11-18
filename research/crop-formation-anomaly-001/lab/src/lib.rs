@@ -37,3 +37,67 @@ pub use statistics::{
     FamilyWiseMaxResult, binary_entropy, familywise_max_statistic_p_value,
     upper_tail_max_p_value, wilson_interval,
 };
+
+#[cfg(test)]
+mod integrated_tests {
+    use super::*;
+
+    const CCAT_ZEALS_KNOLL: &str =
+        include_str!("../../datasets/ccat-zeals-knoll-2026/circles_drag_60.csv");
+
+    #[test]
+    fn geometry_family_replays_all_radius_permutation_nulls_with_familywise_correction() {
+        let circles = parse_circle_csv(CCAT_ZEALS_KNOLL).expect("source geometry fixture");
+        let family = CircleGrammarFamily::new(
+            "ccat-familywise-radius-position-v1",
+            1,
+            vec![
+                CircleGrammarSpec {
+                    spec_id: "k4-t40".into(),
+                    radius_class_count: 4,
+                    tangent_gap_tolerance_px: 40.0,
+                },
+                CircleGrammarSpec {
+                    spec_id: "k5-t45".into(),
+                    radius_class_count: 5,
+                    tangent_gap_tolerance_px: 45.0,
+                },
+                CircleGrammarSpec {
+                    spec_id: "k6-t50".into(),
+                    radius_class_count: 6,
+                    tangent_gap_tolerance_px: 50.0,
+                },
+            ],
+        )
+        .expect("frozen family");
+        let observed = family.evaluate(&circles).expect("observed family");
+        let seeds = [11, 22, 33, 44, 55, 66, 77, 88, 99, 111];
+        let null_replicates = run_radius_permutation_ensemble(&circles, &family, &seeds)
+            .expect("all null replicates rerun complete family");
+
+        let observed_scores: Vec<f64> = observed
+            .iter()
+            .map(|outcome| outcome.first_last_class_edge_count as f64)
+            .collect();
+        let null_score_matrix: Vec<Vec<f64>> = null_replicates
+            .iter()
+            .map(|replicate| {
+                replicate
+                    .iter()
+                    .map(|outcome| outcome.first_last_class_edge_count as f64)
+                    .collect()
+            })
+            .collect();
+        let result = familywise_max_statistic_p_value(
+            &observed_scores,
+            &null_score_matrix,
+        )
+        .expect("complete family-wise null matrix");
+
+        assert_eq!(result.family_size, family.specifications().len());
+        assert_eq!(result.null_replicate_count, seeds.len());
+        assert_eq!(result.observed_maximum, observed_scores.iter().copied().fold(0.0, f64::max));
+        assert!(result.adjusted_p_value >= 1.0 / (seeds.len() + 1) as f64);
+        assert!(result.adjusted_p_value <= 1.0);
+    }
+}
