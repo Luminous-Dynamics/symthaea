@@ -223,7 +223,7 @@ Include \(x=0\) and states where the stabilizer changes. The implementation must
 
 ## 8. Independent qualification
 
-The standalone Rust oracle now includes exact scalar-output checks: `a`, `b`, `c` and signed `ell` are SO(2)-invariant, while absolute external-frame coordinate `x1` is rejected as non-invariant. This validates one observable-level obligation only; the complete task contract and pruning permission remain owned by #11616.
+The standalone Rust oracle now has explicit arithmetic bounds (exponent `0..=8`, coupling `1..=1,000,000`) and rejects unsupported inputs before polynomial expansion. It includes exact scalar-output checks: `a`, `b`, `c` and signed `ell` are SO(2)-invariant, while absolute external-frame coordinate `x1` is rejected as non-invariant. This validates one observable-level obligation only; the complete task contract and pruning permission remain owned by #11616.
 
 The exact development oracle should independently verify:
 1. SO(2) group-generator algebra and the block action on \((x,v)\).
