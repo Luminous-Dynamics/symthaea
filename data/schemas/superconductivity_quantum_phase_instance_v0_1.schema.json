@@ -213,14 +213,14 @@
       "required": [
         "matrix_kind",
         "energy_unit",
-        "matrix_u_ij",
         "offset_charges"
       ],
       "properties": {
         "matrix_kind": {
           "enum": [
             "dense_symmetric_positive_definite",
-            "diagonal_positive"
+            "diagonal_positive",
+            "diagonal_scalar"
           ]
         },
         "energy_unit": {
@@ -243,6 +243,10 @@
           "items": {
             "type": "number"
           }
+        },
+        "diagonal_value": {
+          "type": "number",
+          "exclusiveMinimum": 0
         }
       }
     },
