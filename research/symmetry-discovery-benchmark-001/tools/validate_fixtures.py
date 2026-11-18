@@ -257,11 +257,50 @@ def main():
     if len(split_ids) != len(set(split_ids)):
         fail("discovery/calibration/final holdout split IDs must be distinct")
 
+    split = fixture["split_contract"]
+    split_ids = [
+        split["discovery_split_id"],
+        split["calibration_split_id"],
+        split["final_holdout_split_id"],
+    ]
+    if len(split_ids) != len(set(split_ids)):
+        fail("discovery/calibration/final holdout split IDs must be distinct")
+
+    expected_split_counts = {
+        "fixture_sanity": 5,
+        "discovery": 300,
+        "calibration": 300,
+        "final_holdout": 300,
+    }
+    actual_split_counts = defaultdict(int)
+    generated_family_splits = defaultdict(int)
+    for case in fixture["cases"]:
+        split_name = case.get("split")
+        if split_name not in expected_split_counts:
+            fail(f"{case['case_id']}: invalid or missing split {split_name!r}")
+        actual_split_counts[split_name] += 1
+        if case["case_id"].startswith("GENERATED-"):
+            generated_family_splits[
+                (case["expected_subgroup_label"], split_name)
+            ] += 1
+    if dict(actual_split_counts) != expected_split_counts:
+        fail(f"unexpected split counts: {dict(actual_split_counts)!r}")
+    for family, *_ in generator.FAMILIES:
+        for split_name in ("discovery", "calibration", "final_holdout"):
+            actual = generated_family_splits[(family, split_name)]
+            if actual != 30:
+                fail(
+                    f"{family}/{split_name}: expected 30 generated cases, got {actual}"
+                )
+
     print("SYMM_Q_FIXTURE_PASS")
     print(f"group={ambient['group_id']} order={len(element_ids)} products={len(product_table)} inverse_witnesses={len(inverses)}")
     for case_id, stabilizer in results:
         print(f"{case_id}: {','.join(stabilizer)}")
-    print(f"generated_exact_cases={len(generated)}; families=10; cases_per_family=30")
+    print(
+        f"generated_exact_cases={len(generated)}; families=10; "
+        "cases_per_family=90; split_counts=30/30/30"
+    )
     print("benchmark_status=fixture_validation_only; external_baseline_runs=not_started")
 
 
