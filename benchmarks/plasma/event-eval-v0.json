@@ -43,11 +43,39 @@
         "test_read_only": true
       },
       "tokamark_temporal_transfer": {
-        "description": "Supplementary campaign-shift evaluation using TokaMark temporal split; the two most recent campaigns are held out as test",
+        "description": "Pinned TokaMark temporal campaign split: train and validation use M5/M6/M7 plus Unknown; test is exclusively the later M8 and M9 campaigns",
         "source": "TokaMind official data-split documentation",
         "repository_commit": "d64fbe3826057576f06d3158592917dd2443a960",
         "use_for_primary_temporal_generalization": true,
-        "do_not_mix_with_random_or_paper_cohort": true
+        "do_not_mix_with_random_or_paper_cohort": true,
+        "source_csv": "UKAEA-IBM-STFC-Fusion-FMs/tokamark/src/tokamark/metadata/TokaMark_temporal_data_splits.csv",
+        "source_commit": "146b0a0f87380bb16817f2e8758e84ce79ed45d0",
+        "total_shots": 11188,
+        "shot_counts": {
+          "train": 6525,
+          "validation": 1554,
+          "test": 3109
+        },
+        "campaign_membership": {
+          "train": {
+            "M5": 1418,
+            "M6": 2199,
+            "M7": 2676,
+            "Unknown": 232
+          },
+          "validation": {
+            "M5": 368,
+            "M6": 495,
+            "M7": 631,
+            "Unknown": 60
+          },
+          "test": {
+            "M8": 2009,
+            "M9": 1100
+          }
+        },
+        "test_policy": "M8 and M9 are held out as future campaigns; never tune preprocessing, thresholds, warning interval, persistence or calibration on this test cohort",
+        "split_semantics": "campaign-forward holdout; campaign label Unknown remains in train/validation only"
       },
       "tokamark_random_split": {
         "description": "Secondary in-distribution random shot split (80/10/10) for comparability with conventional benchmark practice",
@@ -55,7 +83,9 @@
         "use_as_secondary_only": true,
         "do_not_mix_with_temporal_or_paper_cohort": true
       }
-    }
+    },
+    "primary_temporal_test": "tokamark_temporal_transfer",
+    "random_split_role": "secondary in-distribution comparator only"
   },
   "online_policy_contract": {
     "input_fields": [
