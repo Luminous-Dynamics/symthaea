@@ -19,8 +19,11 @@ Run the composer adapter from the repository root:
 
 The cohort selector is discovery, confirmation, or both. The adapter validates
 the manifest against the exact frozen style, seed, and 3^4 cell set before
-composing anything. The final argument is a required 40-hex source commit SHA
-and is retained in every result row.
+composing anything. The final argument is a required 40-hex source commit SHA. The adapter verifies
+that it equals the checked-out HEAD and refuses a dirty worktree before
+composing anything; the SHA is retained in every result row. Put generated
+manifests and reports outside the source checkout (for example under /tmp) so
+they do not contaminate the next run.
 
 Analyze the resulting observations. The metric registry must be explicit:
 
