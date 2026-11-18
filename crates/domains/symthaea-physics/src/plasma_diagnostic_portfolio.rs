@@ -601,77 +601,16 @@ pub fn minimum_cost_sufficient_portfolio(
 mod tests {
     use super::*;
 
+    fn benchmark_manifest() -> serde_json::Value {
+        serde_json::from_str(include_str!(
+            "../../../../benchmarks/plasma/diagnostic-portfolio-v0.json"
+        ))
+        .expect("portfolio benchmark manifest should parse")
+    }
+
     fn reference_model() -> DiagnosticPortfolioModel {
-        let worlds = vec![
-            DecisionWorld {
-                world_id: "healthy_closed".to_owned(),
-                decision_id: "PROCEED".to_owned(),
-            },
-            DecisionWorld {
-                world_id: "failed_closed".to_owned(),
-                decision_id: "BLOCK".to_owned(),
-            },
-            DecisionWorld {
-                world_id: "healthy_open".to_owned(),
-                decision_id: "BLOCK".to_owned(),
-            },
-            DecisionWorld {
-                world_id: "failed_open".to_owned(),
-                decision_id: "BLOCK".to_owned(),
-            },
-        ];
-
-        let sensor = |sensor_id: &str,
-                      group: &str,
-                      cost: u64,
-                      values: [&str; 4]| DiagnosticSensor {
-            sensor_id: sensor_id.to_owned(),
-            common_mode_groups: vec![group.to_owned()],
-            resource_cost: Some(cost),
-            resource_unit: Some("synthetic_resource_unit".to_owned()),
-            observations: worlds
-                .iter()
-                .zip(values)
-                .map(|(world, value)| SensorWorldObservation {
-                    world_id: world.world_id.clone(),
-                    observation: if value == "UNKNOWN" {
-                        SensorObservation::Unknown
-                    } else {
-                        SensorObservation::Known(value.to_owned())
-                    },
-                })
-                .collect(),
-        };
-
-        DiagnosticPortfolioModel {
-            schema_version: PLASMA_DIAGNOSTIC_PORTFOLIO_SCHEMA.to_owned(),
-            model_id: "synthetic-plasma-decisions-v0".to_owned(),
-            decision_catalogue_id: "synthetic-proceed-block-v0".to_owned(),
-            resource_unit: Some("synthetic_resource_unit".to_owned()),
-            worlds,
-            sensors: vec![
-                sensor(
-                    "gen_current",
-                    "gen_electrical",
-                    2,
-                    ["H", "F", "H", "F"],
-                ),
-                sensor(
-                    "gen_vibration",
-                    "gen_mechanical",
-                    1,
-                    ["H", "F", "H", "F"],
-                ),
-                sensor("tie_aux", "switch_aux", 4, ["C", "C", "O", "O"]),
-                sensor("tie_optical", "optical", 3, ["C", "C", "O", "O"]),
-                sensor(
-                    "failed_diag",
-                    "diag_bus",
-                    1,
-                    ["UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN"],
-                ),
-            ],
-        }
+        serde_json::from_value(benchmark_manifest()["model"].clone())
+            .expect("synthetic portfolio model should deserialize")
     }
 
     fn all_sensor_ids(model: &DiagnosticPortfolioModel) -> Vec<String> {
@@ -680,6 +619,54 @@ mod tests {
             .iter()
             .map(|sensor| sensor.sensor_id.clone())
             .collect()
+    }
+
+    #[test]
+    fn frozen_portfolio_manifest_matches_rust_oracle_outputs() {
+        let manifest = benchmark_manifest();
+        assert_eq!(
+            manifest["schema_version"],
+            "luminous.plasma-diagnostic-portfolio-benchmark.v0.1"
+        );
+        assert_eq!(
+            manifest["benchmark_id"],
+            PLASMA_DIAGNOSTIC_PORTFOLIO_BENCHMARK_ID
+        );
+        assert_eq!(manifest["physical_measurements"], false);
+        assert_eq!(manifest["resource_costs_are_synthetic_test_values"], true);
+        assert_eq!(
+            manifest["claim_ceiling"],
+            "FINITE_SYMBOLIC_DECISION_SUFFICIENCY_ONLY_NO_PHYSICAL_OBSERVABILITY_OR_SENSOR_RELIABILITY_CLAIM"
+        );
+
+        let model = reference_model();
+        let all = all_sensor_ids(&model);
+        let expected_minimal: Vec<Vec<String>> =
+            serde_json::from_value(manifest["expected"]["minimal_sufficient_sensor_sets"].clone())
+                .expect("minimal set fixture");
+        let expected_sensor_cuts: Vec<Vec<String>> =
+            serde_json::from_value(manifest["expected"]["minimal_sensor_cut_sets"].clone())
+                .expect("sensor cut fixture");
+        let expected_group_cuts: Vec<Vec<String>> =
+            serde_json::from_value(manifest["expected"]["minimal_common_mode_cut_sets"].clone())
+                .expect("common mode cut fixture");
+
+        assert!(diagnose(&model, &all).expect("full portfolio").diagnosable);
+        assert_eq!(minimal_sufficient_sensor_sets(&model).expect("minimal sets"), expected_minimal);
+        assert_eq!(minimal_sensor_cut_sets(&model, &all).expect("sensor cuts"), expected_sensor_cuts);
+        assert_eq!(
+            minimal_common_mode_cut_sets(&model, &all).expect("group cuts"),
+            expected_group_cuts
+        );
+        let expected_cost: CostedSufficientPortfolio =
+            serde_json::from_value(manifest["expected"]["minimum_cost_sufficient_portfolio_at_budget_4"].clone())
+                .expect("cost fixture");
+        assert_eq!(
+            minimum_cost_sufficient_portfolio(&model, 4)
+                .expect("cost optimizer")
+                .expect("feasible"),
+            expected_cost
+        );
     }
 
     #[test]
