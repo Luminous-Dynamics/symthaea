@@ -716,6 +716,16 @@ impl StreamSession {
         self.processor.dropped_sample_count()
     }
 
+    /// Number of frame starts skipped because their source samples were lost.
+    pub fn skipped_frame_count(&self) -> u64 {
+        self.processor.skipped_frame_count()
+    }
+
+    /// Current temporal segment number.
+    pub fn segment_index(&self) -> u64 {
+        self.processor.segment_index()
+    }
+
     /// Get latency in milliseconds
     pub fn latency_ms(&self) -> f32 {
         self.processor.latency_ms()
