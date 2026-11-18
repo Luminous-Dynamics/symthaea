@@ -111,3 +111,13 @@ This is a small exact fixture, not a general superiority claim. It illustrates w
 4. **online noisy policy performance:** compared separately with faithful noisy ODT/ASRN and AFABench baselines.
 
 The benchmark must count unresolved pairs rather than hiding them, and must never label a greedy diagnostic set as globally minimum.
+
+
+## Cross-layer static versus adaptive control
+
+The deterministic active-experiment crate now exposes an exact static probe-basis oracle for small finite cases. The noise-aware crate keeps its four-model greedy weighted set-cover design explicitly non-optimal, and the same frozen four-hypothesis deterministic fixture is now checked against:
+- noise-adapted greedy static design: cost 3;
+- exhaustive exact static basis: cost 3, with an optimality certificate;
+- exact adaptive minimax decision tree: worst-case cost 2.
+
+The added test requires the greedy static result to match the exact static optimum on this fixture, then measures the adaptive advantage separately. This does not promote the greedy method to exact or imply adaptive policies always cost less. The cross-layer test is part of the current pending Rust 1.96 qualification.
