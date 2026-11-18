@@ -204,28 +204,25 @@ fn run_sweep(
             re: original.re + rng.gen_range(-proposal_scale..proposal_scale),
             im: original.im + rng.gen_range(-proposal_scale..proposal_scale),
         };
-        fields[site][component] = candidate;
-        let proposed_energy = match model.energy_for(fields, links) {
-            Ok(energy) if energy.total.is_finite() => energy.total,
-            _ => {
-                fields[site][component] = original;
+        let delta_energy = match model.site_component_energy_delta(
+            fields,
+            site,
+            component,
+            candidate,
+            links,
+        ) {
+            Ok(delta) => delta,
+            Err(_) => {
                 invalid += 1;
                 continue;
             }
         };
-        let delta_energy = proposed_energy - *current_energy;
-        if !delta_energy.is_finite() {
-            fields[site][component] = original;
-            invalid += 1;
-            continue;
-        }
         let accept = delta_energy <= 0.0
             || rng.gen_range(0.0..1.0) < (-delta_energy / temperature).exp();
         if accept {
-            *current_energy = proposed_energy;
+            fields[site][component] = candidate;
+            *current_energy += delta_energy;
             accepted += 1;
-        } else {
-            fields[site][component] = original;
         }
     }
     Ok((accepted, invalid))
