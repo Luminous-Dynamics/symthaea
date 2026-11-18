@@ -537,9 +537,12 @@ fn score(
     let mut task_clustered_hidden_post_minus_full_pre_gap = None;
     if let Some(full_path) = full_results_path {
         let (full_json, full_runs) = load_run_records(full_path)?;
-        let full_profile = require_single_identity(result_profile_name(&full_json), "profile", full_path)?;
-        if full_profile.as_deref().is_some_and(|value| value != "full" && value != "legacy") {
-            return Err(format!("expected full-profile input, found {} ({full_path})", full_profile.unwrap_or_default()));
+        let full_profile = require_single_identity(result_profile_name(&full_json), "profile", full_path)?
+            .ok_or_else(|| format!("full-profile result file has no profile identity: {full_path}"))?;
+        if full_profile != "full" && full_profile != "legacy" {
+            return Err(format!(
+                "expected full-profile input, found {full_profile} ({full_path})"
+            ));
         }
         match (
             result_model_name(&results_json),
@@ -832,6 +835,22 @@ mod tests {
         let _ = std::fs::remove_file(first_path);
         let _ = std::fs::remove_file(second_path);
         assert!(error.contains("different models"));
+    }
+
+    #[test]
+    fn full_profile_role_rejects_explicit_hidden_result_schema() {
+        let full_file = serde_json::json!({
+            "metadata": {"model":"test-model","profile":"hidden"},
+            "runs": [{"task_id":1,"scenario":"evacuation_west_city"}]
+        });
+        let path = std::env::temp_dir().join("hiddenbench-wrong-full-profile.json");
+        std::fs::write(&path, full_file.to_string()).expect("write result file");
+        let path_string = path.to_string_lossy().to_string();
+        let result = load_run_records(&path_string).expect("result file parses");
+        let profile = require_single_identity(result_profile_name(&result.0), "profile", &path_string)
+            .expect("profile is unambiguous");
+        let _ = std::fs::remove_file(path);
+        assert_eq!(profile.as_deref(), Some("hidden"));
     }
 
     #[test]
