@@ -574,8 +574,9 @@ mod tests {
                 .unwrap();
             assert_eq!(stiffness.len(), 2);
             assert!(stiffness.iter().all(|row| {
-                row.as_array()
-                    .is_some_and(|values| values.len() == 2 && values.iter().all(Value::is_number))
+                row.as_array().is_some_and(|values| {
+                    values.len() == 2 && values.iter().all(|value| value.is_number())
+                })
             }));
         }
         let between_chain_stiffness = first["between_chain_summary"]
