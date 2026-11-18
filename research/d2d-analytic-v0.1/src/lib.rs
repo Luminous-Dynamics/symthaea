@@ -870,8 +870,13 @@ mod tests {
 
         // Uniform-random selection's expected EIG across this same finite
         // candidate set is the arithmetic mean, not a lucky random draw.
+        assert!((eig_scores[0] - 0.0382406799619).abs() < 1e-9);
+        assert!((eig_scores[1] - 0.6835294475596).abs() < 1e-9);
+        assert!((eig_scores[2] - 0.3055555593513).abs() < 1e-9);
+
         let uniform_random_expected_eig =
             eig_scores.iter().sum::<f64>() / eig_scores.len() as f64;
+        assert!((uniform_random_expected_eig - 0.3424418956243).abs() < 1e-9);
         assert!(eig_scores[eig_best_index] > uniform_random_expected_eig);
         assert!(uniform_random_expected_eig > 0.0);
 
