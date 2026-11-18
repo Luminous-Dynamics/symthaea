@@ -1,7 +1,7 @@
 use jsonschema::validator_for;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -90,6 +90,7 @@ fn validate_instance(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
         return Err("phase network requires at least two nodes".to_owned());
     }
     let mut node_ids = HashSet::with_capacity(nodes.len());
+    let mut node_positions = HashMap::with_capacity(nodes.len());
     for (index, node) in nodes.iter().enumerate() {
         let id = text_field(node, "node_id")
             .map_err(|error| format!("node[{index}]: {error}"))?;
@@ -106,6 +107,7 @@ fn validate_instance(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
                         coordinates.len()
                     ));
                 }
+                let mut values = Vec::with_capacity(dimension);
                 for coordinate in coordinates {
                     let value = coordinate
                         .as_f64()
@@ -113,7 +115,9 @@ fn validate_instance(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
                     if !value.is_finite() {
                         return Err(format!("node {id}: position values must be finite"));
                     }
+                    values.push(value);
                 }
+                node_positions.insert(id.to_owned(), values);
             }
             ("physical_coordinates", _) => {
                 return Err(format!("node {id}: physical embedding requires position coordinates"));
@@ -127,6 +131,68 @@ fn validate_instance(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
             _ => unreachable!(),
         }
     }
+
+    let boundary = fixture
+        .get("boundary_conditions")
+        .ok_or_else(|| "missing boundary_conditions".to_owned())?;
+    let boundary_kind = text_field(boundary, "kind")?;
+    let periodic_axes = boundary
+        .get("periodic_axes")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "boundary_conditions.periodic_axes must be an array".to_owned())?;
+    let mut axes = HashSet::with_capacity(periodic_axes.len());
+    for axis in periodic_axes {
+        let axis = axis
+            .as_u64()
+            .ok_or_else(|| "periodic_axes must contain non-negative integer axes".to_owned())?
+            as usize;
+        if axis >= dimension {
+            return Err(format!(
+                "periodic axis {axis} is outside declared dimension {dimension}"
+            ));
+        }
+        if !axes.insert(axis) {
+            return Err(format!("duplicate periodic axis {axis}"));
+        }
+    }
+    match boundary_kind {
+        "periodic" if axes.len() == dimension => {}
+        "open" if axes.is_empty() => {}
+        "mixed" if !axes.is_empty() && axes.len() < dimension => {}
+        "periodic" => return Err("periodic boundary conditions must declare every spatial axis".to_owned()),
+        "open" => return Err("open boundary conditions must not declare periodic axes".to_owned()),
+        "mixed" => return Err("mixed boundary conditions require a non-empty proper subset of axes".to_owned()),
+        other => return Err(format!("unsupported boundary condition kind {other}")),
+    }
+
+    let box_lengths: Vec<f64> = if embedding == "physical_coordinates" {
+        let values = boundary
+            .get("box_lengths")
+            .and_then(Value::as_array)
+            .ok_or_else(|| "physical embedding requires boundary_conditions.box_lengths".to_owned())?;
+        if values.len() != dimension {
+            return Err(format!(
+                "box_lengths length {} does not match spatial dimension {dimension}",
+                values.len()
+            ));
+        }
+        let mut lengths = Vec::with_capacity(dimension);
+        for value in values {
+            let length = value
+                .as_f64()
+                .ok_or_else(|| "box_lengths must contain numeric values".to_owned())?;
+            if !length.is_finite() || length <= 0.0 {
+                return Err("box_lengths must contain finite positive values".to_owned());
+            }
+            lengths.push(length);
+        }
+        lengths
+    } else {
+        if boundary.get("box_lengths").is_some() {
+            return Err("abstract_graph must not claim physical box lengths".to_owned());
+        }
+        Vec::new()
+    };
 
     let edges = graph
         .get("edges")
@@ -174,43 +240,48 @@ fn validate_instance(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
             if length <= 0.0 {
                 return Err(format!("edge {id}: physical_edge_length must be positive"));
             }
+            let image_shift = edge
+                .get("periodic_image_shift")
+                .and_then(Value::as_array)
+                .ok_or_else(|| format!("edge {id}: physical embedding requires periodic_image_shift"))?;
+            if image_shift.len() != dimension {
+                return Err(format!(
+                    "edge {id}: periodic_image_shift length {} does not match spatial dimension {dimension}",
+                    image_shift.len()
+                ));
+            }
+            let source_position = node_positions
+                .get(source)
+                .ok_or_else(|| format!("edge {id}: source position does not resolve"))?;
+            let target_position = node_positions
+                .get(target)
+                .ok_or_else(|| format!("edge {id}: target position does not resolve"))?;
+            let mut squared_length = 0.0_f64;
+            for axis in 0..dimension {
+                let shift = image_shift[axis]
+                    .as_i64()
+                    .ok_or_else(|| format!("edge {id}: periodic_image_shift must contain integers"))?;
+                if shift != 0 && !axes.contains(&axis) {
+                    return Err(format!("edge {id}: image shift on non-periodic axis {axis}"));
+                }
+                let displacement =
+                    target_position[axis] + (shift as f64) * box_lengths[axis] - source_position[axis];
+                squared_length += displacement * displacement;
+            }
+            let derived_length = squared_length.sqrt();
+            if !close_enough(derived_length, length) {
+                return Err(format!(
+                    "edge {id}: physical_edge_length {length} does not match image-aware coordinate distance {derived_length}"
+                ));
+            }
+        } else if edge.get("periodic_image_shift").is_some() {
+            return Err(format!(
+                "edge {id}: abstract_graph must not declare physical periodic image shifts"
+            ));
         }
     }
     if !total_coupling.is_finite() {
         return Err("sum of edge coupling energies overflowed".to_owned());
-    }
-
-    let boundary = fixture
-        .get("boundary_conditions")
-        .ok_or_else(|| "missing boundary_conditions".to_owned())?;
-    let boundary_kind = text_field(boundary, "kind")?;
-    let periodic_axes = boundary
-        .get("periodic_axes")
-        .and_then(Value::as_array)
-        .ok_or_else(|| "boundary_conditions.periodic_axes must be an array".to_owned())?;
-    let mut axes = HashSet::with_capacity(periodic_axes.len());
-    for axis in periodic_axes {
-        let axis = axis
-            .as_u64()
-            .ok_or_else(|| "periodic_axes must contain non-negative integer axes".to_owned())?
-            as usize;
-        if axis >= dimension {
-            return Err(format!(
-                "periodic axis {axis} is outside declared dimension {dimension}"
-            ));
-        }
-        if !axes.insert(axis) {
-            return Err(format!("duplicate periodic axis {axis}"));
-        }
-    }
-    match boundary_kind {
-        "periodic" if axes.len() == dimension => {}
-        "open" if axes.is_empty() => {}
-        "mixed" if !axes.is_empty() && axes.len() < dimension => {}
-        "periodic" => return Err("periodic boundary conditions must declare every spatial axis".to_owned()),
-        "open" => return Err("open boundary conditions must not declare periodic axes".to_owned()),
-        "mixed" => return Err("mixed boundary conditions require a non-empty proper subset of axes".to_owned()),
-        other => return Err(format!("unsupported boundary condition kind {other}")),
     }
 
     let twists = boundary
