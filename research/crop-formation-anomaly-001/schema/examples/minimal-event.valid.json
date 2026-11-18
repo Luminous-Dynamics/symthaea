@@ -54,5 +54,33 @@
       "observer_blinding_id": null,
       "raw_measurement_url": null
     }
+  ],
+  "stem_pose_3d_samples": [
+    {
+      "sample_id": "SPS3D-synthetic-001",
+      "parent_specimen_id": null,
+      "base_position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "axis_vector": {
+        "x": 0.2,
+        "y": 0,
+        "z": 0.98
+      },
+      "coordinate_frame": "synthetic-local-x-east-y-north-z-up",
+      "position_unit": "m",
+      "axis_direction_convention": "base_to_tip",
+      "bend_magnitude": 0.12,
+      "bend_unit": "rad",
+      "weight": 1,
+      "weight_basis": "equal synthetic measurement weight",
+      "method": "synthetic known-answer 3D stem-axis fixture",
+      "instrument_or_calibration": "none; generated synthetic observation",
+      "observed_at": null,
+      "observer_blinding_id": null,
+      "raw_measurement_url": null
+    }
   ]
 }
