@@ -23,6 +23,9 @@ on:
       - "rust-toolchain.toml"
       - "crates/domains/symthaea-aqua-bench/**"
       - ".github/workflows/aqua-bench.yml"
+      - ".github/scripts/check-aqua-evidence-corpus.py"
+      - "docs/research/aqua-evidence-corpus-v0.1.schema.json"
+      - "docs/research/aqua-evidence-corpus-v0.1.json"
       - "docs/AQUA_*.md"
   workflow_dispatch:
 
@@ -87,7 +90,7 @@ jobs:
         run: |
           ACTUAL_HEAD="$(git rev-parse HEAD)"
           test "$ACTUAL_HEAD" = "$EXPECTED_HEAD"
-          printf 'Aqua evidence subject: %s\\n' "$ACTUAL_HEAD"
+          printf 'Aqua evidence subject: %s\n' "$ACTUAL_HEAD"
 
       - uses: actions/setup-python@v5
         with:
