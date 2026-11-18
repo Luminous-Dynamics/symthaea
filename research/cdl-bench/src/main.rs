@@ -271,13 +271,23 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
         }),
     )?;
 
-    let sources: [(&str, &[u8]); 3] = [
-        ("fsm-observations", &fsm.observations),
-        ("scm-observational", &scm_observational.stream),
-        ("scm-do-x1", &scm_interventional.stream),
+    let (e3_training, e3_held_out) = e3_mechanism_splits();
+    let mut sources: Vec<(String, Vec<u8>)> = vec![
+        ("fsm-observations".to_owned(), fsm.observations.clone()),
+        ("scm-observational".to_owned(), scm_observational.stream.clone()),
+        ("scm-do-x1".to_owned(), scm_interventional.stream.clone()),
     ];
+    for (index, config) in e3_training.iter().enumerate() {
+        let trace = generate_scm_with_config(steps, seed + index as u64 + 100, *config, None)?;
+        sources.push((format!("e3-train-{index}"), trace.stream));
+    }
+    for (index, config) in e3_held_out.iter().enumerate() {
+        let trace = generate_scm_with_config(steps, seed + index as u64 + 200, *config, None)?;
+        sources.push((format!("e3-heldout-{index}"), trace.stream));
+    }
 
-    for (name, source) in sources {
+    for (name, source) in &sources {
+        let source = source.as_slice();
         let frame0 = compress(source, ModelKind::Order0)?;
         let frame1 = compress(source, ModelKind::Order1)?;
         if decompress(&frame0, source.len())? != source
@@ -300,6 +310,9 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# fsm_observation_alphabet_size={}", fsm.alphabet_size);
     println!("# scm_variables=5");
     println!("# scm_intervention=do(x1=20000) on [steps/4,3*steps/4)");
+    println!("# e3_training_configs={}", e3_training.len());
+    println!("# e3_heldout_combinations={}", e3_held_out.len());
+    println!("# note=E3 held-out tuples reuse mechanism component values but combine them in unseen configurations");
     println!("# note=these are deterministic generator and codec smoke measurements, not predictive transfer results");
     Ok(())
 }
