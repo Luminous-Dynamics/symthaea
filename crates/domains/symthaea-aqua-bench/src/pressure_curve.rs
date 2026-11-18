@@ -157,7 +157,10 @@ impl Display for PressureRunError {
             Self::PressureSeparationTooLarge => {
                 write!(
                     f,
-                    "measured dynamic pressure separation exceeds the preregistered comparison tolerance"
+                    concat!(
+                        "measured dynamic pressure separation exceeds the ",
+                        "preregistered comparison tolerance"
+                    )
                 )
             }
         }
