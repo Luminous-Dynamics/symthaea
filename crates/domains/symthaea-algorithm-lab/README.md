@@ -56,7 +56,7 @@ This is a source-generation prototype only:
 - it does not have filesystem, process, Git or promotion authority;
 - it does not establish that any generated plan is faster or even compiler-valid.
 
-The separate permissioned compiler/runner and independent correctness receipt are the next AR-6B steps. Do not count the 64 plans as 64 tested algorithms until generated artifacts have actually compiled and passed the exact oracle.
+The next increment in [AR-6B #12787](https://github.com/Luminous-Dynamics/symthaea/issues/12787) adds isolated compilation/execution and connects each generated artifact to the independent Hamming oracle and the candidate-independent evaluation context in #1352. Do not count the 64 plans as 64 tested algorithms until generated artifacts have actually compiled and passed the exact oracle.
 
 ## Measurement boundary
 
