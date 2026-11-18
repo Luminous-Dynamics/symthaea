@@ -289,6 +289,19 @@ impl RobustDecisionManifest {
                 push(&mut findings, "invalid_candidate_process_state", format!("{path}.process_capability_state"),
                     "Unknown manufacturing process capability state.");
             }
+            if self.stage != "exploratory"
+                && candidate.process_capability_state == "qualified"
+                && is_blank_option(&candidate.manufacturing_article_ref)
+            {
+                push(&mut findings, "physical_candidate_article_identity_missing", format!("{path}.manufacturing_article_ref"),
+                    "A physical down-selection candidate must bind the exact manufactured article or coupon batch identity.");
+            }
+            if candidate.properties.iter().any(|item| is_transition_metric(&item.metric_id))
+                && is_blank_option(&candidate.transition_ref)
+            {
+                push(&mut findings, "candidate_transition_identity_missing", format!("{path}.transition_ref"),
+                    "A candidate using graded-transition metrics must bind the exact transition candidate/interface identity.");
+            }
             if candidate.process_capability_state == "qualified" {
                 for (field, value) in [
                     ("machine_ref", candidate.machine_ref.as_deref()),
@@ -688,6 +701,19 @@ fn is_known_metric(metric: &str) -> bool {
     metric_definition(metric).is_some()
 }
 
+fn is_transition_metric(metric: &str) -> bool {
+    matches!(
+        metric,
+        "transition_strain_concentration_ratio"
+            | "stiffness_jump_ratio"
+            | "compression_continuity_ratio"
+            | "seam_fatigue_cycles"
+            | "peel_strength_n_per_mm"
+            | "delamination_cycles"
+            | "attachment_retention_cycles"
+    )
+}
+
 fn unit_matches_metric(metric: &str, unit: &str) -> bool {
     metric_definition(metric).is_some_and(|(expected, _)| expected == unit)
 }
@@ -1045,6 +1071,38 @@ mod tests {
         assert!(report.findings.iter().any(|f| f.code == "physical_evidence_missing_provenance")
             || report.candidate_assessments[0].disposition == "insufficient_evidence");
         assert!(!report.physical_pareto_candidates().contains(&"A"));
+    }
+
+    #[test]
+    fn physical_downselection_requires_manufactured_article_identity() {
+        let mut manifest = base_manifest();
+        manifest["candidates"][0]["manufacturing_article_ref"] = json!(null);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "physical_candidate_article_identity_missing"));
+    }
+
+    #[test]
+    fn graded_transition_candidate_requires_transition_identity() {
+        let mut manifest = base_manifest();
+        manifest["requirements"].push(json!({
+            "metric_id":"transition_strain_concentration_ratio","unit":"ratio","direction":"lower_is_better",
+            "role":"pareto_objective","lower_limit":null,"upper_limit":null,"requirement_ref":null,"acceptance_rule_ref":null
+        }));
+        for candidate in manifest["candidates"].as_array_mut().unwrap() {
+            candidate["properties"].as_array_mut().unwrap().push(json!({
+                "metric_id":"transition_strain_concentration_ratio","unit":"ratio","lower_bound":0.8,"upper_bound":0.9,
+                "interval_semantics":"measurement_interval","coverage_fraction":0.95,"evidence_origin":"physical_measurement",
+                "applicability_state":"in_declared_domain","uncertainty_profile_ref":"MAT-UQ-01",
+                "calibration_receipt_ref":null,"predictor_generation_ref":null,
+                "calibration_receipt_predictor_generation_ref":null,"calibration_domain_ref":null,
+                "coupon_evidence_ref":"COUPON-EVIDENCE-12751","coupon_run_ref":"RUN-TRANSITION-001",
+                "method_selection_ref":"METHOD-TRANSITION-01","raw_data_digest":format!("sha256:{}", "a".repeat(64)),
+                "evidence_material_lot_ref":"LOT-001","evidence_process_revision_ref":"PROCESS-REV-A",
+                "evidence_construction_ref":candidate["construction_ref"].clone()
+            }));
+        }
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "candidate_transition_identity_missing"));
     }
 
     #[test]
