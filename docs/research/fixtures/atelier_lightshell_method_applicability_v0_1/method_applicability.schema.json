@@ -118,7 +118,8 @@
               "seam_tensile",
               "abrasion",
               "airflow",
-              "cleaning_retention"
+              "cleaning_retention",
+              "snagging"
             ]
           },
           "metadata_source_ref": {
@@ -181,7 +182,8 @@
               "seam_tensile",
               "abrasion",
               "airflow",
-              "cleaning_retention"
+              "cleaning_retention",
+              "snagging"
             ]
           },
           "selected_surface": {
@@ -190,7 +192,8 @@
               "uncoated_surface",
               "coated_surface",
               "through_thickness",
-              "whole_article"
+              "whole_article",
+              "fabric_surface"
             ]
           },
           "fixture_class": {
@@ -201,7 +204,8 @@
               "air_permeability",
               "spacer_airflow_adapter",
               "washing_machine",
-              "custom"
+              "custom",
+              "mace_snagging"
             ]
           },
           "fixture_ref": {
