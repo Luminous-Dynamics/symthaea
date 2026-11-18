@@ -2,7 +2,7 @@
 
 **Snapshot:** 2026-11-18  
 **Entries:** 17  
-**Claims:** 79
+**Claims:** 80
 
 > Source-classified evidence register. Manufacturer declarations, standards/programme criteria, local installation references, independent market samples and peer-reviewed results are kept distinct. Values marked unknown have not been inferred. This corpus is not a product certification or evidence of Aqua performance.
 
@@ -479,6 +479,7 @@
 | `en18021.2025.shower-outlet-pressure` | shower_outlet_operating_pressure | For shower outlets and shower sets: dynamic pressure lower operating limit 0.05 MPa (0.5 bar); static pressure maximum 0.5 MPa (5 bar); recommended dynamic pressure 0.1–0.3 MPa (1–3 bar). | standard_or_programme_criterion | declared | mode=PN5 shower outlets and PN5 shower sets; method=EN 18021:2025 Table 2; UNI catalogue summary; unknown: full Table 2 measurement procedure and tolerances in controlled standard; Do not infer task quality or performance at each pressure from the operating-range boundary. | context_only: Category-specific operating range and recommended pressure from a current type-test standard; not a product result. | [UNI — Ente Italiano di Normazione](https://store.uni.com/en/en-18021-2025); official_standard_or_programme; 2025-07-02 |
 | `en18021.2025.tap-system-pressure` | tap_shower_system_operating_pressure | For taps and shower systems: dynamic pressure lower operating limit 0.05 MPa (0.5 bar); static pressure maximum 1.0 MPa (10 bar); recommended dynamic pressure 0.1–0.5 MPa (1–5 bar), with recommended dynamic value measured at the point of discharge. | standard_or_programme_criterion | declared | mode=PN10 taps and PN10 shower systems; method=EN 18021:2025 Table 1; UNI catalogue summary; datum=point of discharge for recommended dynamic pressure per Table 1 footnote; unknown: full Table 1 measurement procedure and tolerances in controlled standard; Do not treat the point-of-discharge datum as the terminal fitting inlet. | context_only: Category-specific type-test operating range; point-of-discharge datum must be preserved. | [UNI — Ente Italiano di Normazione](https://store.uni.com/en/en-18021-2025); official_standard_or_programme; 2025-07-02 |
 | `en18021.2025.temperature-limits` | temperature_operating_limits | Maximum 70°C only for short periods not exceeding one hour; recommended temperature up to 42°C for shower outlets/sets and up to 65°C for taps/shower systems. | standard_or_programme_criterion | declared | mode=Table 1 taps/systems and Table 2 shower outlets/sets; method=EN 18021:2025 Tables 1–2; UNI catalogue summary; unknown: full temperature test procedure and tolerance in controlled standard; This is a functional-test operating summary, not an anti-scald setting or user-temperature recommendation for Aqua. | context_only: Category-specific standard temperature limits and recommended test temperatures. | [UNI — Ente Italiano di Normazione](https://store.uni.com/en/en-18021-2025); official_standard_or_programme; 2025-07-02 |
+| `en18021.2025.shower-boost-function-clauses` | shower_boost_function_scope | Separate shower-outlet (8.3.2) and shower-system (10.3.8) boost test clauses; deliberate temporary boost with automatic cancellation. Shower-specific numeric requirements require the controlled full standard. | standard_or_programme_criterion | declared | mode=PN5 shower outlets under clause 8.3.2; PN10 shower systems under clause 10.3.8; method=EN 18021:2025 terms 3.5, clause 8.3.2 and clause 10.3.8; accessible standard preview contents and definition; unknown: Full controlled text and numerical acceptance criteria for shower outlet clause 8.3.2, Full controlled text and numerical acceptance criteria for shower system clause 10.3.8, Exact specimen-specific manufacturer/laboratory results; Tap-only clause 7.3.3.4 numeric criteria must not be transferred to shower outlets or shower systems. | context_only: Confirms separate standard test categories and boost-function definition; no shower-specific acceptance threshold or Aqua/product result is asserted. | [UNI — Ente Italiano di Normazione](https://store.uni.com/en/en-18021-2025); official_standard_or_programme; 2025-07-02 |
 
 **Limitations — `en18021.2025.scope.type-tests`:**
 - Do not treat type testing as production quality control.
@@ -496,6 +497,12 @@
 **Limitations — `en18021.2025.temperature-limits`:**
 - Never use the 70°C short-duration limit as a point-of-use user setpoint.
 - Independent anti-scald and hot-water hygiene requirements remain separate.
+
+**Limitations — `en18021.2025.shower-boost-function-clauses`:**
+- Do not apply tap boost thresholds from EN 18021 clause 7.3.3.4 to shower outlets or systems without reviewing their separate clauses.
+- UWL 2023 clause 12.1 is a separate test method with its own requirements.
+- A manufacturer boost button or advertised flow does not prove conformity or user-task benefit.
+- The controlled standard and exact applicable product category are required before formal testing.
 
 ## Unified Water Label — Taps & Showers Technical Criteria
 
