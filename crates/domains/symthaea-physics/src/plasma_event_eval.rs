@@ -1455,6 +1455,14 @@ mod tests {
             1100
         );
         assert_eq!(
+            manifest["population_and_split_contract"]["split_tracks"]["tokamark_temporal_transfer"]["matching_preprocessing_assets"]["temporal_split_stats"],
+            "src/tokamark/metadata/temporal_split_signals_stats.yaml"
+        );
+        assert_eq!(
+            manifest["population_and_split_contract"]["split_tracks"]["tokamark_temporal_transfer"]["matching_preprocessing_assets"]["resolver_commit"],
+            "d64fbe3826057576f06d3158592917dd2443a960"
+        );
+        assert_eq!(
             manifest["reference_benchmarks"]["gen_toka_group6"]["test_shots"],
             933
         );
