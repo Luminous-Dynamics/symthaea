@@ -204,11 +204,11 @@
           },
           "train_source_date_end": {
             "type": "string",
-            "pattern": "^\\\\d{4}-\\\\d{2}-\\\\d{2}$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
           },
           "test_source_date_start": {
             "type": "string",
-            "pattern": "^\\\\d{4}-\\\\d{2}-\\\\d{2}$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
           },
           "notes": {
             "type": "string",
@@ -352,7 +352,7 @@
           },
           "source_date": {
             "type": "string",
-            "pattern": "^\\\\d{4}-\\\\d{2}-\\\\d{2}$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
           },
           "source_locator": {
             "type": "string",
