@@ -112,6 +112,24 @@ impl PlasmaTemporalSupport {
                     "signal {descriptor_id} sample interval must be positive"
                 )));
             }
+            (PlasmaSignalModality::TimeSeries, Some(sample_interval_ns)) => {
+                let duration_ns =
+                    i128::from(self.end_offset_ns) - i128::from(self.start_offset_ns);
+                if duration_ns <= 0 {
+                    return Err(PlasmaTaskSchemaError::new(format!(
+                        "time-series signal {descriptor_id} requires positive temporal duration"
+                    )));
+                }
+                let sample_interval_ns = i128::from(sample_interval_ns);
+                if duration_ns % sample_interval_ns != 0
+                    || self.native_shape.first().copied()
+                        != usize::try_from(duration_ns / sample_interval_ns).ok()
+                {
+                    return Err(PlasmaTaskSchemaError::new(format!(
+                        "time-series signal {descriptor_id} native time dimension does not match its temporal support and sample interval"
+                    )));
+                }
+            }
             _ => {}
         }
         Ok(())
@@ -393,6 +411,25 @@ mod tests {
         let mut zero_shape = group6_schema();
         zero_shape.context_signals[0].native_shape = vec![0];
         assert!(zero_shape.validate().is_err());
+    }
+
+    #[test]
+    fn time_series_native_shape_must_match_temporal_support() {
+        let mut wrong_shape = group6_schema();
+        wrong_shape.context_signals[0].native_shape = vec![399];
+        assert!(wrong_shape.validate().is_err());
+
+        let mut fractional_support = group6_schema();
+        fractional_support.context_signals[0]
+            .temporal_support
+            .start_offset_ns = -100_000_001;
+        assert!(fractional_support.validate().is_err());
+
+        let mut zero_duration = group6_schema();
+        zero_duration.context_signals[0]
+            .temporal_support
+            .start_offset_ns = 0;
+        assert!(zero_duration.validate().is_err());
     }
 
     #[test]
