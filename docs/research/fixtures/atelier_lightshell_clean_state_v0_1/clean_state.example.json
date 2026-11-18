@@ -31,7 +31,9 @@
           "TOPOLOGY-FASTENER-POCKET-SYNTHETIC"
         ]
       }
-    ]
+    ],
+    "topology_sample_map_ref": "TOPOLOGY-SAMPLE-MAP-REV-SYNTHETIC",
+    "topology_sample_map_digest": "sha256:pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
   },
   "application": {
     "application_ref": "APPLICATION-SYNTHETIC",
