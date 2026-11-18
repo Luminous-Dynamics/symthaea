@@ -1009,7 +1009,7 @@ pub fn evaluate_observation_frame(
     let currently_available_sensor_ids: Vec<String> = sensor_evidence
         .iter()
         .filter(|item| active.contains(item.sensor_id.as_str()))
-        .filter(|item| matches!(item.observation, SensorObservation::Known(_)))
+        .filter(|item| matches!(&item.observation, SensorObservation::Known(_)))
         .map(|item| item.sensor_id.clone())
         .collect();
     let current_available_sensor_diagnosability =
@@ -1372,6 +1372,8 @@ mod tests {
                 decision_ids: vec!["BLOCK".to_owned(), "PROCEED".to_owned()]
             }
         );
+        assert!(result.structural_diagnosability.diagnosable);
+        assert!(!result.current_available_sensor_diagnosability.diagnosable);
         for sensor_id in ["tie_aux", "tie_optical"] {
             let evidence = result
                 .sensor_evidence
@@ -1427,6 +1429,7 @@ mod tests {
                 decision_id: "PROCEED".to_owned()
             }
         );
+        assert!(result.current_available_sensor_diagnosability.diagnosable);
     }
 
     #[test]
