@@ -386,12 +386,13 @@ fn validate_selection_method(
                     "ISO 9237 selection requires through-thickness airflow measurement using an air-permeability fixture.");
             }
             if specimen.construction_class == "3d_spacer"
+                && selection.state == "ready_for_test"
                 && (selection.fixture_class != "spacer_airflow_adapter"
                     || selection.fixture_validation_state != "qualified_spacer"
                     || is_blank_option(&selection.fixture_validation_ref))
             {
                 push(findings, "spacer_airflow_fixture_not_validated", path,
-                    "A 3D spacer specimen requires an explicitly spacer-qualified airflow fixture and validation reference.");
+                    "A 3D spacer specimen requires an explicitly spacer-qualified airflow fixture and validation reference before test readiness.");
             }
         }
         "ISO 6330" => {
@@ -405,22 +406,25 @@ fn validate_selection_method(
                         push(findings, "iso_6330_cleaning_scope_mismatch", format!("{path}.cleaning_profile.service_class"),
                             "ISO 6330 specifies domestic washing and drying procedures; do not claim it covers industrial or robot-specific cleaning.");
                     }
-                    if cleaning.machine_type.as_deref().is_none_or(is_blank)
-                        || cleaning.detergent_ref.as_deref().is_none_or(is_blank)
-                        || cleaning.wash_procedure_ref.as_deref().is_none_or(is_blank)
-                        || cleaning.drying_procedure_ref.as_deref().is_none_or(is_blank)
-                        || cleaning.cycles == 0
-                    {
-                        push(findings, "iso_6330_profile_incomplete", format!("{path}.cleaning_profile"),
-                            "ISO 6330 selection must bind machine type, detergent, wash procedure, drying procedure and nonzero cycle count.");
-                    }
-                    if !matches!(cleaning.machine_type.as_deref(), Some("A" | "B" | "C")) {
-                        push(findings, "iso_6330_unknown_machine_type", format!("{path}.cleaning_profile.machine_type"),
-                            "ISO 6330:2021 defines reference machine types A, B and C.");
+                    if selection.state == "ready_for_test" {
+                        if cleaning.machine_type.as_deref().is_none_or(is_blank)
+                            || cleaning.detergent_ref.as_deref().is_none_or(is_blank)
+                            || cleaning.wash_procedure_ref.as_deref().is_none_or(is_blank)
+                            || cleaning.drying_procedure_ref.as_deref().is_none_or(is_blank)
+                            || cleaning.cycles == 0
+                        {
+                            push(findings, "iso_6330_profile_incomplete", format!("{path}.cleaning_profile"),
+                                "A ready ISO 6330 selection must bind machine type, detergent, wash procedure, drying procedure and nonzero cycle count.");
+                        }
+                        if !matches!(cleaning.machine_type.as_deref(), Some("A" | "B" | "C")) {
+                            push(findings, "iso_6330_unknown_machine_type", format!("{path}.cleaning_profile.machine_type"),
+                                "ISO 6330:2021 defines reference machine types A, B and C.");
+                        }
                     }
                 }
-                None => push(findings, "iso_6330_cleaning_profile_missing", format!("{path}.cleaning_profile"),
-                    "A washing-method selection must preserve its exact cleaning profile."),
+                None if selection.state == "ready_for_test" => push(findings, "iso_6330_cleaning_profile_missing", format!("{path}.cleaning_profile"),
+                    "A ready washing-method selection must preserve its exact cleaning profile."),
+                None => {}
             }
             if selection.fixture_class != "washing_machine" {
                 push(findings, "iso_6330_fixture_mismatch", path,
