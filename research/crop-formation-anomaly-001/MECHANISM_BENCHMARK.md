@@ -98,7 +98,7 @@ For a uniform transverse load q over the length,
 
 Here k_t is translational root stiffness (N/m) and k_theta is rotational root stiffness (N·m/rad). An absent spring is treated as rigid. The model recovers the standard uniform-cantilever formulas when all EI_i are equal and root springs are rigid.
 
-This is a deliberate *intermediate model*, not a validated whole-plant simulator. It represents one bending plane at a time; anisotropic stems require separate profiles for both principal axes and measured cross-section orientation. Root springs are linearized summaries of root–soil support, not root architecture. The model has no shear deformation, dynamic/inertial loading, nonlinear large rotations, hysteresis, damage evolution, viscoelasticity, taper within a segment, leaves, canopy contact or soil plasticity. Use it to define a baseline and design measurements, not to claim historic forces or assign mechanisms.
+This is a deliberate *intermediate model*, not a validated whole-plant simulator. It represents one bending plane at a time; anisotropic stems require separate profiles for both principal axes and measured cross-section orientation. Root springs are linearized summaries of root–soil support, not root architecture. The event schema now carries separate raw force–translation and moment–rotation curves, plus root-plate spread and soil covariates, so the support parameters can be measured independently rather than estimated solely from stem-tip motion. The model has no shear deformation, dynamic/inertial loading, nonlinear large rotations, hysteresis, damage evolution, viscoelasticity, taper within a segment, leaves, canopy contact or soil plasticity. Use it to define a baseline and design measurements, not to claim historic forces or assign mechanisms.
 
 The implementation validates full segment coverage, ordering, positive EI and positive root spring stiffness. Ten new analytical tests cover uniform-profile recovery, partition invariance, nonuniform stiffness gradients, root compliance, uniform loading and invalid profiles. Tests are authored only; they have not been compiled or executed.
 
@@ -118,6 +118,10 @@ Do not use the equations to infer material modulus from posture alone, infer a h
 - Do not mix test rates across comparison groups without a registered rate model or stratification.
 
 Tabaracci, Vos & Robertson (2024) report rate effects in maize and wheat stem testing: the tested rate had a small effect on some three-point bending estimates in their mature, dry samples, while rind-puncture measurements were strongly rate-dependent. They emphasize consistent span lengths and displacement rates, and note that green stems may show larger effects. This is exactly why a measured mechanical endpoint needs a standardized protocol and why puncture force must not be treated as a universal surrogate for whole-stem bending behaviour. [Plant Methods 20, 125 (2024)](https://doi.org/10.1186/s13007-024-01253-9).
+
+### Root support measurements and identifiability
+
+For root support, capture both base translation under applied force and root rotation under applied moment. Fit translational and rotational stiffness only over a registered linear range; retain full loading/unloading curves and any hysteresis. Record root-plate spread, soil water state and bulk density. A single stem-tip force/displacement curve can confound stem EI with root support; do not report unique parameter estimates without multiple load configurations or independent root-motion observations.
 
 ## 4. Falsifiable experiment matrix
 
