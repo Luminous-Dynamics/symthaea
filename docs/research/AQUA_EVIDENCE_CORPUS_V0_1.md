@@ -1,8 +1,8 @@
 # Luminous Aqua — Evidence Corpus v0.1
 
 **Snapshot:** 2026-11-18  
-**Entries:** 9  
-**Claims:** 41
+**Entries:** 10  
+**Claims:** 51
 
 > Source-classified evidence register. Manufacturer declarations, standards/programme criteria, local installation references, independent market samples and peer-reviewed results are kept distinct. Values marked unknown have not been inferred. This corpus is not a product certification or evidence of Aqua performance.
 
@@ -289,6 +289,61 @@
 
 **Limitations — `hansgrohe.28087000.coolcontact`:**
 - Not an independent surface-temperature test.
+
+## Activera Select S Hand Shower 95 2jet EcoSmart+ with WaterBoost
+
+- **Entry ID:** `hansgrohe-activera-waterboost-28036000`
+- **Subject type:** product
+- **Manufacturer / publisher:** Hansgrohe
+- **SKU:** 28036000
+- **Market:** South Africa
+- **Revision:** Not stated
+
+| Claim ID | Parameter | Canonical value | Evidence class | Result class | Conditions / unknowns | Comparison status | Source |
+|---|---|---|---|---|---|---|---|
+| `hansgrohe.28036000.rain.base-flow` | flow_rate | 2.9 L/min | manufacturer_declaration | declared | mode=Rain; pressure=300 kPa; method=Manufacturer product-page declaration; datum=manufacturer nominal 3 bar; unknown: independent laboratory replication, temperature profile, sample count, boost duration and total permitted activation time | eligible_as_matched_test_reference: Exact SKU and base spray mode are stated; this is not an independent matched result. | [Hansgrohe South Africa](https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000); manufacturer_datasheet; date not stated |
+| `hansgrohe.28036000.impactrain.base-flow` | flow_rate | 2.9 L/min | manufacturer_declaration | declared | mode=ImpactRain; pressure=300 kPa; method=Manufacturer product-page declaration; datum=manufacturer nominal 3 bar; unknown: independent laboratory replication, temperature profile, sample count, boost duration and total permitted activation time | eligible_as_matched_test_reference: Exact SKU and base spray mode are stated; this is not an independent matched result. | [Hansgrohe South Africa](https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000); manufacturer_datasheet; date not stated |
+| `hansgrohe.28036000.impactrain.boost-flow` | flow_rate | 6.6 L/min | manufacturer_declaration | declared | mode=ImpactRain + Booster; pressure=300 kPa; method=Manufacturer product-page declaration; datum=manufacturer nominal 3 bar; unknown: independent laboratory replication, temperature profile, sample count, boost duration and total permitted activation time | not_eligible_until_reproduced: Manufacturer declares a mode-specific boosted flow. | [Hansgrohe South Africa](https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000); manufacturer_datasheet; date not stated |
+| `hansgrohe.28036000.rain.boost-flow` | flow_rate | 9.4 L/min | manufacturer_declaration | declared | mode=Rain + Booster; pressure=300 kPa; method=Manufacturer product-page declaration; datum=manufacturer nominal 3 bar; unknown: independent laboratory replication, temperature profile, sample count, boost duration and total permitted activation time | not_eligible_until_reproduced: Manufacturer declares a mode-specific boosted flow. | [Hansgrohe South Africa](https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000); manufacturer_datasheet; date not stated |
+| `hansgrohe.28036000.flow-regulator` | flow_regulator_setting | 4 L/min | manufacturer_declaration | declared | method=Manufacturer product-page declaration; unknown: pressure condition for regulator value, independent measurement of tolerance | context_only: Manufacturer declaration of regulator setting. | [Hansgrohe South Africa](https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000); manufacturer_datasheet; date not stated |
+| `hansgrohe.28036000.maximum-flow` | maximum_flow_rate | 4 L/min | manufacturer_declaration | declared | pressure=300 kPa; method=Manufacturer product-page declaration; datum=manufacturer nominal 3 bar; unknown: independent laboratory replication, temperature profile, sample count, boost duration and total permitted activation time | not_eligible_until_reproduced: Manufacturer's product page lists a 4 L/min maximum while the same page lists boosted mode flows of 6.6 and 9.4 L/min. | [Hansgrohe South Africa](https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000); manufacturer_datasheet; date not stated |
+| `hansgrohe.28036000.minimum-pressure` | minimum_operating_pressure | 80 kPa | manufacturer_declaration | derived | method=Manufacturer product-page declaration; unknown: flow and spray performance at exactly 0.8 bar, pressure measurement datum, complete upper operating range | context_only: Manufacturer-declared minimum flow pressure converted to kPa. | [Hansgrohe South Africa](https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000); manufacturer_datasheet; date not stated |
+| `hansgrohe.28036000.function-from` | minimum_function_flow | 3 L/min | manufacturer_declaration | declared | method=Manufacturer product-page declaration; unknown: pressure condition for function onset | context_only: Manufacturer feature-onset statement, not task success. | [Hansgrohe South Africa](https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000); manufacturer_datasheet; date not stated |
+| `hansgrohe.28036000.waterboost-feature` | task_selective_boost_feature | User-held side button temporarily increases flow; release ends the boost request | manufacturer_declaration | declared | mode=User-held boost; method=Manufacturer product-page declaration; unknown: quantitative boost duration, boost flow at pressures other than 3 bar | context_only: Commercial precedent for an explicitly user-held temporary flow increase. | [Hansgrohe South Africa](https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000); manufacturer_datasheet; date not stated |
+| `hansgrohe.28036000.specification-scope-ambiguity` | manufacturer_specification_scope_ambiguity | Unresolved scope ambiguity: the relationship between the stated 4 L/min regulator / maximum and the separately listed boosted mode flows is not explained on the page. | manufacturer_declaration | declared | pressure=300 kPa; method=Manufacturer product-page declaration; datum=manufacturer nominal 3 bar; unknown: independent laboratory replication, temperature profile, sample count, boost duration and total permitted activation time | not_eligible_until_reproduced: This is a documentation-scope ambiguity that must be clarified or independently reproduced; it is not resolved by assuming the boost bypasses the limiter. | [Hansgrohe South Africa](https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000); manufacturer_datasheet; date not stated |
+
+**Limitations — `hansgrohe.28036000.rain.base-flow`:**
+- Keep base Rain separate from boosted Rain.
+
+**Limitations — `hansgrohe.28036000.impactrain.base-flow`:**
+- Keep base ImpactRain separate from boosted ImpactRain.
+
+**Limitations — `hansgrohe.28036000.impactrain.boost-flow`:**
+- Boost activation is described as press-and-hold; published maximum/regulator scope is ambiguous.
+- Boost duration and all-in task burden are not supplied.
+
+**Limitations — `hansgrohe.28036000.rain.boost-flow`:**
+- Boost activation is described as press-and-hold; published maximum/regulator scope is ambiguous.
+- Boost duration and all-in task burden are not supplied.
+
+**Limitations — `hansgrohe.28036000.flow-regulator`:**
+- Do not assume this figure governs or excludes WaterBoost without clarification; possible tolerance is stated separately.
+
+**Limitations — `hansgrohe.28036000.maximum-flow`:**
+- Scope of the stated maximum relative to WaterBoost is not explained; preserve as an unresolved manufacturer specification ambiguity.
+
+**Limitations — `hansgrohe.28036000.minimum-pressure`:**
+- Not independent task-performance evidence; pressure datum is not detailed on the page.
+
+**Limitations — `hansgrohe.28036000.function-from`:**
+- Do not treat the function-onset number as proof of non-inferior task quality.
+
+**Limitations — `hansgrohe.28036000.waterboost-feature`:**
+- The product page does not state a quantitative boost-duration limit or complete-task water saving result.
+
+**Limitations — `hansgrohe.28036000.specification-scope-ambiguity`:**
+- Do not select an assumed interpretation for benchmark scoring.
+- Physical comparator use requires exact SKU verification and recorded manual/boost state.
 
 ---
 
