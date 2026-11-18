@@ -1160,7 +1160,10 @@ mod retention_tests {
         let high = observation("run-300", 300.0, 5.0);
 
         let result = compare_flow_retention(&low, &high, 0.60).expect("valid paired runs");
-        assert_eq!(result.threshold_status, RetentionThresholdStatus::MeetsOnConservativeMeasurementBound);
+        assert_eq!(
+            result.threshold_status,
+            RetentionThresholdStatus::MeetsOnConservativeMeasurementBound
+        );
         assert_eq!(result.low_pressure_task_outcome, TaskOutcome::Fail);
         assert_eq!(result.low_pressure_standard_outcome, StandardMethodOutcome::Fail);
     }
