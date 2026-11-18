@@ -1,0 +1,270 @@
+{
+  "contract": "SC-INTERTWINED-ORDER-0.1",
+  "instance_id": "synthetic-two-band-interband-gl-2x2-v0",
+  "fixture_only": true,
+  "lattice": {
+    "dimension": 2,
+    "shape": [
+      2,
+      2
+    ],
+    "boundary_conditions": [
+      "periodic",
+      "periodic"
+    ],
+    "coordinate_convention": "integer_lattice_coordinates"
+  },
+  "components": [
+    {
+      "component_id": "band_a_intraband",
+      "component_role": "intraband_pair",
+      "band_orbital_id": "band_a",
+      "symmetry_label": "d_x2_y2",
+      "momentum_vector": [
+        0,
+        0
+      ],
+      "form_factor": "d_x2_y2",
+      "gauge_charge": "Cooper_pair_charge_2e",
+      "complex_field": true
+    },
+    {
+      "component_id": "band_b_intraband",
+      "component_role": "intraband_pair",
+      "band_orbital_id": "band_b",
+      "symmetry_label": "d_x2_y2",
+      "momentum_vector": [
+        0,
+        0
+      ],
+      "form_factor": "d_x2_y2",
+      "gauge_charge": "Cooper_pair_charge_2e",
+      "complex_field": true
+    },
+    {
+      "component_id": "ab_interband_pair",
+      "component_role": "interband_pair",
+      "band_orbital_id": "band_a_band_b",
+      "symmetry_label": "interband_d_wave",
+      "momentum_vector": [
+        0,
+        0
+      ],
+      "form_factor": "interband_pair_form_factor_v0",
+      "gauge_charge": "Cooper_pair_charge_2e",
+      "complex_field": true
+    }
+  ],
+  "field_configuration": {
+    "sites": [
+      {
+        "site_id": "s0_0",
+        "position": [
+          0,
+          0
+        ],
+        "component_fields": [
+          {
+            "component_id": "band_a_intraband",
+            "psi_real": 1,
+            "psi_imag": 0
+          },
+          {
+            "component_id": "band_b_intraband",
+            "psi_real": 0.6,
+            "psi_imag": 0.2
+          },
+          {
+            "component_id": "ab_interband_pair",
+            "psi_real": 0.15,
+            "psi_imag": -0.05
+          }
+        ]
+      },
+      {
+        "site_id": "s0_1",
+        "position": [
+          0,
+          1
+        ],
+        "component_fields": [
+          {
+            "component_id": "band_a_intraband",
+            "psi_real": 1,
+            "psi_imag": 0
+          },
+          {
+            "component_id": "band_b_intraband",
+            "psi_real": 0.6,
+            "psi_imag": 0.2
+          },
+          {
+            "component_id": "ab_interband_pair",
+            "psi_real": 0.15,
+            "psi_imag": -0.05
+          }
+        ]
+      },
+      {
+        "site_id": "s1_0",
+        "position": [
+          1,
+          0
+        ],
+        "component_fields": [
+          {
+            "component_id": "band_a_intraband",
+            "psi_real": 1,
+            "psi_imag": 0
+          },
+          {
+            "component_id": "band_b_intraband",
+            "psi_real": 0.6,
+            "psi_imag": 0.2
+          },
+          {
+            "component_id": "ab_interband_pair",
+            "psi_real": 0.15,
+            "psi_imag": -0.05
+          }
+        ]
+      },
+      {
+        "site_id": "s1_1",
+        "position": [
+          1,
+          1
+        ],
+        "component_fields": [
+          {
+            "component_id": "band_a_intraband",
+            "psi_real": 1,
+            "psi_imag": 0
+          },
+          {
+            "component_id": "band_b_intraband",
+            "psi_real": 0.6,
+            "psi_imag": 0.2
+          },
+          {
+            "component_id": "ab_interband_pair",
+            "psi_real": 0.15,
+            "psi_imag": -0.05
+          }
+        ]
+      }
+    ]
+  },
+  "couplings": {
+    "quadratic_matrix": [
+      [
+        -1,
+        -0.12,
+        0.02
+      ],
+      [
+        -0.12,
+        -0.8,
+        -0.08
+      ],
+      [
+        0.02,
+        -0.08,
+        0.35
+      ]
+    ],
+    "gradient_matrices_by_axis": [
+      [
+        [
+          1,
+          0.08,
+          0
+        ],
+        [
+          0.08,
+          0.85,
+          0.04
+        ],
+        [
+          0,
+          0.04,
+          0.55
+        ]
+      ],
+      [
+        [
+          0.9,
+          0.04,
+          0
+        ],
+        [
+          0.04,
+          0.95,
+          0.03
+        ],
+        [
+          0,
+          0.03,
+          0.5
+        ]
+      ]
+    ],
+    "quartic_self_coefficients": [
+      1,
+      1,
+      1
+    ],
+    "quartic_density_density_terms": [
+      {
+        "component_a": "band_a_intraband",
+        "component_b": "band_b_intraband",
+        "coefficient": 0.2
+      },
+      {
+        "component_a": "band_a_intraband",
+        "component_b": "ab_interband_pair",
+        "coefficient": 0.1
+      },
+      {
+        "component_a": "band_b_intraband",
+        "component_b": "ab_interband_pair",
+        "coefficient": 0.12
+      }
+    ],
+    "phase_locking_terms": [
+      {
+        "component_a": "band_a_intraband",
+        "component_b": "band_b_intraband",
+        "coefficient": 0.15,
+        "convention": "minus_two_J_real_psi_a_conjugate_psi_b"
+      },
+      {
+        "component_a": "band_a_intraband",
+        "component_b": "ab_interband_pair",
+        "coefficient": -0.04,
+        "convention": "minus_two_J_real_psi_a_conjugate_psi_b"
+      }
+    ],
+    "gauge_convention": "single_common_U1_gauge_transform_for_all_charge_2e_components"
+  },
+  "secondary_order_fields": [
+    {
+      "field_id": "charge_modulation_2q",
+      "field_kind": "charge_density",
+      "representation": "real_scalar",
+      "coupling_scope": "quadratic_pair_density_coupling_requires_source_specific_symmetry_term"
+    }
+  ],
+  "stability_gates": {
+    "superfluid_stiffness_must_be_positive_semidefinite": true,
+    "negative_stiffness_is_hard_failure": true,
+    "stiffness_eigenvalue_tolerance": 1e-10
+  },
+  "source_references": [
+    "https://doi.org/10.1103/PhysRevB.109.134508",
+    "https://doi.org/10.1038/s41535-024-00718-3",
+    "https://doi.org/10.1038/s41535-025-00843-7",
+    "https://doi.org/10.1103/1gyj-r5fr"
+  ],
+  "claim_ceiling": "Synthetic multicomponent order-parameter basis and coupling declaration only; no equilibrium, PDW identification, stable superconductivity, Tc, or experimental result is established."
+}
