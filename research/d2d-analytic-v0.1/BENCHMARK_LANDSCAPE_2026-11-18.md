@@ -139,6 +139,19 @@ Measure:
 
 The first scalar friction fixture is the initial software protocol demonstration, not the whole benchmark.
 
+A second known-answer selector case now varies both observation noise and rollout cost across three designs under the same budget. It compares the shipped discrimination/noise/√cost heuristic against:
+- maximum predicted separation (noise/cost-blind);
+- cheapest admissible experiment;
+- uniform-random expected utility across the finite candidate set;
+- exact-family binary Gaussian expected information gain (numerical quadrature, equal priors/equal variance).
+
+The reference ranking is:
+- short-noisy: 1 step, σ=0.15, separation 0.0700, heuristic score 0.4667, EIG ≈0.0382 bits;
+- medium-precise: 2 steps, σ=0.05, separation 0.1337, heuristic score 1.8908, EIG ≈0.6835 bits;
+- long-noisy: 5 steps, σ=0.20, separation 0.2919, heuristic score 0.6527, EIG ≈0.3056 bits.
+
+The heuristic and exact-family EIG select medium-precise; maximum-separation chooses long-noisy; cheapest chooses short-noisy; uniform-random expected EIG is ≈0.3424 bits. This is a narrow analytic comparator whose assumptions are explicit, not a claim that the current heuristic is Bayesian optimal or that the EIG kernel generalizes to arbitrary dynamics. The authored Rust regression remains uncompiled/unexecuted.
+
 ### Layer B — action-conditioned world-model reliability
 
 Use MiraBench-style physical/action/optimism diagnostics and World-In-World's closed-loop action API.
