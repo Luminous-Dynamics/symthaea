@@ -17,9 +17,9 @@ A separate 2026 critical-field workflow expands the property space beyond Tc, ca
 3. **Prototype-out.** Hold out a crystal prototype or structural family.
 4. **Source-out.** Hold out complete papers or data sources to expose source-specific leakage.
 5. **Temporal-out.** Train on records published before a frozen cutoff and evaluate only on later publications.
-6. **Condition shift.** Hold out pressure regimes, field orientation, sample form, doping/strain regions and transition criteria. This is a required next extension; v0.1 does not yet implement condition-shift grouping.
+6. **Condition shift.** v0.1 adds categorical holdouts for field orientation, sample form and transition criterion. Quantitative pressure-regime, doping and strain bins remain planned extensions; they require pre-registered binning rules and enough independent specimens in each condition.
 
-The Rust v0.1 auditor currently implements group holdout by family/prototype/source and temporal holdout, plus schema checks, evidence-class separation, prediction coverage, selective abstention and simple error/interval summaries.
+The Rust v0.1 auditor implements group holdout by family/prototype/source and the three categorical condition axes above, plus temporal holdout, evidence-class separation, prediction coverage, selective abstention and error/interval summaries.
 
 ## Evidence strata and state identity
 
