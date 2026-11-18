@@ -234,6 +234,24 @@
       "maximum": 1,
       "inclusive": true,
       "semantics": "all trigger/clear thresholds, point estimates and uncertainty bounds must lie inside this declared closed interval"
+    },
+    "alarm_episode_trace_contract": {
+      "type": "checked state-transition adapter",
+      "episode_start": "only transition into Raised emits an alarm episode timestamp",
+      "counted_as_same_episode": [
+        "Active",
+        "PendingClear",
+        "Uncertain while alert_remains_active=true",
+        "Abstained while alert_remains_active=true"
+      ],
+      "transitions_refused": [
+        "Active without a preceding Raised",
+        "Raised while already active",
+        "Cleared while inactive",
+        "non-monotonic update timestamps",
+        "Uncertain/Abstained whose alert_remains_active disagrees with trace state"
+      ],
+      "output": "one strictly increasing timestamp per transition into Raised, plus shot ID and frozen policy digest"
     }
   },
   "offline_scoring_contract": {
@@ -366,7 +384,9 @@
       "policy_model_revision",
       "policy_model_artifact_sha256",
       "shot_cluster_bootstrap_plan",
-      "false_alarms_per_non_disruptive_hour_bootstrap_95"
+      "false_alarms_per_non_disruptive_hour_bootstrap_95",
+      "alarm_episode_trace_policy_config_sha256",
+      "alarm_episode_trace_raised_transition_timestamps"
     ],
     "verify_recomputes_per_shot_scores": true,
     "verify_recomputes_cohort_summary": true,
