@@ -386,5 +386,18 @@
     "https://doi.org/10.1038/s41535-025-00843-7",
     "https://doi.org/10.1103/1gyj-r5fr"
   ],
-  "claim_ceiling": "Synthetic multicomponent order-parameter basis and coupling declaration only; no equilibrium, PDW identification, stable superconductivity, Tc, or experimental result is established."
+  "claim_ceiling": "Synthetic multicomponent order-parameter basis and coupling declaration only; no equilibrium, PDW identification, stable superconductivity, Tc, or experimental result is established.",
+  "thermal": {
+    "temperature": 0.15,
+    "temperature_unit": "dimensionless_GL_temperature"
+  },
+  "sampling": {
+    "algorithm": "single_component_site_metropolis",
+    "random_seed": 12838,
+    "warmup_sweeps": 20,
+    "measurement_sweeps": 200,
+    "thinning": 1,
+    "proposal_scale": 0.15,
+    "independent_chains": 4
+  }
 }
