@@ -236,8 +236,8 @@ impl Network {
                 return Err(format!("edge {id} image-shift dimension mismatch"));
             }
             let mut displacement = Vec::with_capacity(dimension);
-            for axis in 0..dimension {
-                let shift = image_shift[axis]
+            for (axis, image_shift_value) in image_shift.iter().enumerate() {
+                let shift = image_shift_value
                     .as_i64()
                     .ok_or_else(|| format!("edge {id} image shifts must be integers"))?;
                 let delta = positions[target][axis]
@@ -367,13 +367,15 @@ fn measure(network: &Network, phases: &[f64]) -> Measurement {
         let sine = delta.sin();
         energy -= edge.coupling * cosine;
 
-        for alpha in 0..network.dimension {
-            current[alpha] += edge.coupling
+        for (alpha, (current_component, diamagnetic_row)) in
+            current.iter_mut().zip(diamagnetic.iter_mut()).enumerate()
+        {
+            *current_component += edge.coupling
                 * edge.displacement[alpha]
                 / network.box_lengths[alpha]
                 * sine;
-            for beta in 0..network.dimension {
-                diamagnetic[alpha][beta] += edge.coupling
+            for (beta, diamagnetic_component) in diamagnetic_row.iter_mut().enumerate() {
+                *diamagnetic_component += edge.coupling
                     * edge.displacement[alpha]
                     * edge.displacement[beta]
                     / (network.box_lengths[alpha] * network.box_lengths[beta])
@@ -459,25 +461,36 @@ fn simulate(
     let mut mean_current = vec![0.0; network.dimension];
     let mut mean_current_products = vec![vec![0.0; network.dimension]; network.dimension];
     for measurement in &measurements {
-        for alpha in 0..network.dimension {
-            mean_current[alpha] += measurement.current[alpha] / sample_count;
-            for beta in 0..network.dimension {
-                mean_diamagnetic[alpha][beta] +=
-                    measurement.diamagnetic[alpha][beta] / sample_count;
-                mean_current_products[alpha][beta] +=
+        for (alpha, ((mean_current_component, mean_diamagnetic_row), mean_current_product_row)) in
+            mean_current
+                .iter_mut()
+                .zip(mean_diamagnetic.iter_mut())
+                .zip(mean_current_products.iter_mut())
+                .enumerate()
+        {
+            *mean_current_component += measurement.current[alpha] / sample_count;
+            for (beta, ((mean_diamagnetic_component, mean_current_product_component), measured_diamagnetic)) in
+                mean_diamagnetic_row
+                    .iter_mut()
+                    .zip(mean_current_product_row.iter_mut())
+                    .zip(measurement.diamagnetic[alpha].iter())
+                    .enumerate()
+            {
+                *mean_diamagnetic_component += measured_diamagnetic / sample_count;
+                *mean_current_product_component +=
                     measurement.current[alpha] * measurement.current[beta] / sample_count;
             }
         }
     }
 
     let mut stiffness = vec![vec![0.0; network.dimension]; network.dimension];
-    for alpha in 0..network.dimension {
-        for beta in 0..network.dimension {
+    for (alpha, stiffness_row) in stiffness.iter_mut().enumerate() {
+        for (beta, stiffness_component) in stiffness_row.iter_mut().enumerate() {
             let covariance = mean_current_products[alpha][beta]
                 - mean_current[alpha] * mean_current[beta];
             let free_energy_curvature =
                 mean_diamagnetic[alpha][beta] - beta * covariance;
-            stiffness[alpha][beta] = network.box_lengths[alpha]
+            *stiffness_component = network.box_lengths[alpha]
                 * network.box_lengths[beta]
                 / volume
                 * free_energy_curvature;
