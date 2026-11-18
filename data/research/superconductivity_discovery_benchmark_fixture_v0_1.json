@@ -1,0 +1,370 @@
+{
+  "contract": "SC-DISCOVERY-BENCHMARK-0.1",
+  "benchmark_id": "sc-discovery-adversarial-synthetic-v0",
+  "dataset": {
+    "dataset_id": "synthetic-adversarial-fixture",
+    "dataset_version": "0.1.0",
+    "authority": "synthetic_test_fixture",
+    "record_count": 7,
+    "licence_review": "not_applicable_synthetic",
+    "notes": "All compositions, observations, source IDs, dates and values are invented software test vectors. They are not materials data, must not be used for model training, and do not contribute benchmark scores."
+  },
+  "task": {
+    "task_id": "measured-tc-bulk-ambient",
+    "target_property": "tc",
+    "target_unit": "K",
+    "label_authority": "measured_experiment",
+    "available_features": [
+      "chemical_composition",
+      "crystal_prototype",
+      "family_hypothesis"
+    ]
+  },
+  "split_regimes": [
+    {
+      "split_id": "family_holdout_cuprate",
+      "kind": "family_held_out",
+      "group_keys": [
+        "family_id",
+        "material_state_id",
+        "source_id",
+        "normalized_formula"
+      ],
+      "held_out_family_ids": [
+        "cuprate"
+      ],
+      "notes": "Entire cuprate family is held out; all records from a family, state, source paper and normalized formula remain in one partition."
+    },
+    {
+      "split_id": "source_holdout_ybco_paper",
+      "kind": "source_paper_held_out",
+      "group_keys": [
+        "source_id",
+        "material_state_id"
+      ],
+      "held_out_source_ids": [
+        "paper-ybco-1987"
+      ],
+      "notes": "All observations from one source paper are held out together."
+    },
+    {
+      "split_id": "pressure_extrapolation_high",
+      "kind": "pressure_regime_held_out",
+      "group_keys": [
+        "material_state_id",
+        "source_id"
+      ],
+      "train_pressure_max_gpa": 2,
+      "test_pressure_min_gpa": 100,
+      "notes": "Ambient/low-pressure states train; high-pressure states test; intermediate-pressure observations would be excluded. Different pressure states of the same composition may intentionally cross this split if their material_state_id differs."
+    },
+    {
+      "split_id": "time_forward_2026",
+      "kind": "time_forward",
+      "group_keys": [
+        "material_state_id",
+        "source_id"
+      ],
+      "train_source_date_end": "2025-12-31",
+      "test_source_date_start": "2026-01-01",
+      "notes": "The publication-date cutoff is frozen; source-paper and exact-state groups cannot cross the cutoff."
+    }
+  ],
+  "observations": [
+    {
+      "observation_id": "obs-pb-tc-a",
+      "material_id": "mat-pb",
+      "material_state_id": "state-pb-bulk-ambient",
+      "normalized_formula": "Pb",
+      "family_id": "conventional",
+      "prototype_id": "A1_fcc",
+      "property_id": "tc",
+      "value": 7.2,
+      "unit": "K",
+      "label_authority": "measured_experiment",
+      "measurement_method": "resistivity",
+      "measurement_class": "resistive_onset",
+      "sample_form": "bulk",
+      "field_orientation": "unspecified",
+      "pressure_gpa": 0,
+      "measurement_temperature_k": null,
+      "source_id": "paper-pb-1970",
+      "source_date": "1970-06-01",
+      "source_locator": "synthetic://pb/table-1",
+      "extraction_method": "synthetic_fixture",
+      "reported_or_derived": "directly_reported",
+      "uncertainty_value": 0.05,
+      "assignments": [
+        {
+          "split_id": "family_holdout_cuprate",
+          "partition": "train"
+        },
+        {
+          "split_id": "source_holdout_ybco_paper",
+          "partition": "train"
+        },
+        {
+          "split_id": "pressure_extrapolation_high",
+          "partition": "train"
+        },
+        {
+          "split_id": "time_forward_2026",
+          "partition": "train"
+        }
+      ]
+    },
+    {
+      "observation_id": "obs-pb-tc-b",
+      "material_id": "mat-pb",
+      "material_state_id": "state-pb-bulk-ambient",
+      "normalized_formula": "Pb",
+      "family_id": "conventional",
+      "prototype_id": "A1_fcc",
+      "property_id": "tc",
+      "value": 7.18,
+      "unit": "K",
+      "label_authority": "measured_experiment",
+      "measurement_method": "magnetic_susceptibility",
+      "measurement_class": "diamagnetic_onset",
+      "sample_form": "bulk",
+      "field_orientation": "unspecified",
+      "pressure_gpa": 0,
+      "measurement_temperature_k": null,
+      "source_id": "paper-pb-1971",
+      "source_date": "1971-02-01",
+      "source_locator": "synthetic://pb/figure-2",
+      "extraction_method": "synthetic_fixture",
+      "reported_or_derived": "directly_reported",
+      "uncertainty_value": 0.04,
+      "assignments": [
+        {
+          "split_id": "family_holdout_cuprate",
+          "partition": "train"
+        },
+        {
+          "split_id": "source_holdout_ybco_paper",
+          "partition": "train"
+        },
+        {
+          "split_id": "pressure_extrapolation_high",
+          "partition": "train"
+        },
+        {
+          "split_id": "time_forward_2026",
+          "partition": "train"
+        }
+      ]
+    },
+    {
+      "observation_id": "obs-nb3sn-tc",
+      "material_id": "mat-nb3sn",
+      "material_state_id": "state-nb3sn-bulk-ambient",
+      "normalized_formula": "Nb3Sn",
+      "family_id": "conventional",
+      "prototype_id": "A15",
+      "property_id": "tc",
+      "value": 18,
+      "unit": "K",
+      "label_authority": "measured_experiment",
+      "measurement_method": "heat_capacity",
+      "measurement_class": "bulk_thermodynamic_transition",
+      "sample_form": "bulk",
+      "field_orientation": "unspecified",
+      "pressure_gpa": 0,
+      "measurement_temperature_k": null,
+      "source_id": "paper-nb3sn-1975",
+      "source_date": "1975-04-10",
+      "source_locator": "synthetic://nb3sn/table-3",
+      "extraction_method": "synthetic_fixture",
+      "reported_or_derived": "directly_reported",
+      "uncertainty_value": 0.1,
+      "assignments": [
+        {
+          "split_id": "family_holdout_cuprate",
+          "partition": "train"
+        },
+        {
+          "split_id": "source_holdout_ybco_paper",
+          "partition": "train"
+        },
+        {
+          "split_id": "pressure_extrapolation_high",
+          "partition": "train"
+        },
+        {
+          "split_id": "time_forward_2026",
+          "partition": "train"
+        }
+      ]
+    },
+    {
+      "observation_id": "obs-lafeaso-tc",
+      "material_id": "mat-lafeaso",
+      "material_state_id": "state-lafeaso-bulk-ambient",
+      "normalized_formula": "LaFeAsO",
+      "family_id": "iron_based",
+      "prototype_id": "111",
+      "property_id": "tc",
+      "value": 26,
+      "unit": "K",
+      "label_authority": "measured_experiment",
+      "measurement_method": "magnetic_susceptibility",
+      "measurement_class": "diamagnetic_onset",
+      "sample_form": "bulk",
+      "field_orientation": "unspecified",
+      "pressure_gpa": 0,
+      "measurement_temperature_k": null,
+      "source_id": "paper-lafeaso-2008",
+      "source_date": "2008-02-29",
+      "source_locator": "synthetic://lafeaso/figure-1",
+      "extraction_method": "synthetic_fixture",
+      "reported_or_derived": "directly_reported",
+      "uncertainty_value": 0.2,
+      "assignments": [
+        {
+          "split_id": "family_holdout_cuprate",
+          "partition": "train"
+        },
+        {
+          "split_id": "source_holdout_ybco_paper",
+          "partition": "train"
+        },
+        {
+          "split_id": "pressure_extrapolation_high",
+          "partition": "train"
+        },
+        {
+          "split_id": "time_forward_2026",
+          "partition": "train"
+        }
+      ]
+    },
+    {
+      "observation_id": "obs-ybco-tc-a",
+      "material_id": "mat-ybco",
+      "material_state_id": "state-ybco-bulk-ambient",
+      "normalized_formula": "YBa2Cu3O7",
+      "family_id": "cuprate",
+      "prototype_id": "123",
+      "property_id": "tc",
+      "value": 92,
+      "unit": "K",
+      "label_authority": "measured_experiment",
+      "measurement_method": "resistivity",
+      "measurement_class": "zero_resistance",
+      "sample_form": "bulk",
+      "field_orientation": "unspecified",
+      "pressure_gpa": 0,
+      "measurement_temperature_k": null,
+      "source_id": "paper-ybco-1987",
+      "source_date": "1987-03-01",
+      "source_locator": "synthetic://ybco/table-2",
+      "extraction_method": "synthetic_fixture",
+      "reported_or_derived": "directly_reported",
+      "uncertainty_value": 0.5,
+      "assignments": [
+        {
+          "split_id": "family_holdout_cuprate",
+          "partition": "test"
+        },
+        {
+          "split_id": "source_holdout_ybco_paper",
+          "partition": "test"
+        },
+        {
+          "split_id": "pressure_extrapolation_high",
+          "partition": "train"
+        },
+        {
+          "split_id": "time_forward_2026",
+          "partition": "train"
+        }
+      ]
+    },
+    {
+      "observation_id": "obs-ybco-tc-b",
+      "material_id": "mat-ybco",
+      "material_state_id": "state-ybco-bulk-ambient",
+      "normalized_formula": "YBa2Cu3O7",
+      "family_id": "cuprate",
+      "prototype_id": "123",
+      "property_id": "tc",
+      "value": 91.5,
+      "unit": "K",
+      "label_authority": "measured_experiment",
+      "measurement_method": "magnetic_susceptibility",
+      "measurement_class": "diamagnetic_onset",
+      "sample_form": "bulk",
+      "field_orientation": "unspecified",
+      "pressure_gpa": 0,
+      "measurement_temperature_k": null,
+      "source_id": "paper-ybco-1987",
+      "source_date": "1987-03-01",
+      "source_locator": "synthetic://ybco/figure-2",
+      "extraction_method": "synthetic_fixture",
+      "reported_or_derived": "directly_reported",
+      "uncertainty_value": 0.4,
+      "assignments": [
+        {
+          "split_id": "family_holdout_cuprate",
+          "partition": "test"
+        },
+        {
+          "split_id": "source_holdout_ybco_paper",
+          "partition": "test"
+        },
+        {
+          "split_id": "pressure_extrapolation_high",
+          "partition": "train"
+        },
+        {
+          "split_id": "time_forward_2026",
+          "partition": "train"
+        }
+      ]
+    },
+    {
+      "observation_id": "obs-h3s-tc",
+      "material_id": "mat-h3s",
+      "material_state_id": "state-h3s-200gpa",
+      "normalized_formula": "H3S",
+      "family_id": "hydride",
+      "prototype_id": "Im3m",
+      "property_id": "tc",
+      "value": 181,
+      "unit": "K",
+      "label_authority": "measured_experiment",
+      "measurement_method": "resistivity",
+      "measurement_class": "resistive_onset",
+      "sample_form": "bulk",
+      "field_orientation": "unspecified",
+      "pressure_gpa": 200,
+      "measurement_temperature_k": null,
+      "source_id": "paper-h3s-2026",
+      "source_date": "2026-02-03",
+      "source_locator": "synthetic://h3s/figure-4",
+      "extraction_method": "synthetic_fixture",
+      "reported_or_derived": "directly_reported",
+      "uncertainty_value": 2,
+      "assignments": [
+        {
+          "split_id": "family_holdout_cuprate",
+          "partition": "train"
+        },
+        {
+          "split_id": "source_holdout_ybco_paper",
+          "partition": "train"
+        },
+        {
+          "split_id": "pressure_extrapolation_high",
+          "partition": "test"
+        },
+        {
+          "split_id": "time_forward_2026",
+          "partition": "test"
+        }
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic schema/audit fixture only. No external dataset is present; no material property claim, model evaluation, leaderboard score, discovery, or experimental result is made."
+}
