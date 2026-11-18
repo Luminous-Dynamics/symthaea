@@ -1,0 +1,647 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:lightshell-installed-system-qual:0.1.0",
+  "title": "Atelier Lightshell Paired Installed-System Qualification",
+  "description": "Compares the exact robot before/after garment installation using matched physical tests and uncertainty-bounded gate decisions. Not safety approval, product certification or robot-motion authorization.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "state",
+    "article",
+    "test_setup",
+    "baseline_context",
+    "gates",
+    "runs",
+    "engineering_review",
+    "evidence_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "proposed",
+        "measured",
+        "adjudicated"
+      ]
+    },
+    "article": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "garment_generation_ref",
+        "manufactured_article_ref",
+        "robot_id",
+        "robot_serial",
+        "robot_model_revision",
+        "robot_firmware_revision",
+        "robot_configuration_digest",
+        "installed_garment_digest",
+        "topology_digest",
+        "route_digest",
+        "asbuilt_inspection_ref",
+        "mission_profile_ref",
+        "pose_set_ref"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "garment_generation_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manufactured_article_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robot_serial": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robot_model_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robot_firmware_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robot_configuration_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        },
+        "installed_garment_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        },
+        "topology_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        },
+        "route_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        },
+        "asbuilt_inspection_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mission_profile_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pose_set_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "test_setup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "test_cell_ref",
+        "fixture_ref",
+        "fixture_revision_ref",
+        "operating_authority_ref",
+        "safety_review_ref",
+        "approved_motion_envelope_ref",
+        "emergency_stop_check_ref",
+        "safety_systems_unchanged",
+        "no_safety_bypass"
+      ],
+      "properties": {
+        "test_cell_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fixture_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fixture_revision_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operating_authority_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "safety_review_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approved_motion_envelope_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "emergency_stop_check_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "safety_systems_unchanged": {
+          "type": "boolean"
+        },
+        "no_safety_bypass": {
+          "type": "boolean"
+        }
+      }
+    },
+    "baseline_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_session_ref",
+        "robot_serial",
+        "firmware_revision",
+        "robot_configuration_digest",
+        "tool_payload_digest",
+        "mission_profile_ref",
+        "environment_stratum_ref",
+        "matched_conditions_ref",
+        "incumbent_cover_ref",
+        "incumbent_session_ref",
+        "incumbent_cover_digest"
+      ],
+      "properties": {
+        "baseline_session_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robot_serial": {
+          "type": "string",
+          "minLength": 1
+        },
+        "firmware_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robot_configuration_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        },
+        "tool_payload_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mission_profile_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "environment_stratum_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "matched_conditions_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "incumbent_cover_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "incumbent_session_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "incumbent_cover_digest": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-fA-F]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "gate_id",
+          "gate_family",
+          "metric_id",
+          "unit",
+          "comparison_mode",
+          "lower_limit",
+          "upper_limit",
+          "hard_gate",
+          "applicability",
+          "applicability_owner_ref",
+          "not_applicable_rationale_ref",
+          "minimum_replicates",
+          "minimum_coverage_fraction",
+          "required_pose_set_ref",
+          "required_pose_refs",
+          "method_selection_ref",
+          "acceptance_rule_ref",
+          "comparison_control"
+        ],
+        "properties": {
+          "gate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "gate_family": {
+            "enum": [
+              "articulation_clearance",
+              "cable_interface",
+              "sensor_aperture",
+              "thermal_non_regression",
+              "airflow_non_regression",
+              "actuation_non_regression",
+              "sensing_non_regression",
+              "attachment_stability",
+              "service_access",
+              "environmental_protection",
+              "cleanability",
+              "mass_inertia"
+            ]
+          },
+          "metric_id": {
+            "enum": [
+              "joint_clearance_mm",
+              "cable_clearance_mm",
+              "sensor_aperture_clearance_mm",
+              "robot_temperature_delta_c",
+              "airflow_delta_l_min",
+              "pressure_drop_delta_pa",
+              "actuator_current_delta_a",
+              "actuator_torque_delta_nm",
+              "electrical_power_delta_w",
+              "sensor_signal_delta_pct",
+              "sensor_localization_error_mm",
+              "attachment_migration_mm",
+              "service_time_delta_s",
+              "installed_mass_delta_kg",
+              "inertia_delta_kg_m2",
+              "ingress_mass_gain_g",
+              "contamination_score_delta"
+            ]
+          },
+          "unit": {
+            "enum": [
+              "mm",
+              "degC",
+              "L/min",
+              "Pa",
+              "A",
+              "N*m",
+              "W",
+              "%",
+              "s",
+              "kg",
+              "kg*m^2",
+              "g"
+            ]
+          },
+          "comparison_mode": {
+            "enum": [
+              "absolute_interval",
+              "delta_upper_bound",
+              "delta_lower_bound",
+              "delta_interval"
+            ]
+          },
+          "lower_limit": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "upper_limit": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "hard_gate": {
+            "type": "boolean"
+          },
+          "applicability": {
+            "enum": [
+              "required",
+              "not_applicable"
+            ]
+          },
+          "applicability_owner_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "not_applicable_rationale_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "minimum_replicates": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minimum_coverage_fraction": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "required_pose_set_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "required_pose_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "method_selection_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "acceptance_rule_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "comparison_control": {
+            "anyOf": [
+              {
+                "enum": [
+                  "baseline_uncovered",
+                  "incumbent_cover"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "run_id",
+          "gate_id",
+          "paired_group_id",
+          "condition",
+          "replicate_index",
+          "profile_ref",
+          "robot_serial",
+          "firmware_revision",
+          "robot_configuration_digest",
+          "tool_payload_digest",
+          "environment_stratum_ref",
+          "matched_conditions_ref",
+          "pose_ref",
+          "joint_state_ref",
+          "measured_value",
+          "expanded_uncertainty",
+          "coverage_fraction",
+          "evidence_origin",
+          "instrument_ref",
+          "calibration_ref",
+          "calibration_state",
+          "method_selection_ref",
+          "fixture_revision_ref",
+          "raw_data_digest",
+          "evidence_ref",
+          "cover_digest"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "gate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "paired_group_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "condition": {
+            "enum": [
+              "baseline_uncovered",
+              "incumbent_cover",
+              "garment_installed"
+            ]
+          },
+          "replicate_index": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "profile_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "robot_serial": {
+            "type": "string",
+            "minLength": 1
+          },
+          "firmware_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "robot_configuration_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-fA-F]{64}$"
+          },
+          "tool_payload_digest": {
+            "type": "string",
+            "minLength": 1
+          },
+          "environment_stratum_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "matched_conditions_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pose_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "joint_state_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "measured_value": {
+            "type": "number"
+          },
+          "expanded_uncertainty": {
+            "type": "number",
+            "minimum": 0
+          },
+          "coverage_fraction": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "evidence_origin": {
+            "enum": [
+              "physical_measurement",
+              "synthetic_fixture",
+              "simulation",
+              "supplier_declaration"
+            ]
+          },
+          "instrument_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "calibration_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "calibration_state": {
+            "enum": [
+              "valid",
+              "expired",
+              "unknown",
+              "revoked"
+            ]
+          },
+          "method_selection_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fixture_revision_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "raw_data_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-fA-F]{64}$"
+          },
+          "evidence_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cover_digest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-fA-F]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "engineering_review": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "disposition",
+            "reviewer_ref",
+            "reviewed_at",
+            "review_record_ref"
+          ],
+          "properties": {
+            "disposition": {
+              "enum": [
+                "accept",
+                "reject",
+                "hold"
+              ]
+            },
+            "reviewer_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reviewed_at": {
+              "type": "string",
+              "minLength": 1
+            },
+            "review_record_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "evidence_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "same_serial_paired_comparison_required",
+        "physical_runs_require_current_calibration",
+        "paired_uncertainty_uses_conservative_sum",
+        "hard_gates_are_noncompensable",
+        "required_pose_coverage_must_be_complete",
+        "missing_or_unknown_is_not_pass",
+        "no_robot_safety_authority"
+      ],
+      "properties": {
+        "same_serial_paired_comparison_required": {
+          "const": true
+        },
+        "physical_runs_require_current_calibration": {
+          "const": true
+        },
+        "paired_uncertainty_uses_conservative_sum": {
+          "const": true
+        },
+        "hard_gates_are_noncompensable": {
+          "const": true
+        },
+        "required_pose_coverage_must_be_complete": {
+          "const": true
+        },
+        "missing_or_unknown_is_not_pass": {
+          "const": true
+        },
+        "no_robot_safety_authority": {
+          "const": true
+        }
+      }
+    }
+  }
+}
