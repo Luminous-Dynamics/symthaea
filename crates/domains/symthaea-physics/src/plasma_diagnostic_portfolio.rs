@@ -1071,6 +1071,129 @@ mod tests {
             .expect("synthetic portfolio model should deserialize")
     }
 
+    fn frame_and_category_rules() -> (
+        crate::plasma_observability::PlasmaObservationFrame,
+        Vec<DiagnosticCategoryRule>,
+    ) {
+        use crate::plasma_observability::{
+            CalibrationIdentity, DecisionChannelRequirement, DiagnosticChannelObservation,
+            ObservationDisposition, PlasmaObservationFrame, PLASMA_OBSERVATION_SCHEMA,
+        };
+
+        let model = reference_model();
+        let frame_time_ns = 100_u64;
+        let mut expected_channel_ids = Vec::new();
+        let mut channels = Vec::new();
+        let mut rules = Vec::new();
+
+        for sensor in &model.sensors {
+            let channel_id = format!("channel-{}", sensor.sensor_id);
+            expected_channel_ids.push(channel_id.clone());
+            let source_id = format!("source-{}", sensor.sensor_id);
+            let calibration_id = format!("calibration-{}", sensor.sensor_id);
+            let units = "synthetic-unit".to_owned();
+            let (value, disposition) = if sensor.sensor_id == "failed_diag" {
+                (
+                    None,
+                    ObservationDisposition::Unavailable {
+                        reason: "synthetic fixture diagnostic unavailable".to_owned(),
+                    },
+                )
+            } else {
+                let value = 0.5;
+                (
+                    Some(value),
+                    ObservationDisposition::Measured {
+                        value,
+                        units: units.clone(),
+                        source_id: source_id.clone(),
+                        source_digest: "a".repeat(64),
+                        calibration: CalibrationIdentity {
+                            calibration_id: calibration_id.clone(),
+                            calibration_revision: "rev-1".to_owned(),
+                        },
+                        observed_at_ns: frame_time_ns,
+                    },
+                )
+            };
+            let _ = value;
+            channels.push(DiagnosticChannelObservation {
+                channel_id: channel_id.clone(),
+                diagnostic_system_id: format!("system-{}", sensor.sensor_id),
+                disposition,
+            });
+            rules.push(DiagnosticCategoryRule {
+                sensor_id: sensor.sensor_id.clone(),
+                channel_id: channel_id.clone(),
+                category_schema_id: format!("category-map-{}", sensor.sensor_id),
+                category_schema_sha256: "b".repeat(64),
+                requirement: DecisionChannelRequirement {
+                    channel_id,
+                    expected_units: units,
+                    max_age_ns: 1_000,
+                    allowed_source_ids: vec![source_id],
+                    calibration: CalibrationIdentity {
+                        calibration_id,
+                        calibration_revision: "rev-1".to_owned(),
+                    },
+                },
+                bands: if sensor.sensor_id.starts_with("gen_") {
+                    vec![
+                        NumericCategoryBand {
+                            lower_inclusive: 0.0,
+                            upper_exclusive: Some(1.0),
+                            category: "H".to_owned(),
+                        },
+                        NumericCategoryBand {
+                            lower_inclusive: 1.0,
+                            upper_exclusive: Some(2.0),
+                            category: "F".to_owned(),
+                        },
+                    ]
+                } else {
+                    vec![
+                        NumericCategoryBand {
+                            lower_inclusive: 0.0,
+                            upper_exclusive: Some(1.0),
+                            category: "C".to_owned(),
+                        },
+                        NumericCategoryBand {
+                            lower_inclusive: 1.0,
+                            upper_exclusive: Some(2.0),
+                            category: "O".to_owned(),
+                        },
+                    ]
+                },
+            });
+        }
+
+        (
+            PlasmaObservationFrame {
+                schema_version: PLASMA_OBSERVATION_SCHEMA.to_owned(),
+                shot_id: "synthetic-portfolio-shot-001".to_owned(),
+                frame_id: "synthetic-portfolio-frame-001".to_owned(),
+                clock_domain: "shot-relative-ns".to_owned(),
+                frame_time_ns,
+                expected_channel_ids,
+                channels,
+            },
+            rules,
+        )
+    }
+
+    fn set_channel_disposition(
+        frame: &mut crate::plasma_observability::PlasmaObservationFrame,
+        channel_id: &str,
+        disposition: crate::plasma_observability::ObservationDisposition,
+    ) {
+        let channel = frame
+            .channels
+            .iter_mut()
+            .find(|channel| channel.channel_id == channel_id)
+            .expect("fixture channel");
+        channel.disposition = disposition;
+    }
+
     fn all_sensor_ids(model: &DiagnosticPortfolioModel) -> Vec<String> {
         model
             .sensors
@@ -1124,6 +1247,184 @@ mod tests {
                 .expect("cost optimizer")
                 .expect("feasible"),
             expected_cost
+        );
+    }
+
+    #[test]
+    fn measured_frame_identifies_decision_and_preserves_sensor_provenance() {
+        let model = reference_model();
+        let (frame, rules) = frame_and_category_rules();
+        let active = all_sensor_ids(&model);
+        let result = evaluate_observation_frame(&model, &frame, &rules, &active)
+            .expect("measured portfolio frame should evaluate");
+
+        assert!(result.structural_diagnosability.diagnosable);
+        assert_eq!(
+            result.frame_decision,
+            FrameDecisionDisposition::Identified {
+                decision_id: "PROCEED".to_owned()
+            }
+        );
+        assert_eq!(result.compatible_world_ids, vec!["healthy_closed".to_owned()]);
+        let density = result
+            .sensor_evidence
+            .iter()
+            .find(|item| item.sensor_id == "gen_current")
+            .expect("density sensor evidence");
+        assert_eq!(density.observation, SensorObservation::Known("H".to_owned()));
+        assert_eq!(density.source_id.as_deref(), Some("source-gen_current"));
+        assert_eq!(density.source_digest.as_deref(), Some("a".repeat(64).as_str()));
+        assert_eq!(density.calibration_revision.as_deref(), Some("rev-1"));
+    }
+
+    #[test]
+    fn synthetic_and_unavailable_channels_remain_unknown_and_leave_decision_ambiguous() {
+        use crate::plasma_observability::ObservationDisposition;
+
+        let model = reference_model();
+        let (mut frame, rules) = frame_and_category_rules();
+        set_channel_disposition(
+            &mut frame,
+            "channel-tie_aux",
+            ObservationDisposition::Synthetic {
+                value: 0.5,
+                units: "synthetic-unit".to_owned(),
+                model_id: "diag-reconstruction".to_owned(),
+                model_revision: "rev-1".to_owned(),
+                input_digest: "c".repeat(64),
+            },
+        );
+        set_channel_disposition(
+            &mut frame,
+            "channel-tie_optical",
+            ObservationDisposition::Unavailable {
+                reason: "optical subsystem unavailable".to_owned(),
+            },
+        );
+
+        let result = evaluate_observation_frame(
+            &model,
+            &frame,
+            &rules,
+            &all_sensor_ids(&model),
+        )
+        .expect("unqualified channels should become UNKNOWN");
+        assert_eq!(
+            result.frame_decision,
+            FrameDecisionDisposition::Ambiguous {
+                decision_ids: vec!["BLOCK".to_owned(), "PROCEED".to_owned()]
+            }
+        );
+        for sensor_id in ["tie_aux", "tie_optical"] {
+            let evidence = result
+                .sensor_evidence
+                .iter()
+                .find(|item| item.sensor_id == sensor_id)
+                .expect("sensor evidence");
+            assert_eq!(evidence.observation, SensorObservation::Unknown);
+            assert!(evidence.source_id.is_none());
+        }
+    }
+
+    #[test]
+    fn out_of_category_domain_is_unknown_but_an_independent_channel_can_still_identify() {
+        use crate::plasma_observability::ObservationDisposition;
+
+        let model = reference_model();
+        let (mut frame, rules) = frame_and_category_rules();
+        set_channel_disposition(
+            &mut frame,
+            "channel-tie_aux",
+            ObservationDisposition::Measured {
+                value: 99.0,
+                units: "synthetic-unit".to_owned(),
+                source_id: "source-tie_aux".to_owned(),
+                source_digest: "a".repeat(64),
+                calibration: crate::plasma_observability::CalibrationIdentity {
+                    calibration_id: "calibration-tie_aux".to_owned(),
+                    calibration_revision: "rev-1".to_owned(),
+                },
+                observed_at_ns: 100,
+            },
+        );
+        let result = evaluate_observation_frame(
+            &model,
+            &frame,
+            &rules,
+            &all_sensor_ids(&model),
+        )
+        .expect("out-of-domain measurement should remain unknown");
+        let evidence = result
+            .sensor_evidence
+            .iter()
+            .find(|item| item.sensor_id == "tie_aux")
+            .expect("tie auxiliary evidence");
+        assert_eq!(evidence.observation, SensorObservation::Unknown);
+        assert_eq!(
+            evidence.unknown_reason,
+            Some(DiagnosticUnknownReason::OutsideDeclaredCategoryDomain)
+        );
+        assert_eq!(
+            result.frame_decision,
+            FrameDecisionDisposition::Identified {
+                decision_id: "PROCEED".to_owned()
+            }
+        );
+    }
+
+    #[test]
+    fn frame_bridge_rejects_overlapping_bands_duplicate_channels_and_incomplete_rules() {
+        let model = reference_model();
+        let (frame, mut rules) = frame_and_category_rules();
+        rules[0].bands[1].lower_inclusive = 0.5;
+        assert!(evaluate_observation_frame(
+            &model,
+            &frame,
+            &rules,
+            &all_sensor_ids(&model)
+        ).is_err());
+
+        let (frame, mut rules) = frame_and_category_rules();
+        rules[1].channel_id = rules[0].channel_id.clone();
+        rules[1].requirement.channel_id = rules[0].channel_id.clone();
+        assert!(evaluate_observation_frame(
+            &model,
+            &frame,
+            &rules,
+            &all_sensor_ids(&model)
+        ).is_err());
+
+        let (frame, mut rules) = frame_and_category_rules();
+        rules.pop();
+        assert!(evaluate_observation_frame(
+            &model,
+            &frame,
+            &rules,
+            &all_sensor_ids(&model)
+        ).is_err());
+    }
+
+    #[test]
+    fn frame_bridge_uses_decision_gate_for_units_and_freshness() {
+        let model = reference_model();
+        let (frame, mut rules) = frame_and_category_rules();
+        rules[0].requirement.expected_units = "wrong-unit".to_owned();
+        let result = evaluate_observation_frame(
+            &model,
+            &frame,
+            &rules,
+            &all_sensor_ids(&model)
+        ).expect("unit mismatch should abstain for this channel");
+        let evidence = result.sensor_evidence
+            .iter()
+            .find(|item| item.sensor_id == "gen_current")
+            .expect("sensor evidence");
+        assert_eq!(evidence.observation, SensorObservation::Unknown);
+        assert_eq!(
+            evidence.unknown_reason,
+            Some(DiagnosticUnknownReason::EvidenceGateBlocked {
+                reason: PortfolioEvidenceBlockReason::WrongUnits
+            })
         );
     }
 
