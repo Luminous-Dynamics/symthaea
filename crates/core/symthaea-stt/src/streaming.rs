@@ -974,6 +974,59 @@ mod tests {
         }
     }
 
+    fn collect_live_hvs(audio: &[f32], chunk_samples: usize) -> Vec<HV16> {
+        let mut processor = StreamProcessor::new(StreamConfig::default());
+        let mut result = Vec::new();
+
+        for chunk in audio.chunks(chunk_samples) {
+            processor.push_audio(chunk).unwrap();
+            result.extend(processor.process().into_iter().map(|frame| frame.hv));
+        }
+
+        assert_eq!(processor.dropped_sample_count(), 0);
+        assert_eq!(processor.segment_index(), 0);
+        result
+    }
+
+    fn deterministic_audio_fixture() -> Vec<f32> {
+        (0..16_000)
+            .map(|index| {
+                let t = index as f32 / 16_000.0;
+                0.55 * (2.0 * std::f32::consts::PI * 440.0 * t).sin()
+                    + 0.20 * (2.0 * std::f32::consts::PI * 880.0 * t).sin()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn live_stream_hvs_match_offline_training_encoder() {
+        let audio = deterministic_audio_fixture();
+        let mut projector = AudioProjector::default_config();
+        let offline = projector.project_raw(&audio);
+        let live = collect_live_hvs(&audio, audio.len());
+
+        assert_eq!(live.len(), offline.len());
+        assert_eq!(
+            live, offline,
+            "each live frame must use the same mel-HDC code as project_raw"
+        );
+    }
+
+    #[test]
+    fn live_encoder_is_invariant_to_input_chunk_boundaries() {
+        let audio = deterministic_audio_fixture();
+        let mut projector = AudioProjector::default_config();
+        let offline = projector.project_raw(&audio);
+
+        for chunk_samples in [80usize, 160, 592, 137] {
+            let live = collect_live_hvs(&audio, chunk_samples);
+            assert_eq!(
+                live, offline,
+                "live HDC sequence changed for chunk size {chunk_samples}"
+            );
+        }
+    }
+
     #[test]
     fn stream_session_transcription_marks_audio_gaps() {
         let mut session = StreamSession::new(small_stream_config());
