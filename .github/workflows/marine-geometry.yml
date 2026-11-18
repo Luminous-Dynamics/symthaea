@@ -1,0 +1,52 @@
+name: Marine Geometry Focused Verification
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-marine-geometry/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/marine-geometry.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: marine-geometry-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  geometry-admission:
+    name: Geometry admission (format, tests, clippy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-marine-geometry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-marine-geometry-
+
+      - name: Verify workspace package discovery
+        run: |
+          cargo metadata --no-deps --format-version 1 \
+            | jq -e '.packages[] | select(.name == "symthaea-marine-geometry")'
+
+      - name: Format check
+        run: cargo fmt --check -p symthaea-marine-geometry
+
+      - name: Unit tests
+        run: cargo test --locked -p symthaea-marine-geometry
+
+      - name: Clippy
+        run: cargo clippy --locked -p symthaea-marine-geometry --all-targets -- -D warnings
