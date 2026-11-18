@@ -169,7 +169,7 @@
         },
         "unit": { "type": "string", "minLength": 1 },
         "acceptance_limit": { "type": "number", "minimum": 0 },
-        "hard_gate": { "type": "boolean" },
+        "hard_gate": { "const": true },
         "applicability": { "enum": ["required", "not_applicable"] },
         "applicability_owner_ref": { "type": ["string", "null"] },
         "not_applicable_rationale_ref": { "type": ["string", "null"] },
