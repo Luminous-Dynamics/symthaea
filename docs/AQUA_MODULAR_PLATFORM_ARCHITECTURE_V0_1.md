@@ -201,3 +201,8 @@ Track the dedicated low-pressure programme in [AQUA-LOW-PRESSURE-001 #12784](htt
 ## Software continuity evaluator
 
 The product-level continuity vocabulary now has a deterministic Rust implementation in `symthaea-aqua-bench::service_continuity`. It consumes externally supplied owner-qualified state and reports the highest already-qualified mode. It cannot actuate isolation, create a reduced mode, override local protection, or clear requalification requirements. The protocol and negative tests are documented in [AQUA_ESSENTIAL_SERVICE_CONTINUITY_PROTOCOL_V0_1.md](AQUA_ESSENTIAL_SERVICE_CONTINUITY_PROTOCOL_V0_1.md).
+
+
+## Low-pressure validation protocol
+
+The detailed pressure-run matrix, pressure datum definitions, comparator admission rules and unoccupied sequence are now specified in [AQUA_LOW_PRESSURE_VALIDATION_PROTOCOL_V0_1.md](AQUA_LOW_PRESSURE_VALIDATION_PROTOCOL_V0_1.md), tracked by [#12784](https://github.com/Luminous-Dynamics/symthaea/issues/12784). It distinguishes static, upstream residual and dynamic fitting-inlet pressure and treats out-of-declared-range competitor tests as exploratory only.
