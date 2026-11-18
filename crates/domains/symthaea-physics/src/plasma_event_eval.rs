@@ -852,16 +852,24 @@ pub fn summarize_alarm_evaluations(
                     "disruptive shot evaluation has inconsistent event metrics",
                 ));
             }
-            if evaluation.event_detected {
+            if let Some(lead_time_ns) = evaluation.lead_time_ns {
+                if lead_time_ns < evaluation.required_warning_ns
+                    || lead_time_ns > evaluation.exposure_duration_ns
+                {
+                    return Err(PlasmaEventEvalError::new(
+                        "detected event lead time violates the frozen warning or exposure bound",
+                    ));
+                }
                 detected_disruptions += 1;
-                warning_times_ns.push(evaluation.lead_time_ns.ok_or_else(|| {
-                    PlasmaEventEvalError::new("detected event is missing lead time")
-                })?);
+                warning_times_ns.push(lead_time_ns);
             }
         } else {
             non_disruptive_shots += 1;
             total_non_disruptive_exposure_ns = total_non_disruptive_exposure_ns
-                .saturating_add(u128::from(evaluation.exposure_duration_ns));
+                .checked_add(u128::from(evaluation.exposure_duration_ns))
+                .ok_or_else(|| {
+                    PlasmaEventEvalError::new("non-disruptive exposure duration overflow")
+                })?;
             if evaluation.event_detected || evaluation.lead_time_ns.is_some() {
                 return Err(PlasmaEventEvalError::new(
                     "non-disruptive shot cannot be marked as an event detection",
@@ -870,8 +878,11 @@ pub fn summarize_alarm_evaluations(
             if evaluation.false_alarm_events > 0 {
                 false_alarm_shots += 1;
             }
-            false_alarm_events =
-                false_alarm_events.saturating_add(evaluation.false_alarm_events);
+            false_alarm_events = false_alarm_events
+                .checked_add(evaluation.false_alarm_events)
+                .ok_or_else(|| {
+                    PlasmaEventEvalError::new("false-alarm event count overflow")
+                })?;
         }
     }
 
@@ -1369,6 +1380,29 @@ mod tests {
         assert_eq!(summary.event_tpr, Some(1.0));
         assert_eq!(summary.false_alarm_shot_rate, Some(1.0));
         assert_eq!(summary.warning_time_p50_ns, Some(80));
+    }
+
+    #[test]
+    fn cohort_rejects_forged_detection_below_warning_or_beyond_exposure() {
+        let mut too_late = score_shot_alarms(
+            "too-late",
+            ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
+            &[20],
+            &config(),
+        )
+        .expect("shot score");
+        too_late.lead_time_ns = Some(10);
+        assert!(summarize_alarm_evaluations(&[too_late]).is_err());
+
+        let mut impossible_exposure = score_shot_alarms(
+            "impossible-exposure",
+            ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
+            &[20],
+            &config(),
+        )
+        .expect("shot score");
+        impossible_exposure.exposure_duration_ns = 50;
+        assert!(summarize_alarm_evaluations(&[impossible_exposure]).is_err());
     }
 
     #[test]
