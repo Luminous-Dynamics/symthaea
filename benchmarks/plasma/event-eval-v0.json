@@ -349,7 +349,9 @@
     "recomputed_cohort_summary",
     "outer_receipt_sha256",
     "shot_cluster_bootstrap_plan_sha256",
-    "shot_cluster_bootstrap_rng_algorithm"
+    "shot_cluster_bootstrap_rng_algorithm",
+    "paired_metric_bootstrap_plan_sha256",
+    "paired_metric_delta_interval"
   ],
   "explicit_non_goals": [
     "live_tokamak_control",
@@ -539,8 +541,29 @@
       "rng_algorithm": "splitmix64-v1-uniform-rejection",
       "confidence_interval": "95% percentile interval over shot-cluster bootstrap replicates",
       "sampling_rule": "when a shot ID is sampled, include every benchmark window belonging to that shot; repeated shot IDs duplicate the entire window cluster",
-      "paired_model_comparison": "use the exact same bootstrap shot-index plan for every model and report paired metric deltas",
-      "forbidden": "resampling individual windows independently or treating windows from one shot as independent observations"
+      "paired_model_comparison": "evaluate both models on the exact same shot-cluster bootstrap index vector per replicate; report paired model-B-minus-model-A deltas and the 95% percentile interval",
+      "forbidden": "resampling individual windows independently or treating windows from one shot as independent observations",
+      "paired_metric_delta_bootstrap": {
+        "schema": "PairedMetricBootstrapInterval",
+        "method": "paired 95% percentile bootstrap over whole shot clusters",
+        "delta_direction": "model_b_metric - model_a_metric",
+        "same_replicate_draws_for_both_models": true,
+        "requires_exact_ordered_shot_id_cohort": true,
+        "callback_receives": "shot indices with replacement; caller expands each index to all windows for that shot, preserving multiplicity",
+        "undefined_or_non_finite_replicate": "fail closed; do not silently drop undefined metrics",
+        "records": [
+          "model_a_metric",
+          "model_b_metric",
+          "model_b_minus_model_a_delta",
+          "delta_lower_95",
+          "delta_upper_95",
+          "confidence_level",
+          "requested_replicates",
+          "valid_replicates",
+          "plan_sha256",
+          "rng_algorithm"
+        ]
+      }
     },
     "shot_level_event_metrics": {
       "method": "Wilson score intervals for event TPR and false-alarm shot rate",
