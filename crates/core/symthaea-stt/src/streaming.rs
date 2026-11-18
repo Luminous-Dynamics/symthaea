@@ -693,30 +693,21 @@ impl StreamSession {
 
     /// Format one contiguous phoneme segment, preserving word-boundary markers.
     fn format_segment(&self, start: usize, end: usize) -> String {
-        let mut result = String::new();
+        let mut pieces = Vec::new();
         let mut cursor = start;
 
         for &boundary in &self.boundaries {
             if boundary > cursor && boundary <= end {
-                if !result.is_empty() {
-                    result.push(' ');
-                }
-                result.push_str(&self.phonemes[cursor..boundary].join(" "));
+                pieces.push(self.phonemes[cursor..boundary].join(" "));
                 cursor = boundary;
-                if cursor < end {
-                    result.push_str(" | ");
-                }
             }
         }
 
         if cursor < end {
-            if !result.is_empty() && !result.ends_with(" | ") {
-                result.push(' ');
-            }
-            result.push_str(&self.phonemes[cursor..end].join(" "));
+            pieces.push(self.phonemes[cursor..end].join(" "));
         }
 
-        result
+        pieces.join(" | ")
     }
 
     /// Get full transcription so far. Audio gaps are rendered explicitly;
