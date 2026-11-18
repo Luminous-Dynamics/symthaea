@@ -46,4 +46,7 @@ pub use memory_coordinator::{
     CoordinatorConfig, CoordinatorStats, GraduationEvent, MemoryCoordinator, MemorySignals,
     MemorySource, content_hash,
 };
-pub use semantic_memory::{SemanticEntry, SemanticMemory, SemanticMemoryStats};
+pub use semantic_memory::{
+    PROVENANCED_SEMANTIC_ENTRY_SCHEMA_VERSION, ProvenancedSemanticEntry, SemanticEntry,
+    SemanticMemory, SemanticMemoryStats,
+};
