@@ -92,6 +92,17 @@
           "abstention_reason": {
             "type": "string",
             "minLength": 1
+          },
+          "group_distribution": {
+            "type": "object",
+            "minProperties": 8,
+            "maxProperties": 8,
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "description": "Optional mass over all eight frozen D4 elements; runtime checks exact IDs and sum-to-one."
           }
         },
         "allOf": [
