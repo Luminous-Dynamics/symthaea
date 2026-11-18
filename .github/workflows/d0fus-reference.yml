@@ -1,0 +1,149 @@
+name: D0FUS 3.2.0 pinned ITER reference run
+
+on:
+  pull_request:
+    paths:
+      - "research/d0fus-reference-run-v0-1/**"
+      - ".github/workflows/d0fus-reference.yml"
+  push:
+    branches:
+      - main
+      - research/fusion-d0fus-reference-v0-1
+    paths:
+      - "research/d0fus-reference-run-v0-1/**"
+      - ".github/workflows/d0fus-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference-run:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out Luminous reference harness
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: research/d0fus-reference-run-v0-1/runtime-requirements.in
+
+      - name: Read frozen D0FUS reference identities
+        id: pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "D0FUS_COMMIT=a682c3511dc189b2a4cdd6f4b8bc545d3cdb8924" >> "$GITHUB_ENV"
+          echo "D0FUS_WHEEL_SHA256=068a865a979367b1c74a93138bc16384e00d7d85c2dfe7e6d8b5a212d5885847" >> "$GITHUB_ENV"
+          echo "D0FUS_SDIST_SHA256=02a81bbead2f7bc87b7f0f981687e784acfce27dea1090c9a2931ecd44e2fd40" >> "$GITHUB_ENV"
+          echo "D0FUS_SOURCE=$RUNNER_TEMP/D0FUS" >> "$GITHUB_ENV"
+          echo "D0FUS_ARTIFACTS=$RUNNER_TEMP/d0fus-reference-artifacts" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/d0fus-reference-artifacts"
+
+      - name: Fetch exact D0FUS source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --no-checkout https://github.com/IRFM/D0FUS.git "$D0FUS_SOURCE"
+          git -C "$D0FUS_SOURCE" fetch --depth 1 origin "$D0FUS_COMMIT"
+          git -C "$D0FUS_SOURCE" checkout --detach "$D0FUS_COMMIT"
+          actual="$(git -C "$D0FUS_SOURCE" rev-parse HEAD)"
+          test "$actual" = "$D0FUS_COMMIT"
+          echo "D0FUS source commit verified: $actual"
+
+      - name: Verify source metadata and ITER deck Git blob identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          pyproject_blob="$(git -C "$D0FUS_SOURCE" hash-object pyproject.toml)"
+          deck_blob="$(git -C "$D0FUS_SOURCE" hash-object D0FUS_INPUTS/1_run_ITER.txt)"
+          test "$pyproject_blob" = "cb526504e8be1b318c2e7c05195e98adb3ca7d2d"
+          test "$deck_blob" = "d8932a85adf05e2b1b72a52d5a04a20cb25943b8"
+          grep -Eq '^version = "3\.2\.0"$' "$D0FUS_SOURCE/pyproject.toml"
+          echo "pyproject Git blob: $pyproject_blob"
+          echo "ITER deck Git blob: $deck_blob"
+
+      - name: Download exact PyPI wheel and source distribution
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$D0FUS_ARTIFACTS/wheelhouse" "$D0FUS_ARTIFACTS/sdist"
+          python -m pip download --disable-pip-version-check --no-deps --only-binary=:all: \
+            --dest "$D0FUS_ARTIFACTS/wheelhouse" "d0fus==3.2.0"
+          python -m pip download --disable-pip-version-check --no-deps --no-binary=:all: \
+            --dest "$D0FUS_ARTIFACTS/sdist" "d0fus==3.2.0"
+
+          wheel_file="$D0FUS_ARTIFACTS/wheelhouse/d0fus-3.2.0-py3-none-any.whl"
+          sdist_file="$D0FUS_ARTIFACTS/sdist/d0fus-3.2.0.tar.gz"
+          test -f "$wheel_file"
+          test -f "$sdist_file"
+
+          wheel_sha="$(sha256sum "$wheel_file" | cut -d ' ' -f 1)"
+          sdist_sha="$(sha256sum "$sdist_file" | cut -d ' ' -f 1)"
+          test "$wheel_sha" = "$D0FUS_WHEEL_SHA256"
+          test "$sdist_sha" = "$D0FUS_SDIST_SHA256"
+          echo "Verified wheel SHA-256: $wheel_sha"
+          echo "Verified sdist SHA-256: $sdist_sha"
+
+      - name: Install D0FUS runtime dependencies and verified wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check \
+            -r research/d0fus-reference-run-v0-1/runtime-requirements.in
+          python -m pip install --disable-pip-version-check --no-deps \
+            "$D0FUS_ARTIFACTS/wheelhouse/d0fus-3.2.0-py3-none-any.whl"
+          python - <<'PY'
+          from importlib.metadata import version
+          assert version("d0fus") == "3.2.0"
+          print("Installed verified D0FUS distribution:", version("d0fus"))
+          PY
+          python -m pip freeze > "$D0FUS_ARTIFACTS/runtime-pip-freeze.txt"
+
+      - name: Run official ITER deck using verified PyPI wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          python "$GITHUB_WORKSPACE/research/d0fus-reference-run-v0-1/run_d0fus_reference.py" \
+            --mode wheel \
+            --lock "$GITHUB_WORKSPACE/research/d0fus-reference-run-v0-1/reference_lock.json" \
+            --source-root "$D0FUS_SOURCE" \
+            --deck "$D0FUS_SOURCE/D0FUS_INPUTS/1_run_ITER.txt" \
+            --output-dir "$D0FUS_ARTIFACTS/wheel-run" \
+            --receipt "$D0FUS_ARTIFACTS/wheel-run-receipt.json"
+
+      - name: Run official ITER deck using pinned source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          python "$GITHUB_WORKSPACE/research/d0fus-reference-run-v0-1/run_d0fus_reference.py" \
+            --mode source \
+            --lock "$GITHUB_WORKSPACE/research/d0fus-reference-run-v0-1/reference_lock.json" \
+            --source-root "$D0FUS_SOURCE" \
+            --deck "$D0FUS_SOURCE/D0FUS_INPUTS/1_run_ITER.txt" \
+            --output-dir "$D0FUS_ARTIFACTS/source-run" \
+            --receipt "$D0FUS_ARTIFACTS/source-run-receipt.json"
+
+      - name: Require wheel/source output parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python research/d0fus-reference-run-v0-1/compare_d0fus_receipts.py \
+            --wheel-receipt "$D0FUS_ARTIFACTS/wheel-run-receipt.json" \
+            --source-receipt "$D0FUS_ARTIFACTS/source-run-receipt.json" \
+            --receipt "$D0FUS_ARTIFACTS/parity-receipt.json"
+
+      - name: Upload reference-run evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d0fus-3.2.0-iter-reference-${{ github.sha }}
+          path: ${{ runner.temp }}/d0fus-reference-artifacts/
+          if-no-files-found: warn
+          retention-days: 30
