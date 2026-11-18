@@ -47,13 +47,15 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/ingredient"
-      }
+      },
+      "minItems": 1
     },
     "tasks": {
       "type": "array",
       "items": {
         "$ref": "#/$defs/task"
-      }
+      },
+      "minItems": 1
     },
     "facts": {
       "type": "array",
