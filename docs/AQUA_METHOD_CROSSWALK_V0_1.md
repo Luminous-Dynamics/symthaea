@@ -73,7 +73,31 @@ The ETL's 4.5 / 9 / 10.6 L/min electric-shower pathways are conditional programm
 
 Source: https://etl.energysecurity.gov.uk/products/showers/showers
 
-### 2.4 EPA WaterSense v1.1 / ASME-CSA methods
+### 2.4 UWL 2023 boost-function test — clause 12.1
+
+UWL defines a boost function as a temporary flow increase that is automatically cancelled when the flow control is closed. Clause 12.1 applies P2, records regular flow Qreg, activates boost and records Qboost, closes the flow control, reopens without actively using boost and records Qmax. The requirement is automatic return to regular flow (Qmax = Qreg), Qboost < 2 Qreg, and Qreg must be listed on the scheme label.
+
+Aqua's `standard_methods::UwlBoostFunctionObservation` preserves the pressure-run identity, separate hot/cold P2 channels, Qreg/Qboost/post-close Qmax, the close/reopen event, reset observation, flow instrument/calibration and uncertainty. It validates:
+- boost flow increase resolved above regular-flow measurement uncertainty;
+- boosted upper measurement bound strictly below twice regular-flow lower bound;
+- post-close flow equivalent to Qreg within combined declared flow uncertainty;
+- regular-flow labelling evidence exists.
+
+The UWL text does not state an absolute L/min equality tolerance for Qmax=Qreg in clause 12.1. Aqua therefore records the declared measurement uncertainties and only supports equality within their combined bound; formal method interpretation remains with the scheme / qualified laboratory. This validator is not UWL certification.
+
+**Important commercial discrepancy:** Hansgrohe SKU 28036000 lists Qreg = 2.9 L/min, Qboost = 6.6 L/min (ImpactRain) and 9.4 L/min (Rain) at 3 bar. If these declarations are directly comparable under UWL P2, the nominal ratios are approximately 2.28 and 3.24, both above the UWL Qboost < 2 Qreg ceiling. The same page lists a 4 L/min flow regulator / maximum, creating a separate scope contradiction. This is a method-screening signal, not a finding of non-conformity: obtain manufacturer clarification and reproduce the exact SKU/mode under the controlled UWL apparatus before making a compliance statement.
+
+Sources:
+- UWL Taps & Showers Technical Criteria, January 2023, definitions 3.12 and clause 12.1: https://uwla.eu/wp-content/uploads/2023/05/TAPS-Showers-Technical-2023.pdf
+- Hansgrohe South African SKU 28036000: https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28036000
+
+### UWL boost is not an ETL user-behaviour feature by default
+
+ETL defines UBFs by their effect on user behaviour to reduce total shower duration / water volume (examples include timed shutoff, resource display and water/temperature breaks). A boost button can qualify for the UWL boost function test without being an ETL UBF. Evaluate actual task duration and total volume before treating it as such.
+
+Source: https://etl.energysecurity.gov.uk/products/showers/showers
+
+## 2.4 EPA WaterSense v1.1 / ASME-CSA methods
 
 WaterSense uses specific pressure points for flow and spray-force testing, including nominal 140, 310 and 550 kPa with method-specific tolerances. Its pressure-compensation criteria include minimum flow fractions at specified points; its force and spray-coverage criteria use incorporated standard test procedures.
 
