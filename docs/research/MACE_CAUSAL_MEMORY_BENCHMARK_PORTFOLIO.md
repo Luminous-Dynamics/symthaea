@@ -199,8 +199,10 @@ The synthetic `source_root_id` and `measurement_error_bound` fields are not trus
 A measurement-error bound must be tied to an identified sensor/method, units, calibration revision, operating interval and evidence record. It must not be an agent-editable confidence claim. This connects MACE to the bitemporal source-event ledger (#9075) and independent evaluator provenance (#11816).
 
 
-### Raw-native and bitemporal coverage
+### Raw-native, bitemporal and consolidation-gated coverage
 
-MACE v0.7 adds a provider-neutral JSONL ingestion path that derives experiences from pre-registration, dispatch, tool-result, world-observation and correction events. It evaluates state as of `(valid_at, known_at)`, preserving late-arriving observations and delayed retractions without rewriting prior knowledge states.
+MACE v0.7 adds a provider-neutral JSONL ingestion path that derives experiences from pre-registration, dispatch, tool-result, world-observation and correction events. It evaluates state as of `(valid_at, known_at)`, preserves late-arriving observations and delayed retractions, and computes SHA-256 digests over the original session bytes and each event line.
 
-This closes part of the raw-native gap identified by TimlMemBench, but it is not yet a provider-native parser for OpenAI/Anthropic logs or an end-to-end integration with #12731. Execution receipts (Symtropy), outcome receipts and source-lineage/calibration receipts (Mycelix) are injected registries that bind exact event/action IDs and payload digests; no signatures are verified in this crate. The harness computes SHA-256 over raw session bytes and each raw event line for replay identity, not authenticity. Future adapters must retain provider raw bytes, map them to the interchange envelope, then run consolidation and MACE transfer without bypassing provenance.
+Transfer candidates must pass four independent registry boundaries: a Symtropy-style execution receipt; a reconciled world-outcome receipt; a Mycelix-style source-lineage/calibration receipt; and a consolidation receipt that explicitly promotes the exact source event to `PromoteToProcedure`. The raw payload cannot author its own intervention status, pre-registration, observed utility, provenance root, measurement bound or consolidation promotion.
+
+This is a provider-neutral ingestion contract, not yet a provider-native parser for OpenAI/Anthropic logs or an end-to-end integration with #12731. The four registries are injected test seams, not cryptographic verification or live connectors. The forgetting/erasure dispositions prevent candidate reuse but do not establish physical deletion. Raw event retention remains separate from active/procedural memory.
