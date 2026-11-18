@@ -9,7 +9,8 @@ This is the first executable component of CROP-INTEL-001. It is deliberately sma
 - Frozen circle-grammar family evaluator: reruns centre, classing, radial bands, contacts and motifs for every declared class-count/contact-threshold configuration.
 - Conditional radius-permutation null ensemble: holds centres and the radius multiset fixed, permutes radius-to-location assignments, and reruns every frozen family member for each replicate.
 - Event-grouped benchmark splitting: deterministic approximately balanced grouped K-folds with train/validation complement and event/site/source leakage checks.
-- Finite-hypothesis expected information gain in bits for candidate measurements, with strict prior/conditional distribution validation and known-answer tests. Predictive probabilities are caller-supplied; this is a score primitive, not an autonomous or permission-granting experiment planner.
+- Finite-hypothesis expected information gain in bits for candidate measurements, with strict prior/conditional distribution validation and known-answer tests.
+- Candidate experiment ranking by raw and cost-normalized information gain. Actions failing caller-supplied hard gates remain visible but unscored with a required reason; predictive probabilities are caller-supplied and the selector never grants permission.
 - Seeded measurement-sensitivity audit: explicit uniform centre/radius pixel-error bounds, full-pipeline reruns, sample spread, radius-class agreement and exact-signature stability; stress-test assumptions only, not inferred measurement errors.
 - Crop-flow orientation-field descriptors: circular mean/resultant, direction entropy, bend-magnitude spread and nearest-neighbour alignment.
 - 3D stem-pose orientation statistics: base-to-tip vector concentration, inclination from vertical, horizontal azimuth, 3D nearest-neighbour alignment and optional centre-relative radial/tangential alignment.
@@ -39,7 +40,7 @@ cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 ```
 
-The crate has no third-party dependencies. It includes a local `[workspace]` declaration so that it is not silently pulled into the root Symthaea workspace. The current source contains 99 authored unit tests; their execution remains pending because this editing environment has no Rust toolchain.
+The crate has no third-party dependencies. It includes a local `[workspace]` declaration so that it is not silently pulled into the root Symthaea workspace. The current source contains 104 authored unit tests; their execution remains pending because this editing environment has no Rust toolchain.
 
 ## Statistical interpretation
 
