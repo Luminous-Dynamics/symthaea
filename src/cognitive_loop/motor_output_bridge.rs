@@ -264,10 +264,14 @@ impl MotorOutputBridge {
         // Malformed numeric state must fail before any ordinary comparison:
         // NaN < threshold is false and can otherwise bypass these gates.
         if !current_phi.is_finite() || !(0.0..=1.0).contains(&current_phi) {
-            return MotorOutputResult::skipped("Invalid current_phi: expected a finite value in [0, 1]");
+            return MotorOutputResult::skipped(
+                "Invalid current_phi: expected a finite value in [0, 1]",
+            );
         }
         if !motor_confidence.is_finite() || !(0.0..=1.0).contains(&motor_confidence) {
-            return MotorOutputResult::skipped("Invalid motor_confidence: expected a finite value in [0, 1]");
+            return MotorOutputResult::skipped(
+                "Invalid motor_confidence: expected a finite value in [0, 1]",
+            );
         }
 
         // 1. Check minimum cognitive-caution threshold.
@@ -275,7 +279,9 @@ impl MotorOutputBridge {
             .min_phi_override
             .unwrap_or(self.policy.capabilities.min_phi);
         if !min_phi.is_finite() || !(0.0..=1.0).contains(&min_phi) {
-            return MotorOutputResult::skipped("Invalid configured min_phi: expected a finite value in [0, 1]");
+            return MotorOutputResult::skipped(
+                "Invalid configured min_phi: expected a finite value in [0, 1]",
+            );
         }
         if current_phi < min_phi {
             return MotorOutputResult::skipped(&format!(
@@ -810,7 +816,6 @@ mod tests {
     }
 }
 
-
 #[cfg(test)]
 mod authority_numeric_input_tests {
     use super::*;
@@ -818,17 +823,20 @@ mod authority_numeric_input_tests {
     #[test]
     fn action_type_selector_requires_exact_finite_integer() {
         for value in 0..=7u8 {
-            assert_eq!(ActionType::from_param(value as f64), Some(match value {
-                0 => ActionType::Read,
-                1 => ActionType::Write,
-                2 => ActionType::List,
-                3 => ActionType::Parse,
-                4 => ActionType::CargoTest,
-                5 => ActionType::CargoCheck,
-                6 => ActionType::GitCommit,
-                7 => ActionType::RunCommand,
-                _ => unreachable!(),
-            }));
+            assert_eq!(
+                ActionType::from_param(value as f64),
+                Some(match value {
+                    0 => ActionType::Read,
+                    1 => ActionType::Write,
+                    2 => ActionType::List,
+                    3 => ActionType::Parse,
+                    4 => ActionType::CargoTest,
+                    5 => ActionType::CargoCheck,
+                    6 => ActionType::GitCommit,
+                    7 => ActionType::RunCommand,
+                    _ => unreachable!(),
+                })
+            );
         }
 
         for value in [
