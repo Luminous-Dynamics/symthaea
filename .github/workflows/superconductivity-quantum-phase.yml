@@ -68,7 +68,7 @@ jobs:
           cargo run --locked --manifest-path tools/superconductivity-quantum-phase-harness/Cargo.toml --bin sc_qxy_phase_pimc -- \
             --schema data/schemas/superconductivity_quantum_phase_instance_v0_1.schema.json \
             --fixture data/research/superconductivity_quantum_phase_QXY_smoke_fixture_v0_1.json \
-            --warmup-sweeps 1 --measurement-sweeps 2 \
+            --warmup-sweeps 1 --measurement-sweeps 2 --replicates 2 \
             --out "$RUNNER_TEMP/sc-qxy-pimc-smoke-receipt.json"
           cat "$RUNNER_TEMP/sc-qxy-pimc-smoke-receipt.json"
 
