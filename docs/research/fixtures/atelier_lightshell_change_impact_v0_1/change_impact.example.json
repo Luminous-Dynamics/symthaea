@@ -1,0 +1,153 @@
+{
+  "schema_version": "0.1.0",
+  "decision_id": "LIGHTSHELL-CHANGE-IMPACT-SYNTHETIC-001",
+  "state": "proposed",
+  "predecessor": {
+    "generation_ref": "GARMENT-GENERATION-01",
+    "article_ref": "GARMENT-ARTICLE-01",
+    "robot_article_revision": "ROBOT-REV-A",
+    "geometry_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "topology_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "route_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "successor": {
+    "generation_ref": "GARMENT-GENERATION-02",
+    "article_ref": "GARMENT-ARTICLE-01",
+    "robot_article_revision": "ROBOT-REV-A",
+    "geometry_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "topology_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "route_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "change_event": {
+    "event_id": "REPAIR-EVENT-001",
+    "event_ref": "MYCELIX-LIFECYCLE-EVENT-001",
+    "event_kind": "panel_replacement",
+    "event_origin": "synthetic_fixture",
+    "authority_ref": null,
+    "event_evidence_ref": null,
+    "predecessor_generation_ref": "GARMENT-GENERATION-01",
+    "successor_generation_ref": "GARMENT-GENERATION-02",
+    "treatment_state": "after_repair",
+    "changed_entities": [
+      {
+        "entity_kind": "panel",
+        "predecessor_entity_ref": "FOREARM-PANEL-REV-A",
+        "successor_entity_ref": "FOREARM-PANEL-REV-B"
+      },
+      {
+        "entity_kind": "connection",
+        "predecessor_entity_ref": "FOREARM-ELBOW-SEAM-REV-A",
+        "successor_entity_ref": "FOREARM-ELBOW-SEAM-REV-B"
+      }
+    ]
+  },
+  "unaffected_claim_policy": {
+    "disposition": "preserved",
+    "owner_ref": "LIGHTSHELL-ENGINEERING-OWNER",
+    "policy_ref": "UNAFFECTED-CLAIM-CARRY-FORWARD-REV-A"
+  },
+  "claims": [
+    {
+      "claim_id": "CLAIM-FOREARM-FIT",
+      "claim_family": "geometry_fit",
+      "evidence_generation_ref": "GARMENT-GENERATION-01",
+      "evidence_origin": "physical_measurement",
+      "evidence_ref": "ASBUILT-METROLOGY-CLAIM-01",
+      "dependencies": [
+        {
+          "entity_kind": "panel",
+          "entity_ref": "FOREARM-PANEL-REV-A"
+        },
+        {
+          "entity_kind": "robot_geometry",
+          "entity_ref": "ROBOT-GEOMETRY-REV-A"
+        }
+      ]
+    },
+    {
+      "claim_id": "CLAIM-SEAM-INTEGRITY",
+      "claim_family": "seam_integrity",
+      "evidence_generation_ref": "GARMENT-GENERATION-01",
+      "evidence_origin": "physical_measurement",
+      "evidence_ref": "SEAM-TEST-CLAIM-01",
+      "dependencies": [
+        {
+          "entity_kind": "connection",
+          "entity_ref": "FOREARM-ELBOW-SEAM-REV-A"
+        },
+        {
+          "entity_kind": "panel",
+          "entity_ref": "FOREARM-PANEL-REV-A"
+        }
+      ]
+    },
+    {
+      "claim_id": "CLAIM-SENSOR-CAL",
+      "claim_family": "sensor_calibration",
+      "evidence_generation_ref": "GARMENT-GENERATION-01",
+      "evidence_origin": "physical_measurement",
+      "evidence_ref": "SENSOR-CALIBRATION-CLAIM-01",
+      "dependencies": [
+        {
+          "entity_kind": "sensor_tile",
+          "entity_ref": "SENSOR-TILE-01"
+        }
+      ]
+    },
+    {
+      "claim_id": "CLAIM-MATERIAL-AIRFLOW",
+      "claim_family": "airflow",
+      "evidence_generation_ref": "GARMENT-GENERATION-01",
+      "evidence_origin": "physical_measurement",
+      "evidence_ref": "COUPON-AIRFLOW-CLAIM-01",
+      "dependencies": [
+        {
+          "entity_kind": "material_lot",
+          "entity_ref": "SPACER-LOT-01"
+        }
+      ]
+    }
+  ],
+  "impact_rules": [
+    {
+      "rule_id": "RULE-PANEL-FIT-RETEST",
+      "event_kind": "panel_replacement",
+      "claim_family": "geometry_fit",
+      "affected_entity_kinds": [
+        "panel"
+      ],
+      "disposition": "retest_required",
+      "owner_ref": "LIGHTSHELL-GEOMETRY-OWNER",
+      "policy_ref": "PANEL-REPAIR-IMPACT-POLICY-REV-A",
+      "review_record_ref": null,
+      "test_plan_ref": "ASBUILT-POSE-RETEST-PLAN-01",
+      "method_selection_ref": "METROLOGY-METHOD-01",
+      "fixture_revision_ref": "FIXTURE-REV-A",
+      "acceptance_rule_ref": "FOREARM-FIT-ACCEPTANCE-01"
+    },
+    {
+      "rule_id": "RULE-SEAM-REVIEW",
+      "event_kind": "panel_replacement",
+      "claim_family": "seam_integrity",
+      "affected_entity_kinds": [
+        "connection"
+      ],
+      "disposition": "review_required",
+      "owner_ref": "LIGHTSHELL-TEXTILE-OWNER",
+      "policy_ref": "SEAM-REPAIR-IMPACT-POLICY-REV-A",
+      "review_record_ref": "SEAM-ENGINEERING-REVIEW-SLOT-01",
+      "test_plan_ref": null,
+      "method_selection_ref": null,
+      "fixture_revision_ref": null,
+      "acceptance_rule_ref": null
+    }
+  ],
+  "evidence_policy": {
+    "canonical_event_authority_is_external": true,
+    "historical_evidence_is_immutable": true,
+    "unaffected_claims_need_explicit_policy": true,
+    "missing_dependency_mapping_is_not_evaluated": true,
+    "retest_targets_successor_generation": true,
+    "no_return_to_service_authority": true
+  }
+}
