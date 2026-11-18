@@ -197,3 +197,86 @@ Research targets for a future prospective cohort (not achieved):
 - when the physical validation cohort is too small for a meaningful confidence interval, report the result as inconclusive.
 
 The most defensible differentiator is not a larger model. It is an **evidence-executing discovery loop**: mechanism-specific physics, state-preserving data, capability-aware compute/measurement choice, calibrated abstention, synthesis outcome feedback, and independent physical verification. This is aligned with the field's stated prediction/engineering gap rather than a claim that the gap has already been solved.
+
+
+## Versioned numerical reconstruction: arXiv:2603.05123v2
+
+A second fixture is now present:
+
+\`data/research/superconductivity_microscopic_gl_translation_arxiv_2603_05123v2_fixture_v0_1.json\`
+
+It is intentionally separate from the metadata-only PRL publication record above. The numerical table was transcribed from author manuscript arXiv:2603.05123v2 (manuscript dated 7 August 2026; the version identifier is also shown as 6 August on the PDF front matter). The final PRL version was published on 3 November 2026. The fixtures are not silently treated as version-identical.
+
+The preprint reports a first-principles SCDFT finite-center-of-mass-momentum method and applies it to Al, In, Sn, Ta, Pb, Nb, H3S at 200 GPa and V3Si. Each material is a separate state record with structure, pressure, pseudopotential library, plane-wave cutoff, q grid, derived k grid, PBE, DFPT and spin-orbit provenance. The paper says the electronic k grids are twice the q grid in each direction, with SOI included for the principal Pb calculation. The SCTK code version used for the paper is not stated in the extracted source and remains null.
+
+### Paper-reported calculated values
+
+All values below are **calculated and paper-reported**, not independently reproduced and not experimental measurements. Units are shown in the headers.
+
+| Material/state | Tc (K) | xi0 (nm) | lambda from current slope (nm) | lambda from depairing peak (nm) | Jdp (10^7 A/cm²) | avg gap (meV) | avg vF (10^6 m/s) | lambda_ep |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Al, 0 GPa | 1.61 | 636 | 21 | 26 | 2.3 | 0.295 | 1.423 | 0.42 |
+| In, 0 GPa | 3.06 | 254 | 28 | 33 | 3.6 | 0.581 | 1.433 | 0.96 |
+| Sn, 0 GPa | 4.02 | 132 | 43 | 43 | 4.0 | 0.732 | 1.137 | 0.94 |
+| Ta, 0 GPa | 4.42 | 80 | 33 | 34 | 10 | 0.766 | 0.592 | 0.97 |
+| Pb, 0 GPa, SOI | 5.33 | 104 | 22 | 24 | 15 | 1.081 | 1.152 | 1.49 |
+| Nb, 0 GPa | 8.09 | 34 | 34 | 40 | 19 | 1.466 | 0.557 | 1.34 |
+| H3S, 200 GPa | 181 | 3 | 19 | 22 | 697 | 38.77 | 1.009 | 2.73 |
+| V3Si, 0 GPa | 20.5 | 2.2 | 97 | 136 | 24 | 3.955 | 0.143 | 3.36 |
+
+The current-slope \(\lambda_L\) uses the linear response derivative at Q→0 (Eq. 20 in the source). The depairing-peak \(\lambda_L\) uses the GL relation with the calculated \(J_{\mathrm{dp}}\) (Eq. 21). The authors state that Eq. 21 is approximate and accurate only near Tc; it diverges increasingly from the slope method at lower temperatures. These are retained as **two separate observable kinds**, not averaged.
+
+The coherence length is the microscopic \(\xi_0\) extracted from the finite-Q suppression of the Fermi-surface-averaged gap, using the Q2 point where the gap reaches \(1/\sqrt{2}\) of its Q=0 value and \(\xi_0=1/(\sqrt{2}Q_2)\). It is never relabelled as \(\xi_{\mathrm{GL}}(T)\).
+
+The calculated \(J_{\mathrm{dp}}\) is an intrinsic depairing-current upper bound, not measured \(J_c\). The paper explicitly distinguishes these quantities because measured critical current can be reduced by vortex motion, geometry, grain boundaries and disorder.
+
+### Per-material DFT/SCTK settings transcribed from Table S1
+
+| Material | Structure | Cutoff (Ry) | q mesh | derived k mesh | Pseudopotential(s) | SOI |
+|---|---|---:|---:|---:|---|---|
+| Al | fcc | 30 | 8³ | 16³ | PSL-PAW | no |
+| In | bct | 50 | 7³ | 14³ | PSL-US | no |
+| Sn | beta-Sn | 60 | 5³ | 10³ | GBRV-US | no |
+| Ta | bcc | 45 | 8³ | 16³ | GBRV-US | no |
+| Pb | fcc | 35 | 6³ | 12³ | SG15-NC | yes |
+| Nb | bcc | 40 | 8³ | 16³ | PSL-PAW | no |
+| H3S | Im3m | 60 | 9³ | 18³ | H: PSL-US; S: GBRV-US | no |
+| V3Si | A15 | 35 | 5³ | 10³ | V: GBRV-US; Si: PSL-US | no |
+
+The paper states PBE for normal-state DFT, DFPT for phonons and electron–phonon interactions, an Eliashberg-combined SCDFT functional, RPA for the plasmon-assisted kernel and mass renormalization, and an adiabatic-LDA spin-fluctuation kernel. It uses Quantum ESPRESSO outputs with the open-source Superconducting-Toolkit.
+
+The public SCTK repository inspected on 18 November 2026 resolved to upstream main commit \`4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33\`. This is an **inspected current upstream source snapshot**, not evidence that the paper used this exact revision. The paper's actual QE/SCTK software revisions, input files and calculation checkpoints are not yet identified. The authors' webpage points to a data bundle, but the bundle has not yet been downloaded, checksummed or independently replayed.
+
+### What the data do and do not identify
+
+The finite-Q response framework is physically richer than a Tc-only label and directly provides microscopic \(\xi_0\), a current response from which \(\lambda_L\) is extracted, and intrinsic \(J_{\mathrm{dp}}\). It still does not yield normalized near-Tc GL coefficients \(a'(T_c)\), \(b\), and \(K_{\mu\nu}\) in this fixture. The numerical records therefore contain 64 observables with \`result_authority=calculated\` and \`evidence_status=paper_reported\`, while all three example GL coefficients remain \`not_identifiable\` with null numeric values.
+
+The top-level audit reports these axes separately:
+- evidence origin: \`paper_reported\`;
+- result authority: \`calculated\`;
+- experimental measurements: absent from this numerical fixture;
+- independent reproduction: absent;
+- effective GL coefficient export: zero.
+
+This avoids a common evaluation error: a calculated quantity quoted in a paper does not become an experimental measurement merely because the paper compares it to experimental reference values.
+
+### Source-version and evidence gaps
+
+Before claiming reproduction, the programme still needs:
+1. the final PRL version's tables/supplementary files, compared cell-by-cell against arXiv v2;
+2. the authors' downloadable calculation data bundle, with legal-use and redistribution review, immutable file hashes and a manifest;
+3. exact QE/SCTK code revisions, all input files, k/q convergence, output files and run logs;
+4. raw Q-dependent gap/current curves or sufficient checkpoints to independently re-evaluate \(\xi_0\), \(\lambda_L\) and \(J_{\mathrm{dp}}\);
+5. independent re-execution for at least Nb, then V3Si and H3S at 200 GPa.
+
+The source reports experimental comparisons separately in Table S2. The current fixture deliberately does not collapse those multi-reference measurements into one scalar or label them as independently verified; a next data-admission step should retain each cited experimental source, method, range, pressure, temperature and observable definition individually.
+
+## First-principles baseline interpretation
+
+This workstream is not competing with BEE-NET on a mismatched metric. BEE-NET's 0.87 K MAE is against DFT/Allen–Dynes labels and belongs to a conventional electron–phonon screening task. The SCDFT length-scale work adds a different response bundle—microscopic coherence, penetration depth and depairing current—rather than another regression score.
+
+The most valuable comparison is therefore a matched, source-frozen benchmark:
+- reproduce the paper's own SCDFT outputs before claiming improvement;
+- compare predicted \(\xi_0\), both \(\lambda_L\) estimators and \(J_{\mathrm{dp}}\) against their corresponding table entries and experimental citations, without conflating them;
+- quantify uncertainty and sensitivity to k/q meshes, pseudopotential, SOC and kernel choices;
+- only then evaluate whether response-aware selection and synthesis-aware discovery improve independent validation yield at fixed compute budget.
