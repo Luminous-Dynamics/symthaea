@@ -58,6 +58,8 @@ struct AlarmObservation {
 #[derive(Debug, Clone, PartialEq)]
 pub struct AlarmPolicyConfig {
     pub policy_id: String,
+    /// Identity of the numeric scale shared by thresholds and model score evidence.
+    pub score_scale_id: String,
     /// SHA-256 content identity for the frozen validation/calibration receipt.
     pub validation_receipt_sha256: String,
     pub trigger_threshold: f64,
@@ -71,6 +73,9 @@ impl AlarmPolicyConfig {
     pub fn validate(&self) -> Result<(), PlasmaEventEvalError> {
         if self.policy_id.trim().is_empty() {
             return Err(PlasmaEventEvalError::new("policy_id must be non-empty"));
+        }
+        if self.score_scale_id.trim().is_empty() {
+            return Err(PlasmaEventEvalError::new("score_scale_id must be non-empty"));
         }
         if self.validation_receipt_sha256.len() != 64
             || !self.validation_receipt_sha256.bytes().all(|byte| {
@@ -107,8 +112,9 @@ impl AlarmPolicyConfig {
     /// represented by their IEEE-754 bit patterns for canonical identity.
     pub fn policy_config_sha256(&self) -> String {
         let canonical = format!(
-            "luminous.plasma-alarm-policy.v0.1\\n{}\\n{}\\n{:016x}\\n{:016x}\\n{}\\n{}\\n{}",
+            "luminous.plasma-alarm-policy.v0.2\\n{}\\n{}\\n{}\\n{:016x}\\n{:016x}\\n{}\\n{}\\n{}",
             self.policy_id,
+            self.score_scale_id,
             self.validation_receipt_sha256,
             self.trigger_threshold.to_bits(),
             self.clear_threshold.to_bits(),
@@ -176,6 +182,8 @@ pub struct RiskScoreEvidence {
     pub target_time_ns: u64,
     pub model_id: String,
     pub model_revision: String,
+    /// Numeric scale identifier; must equal the frozen policy's score_scale_id.
+    pub score_scale_id: String,
     pub model_artifact_sha256: String,
     pub training_split_sha256: String,
     pub calibration_id: String,
@@ -194,6 +202,7 @@ impl RiskScoreEvidence {
     pub fn validate_for_frame(
         &self,
         frame: &PlasmaObservationFrame,
+        expected_score_scale_id: &str,
     ) -> Result<(), PlasmaEventEvalError> {
         if self.schema_version != PLASMA_RISK_SCORE_EVIDENCE_SCHEMA {
             return Err(PlasmaEventEvalError::new(
@@ -205,6 +214,7 @@ impl RiskScoreEvidence {
             (self.frame_id.as_str(), "risk evidence frame_id"),
             (self.model_id.as_str(), "model_id"),
             (self.model_revision.as_str(), "model_revision"),
+            (self.score_scale_id.as_str(), "score_scale_id"),
             (self.calibration_id.as_str(), "calibration_id"),
             (self.calibration_revision.as_str(), "calibration_revision"),
             (self.uncertainty_method_id.as_str(), "uncertainty_method_id"),
@@ -248,6 +258,11 @@ impl RiskScoreEvidence {
         {
             return Err(PlasmaEventEvalError::new(
                 "risk estimate and interval bounds must be finite and ordered",
+            ));
+        }
+        if self.score_scale_id != expected_score_scale_id {
+            return Err(PlasmaEventEvalError::new(
+                "risk evidence score_scale_id does not match the frozen alarm policy",
             ));
         }
         if self.horizon_ns == 0 {
@@ -409,7 +424,7 @@ impl OnlinePlasmaAlarmPolicy {
                         "a qualified measured frame requires model-bound risk evidence",
                     )
                 })?;
-                evidence.validate_for_frame(frame)?;
+                evidence.validate_for_frame(frame, &self.config.score_scale_id)?;
                 let risk_evidence_sha256 = evidence.evidence_sha256()?;
                 let observation = AlarmObservation {
                     shot_id: inputs.shot_id().to_owned(),
@@ -872,6 +887,7 @@ mod tests {
     fn config() -> AlarmPolicyConfig {
         AlarmPolicyConfig {
             policy_id: "fixed-test-policy-v1".to_owned(),
+            score_scale_id: "normalized-risk-0-1-v1".to_owned(),
             validation_receipt_sha256: "a".repeat(64),
             trigger_threshold: 0.8,
             clear_threshold: 0.3,
@@ -947,6 +963,7 @@ mod tests {
             target_time_ns: frame.frame_time_ns.checked_add(10).expect("target time"),
             model_id: "symthaea-plasma-risk".to_owned(),
             model_revision: "test-model-v1".to_owned(),
+            score_scale_id: "normalized-risk-0-1-v1".to_owned(),
             model_artifact_sha256: "1".repeat(64),
             training_split_sha256: "2".repeat(64),
             calibration_id: "plasma-risk-calibration".to_owned(),
@@ -1044,6 +1061,10 @@ mod tests {
         let digest = original.policy_config_sha256();
         assert_eq!(digest.len(), 64);
         assert!(digest.bytes().all(|byte| byte.is_ascii_hexdigit()));
+
+        let mut changed_scale = original.clone();
+        changed_scale.score_scale_id = "alternate-risk-score-v2".to_owned();
+        assert_ne!(digest, changed_scale.policy_config_sha256());
 
         let mut changed_threshold = original.clone();
         changed_threshold.trigger_threshold += 0.01;
@@ -1338,6 +1359,13 @@ mod tests {
             .is_err());
         assert_eq!(policy.last_window_end_ns, None);
 
+        let mut wrong_scale = risk_evidence(&frame, 0.9, 0.9, 0.9);
+        wrong_scale.score_scale_id = "another-scale".to_owned();
+        assert!(policy
+            .update_from_frame(&frame, &requirements, Some(wrong_scale))
+            .is_err());
+        assert_eq!(policy.last_window_end_ns, None);
+
         let mut wrong_target = risk_evidence(&frame, 0.9, 0.9, 0.9);
         wrong_target.target_time_ns += 1;
         assert!(policy
@@ -1472,6 +1500,13 @@ mod tests {
         let (frame, _) = observation_frame(measured_disposition(10), 10);
         let original = risk_evidence(&frame, 0.9, 0.8, 0.95);
         let original_digest = original.evidence_sha256().expect("risk evidence digest");
+
+        let mut changed_scale = original.clone();
+        changed_scale.score_scale_id = "alternate-risk-score-v2".to_owned();
+        assert_ne!(
+            original_digest,
+            changed_scale.evidence_sha256().expect("changed digest")
+        );
 
         let mut changed_model = original.clone();
         changed_model.model_revision = "test-model-v2".to_owned();
