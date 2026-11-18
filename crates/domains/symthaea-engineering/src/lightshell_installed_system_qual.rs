@@ -86,6 +86,7 @@ pub struct SystemGate {
     pub applicability_owner_ref: Option<String>,
     pub not_applicable_rationale_ref: Option<String>,
     pub minimum_replicates: u32,
+    pub minimum_coverage_fraction: f64,
     pub required_pose_set_ref: Option<String>,
     pub required_pose_refs: Vec<String>,
     pub method_selection_ref: String,
@@ -242,6 +243,13 @@ impl InstalledSystemManifest {
                 push(&mut findings, "zero_minimum_replicates", format!("{path}.minimum_replicates"),
                     "Applicable gates require at least one declared replicate.");
             }
+            if !gate.minimum_coverage_fraction.is_finite()
+                || gate.minimum_coverage_fraction <= 0.0
+                || gate.minimum_coverage_fraction > 1.0
+            {
+                push(&mut findings, "invalid_gate_minimum_coverage", format!("{path}.minimum_coverage_fraction"),
+                    "Gate minimum coverage must be finite and within (0, 1].");
+            }
             if is_blank(&gate.method_selection_ref) || is_blank(&gate.acceptance_rule_ref) {
                 push(&mut findings, "gate_method_or_rule_missing", &path,
                     "Every gate must bind an exact method selection and acceptance rule.");
@@ -314,7 +322,6 @@ impl InstalledSystemManifest {
                 push(&mut findings, "measured_campaign_without_runs", "runs",
                     "Measured/adjudicated campaign requires physical system test runs.");
             }
-            validate_setup(&self.test_setup, "measured", &mut findings);
         }
 
         for (index, run) in self.runs.iter().enumerate() {
@@ -566,7 +573,7 @@ impl InstalledSystemManifest {
                     push(&mut findings, "required_pose_coverage_missing", format!("gates.{}.required_pose_refs", gate.gate_id),
                         "At least one owner-approved pose lacks an installed-condition measurement.");
                 }
-                if installed.iter().any(|run| run.coverage_fraction < 0.95) {
+                if installed.iter().any(|run| run.coverage_fraction < gate.minimum_coverage_fraction) {
                     insufficient = true;
                 }
                 if gate.comparison_mode == "absolute_interval" {
@@ -843,7 +850,7 @@ mod tests {
             "gate_id":id,"gate_family":family,"metric_id":metric,"unit":unit,"comparison_mode":mode,
             "lower_limit":lower,"upper_limit":upper,"hard_gate":true,"applicability":"required",
             "applicability_owner_ref":null,"not_applicable_rationale_ref":null,
-            "minimum_replicates":1,
+            "minimum_replicates":1,"minimum_coverage_fraction":0.95,
             "required_pose_set_ref":if pose {Some("POSE-SET-REV-A")} else {None},
             "required_pose_refs":if pose {vec!["POSE-EXTREME-A","POSE-EXTREME-B"]} else {vec![]},
             "method_selection_ref":format!("METHOD-{id}"),"acceptance_rule_ref":format!("RULE-{id}")
