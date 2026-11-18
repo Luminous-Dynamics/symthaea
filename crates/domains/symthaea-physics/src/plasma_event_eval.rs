@@ -464,6 +464,124 @@ pub enum AlarmPolicyUpdate {
     },
 }
 
+/// A checked per-shot adapter from online policy state transitions to
+/// alarm-episode start timestamps. Only Raised transitions create episodes;
+/// repeated Active/PendingClear windows never create extra alarm timestamps.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AlarmEpisodeTrace {
+    pub shot_id: String,
+    pub policy_id: String,
+    pub policy_config_sha256: String,
+    pub update_count: usize,
+    pub alarm_times_ns: Vec<u64>,
+    pub final_alarm_active: bool,
+    last_update_ns: Option<u64>,
+}
+
+impl AlarmEpisodeTrace {
+    pub fn new(
+        shot_id: impl Into<String>,
+        policy: &AlarmPolicyConfig,
+    ) -> Result<Self, PlasmaEventEvalError> {
+        policy.validate()?;
+        let shot_id = shot_id.into();
+        if shot_id.trim().is_empty() {
+            return Err(PlasmaEventEvalError::new("trace shot_id must be non-empty"));
+        }
+        Ok(Self {
+            shot_id,
+            policy_id: policy.policy_id.clone(),
+            policy_config_sha256: policy.policy_config_sha256(),
+            update_count: 0,
+            alarm_times_ns: Vec::new(),
+            final_alarm_active: false,
+            last_update_ns: None,
+        })
+    }
+
+    /// Records one online policy update and verifies that the transition is
+    /// consistent with the trace's own alarm-active state.
+    pub fn record(&mut self, update: &AlarmPolicyUpdate) -> Result<(), PlasmaEventEvalError> {
+        let (at_ns, next_active, raised) = match update {
+            AlarmPolicyUpdate::BelowThreshold { at_ns, .. }
+            | AlarmPolicyUpdate::PendingTrigger { at_ns, .. } => {
+                if self.final_alarm_active {
+                    return Err(PlasmaEventEvalError::new(
+                        "inactive-only alarm update received while trace is active",
+                    ));
+                }
+                (*at_ns, false, false)
+            }
+            AlarmPolicyUpdate::Raised { at_ns, .. } => {
+                if self.final_alarm_active {
+                    return Err(PlasmaEventEvalError::new(
+                        "Raised transition received while an alarm episode is already active",
+                    ));
+                }
+                (*at_ns, true, true)
+            }
+            AlarmPolicyUpdate::Active { at_ns, .. }
+            | AlarmPolicyUpdate::PendingClear { at_ns, .. } => {
+                if !self.final_alarm_active {
+                    return Err(PlasmaEventEvalError::new(
+                        "active alarm update received without a preceding Raised transition",
+                    ));
+                }
+                (*at_ns, true, false)
+            }
+            AlarmPolicyUpdate::Cleared { at_ns, .. } => {
+                if !self.final_alarm_active {
+                    return Err(PlasmaEventEvalError::new(
+                        "Cleared transition received while no alarm episode is active",
+                    ));
+                }
+                (*at_ns, false, false)
+            }
+            AlarmPolicyUpdate::Uncertain {
+                at_ns,
+                alert_remains_active,
+                ..
+            }
+            | AlarmPolicyUpdate::Abstained {
+                at_ns,
+                alert_remains_active,
+                ..
+            } => {
+                if *alert_remains_active != self.final_alarm_active {
+                    return Err(PlasmaEventEvalError::new(
+                        "uncertain/abstained update contradicts the trace alarm-active state",
+                    ));
+                }
+                (*at_ns, self.final_alarm_active, false)
+            }
+        };
+        if let Some(previous) = self.last_update_ns
+            && at_ns <= previous
+        {
+            return Err(PlasmaEventEvalError::new(
+                "alarm policy update timestamps must be strictly increasing",
+            ));
+        }
+        if raised {
+            self.alarm_times_ns.push(at_ns);
+        }
+        self.final_alarm_active = next_active;
+        self.last_update_ns = Some(at_ns);
+        self.update_count = self
+            .update_count
+            .checked_add(1)
+            .ok_or_else(|| PlasmaEventEvalError::new("trace update_count overflow"))?;
+        Ok(())
+    }
+
+    /// The scorer consumes only the episode-start timestamps, never each
+    /// Active window. The trace retains its policy identity for audit.
+    pub fn alarm_times_ns(&self) -> &[u64] {
+        &self.alarm_times_ns
+    }
+}
+
 /// Online hysteresis/persistence state machine.
 ///
 /// Thresholds and persistence counts must be selected before test evaluation.
@@ -2233,6 +2351,82 @@ mod tests {
         second.policy_id = "alpha".to_owned();
         second.score_scale_id = "beta\\ngamma".to_owned();
         assert_ne!(first.policy_config_sha256(), second.policy_config_sha256());
+    }
+
+    #[test]
+    fn alarm_episode_trace_counts_only_raised_transitions() {
+        let policy = config();
+        let mut trace = AlarmEpisodeTrace::new("shot-episode-trace", &policy)
+            .expect("trace should initialize");
+
+        for update in [
+            AlarmPolicyUpdate::PendingTrigger {
+                at_ns: 10,
+                consecutive_windows: 1,
+                risk_evidence_sha256: "a".repeat(64),
+            },
+            AlarmPolicyUpdate::Raised {
+                at_ns: 20,
+                risk_evidence_sha256: "b".repeat(64),
+            },
+            AlarmPolicyUpdate::Active {
+                at_ns: 30,
+                risk_evidence_sha256: "c".repeat(64),
+            },
+            AlarmPolicyUpdate::PendingClear {
+                at_ns: 40,
+                consecutive_windows: 1,
+                risk_evidence_sha256: "d".repeat(64),
+            },
+            AlarmPolicyUpdate::Active {
+                at_ns: 50,
+                risk_evidence_sha256: "e".repeat(64),
+            },
+            AlarmPolicyUpdate::Cleared {
+                at_ns: 60,
+                risk_evidence_sha256: "f".repeat(64),
+            },
+            AlarmPolicyUpdate::BelowThreshold {
+                at_ns: 70,
+                risk_evidence_sha256: "0".repeat(64),
+            },
+            AlarmPolicyUpdate::Raised {
+                at_ns: 80,
+                risk_evidence_sha256: "1".repeat(64),
+            },
+        ] {
+            trace.record(&update).expect("valid transition");
+        }
+
+        assert_eq!(trace.alarm_times_ns(), &[20, 80]);
+        assert_eq!(trace.update_count, 8);
+        assert!(trace.final_alarm_active);
+        assert_eq!(trace.policy_config_sha256, policy.policy_config_sha256());
+    }
+
+    #[test]
+    fn alarm_episode_trace_rejects_impossible_or_non_monotonic_transitions() {
+        let policy = config();
+        let mut trace = AlarmEpisodeTrace::new("shot-episode-trace", &policy)
+            .expect("trace should initialize");
+        assert!(trace.record(&AlarmPolicyUpdate::Active {
+            at_ns: 10,
+            risk_evidence_sha256: "a".repeat(64),
+        }).is_err());
+
+        trace.record(&AlarmPolicyUpdate::Raised {
+            at_ns: 20,
+            risk_evidence_sha256: "b".repeat(64),
+        }).expect("raise");
+        assert!(trace.record(&AlarmPolicyUpdate::Raised {
+            at_ns: 30,
+            risk_evidence_sha256: "c".repeat(64),
+        }).is_err());
+        assert!(trace.record(&AlarmPolicyUpdate::Active {
+            at_ns: 20,
+            risk_evidence_sha256: "d".repeat(64),
+        }).is_err());
+        assert_eq!(trace.alarm_times_ns(), &[20]);
     }
 
     #[test]
