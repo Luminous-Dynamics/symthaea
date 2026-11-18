@@ -1,0 +1,584 @@
+{
+  "contract": "SC-QUANTUM-PHASE-0.1",
+  "instance_id": "ponticelli-2026-qxy-U4-T03-synthetic-L4-Ntau16-smoke-v0",
+  "fixture_only": true,
+  "model": {
+    "kind": "source_reproduction",
+    "equation_id": "ponticelli-2026-qxy-phase-representation-eq1",
+    "hbar_convention": "hbar_equals_1",
+    "kB_convention": "kB_equals_1",
+    "pair_charge_convention": "2e_equals_1",
+    "energy_unit": "coupling_energy_units",
+    "temperature_unit": "coupling_energy_units",
+    "charge_convention": "integer_cooper_pair_number",
+    "phase_compactification": "2pi",
+    "source_model_id": "ponticelli-2026-qxy-2d-square-lattice-phase-representation",
+    "notes": "Synthetic L=4 software smoke input at the source-aligned U/t=4 and T/t=0.3 parameter point. N_tau=16 is deliberately much smaller than the source's converged settings; no scientific result may be inferred."
+  },
+  "graph": {
+    "spatial_dimension": 2,
+    "embedding": "physical_coordinates",
+    "topology_family": "periodic_square_lattice",
+    "box_lengths": [
+      4,
+      4
+    ],
+    "periodic_axes": [
+      0,
+      1
+    ],
+    "nodes": [
+      {
+        "node_id": "n0_0",
+        "position": [
+          0,
+          0
+        ]
+      },
+      {
+        "node_id": "n0_1",
+        "position": [
+          0,
+          1
+        ]
+      },
+      {
+        "node_id": "n0_2",
+        "position": [
+          0,
+          2
+        ]
+      },
+      {
+        "node_id": "n0_3",
+        "position": [
+          0,
+          3
+        ]
+      },
+      {
+        "node_id": "n1_0",
+        "position": [
+          1,
+          0
+        ]
+      },
+      {
+        "node_id": "n1_1",
+        "position": [
+          1,
+          1
+        ]
+      },
+      {
+        "node_id": "n1_2",
+        "position": [
+          1,
+          2
+        ]
+      },
+      {
+        "node_id": "n1_3",
+        "position": [
+          1,
+          3
+        ]
+      },
+      {
+        "node_id": "n2_0",
+        "position": [
+          2,
+          0
+        ]
+      },
+      {
+        "node_id": "n2_1",
+        "position": [
+          2,
+          1
+        ]
+      },
+      {
+        "node_id": "n2_2",
+        "position": [
+          2,
+          2
+        ]
+      },
+      {
+        "node_id": "n2_3",
+        "position": [
+          2,
+          3
+        ]
+      },
+      {
+        "node_id": "n3_0",
+        "position": [
+          3,
+          0
+        ]
+      },
+      {
+        "node_id": "n3_1",
+        "position": [
+          3,
+          1
+        ]
+      },
+      {
+        "node_id": "n3_2",
+        "position": [
+          3,
+          2
+        ]
+      },
+      {
+        "node_id": "n3_3",
+        "position": [
+          3,
+          3
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "e0_0_r",
+        "source": "n0_0",
+        "target": "n0_1",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e0_0_d",
+        "source": "n0_0",
+        "target": "n1_0",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e0_1_r",
+        "source": "n0_1",
+        "target": "n0_2",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e0_1_d",
+        "source": "n0_1",
+        "target": "n1_1",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e0_2_r",
+        "source": "n0_2",
+        "target": "n0_3",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e0_2_d",
+        "source": "n0_2",
+        "target": "n1_2",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e0_3_r",
+        "source": "n0_3",
+        "target": "n0_0",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ]
+      },
+      {
+        "edge_id": "e0_3_d",
+        "source": "n0_3",
+        "target": "n1_3",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e1_0_r",
+        "source": "n1_0",
+        "target": "n1_1",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e1_0_d",
+        "source": "n1_0",
+        "target": "n2_0",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e1_1_r",
+        "source": "n1_1",
+        "target": "n1_2",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e1_1_d",
+        "source": "n1_1",
+        "target": "n2_1",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e1_2_r",
+        "source": "n1_2",
+        "target": "n1_3",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e1_2_d",
+        "source": "n1_2",
+        "target": "n2_2",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e1_3_r",
+        "source": "n1_3",
+        "target": "n1_0",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ]
+      },
+      {
+        "edge_id": "e1_3_d",
+        "source": "n1_3",
+        "target": "n2_3",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e2_0_r",
+        "source": "n2_0",
+        "target": "n2_1",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e2_0_d",
+        "source": "n2_0",
+        "target": "n3_0",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e2_1_r",
+        "source": "n2_1",
+        "target": "n2_2",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e2_1_d",
+        "source": "n2_1",
+        "target": "n3_1",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e2_2_r",
+        "source": "n2_2",
+        "target": "n2_3",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e2_2_d",
+        "source": "n2_2",
+        "target": "n3_2",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e2_3_r",
+        "source": "n2_3",
+        "target": "n2_0",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ]
+      },
+      {
+        "edge_id": "e2_3_d",
+        "source": "n2_3",
+        "target": "n3_3",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e3_0_r",
+        "source": "n3_0",
+        "target": "n3_1",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e3_0_d",
+        "source": "n3_0",
+        "target": "n0_0",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ]
+      },
+      {
+        "edge_id": "e3_1_r",
+        "source": "n3_1",
+        "target": "n3_2",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e3_1_d",
+        "source": "n3_1",
+        "target": "n0_1",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ]
+      },
+      {
+        "edge_id": "e3_2_r",
+        "source": "n3_2",
+        "target": "n3_3",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e3_2_d",
+        "source": "n3_2",
+        "target": "n0_2",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ]
+      },
+      {
+        "edge_id": "e3_3_r",
+        "source": "n3_3",
+        "target": "n3_0",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ]
+      },
+      {
+        "edge_id": "e3_3_d",
+        "source": "n3_3",
+        "target": "n0_3",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ]
+      }
+    ]
+  },
+  "charging": {
+    "matrix_kind": "diagonal_scalar",
+    "energy_unit": "coupling_energy_units",
+    "diagonal_value": 4,
+    "offset_charges": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "simulation": {
+    "algorithm": "path_integral_quantum_monte_carlo",
+    "representation": "phase_path_integral",
+    "temperature": 0.3,
+    "temperature_unit": "coupling_energy_units",
+    "imaginary_time_slices": 16,
+    "imaginary_time_step": 0.20833333333333334,
+    "charge_basis_cutoff": {
+      "mode": "not_applicable",
+      "max_abs_charge_state": null
+    },
+    "random_seed": 0
+  },
+  "bath": {
+    "mode": "none",
+    "coupling_operator": "none",
+    "coupling_strength": 0,
+    "low_frequency_exponent": null,
+    "cutoff_energy": null,
+    "spectral_density": []
+  },
+  "external_flux": {
+    "mode": "zero",
+    "total_flux_quanta": 0
+  },
+  "source_references": [
+    "https://doi.org/10.1103/jbz7-l9h4",
+    "https://arxiv.org/abs/2512.20476"
+  ],
+  "claim_ceiling": "Software smoke input only on a synthetic L=4 lattice with deliberately under-resolved N_tau=16; not a source reproduction, converged result, phase boundary, conductivity result or material observation."
+}
