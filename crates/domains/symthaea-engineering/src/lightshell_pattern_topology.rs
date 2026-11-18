@@ -888,6 +888,23 @@ mod tests {
     }
 
     #[test]
+    fn fully_bound_cad_topology_with_verified_correspondence_can_preflight() {
+        let mut manifest = base_manifest();
+        manifest["state"] = json!("topology_preflighted");
+        manifest["compiler_binding"]["geometry_state"] = json!("cad_revision_bound");
+        manifest["compiler_binding"]["robot_article_revision"] = json!("ROBOT-REV-A");
+        manifest["compiler_binding"]["geometry_digest"] = json!(format!("sha256:{}", "1".repeat(64)));
+        for panel in manifest["panels"].as_array_mut().unwrap() {
+            panel["correspondence_state"] = json!("verified");
+        }
+        manifest["connections"][1]["retention_evidence_ref"] = json!("RETENTION-PLAN-OR-TEST-RECORD-01");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.is_valid(), "{:?}", report.findings);
+        assert!(report.semantic_coverage_complete);
+        assert!(report.can_preflight());
+    }
+
+    #[test]
     fn synthetic_geometry_cannot_be_promoted_to_topology_preflight() {
         let mut manifest = base_manifest();
         manifest["state"] = json!("topology_preflighted");
