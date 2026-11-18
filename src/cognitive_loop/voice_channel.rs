@@ -180,16 +180,23 @@ impl VoiceSynthesisChannel {
                 #[cfg(feature = "voice-stt")]
                 let self_hv = {
                     let resampled = resample_linear(&audio, 24_000, 16_000);
-                    self_ear.push_audio(&resampled);
-                    let frames: Vec<symthaea_stt::HV16> =
-                        self_ear.process().into_iter().map(|f| f.hv).collect();
-                    if frames.is_empty() {
-                        None
-                    } else {
-                        let bundled = symthaea_stt::bundle(&frames);
-                        Some(symthaea_core::hdc::ContinuousHV::from_vec(
-                            bundled.to_core_continuous(),
-                        ))
+                    match self_ear.push_audio(&resampled) {
+                        Ok(()) => {
+                            let frames: Vec<symthaea_stt::HV16> =
+                                self_ear.process().into_iter().map(|frame| frame.hv).collect();
+                            if frames.is_empty() {
+                                None
+                            } else {
+                                let bundled = symthaea_stt::bundle(&frames);
+                                Some(symthaea_core::hdc::ContinuousHV::from_vec(
+                                    bundled.to_core_continuous(),
+                                ))
+                            }
+                        }
+                        Err(error) => {
+                            tracing::warn!(?error, "self-hearing audio chunk rejected");
+                            None
+                        }
                     }
                 };
 
