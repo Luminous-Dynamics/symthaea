@@ -413,8 +413,8 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# scm_shuffled_parent_predictor_state_bytes={}", ScmShuffledParentPredictor::state_bytes());
     println!("# scm_parent_oracle_predictor_state_bytes={}", ScmParentPredictor::state_bytes());
     println!("# note=field_frame conditions on typed variable/byte-lane identity only");
-    println!("# note=lag_frame conditions on the previous timestep of the same variable and byte lane, without graph structure");
-    println!("# note=parent_oracle_frame additionally receives the known SCM graph and conditions on same-step parent bytes");
+    println!("# note=lag_frame conditions on the previous timestep's full i16 value for the same variable, without graph structure");
+    println!("# note=parent_oracle_frame additionally receives the known SCM graph and conditions on same-step parent i16 values");
     println!("# note=compare parent_oracle_frame against lag_frame to isolate graph-aligned conditioning from same-channel temporal context");
     println!("# note=hybrid_frame combines known parent topology with previous-sample context using coarser parent buckets");
     println!("# note=parent_oracle is an oracle-topology control, not learned causal discovery or transfer");
