@@ -82,7 +82,10 @@ fn validate_observable_value(observation: &Value) -> Result<(), String> {
         return Err(format!("observable {id}: unsupported value_kind {value_kind}"));
     }
 
-    if kind == "lambda_L_scalar" {
+    if kind == "lambda_L_scalar"
+        || kind == "lambda_L_from_current_slope"
+        || kind == "lambda_L_from_depairing_peak"
+    {
         if value_kind != "scalar" {
             return Err(format!("observable {id}: lambda_L_scalar must be scalar"));
         }
