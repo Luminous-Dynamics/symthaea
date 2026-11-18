@@ -146,4 +146,4 @@ The validator:
 - permits matched pressure comparisons only with the same frozen context/protocol, same setpoint/tolerance and a preregistered maximum difference between actual measured pressure bands;
 - performs no interpolation and does not determine task success or comfort.
 
-The module has 17 authored tests. These are not yet a current-head CI pass. Mycelix remains the authority for instrument identity/calibration/uncertainty admission; Symtropy remains the authority for hydraulic and resource modeling.
+The module has 20 authored tests. Manufacturer pressure documentation can be one-sided: a stated minimum without a maximum, or maximum without a minimum, is preserved as such. The evaluator reports `MeetsDeclaredMinimumOnly` / `MeetsDeclaredMaximumOnly` rather than claiming a complete declared operating range. It rejects an empty range and never manufactures an unpublished bound. These tests are not yet a current-head CI pass. Mycelix remains the authority for instrument identity/calibration/uncertainty admission; Symtropy remains the authority for hydraulic and resource modeling.
