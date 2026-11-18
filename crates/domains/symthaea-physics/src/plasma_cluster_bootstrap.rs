@@ -460,6 +460,20 @@ mod tests {
             contract["paired_model_comparison"],
             "use the exact same bootstrap shot-index plan for every model and report paired metric deltas"
         );
+        let paired = &contract["paired_metric_delta_bootstrap"];
+        assert_eq!(paired["same_replicate_draws_for_both_models"], true);
+        assert_eq!(
+            paired["delta_direction"],
+            "model_b_metric - model_a_metric"
+        );
+        assert_eq!(
+            paired["schema"],
+            "PairedMetricBootstrapInterval"
+        );
+        assert_eq!(
+            paired["undefined_or_non_finite_replicate"],
+            "fail closed; do not silently drop undefined metrics"
+        );
         assert!(
             contract["forbidden"]
                 .as_str()
