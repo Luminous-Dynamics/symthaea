@@ -622,7 +622,12 @@ mod tests {
         let top = episodic.get_top_episodes_with_provenance(2);
         let low = top
             .iter()
-            .find(|record| (record.episode.psi - 0.4).abs() < 1e-9)
+            .find(|record| {
+                record
+                    .graduation_provenance
+                    .as_ref()
+                    .is_some_and(|p| !p.verification_claimed)
+            })
             .unwrap();
         let verified = top
             .iter()
@@ -630,11 +635,12 @@ mod tests {
                 record
                     .graduation_provenance
                     .as_ref()
-                    .is_some_and(|p| p.source == MemorySource::ActionFeedback)
+                    .is_some_and(|p| p.verification_claimed)
             })
             .unwrap();
         assert_eq!(low.episode.valence, Some(0.0));
         assert_eq!(verified.episode.valence, Some(0.0));
+        assert_eq!(low.episode.psi, verified.episode.psi);
         assert_eq!(
             verified.graduation_provenance.as_ref().unwrap().verification_claimed,
             true
