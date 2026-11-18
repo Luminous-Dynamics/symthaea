@@ -965,6 +965,16 @@ pub struct BoundedNoiseElementDecisionV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedNoiseSubgroupCandidateV1 {
+    /// Every listed element is individually compatible with the bounded
+    /// observation model. This is a necessary, not sufficient, joint test.
+    pub element_ids: Vec<String>,
+    /// No strictly larger candidate subgroup is contained in the possible
+    /// element set. "Maximal" is relative to this finite upper envelope.
+    pub maximal_within_surviving_candidates: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BoundedNoiseStabilizerReportV1 {
     pub base_case_id: String,
     pub epsilon_scaled: i128,
@@ -972,11 +982,15 @@ pub struct BoundedNoiseStabilizerReportV1 {
     /// Not ruled out by the coordinate uncertainty envelope. This is not a
     /// proven or accepted subgroup and need not itself be group-closed.
     pub possible_elements: Vec<String>,
+    /// Every D4 subgroup whose elements all remain individually possible.
+    /// This over-approximates jointly realizable noisy symmetry groups.
+    pub not_falsified_subgroup_candidates: Vec<BoundedNoiseSubgroupCandidateV1>,
     /// Each rejected action carries a Hall-deficiency counterexample.
     pub ruled_out_elements: Vec<String>,
     /// Soundness invariant: bounded observations must never reject a true
     /// latent stabilizer element when the declared error bound is respected.
     pub all_exact_stabilizer_elements_remain_possible: bool,
+    pub exact_latent_subgroup_remains_candidate: bool,
     pub decisions: Vec<BoundedNoiseElementDecisionV1>,
 }
 
@@ -1123,6 +1137,82 @@ fn bounded_noise_matching_witness(
 }
 
 impl Manifest {
+    /// Enumerate the D4 subgroups contained in the per-element compatibility
+    /// set. This is deliberately an over-approximation: the independently
+    /// constructed point matchings for different elements need not compose
+    /// into one common noisy realization of the group action.
+    fn bounded_noise_subgroup_candidates(
+        &self,
+        possible_elements: &[String],
+    ) -> Result<Vec<BoundedNoiseSubgroupCandidateV1>, String> {
+        let element_ids: Vec<String> = self.elements.iter().map(|element| element.id.clone()).collect();
+        if element_ids.len() != 8 {
+            return Err("bounded-noise subgroup lattice currently requires D4 (8 elements)".to_owned());
+        }
+        let possible: BTreeSet<String> = possible_elements.iter().cloned().collect();
+        let identity_id = string_field(field(&self.root, "ambient_group")?, "identity_element_id")?;
+        let mut candidates: Vec<Vec<String>> = Vec::new();
+
+        for mask in 0_u16..(1_u16 << element_ids.len()) {
+            if mask.count_ones() == 0 {
+                continue;
+            }
+            let members: BTreeSet<String> = element_ids
+                .iter()
+                .enumerate()
+                .filter_map(|(index, id)| ((mask & (1_u16 << index)) != 0).then_some(id.clone()))
+                .collect();
+            if !members.contains(&identity_id) || !members.is_subset(&possible) {
+                continue;
+            }
+
+            let mut subgroup = true;
+            for left in &members {
+                let inverse = self.inverses.get(left)
+                    .ok_or_else(|| format!("missing D4 inverse for {left}"))?;
+                if !members.contains(inverse) {
+                    subgroup = false;
+                    break;
+                }
+                for right in &members {
+                    let product = self.multiplication
+                        .get(&(left.clone(), right.clone()))
+                        .ok_or_else(|| format!("missing D4 product {left} * {right}"))?;
+                    if !members.contains(product) {
+                        subgroup = false;
+                        break;
+                    }
+                }
+                if !subgroup {
+                    break;
+                }
+            }
+            if subgroup {
+                candidates.push(members.into_iter().collect());
+            }
+        }
+
+        candidates.sort_by(|left, right| {
+            (left.len(), left.as_slice()).cmp(&(right.len(), right.as_slice()))
+        });
+        let mut reports = Vec::with_capacity(candidates.len());
+        for candidate in &candidates {
+            let candidate_set: BTreeSet<&str> = candidate.iter().map(String::as_str).collect();
+            let maximal = !candidates.iter().any(|other| {
+                if other.len() <= candidate.len() {
+                    return false;
+                }
+                let other_set: BTreeSet<&str> = other.iter().map(String::as_str).collect();
+                candidate_set.is_subset(&other_set)
+            });
+            reports.push(BoundedNoiseSubgroupCandidateV1 {
+                element_ids: candidate.clone(),
+                maximal_within_surviving_candidates: maximal,
+            });
+        }
+        Ok(reports)
+    }
+
     /// Conservatively test each ambient action against a bounded coordinate
     /// error model. An edge i->j exists when observed point i is within
     /// 2*epsilon (L-infinity, in fixed-point units) of g(observed point j).
@@ -1236,14 +1326,28 @@ impl Manifest {
                 "bounded-noise filter eliminated an exact latent stabilizer element".to_owned(),
             );
         }
+        let not_falsified_subgroup_candidates =
+            self.bounded_noise_subgroup_candidates(&possible_elements)?;
+        let exact_stabilizer_vector: Vec<String> = exact_stabilizer.iter().cloned().collect();
+        let exact_latent_subgroup_remains_candidate =
+            not_falsified_subgroup_candidates
+                .iter()
+                .any(|candidate| candidate.element_ids == exact_stabilizer_vector);
+        if !exact_latent_subgroup_remains_candidate {
+            return Err(
+                "bounded-noise subgroup lattice eliminated the exact latent stabilizer".to_owned(),
+            );
+        }
 
         Ok(BoundedNoiseStabilizerReportV1 {
             base_case_id: base_case_id.to_owned(),
             epsilon_scaled,
-            exact_stabilizer_elements: exact_stabilizer.into_iter().collect(),
+            exact_stabilizer_elements: exact_stabilizer_vector,
             possible_elements,
+            not_falsified_subgroup_candidates,
             ruled_out_elements,
             all_exact_stabilizer_elements_remain_possible,
+            exact_latent_subgroup_remains_candidate,
             decisions,
         })
     }
@@ -1648,6 +1752,46 @@ mod bounded_noise_tests {
                 )
                 .unwrap();
         }
+    }
+
+    #[test]
+    fn subgroup_lattice_reports_a_conservative_upper_envelope() {
+        let manifest = manifest();
+        let fixture = noise_cases();
+        let cases = fixture["cases"].as_array().unwrap();
+        let near_tight = cases
+            .iter()
+            .find(|case| case["noise_case_id"] == "NOISE-NEAR-SYMMETRY-EPS-3")
+            .unwrap();
+        let near_wide = cases
+            .iter()
+            .find(|case| case["noise_case_id"] == "NOISE-NEAR-SYMMETRY-EPS-5")
+            .unwrap();
+        let tight = manifest
+            .bounded_noise_stabilizer_report(
+                near_tight["base_case_id"].as_str().unwrap(),
+                &near_tight["observed_points"],
+                i128::from(near_tight["epsilon_scaled"].as_i64().unwrap()),
+            )
+            .unwrap();
+        let wide = manifest
+            .bounded_noise_stabilizer_report(
+                near_wide["base_case_id"].as_str().unwrap(),
+                &near_wide["observed_points"],
+                i128::from(near_wide["epsilon_scaled"].as_i64().unwrap()),
+            )
+            .unwrap();
+        assert_eq!(tight.not_falsified_subgroup_candidates.len(), 1);
+        assert_eq!(
+            tight.not_falsified_subgroup_candidates[0].element_ids,
+            vec!["e".to_owned()]
+        );
+        assert_eq!(wide.not_falsified_subgroup_candidates.len(), 2);
+        assert!(wide.not_falsified_subgroup_candidates.iter().any(|candidate| {
+            candidate.element_ids == vec!["e".to_owned(), "fx".to_owned()]
+                && candidate.maximal_within_surviving_candidates
+        }));
+        assert!(wide.exact_latent_subgroup_remains_candidate);
     }
 
     #[test]
