@@ -133,7 +133,8 @@
           "mandatory",
           "required_metric_ids",
           "minimum_coverage_fraction",
-          "acceptance_rule_ref"
+          "acceptance_rule_ref",
+          "required_pose_refs"
         ],
         "properties": {
           "feature_ref": {
@@ -185,6 +186,13 @@
           "acceptance_rule_ref": {
             "type": "string",
             "minLength": 1
+          },
+          "required_pose_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         }
       }
@@ -230,7 +238,9 @@
             "occlusion_fraction",
             "missing_data_fraction",
             "gap_disposition_ref",
-            "operator_ref"
+            "operator_ref",
+            "fit_datum_refs",
+            "holdout_datum_residuals"
           ],
           "properties": {
             "session_id": {
@@ -389,6 +399,40 @@
             "operator_ref": {
               "type": "string",
               "minLength": 1
+            },
+            "fit_datum_refs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "holdout_datum_residuals": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "datum_ref",
+                  "residual_mm",
+                  "expanded_uncertainty_mm"
+                ],
+                "properties": {
+                  "datum_ref": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "residual_mm": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "expanded_uncertainty_mm": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                }
+              }
             }
           }
         }
@@ -413,7 +457,9 @@
           "method_selection_ref",
           "raw_data_slice_ref",
           "uncertainty_budget_ref",
-          "measurement_evidence_ref"
+          "measurement_evidence_ref",
+          "pose_ref",
+          "joint_state_ref"
         ],
         "properties": {
           "measurement_id": {
@@ -487,6 +533,18 @@
             ]
           },
           "measurement_evidence_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pose_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "joint_state_ref": {
             "type": [
               "string",
               "null"
