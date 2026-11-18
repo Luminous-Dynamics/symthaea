@@ -25,7 +25,7 @@ The exact values and low / centre / high settings must be established from CAD, 
 | F6 | Outlet diameter distribution | Process-capable tolerance range | F4, F7 |
 | F7 | Passive pressure compensation | None / qualified commercial element / candidate passive concept | F5, F6 |
 | F8 | Cassette face / seal / retention geometry | Serviceable, manufacturable interface alternatives | F1, F5 |
-| F9 | Passive feedback-channel / oscillator geometry (optional research arm) | No oscillator / single-feedback / double-feedback; feasible cavity and channel ratios from a defined design envelope | F1, F3, F5, F6 |
+| F9 | Passive feedback-channel / oscillator geometry (optional research arm) | No oscillator / single-feedback / double-feedback; feasible cavity and channel ratios from a defined design envelope | F1, F3, F5, F6 |\n| F10 | Nozzle-area ratio and resistance factor | Exact dimensionless definitions and manufacturable bounds taken from the replicated literature method / CAD | F1, F2, F5, F6 |
 
 Each factor entry must include: units, exact CAD parameter, physical rationale, manufacturable range, tolerance distribution, process route, material/finish, rated pressure/temperature constraints, and a digest of the source CAD / configuration. If a factor changes another dimension unintentionally, record the dependency rather than treating the variables as independent.
 
@@ -47,7 +47,7 @@ The Rust helper in `symthaea-aqua-bench` calculates these descriptive values and
 
 ### Other independent outcomes
 
-Retain separate outputs for flow, dynamic inlet pressure, standardized force/coverage, temperature drop at declared bather-plane location(s), splash/off-target capture, noise, scale, partial blockage, cleaning labour, post-clean performance recovery, manufacturing yield and unit-to-unit variation.
+Retain separate outputs for flow, dynamic inlet pressure, standardized force/coverage, temperature drop at declared bather-plane location(s), spray-to-skin heat-transfer coefficient only where the measurement method is validated, splash/off-target capture, noise, scale, partial blockage, cleaning labour, post-clean performance recovery, manufacturing yield and unit-to-unit variation.
 
 No single weighted score may compensate for a hard-constraint violation. Do not infer comfort, cleaning efficacy or aerosol safety from deposited-water density.
 
@@ -191,3 +191,12 @@ The research basis is adjacent, not direct: a March 2026 review compares cavity 
 - Reject any design whose oscillation becomes intermittent, asymmetric, noisy, hard to clean or unstable after fouling.
 
 **Falsification:** if the device needs more inlet pressure than the target installation can supply, or its pressure loss, aerosol profile, clogging or cleanability erases any useful coverage gain, it is not an Aqua breakthrough. A simple fixed passive manifold may remain superior.
+
+
+## 12. Prior evidence: spray pattern and heat-transfer coupling
+
+Zhang, Mui and Wong (Water, 2024, 16(7), 928) tested five showerheads and 18 spray patterns. Their study reports that nozzle area ratio, supply pressure and resistance factor significantly affected the spray-to-skin heat-transfer coefficient; it reports that a higher heat-transfer coefficient could reduce energy use by up to 20% while maintaining the same thermal sensation in that study's conditions.
+
+This is important prior evidence: nozzle geometry should not be optimized independently of the thermal-service boundary. Aqua should preserve the paper's dimensionless predictor variables where definitions can be reproduced, and separately measure water flow, pressure, delivered temperature, bather-plane temperature and any validated heat-transfer coefficient. A product-level thermal or human-comfort claim requires a matched Aqua test and its own independent endpoint method; the paper's 20% result is not an Aqua target or guarantee.
+
+Source: https://www.mdpi.com/2073-4441/16/7/928
