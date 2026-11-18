@@ -1,0 +1,19 @@
+[package]
+name = "superconductivity-quantum-phase-harness"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Offline quantum-phase model-input contract auditor"
+
+[workspace]
+resolver = "2"
+
+[dependencies]
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
+jsonschema = { version = "=0.59.0", default-features = false }
+
+[[bin]]
+name = "sc_quantum_phase_audit"
+path = "src/main.rs"
