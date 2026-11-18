@@ -78,6 +78,27 @@ pub struct KernelPlan {
     pub accumulator_count: u8,
 }
 
+/// Content identity of the complete source-generation grammar and renderer template.
+pub fn generator_id() -> ContentId {
+    let mut parts = vec![
+        GRAMMAR_SCHEMA.to_vec(),
+        b"rust-portable-xor-popcount-renderer-v1".to_vec(),
+    ];
+    for width in WordWidth::ALL {
+        parts.push(width.name().as_bytes().to_vec());
+    }
+    for unroll in KernelPlan::UNROLL_FACTORS {
+        parts.push(vec![unroll]);
+    }
+    for accumulators in KernelPlan::ACCUMULATOR_COUNTS {
+        parts.push(vec![accumulators]);
+    }
+    ContentId::derive(
+        "symthaea.hdc-kernel-source-generator.v1",
+        parts.iter().map(Vec::as_slice),
+    )
+}
+
 impl KernelPlan {
     pub const UNROLL_FACTORS: [u8; 4] = [1, 2, 4, 8];
     pub const ACCUMULATOR_COUNTS: [u8; 4] = [1, 2, 4, 8];
@@ -135,10 +156,11 @@ impl KernelPlan {
         let width = (self.word_width.bits() as u64).to_be_bytes();
         let unroll = [self.unroll_factor];
         let accumulators = [self.accumulator_count];
+        let generator = generator_id();
         ContentId::derive(
             GRAMMAR_DOMAIN,
             [
-                GRAMMAR_SCHEMA,
+                generator.as_str().as_bytes(),
                 width.as_slice(),
                 unroll.as_slice(),
                 accumulators.as_slice(),
@@ -238,6 +260,16 @@ mod tests {
             plans.iter().map(|plan| plan.id()).collect::<std::collections::BTreeSet<_>>().len(),
             plans.len()
         );
+    }
+
+    #[test]
+    fn generator_identity_is_deterministic_and_bound_into_plan_identity() {
+        let first = generator_id();
+        let second = generator_id();
+        assert_eq!(first, second);
+
+        let plan = KernelPlan::new(WordWidth::U64, 4, 4).unwrap();
+        assert!(plan.id().as_str().starts_with("sha256:"));
     }
 
     #[test]
