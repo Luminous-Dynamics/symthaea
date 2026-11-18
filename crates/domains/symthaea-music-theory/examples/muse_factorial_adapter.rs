@@ -14,7 +14,7 @@ use std::fs;
 use std::io::{BufWriter, Write};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
-use std::process::ExitCode;
+use std::process::{Command, ExitCode};
 
 use serde_json::to_vec;
 use sha2::{Digest, Sha256};
@@ -573,6 +573,39 @@ fn is_commit_sha(value: &str) -> bool {
     value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
+fn git_output(args: &[&str]) -> Result<String, String> {
+    let output = Command::new("git")
+        .args(args)
+        .output()
+        .map_err(|error| format!("cannot execute git {:?}: {error}", args))?;
+    if !output.status.success() {
+        return Err(format!(
+            "git {:?} failed with status {}",
+            args,
+            output.status
+        ));
+    }
+    String::from_utf8(output.stdout)
+        .map(|value| value.trim().to_string())
+        .map_err(|error| format!("git {:?} output is not UTF-8: {error}", args))
+}
+
+fn verify_source_revision(source_commit: &str) -> Result<(), String> {
+    let head = git_output(&["rev-parse", "HEAD"])?;
+    if head != source_commit {
+        return Err(format!(
+            "provided source commit {source_commit} does not match checked-out HEAD {head}"
+        ));
+    }
+    let dirty = git_output(&["status", "--porcelain", "--untracked-files=all"])?;
+    if !dirty.is_empty() {
+        return Err(format!(
+            "source worktree is not clean; refusing to bind measurements to commit {head}"
+        ));
+    }
+    Ok(())
+}
+
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.len() != 4 {
@@ -591,6 +624,7 @@ fn run() -> Result<(), String> {
     if !is_commit_sha(&args[3]) {
         return Err("source commit must be exactly 40 hexadecimal characters".to_string());
     }
+    verify_source_revision(&args[3])?;
 
     let manifest_bytes = fs::read(manifest_path)
         .map_err(|error| format!("cannot read {}: {error}", manifest_path.display()))?;
