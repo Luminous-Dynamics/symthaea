@@ -3,7 +3,6 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::env;
-use std::f64::consts::TAU;
 use std::fs;
 use std::path::PathBuf;
 use std::process;
@@ -991,6 +990,7 @@ impl IntertwinedModel {
     }
 
     fn receipt(&self, energy: &EnergyBreakdown, gauge_residual: f64) -> Value {
+        let component_mean_amplitudes = self.component_mean_amplitudes(&self.initial_fields());
         let component_metadata: Vec<Value> = self
             .components
             .iter()
@@ -1002,7 +1002,7 @@ impl IntertwinedModel {
                     "band_orbital_id": component.band_orbital_id,
                     "symmetry_label": component.symmetry_label,
                     "momentum_vector": component.momentum,
-                    "mean_amplitude": self.component_mean_amplitudes(&self.initial_fields())[index],
+                    "mean_amplitude": component_mean_amplitudes[index],
                     "basis_gauge_charge": "Cooper_pair_charge_2e"
                 })
             })
@@ -1018,7 +1018,19 @@ impl IntertwinedModel {
                 "shape": self.shape,
                 "boundary_conditions": self.boundary_conditions,
                 "site_count": self.sites.len(),
-                "edge_count": self.edges.len()
+                "edge_count": self.edges.len(),
+                "sites": self.sites.iter().map(|site| json!({
+                    "site_id": site.id,
+                    "position": site.position
+                })).collect::<Vec<_>>(),
+                "edges": self.edges.iter().map(|edge| json!({
+                    "edge_id": edge.id,
+                    "source_site_id": self.sites[edge.source].id,
+                    "target_site_id": self.sites[edge.target].id,
+                    "axis_index": edge.axis,
+                    "periodic_image_shift": edge.image_shift,
+                    "gauge_link_phase_rad": edge.gauge_phase
+                })).collect::<Vec<_>>()
             },
             "components": component_metadata,
             "model_scope": {
@@ -1315,22 +1327,6 @@ mod tests {
             .clone();
         permuted["couplings"]["quartic_self_coefficients"] =
             json!(permutation.iter().map(|i| old_beta[*i].clone()).collect::<Vec<_>>());
-
-        let old_component_ids: Vec<String> = old_components
-            .iter()
-            .map(|component| component["component_id"].as_str().unwrap().to_owned())
-            .collect();
-        let new_component_ids: Vec<String> = permutation
-            .iter()
-            .map(|index| old_component_ids[*index].clone())
-            .collect();
-        let old_to_new: HashMap<String, String> = new_component_ids
-            .iter()
-            .enumerate()
-            .map(|(new_index, id)| (id.clone(), old_component_ids[permutation[new_index]].clone()))
-            .collect();
-        // Terms are ID-addressed, so no reindexing is needed for their meaning.
-        let _ = old_to_new;
 
         let permuted_bytes = serde_json::to_vec(&permuted).unwrap();
         let permuted_model = IntertwinedModel::from_bytes(&schema, &permuted_bytes).unwrap();
