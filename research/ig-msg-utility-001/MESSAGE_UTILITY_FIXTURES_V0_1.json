@@ -69,7 +69,8 @@
         "token_savings_milli": 0,
         "provenance_violations": 0,
         "required_roots_delivered_count": 1,
-        "required_root_coverage_milli": 1000
+        "required_root_coverage_milli": 1000,
+        "unauthorized_attempt_count": 0
       }
     },
     {
@@ -129,7 +130,8 @@
         "token_savings_milli": 650,
         "provenance_violations": 0,
         "required_roots_delivered_count": 1,
-        "required_root_coverage_milli": 1000
+        "required_root_coverage_milli": 1000,
+        "unauthorized_attempt_count": 0
       }
     },
     {
@@ -189,7 +191,8 @@
         "token_savings_milli": 1000,
         "provenance_violations": 0,
         "required_roots_delivered_count": 0,
-        "required_root_coverage_milli": null
+        "required_root_coverage_milli": null,
+        "unauthorized_attempt_count": 0
       }
     },
     {
@@ -286,7 +289,8 @@
         "token_savings_milli": 0,
         "provenance_violations": 0,
         "required_roots_delivered_count": 1,
-        "required_root_coverage_milli": 1000
+        "required_root_coverage_milli": 1000,
+        "unauthorized_attempt_count": 0
       }
     },
     {
@@ -346,7 +350,8 @@
         "token_savings_milli": 650,
         "provenance_violations": 0,
         "required_roots_delivered_count": 1,
-        "required_root_coverage_milli": 1000
+        "required_root_coverage_milli": 1000,
+        "unauthorized_attempt_count": 0
       }
     },
     {
@@ -406,7 +411,8 @@
         "token_savings_milli": 650,
         "provenance_violations": 0,
         "required_roots_delivered_count": 1,
-        "required_root_coverage_milli": 1000
+        "required_root_coverage_milli": 1000,
+        "unauthorized_attempt_count": 0
       }
     },
     {
@@ -466,7 +472,8 @@
         "token_savings_milli": 650,
         "provenance_violations": 1,
         "required_roots_delivered_count": 1,
-        "required_root_coverage_milli": 1000
+        "required_root_coverage_milli": 1000,
+        "unauthorized_attempt_count": 0
       }
     },
     {
@@ -525,7 +532,8 @@
         "token_savings_milli": 650,
         "provenance_violations": 1,
         "required_roots_delivered_count": 1,
-        "required_root_coverage_milli": 1000
+        "required_root_coverage_milli": 1000,
+        "unauthorized_attempt_count": 0
       }
     },
     {
@@ -584,7 +592,8 @@
         "token_savings_milli": 650,
         "provenance_violations": 1,
         "required_roots_delivered_count": 1,
-        "required_root_coverage_milli": 1000
+        "required_root_coverage_milli": 1000,
+        "unauthorized_attempt_count": 0
       }
     },
     {
@@ -643,7 +652,8 @@
         "token_savings_milli": 650,
         "provenance_violations": 2,
         "required_roots_delivered_count": 1,
-        "required_root_coverage_milli": 1000
+        "required_root_coverage_milli": 1000,
+        "unauthorized_attempt_count": 0
       }
     },
     {
@@ -703,7 +713,8 @@
         "token_savings_milli": 650,
         "provenance_violations": 0,
         "required_roots_delivered_count": 1,
-        "required_root_coverage_milli": 1000
+        "required_root_coverage_milli": 1000,
+        "unauthorized_attempt_count": 0
       }
     },
     {
@@ -762,7 +773,8 @@
         "token_savings_milli": 650,
         "provenance_violations": 2,
         "required_roots_delivered_count": 1,
-        "required_root_coverage_milli": 1000
+        "required_root_coverage_milli": 1000,
+        "unauthorized_attempt_count": 0
       }
     },
     {
@@ -812,7 +824,7 @@
       ],
       "expected": {
         "disposition": "reject",
-        "unique_new_root_count": 1,
+        "unique_new_root_count": 0,
         "duplicate_message_count": 0,
         "retained_message_count": 1,
         "original_tokens": 100,
@@ -820,7 +832,8 @@
         "token_savings_milli": 650,
         "provenance_violations": 1,
         "required_roots_delivered_count": 0,
-        "required_root_coverage_milli": null
+        "required_root_coverage_milli": null,
+        "unauthorized_attempt_count": 1
       }
     },
     {
@@ -878,7 +891,8 @@
         "token_savings_milli": 1000,
         "provenance_violations": 0,
         "required_roots_delivered_count": 0,
-        "required_root_coverage_milli": null
+        "required_root_coverage_milli": null,
+        "unauthorized_attempt_count": 0
       }
     },
     {
@@ -938,7 +952,8 @@
         "token_savings_milli": 1000,
         "provenance_violations": 1,
         "required_roots_delivered_count": 0,
-        "required_root_coverage_milli": 0
+        "required_root_coverage_milli": 0,
+        "unauthorized_attempt_count": 0
       }
     },
     {
@@ -1072,7 +1087,8 @@
         "token_savings_milli": 0,
         "provenance_violations": 0,
         "required_roots_delivered_count": 1,
-        "required_root_coverage_milli": 1000
+        "required_root_coverage_milli": 1000,
+        "unauthorized_attempt_count": 0
       }
     },
     {
@@ -1132,7 +1148,8 @@
         "token_savings_milli": 650,
         "provenance_violations": 1,
         "required_roots_delivered_count": 1,
-        "required_root_coverage_milli": 1000
+        "required_root_coverage_milli": 1000,
+        "unauthorized_attempt_count": 0
       }
     },
     {
@@ -1190,7 +1207,8 @@
         "token_savings_milli": 1000,
         "provenance_violations": 0,
         "required_roots_delivered_count": 0,
-        "required_root_coverage_milli": null
+        "required_root_coverage_milli": null,
+        "unauthorized_attempt_count": 0
       }
     },
     {
@@ -1248,7 +1266,8 @@
         "token_savings_milli": 1000,
         "provenance_violations": 1,
         "required_roots_delivered_count": 0,
-        "required_root_coverage_milli": null
+        "required_root_coverage_milli": null,
+        "unauthorized_attempt_count": 0
       }
     },
     {
@@ -1308,7 +1327,8 @@
         "token_savings_milli": -200,
         "provenance_violations": 1,
         "required_roots_delivered_count": 1,
-        "required_root_coverage_milli": 1000
+        "required_root_coverage_milli": 1000,
+        "unauthorized_attempt_count": 0
       }
     }
   ]
