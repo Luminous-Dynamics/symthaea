@@ -154,6 +154,8 @@ impl ManufacturingRouteManifest {
         let mut accounted_connections = HashSet::new();
         let mut accounted_articulation = HashSet::new();
         let mut accounted_service = HashSet::new();
+        let mut received_lots = HashSet::new();
+        let mut final_inspection_count = 0usize;
         let mut operation_indices = HashSet::new();
 
         if self.schema_version != "0.1.0" {
@@ -319,6 +321,12 @@ impl ManufacturingRouteManifest {
                     push(&mut findings, "operation_unknown_material_lot", format!("{path}.material_lot_refs"),
                         format!("Operation references unknown material lot {lot_ref}."));
                 }
+                if operation.operation_kind == "material_receipt" && lots.contains_key(lot_ref.as_str()) {
+                    received_lots.insert(lot_ref.as_str());
+                }
+            }
+            if operation.operation_kind == "final_inspect" {
+                final_inspection_count += 1;
             }
             for input in &operation.input_component_refs {
                 if let Some(producer) = output_owner.get(input.as_str()) {
@@ -405,6 +413,19 @@ impl ManufacturingRouteManifest {
                 if !operations.contains_key(dependency.as_str()) {
                     push(&mut findings, "unknown_operation_dependency", format!("{path}.dependencies"),
                         format!("Dependency {dependency} is not declared in this route."));
+                }
+            }
+        }
+
+        if self.state == "route_reviewed" {
+            if final_inspection_count == 0 {
+                push(&mut findings, "route_review_missing_final_inspection", "operations",
+                    "A route-reviewed garment requires a final inspection operation with a declared method, fixture and acceptance rule.");
+            }
+            for lot in &self.material_lots {
+                if !received_lots.contains(lot.lot_id.as_str()) {
+                    push(&mut findings, "route_review_lot_not_received", "material_lots",
+                        format!("Material lot {} has no material_receipt operation.", lot.lot_id));
                 }
             }
         }
@@ -915,12 +936,48 @@ mod tests {
     }
 
     #[test]
+    fn route_review_requires_a_final_inspection_operation() {
+        let mut manifest = base_manifest();
+        manifest["state"] = json!("route_reviewed");
+        manifest["topology_state"] = json!("topology_preflighted");
+        manifest["article_revision"] = json!("ROBOT-REV-A");
+        manifest["geometry_digest"] = json!(format!("sha256:{}", "b".repeat(64)));
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "route_review_missing_final_inspection"));
+    }
+
+    #[test]
+    fn route_review_requires_every_material_lot_to_have_receipt_operation() {
+        let mut manifest = base_manifest();
+        manifest["material_lots"].push(json!({
+            "lot_id":"LOT-002","material_ref":"YARN-002",
+            "supplier_lot_ref":"SUPPLIER-LOT-002","receipt_evidence_ref":"RECEIPT-002"
+        }));
+        manifest["state"] = json!("route_reviewed");
+        manifest["topology_state"] = json!("topology_preflighted");
+        manifest["article_revision"] = json!("ROBOT-REV-A");
+        manifest["geometry_digest"] = json!(format!("sha256:{}", "b".repeat(64)));
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "route_review_lot_not_received"));
+    }
+
+    #[test]
     fn route_review_requires_qualified_machine_process_and_tool_binding() {
         let mut manifest = base_manifest();
         manifest["state"] = json!("route_reviewed");
         manifest["topology_state"] = json!("topology_preflighted");
         manifest["article_revision"] = json!("ROBOT-REV-A");
         manifest["geometry_digest"] = json!(format!("sha256:{}", "b".repeat(64)));
+        manifest["operations"].push(operation(
+            "OP-FINAL-INSPECT",6,"final_inspect",vec!["OP-ATTACH"],
+            vec![json!({"entity_kind":"garment","entity_ref":"ELBOW-GARMENT-CANDIDATE-001"})],
+            vec!["COMP-ASSEMBLY-001"],vec!["COMP-INSPECTED-001"]
+        ));
+        manifest["operations"][6]["inspection_gate"] = json!({
+            "gate_id":"FINAL-GATE-01","method_selection_ref":"METHOD-01","fixture_ref":"FIXTURE-01",
+            "fixture_revision_ref":"FIXTURE-REV-A","acceptance_rule_ref":"ACCEPT-01",
+            "result_state":"not_run","result_evidence_ref":null
+        });
         for op in manifest["operations"].as_array_mut().unwrap() {
             op["process_binding"]["process_profile_ref"] = json!("MFG-PROC-PROFILE-01");
             op["process_binding"]["capability_state"] = json!("qualified");
