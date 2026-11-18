@@ -1,0 +1,955 @@
+{
+  "schema_version": 1,
+  "protocol_id": "IG-INTEGRATION-001",
+  "fixtures": [
+    {
+      "id": "IF-001-perfect-integration",
+      "candidate_ids": [
+        "A",
+        "B",
+        "C"
+      ],
+      "evidence_catalog": [
+        {
+          "evidence_id": "EA1",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "delivery",
+          "polarity": "supports",
+          "gold_contribution": 4
+        },
+        {
+          "evidence_id": "EA2",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "reliability",
+          "polarity": "supports",
+          "gold_contribution": 3
+        },
+        {
+          "evidence_id": "EB1",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "experience",
+          "polarity": "supports",
+          "gold_contribution": 1
+        },
+        {
+          "evidence_id": "EB2",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "failure",
+          "polarity": "opposes",
+          "gold_contribution": -2
+        },
+        {
+          "evidence_id": "EC1",
+          "source_agent_id": "AgentC",
+          "candidate_id": "C",
+          "attribute_id": "cost",
+          "polarity": "supports",
+          "gold_contribution": 1
+        },
+        {
+          "evidence_id": "EC2",
+          "source_agent_id": "AgentC",
+          "candidate_id": "C",
+          "attribute_id": "risk",
+          "polarity": "opposes",
+          "gold_contribution": -1
+        }
+      ],
+      "surfaced_evidence_ids": [
+        "EA1",
+        "EA2",
+        "EB1",
+        "EB2",
+        "EC1",
+        "EC2"
+      ],
+      "matrix": [
+        {
+          "evidence_id": "EA1",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "delivery",
+          "polarity": "supports",
+          "contribution": 4
+        },
+        {
+          "evidence_id": "EA2",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "reliability",
+          "polarity": "supports",
+          "contribution": 3
+        },
+        {
+          "evidence_id": "EB1",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "experience",
+          "polarity": "supports",
+          "contribution": 1
+        },
+        {
+          "evidence_id": "EB2",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "failure",
+          "polarity": "opposes",
+          "contribution": -2
+        },
+        {
+          "evidence_id": "EC1",
+          "source_agent_id": "AgentC",
+          "candidate_id": "C",
+          "attribute_id": "cost",
+          "polarity": "supports",
+          "contribution": 1
+        },
+        {
+          "evidence_id": "EC2",
+          "source_agent_id": "AgentC",
+          "candidate_id": "C",
+          "attribute_id": "risk",
+          "polarity": "opposes",
+          "contribution": -1
+        }
+      ],
+      "selected_candidate_id": "A",
+      "gold_choice_id": "A",
+      "expected": {
+        "disposition": "qualified",
+        "surface_coverage_milli": 1000,
+        "decisive_surface_coverage_milli": 1000,
+        "matrix_recall_milli": 1000,
+        "source_accuracy_milli": 1000,
+        "candidate_mapping_accuracy_milli": 1000,
+        "attribute_mapping_accuracy_milli": 1000,
+        "polarity_accuracy_milli": 1000,
+        "contribution_exact_milli": 1000,
+        "duplicate_matrix_rows": 0,
+        "provenance_violations": 0,
+        "matrix_decision_consistent": true,
+        "decision_correct": true
+      }
+    },
+    {
+      "id": "IF-002-surfaced-but-not-integrated",
+      "candidate_ids": [
+        "A",
+        "B",
+        "C"
+      ],
+      "evidence_catalog": [
+        {
+          "evidence_id": "EA1",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "delivery",
+          "polarity": "supports",
+          "gold_contribution": 4
+        },
+        {
+          "evidence_id": "EA2",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "reliability",
+          "polarity": "supports",
+          "gold_contribution": 3
+        },
+        {
+          "evidence_id": "EB1",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "experience",
+          "polarity": "supports",
+          "gold_contribution": 1
+        },
+        {
+          "evidence_id": "EB2",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "failure",
+          "polarity": "opposes",
+          "gold_contribution": -2
+        },
+        {
+          "evidence_id": "EC1",
+          "source_agent_id": "AgentC",
+          "candidate_id": "C",
+          "attribute_id": "cost",
+          "polarity": "supports",
+          "gold_contribution": 1
+        },
+        {
+          "evidence_id": "EC2",
+          "source_agent_id": "AgentC",
+          "candidate_id": "C",
+          "attribute_id": "risk",
+          "polarity": "opposes",
+          "gold_contribution": -1
+        }
+      ],
+      "surfaced_evidence_ids": [
+        "EA1",
+        "EA2",
+        "EB1",
+        "EB2",
+        "EC1",
+        "EC2"
+      ],
+      "matrix": [
+        {
+          "evidence_id": "EA1",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "delivery",
+          "polarity": "supports",
+          "contribution": 1
+        },
+        {
+          "evidence_id": "EB1",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "experience",
+          "polarity": "supports",
+          "contribution": 2
+        },
+        {
+          "evidence_id": "EB2",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "failure",
+          "polarity": "opposes",
+          "contribution": -2
+        },
+        {
+          "evidence_id": "EC1",
+          "source_agent_id": "AgentC",
+          "candidate_id": "C",
+          "attribute_id": "cost",
+          "polarity": "supports",
+          "contribution": 1
+        },
+        {
+          "evidence_id": "EC2",
+          "source_agent_id": "AgentC",
+          "candidate_id": "C",
+          "attribute_id": "risk",
+          "polarity": "opposes",
+          "contribution": -1
+        }
+      ],
+      "selected_candidate_id": "B",
+      "gold_choice_id": "A",
+      "expected": {
+        "disposition": "qualified",
+        "surface_coverage_milli": 1000,
+        "decisive_surface_coverage_milli": 1000,
+        "matrix_recall_milli": 833,
+        "source_accuracy_milli": 1000,
+        "candidate_mapping_accuracy_milli": 1000,
+        "attribute_mapping_accuracy_milli": 1000,
+        "polarity_accuracy_milli": 1000,
+        "contribution_exact_milli": 600,
+        "duplicate_matrix_rows": 0,
+        "provenance_violations": 0,
+        "matrix_decision_consistent": false,
+        "decision_correct": false
+      }
+    },
+    {
+      "id": "IF-003-duplicate-row-does-not-inflate",
+      "candidate_ids": [
+        "A",
+        "B"
+      ],
+      "evidence_catalog": [
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "benefit",
+          "polarity": "supports",
+          "gold_contribution": 2
+        },
+        {
+          "evidence_id": "EB",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "benefit",
+          "polarity": "supports",
+          "gold_contribution": 1
+        }
+      ],
+      "surfaced_evidence_ids": [
+        "EA",
+        "EB"
+      ],
+      "matrix": [
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "benefit",
+          "polarity": "supports",
+          "contribution": 2
+        },
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "benefit",
+          "polarity": "supports",
+          "contribution": 100
+        },
+        {
+          "evidence_id": "EB",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "benefit",
+          "polarity": "supports",
+          "contribution": 1
+        }
+      ],
+      "selected_candidate_id": "A",
+      "gold_choice_id": "A",
+      "expected": {
+        "disposition": "qualified",
+        "surface_coverage_milli": 1000,
+        "decisive_surface_coverage_milli": 1000,
+        "matrix_recall_milli": 1000,
+        "source_accuracy_milli": 1000,
+        "candidate_mapping_accuracy_milli": 1000,
+        "attribute_mapping_accuracy_milli": 1000,
+        "polarity_accuracy_milli": 1000,
+        "contribution_exact_milli": 1000,
+        "duplicate_matrix_rows": 1,
+        "provenance_violations": 0,
+        "matrix_decision_consistent": true,
+        "decision_correct": true
+      }
+    },
+    {
+      "id": "IF-004-polarity-reversal",
+      "candidate_ids": [
+        "A",
+        "B"
+      ],
+      "evidence_catalog": [
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "gold_contribution": 3
+        },
+        {
+          "evidence_id": "EB",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "gold_contribution": 1
+        }
+      ],
+      "surfaced_evidence_ids": [
+        "EA",
+        "EB"
+      ],
+      "matrix": [
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "quality",
+          "polarity": "opposes",
+          "contribution": -3
+        },
+        {
+          "evidence_id": "EB",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "contribution": 1
+        }
+      ],
+      "selected_candidate_id": "B",
+      "gold_choice_id": "A",
+      "expected": {
+        "disposition": "qualified",
+        "surface_coverage_milli": 1000,
+        "decisive_surface_coverage_milli": 1000,
+        "matrix_recall_milli": 1000,
+        "source_accuracy_milli": 1000,
+        "candidate_mapping_accuracy_milli": 1000,
+        "attribute_mapping_accuracy_milli": 1000,
+        "polarity_accuracy_milli": 500,
+        "contribution_exact_milli": 500,
+        "duplicate_matrix_rows": 0,
+        "provenance_violations": 0,
+        "matrix_decision_consistent": true,
+        "decision_correct": false
+      }
+    },
+    {
+      "id": "IF-005-source-attribution-mismatch",
+      "candidate_ids": [
+        "A",
+        "B"
+      ],
+      "evidence_catalog": [
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "gold_contribution": 3
+        },
+        {
+          "evidence_id": "EB",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "gold_contribution": 1
+        }
+      ],
+      "surfaced_evidence_ids": [
+        "EA",
+        "EB"
+      ],
+      "matrix": [
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentX",
+          "candidate_id": "A",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "contribution": 3
+        },
+        {
+          "evidence_id": "EB",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "contribution": 1
+        }
+      ],
+      "selected_candidate_id": "A",
+      "gold_choice_id": "A",
+      "expected": {
+        "disposition": "reject",
+        "surface_coverage_milli": 1000,
+        "decisive_surface_coverage_milli": 1000,
+        "matrix_recall_milli": 1000,
+        "source_accuracy_milli": 500,
+        "candidate_mapping_accuracy_milli": 1000,
+        "attribute_mapping_accuracy_milli": 1000,
+        "polarity_accuracy_milli": 1000,
+        "contribution_exact_milli": 1000,
+        "duplicate_matrix_rows": 0,
+        "provenance_violations": 1,
+        "matrix_decision_consistent": true,
+        "decision_correct": true
+      }
+    },
+    {
+      "id": "IF-006-fabricated-evidence-row",
+      "candidate_ids": [
+        "A",
+        "B"
+      ],
+      "evidence_catalog": [
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "gold_contribution": 3
+        },
+        {
+          "evidence_id": "EB",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "gold_contribution": 1
+        }
+      ],
+      "surfaced_evidence_ids": [
+        "EA",
+        "EB"
+      ],
+      "matrix": [
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "contribution": 3
+        },
+        {
+          "evidence_id": "E-FAKE",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "contribution": 9
+        }
+      ],
+      "selected_candidate_id": "A",
+      "gold_choice_id": "A",
+      "expected": {
+        "disposition": "reject",
+        "surface_coverage_milli": 1000,
+        "decisive_surface_coverage_milli": 1000,
+        "matrix_recall_milli": 500,
+        "source_accuracy_milli": 1000,
+        "candidate_mapping_accuracy_milli": 1000,
+        "attribute_mapping_accuracy_milli": 1000,
+        "polarity_accuracy_milli": 1000,
+        "contribution_exact_milli": 1000,
+        "duplicate_matrix_rows": 0,
+        "provenance_violations": 1,
+        "matrix_decision_consistent": true,
+        "decision_correct": true
+      }
+    },
+    {
+      "id": "IF-007-wrong-candidate-mapping",
+      "candidate_ids": [
+        "A",
+        "B"
+      ],
+      "evidence_catalog": [
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "gold_contribution": 4
+        },
+        {
+          "evidence_id": "EB",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "gold_contribution": 1
+        }
+      ],
+      "surfaced_evidence_ids": [
+        "EA",
+        "EB"
+      ],
+      "matrix": [
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentA",
+          "candidate_id": "B",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "contribution": 4
+        },
+        {
+          "evidence_id": "EB",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "contribution": 1
+        }
+      ],
+      "selected_candidate_id": "B",
+      "gold_choice_id": "A",
+      "expected": {
+        "disposition": "qualified",
+        "surface_coverage_milli": 1000,
+        "decisive_surface_coverage_milli": 1000,
+        "matrix_recall_milli": 1000,
+        "source_accuracy_milli": 1000,
+        "candidate_mapping_accuracy_milli": 500,
+        "attribute_mapping_accuracy_milli": 1000,
+        "polarity_accuracy_milli": 1000,
+        "contribution_exact_milli": 1000,
+        "duplicate_matrix_rows": 0,
+        "provenance_violations": 0,
+        "matrix_decision_consistent": true,
+        "decision_correct": false
+      }
+    },
+    {
+      "id": "IF-008-negative-evidence-omitted",
+      "candidate_ids": [
+        "A",
+        "B",
+        "C"
+      ],
+      "evidence_catalog": [
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "benefit",
+          "polarity": "supports",
+          "gold_contribution": 2
+        },
+        {
+          "evidence_id": "EB1",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "benefit",
+          "polarity": "supports",
+          "gold_contribution": 4
+        },
+        {
+          "evidence_id": "EB2",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "risk",
+          "polarity": "opposes",
+          "gold_contribution": -5
+        },
+        {
+          "evidence_id": "EC",
+          "source_agent_id": "AgentC",
+          "candidate_id": "C",
+          "attribute_id": "benefit",
+          "polarity": "supports",
+          "gold_contribution": 1
+        }
+      ],
+      "surfaced_evidence_ids": [
+        "EA",
+        "EB1",
+        "EB2",
+        "EC"
+      ],
+      "matrix": [
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "benefit",
+          "polarity": "supports",
+          "contribution": 2
+        },
+        {
+          "evidence_id": "EB1",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "benefit",
+          "polarity": "supports",
+          "contribution": 4
+        },
+        {
+          "evidence_id": "EC",
+          "source_agent_id": "AgentC",
+          "candidate_id": "C",
+          "attribute_id": "benefit",
+          "polarity": "supports",
+          "contribution": 1
+        }
+      ],
+      "selected_candidate_id": "B",
+      "gold_choice_id": "A",
+      "expected": {
+        "disposition": "qualified",
+        "surface_coverage_milli": 1000,
+        "decisive_surface_coverage_milli": 1000,
+        "matrix_recall_milli": 750,
+        "source_accuracy_milli": 1000,
+        "candidate_mapping_accuracy_milli": 1000,
+        "attribute_mapping_accuracy_milli": 1000,
+        "polarity_accuracy_milli": 1000,
+        "contribution_exact_milli": 1000,
+        "duplicate_matrix_rows": 0,
+        "provenance_violations": 0,
+        "matrix_decision_consistent": true,
+        "decision_correct": false
+      }
+    },
+    {
+      "id": "IF-009-valid-tie-abstention",
+      "candidate_ids": [
+        "A",
+        "B"
+      ],
+      "evidence_catalog": [
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "gold_contribution": 2
+        },
+        {
+          "evidence_id": "EB",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "gold_contribution": 2
+        }
+      ],
+      "surfaced_evidence_ids": [
+        "EA",
+        "EB"
+      ],
+      "matrix": [
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "contribution": 2
+        },
+        {
+          "evidence_id": "EB",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "contribution": 2
+        }
+      ],
+      "selected_candidate_id": null,
+      "gold_choice_id": null,
+      "expected": {
+        "disposition": "qualified",
+        "surface_coverage_milli": 1000,
+        "decisive_surface_coverage_milli": 1000,
+        "matrix_recall_milli": 1000,
+        "source_accuracy_milli": 1000,
+        "candidate_mapping_accuracy_milli": 1000,
+        "attribute_mapping_accuracy_milli": 1000,
+        "polarity_accuracy_milli": 1000,
+        "contribution_exact_milli": 1000,
+        "duplicate_matrix_rows": 0,
+        "provenance_violations": 0,
+        "matrix_decision_consistent": true,
+        "decision_correct": true
+      }
+    },
+    {
+      "id": "IF-010-correct-minority-evidence",
+      "candidate_ids": [
+        "A",
+        "B"
+      ],
+      "evidence_catalog": [
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "shared",
+          "polarity": "supports",
+          "gold_contribution": 3
+        },
+        {
+          "evidence_id": "EB",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "private-decisive",
+          "polarity": "supports",
+          "gold_contribution": 5
+        }
+      ],
+      "surfaced_evidence_ids": [
+        "EA",
+        "EB"
+      ],
+      "matrix": [
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "shared",
+          "polarity": "supports",
+          "contribution": 3
+        },
+        {
+          "evidence_id": "EB",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "private-decisive",
+          "polarity": "supports",
+          "contribution": 5
+        }
+      ],
+      "selected_candidate_id": "B",
+      "gold_choice_id": "B",
+      "expected": {
+        "disposition": "qualified",
+        "surface_coverage_milli": 1000,
+        "decisive_surface_coverage_milli": 1000,
+        "matrix_recall_milli": 1000,
+        "source_accuracy_milli": 1000,
+        "candidate_mapping_accuracy_milli": 1000,
+        "attribute_mapping_accuracy_milli": 1000,
+        "polarity_accuracy_milli": 1000,
+        "contribution_exact_milli": 1000,
+        "duplicate_matrix_rows": 0,
+        "provenance_violations": 0,
+        "matrix_decision_consistent": true,
+        "decision_correct": true
+      }
+    },
+    {
+      "id": "IF-011-partial-surfacing-abstain",
+      "candidate_ids": [
+        "A",
+        "B",
+        "C"
+      ],
+      "evidence_catalog": [
+        {
+          "evidence_id": "EA1",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "delivery",
+          "polarity": "supports",
+          "gold_contribution": 4
+        },
+        {
+          "evidence_id": "EA2",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "reliability",
+          "polarity": "supports",
+          "gold_contribution": 3
+        },
+        {
+          "evidence_id": "EB1",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "experience",
+          "polarity": "supports",
+          "gold_contribution": 1
+        },
+        {
+          "evidence_id": "EB2",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "failure",
+          "polarity": "opposes",
+          "gold_contribution": -2
+        },
+        {
+          "evidence_id": "EC1",
+          "source_agent_id": "AgentC",
+          "candidate_id": "C",
+          "attribute_id": "cost",
+          "polarity": "supports",
+          "gold_contribution": 1
+        },
+        {
+          "evidence_id": "EC2",
+          "source_agent_id": "AgentC",
+          "candidate_id": "C",
+          "attribute_id": "risk",
+          "polarity": "opposes",
+          "gold_contribution": -1
+        }
+      ],
+      "surfaced_evidence_ids": [
+        "EA1",
+        "EB1"
+      ],
+      "matrix": [
+        {
+          "evidence_id": "EA1",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "delivery",
+          "polarity": "supports",
+          "contribution": 4
+        },
+        {
+          "evidence_id": "EB1",
+          "source_agent_id": "AgentB",
+          "candidate_id": "B",
+          "attribute_id": "experience",
+          "polarity": "supports",
+          "contribution": 1
+        }
+      ],
+      "selected_candidate_id": null,
+      "gold_choice_id": "A",
+      "expected": {
+        "disposition": "qualified",
+        "surface_coverage_milli": 333,
+        "decisive_surface_coverage_milli": 333,
+        "matrix_recall_milli": 1000,
+        "source_accuracy_milli": 1000,
+        "candidate_mapping_accuracy_milli": 1000,
+        "attribute_mapping_accuracy_milli": 1000,
+        "polarity_accuracy_milli": 1000,
+        "contribution_exact_milli": 1000,
+        "duplicate_matrix_rows": 0,
+        "provenance_violations": 0,
+        "matrix_decision_consistent": false,
+        "decision_correct": false
+      }
+    },
+    {
+      "id": "IF-012-unknown-entity-in-matrix",
+      "candidate_ids": [
+        "A",
+        "B"
+      ],
+      "evidence_catalog": [
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentA",
+          "candidate_id": "A",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "gold_contribution": 3
+        }
+      ],
+      "surfaced_evidence_ids": [
+        "EA"
+      ],
+      "matrix": [
+        {
+          "evidence_id": "EA",
+          "source_agent_id": "AgentA",
+          "candidate_id": "Z",
+          "attribute_id": "quality",
+          "polarity": "supports",
+          "contribution": 3
+        }
+      ],
+      "selected_candidate_id": "Z",
+      "gold_choice_id": "A",
+      "expected": {
+        "disposition": "reject",
+        "surface_coverage_milli": 1000,
+        "decisive_surface_coverage_milli": 1000,
+        "matrix_recall_milli": 1000,
+        "source_accuracy_milli": 1000,
+        "candidate_mapping_accuracy_milli": 0,
+        "attribute_mapping_accuracy_milli": 1000,
+        "polarity_accuracy_milli": 1000,
+        "contribution_exact_milli": 1000,
+        "duplicate_matrix_rows": 0,
+        "provenance_violations": 1,
+        "matrix_decision_consistent": false,
+        "decision_correct": false
+      }
+    }
+  ]
+}
