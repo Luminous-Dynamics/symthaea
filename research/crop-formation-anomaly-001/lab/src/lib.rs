@@ -14,8 +14,8 @@ pub mod statistics;
 pub use circle_layout::{
     audit_circle_measurement_sensitivity, class_circle_layout, count_centred_motifs,
     describe_circle_layout, parse_circle_csv, validate_circles, CircleClassing, CircleContact,
-    CircleLayout, CircleLayoutError, CircleRecord, CircleSensitivityConfig,
-    CircleSensitivitySummary,
+    CircleGrammarFamily, CircleGrammarOutcome, CircleGrammarSpec, CircleLayout,
+    CircleLayoutError, CircleRecord, CircleSensitivityConfig, CircleSensitivitySummary,
 };
 pub use crop_flow::{CropFlowDescriptor, CropFlowError, CropFlowSample, describe_crop_flow, describe_crop_flow_about_center};
 pub use event_split::{BenchmarkSample, EventFold, EventFoldPlan, EventSplitError, grouped_event_kfold, validate_event_fold_plan};
