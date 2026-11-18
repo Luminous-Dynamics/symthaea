@@ -179,7 +179,6 @@ impl ChangeImpactManifest {
         let mut claim_ids = HashSet::new();
         let mut rule_ids = HashSet::new();
         let mut changed_entity_keys = HashSet::new();
-        let mut entity_dependencies: HashMap<&str, Vec<&str>> = HashMap::new();
 
         if self.schema_version != "0.1.0" {
             push(&mut findings, "unsupported_schema_version", "schema_version",
@@ -245,6 +244,12 @@ impl ChangeImpactManifest {
             push(&mut findings, "change_event_without_affected_entities", "change_event.changed_entities",
                 "A change event must identify at least one affected entity; unknown scope is not a blanket preserve.");
         }
+        if let Some(required_kind) = required_entity_kind_for_event(&self.change_event.event_kind) {
+            if !self.change_event.changed_entities.iter().any(|entity| entity.entity_kind == required_kind) {
+                push(&mut findings, "change_event_entity_kind_mismatch", "change_event.changed_entities",
+                    format!("Event kind {} requires at least one changed entity of kind {}.", self.change_event.event_kind, required_kind));
+            }
+        }
 
         for (index, entity) in self.change_event.changed_entities.iter().enumerate() {
             let path = format!("change_event.changed_entities[{index}]");
@@ -256,6 +261,19 @@ impl ChangeImpactManifest {
                 push(&mut findings, "changed_entity_identity_missing", &path,
                     "A changed entity requires at least a predecessor or successor identity.");
             }
+            let replacement_requires_new_identity = matches!(
+                self.change_event.event_kind.as_str(),
+                "panel_replacement" | "seam_replacement" | "attachment_replacement" |
+                "sensor_replacement" | "material_lot_change" | "process_revision_change" |
+                "robot_geometry_change" | "joint_revision_change"
+            ) && entity.entity_kind == required_entity_kind_for_event(&self.change_event.event_kind).unwrap_or("");
+            if replacement_requires_new_identity {
+                match (entity.predecessor_entity_ref.as_deref(), entity.successor_entity_ref.as_deref()) {
+                    (Some(previous), Some(next)) if previous != next => {}
+                    _ => push(&mut findings, "replacement_identity_not_advanced", &path,
+                        "Replacement/change of an identity-bearing entity requires distinct predecessor and successor entity references."),
+                }
+            }
             if let Some(previous) = entity.predecessor_entity_ref.as_deref() {
                 if is_blank(previous) {
                     push(&mut findings, "blank_predecessor_entity_ref", format!("{path}.predecessor_entity_ref"),
@@ -264,7 +282,6 @@ impl ChangeImpactManifest {
                     push(&mut findings, "duplicate_changed_entity", &path,
                         "Predecessor entity references must be unique within a change event.");
                 }
-                entity_dependencies.entry(entity.entity_kind.as_str()).or_default().push(previous);
             }
             if let Some(next) = entity.successor_entity_ref.as_deref() {
                 if is_blank(next) {
@@ -491,6 +508,20 @@ fn validate_generation(generation: &ConfigurationGeneration, path: &str, finding
             push(findings, "configuration_generation_digest_invalid", format!("{path}.{field}"),
                 "Configuration generation geometry/topology/route identity must bind a SHA-256 digest.");
         }
+    }
+}
+
+fn required_entity_kind_for_event(value: &str) -> Option<&'static str> {
+    match value {
+        "panel_replacement" => Some("panel"),
+        "seam_replacement" => Some("connection"),
+        "attachment_replacement" => Some("connection"),
+        "sensor_replacement" | "sensor_recalibration" => Some("sensor_tile"),
+        "material_lot_change" => Some("material_lot"),
+        "process_revision_change" => Some("process_revision"),
+        "robot_geometry_change" => Some("robot_geometry"),
+        "joint_revision_change" => Some("robot_joint"),
+        _ => None,
     }
 }
 
@@ -793,6 +824,22 @@ mod tests {
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|f| f.code == "conflicting_impact_rules"));
         assert_eq!(report.assessments.iter().find(|item| item.claim_id == "CLAIM-FOREARM-FIT").unwrap().disposition, "not_evaluated");
+    }
+
+    #[test]
+    fn panel_replacement_must_bind_panel_predecessor_and_successor() {
+        let mut manifest = base_manifest();
+        manifest["change_event"]["changed_entities"][0]["successor_entity_ref"] = json!("FOREARM-PANEL-REV-A");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "replacement_identity_not_advanced"));
+    }
+
+    #[test]
+    fn event_kind_must_match_changed_entity_kind() {
+        let mut manifest = base_manifest();
+        manifest["change_event"]["event_kind"] = json!("sensor_replacement");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "change_event_entity_kind_mismatch"));
     }
 
     #[test]
