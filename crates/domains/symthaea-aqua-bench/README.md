@@ -167,7 +167,7 @@ It only counts a routine job as a non-destructive qualified repair when:
 
 Unknown access and pending/failed/unknown requalification remain visible and do not count as successes. A zero routine-job denominator yields an undefined fraction, not 0%. The evaluator reports median technician and downtime minutes and tool count, but does not calculate lifecycle cost or water/energy/environmental totals. Those remain with Symtropy and Mycelix.
 
-Sixteen unit tests are authored; no current-head test or Clippy pass is claimed.
+Twenty unit tests are authored; no current-head test or Clippy pass is claimed.
 
 
 ## Repairability evidence and post-repair qualification
