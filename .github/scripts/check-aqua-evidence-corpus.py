@@ -71,6 +71,12 @@ EXPECTED_VALUES = {
     "heat_pump_cop_reduction": ("scalar", "%"),
     "preferred_dhwr_coupling_topology": ("text", None),
     "model_validation_cv_rmse": ("scalar", "%"),
+    "functional_test_scope": ("text", None),
+    "shower_outlet_operating_pressure": ("text", None),
+    "tap_shower_system_operating_pressure": ("text", None),
+    "temperature_operating_limits": ("text", None),
+    "uwl_dynamic_pressure_point": ("text", None),
+    "test_instrument_calibration_requirement": ("text", None),
 }
 
 
