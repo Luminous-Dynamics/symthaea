@@ -1439,6 +1439,74 @@ mod tests {
     }
 
     #[test]
+    fn frame_bridge_rejects_diagnostic_system_mismatch_and_unknown_categories() {
+        let model = reference_model();
+        let (mut frame, rules) = frame_and_category_rules();
+        frame
+            .channels
+            .iter_mut()
+            .find(|channel| channel.channel_id == "channel-gen_current")
+            .expect("generator current channel")
+            .diagnostic_system_id = "unregistered-system".to_owned();
+        assert!(evaluate_observation_frame(
+            &model,
+            &frame,
+            &rules,
+            &all_sensor_ids(&model)
+        )
+        .is_err());
+
+        let (frame, mut rules) = frame_and_category_rules();
+        rules[0].bands.push(NumericCategoryBand {
+            lower_inclusive: 2.0,
+            upper_exclusive: Some(3.0),
+            category: "not-in-world-model".to_owned(),
+        });
+        assert!(evaluate_observation_frame(
+            &model,
+            &frame,
+            &rules,
+            &all_sensor_ids(&model)
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn mutually_inconsistent_measured_signatures_return_no_compatible_world() {
+        use crate::plasma_observability::ObservationDisposition;
+
+        let model = reference_model();
+        let (mut frame, rules) = frame_and_category_rules();
+        set_channel_disposition(
+            &mut frame,
+            "channel-gen_vibration",
+            ObservationDisposition::Measured {
+                value: 1.5,
+                units: "synthetic-unit".to_owned(),
+                source_id: "source-gen_vibration".to_owned(),
+                source_digest: "a".repeat(64),
+                calibration: crate::plasma_observability::CalibrationIdentity {
+                    calibration_id: "calibration-gen_vibration".to_owned(),
+                    calibration_revision: "rev-1".to_owned(),
+                },
+                observed_at_ns: 100,
+            },
+        );
+        let result = evaluate_observation_frame(
+            &model,
+            &frame,
+            &rules,
+            &all_sensor_ids(&model)
+        )
+        .expect("well-formed but contradictory measured frame");
+        assert_eq!(
+            result.frame_decision,
+            FrameDecisionDisposition::NoCompatibleWorld
+        );
+        assert!(result.compatible_world_ids.is_empty());
+    }
+
+    #[test]
     fn frame_bridge_uses_decision_gate_for_units_and_freshness() {
         let model = reference_model();
         let (frame, mut rules) = frame_and_category_rules();
