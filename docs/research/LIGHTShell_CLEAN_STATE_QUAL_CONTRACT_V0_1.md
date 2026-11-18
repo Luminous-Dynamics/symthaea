@@ -87,7 +87,7 @@ For removed-module cleaning, preserve exact removal and reinstallation inspectio
 
 A zone-level average is not enough to establish cleanability. Residual soil can concentrate at seam allowances, overlaps, folds, fastener pockets, sensor carriers, vent lips and drainage interfaces while the accessible panel face appears clean.
 
-Use the existing pattern-topology (#12785), manufacturing-route (#12800) and as-built metrology (#12802) identities to bind an explicit set of sample-location references to each zone. Do not introduce a second geometry or sampling-location registry.
+Use the existing pattern-topology (#12785), manufacturing-route (#12800) and as-built metrology (#12802) identities to bind an explicit set of sample-location references to each zone. The campaign binds the exact topology sample-map revision reference and SHA-256 digest; sample-point labels without this revisioned map identity are insufficient. Do not introduce a second geometry or sampling-location registry.
 
 For each required claim gate, freeze its required sample-location references before the first cycle. Typical locations to consider, where physically present, include:
 - accessible panel face / representative surface;
@@ -96,7 +96,7 @@ For each required claim gate, freeze its required sample-location references bef
 - sensor tile/carrier, cable exit or encapsulation boundary;
 - vent lip, drain path, recessed interface or other soil-retention feature.
 
-These are examples, not a universal mandatory list. The application and design owners must select locations based on the exact assembled topology and declared soil/cleaning challenge. Every reference must resolve to the exact zone's topology-owned sample map.
+These are examples, not a universal mandatory list. The application and design owners must select locations based on the exact assembled topology and declared soil/cleaning challenge. Every reference must resolve to the exact zone's topology-owned sample map. The external evidence layer must dereference the map and confirm that every required location is present in that frozen revision before admitting a physical observation.
 
 For every required gate × zone × sample location × cleaning cycle, collect at least the declared replicate count. A missing location, unknown topology reference or insufficient replicate count makes that gate insufficient evidence. Not-applicable requires an owner and rationale; an unobserved hotspot cannot be silently excluded.
 
