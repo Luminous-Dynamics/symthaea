@@ -1962,6 +1962,97 @@ mod tests {
     }
 
     #[test]
+    fn evaluation_receipt_roundtrips_and_recomputes_shot_cluster_bootstrap_interval() {
+        let policy = config();
+        let evaluations = vec![
+            score_shot_alarms(
+                "positive",
+                ShotReferenceOutcome::Disruptive { t_cut_ns: 100 },
+                &[20],
+                &policy,
+            ).expect("positive"),
+            score_shot_alarms(
+                "negative-a",
+                ShotReferenceOutcome::NonDisruptive {
+                    observation_end_ns: 3_600_000_000_000,
+                },
+                &[10],
+                &policy,
+            ).expect("negative"),
+            score_shot_alarms(
+                "negative-b",
+                ShotReferenceOutcome::NonDisruptive {
+                    observation_end_ns: 3_600_000_000_000,
+                },
+                &policy,
+            ).expect("negative"),
+            score_shot_alarms(
+                "negative-c",
+                ShotReferenceOutcome::NonDisruptive {
+                    observation_end_ns: 7_200_000_000_000,
+                },
+                &[20, 30],
+                &policy,
+            ).expect("negative"),
+        ];
+        let shot_ids = evaluations
+            .iter()
+            .map(|evaluation| evaluation.shot_id.clone())
+            .collect::<Vec<_>>();
+        let plan = crate::plasma_cluster_bootstrap::build_shot_cluster_bootstrap_plan(
+            "tokamark-v1@frozen-revision",
+            &shot_ids,
+            2026,
+            500,
+        ).expect("bootstrap plan");
+        let receipt = PlasmaEventEvaluationReceipt::build_with_shot_cluster_bootstrap(
+            "f".repeat(40),
+            "tokamark-v1@frozen-revision".to_owned(),
+            "a".repeat(64),
+            "b".repeat(64),
+            "symthaea-plasma-risk".to_owned(),
+            "test-model-v1".to_owned(),
+            "1".repeat(64),
+            42,
+            "cpu-x86_64-rust-1.96".to_owned(),
+            policy,
+            evaluations,
+            plan,
+        ).expect("receipt with bootstrap should build");
+        receipt.verify().expect("receipt should verify");
+        let interval = receipt
+            .body
+            .false_alarms_per_non_disruptive_hour_bootstrap_95
+            .as_ref()
+            .expect("bootstrap interval");
+        assert_eq!(interval.requested_replicates, 500);
+        assert!(interval.valid_replicates >= 475);
+        assert_eq!(
+            receipt.body.shot_cluster_bootstrap_plan.as_ref().unwrap().plan_sha256,
+            interval.plan_sha256
+        );
+
+        let encoded = serde_json::to_string(&receipt).expect("serialize");
+        let decoded: PlasmaEventEvaluationReceipt =
+            serde_json::from_str(&encoded).expect("deserialize");
+        decoded.verify().expect("round-trip receipt should verify");
+
+        let mut forged = decoded;
+        forged
+            .body
+            .shot_cluster_bootstrap_plan
+            .as_mut()
+            .unwrap()
+            .body
+            .seed += 1;
+        forged.receipt_sha256 = forged
+            .body
+            .content_sha256()
+            .expect("reseal outer receipt after tampering");
+        assert!(forged.verify().is_err());
+    }
+
+    #[test]
     fn evaluation_receipt_detects_tampered_alarm_trace_even_after_digest_reseal() {
         let negative = score_shot_alarms(
             "negative",
