@@ -289,7 +289,7 @@
     "claiming_observability_from_evidence_provenance_alone"
   ],
   "evaluation_receipt_contract": {
-    "schema_version": "luminous.plasma-event-evaluation-receipt.v0.1",
+    "schema_version": "luminous.plasma-event-evaluation-receipt.v0.2",
     "contains": [
       "repository_commit",
       "dataset_revision",
@@ -303,11 +303,16 @@
       "frozen_alarm_policy",
       "per_shot_event_outcome",
       "per_shot_alarm_episode_timestamps",
-      "recomputed_cohort_summary"
+      "recomputed_cohort_summary",
+      "maximum_warning_horizon_ns",
+      "false_alarm_events_on_disruptive_shots",
+      "false_alarm_events_on_non_disruptive_shots"
     ],
     "verify_recomputes_per_shot_scores": true,
     "verify_recomputes_cohort_summary": true,
-    "outer_sha256_is_content_identity_not_authentication": true
+    "outer_sha256_is_content_identity_not_authentication": true,
+    "verify_recomputes_warning_window_matches": true,
+    "verify_recomputes_alarm_episode_partitions": true
   },
   "reference_benchmarks": {
     "published_toka_mark_robustness": {
