@@ -1,0 +1,82 @@
+name: Superconductivity Intertwined-Order Contract
+
+on:
+  pull_request:
+    paths:
+      - "tools/superconductivity-intertwined-order-harness/**"
+      - "data/schemas/superconductivity_intertwined_order_instance_v0_1.schema.json"
+      - "data/research/superconductivity_intertwined_order_fixture_v0_1.json"
+      - "research/superconductivity/intertwined_order/**"
+      - ".github/workflows/superconductivity-intertwined-order.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: superconductivity-intertwined-order-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  intertwined-order:
+    name: Multicomponent GL energy and common gauge invariance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/superconductivity-intertwined-order-harness/Cargo.toml --all -- --check
+
+      - name: Generate isolated dependency lockfile
+        run: cargo generate-lockfile --manifest-path tools/superconductivity-intertwined-order-harness/Cargo.toml
+
+      - name: Run common-gauge, basis and boundedness tests
+        run: cargo test --locked --manifest-path tools/superconductivity-intertwined-order-harness/Cargo.toml --bin sc_intertwined_order_audit
+
+      - name: Audit synthetic multicomponent GL configuration
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-intertwined-order-harness/Cargo.toml --bin sc_intertwined_order_audit -- \
+            --schema data/schemas/superconductivity_intertwined_order_instance_v0_1.schema.json \
+            --fixture data/research/superconductivity_intertwined_order_fixture_v0_1.json \
+            --out "$RUNNER_TEMP/sc-intertwined-order-receipt.json"
+          cat "$RUNNER_TEMP/sc-intertwined-order-receipt.json"
+
+      - name: Run Clippy
+        run: cargo clippy --locked --manifest-path tools/superconductivity-intertwined-order-harness/Cargo.toml --bin sc_intertwined_order_audit -- -D warnings
+
+      - name: Record exact-run identity
+        if: always()
+        run: |
+          {
+            echo "git_head=$(git rev-parse HEAD)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            sha256sum data/schemas/superconductivity_intertwined_order_instance_v0_1.schema.json
+            sha256sum data/research/superconductivity_intertwined_order_fixture_v0_1.json
+            sha256sum tools/superconductivity-intertwined-order-harness/Cargo.toml
+            sha256sum tools/superconductivity-intertwined-order-harness/src/main.rs
+            if [ -f tools/superconductivity-intertwined-order-harness/Cargo.lock ]; then
+              sha256sum tools/superconductivity-intertwined-order-harness/Cargo.lock
+            else
+              echo "cargo_lock=not-generated"
+            fi
+          } > "$RUNNER_TEMP/sc-intertwined-order-environment.txt"
+
+      - name: Upload exact-run evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sc-intertwined-order-exact-run-evidence
+          if-no-files-found: warn
+          path: |
+            tools/superconductivity-intertwined-order-harness/Cargo.lock
+            ${{ runner.temp }}/sc-intertwined-order-environment.txt
+            ${{ runner.temp }}/sc-intertwined-order-receipt.json
