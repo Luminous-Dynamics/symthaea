@@ -1273,6 +1273,14 @@ mod tests {
             manifest["frame_bridge_contract"]["category_labels_must_exist_in_declared_world_signatures"],
             true
         );
+        assert_eq!(
+            manifest["frame_bridge_contract"]["distinguishes_nominal_architecture_diagnosability_from_current_frame_available_sensor_diagnosability"],
+            true
+        );
+        assert_eq!(
+            manifest["frame_bridge_contract"]["current_available_sensor_set_includes_only_direct_measured_in_domain_categories"],
+            true
+        );
 
         let model = reference_model();
         let all = all_sensor_ids(&model);
