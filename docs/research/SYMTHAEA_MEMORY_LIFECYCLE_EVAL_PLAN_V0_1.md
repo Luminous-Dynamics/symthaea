@@ -106,7 +106,8 @@ Keep base model, prompt, tool access, data split, retrieval budget and total tok
 These are targets to preregister and measure, not current results.
 
 ### P0 — deterministic invariants
-- 100% of graduation source class, producer verification claim and available label survive into the provenance-bearing replay envelope.
+- 100% of graduation source class and producer verification claim survive into the provenance-bearing replay envelope.
+- Arbitrary producer labels are not copied into durable replay metadata; they may contain user content and are not source identities. A later receipt adapter must bind a privacy-reviewed source-event ID and payload digest.
 - Exactly zero change to raw Psi from source class, verification claim, persistence bonus or Sigma bonus.
 - Exactly zero synthetic emotional-valence change from a verification claim.
 - Zero admission when raw Psi is non-finite, outside [0, 1], or below the configured threshold—even when a verification claim or priority bonus is present.
