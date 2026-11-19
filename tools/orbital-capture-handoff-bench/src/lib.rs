@@ -505,7 +505,11 @@ mod tests {
     #[test]
     fn interface_mismatch_is_rejected() {
         let data = fixture();
-        let case = data.cases.iter().find(|case| case.id == "INTERFACE_REVISION_MISMATCH").unwrap();
+        let case = data
+            .cases
+            .iter()
+            .find(|case| case.id == "INTERFACE_REVISION_MISMATCH")
+            .unwrap();
         assert_eq!(evaluate_case(&data.profile, case).status, GateStatus::Rejected);
     }
 
@@ -560,7 +564,11 @@ mod tests {
     #[test]
     fn high_joint_angle_is_rejected() {
         let data = fixture();
-        let case = data.cases.iter().find(|case| case.id == "JOINT_LIMIT_MARGIN_VIOLATION").unwrap();
+        let case = data
+            .cases
+            .iter()
+            .find(|case| case.id == "JOINT_LIMIT_MARGIN_VIOLATION")
+            .unwrap();
         assert_eq!(evaluate_case(&data.profile, case).status, GateStatus::Rejected);
     }
 
