@@ -1068,6 +1068,7 @@ mod tests {
         trust_policy_digest_valid: bool,
         vary_root_without_source_id: bool,
         vary_root_digest_by_event: bool,
+        vary_upstream_source_by_event: bool,
         unknown_root_digest: bool,
         lifecycle_event_id: Option<u32>,
     }
@@ -1105,6 +1106,7 @@ mod tests {
                 trust_policy_digest_valid: true,
                 vary_root_without_source_id: false,
                 vary_root_digest_by_event: false,
+                vary_upstream_source_by_event: false,
                 unknown_root_digest: false,
                 lifecycle_event_id: None,
             }
@@ -1189,7 +1191,9 @@ mod tests {
                     "invalid".into()
                 },
                 acquisition_mode: "api".into(),
-                upstream_source_id: if self.vary_lineage_by_event {
+                upstream_source_id: if self.vary_lineage_by_event
+                    || self.vary_upstream_source_by_event
+                {
                     format!("synthetic:independent-source:{event_id}")
                 } else {
                     "bis:dataflow:private-credit".into()
@@ -2149,6 +2153,7 @@ mod tests {
 
         let verifier = TestVerifier {
             vary_root_digest_by_event: true,
+            vary_upstream_source_by_event: true,
             root_id: 700,
             ..TestVerifier::default()
         };
