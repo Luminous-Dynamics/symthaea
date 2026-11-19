@@ -163,11 +163,13 @@ A deterministic prefix-only LZV segmentation reference is now checked in:
 
 For each new bit pattern, the detector computes the leading-zero count of the exact XOR residual against the prior decoded value. It compares the most recent fast-window distribution with an older slow window using exact integer mean and population-variance comparisons. A pending-change latch preserves a detected shift until the minimum segment length is legal; a cooldown reduces repeated alarms; maximum segment length forces a boundary even without a detected change. Decisions depend only on the reconstructed prefix and fixed config—no boundary labels are transmitted.
 
-The independent C++20 reference passed strict-warning compilation (`-O2 -std=c++20 -Wall -Wextra -Wconversion -Werror`) and four tests:
+The independent C++20 reference passed strict-warning compilation (`-O2 -std=c++20 -Wall -Wextra -Wconversion -Werror`) and four test groups:
 - constant stream: only forced max-length boundaries;
-- stationary random stream: no unnecessary early splits;
+- stationary random: 64 deterministic seeds × 4,096 values each, with no unnecessary early splits beyond the declared tolerance;
 - abrupt stable-to-random shift: boundary within 32 observations after the transition;
 - deterministic and empty-input behavior.
+
+The checked-in runner is `scripts/research/cdl_lzv_segmentation_reference.sh`; it passes `bash -n` and compiles/runs the reference with strict warnings. This is a reproducible boundary-control smoke suite, not a broad false-alarm-rate estimate.
 
 Observed example boundaries with default configuration (fast=8, slow=16, min=32, max=512, cooldown=32):
 - constant 2,048 values: `0,512,1024,1536,2048`;
