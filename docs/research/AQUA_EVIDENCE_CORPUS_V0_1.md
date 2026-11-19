@@ -1,8 +1,8 @@
 # Luminous Aqua — Evidence Corpus v0.1
 
-**Snapshot:** 2026-11-18  
-**Entries:** 17  
-**Claims:** 80
+**Snapshot:** 2026-11-19  
+**Entries:** 20  
+**Claims:** 120
 
 > Source-classified evidence register. Manufacturer declarations, standards/programme criteria, local installation references, independent market samples and peer-reviewed results are kept distinct. Values marked unknown have not been inferred. This corpus is not a product certification or evidence of Aqua performance.
 
@@ -191,6 +191,14 @@
 | `clasp.sa.sample.size` | sample_size | 19 products | independent_market_sample | measured | method=CLASP South African Shower Heads Testing Report; sample n=19 | context_only: Dated local product sample; product identities were removed from public report imagery. | [CLASP](https://www.clasp.ngo/research/all/south-african-shower-heads-testing-report/); independent_market_study; date not stated |
 | `clasp.sa.pressure-compensating.mean-flow` | mean_flow_rate | 6.6 L/min | independent_market_sample | measured | pressure=300 kPa; method=CLASP report; WRC 2025 summary of 19-product sample; sample n=19 | context_only: Aggregate mean for the pressure-compensating subset. | [Water Research Commission summarizing CLASP South African testing](https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf); independent_market_study; date not stated |
 | `clasp.sa.fixed-orifice.mean-flow` | observed_flow_rate_range | 24–27 L/min | independent_market_sample | measured | pressure=300 kPa; method=CLASP report; WRC 2025 summary of 19-product sample; sample n=19 | context_only: Dated aggregate range for fixed-orifice products in the sample; not an exact-SKU mean or named product result. | [Water Research Commission summarizing CLASP South African testing](https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf); independent_market_study; date not stated |
+| `clasp.sa.test.pressure-range` | sampled_test_pressure_range | 250–550 kPa | independent_market_sample | measured | method=CLASP 2022 report; flow measured at intervals while supply pressure was swept; sample n=19; datum=Pressure transmitter connected via a take-off tee intended to avoid velocity-component influence; unknown: individual product pressure series and raw observations require full source tables, the report notes sampling is limited and not a current market census; The report photographed spray patterns at 300 kPa; tests included all stated settings. | context_only: Dated South African market sample, useful for local pressure-flow test design; not a current 2026 market census. | [CLASP / Omega Test House — South African Shower Heads Testing Report](https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf); independent_market_study; 2022-10-01 |
+| `clasp.sa.flow-meter.uncertainty` | instrument_measurement_uncertainty | 0.3 % | independent_market_sample | measured | method=Endress+Hauser DMA20 mass-flow water meter as reported by CLASP; sample n=19; unknown: calibration certificate and traceability record not reproduced in the report extract; Report states the instrument uncertainty at 95% confidence. | context_only: Measurement-system detail for interpreting the CLASP data; not an Aqua instrument qualification. | [CLASP / Omega Test House — South African Shower Heads Testing Report](https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf); independent_market_study; 2022-10-01 |
+| `clasp.sa.pressure-transmitter.uncertainty` | instrument_measurement_uncertainty | 2.9 % | independent_market_sample | measured | method=WIKA A-10 pressure transmitter using a pressure take-off tee; sample n=19; unknown: calibration certificate and exact pressure-point uncertainty propagation; Report states the instrument uncertainty at 95% confidence. | context_only: Measurement-system detail; pressure uncertainty is materially larger than the stated flow-meter uncertainty. | [CLASP / Omega Test House — South African Shower Heads Testing Report](https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf); independent_market_study; 2022-10-01 |
+| `clasp.sa.fixed-orifice.fraction` | flow_profile_fraction | 58 % | independent_market_sample | measured | pressure=300 kPa; method=CLASP flow-profile classification of 19 sampled showerheads; sample n=19; unknown: individual classification sensitivity and confidence interval; 42% of patterns were classified as pressure-compensating. | context_only: Small, dated sample showing the prevalence of fixed-orifice flow behaviour among the selected South African market products. | [CLASP / Omega Test House — South African Shower Heads Testing Report](https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf); independent_market_study; 2022-10-01 |
+| `clasp.sa.pressure-compensating.fraction` | flow_profile_fraction | 42 % | independent_market_sample | measured | pressure=300 kPa; method=CLASP flow-profile classification of 19 sampled showerheads; sample n=19; unknown: individual classification sensitivity and confidence interval; 58% of patterns were classified as fixed-orifice. | context_only: Small, dated sample showing the prevalence of pressure-compensating flow behaviour among selected products. | [CLASP / Omega Test House — South African Shower Heads Testing Report](https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf); independent_market_study; 2022-10-01 |
+| `clasp.sa.pressure-compensating.mean-flow.clasp-2022` | mean_flow_rate | 7 L/min | independent_market_sample | measured | pressure=300 kPa; method=CLASP Table 3 / analysis summary; sample n=19; unknown: subset denominator and calculation precision should be confirmed from the complete raw dataset; WRC's 2025 summary of this study reports 6.6 L/min; keep these as separate source statements pending reconciliation. | context_only: Direct report figure for the selected sample; not a named product or current market value. | [CLASP / Omega Test House — South African Shower Heads Testing Report](https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf); independent_market_study; 2022-10-01 |
+| `clasp.sa.fixed-orifice.mean-flow.clasp-2022` | mean_flow_rate | 25 L/min | independent_market_sample | measured | pressure=300 kPa; method=CLASP Table 3 / analysis summary; sample n=19; unknown: subset denominator and calculation precision should be confirmed from the complete raw dataset; WRC's 2025 summary of this study reports 24 L/min; retain the source distinction. | context_only: Direct report figure for the selected sample; not a named product or current market value. | [CLASP / Omega Test House — South African Shower Heads Testing Report](https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf); independent_market_study; 2022-10-01 |
+| `clasp.sa.report-wrc-summary.discrepancy` | source_internal_numerical_discrepancy | Source summary difference: CLASP report = 7.0 L/min pressure-compensating / 25 L/min fixed-orifice; WRC 2025 summary = 6.6 / 24 L/min. Reconciliation of subset/rounding method is unresolved. | independent_market_sample | measured | pressure=300 kPa; method=Cross-check of CLASP 2022 report and WRC 2025 summary; sample n=19; unknown: whether the difference is rounding, subset definition or secondary-summary calculation; Keep both figures source-labelled; do not select or average one without reconciliation. | context_only: Preserves an observed difference between the primary report and later secondary summary. | [CLASP / Omega Test House — South African Shower Heads Testing Report](https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf); independent_market_study; 2022-10-01 |
 
 **Limitations — `clasp.sa.sample.size`:**
 - Not a 2026 exhaustive market census.
@@ -204,6 +212,31 @@
 - Not a named product result.
 - Do not interpret the lower and upper values as an uncertainty interval or confidence interval.
 - Sample composition and market availability may have changed.
+
+**Limitations — `clasp.sa.test.pressure-range`:**
+- Do not infer low-pressure behaviour below about 250 kPa from this sample.
+- The report does not identify the tested brands/models in its published figures.
+
+**Limitations — `clasp.sa.flow-meter.uncertainty`:**
+- Do not transfer this uncertainty to Aqua instruments or other test arrangements.
+
+**Limitations — `clasp.sa.pressure-transmitter.uncertainty`:**
+- Do not infer combined uncertainty for a derived flow-retention statistic without its measurement model.
+
+**Limitations — `clasp.sa.fixed-orifice.fraction`:**
+- Not a statistically representative estimate of the full national showerhead market.
+
+**Limitations — `clasp.sa.pressure-compensating.fraction`:**
+- Not a statistically representative estimate of the full national showerhead market.
+
+**Limitations — `clasp.sa.pressure-compensating.mean-flow.clasp-2022`:**
+- Do not average with WRC's 2025 secondary summary without reconciling subset and rounding methods.
+
+**Limitations — `clasp.sa.fixed-orifice.mean-flow.clasp-2022`:**
+- Do not treat 24–25 L/min as a confidence interval; it is a difference between published source summaries.
+
+**Limitations — `clasp.sa.report-wrc-summary.discrepancy`:**
+- No universal benchmark should use a single selected value until the calculation basis is reconciled.
 
 ## Consequences of the Integration of a Hyperbolic Funnel into a Showerhead for Droplets, Jet Break-Up Lengths, and Physical-Chemical Parameters
 
@@ -314,6 +347,9 @@
 | `hansgrohe.28036000.function-from` | minimum_function_flow | 3 L/min | manufacturer_declaration | declared | method=Manufacturer product-page declaration; unknown: pressure condition for function onset | context_only: Manufacturer feature-onset statement, not task success. | [Hansgrohe South Africa](https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000); manufacturer_product_page; date not stated |
 | `hansgrohe.28036000.waterboost-feature` | task_selective_boost_feature | User-held side button temporarily increases flow; release ends the boost request | manufacturer_declaration | declared | mode=User-held boost; method=Manufacturer product-page declaration; unknown: quantitative boost duration, boost flow at pressures other than 3 bar | context_only: Commercial precedent for an explicitly user-held temporary flow increase. | [Hansgrohe South Africa](https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000); manufacturer_product_page; date not stated |
 | `hansgrohe.28036000.specification-scope-ambiguity` | manufacturer_specification_scope_ambiguity | Unresolved scope ambiguity: the relationship between the stated 4 L/min regulator / maximum and the separately listed boosted mode flows is not explained on the page. | manufacturer_declaration | declared | pressure=300 kPa; method=Manufacturer product-page declaration; datum=manufacturer nominal 3 bar; unknown: independent laboratory replication, temperature profile, sample count, boost duration and total permitted activation time | not_eligible_until_reproduced: This is a documentation-scope ambiguity that must be clarified or independently reproduced; it is not resolved by assuming the boost bypasses the limiter. | [Hansgrohe South Africa](https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000); manufacturer_product_page; date not stated |
+| `hansgrohe.28036000.water-saving-claim` | water_savings_fraction | 60 % | manufacturer_declaration | declared | mode=EcoSmart+ base spray modes; method=Manufacturer product-page marketing declaration; unknown: exact baseline SKU and test conditions, whether advertised saving includes boosted mode use; Boosted operation is separately listed. | context_only: Manufacturer claim; the exact baseline and boost-use share need matched testing. | [Hansgrohe South Africa — Activera Select S 28036000](https://www.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000); manufacturer_product_page; date not stated |
+| `hansgrohe.28036000.easy-split-repair` | repairability_feature | Manufacturer-declared EasySplit disassembly to facilitate replacement of parts and separation into components. | manufacturer_declaration | declared | method=Manufacturer product-page feature declaration; unknown: repair time, tools, fastener count and exact replaceable part manifest, independent return-to-service evidence; This is a repair-oriented design feature, not a measured repairability score. | context_only: Commercial design-for-repair precedent; Aqua should compete on measured access, time, part availability and qualified return-to-service. | [Hansgrohe South Africa — Activera Select S 28036000](https://www.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000); manufacturer_product_page; date not stated |
+| `hansgrohe.28036000.flexpower-nozzle` | pressure_compensation_feature | Elastic spray nozzles dynamically open and close with pressure to adapt spray delivery. | manufacturer_declaration | declared | method=Manufacturer product-page technology description; unknown: measured pressure-flow and spray-force curves, low-pressure task quality; Do not infer a pressure retention ratio from the feature description alone. | context_only: Commercial pressure-adaptive nozzle architecture; exact performance requires reproduced measurements. | [Hansgrohe South Africa — Activera Select S 28036000](https://www.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000); manufacturer_product_page; date not stated |
 
 **Limitations — `hansgrohe.28036000.rain.base-flow`:**
 - Keep base Rain separate from boosted Rain.
@@ -347,6 +383,16 @@
 **Limitations — `hansgrohe.28036000.specification-scope-ambiguity`:**
 - Do not select an assumed interpretation for benchmark scoring.
 - Physical comparator use requires exact SKU verification and recorded manual/boost state.
+
+**Limitations — `hansgrohe.28036000.water-saving-claim`:**
+- Do not infer whole-task savings from the up-to percentage.
+- Record boost frequency and duration in any comparative task trial.
+
+**Limitations — `hansgrohe.28036000.easy-split-repair`:**
+- Does not establish that every repair is non-destructive or that repair is completed successfully.
+
+**Limitations — `hansgrohe.28036000.flexpower-nozzle`:**
+- Aqua must benchmark actual flow, force, coverage and task completion under matched pressure points.
 
 ## UK Energy Technology List — Showers
 
@@ -444,6 +490,7 @@
 | `dhwr.2026.heat-pump-cop-penalty` | heat_pump_cop_reduction | 15 % | peer_reviewed_study_result | measured | mode=Study-specific shower DWHR configuration; task=Domestic hot-water / shower service; method=Study-specific in-situ measurement and/or validated model; unknown: full rig and site conditions must be taken from the paper, not transferable to another climate, topology or exchanger; 15% is the lower endpoint of a reported 15–20% effect in some configurations, not a universal penalty. | context_only: Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee. | [Bouvenot and Beaudet, Energy and Buildings](https://doi.org/10.1016/j.enbuild.2026.117761); peer_reviewed_article; 2026-10-01 |
 | `dhwr.2026.best-coupling-topology` | preferred_dhwr_coupling_topology | Unbalanced DWHR connected to the shower mixer performed best in the tested overall system configurations. | peer_reviewed_study_result | measured | mode=Study-specific heat-pump/storage and DWHR topologies; task=Shower DHW service; method=Study-specific validated numerical/experimental model; unknown: not transferable without matched topology/system testing; The best overall system topology was not necessarily the topology with the highest component recovery efficiency. | context_only: Study-specific whole-system topology finding; not a universal ranking or Aqua result. | [Bouvenot and Beaudet, Energy and Buildings](https://doi.org/10.1016/j.enbuild.2026.117761); peer_reviewed_article; 2026-10-01 |
 | `dhwr.2026.model-validation` | model_validation_cv_rmse | 7 % | peer_reviewed_study_result | measured | mode=Study-specific shower DWHR configuration; task=Domestic hot-water / shower service; method=Study-specific in-situ measurement and/or validated model; unknown: full rig and site conditions must be taken from the paper, not transferable to another climate, topology or exchanger; Study-reported model validation result; not Aqua model accuracy. | context_only: Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee. | [Bouvenot and Beaudet, Energy and Buildings](https://doi.org/10.1016/j.enbuild.2026.117761); peer_reviewed_article; 2026-10-01 |
+| `dhwr.2026.highlights-abstract-cop-discrepancy` | source_internal_numerical_discrepancy | Source-internal figure discrepancy: Highlights = 6.3 experimental / 8.0 simulation; Abstract = 6.2 experimental / 8.0 simulation. | peer_reviewed_study_result | measured | mode=Coupled shower DWHR + DHW storage / heat pump configurations studied in the article; task=Domestic hot-water system performance; method=Publisher landing-page Highlights and Abstract comparison; unknown: authoritative corrected numerical figure in article body / erratum, full configuration-specific COP conditions; Do not silently select 6.2 or 6.3 as a universal value; keep this difference source-scoped until the full article or authors resolve it. | context_only: The source page itself reports different experimental COP values in Highlights and Abstract. Preserve the discrepancy and do not use one figure as an Aqua design target. | [Bouvenot and Beaudet, Energy and Buildings](https://doi.org/10.1016/j.enbuild.2026.117761); peer_reviewed_article; 2026-10-01 |
 
 **Limitations — `dhwr.2026.global-cop-experimental`:**
 - Do not transfer the numerical result to an Aqua design without matched whole-system testing.
@@ -463,6 +510,11 @@
 **Limitations — `dhwr.2026.model-validation`:**
 - Do not transfer the numerical result to an Aqua design without matched whole-system testing.
 - Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary.
+
+**Limitations — `dhwr.2026.highlights-abstract-cop-discrepancy`:**
+- Both figures are study-specific and not transferable to an Aqua design.
+- Use the exact article body, configuration and boundary before any comparative model calibration.
+- Simulation COP of 8.0 must remain distinct from experimental results.
 
 ## EN 18021:2025 — Sanitary tapware, measurement of functional performance of taps and showers
 
@@ -579,6 +631,170 @@
 - The stated scope is energy-related products; it is not automatically applicable to passive plumbing fixtures.
 - It is not an Aqua product repairability result or a universal repairability score.
 - Aqua must establish a product-specific fault/job manifest and measured acceptance method.
+
+## KOHLER Anthem EvoCycle smart shower system
+
+- **Entry ID:** `kohler-anthem-evocycle-k33481`
+- **Subject type:** product
+- **Manufacturer / publisher:** KOHLER
+- **SKU:** K-33481
+- **Market:** United States / Canada specification
+- **Revision:** Technical specification dated 2026-04-15
+
+| Claim ID | Parameter | Canonical value | Evidence class | Result class | Conditions / unknowns | Comparison status | Source |
+|---|---|---|---|---|---|---|---|
+| `kohler.k33481.cycle.fresh-water-feed` | fresh_water_flow_rate | 1.8927 L/min | manufacturer_declaration | declared | mode=Cycle Mode; task=One active shower session; method=Manufacturer product-page description; unknown: independent flow measurement, supply pressure and water-temperature conditions, fresh-water feed trace over a full task; Fresh-water input is blended with filtered recirculated water; this is not the total delivered shower flow. | context_only: Manufacturer-declared fresh-water feed; not an independent matched test or whole-task water result. | [KOHLER manufacturer product page](https://www.kohler.com/en/products/showers/anthem-evocycle); manufacturer_product_page; date not stated |
+| `kohler.k33481.cycle.water-savings` | water_savings_fraction | 80 % | manufacturer_declaration | declared | mode=Cycle Mode with 2.5 US gal/min outlet; duration=10 min; task=Manufacturer's 10-minute example; method=Manufacturer comparison: 25 US gal conventional flow versus 5 US gal fresh water in Cycle Mode; unknown: independent replication, task-quality equivalence method, startup and cleaning boundary outside the illustrated example; The manufacturer states 2 US gal/min is recirculated and 0.5 US gal/min is fresh input. | context_only: Manufacturer claim based on a stated 10-minute same-flow example; not an independently verified saving. | [KOHLER manufacturer product page](https://www.kohler.com/en/products/showers/anthem-evocycle); manufacturer_product_page; date not stated |
+| `kohler.k33481.cycle.rapid-clean-water` | cleaning_water_per_cycle | 2.8391 L | manufacturer_declaration | derived | mode=Rapid Clean; duration=5 min; task=After-session cleaning cycle; method=Manufacturer product-page description; US gallon conversion; unknown: measured water at drain boundary, measured electrical energy, actual use across installations; Manufacturer recommends the five-minute Rapid Clean after each shower. | context_only: Manufacturer-declared water per cleaning cycle converted from 0.75 US gallons; not a measured Aqua or independent result. | [KOHLER manufacturer product page](https://www.kohler.com/en/products/showers/anthem-evocycle); manufacturer_product_page; date not stated |
+| `kohler.k33481.cycle.rapid-clean-duration` | cleaning_cycle_duration | 5 min | manufacturer_declaration | declared | mode=Rapid Clean; duration=5 min; task=After-session cleaning; method=Manufacturer product-page description; unknown: measured cleaning efficacy, actual power draw; Recommended after each shower. | context_only: Manufacturer-declared cycle duration, not an independently qualified cleaning outcome. | [KOHLER manufacturer product page](https://www.kohler.com/en/products/showers/anthem-evocycle); manufacturer_product_page; date not stated |
+| `kohler.k33481.cycle.deep-clean-duration` | deep_clean_cycle_duration | 15 min | manufacturer_declaration | declared | mode=Deep Clean; duration=15 min; task=Periodic system cleaning; method=Manufacturer product-page description; unknown: water and energy consumed, consumables or service labour, independent endpoint method; Manufacturer recommendation is monthly. | context_only: Manufacturer-declared maintenance schedule; full resource and service burden must be measured. | [KOHLER manufacturer product page](https://www.kohler.com/en/products/showers/anthem-evocycle); manufacturer_product_page; date not stated |
+| `kohler.k33481.cycle.same-session-boundary` | recirculation_scope | Same-session recirculation only while Cycle Mode is active; no storage for later users or connection to other household plumbing. | manufacturer_declaration | declared | mode=Cycle Mode; task=One active shower session; method=Manufacturer product-page description; unknown: independent validation of water quality, biofilm and aerosol exposure outcomes, cleaning coverage of all wetted surfaces; Manufacturer describes a washable reusable fine-mesh filter and continuous 0.5 US gal/min fresh-water refresh. | context_only: Manufacturer-described process boundary; not evidence of microbiological safety or hygiene efficacy. | [KOHLER manufacturer product page](https://www.kohler.com/en/products/showers/anthem-evocycle); manufacturer_product_page; date not stated |
+| `kohler.k33481.minimum-outlet-flow` | minimum_connected_showerhead_flow | 3.4 L/min | manufacturer_declaration | derived | mode=Compatible connected showerhead / handspray; method=K-33481 technical specification; unknown: performance below the listed minimum, task performance at each outlet flow; Manufacturer compatibility statement; converted from 0.9 US gal/min. | context_only: Manufacturer compatibility floor, not an independently tested service-quality threshold. | [KOHLER K-33481 technical specification](https://techcomm.kohler.com/techcomm/pdf/K-33481_spec_US-CA_Kohler_en.pdf); manufacturer_datasheet; 2026-04-15 |
+| `kohler.k33481.cycle.water-savings-after-rapid-clean` | water_savings_fraction | 77 % | manufacturer_declaration | derived | mode=Cycle Mode with 2.5 US gal/min outlet plus one Rapid Clean after the shower; duration=10 min; task=Manufacturer's 10-minute example with one recommended after-session Rapid Clean; method=Arithmetic derived from KOHLER's published 25 US gal conventional example, 5 US gal Cycle Mode example and 0.75 US gal Rapid Clean water; unknown: monthly Deep Clean water and energy use, actual startup, purge, reject water and measured usage, independent task-quality equivalence, site-specific actual consumption; This is not an independently measured result. It includes the stated Rapid Clean water only; monthly Deep Clean and other unreported flows are excluded. | context_only: Transparent arithmetic on manufacturer-published figures to illustrate the effect of the recommended per-shower cleaning cycle; not a matched or independent result. | [KOHLER manufacturer product page](https://www.kohler.com/en/products/showers/anthem-evocycle); manufacturer_product_page; date not stated |
+
+**Limitations — `kohler.k33481.cycle.fresh-water-feed`:**
+- Do not equate fresh-water feed with the total shower stream.
+- Measure startup, pauses, post-use cleaning and reject water in a matched task.
+
+**Limitations — `kohler.k33481.cycle.water-savings`:**
+- Do not compare directly with direct-flow showerhead L/min without the same completed-task functional unit.
+- The claim applies to Cycle Mode and the stated 2.5 US gal/min outlet configuration.
+
+**Limitations — `kohler.k33481.cycle.rapid-clean-water`:**
+- Count this water in every applicable completed-task and lifecycle boundary.
+- Do not infer microbiological efficacy from the cycle's existence or name.
+
+**Limitations — `kohler.k33481.cycle.rapid-clean-duration`:**
+- Duration does not establish cleaning or disinfection efficacy.
+
+**Limitations — `kohler.k33481.cycle.deep-clean-duration`:**
+- Include periodic cleaning and downtime in lifecycle comparisons.
+
+**Limitations — `kohler.k33481.cycle.same-session-boundary`:**
+- Water-quality, surface/biofilm and aerosol outcomes require independent method-specific assessment.
+- Do not describe the system as greywater reuse or cross-user stored-water reuse.
+
+**Limitations — `kohler.k33481.minimum-outlet-flow`:**
+- Do not interpret as the fresh-water input rate in Cycle Mode.
+
+**Limitations — `kohler.k33481.cycle.water-savings-after-rapid-clean`:**
+- Do not present 77% as a measured or fully all-in lifecycle saving.
+- Monthly Deep Clean water/energy, startup, purge, standby, consumables and maintenance remain unquantified.
+- The 80% headline claim is for Cycle Mode use; this adjusted illustration adds only the stated Rapid Clean water.
+
+## Orbital Shower recirculating shower system
+
+- **Entry ID:** `orbital-shower-current-family`
+- **Subject type:** product
+- **Manufacturer / publisher:** Orbital Systems
+- **SKU:** Current product family; individual configuration / SKU not stated on cited public product page
+- **Market:** Manufacturer global product and installation pages; regional market applicability not specified
+- **Revision:** Installation requirements page accessed 2026-11-19
+
+| Claim ID | Parameter | Canonical value | Evidence class | Result class | Conditions / unknowns | Comparison status | Source |
+|---|---|---|---|---|---|---|---|
+| `orbital.shower.water-savings` | water_savings_fraction | 90 % | manufacturer_declaration | declared | mode=Recirculating shower; package/configuration dependent; task=Long shower / user-selected shower duration; method=Manufacturer product-page claim; unknown: baseline product and flow, task duration and user profile, startup, purge and cleaning boundary, independent matched testing; A product-page claim, not a matched Aqua result. | context_only: Manufacturer marketing claim; baseline, task and all-in boundary require exact configuration clarification. | [Orbital Systems manufacturer product page](https://www.orbital-systems.com/products/orbital-shower); manufacturer_product_page; date not stated |
+| `orbital.shower.energy-savings` | energy_savings_fraction | 80 % | manufacturer_declaration | declared | mode=Recirculating shower; package/configuration dependent; task=Long shower / user-selected shower duration; method=Manufacturer product-page claim; unknown: baseline heater and system boundary, tariff, inlet temperatures and use profile, pump, control, standby and cleaning energy, independent matched testing; A product-page claim, not a measured Aqua result. | context_only: Manufacturer marketing claim; system boundary and baseline require independent matched testing. | [Orbital Systems manufacturer product page](https://www.orbital-systems.com/products/orbital-shower); manufacturer_product_page; date not stated |
+| `orbital.shower.water-volume` | water_volume_per_shower | 20 L | manufacturer_declaration | declared | mode=Recirculating shower; task=Manufacturer-described long shower; method=Manufacturer product-page statement; unknown: duration of long shower, user count and spray configuration, startup, cleaning, purge and reject water, pressure and inlet-temperature conditions; No duration is supplied in the cited headline statement. | context_only: Context-only manufacturer declaration; cannot be normalized to litres per minute or per completed task without the missing duration and accounting boundary. | [Orbital Systems manufacturer product page](https://www.orbital-systems.com/products/orbital-shower); manufacturer_product_page; date not stated |
+| `orbital.shower.pressure-range` | operating_pressure_range | 200–1000 kPa | manufacturer_declaration | derived | mode=Incoming hot and cold water supplies; method=Orbital installation requirements page; datum=Incoming supply; exact dynamic/static datum not clarified; unknown: pressure measurement datum, performance at all points in the declared range; The same page includes a pressure-flow table with a 1.5 bar row; scope relative to the stated 2 bar lower range is unresolved. | context_only: Manufacturer installation requirement converted from bar to kPa; not a product performance curve. | [Orbital Systems installation requirements](https://support.orbital-systems.com/en/19639-installation-requirements.html); manufacturer_product_page; date not stated |
+| `orbital.shower.pressure-flow-table` | pressure_flow_declaration | Published expected system flow: 1.5 bar = 8.7 L/min; 2 bar = 10.2 L/min; 3 bar = 11.7 L/min; 4 bar and above = 12.0 L/min. | manufacturer_declaration | declared | mode=Pressure-dependent system flow; method=Orbital installation requirements sidebar; datum=Incoming tap-water pressure; precise test datum not stated; unknown: test fixture and outlet configuration, measurement uncertainty and sample count, why 1.5 bar appears below the declared 2 bar operating-range minimum; Retain independently from the 2–10 bar stated incoming pressure range. | context_only: Manufacturer-declared pressure/flow table; values are not independently measured and do not resolve the stated 2 bar minimum. | [Orbital Systems installation requirements](https://support.orbital-systems.com/en/19639-installation-requirements.html); manufacturer_product_page; date not stated |
+| `orbital.shower.inlet-capacity-table` | inlet_supply_capacity | System flow 12 L/min → 9 L/min per hot and cold inlet; 10 → 8; 8 → 6; 6 → 5 L/min per inlet. | manufacturer_declaration | declared | mode=Separate hot and cold inlet connections; method=Orbital installation requirements page; unknown: flow test pressure and temperature, independent capacity verification; Each inlet is considered separately; do not sum the two inlet capacities as a single mixed-flow measurement. | context_only: Manufacturer installation-capacity declaration; configuration-specific and not a local plumbing approval. | [Orbital Systems installation requirements](https://support.orbital-systems.com/en/19639-installation-requirements.html); manufacturer_product_page; date not stated |
+| `orbital.shower.site-envelope` | installation_requirements | Fixed installation; continuously powered while idle; ambient 15–35°C during operation and ≥4°C when idle; accessible core ≤3 m from drain; separate hot/cold supplies; cold 4–25°C; hot 50–65°C; incoming pressure 2–10 bar; PN10 maximum working pressure; hardness 53–250 mg CaCO3/L; iron <0.3 mg/L; single-phase 230 VAC 50–60 Hz 16 A. Manufacturer also recommends a warm controlled core location. | manufacturer_declaration | declared | mode=Fixed residential / commercial installation; method=Orbital installation requirements page; unknown: pressure measurement datum and dynamic pressure profile, local electrical/plumbing approvals and site-specific installation scope, actual standby energy and outage behavior, availability of compliant inlet water across all sites; Current product-specific installation page accessed 2026-11-19. Older product-page variants may differ; use exact market/configuration documentation. | context_only: Manufacturer installation envelope; market-specific building and electrical approval remains separate. | [Orbital Systems installation requirements](https://support.orbital-systems.com/en/19639-installation-requirements.html); manufacturer_product_page; date not stated |
+| `orbital.shower.operating-ambient-envelope` | operating_environment_requirements | Ambient 15–35°C while operating; ambient must remain ≥4°C when idle; core must be continuously powered even while not in use. | manufacturer_declaration | declared | mode=Fixed installation / exact Orbital Shower Core configuration; task=Site installation eligibility; method=Orbital Systems current installation requirements page (19639); unknown: independent confirmation of exact sensor/ambient measurement point, behavior during prolonged loss of mains power; Manufacturer operating/idle ambient and always-powered declaration. | context_only: Manufacturer-declared site operating envelope; not proof of outage safety or local suitability. | [Orbital Systems installation requirements](https://support.orbital-systems.com/en/19639-installation-requirements.html); manufacturer_product_page; date not stated |
+| `orbital.shower.drain-floor-geometry` | floor_drain_geometry | Core ≤3 m from drain centre; manufacturer recommends floor slope 20 mm/m toward drain; core positioned below head shower and ≥100 mm above floor. | manufacturer_declaration | declared | mode=Fixed installation / exact Orbital Shower Core configuration; task=Site installation eligibility; method=Orbital Systems current installation requirements page (19639); unknown: site-specific drain levels and fall survey, as-built pipe route and local plumbing code; The 20 mm/m slope is a manufacturer recommendation, not an independent universal building code. | context_only: Manufacturer installation geometry declaration/recommendation; requires a competent site survey. | [Orbital Systems installation requirements](https://support.orbital-systems.com/en/19639-installation-requirements.html); manufacturer_product_page; date not stated |
+| `orbital.shower.tile-thickness` | tile_thickness_limit | 10 mm | manufacturer_declaration | declared | mode=Fixed installation / exact Orbital Shower Core configuration; task=Site installation eligibility; method=Orbital Systems current installation requirements page (19639); unknown: market / base configuration compatibility, adhesive and substrate details; Manufacturer installation-page limit. | context_only: Manufacturer installation constraint for the shower zone; not a general tile standard. | [Orbital Systems installation requirements](https://support.orbital-systems.com/en/19639-installation-requirements.html); manufacturer_product_page; date not stated |
+| `orbital.shower.fuse-dependent-flow` | fuse_dependent_flow_capacity | Declared fuse-dependent system flow: 10 A → 6 L/min; 13 A → 8 L/min; 16 A → 12 L/min. | manufacturer_declaration | declared | mode=Fixed installation / exact Orbital Shower Core configuration; task=Site installation eligibility; method=Orbital Systems current installation requirements page (19639); unknown: independent measured flow and uncertainty, exact voltage and load profile, competent electrical approval; Manufacturer states lower fuse ratings reduce system flow; one dedicated residual circuit breaker per core. | context_only: Manufacturer declaration linking electrical capacity to system flow; not an electrical design approval or independent measurement. | [Orbital Systems installation requirements](https://support.orbital-systems.com/en/19639-installation-requirements.html); manufacturer_product_page; date not stated |
+| `orbital.shower.network-requirement-18295` | installation_requirements | Connectivity: password-protected Wi-Fi (2.4 GHz / 5 GHz) or Ethernet. | manufacturer_declaration | declared | mode=Orbital Shower installation / article 18295; method=Manufacturer installation requirements page 18295; unknown: whether connectivity is required for continuous operation, setup only, remote functions or warranty, exact current product revision / regional applicability; Article 19639 does not list this connectivity clause; confirm applicability to the exact product configuration. | context_only: Product-specific installation prerequisite declared on one manufacturer support article; exact variant applicability requires confirmation. | [Orbital Systems support portal — Installation requirements article 18295](https://support.orbital-systems.com/en/18295-installation-requirements.html); manufacturer_product_page; date not stated |
+| `orbital.shower.pipe-bend-limit-18295` | installation_requirements | Maximum three bends on pipe routing. | manufacturer_declaration | declared | mode=Orbital Shower installation / article 18295; method=Manufacturer installation requirements page 18295; unknown: whether the bend limit applies to all markets and current product revisions, bend radius and pipe diameter conditions; Article 19639 does not mention a bend-count limit; confirm exact applicability rather than deleting or universally applying it. | context_only: A current manufacturer support article states a three-bend maximum; another support article omits it. | [Orbital Systems support portal — Installation requirements article 18295](https://support.orbital-systems.com/en/18295-installation-requirements.html); manufacturer_product_page; date not stated |
+| `orbital.shower.install-document-scope-difference` | manufacturer_specification_scope_ambiguity | Two live manufacturer installation articles contain different scope fields: article 18295 lists Wi-Fi/Ethernet and max three pipe bends; article 19639 lists ambient/freeze protection, floor slope and fuse-dependent flow. Exact market, product revision and applicability are not declared across the two pages. | manufacturer_declaration | declared | method=Cross-check of Orbital support articles 18295 and 19639; unknown: authoritative document hierarchy, product revision and country applicability, whether omitted clauses remain required or are superseded; Preserve both source statements pending manufacturer clarification. | context_only: Cross-document scope difference requiring product/revision clarification; not resolved by assuming one page supersedes the other. | [Orbital Systems support portal — Installation requirements article 18295](https://support.orbital-systems.com/en/18295-installation-requirements.html); manufacturer_product_page; date not stated |
+
+**Limitations — `orbital.shower.water-savings`:**
+- Do not use as a verified comparator saving without reproducing the exact configuration and full service boundary.
+
+**Limitations — `orbital.shower.energy-savings`:**
+- Do not infer purchased kWh savings from recirculated water volume or component efficiency alone.
+
+**Limitations — `orbital.shower.water-volume`:**
+- Do not infer a standardized 10-minute or 15-minute result.
+
+**Limitations — `orbital.shower.pressure-range`:**
+- Preserve the 1.5 bar table row as an unresolved scope discrepancy, not as a revised minimum.
+
+**Limitations — `orbital.shower.pressure-flow-table`:**
+- Do not call the 1.5 bar point a supported operating point until the manufacturer clarifies it.
+- Do not treat this table as a flow-retention or task-performance test.
+
+**Limitations — `orbital.shower.inlet-capacity-table`:**
+- Record hot and cold inlet supply capacity separately in any matched installation.
+
+**Limitations — `orbital.shower.site-envelope`:**
+- These are manufacturer installation declarations/recommendations, not local building/electrical approvals.
+- Do not carry a pipe-bend limit from another installation document revision unless the exact product configuration confirms it.
+- Treat continuous power while idle, ambient envelope, service access and drain location as explicit site-fit inputs.
+- Do not assume this envelope matches every South African household or retrofit.
+
+**Limitations — `orbital.shower.operating-ambient-envelope`:**
+- Treat continuous power and idle temperature as separate site-fit prerequisites.
+- Do not interpret the ambient range as an independent thermal-safety limit.
+
+**Limitations — `orbital.shower.drain-floor-geometry`:**
+- Do not treat the recommended slope as a universal statutory requirement.
+- Measure actual drain location, levels, access and pipe route for the exact installation.
+
+**Limitations — `orbital.shower.tile-thickness`:**
+- Check the exact product and installation configuration before design freeze.
+
+**Limitations — `orbital.shower.fuse-dependent-flow`:**
+- Record fuse / protective-device configuration with actual flow and temperature tests.
+- Never infer the required circuit or protection design from this declaration alone.
+
+**Limitations — `orbital.shower.network-requirement-18295`:**
+- Do not impose network connectivity on all recirculating architectures or Aqua passive direct-flow products.
+- Treat connectivity as a product-specific Site Fit domain where the exact manual requires it.
+
+**Limitations — `orbital.shower.pipe-bend-limit-18295`:**
+- Do not assume it applies to every product revision or every market without manufacturer confirmation.
+- Use this as a product-specific installation-envelope field, not a generic Aqua plumbing rule.
+
+**Limitations — `orbital.shower.install-document-scope-difference`:**
+- Do not treat absent information on one page as evidence that a prerequisite is waived.
+- For exact Orbital comparison, request a revision-controlled installation manual for the regional product variant.
+
+## Consumer Reports 2026 showerhead laboratory rating panel
+
+- **Entry ID:** `consumer-reports-2026-showerhead-panel`
+- **Subject type:** market_sample
+- **Manufacturer / publisher:** Consumer Reports
+- **SKU:** 22-model U.S. showerhead test panel; models listed individually by Consumer Reports
+- **Market:** United States; not a South African market census
+- **Revision:** Ratings page accessed 2026-11-19
+
+| Claim ID | Parameter | Canonical value | Evidence class | Result class | Conditions / unknowns | Comparison status | Source |
+|---|---|---|---|---|---|---|---|
+| `consumer-reports.2026.panel.sample-size` | sample_size | 22 products | independent_market_sample | measured | method=Consumer Reports 2026 showerhead laboratory testing; sample n=22; unknown: sampling frame and market representativeness for South Africa; The ratings page reports 22 showerheads across single-setting and multisetting categories. | context_only: Independent consumer-laboratory panel; not a universal or local-market census. | [Consumer Reports 2026 showerhead laboratory ratings](https://www.consumerreports.org/home-garden/showerheads/c33121/); independent_market_study; 2026-01-27 |
+| `consumer-reports.2026.panel.test-dimensions` | spray_coverage_criteria | Coverage uniformity; force relative to an ideal comfort value; measured water consumption; ease of switching settings; temperature drop measured at a container 18 inches from the showerhead. | independent_market_sample | measured | method=Consumer Reports laboratory rating methodology; sample n=22; unknown: full raw data and complete apparatus tolerances, pressure and inlet-temperature conditions for each model; Consumer Reports publishes claimed and actual water consumption on model rating pages. | context_only: Independent consumer-lab method summary; Aqua should reproduce or exceed relevant outcomes with a preregistered standard-compatible protocol. | [Consumer Reports 2026 showerhead laboratory ratings](https://www.consumerreports.org/home-garden/showerheads/c33121/); independent_market_study; 2026-01-27 |
+| `consumer-reports.2026.high-sierra.measured-flow` | flow_rate | 6.0567 L/min | independent_market_sample | measured | mode=High Sierra Classic Plus Low Flow; single-setting; method=Consumer Reports published showerhead ratings; measured actual flow; unknown: pressure and temperature conditions, test repeatability and uncertainty; Actual flow converted from the published 1.6 US gal/min; manufacturer claim shown separately on the rating page. | context_only: Independent published measurement; US test sample and conditions must be matched before direct Aqua comparison. | [Consumer Reports 2026 showerhead laboratory ratings](https://www.consumerreports.org/home-garden/showerheads/c33121/); independent_market_study; 2026-01-27 |
+| `consumer-reports.2026.jolie.measured-flow` | flow_rate | 5.6781 L/min | independent_market_sample | measured | mode=Jolie Filtered; single-setting; method=Consumer Reports published showerhead ratings; measured actual flow; unknown: pressure and temperature conditions, test repeatability and uncertainty; Actual flow converted from the published 1.5 US gal/min. | context_only: Independent published measurement; exact test context is not fully exposed on the public ratings summary. | [Consumer Reports 2026 showerhead laboratory ratings](https://www.consumerreports.org/home-garden/showerheads/c33121/); independent_market_study; 2026-01-27 |
+| `consumer-reports.2026.sparkpod.measured-flow` | flow_rate | 6.0567 L/min | independent_market_sample | measured | mode=SparkPod High Pressure Rain Showerhead; single-setting; method=Consumer Reports published showerhead ratings; measured actual flow; unknown: pressure and temperature conditions, test repeatability and uncertainty; Actual flow converted from the published 1.6 US gal/min. | context_only: Independent published measurement; exact test context is not fully exposed on the public ratings summary. | [Consumer Reports 2026 showerhead laboratory ratings](https://www.consumerreports.org/home-garden/showerheads/c33121/); independent_market_study; 2026-01-27 |
+| `consumer-reports.2026.delta-in2ition.measured-flow` | flow_rate | 5.6781 L/min | independent_market_sample | measured | mode=Delta Faucet 5-Spray In2ition; multisetting model; method=Consumer Reports published showerhead ratings; measured actual flow; unknown: specific spray setting corresponding to the summary flow figure, pressure and temperature conditions, test repeatability and uncertainty; The public rating summary gives claimed and measured flow; verify exact model and mode before replication. | context_only: Independent published measurement; use as a method/claim-calibration signal, not as a matched product superiority conclusion. | [Consumer Reports 2026 showerhead laboratory ratings](https://www.consumerreports.org/home-garden/showerheads/c33121/); independent_market_study; 2026-01-27 |
+
+**Limitations — `consumer-reports.2026.panel.sample-size`:**
+- Use as an independent-method benchmark, not as evidence about every showerhead or South African SKU.
+
+**Limitations — `consumer-reports.2026.panel.test-dimensions`:**
+- Consumer Reports' comfort-force reference is its own rating method, not a substitute for EN, UWL or WaterSense criteria.
+
+**Limitations — `consumer-reports.2026.high-sierra.measured-flow`:**
+- Do not substitute manufacturer claimed flow for measured flow.
+
+**Limitations — `consumer-reports.2026.jolie.measured-flow`:**
+- Keep claimed and measured values distinct.
+
+**Limitations — `consumer-reports.2026.sparkpod.measured-flow`:**
+- Keep claimed and measured values distinct.
+
+**Limitations — `consumer-reports.2026.delta-in2ition.measured-flow`:**
+- Freeze exact model and spray setting before any physical comparison.
 
 ---
 

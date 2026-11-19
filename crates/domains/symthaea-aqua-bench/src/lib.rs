@@ -12,6 +12,7 @@ use std::fmt::{Display, Formatter};
 pub mod pressure_curve;
 pub mod service_continuity;
 pub mod serviceability;
+pub mod service_qualification;
 pub mod spray_field;
 pub mod standard_methods;
 pub mod task_phase;
@@ -114,6 +115,9 @@ fn require_digest(field: &'static str, value: &str) -> Result<(), ContractError>
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BenchmarkConditions {
     pub task_profile_id: String,
+    /// Canonical digest of the complete matched trial condition bundle consumed by
+    /// independent endpoint assessments, including the exact task and shared conditions.
+    pub conditions_bundle_sha256: String,
     pub duration_seconds: u32,
     pub inlet_water_profile_sha256: String,
     pub delivery_conditions_sha256: String,
@@ -125,6 +129,10 @@ pub struct BenchmarkConditions {
 impl BenchmarkConditions {
     pub fn validate(&self) -> Result<(), ContractError> {
         require_nonempty("task_profile_id", &self.task_profile_id)?;
+        require_digest(
+            "conditions_bundle_sha256",
+            &self.conditions_bundle_sha256,
+        )?;
         if self.duration_seconds == 0 {
             return Err(ContractError::ZeroDuration);
         }
@@ -152,6 +160,11 @@ impl BenchmarkConditions {
         if self.task_profile_id != other.task_profile_id {
             return Err(ContractError::ContextMismatch {
                 field: "task_profile_id",
+            });
+        }
+        if self.conditions_bundle_sha256 != other.conditions_bundle_sha256 {
+            return Err(ContractError::ContextMismatch {
+                field: "conditions_bundle_sha256",
             });
         }
         if self.duration_seconds != other.duration_seconds {
@@ -193,6 +206,8 @@ impl BenchmarkConditions {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeviceConfiguration {
     pub market_variant_id: String,
+    /// Canonical digest covering market variant, hardware, installation, cleaning and firmware.
+    pub device_configuration_sha256: String,
     pub hardware_configuration_sha256: String,
     pub installation_sha256: String,
     pub cleaning_protocol_sha256: String,
@@ -202,6 +217,10 @@ pub struct DeviceConfiguration {
 impl DeviceConfiguration {
     pub fn validate(&self) -> Result<(), ContractError> {
         require_nonempty("market_variant_id", &self.market_variant_id)?;
+        require_digest(
+            "device_configuration_sha256",
+            &self.device_configuration_sha256,
+        )?;
         require_digest(
             "hardware_configuration_sha256",
             &self.hardware_configuration_sha256,
@@ -295,6 +314,109 @@ pub fn validate_matched_comparison(
     control.conditions.compare_with(&candidate.conditions)
 }
 
+/// Error returned by the composed matched-run and service-qualification gate.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum QualifiedComparisonError {
+    Benchmark(ContractError),
+    ServiceQualification(crate::service_qualification::ServiceQualificationError),
+}
+
+impl Display for QualifiedComparisonError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Benchmark(error) => write!(f, "matched benchmark evidence failed: {error}"),
+            Self::ServiceQualification(error) => {
+                write!(f, "completed-service qualification failed: {error}")
+            }
+        }
+    }
+}
+
+impl Error for QualifiedComparisonError {}
+
+impl From<ContractError> for QualifiedComparisonError {
+    fn from(error: ContractError) -> Self {
+        Self::Benchmark(error)
+    }
+}
+
+impl From<crate::service_qualification::ServiceQualificationError> for QualifiedComparisonError {
+    fn from(error: crate::service_qualification::ServiceQualificationError) -> Self {
+        Self::ServiceQualification(error)
+    }
+}
+
+/// Compose canonical Aqua run-receipt validation with independent completed-service decisions.
+///
+/// This is the preferred comparison entry point for product claims. It first validates the
+/// matched task/resource context and canonical subsystem receipts, then requires both the control
+/// and candidate to have complete, current, domain-specific independent assessments. It returns
+/// no physical score and does not calculate non-inferiority or superiority.
+pub fn validate_qualified_matched_comparison(
+    control: &AquaRunRecord,
+    candidate: &AquaRunRecord,
+    scope: ComparisonScope,
+    qualification_profile: &crate::service_qualification::ServiceQualificationProfile,
+    control_qualification: &crate::service_qualification::ServiceQualificationRecord,
+    candidate_qualification: &crate::service_qualification::ServiceQualificationRecord,
+) -> Result<
+    crate::service_qualification::MatchedServiceQualificationResult,
+    QualifiedComparisonError,
+> {
+    validate_matched_comparison(control, candidate, scope)?;
+    qualification_profile
+        .validate()
+        .map_err(QualifiedComparisonError::ServiceQualification)?;
+    if qualification_profile.conditions_sha256 != control.conditions.conditions_bundle_sha256
+        || qualification_profile.conditions_sha256
+            != candidate.conditions.conditions_bundle_sha256
+    {
+        return Err(QualifiedComparisonError::Benchmark(
+            ContractError::ContextMismatch {
+                field: "qualification_conditions_sha256",
+            },
+        ));
+    }
+    if control_qualification.run_id != control.run_id {
+        return Err(QualifiedComparisonError::Benchmark(
+            ContractError::ContextMismatch {
+                field: "control_qualification.run_id",
+            },
+        ));
+    }
+    if candidate_qualification.run_id != candidate.run_id {
+        return Err(QualifiedComparisonError::Benchmark(
+            ContractError::ContextMismatch {
+                field: "candidate_qualification.run_id",
+            },
+        ));
+    }
+    if control_qualification.device_configuration_sha256
+        != control.device.device_configuration_sha256
+    {
+        return Err(QualifiedComparisonError::Benchmark(
+            ContractError::ContextMismatch {
+                field: "control_device_configuration_sha256",
+            },
+        ));
+    }
+    if candidate_qualification.device_configuration_sha256
+        != candidate.device.device_configuration_sha256
+    {
+        return Err(QualifiedComparisonError::Benchmark(
+            ContractError::ContextMismatch {
+                field: "candidate_device_configuration_sha256",
+            },
+        ));
+    }
+    crate::service_qualification::evaluate_matched_service_qualification(
+        qualification_profile,
+        control_qualification,
+        candidate_qualification,
+    )
+    .map_err(QualifiedComparisonError::from)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -316,6 +438,7 @@ mod tests {
             run_id: run_id.to_owned(),
             conditions: BenchmarkConditions {
                 task_profile_id: "STANDARD_SHOWER".to_owned(),
+                conditions_bundle_sha256: digest('b'),
                 duration_seconds: 600,
                 inlet_water_profile_sha256: digest('a'),
                 delivery_conditions_sha256: digest('b'),
@@ -325,6 +448,7 @@ mod tests {
             },
             device: DeviceConfiguration {
                 market_variant_id: market_variant_id.to_owned(),
+                device_configuration_sha256: digest('6'),
                 hardware_configuration_sha256: digest('f'),
                 installation_sha256: digest('1'),
                 cleaning_protocol_sha256: digest(cleaning_digest),
@@ -356,6 +480,102 @@ mod tests {
         }
     }
 
+    fn qualification_profile(
+        claim: crate::service_qualification::QualificationClaim,
+    ) -> crate::service_qualification::ServiceQualificationProfile {
+        use crate::service_qualification::QualificationMethodBinding;
+        crate::service_qualification::ServiceQualificationProfile {
+            profile_id: "AQS1-QUALIFICATION-001".to_owned(),
+            claim,
+            protocol_sha256: digest('a'),
+            conditions_sha256: digest('b'),
+            method_bindings: claim
+                .required_domains()
+                .iter()
+                .map(|domain| QualificationMethodBinding {
+                    domain: *domain,
+                    method_sha256: digest('c'),
+                    conditions_sha256: digest('d'),
+                })
+                .collect(),
+        }
+    }
+
+    fn service_qualification_record(
+        run_id: &str,
+        profile: &crate::service_qualification::ServiceQualificationProfile,
+        outcome: crate::service_qualification::AssessmentOutcome,
+    ) -> crate::service_qualification::ServiceQualificationRecord {
+        use crate::service_qualification::{
+            DomainAssessment, QualificationEvidenceRef, ServiceQualificationRecord,
+        };
+
+        ServiceQualificationRecord {
+            run_id: run_id.to_owned(),
+            device_configuration_sha256: digest('6'),
+            profile_id: profile.profile_id.clone(),
+            protocol_sha256: profile.protocol_sha256.clone(),
+            conditions_sha256: profile.conditions_sha256.clone(),
+            assessments: profile
+                .claim
+                .required_domains()
+                .iter()
+                .map(|domain| {
+                    let binding = profile
+                        .method_bindings
+                        .iter()
+                        .find(|binding| binding.domain == *domain)
+                        .expect("domain method binding");
+                    DomainAssessment {
+                        domain: *domain,
+                        outcome,
+                        evidence: QualificationEvidenceRef {
+                            authority: domain.expected_authority(),
+                            run_id: run_id.to_owned(),
+                            issuer_principal_id: format!("issuer-{domain:?}"),
+                            authority_verification_receipt_sha256: digest('e'),
+                            status: crate::service_qualification::QualificationEvidenceStatus::Current,
+                            record_id: format!("{run_id}-{domain:?}"),
+                            evidence_sha256: digest('f'),
+                            method_sha256: binding.method_sha256.clone(),
+                            method_conditions_sha256: binding.conditions_sha256.clone(),
+                            trial_conditions_sha256: profile.conditions_sha256.clone(),
+                        },
+                    }
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn rejects_different_canonical_condition_bundles() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.conditions.conditions_bundle_sha256 = digest('9');
+        assert_eq!(
+            validate_matched_comparison(
+                &control,
+                &candidate,
+                ComparisonScope::WaterServiceOnly
+            ),
+            Err(ContractError::ContextMismatch {
+                field: "conditions_bundle_sha256"
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_device_configuration_bundle_digest() {
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.device.device_configuration_sha256 = "not-a-digest".to_owned();
+        assert_eq!(
+            candidate.validate(ComparisonScope::WaterServiceOnly),
+            Err(ContractError::InvalidDigest {
+                field: "device_configuration_sha256"
+            })
+        );
+    }
+
     #[test]
     fn allows_matched_task_conditions_with_different_device_and_cleaning_profiles() {
         let control = run("control-001", "incumbent-shower", '7');
@@ -363,6 +583,313 @@ mod tests {
         assert_eq!(
             validate_matched_comparison(&control, &candidate, ComparisonScope::WaterAndEnergy,),
             Ok(())
+        );
+    }
+
+    #[test]
+    fn qualified_comparison_requires_both_owner_receipts_and_service_assessments() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let candidate = run("candidate-001", "aqua-test-article", '8');
+        let profile = qualification_profile(
+            crate::service_qualification::QualificationClaim::WaterAndEnergyEfficiency,
+        );
+        let control_assessment = service_qualification_record(
+            "control-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let candidate_assessment = service_qualification_record(
+            "candidate-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+
+        let result = validate_qualified_matched_comparison(
+            &control,
+            &candidate,
+            ComparisonScope::WaterAndEnergy,
+            &profile,
+            &control_assessment,
+            &candidate_assessment,
+        )
+        .expect("both matched runs and independent service assessments qualify");
+
+        assert_eq!(
+            result.disposition,
+            crate::service_qualification::MatchedComparisonDisposition::CandidateQualified
+        );
+    }
+
+    #[test]
+    fn qualified_comparison_rejects_service_evidence_from_another_run() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let candidate = run("candidate-001", "aqua-test-article", '8');
+        let profile = qualification_profile(
+            crate::service_qualification::QualificationClaim::FunctionalService,
+        );
+        let control_assessment = service_qualification_record(
+            "different-control-run",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let candidate_assessment = service_qualification_record(
+            "candidate-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+
+        assert_eq!(
+            validate_qualified_matched_comparison(
+                &control,
+                &candidate,
+                ComparisonScope::WaterServiceOnly,
+                &profile,
+                &control_assessment,
+                &candidate_assessment,
+            ),
+            Err(QualifiedComparisonError::Benchmark(
+                ContractError::ContextMismatch {
+                    field: "control_qualification.run_id"
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn qualified_comparison_rejects_service_evidence_from_another_device_configuration() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let candidate = run("candidate-001", "aqua-test-article", '8');
+        let profile = qualification_profile(
+            crate::service_qualification::QualificationClaim::FunctionalService,
+        );
+        let mut control_assessment = service_qualification_record(
+            "control-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        control_assessment.device_configuration_sha256 = digest('z');
+        let candidate_assessment = service_qualification_record(
+            "candidate-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+
+        assert_eq!(
+            validate_qualified_matched_comparison(
+                &control,
+                &candidate,
+                ComparisonScope::WaterServiceOnly,
+                &profile,
+                &control_assessment,
+                &candidate_assessment,
+            ),
+            Err(QualifiedComparisonError::Benchmark(
+                ContractError::ContextMismatch {
+                    field: "control_device_configuration_sha256"
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn qualified_comparison_rejects_missing_canonical_energy_receipt() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.evidence.energy_resource_closure = None;
+        let profile = qualification_profile(
+            crate::service_qualification::QualificationClaim::WaterAndEnergyEfficiency,
+        );
+        let control_assessment = service_qualification_record(
+            "control-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let candidate_assessment = service_qualification_record(
+            "candidate-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+
+        assert_eq!(
+            validate_qualified_matched_comparison(
+                &control,
+                &candidate,
+                ComparisonScope::WaterAndEnergy,
+                &profile,
+                &control_assessment,
+                &candidate_assessment,
+            ),
+            Err(QualifiedComparisonError::Benchmark(
+                ContractError::MissingEnergyReceipt
+            ))
+        );
+    }
+
+    #[test]
+    fn qualified_comparison_reports_candidate_endpoint_failure() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let candidate = run("candidate-001", "aqua-test-article", '8');
+        let profile = qualification_profile(
+            crate::service_qualification::QualificationClaim::FunctionalService,
+        );
+        let control_assessment = service_qualification_record(
+            "control-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let mut candidate_assessment = service_qualification_record(
+            "candidate-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        candidate_assessment.assessments[2].outcome =
+            crate::service_qualification::AssessmentOutcome::Fail;
+
+        let result = validate_qualified_matched_comparison(
+            &control,
+            &candidate,
+            ComparisonScope::WaterServiceOnly,
+            &profile,
+            &control_assessment,
+            &candidate_assessment,
+        )
+        .expect("well-formed endpoint failure is a decision, not a structural error");
+
+        assert_eq!(
+            result.disposition,
+            crate::service_qualification::MatchedComparisonDisposition::CandidateFailed
+        );
+    }
+
+    #[test]
+    fn qualified_comparison_rejects_indeterminate_control() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let candidate = run("candidate-001", "aqua-test-article", '8');
+        let profile = qualification_profile(
+            crate::service_qualification::QualificationClaim::FunctionalService,
+        );
+        let mut control_assessment = service_qualification_record(
+            "control-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        control_assessment.assessments[0].outcome =
+            crate::service_qualification::AssessmentOutcome::Indeterminate;
+        let candidate_assessment = service_qualification_record(
+            "candidate-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+
+        let result = validate_qualified_matched_comparison(
+            &control,
+            &candidate,
+            ComparisonScope::WaterServiceOnly,
+            &profile,
+            &control_assessment,
+            &candidate_assessment,
+        )
+        .expect("indeterminate control is a valid unresolved decision");
+
+        assert_eq!(
+            result.disposition,
+            crate::service_qualification::MatchedComparisonDisposition::ControlIndeterminate
+        );
+    }
+
+    #[test]
+    fn qualified_comparison_requires_service_profile_to_bind_run_condition_bundle() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let candidate = run("candidate-001", "aqua-test-article", '8');
+        let profile = qualification_profile(
+            crate::service_qualification::QualificationClaim::FunctionalService,
+        );
+        let control_assessment = service_qualification_record(
+            "control-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let candidate_assessment = service_qualification_record(
+            "candidate-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let mut unrelated_profile = profile.clone();
+        unrelated_profile.conditions_sha256 = digest('z');
+        let unrelated_control = service_qualification_record(
+            "control-001",
+            &unrelated_profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let unrelated_candidate = service_qualification_record(
+            "candidate-001",
+            &unrelated_profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+
+        assert_eq!(
+            validate_qualified_matched_comparison(
+                &control,
+                &candidate,
+                ComparisonScope::WaterServiceOnly,
+                &unrelated_profile,
+                &unrelated_control,
+                &unrelated_candidate,
+            ),
+            Err(QualifiedComparisonError::Benchmark(
+                ContractError::ContextMismatch {
+                    field: "qualification_conditions_sha256"
+                }
+            ))
+        );
+
+        // The bound profile remains valid for the same run context.
+        assert_eq!(
+            validate_qualified_matched_comparison(
+                &control,
+                &candidate,
+                ComparisonScope::WaterServiceOnly,
+                &profile,
+                &control_assessment,
+                &candidate_assessment,
+            )
+            .expect("bound profile")
+            .disposition,
+            crate::service_qualification::MatchedComparisonDisposition::CandidateQualified
+        );
+    }
+
+    #[test]
+    fn qualified_comparison_rejects_divergent_independent_trial_conditions() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let candidate = run("candidate-001", "aqua-test-article", '8');
+        let profile = qualification_profile(
+            crate::service_qualification::QualificationClaim::FunctionalService,
+        );
+        let control_assessment = service_qualification_record(
+            "control-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let mut candidate_assessment = service_qualification_record(
+            "candidate-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        candidate_assessment.conditions_sha256 = digest('z');
+
+        assert_eq!(
+            validate_qualified_matched_comparison(
+                &control,
+                &candidate,
+                ComparisonScope::WaterServiceOnly,
+                &profile,
+                &control_assessment,
+                &candidate_assessment,
+            ),
+            Err(QualifiedComparisonError::ServiceQualification(
+                crate::service_qualification::ServiceQualificationError::ConditionsMismatch
+            ))
         );
     }
 
