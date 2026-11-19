@@ -22,6 +22,7 @@ Values are converted only with `f64::to_bits` and `f64::from_bits`. The current 
 |---|---|---|
 | Raw | Original u64 bit pattern, little-endian | Exact control |
 | XOR previous | `bits_t XOR bits_(t-1)`, first previous = 0, canonical u64 varint | Simple temporal bit-pattern baseline |
+| XOR leading/trailing | XOR residual, then store leading-zero count, trailing-zero count and only the meaningful middle bits | Simple reversible bit-window baseline; not Gorilla/Chimp |
 
 No float subtraction, rounding, decimal parsing, NaN canonicalization, or normalization occurs. Tests compare each reconstructed `to_bits()` result with the input. Edge fixtures include:
 - positive and negative zero;
@@ -31,9 +32,9 @@ No float subtraction, rounding, decimal parsing, NaN canonicalization, or normal
 - repeated constants, smooth bit increments, sign-alternating/oscillating patterns;
 - deterministic random 64-bit patterns.
 
-The F64C frame has a 32-byte header: magic/version, transform ID, inner model ID, element count, inner frame length, CRC-32 of original raw u64 bytes, and CRC-32 of inner frame. The decoder applies the element-count limit before allocating and caps transformed output to ten bytes per f64 for the XOR-varint transform.
+The F64C frame has a 32-byte header: magic/version, transform ID, inner model ID, element count, inner frame length, CRC-32 of original raw u64 bytes, and CRC-32 of inner frame. The decoder applies the element-count limit before allocating and caps transformed output to eleven bytes per f64 for the XOR-leading/trailing transform (marker, two span bytes and up to eight payload bytes).
 
-The u64 varint parser rejects truncation, overlong encodings and values exceeding 64 bits. The raw and XOR transforms must both reproduce all IEEE-754 bits exactly.
+The u64 varint parser rejects truncation, overlong encodings and values exceeding 64 bits. All three transforms must reproduce every IEEE-754 bit exactly.
 
 ## Current CLI
 
@@ -43,41 +44,43 @@ From `research/cdl-bench`:
 cargo run --release -- float --values 10000 --seed 42
 ```
 
-The command emits frame lengths and encode/decode nanoseconds for the single-stream arms and the segment portfolio at fixed chunk sizes 64, 256 and 1,024, across:
+The command emits frame lengths and encode/decode nanoseconds for the single-stream arms, the offline segment portfolio and the historical-cost online selector at fixed chunk sizes 64, 256 and 1,024, across:
 - constant;
 - smooth-ramp;
 - oscillating/sign-alternating;
 - high-precision decimal-like;
 - random-bit-pattern streams.
 
-Each stream is evaluated with raw and XOR-previous transforms under order-0 and order-1 entropy models. The segment portfolio tries all four combinations per chunk and picks the smallest complete child F64C frame. The F64S container header, every F64C child header, child CRCs, and the inner CDL payloads are all counted in the reported frame size. Zstandard is measured on the original raw little-endian f64 bytes if installed. The CLI does not yet invoke DeXOR, ACTF, Gorilla, Chimp, Rabbit or Dolphin.
+Each stream is evaluated with raw, XOR-previous-varint and XOR-leading/trailing transforms under order-0 and order-1 entropy models. The segment portfolio tries all six combinations per chunk and picks the smallest complete child F64C frame. The F64S container header, every F64C child header, child CRCs, and the inner CDL payloads are all counted in the reported frame size. Zstandard is measured on the original raw little-endian f64 bytes if installed. The CLI does not yet invoke DeXOR, ACTF, Gorilla, Chimp, Rabbit or Dolphin.
 
-**Selection caveat:** the current selector has the entire chunk available and tries all four encodings before choosing one. This is an offline size oracle, not an online selector and not a WZS reproduction. It is useful as a transparent fixed-chunk upper bound for the specific four candidate encodings; it does not establish that transmitted or inferred online segmentation would achieve the same result.
+**Selection caveat:** the offline selector has the entire chunk available and tries all six encodings before choosing one. This is an offline size oracle, not an online selector and not a WZS reproduction. It is useful as a transparent fixed-chunk upper bound for the specific four candidate encodings; it does not establish that transmitted or inferred online segmentation would achieve the same result.
 
 ## Two segment-local selection policies
 
 Both segmented policies use F64S outer framing, then concatenate self-describing F64C child frames. Each F64C child has its own transform/model IDs, inner frame length, and CRCs; the outer F64S header records version, policy ID, element count, chunk size, segment count, raw CRC and header CRC. The child headers and outer header are all included in reported bytes.
 
-### Policy 1: offline best-of-four size oracle
+### Policy 1: offline best-of-six size oracle
 
-For each complete chunk the encoder tries:
+For each complete chunk the encoder tries six candidates:
 1. Raw / Order0
 2. Raw / Order1
-3. XOR-previous / Order0
-4. XOR-previous / Order1
+3. XOR-previous-varint / Order0
+4. XOR-previous-varint / Order1
+5. XOR-leading/trailing / Order0
+6. XOR-leading/trailing / Order1
 
-It stores the smallest complete F64C frame. Ties resolve by candidate order. The decoder independently reconstructs the chunk, recomputes all four canonical F64C frames, and rejects a child that is not the exact smallest candidate frame. This is a size oracle with full current-chunk access, not a streaming selector or a WZS reproduction. It gives an upper reference for the four candidates and fixed chunk size.
+It stores the smallest complete F64C frame. Ties resolve by candidate order. The decoder independently reconstructs the chunk, recomputes all six canonical F64C frames, and rejects a child that is not the exact smallest candidate frame. This is a size oracle with full current-chunk access, not a streaming selector or a WZS reproduction. It gives an upper reference for the six candidates and fixed chunk size.
 
 ### Policy 2: decoder-synchronous historical-cost selection
 
-The new `compress_f64_online_selector` / `decompress_f64_online_selector` pair uses a past-only policy:
+The new `compress_f64_online_selector` / `decompress_f64_online_selector` pair uses a six-candidate past-only policy:
 - first chunk defaults deterministically to Raw / Order0;
 - before each later chunk, select the candidate with the smallest mean complete F64C frame length over previous chunks;
 - encode the current chunk with that candidate;
-- after each chunk, both encoder and decoder recompute all four complete candidate sizes from that chunk and update the same integer totals;
+- after each chunk, both encoder and decoder recompute all six complete candidate sizes from that chunk and update the same integer totals;
 - the child F64C header exposes the selected transform/model IDs; the decoder independently computes the expected candidate and rejects a child whose IDs violate the historical policy.
 
-This transmits no additional selector symbols. The selected transform/model IDs already live in the child header and are counted as part of the F64C frame. The policy is decoder-synchronous and uses only prior chunks to select the current chunk, but it is **compute-heavy**: both sides perform four candidate encodings after every chunk to update historical cost. It is a diagnostic online baseline, not yet a practical throughput-optimized selector. The policy is not a learned causal mechanism, and it should be compared against simpler features, fixed share, and WZS-style selectors.
+This transmits no additional selector symbols. The selected transform/model IDs already live in the child header and are counted as part of the F64C frame. The policy is decoder-synchronous and uses only prior chunks to select the current chunk, but it is **compute-heavy**: both sides perform six candidate encodings after every chunk to update historical cost. It is a diagnostic online baseline, not yet a practical throughput-optimized selector. The policy is not a learned causal mechanism, and it should be compared against simpler features, fixed share, and WZS-style selectors.
 
 The float CLI evaluates both policies at chunk sizes 64, 256 and 1,024. It reports size ratio and encode/decode nanoseconds for each complete outer frame. Rust tests are authored for exact bitwise reconstruction, policy mismatch rejection, corruption/truncation, zero chunk size and output limits; they have not run.
 
@@ -91,7 +94,7 @@ A separate Python translation exercised:
 
 All checks passed. This is **not** Rust compilation, F64C frame validation, arithmetic coder execution, or a compression-performance result.
 
-Rust tests are authored for raw/XOR exact reconstruction, deterministic encoding, truncated-prefix rejection, single-bit mutation rejection, output-limit enforcement and malformed u64-varint rejection. Segmented tests cover bitwise round-trip at chunk sizes 1/64/256/1024, truncation, zero chunk size, output limit, header flags/policy validation, canonical best-of-four child selection, and single-bit mutation rejection. Historical-cost policy tests cover initial choice, cumulative mean updates, stable tie-breaking, exact round-trip, child-policy mismatch rejection and corruption. An independent Python check reproduced the decision sequence [0, 3, 3] from example historical sizes and confirmed stable tie-breaking. The Rust tests have not run because the local environment has no Rust toolchain. No SOTA or frame-size win is claimed.
+Rust tests are authored for raw/XOR-varint/XOR-leading-trailing exact reconstruction, deterministic encoding, truncated-prefix rejection, single-bit mutation rejection, output-limit enforcement, malformed u64-varint rejection and malformed bit-window rejection. Segmented tests cover bitwise round-trip at chunk sizes 1/64/256/1024, truncation, zero chunk size, output limit, header flags/policy validation, canonical best-of-six child selection, and single-bit mutation rejection. Historical-cost policy tests cover initial choice, cumulative six-candidate mean updates, stable tie-breaking, exact round-trip, child-policy mismatch rejection and corruption. An independent Python transform translation exercised 57,103 bit patterns over five fixture families and rejected five malformed bit-window cases. A separate Python policy check reproduced the decision sequence [0, 3, 3] and stable tie-breaking. The Rust tests have not run because the local environment has no Rust toolchain. No SOTA or frame-size win is claimed.
 
 ## 2026 competitive comparison
 
