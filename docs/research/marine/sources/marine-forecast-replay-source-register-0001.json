@@ -37,9 +37,12 @@
         "parameter_set",
         "grid_definition",
         "units",
-        "regridding_method"
+        "regridding_method",
+        "availability_evidence_class",
+        "first_available_evidence_ref",
+        "first_available_evidence_sha256"
       ],
-      "admissibility": "A cycle can enter a deployable decision snapshot only where issue time, object first-seen/publication time and data validity are independently recorded and the object was available by the decision cutoff. Do not substitute ERA5 or later analyses for missing forecast cycles.",
+      "admissibility": "A cycle can enter a deployable decision snapshot only where issue time, object first-seen/publication time and data validity are independently recorded and the object was available by the decision cutoff. Do not substitute ERA5 or later analyses for missing forecast cycles. First-availability claims require an immutable evidence-artifact reference and digest, not only a typed evidence class.",
       "known_limits": [
         "GFS model configuration evolves; preserve cycle and parameter metadata",
         "The GDEX page states the archive copy is moving to an AWS mirror and RDA updates stop in early 2026",
@@ -69,9 +72,12 @@
         "object_sha256",
         "parameter_set",
         "grid_definition",
-        "units"
+        "units",
+        "availability_evidence_class",
+        "first_available_evidence_ref",
+        "first_available_evidence_sha256"
       ],
-      "admissibility": "Use only as-of captured forecast objects with first-seen timestamps; the trailing window is not a substitute for a long historical forecast archive.",
+      "admissibility": "Use only as-of captured forecast objects with first-seen timestamps; the trailing window is not a substitute for a long historical forecast archive. First-availability claims require an immutable evidence-artifact reference and digest, not only a typed evidence class.",
       "known_limits": [
         "Only trailing 30 days at this high resolution according to NCEI",
         "NCEI currently warns cloud migration may delay archival and update cycles"
