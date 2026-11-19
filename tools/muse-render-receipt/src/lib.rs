@@ -994,10 +994,53 @@ struct SoundingRangeV1 {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum InstrumentKindV1 {
+    Piano,
+    Harpsichord,
+    Celesta,
+    Organ,
+    Violin,
+    Viola,
+    Cello,
+    DoubleBass,
+    UprightBass,
+    Harp,
+    ClassicalGuitar,
+    AcousticGuitar,
+    ElectricBass,
+    Mandolin,
+    Banjo,
+    Sitar,
+    Koto,
+    Oud,
+    Flute,
+    Piccolo,
+    Oboe,
+    Clarinet,
+    Bassoon,
+    Saxophone,
+    Ney,
+    Duduk,
+    FrenchHorn,
+    Trumpet,
+    Trombone,
+    Tuba,
+    Timpani,
+    Marimba,
+    Vibraphone,
+    Xylophone,
+    Accordion,
+    SoloVoice,
+    Choir,
+    Synthesizer,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct InstrumentCapabilityV1 {
     id: String,
-    kind: String,
+    kind: InstrumentKindV1,
     sounding_range: SoundingRangeV1,
     max_polyphony: u8,
 }
@@ -1133,7 +1176,7 @@ fn verify_timeline_binding_bundle(
     }
     let mut capability_map = BTreeMap::new();
     for capability in capabilities {
-        if capability.id.trim().is_empty() || capability.kind.trim().is_empty()
+        if capability.id.trim().is_empty()
             || capability.sounding_range.lowest_midi > capability.sounding_range.highest_midi
             || capability.max_polyphony == 0 || capability.max_polyphony > 64
         {
@@ -1630,7 +1673,7 @@ mod tests {
             "instrument_id":"inst-a","renderer_id":"test-renderer",
             "patch_id":"test-patch","gm_program":0,"asset_sha256":null
         }])).unwrap();
-        let capability_bytes = serde_json::to_vec(&json!([{"id":"inst-a"}])).unwrap();
+        let capability_bytes = serde_json::to_vec(&json!([{"id":"inst-a","kind":"piano","sounding_range":{"lowest_midi":0,"highest_midi":127},"max_polyphony":16}])).unwrap();
         std::fs::write(root.join("orchestration-timeline.json"), &timeline_bytes).unwrap();
         std::fs::write(root.join("instrument-bindings.json"), &binding_bytes).unwrap();
         std::fs::write(root.join("instrument-capabilities.json"), &capability_bytes).unwrap();
