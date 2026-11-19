@@ -244,7 +244,7 @@
                       }
                     },
                     "coefficient": {
-                      "type": "number",
+                      "type": "integer",
                       "not": {
                         "const": 0
                       }
