@@ -305,10 +305,12 @@ fn validate_group(
     })
 }
 
-fn subgroup_id(group: &FiniteGroupTableV1, element_indices: &[usize]) -> String {
+fn subgroup_id(_group: &FiniteGroupTableV1, element_indices: &[usize]) -> String {
+    // The ordered index list is unambiguous even if caller-supplied element
+    // labels contain commas, brackets, or other delimiter characters.
     let members = element_indices
         .iter()
-        .map(|index| group.element_ids[*index].as_str())
+        .map(usize::to_string)
         .collect::<Vec<_>>()
         .join(",");
     format!("H[{members}]")
@@ -782,33 +784,13 @@ pub fn replay_membership_observations(
 ) -> Result<SubgroupObservationReceiptV1, SubgroupErrorV1> {
     verify_subgroup_identification_certificate(problem, certificate, budget)?;
     let mut seen_observation_ids = BTreeSet::new();
+    let mut resolved_observations = Vec::with_capacity(observations.len());
     let mut results_by_probe: BTreeMap<usize, bool> = BTreeMap::new();
     let mut snapshots = Vec::with_capacity(observations.len() + 1);
 
-    let candidate_ids = |results: &BTreeMap<usize, bool>| {
-        certificate
-            .enumeration
-            .subgroups
-            .iter()
-            .filter(|subgroup| {
-                results.iter().all(|(probe_index, preserved)| {
-                    let element = problem.probes[*probe_index].group_element_index;
-                    let predicted = subgroup.element_mask & (1_u64 << element) != 0;
-                    predicted == *preserved
-                })
-            })
-            .map(|subgroup| subgroup.subgroup_id.clone())
-            .collect::<Vec<_>>()
-    };
-
-    let initial = candidate_ids(&results_by_probe);
-    snapshots.push(SubgroupFrontierSnapshotV1 {
-        after_observation_count: 0,
-        candidate_subgroup_ids: initial.clone(),
-        model_consistent: !initial.is_empty(),
-    });
-
-    for (observation_index, observation) in observations.iter().enumerate() {
+    // Validate the entire batch before replay. An early inconsistency must
+    // not hide a malformed or wrong-context observation later in the batch.
+    for observation in observations {
         if !nonempty(&observation.observation_id) {
             return Err(SubgroupErrorV1::InvalidObservationId);
         }
@@ -840,32 +822,61 @@ pub fn replay_membership_observations(
                 probe_id: probe.probe_id.clone(),
             });
         }
+        let exact_outcome = match observation.outcome {
+            MembershipOutcomeV1::Unknown => None,
+            MembershipOutcomeV1::Preserved => Some(true),
+            MembershipOutcomeV1::Violated => Some(false),
+        };
+        resolved_observations.push((probe_index, exact_outcome));
+    }
 
-        match observation.outcome {
-            MembershipOutcomeV1::Unknown => {}
-            MembershipOutcomeV1::Preserved | MembershipOutcomeV1::Violated => {
-                let preserved = observation.outcome == MembershipOutcomeV1::Preserved;
-                if let Some(previous) = results_by_probe.get(&probe_index) {
-                    if *previous != preserved {
-                        snapshots.push(SubgroupFrontierSnapshotV1 {
-                            after_observation_count: observation_index + 1,
-                            candidate_subgroup_ids: Vec::new(),
-                            model_consistent: false,
-                        });
-                        return Ok(SubgroupObservationReceiptV1 {
-                            schema_version: 1,
-                            problem_id: problem.problem_id.clone(),
-                            problem_contract_bytes: problem.canonical_bytes(),
-                            observations_contract_bytes: observations_bytes(observations),
-                            snapshots,
-                            final_candidate_subgroup_ids: Vec::new(),
-                            status: IdentificationStatusV1::ModelInconsistent,
-                            pruning_authorized: false,
-                        });
-                    }
-                } else {
-                    results_by_probe.insert(probe_index, preserved);
+    let candidate_ids = |results: &BTreeMap<usize, bool>| {
+        certificate
+            .enumeration
+            .subgroups
+            .iter()
+            .filter(|subgroup| {
+                results.iter().all(|(probe_index, preserved)| {
+                    let element = problem.probes[*probe_index].group_element_index;
+                    let predicted = subgroup.element_mask & (1_u64 << element) != 0;
+                    predicted == *preserved
+                })
+            })
+            .map(|subgroup| subgroup.subgroup_id.clone())
+            .collect::<Vec<_>>()
+    };
+
+    let initial = candidate_ids(&results_by_probe);
+    snapshots.push(SubgroupFrontierSnapshotV1 {
+        after_observation_count: 0,
+        candidate_subgroup_ids: initial.clone(),
+        model_consistent: !initial.is_empty(),
+    });
+
+    for (observation_index, (probe_index, exact_outcome)) in
+        resolved_observations.iter().enumerate()
+    {
+        if let Some(preserved) = exact_outcome {
+            if let Some(previous) = results_by_probe.get(probe_index) {
+                if previous != preserved {
+                    snapshots.push(SubgroupFrontierSnapshotV1 {
+                        after_observation_count: observation_index + 1,
+                        candidate_subgroup_ids: Vec::new(),
+                        model_consistent: false,
+                    });
+                    return Ok(SubgroupObservationReceiptV1 {
+                        schema_version: 1,
+                        problem_id: problem.problem_id.clone(),
+                        problem_contract_bytes: problem.canonical_bytes(),
+                        observations_contract_bytes: observations_bytes(observations),
+                        snapshots,
+                        final_candidate_subgroup_ids: Vec::new(),
+                        status: IdentificationStatusV1::ModelInconsistent,
+                        pruning_authorized: false,
+                    });
                 }
+            } else {
+                results_by_probe.insert(*probe_index, *preserved);
             }
         }
 
