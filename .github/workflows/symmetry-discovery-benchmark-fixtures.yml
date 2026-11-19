@@ -59,5 +59,47 @@ jobs:
         run: cargo fmt --manifest-path research/symmetry-discovery-benchmark-001/oracle/Cargo.toml --all -- --check
       - name: Run independent Rust exact oracle
         run: cargo test --locked --manifest-path research/symmetry-discovery-benchmark-001/oracle/Cargo.toml
+      - name: Execute structural proposal audit smoke
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path research/symmetry-discovery-benchmark-001/oracle/Cargo.toml --bin audit_proposals -- research/symmetry-discovery-benchmark-001/fixtures/v0.1/proposal_smoke_input.json > "$RUNNER_TEMP/structural-proposal-audit.json"
+          python3 - "$RUNNER_TEMP/structural-proposal-audit.json" <<'PY'
+          import json
+          import sys
+
+          receipt = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert receipt["execution_status"] == "completed"
+          rows = receipt["case_results"]
+          assert len(rows) == 3
+          assert sum(row["proposal_exact_match"] for row in rows) == 2
+          chiral = next(row for row in rows if row["case_id"] == "C4-CHIRAL-ORBIT-001")
+          assert chiral["false_exact_promotion"] is True
+          assert chiral["false_promotion_elements"] == ["fanti", "fdiag", "fx", "fy"]
+          assert chiral["group_axioms_satisfied"] is True
+          assert all(row["audit_replayed"] for row in rows)
+          print("STRUCTURAL_PROPOSAL_ORACLE_SMOKE_PASS: D4/C4/C1, four exact false promotions witnessed")
+          PY
+      - name: Execute regression proposal audit smoke
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path research/symmetry-discovery-benchmark-001/oracle/Cargo.toml --bin audit_proposals -- research/symmetry-discovery-benchmark-001/fixtures/v0.1/regression_proposal_smoke_input.json > "$RUNNER_TEMP/regression-proposal-audit.json"
+          python3 - "$RUNNER_TEMP/regression-proposal-audit.json" <<'PY'
+          import json
+          import sys
+
+          receipt = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert receipt["execution_status"] == "completed"
+          rows = receipt["case_results"]
+          assert len(rows) == 2
+          assert all(row["proposal_exact_match"] for row in rows)
+          assert all(not row["false_exact_promotion"] for row in rows)
+          assert all(not row["false_elimination"] for row in rows)
+          assert all(row["audit_replayed"] for row in rows)
+          print("REGRESSION_PROPOSAL_ORACLE_SMOKE_PASS: D4 and C4 exact subgroup proposals")
+          PY
+      - name: Record oracle proposal smoke identities
+        run: |
+          set -euo pipefail
+          sha256sum "$RUNNER_TEMP/structural-proposal-audit.json" "$RUNNER_TEMP/regression-proposal-audit.json" | tee "$RUNNER_TEMP/proposal-audit-receipts.sha256"
       - name: Strict Clippy for exact oracle
         run: cargo clippy --locked --manifest-path research/symmetry-discovery-benchmark-001/oracle/Cargo.toml --all-targets -- -D warnings
