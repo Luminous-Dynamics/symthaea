@@ -36,6 +36,11 @@ mkdir -p "$OUT_DIR"
 require_command git
 require_command sha256sum
 require_command sort
+require_command find
+require_command xargs
+require_command head
+require_command sed
+require_command cut
 
 if [[ -n "$DEXOR_DIR" ]]; then
   require_command java
