@@ -1,0 +1,160 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "D4-DENSE-COORDINATE-REPRESENTATION-001",
+  "coordinate_convention": "q = S y; column vectors; transformed action A_y = S^-1 A_q S; transformed metric G_y = S^T G_q S",
+  "ambient_group_id": "D4",
+  "canonical_metric": [
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "basis_matrix": [
+    [
+      2,
+      1
+    ],
+    [
+      1,
+      1
+    ]
+  ],
+  "inverse_basis_matrix": [
+    [
+      1,
+      -1
+    ],
+    [
+      -1,
+      2
+    ]
+  ],
+  "determinant_exact": 1,
+  "transformed_metric": [
+    [
+      5,
+      3
+    ],
+    [
+      3,
+      2
+    ]
+  ],
+  "transformed_group_elements": [
+    {
+      "element_id": "e",
+      "matrix": [
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ]
+    },
+    {
+      "element_id": "r90",
+      "matrix": [
+        [
+          -3,
+          -2
+        ],
+        [
+          5,
+          3
+        ]
+      ]
+    },
+    {
+      "element_id": "r180",
+      "matrix": [
+        [
+          -1,
+          0
+        ],
+        [
+          0,
+          -1
+        ]
+      ]
+    },
+    {
+      "element_id": "r270",
+      "matrix": [
+        [
+          3,
+          2
+        ],
+        [
+          -5,
+          -3
+        ]
+      ]
+    },
+    {
+      "element_id": "fx",
+      "matrix": [
+        [
+          3,
+          2
+        ],
+        [
+          -4,
+          -3
+        ]
+      ]
+    },
+    {
+      "element_id": "fy",
+      "matrix": [
+        [
+          -3,
+          -2
+        ],
+        [
+          4,
+          3
+        ]
+      ]
+    },
+    {
+      "element_id": "fdiag",
+      "matrix": [
+        [
+          -1,
+          0
+        ],
+        [
+          3,
+          1
+        ]
+      ]
+    },
+    {
+      "element_id": "fanti",
+      "matrix": [
+        [
+          1,
+          0
+        ],
+        [
+          -3,
+          -1
+        ]
+      ]
+    }
+  ],
+  "expected": {
+    "abstract_multiplication_table_preserved": true,
+    "every_transformed_element_preserves_transformed_metric": true,
+    "at_least_one_transformed_element_fails_euclidean_orthogonality": true,
+    "every_transformed_element_fails_under_stale_identity_metric": false
+  },
+  "claim_boundary": "Exact 2D finite representation covariance fixture. It does not establish a physical system's action or dynamics."
+}
