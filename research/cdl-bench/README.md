@@ -558,6 +558,8 @@ The public API is:
 - `compress_telemetry_records(records, schema, state_capacity, segment_records, model)`.
 - `decompress_telemetry_records(frame, max_records, max_state_entries)`.
 
+An independent C++20 transform reference and Zstandard comparison runner are checked in at `research/cdl-bench/reference/typed_record_delta_bounded_reference.cpp` and `scripts/research/cdl_typed_record_delta_bounded_reference.sh`. The C++ runner exercises 200 randomized state/segment round trips, six malformed cases and four 65,536-record synthetic fixtures under strict compiler warnings. Its output is transform-level, not a Rust test or a complete CDL frame result. Run from the repository root with `bash scripts/research/cdl_typed_record_delta_bounded_reference.sh`; it requires `g++` and `zstd`.
+
 This is an initial fixed eight-lane reference, not a general Arrow/Parquet schema container. The frame preserves row order and exact values, but this first version does not include a random-access index, timestamps dictionary, schema evolution, multi-segment independent child frames, or production recovery protocol. Segment resets bound predictor replay/state but do not by themselves make the monolithic outer frame randomly seekable. The frame stores only the field-kind IDs, not semantic field names; a higher-level schema registry is still required and must be included in total system accounting.
 
 Authored Rust tests cover empty and populated streams, two entropy models, multiple state capacities, segment resets, bitwise f64 payloads, null transitions, truncated prefixes, single-bit mutations, malformed varints, invalid values, and record/state output limits. They have **not** been compiler-run in the current environment.
