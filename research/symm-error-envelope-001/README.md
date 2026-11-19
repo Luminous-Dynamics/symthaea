@@ -6,6 +6,8 @@ First executable reference for [SYMM-ERROR-ENVELOPE-001 #12830](https://github.c
 
 An approximate symmetry is not an equivalence relation. It cannot be substituted for exact group closure or used for exact quotient pruning. Its legitimate role is bounded comparison: quantify how far two represented trajectories, objective values, and constraint residuals may diverge over a finite horizon.
 
+Every step-map Lipschitz bound and one-step defect bound carries its own non-empty certificate identifier. Objective/constraint Lipschitz and direct-defect premises have separate identifiers as well. The receipt binds these IDs together with all numeric assumptions; it does not verify the cited external certificates.
+
 The reference propagates the recurrence
 
 `e_{k+1} ≤ L_k e_k + δ_k`
@@ -37,7 +39,7 @@ If the domain guard stops early, objective and constraint assessments are not ma
 ## Tests
 
 The reference includes:
-- contractive (L<1), neutral (L=1), and expansive (L>1) recurrence oracles;
+- contractive (L<1), neutral (L=1), and expansive (L>1) exact integer recurrence oracles;
 - horizons 1, 2, 4, 8, 16, 32 and 64;
 - zero, constant and step-varying defect envelopes;
 - initial and later domain-boundary crossings;
