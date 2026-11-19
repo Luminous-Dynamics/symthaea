@@ -148,9 +148,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             previous_residual = observed_residual;
         }
 
-        single_crossings += u64::from(single_crossed);
-        mixture_crossings += u64::from(mixture_crossed);
-        leaked_crossings += u64::from(leaked_crossed);
+        if single_crossed {
+            single_crossings += 1;
+        }
+        if mixture_crossed {
+            mixture_crossings += 1;
+        }
+        if leaked_crossed {
+            leaked_crossings += 1;
+        }
     }
 
     let (single_lower, single_upper) = wilson_interval(single_crossings, PATHS);
@@ -180,10 +186,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // This is a regression sanity gate, not a formal proof or a substitute for
     // a calibrated campaign. The tolerance allows Monte Carlo variation.
     if single_upper > ALPHA + 0.02 || mixture_upper > ALPHA + 0.02 {
-        return Err("predictable null crossing rate exceeded the calibration tolerance".into());
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "predictable null crossing rate exceeded the calibration tolerance",
+        )
+        .into());
     }
     if leaked_lower < 0.50 {
-        return Err("post-hoc leakage control did not show material false promotion".into());
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "post-hoc leakage control did not show material false promotion",
+        )
+        .into());
     }
     Ok(())
 }
