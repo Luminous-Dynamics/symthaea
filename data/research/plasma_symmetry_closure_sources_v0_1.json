@@ -37,13 +37,22 @@
         "The authors report suppression of spurious inertial-frame-dependent correlations.",
         "The authors report improved data efficiency and performance over unaugmented models and selected theoretical closures."
       ],
-      "metric_policy": "Do not invent numerical gains from the abstract; extract exact tables, splits and uncertainty from the paper/supplement before reproducing.",
-      "data_access_state": "NOT_YET_AUDITED",
-      "code_access_state": "NOT_YET_AUDITED",
-      "redistribution_rights_state": "NOT_YET_AUDITED",
+      "metric_policy": "The publisher article is CC-BY-4.0 and cites a Zenodo data record (10.5281/zenodo.15498576). The Zenodo record includes both OSIRIS input decks and Section2_Data.zip (~3.6 GB) for the closure study; Section1 diagnostics (~500 GB) are not included. Pin exact record version, files, hashes, and data license. Do not claim the full fluid-equation dataset is available from this record.",
+      "data_access_state": "OPEN_ZENODO_DATASET_10_5281_ZENODO_15498576",
+      "code_access_state": "OSIRIS_INPUT_DECKS_AVAILABLE; ARTICLE_REPRODUCTION_CODE_NOT_YET_AUDITED",
+      "redistribution_rights_state": "ARTICLE_CC_BY_4_0; ZENODO_DATASET_LICENSE_PENDING_RECORD_AUDIT",
       "source_revision": "publisher_version_2026-02-23",
       "luminous_reproduction": false,
-      "claim_ceiling": "PUBLISHED_KINETIC_PIC_NUMERICAL_STUDY_ONLY_NO_LUMINOUS_REPRODUCTION_OR_EXPERIMENTAL_TOKAMAK_TRANSFER_CLAIM"
+      "claim_ceiling": "PUBLISHED_KINETIC_PIC_NUMERICAL_STUDY_ONLY_NO_LUMINOUS_REPRODUCTION_OR_EXPERIMENTAL_TOKAMAK_TRANSFER_CLAIM",
+      "data_artifact_url": "https://doi.org/10.5281/zenodo.15498576",
+      "dataset_size_reported": "3.6 GB",
+      "dataset_inventory": [
+        "input_Section1.2d: OSIRIS PIC input deck; Section 1 diagnostics are ~500 GB and are not included in the record.",
+        "input_Section2.2d: OSIRIS PIC input deck for the machine-learned closure dataset.",
+        "Section2_Data.zip: approximately 3.6 GB of Section 2 diagnostics used for the closure study."
+      ],
+      "artifact_rights_state": "ZENODO_RECORD_LICENSE_NOT_YET_AUDITED",
+      "article_license": "CC-BY-4.0"
     },
     {
       "source_id": "burles_online_fno_landaudamping_2026",
@@ -107,8 +116,8 @@
       "reported_findings": [
         "The authors report a learned heat-flux closure that reproduces linear and nonlinear Landau-damping evolution against their Vlasov references."
       ],
-      "metric_policy": "Publisher states the linear and nonlinear Vlasov training datasets are deposited on Zenodo (DOI 10.5281/zenodo.14915239). Pin exact record files and hashes; do not assume the dataset's license from the article license.",
-      "data_access_state": "ZENODO_DATASET_AVAILABLE",
+      "metric_policy": "The publisher states that the linear and nonlinear Vlasov training datasets are deposited on Zenodo (DOI 10.5281/zenodo.14915239). Zenodo record lists two MAT files (~81.9 MB total). Pin exact record version, file checksums and dataset license; article license does not establish dataset license.",
+      "data_access_state": "OPEN_ZENODO_DATASET_10_5281_ZENODO_14915239",
       "code_access_state": "TRAINING_DATA_AVAILABLE; TRAINING_CODE_NOT_YET_AUDITED",
       "redistribution_rights_state": "ARTICLE_CC_BY_NC_ND_4_0; DATASET_LICENSE_PENDING_ZENODO_RECORD_AUDIT",
       "source_revision": "publisher_version_2025-03-18",
@@ -117,7 +126,11 @@
       "data_artifact_url": "https://doi.org/10.5281/zenodo.14915239",
       "artifact_version": "NOT_YET_PINNED",
       "article_license": "CC-BY-NC-ND-4.0",
-      "artifact_rights_state": "ZENODO_RECORD_LICENSE_NOT_YET_AUDITED"
+      "artifact_rights_state": "ZENODO_RECORD_LICENSE_NOT_YET_AUDITED",
+      "dataset_inventory": [
+        "Linear_Landau_Damping_training_data.mat: approximately 41.0 MB.",
+        "Nonlinear_Landau_Damping_training_data.mat: approximately 41.0 MB."
+      ]
     },
     {
       "source_id": "ingelsten_sparse_heatflux_2025",
