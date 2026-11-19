@@ -200,7 +200,7 @@ For Symthaea, these are useful architectural patterns, not systems to copy whole
 
 TimlMemBench's raw-native track exposes a remaining gap: MACE now tests receipt-gated structured interaction envelopes, receipt-preserving pack projection, action-scoped evidence summaries and a proposal-only consolidation consumer. The fixed/generated MACE evaluators still use structured Experience fixtures, and ingress does not yet parse natural-language transcript turns or bind extracted claims to exact text spans. The broader governed lifecycle policy in #12731 (privacy erasure, reversible storage transitions, retention and forgetting) still does not consume the MACE evidence pack. The next seam is transcript/span provenance plus a single raw transcript → verified evidence → governed lifecycle → Session-B decision → Session-C correction evaluator.
 
-The Agent Memory Challenge Cycle 2 official page, checked on November 18, 2026, says results are **expected November 19, 2026**. The October 31 submission deadline and November 4 evaluation close have passed; Cycle 2 is not open for new submissions. Its Add/Search → platform Answer/Eval contract is a target for a future MACE/Mycelix adapter. Do not claim a Cycle 2 rank before official publication.
+The Agent Memory Challenge Cycle 2 official page, rechecked on November 19, 2026, still labels results **expected November 19, 2026** and displays no official result table in the page content. The October 31 submission deadline and November 4 evaluation close have passed; Cycle 2 is not open for new submissions. Its Add/Search → platform Answer/Eval contract is a target for a future MACE/Mycelix adapter. Do not claim a Cycle 2 rank before official publication.
 
 
 ### Mycelix lineage and measurement assurance
@@ -221,3 +221,20 @@ This is a provider-neutral ingestion contract, not yet a provider-native parser 
 ### Producer/consumer integration status (2026-11-18)
 
 Draft PR #12731 now emits a candidate-side source-bound consolidation receipt proposal from exact event-level source references and has a structural evaluator for binding and common-root attacks. Draft PR #12743 requires a separately verified PromoteToProcedure receipt for the exact raw observation event before transfer memory admission. They are not yet wired directly together: #12731's proposal is unsigned and uses fixture digests; #12743's receipt registries are injected test seams. Issue #12846 specifies the canonical bitemporal Mycelix/Symtropy verifier adapter, policy/authority digest, signature, supersession and privacy semantics needed for production.
+
+### Canonical 256-bit source-root identity (MACE v0.6)
+
+The numeric `source_root_id: u32` is retained only as a legacy/display identifier. **It is not an independence key.** Candidate qualification, evidence-pack root counts, batch consistency and cross-regime source/target disjointness use the typed `SourceRootDigest([u8; 32])` carried by verifier-returned lineage, receipt bundles, consolidation evidence references and candidate experiences.
+
+The canonical digest contract for a production Mycelix source-ledger verifier is:
+
+```text
+SHA-256(
+  "mycelix:source-root:v1\0"
+  || canonical_upstream_identity
+)
+```
+
+`canonical_upstream_identity` should identify the upstream dataset/series or primary source lineage, not a particular publisher's copy, acquisition artifact or transformation. Multiple publishers reusing one BIS/IMF series therefore share one root; separately sourced series with the same legacy numeric ID remain distinct when their verified canonical roots differ. Release/revision identity, exact artifact digest, acquisition mode and transformation digest remain separate receipt fields.
+
+The digest is only a stable identity. Trust still requires independent verification of the lineage receipt's issuer, signature, source policy revision, scope, validity, revocation status and canonical payload binding. The all-zero digest is unknown and fails closed. The current MACE `EvidenceVerifier` implementations remain fixtures/mocks; no production Mycelix cryptographic verifier is claimed.

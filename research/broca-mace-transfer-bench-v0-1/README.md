@@ -61,7 +61,7 @@ The deterministic fixed corpus includes seventeen two-session cases:
 - `no_memory`: fixed conservative fallback.
 - `frequency_only`: aggregate all observed outcomes, ignoring scope and evidence governance.
 - `scope_aware`: restrict to exact regime and objective, but does not qualify source or causal evidence.
-- `causal_qualified`: require exact scope, intervention, pre-registration, reconciled outcome, trusted non-retracted source, confounder control, completed delayed horizon, unique event IDs, at least two source-family labels and at least two distinct nonzero upstream source roots. A comparative decision also requires qualified support for both candidate actions; one-sided support abstains.
+- `causal_qualified`: require exact scope, intervention, pre-registration, reconciled outcome, trusted non-retracted source, confounder control, completed delayed horizon, unique event IDs, at least two source-family labels and at least two distinct verified upstream source-root digests. A comparative decision also requires qualified support for both candidate actions; one-sided support abstains.
 - `invariant_transport`: reuse prior-regime effects only with target-regime witnesses, disjoint source families and roots, and worst-case source/target effect-interval difference within the fixed 0.12 normalized-utility margin.
 - `active_probe`: try exact-scope and invariant transport first; otherwise emit a typed, bounded environment-interaction request.
 
@@ -117,7 +117,7 @@ Do not pool percentages across these tasks. Reproduce each official protocol sep
 - [#8265](https://github.com/Luminous-Dynamics/symthaea/issues/8265): claim identity versus similarity.
 - [#11816](https://github.com/Luminous-Dynamics/symthaea/issues/11816): evaluator and oracle independence.
 
-## Generated stress tranche (MACE v0.5 research)
+## Generated stress tranche (MACE v0.6 research)
 
 A second evaluator binary adds **256 deterministic clusters × 16 scenario families = 4,096 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, a shared-common-root attack, an error-interval negative control, qualified negative experience, few-shot invariant transport, a mechanism-break negative control, and an unseen-target case that triggers active probing.
 
@@ -128,7 +128,7 @@ cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p 
 cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-evaluator --bin mace_generated_stress
 ```
 
-The candidate gate requires unique event IDs, at least two declared source families and at least two distinct nonzero source-root IDs for each action. MACE v0.5 also requires both action alternatives to have qualified support and checks transport using worst-case effect intervals including candidate-supplied measurement bounds; the bounds remain untrusted until an ingress calibration receipt verifies them. A comparative choice also requires qualified evidence for both candidate actions; one-sided support is not treated as proof that the unsupported alternative is inferior. Different family labels cannot turn a shared upstream source into independent evidence. Root IDs are candidate-visible claims in this prototype; trusted lineage attestation must come from the source ledger. The runner reports aggregate metrics for all policies and per-family metrics for both exact-scope causal memory and invariant transport. It also reports paired utility lift versus no-memory with a deterministic **cluster-bootstrap 95% interval**, resampling world clusters rather than individual scenarios, and a Session-B / Session-C known-retraction recovery control.
+The candidate gate requires unique event IDs, at least two declared source families and at least two distinct nonzero verified 256-bit source-root digests for each action. MACE v0.5 also requires both action alternatives to have qualified support and checks transport using worst-case effect intervals including candidate-supplied measurement bounds; the bounds remain untrusted until an ingress calibration receipt verifies them. A comparative choice also requires qualified evidence for both candidate actions; one-sided support is not treated as proof that the unsupported alternative is inferior. Different family labels cannot turn a shared upstream source into independent evidence. Root digests are supplied by the ingress verifier; the current verifier itself is still a mock. The runner reports aggregate metrics for all policies and per-family metrics for both exact-scope causal memory and invariant transport. It also reports paired utility lift versus no-memory with a deterministic **cluster-bootstrap 95% interval**, resampling world clusters rather than individual scenarios, and a Session-B / Session-C known-retraction recovery control.
 
 This is a generated synthetic stress distribution—not an official MemoryArena/AMA-Bench adapter, learned-policy train/test split, sealed external oracle or real-world causal discovery. Source-family IDs vary to expose correlation/identity failures, but independence is not cryptographically attested. Bootstrap intervals quantify variation over these generated clusters only; they do not establish external validity. Session-C corrections are applied as observed source-state updates before the next decision.
 
@@ -181,7 +181,7 @@ TimlMemBench reports 208 reviewed samples, 1,566 sessions, 1,715 questions and 1
 
 ### Agent Memory Challenge Cycle 2
 
-As of **November 18, 2026**, the official Cycle 2 page says leaderboard publication is **expected November 19, 2026**; that is an expected date, not a published result. The Cycle 2 submission deadline was October 31 and evaluation closed November 4, so this cycle is no longer open for new submissions. The platform standardizes Add/Search from the memory system and delegates Answer/Eval to the platform, with separate textual, coding and multimodal tracks. See the [official competition page](https://agentmemoryleaderboard.ai/competition/).
+As checked on **November 19, 2026**, the official Cycle 2 page still labels leaderboard publication **expected November 19, 2026**; the page does not yet provide an official result table. The Cycle 2 submission deadline was October 31 and evaluation closed November 4, so this cycle is no longer open for new submissions. The platform standardizes Add/Search from the memory system and delegates Answer/Eval to the platform, with separate textual, coding and multimodal tracks. See the [official competition page](https://agentmemoryleaderboard.ai/competition/).
 
 **Implication for Luminous:** prepare a provider-neutral Add/Search adapter and target the next eligible cycle. Do not claim a Cycle 2 rank or infer results from interim displays. The MACE synthetic causal-transfer score is a separate axis and must never be presented as an AML leaderboard score.
 
@@ -274,3 +274,20 @@ The raw-ingestion module has 23 authored tests. Controls cover tool-success misa
 Draft [PR #12731](https://github.com/Luminous-Dynamics/symthaea/pull/12731) now emits a candidate-side `ConsolidationReceiptProposal` binding the selected disposition and policy ID/version to the exact source event IDs, fixture payload digests, source families and upstream roots. Its structural evaluator checks exact binding, duplicate IDs and minimum independent support; it rejects the frequency-only promotion over correlated echoes.
 
 This is a producer-side proposal with synthetic fixture digests, not a signed or cryptographically verified Mycelix receipt. MACE v0.7 in this PR still consumes injected test registries rather than PR #12731 output. The production adapter and independent verifier are specified in [#12846](https://github.com/Luminous-Dynamics/symthaea/issues/12846).
+
+### Canonical 256-bit source-root identity (MACE v0.6)
+
+The numeric `source_root_id: u32` is retained only as a legacy/display identifier. **It is not an independence key.** Candidate qualification, evidence-pack root counts, batch consistency and cross-regime source/target disjointness use the typed `SourceRootDigest([u8; 32])` carried by verifier-returned lineage, receipt bundles, consolidation evidence references and candidate experiences.
+
+The canonical digest contract for a production Mycelix source-ledger verifier is:
+
+```text
+SHA-256(
+  "mycelix:source-root:v1\0"
+  || canonical_upstream_identity
+)
+```
+
+`canonical_upstream_identity` should identify the upstream dataset/series or primary source lineage, not a particular publisher's copy, acquisition artifact or transformation. Multiple publishers reusing one BIS/IMF series therefore share one root; separately sourced series with the same legacy numeric ID remain distinct when their verified canonical roots differ. Release/revision identity, exact artifact digest, acquisition mode and transformation digest remain separate receipt fields.
+
+The digest is only a stable identity. Trust still requires independent verification of the lineage receipt's issuer, signature, source policy revision, scope, validity, revocation status and canonical payload binding. The all-zero digest is unknown and fails closed. The current MACE `EvidenceVerifier` implementations remain fixtures/mocks; no production Mycelix cryptographic verifier is claimed.
