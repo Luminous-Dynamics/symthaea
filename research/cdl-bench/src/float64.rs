@@ -267,11 +267,21 @@ fn encode_segment_candidate(
 }
 
 fn segment_candidate_from_child_header(child: &[u8]) -> Result<u8, NumericError> {
-    if child.len() < HEADER_LEN || &child[0..4] != MAGIC {
+    if child.len() < HEADER_LEN {
+        return Err(NumericError::TruncatedHeader);
+    }
+    if &child[0..4] != MAGIC {
         return Err(NumericError::BadMagic);
+    }
+    let version = u16::from_le_bytes([child[4], child[5]]);
+    if version != VERSION {
+        return Err(NumericError::UnsupportedVersion(version));
     }
     let transform = child[6];
     let model = child[7];
+    if model > 1 {
+        return Err(NumericError::UnsupportedModel(model));
+    }
     match (transform, model) {
         (0, 0) => Ok(0),
         (0, 1) => Ok(1),
@@ -675,7 +685,7 @@ pub fn decompress_f64_segmented(
             best_segment_candidate_frame(&decoded)?;
         let actual_candidate = segment_candidate_from_child_header(&frame[cursor..child_end])?;
         if actual_candidate != expected_candidate
-            || frame[cursor..child_end] != canonical_child
+            || frame[cursor..child_end] != canonical_child.as_slice()
         {
             return Err(NumericError::SegmentPolicyMismatch {
                 expected: expected_candidate,
