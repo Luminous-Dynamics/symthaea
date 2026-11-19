@@ -1060,6 +1060,34 @@ mod tests {
     }
 
     #[test]
+    fn xor_leading_trailing_reuses_a_window_when_residual_fits() {
+        let residual = 0x0000_0000_0000_1000u64;
+        let input = [
+            f64::from_bits(0),
+            f64::from_bits(residual),
+            f64::from_bits(0),
+            f64::from_bits(residual),
+        ];
+        let encoded =
+            encode_transform(&input, Float64Transform::XorLeadingTrailing).unwrap();
+
+        assert_eq!(encoded[0], 0); // unchanged first value
+        assert_eq!(encoded[1], 2); // define initial significant-bit window
+        let leading = encoded[2] as u32;
+        let trailing = encoded[3] as u32;
+        let width = 64 - leading - trailing;
+        let payload_bytes = (width as usize + 7) / 8;
+        let reuse_first = 4 + payload_bytes;
+        assert_eq!(encoded[reuse_first], 1); // reuse prior window
+        let reuse_second = reuse_first + 1 + payload_bytes;
+        assert_eq!(encoded[reuse_second], 1); // reuse it again
+
+        let decoded =
+            decode_transform(&encoded, Float64Transform::XorLeadingTrailing, input.len()).unwrap();
+        assert_same_bits(&decoded, &input);
+    }
+
+    #[test]
     fn xor_leading_trailing_rejects_malformed_markers_and_spans() {
         for payload in [
             vec![3],                         // unsupported marker
