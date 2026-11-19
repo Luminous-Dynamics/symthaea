@@ -244,6 +244,185 @@ pub fn decompress_f64(frame: &[u8], max_values: usize) -> Result<Vec<f64>, Numer
     Ok(values)
 }
 
+const SEGMENTED_MAGIC: &[u8; 4] = b"F64S";
+const SEGMENTED_VERSION: u16 = 1;
+const SEGMENTED_HEADER_LEN: usize = 32;
+const SEGMENT_SELECTION_POLICY_BEST_OF_FOUR: u8 = 1;
+
+/// Encode fixed-size f64 chunks by selecting the smallest complete subframe
+/// among Raw/XorPrevious x Order0/Order1. Every selected F64C frame (including
+/// its own header and CRCs) is retained in the output, so selection overhead is
+/// included. This is an offline segment-local size oracle, not an online or
+/// WZS-equivalent algorithm.
+pub fn compress_f64_segmented(
+    values: &[f64],
+    segment_size: usize,
+) -> Result<Vec<u8>, NumericError> {
+    if segment_size == 0 {
+        return Err(NumericError::InvalidSegmentSize);
+    }
+    let segment_count = if values.is_empty() {
+        0
+    } else {
+        (values.len() - 1) / segment_size + 1
+    };
+    let segment_size_u32 =
+        u32::try_from(segment_size).map_err(|_| NumericError::LengthOverflow)?;
+    let segment_count_u32 =
+        u32::try_from(segment_count).map_err(|_| NumericError::LengthOverflow)?;
+    let count = u64::try_from(values.len()).map_err(|_| NumericError::LengthOverflow)?;
+    let raw = raw_bits_bytes(values)?;
+
+    let mut frame = Vec::new();
+    frame.extend_from_slice(SEGMENTED_MAGIC);
+    frame.extend_from_slice(&SEGMENTED_VERSION.to_le_bytes());
+    frame.push(0); // flags
+    frame.push(SEGMENT_SELECTION_POLICY_BEST_OF_FOUR);
+    frame.extend_from_slice(&count.to_le_bytes());
+    frame.extend_from_slice(&segment_size_u32.to_le_bytes());
+    frame.extend_from_slice(&segment_count_u32.to_le_bytes());
+    frame.extend_from_slice(&crc32(&raw).to_le_bytes());
+    let header_crc = crc32(&frame);
+    frame.extend_from_slice(&header_crc.to_le_bytes());
+    debug_assert_eq!(frame.len(), SEGMENTED_HEADER_LEN);
+
+    for segment in values.chunks(segment_size) {
+        let mut best: Option<Vec<u8>> = None;
+        for transform in [Float64Transform::Raw, Float64Transform::XorPrevious] {
+            for model in [ModelKind::Order0, ModelKind::Order1] {
+                let candidate = compress_f64(segment, transform, model)?;
+                if best
+                    .as_ref()
+                    .map_or(true, |current| candidate.len() < current.len())
+                {
+                    best = Some(candidate);
+                }
+            }
+        }
+        let best = best.ok_or(NumericError::LengthMismatch)?;
+        frame.extend_from_slice(&best);
+    }
+    Ok(frame)
+}
+
+/// Decode a segmented F64S frame. Segment sizes are fixed by the outer header;
+/// each self-describing F64C child frame identifies its chosen transform/model.
+pub fn decompress_f64_segmented(
+    frame: &[u8],
+    max_values: usize,
+) -> Result<Vec<f64>, NumericError> {
+    if frame.len() < SEGMENTED_HEADER_LEN {
+        return Err(NumericError::TruncatedHeader);
+    }
+    if &frame[0..4] != SEGMENTED_MAGIC {
+        return Err(NumericError::BadMagic);
+    }
+    let version = u16::from_le_bytes([frame[4], frame[5]]);
+    if version != SEGMENTED_VERSION {
+        return Err(NumericError::UnsupportedVersion(version));
+    }
+    if frame[6] != 0 || frame[7] != SEGMENT_SELECTION_POLICY_BEST_OF_FOUR {
+        return Err(NumericError::UnsupportedTransform(frame[7]));
+    }
+
+    let count = u64::from_le_bytes(
+        frame[8..16]
+            .try_into()
+            .map_err(|_| NumericError::LengthMismatch)?,
+    );
+    let segment_size = u32::from_le_bytes(
+        frame[16..20]
+            .try_into()
+            .map_err(|_| NumericError::LengthMismatch)?,
+    ) as usize;
+    let segment_count = u32::from_le_bytes(
+        frame[20..24]
+            .try_into()
+            .map_err(|_| NumericError::LengthMismatch)?,
+    ) as usize;
+    let raw_crc = u32::from_le_bytes(
+        frame[24..28]
+            .try_into()
+            .map_err(|_| NumericError::LengthMismatch)?,
+    );
+    let header_crc = u32::from_le_bytes(
+        frame[28..32]
+            .try_into()
+            .map_err(|_| NumericError::LengthMismatch)?,
+    );
+
+    if count > max_values as u64 {
+        return Err(NumericError::OutputLimitExceeded {
+            declared: count,
+            limit: max_values,
+        });
+    }
+    if segment_size == 0 {
+        return Err(NumericError::InvalidSegmentSize);
+    }
+    if crc32(&frame[..28]) != header_crc {
+        return Err(NumericError::ChecksumMismatch);
+    }
+    let count = usize::try_from(count).map_err(|_| NumericError::LengthOverflow)?;
+    let expected_segments = if count == 0 {
+        0
+    } else {
+        (count - 1) / segment_size + 1
+    };
+    if segment_count != expected_segments {
+        return Err(NumericError::LengthMismatch);
+    }
+
+    let mut output = Vec::with_capacity(count);
+    let mut cursor = SEGMENTED_HEADER_LEN;
+    for segment_index in 0..segment_count {
+        let header_end = cursor
+            .checked_add(HEADER_LEN)
+            .ok_or(NumericError::LengthOverflow)?;
+        if header_end > frame.len() {
+            return Err(NumericError::TruncatedHeader);
+        }
+        if &frame[cursor..cursor + 4] != MAGIC {
+            return Err(NumericError::BadMagic);
+        }
+        let inner_len = u64::from_le_bytes(
+            frame[cursor + 16..cursor + 24]
+                .try_into()
+                .map_err(|_| NumericError::LengthMismatch)?,
+        );
+        let inner_len = usize::try_from(inner_len).map_err(|_| NumericError::LengthOverflow)?;
+        let child_len = HEADER_LEN
+            .checked_add(inner_len)
+            .ok_or(NumericError::LengthOverflow)?;
+        let child_end = cursor
+            .checked_add(child_len)
+            .ok_or(NumericError::LengthOverflow)?;
+        if child_end > frame.len() {
+            return Err(NumericError::LengthMismatch);
+        }
+
+        let expected_values = if segment_index + 1 == segment_count {
+            count - output.len()
+        } else {
+            segment_size
+        };
+        let decoded = decompress_f64(&frame[cursor..child_end], expected_values)?;
+        if decoded.len() != expected_values {
+            return Err(NumericError::LengthMismatch);
+        }
+        output.extend_from_slice(&decoded);
+        cursor = child_end;
+    }
+
+    if cursor != frame.len() || output.len() != count {
+        return Err(NumericError::LengthMismatch);
+    }
+    if crc32(&raw_bits_bytes(&output)?) != raw_crc {
+        return Err(NumericError::ChecksumMismatch);
+    }
+    Ok(output)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -347,6 +526,39 @@ mod tests {
         let frame = compress_f64(&[1.0, 2.0, 3.0], Float64Transform::Raw, ModelKind::Order0).unwrap();
         assert!(matches!(
             decompress_f64(&frame, 2),
+            Err(NumericError::OutputLimitExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn segmented_portfolio_round_trips_with_all_overhead_counted() {
+        for input in bit_fixtures() {
+            for segment_size in [1, 64, 256, 1024] {
+                let frame = compress_f64_segmented(&input, segment_size).unwrap();
+                let decoded = decompress_f64_segmented(&frame, input.len()).unwrap();
+                assert_same_bits(&decoded, &input);
+            }
+        }
+    }
+
+    #[test]
+    fn segmented_frame_rejects_truncation_and_bad_segment_size() {
+        let input = [0.0, -0.0, 1.0, f64::from_bits(0x7ff8_0000_0000_0001)];
+        let frame = compress_f64_segmented(&input, 2).unwrap();
+        for end in 0..frame.len() {
+            assert!(decompress_f64_segmented(&frame[..end], 100).is_err());
+        }
+        assert_eq!(
+            compress_f64_segmented(&input, 0),
+            Err(NumericError::InvalidSegmentSize)
+        );
+    }
+
+    #[test]
+    fn segmented_output_limit_is_enforced() {
+        let frame = compress_f64_segmented(&[1.0, 2.0, 3.0], 2).unwrap();
+        assert!(matches!(
+            decompress_f64_segmented(&frame, 2),
             Err(NumericError::OutputLimitExceeded { .. })
         ));
     }
