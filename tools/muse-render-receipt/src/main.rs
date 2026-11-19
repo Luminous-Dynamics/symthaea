@@ -47,7 +47,13 @@ fn main() {
             }
         }
     } else {
-        receipt_only_report(&receipt)
+        match receipt_only_report(&receipt) {
+            Ok(report) => report,
+            Err(error) => {
+                eprintln!("receipt-only verification failed: {error}");
+                process::exit(1);
+            }
+        }
     };
 
     match serde_json::to_string_pretty(&report) {
