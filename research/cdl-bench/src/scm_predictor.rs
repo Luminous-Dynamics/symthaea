@@ -414,6 +414,19 @@ impl ScmMixtureState {
         cdf
     }
 
+    fn reset_conditional_contexts(&mut self) {
+        for variable in 0..SCM_VARIABLES {
+            for lane in 0..BYTE_LANES {
+                for context in 0..4 {
+                    self.lag_contexts[variable][lane][context].fill(1);
+                }
+                for context in 0..CONTEXTS {
+                    self.parent_contexts[variable][lane][context].fill(1);
+                }
+            }
+        }
+    }
+
     fn observe(&mut self, symbol: u8) {
         if self.position < SCM_HEADER_BYTES {
             StructuredState::update_histogram(&mut self.header, symbol);
@@ -441,6 +454,82 @@ impl ScmMixtureState {
             }
         }
         self.position += 1;
+    }
+}
+
+const CUSUM_WARMUP_BYTES: u64 = 64;
+const CUSUM_DRIFT_Q8: i64 = 64; // 0.25 bits per byte.
+const CUSUM_THRESHOLD_Q8: i64 = 8 * 256;
+const CUSUM_COOLDOWN_BYTES: u16 = 256;
+const CUSUM_BASELINE_SHIFT: u32 = 6; // Slow baseline EMA alpha = 1/64.
+
+/// Deterministic Q8 log2(numerator / denominator), for numerator >= denominator > 0.
+/// Uses eight rounds of fixed-point squaring; no floating-point or libm dependency.
+fn integer_log2_ratio_q8(numerator: u32, denominator: u32) -> u32 {
+    if denominator == 0 || numerator < denominator {
+        return 0;
+    }
+    let mut exponent = 0u32;
+    while exponent < 31
+        && (denominator as u64) << (exponent + 1) <= numerator as u64
+    {
+        exponent += 1;
+    }
+
+    let scaled_denominator = (denominator as u128) << exponent;
+    let mut normalized = ((numerator as u128) << 32) / scaled_denominator;
+    let mut fraction = 0u32;
+    for bit in 0..8 {
+        normalized = (normalized * normalized) >> 32;
+        if normalized >= (2u128 << 32) {
+            normalized >>= 1;
+            fraction |= 1 << (7 - bit);
+        }
+    }
+    exponent * 256 + fraction
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct SurpriseCusum {
+    samples: u64,
+    baseline_q8: i64,
+    fast_q8: i64,
+    cusum_q8: i64,
+    cooldown: u16,
+    alarms: u32,
+}
+
+impl SurpriseCusum {
+    fn observe(&mut self, surprise_q8: u32) -> bool {
+        let surprise = surprise_q8 as i64;
+        if self.samples == 0 {
+            self.baseline_q8 = surprise;
+            self.fast_q8 = surprise;
+            self.samples = 1;
+            return false;
+        }
+
+        self.fast_q8 += (surprise - self.fast_q8) / 4;
+        if self.samples >= CUSUM_WARMUP_BYTES {
+            let excess = surprise - self.baseline_q8 - CUSUM_DRIFT_Q8;
+            self.cusum_q8 = (self.cusum_q8 + excess).max(0);
+        }
+        self.baseline_q8 += (surprise - self.baseline_q8) / (1i64 << CUSUM_BASELINE_SHIFT);
+
+        if self.cooldown > 0 {
+            self.cooldown -= 1;
+        }
+        let alarm = self.samples >= CUSUM_WARMUP_BYTES
+            && self.cooldown == 0
+            && self.cusum_q8 >= CUSUM_THRESHOLD_Q8;
+        if alarm {
+            self.alarms = self.alarms.saturating_add(1);
+            self.cusum_q8 = 0;
+            self.baseline_q8 = self.fast_q8;
+            self.cooldown = CUSUM_COOLDOWN_BYTES;
+        }
+        self.samples = self.samples.saturating_add(1);
+        alarm
     }
 }
 
@@ -623,6 +712,94 @@ impl ScmExpertMixturePredictor {
             self.state.cdf(2),
             self.state.cdf(1),
         ]
+    }
+}
+
+/// Change-point-gated expert mixture (custom model ID 8).
+///
+/// Uses the same field/lag/parent exact-rational mixture as model 7. A
+/// decoder-synchronous CUSUM monitors prequential mixture surprisal. On alarm,
+/// specialist context tables are reset while field-level base histograms are
+/// retained, and posterior weights are re-primed toward the temporal expert.
+/// No intervention labels or reset symbols are transmitted; encoder and
+/// decoder derive the same alarm from the same decoded prefix.
+pub struct ScmChangePointMixturePredictor {
+    state: ScmMixtureState,
+    weights: [u32; EXPERT_COUNT],
+    detector: SurpriseCusum,
+}
+
+impl ScmChangePointMixturePredictor {
+    pub fn new() -> Self {
+        let third = EXPERT_MIXTURE_TOTAL_WEIGHT / 3;
+        Self {
+            state: ScmMixtureState::new(),
+            weights: [third, third, EXPERT_MIXTURE_TOTAL_WEIGHT - 2 * third],
+            detector: SurpriseCusum::default(),
+        }
+    }
+
+    pub fn expert_weights(&self) -> [u32; EXPERT_COUNT] {
+        self.weights
+    }
+
+    pub fn alarm_count(&self) -> u32 {
+        self.detector.alarms
+    }
+
+    pub fn cusum_q8(&self) -> i64 {
+        self.detector.cusum_q8
+    }
+
+    pub fn surprise_baseline_q8(&self) -> i64 {
+        self.detector.baseline_q8
+    }
+
+    pub fn state_bytes() -> usize {
+        std::mem::size_of::<Self>()
+    }
+
+    fn expert_cdfs(&self) -> [ByteCdf; EXPERT_COUNT] {
+        [
+            self.state.cdf(0),
+            self.state.cdf(2),
+            self.state.cdf(1),
+        ]
+    }
+}
+
+impl Default for ScmChangePointMixturePredictor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BytePredictor for ScmChangePointMixturePredictor {
+    fn model_id(&self) -> u8 {
+        8
+    }
+
+    fn cumulative_frequency(&self) -> ByteCdf {
+        make_expert_mixture_cdf(&self.weights, &self.expert_cdfs())
+    }
+
+    fn observe(&mut self, symbol: u8) {
+        let experts = self.expert_cdfs();
+        let mixture = make_expert_mixture_cdf(&self.weights, &experts);
+        let width = mixture[symbol as usize + 1] - mixture[symbol as usize];
+        let surprise_q8 = integer_log2_ratio_q8(mixture[BYTE_SYMBOLS], width);
+        let next_weights = update_expert_weights(&self.weights, &experts, symbol);
+
+        if self.detector.observe(surprise_q8) {
+            // Keep slow field-level base histograms, but discard stale local
+            // contexts so specialist state can relearn the changed regime.
+            self.state.reset_conditional_contexts();
+            let quarter = EXPERT_MIXTURE_TOTAL_WEIGHT / 4;
+            self.weights = [quarter, quarter * 2, EXPERT_MIXTURE_TOTAL_WEIGHT - 3 * quarter];
+        } else {
+            self.weights = next_weights;
+        }
+        self.state.observe(symbol);
     }
 }
 
@@ -884,6 +1061,71 @@ mod tests {
     }
 
     #[test]
+    fn integer_log2_ratio_is_monotone_and_exact_at_powers_of_two() {
+        assert_eq!(integer_log2_ratio_q8(1, 1), 0);
+        assert_eq!(integer_log2_ratio_q8(2, 1), 256);
+        assert_eq!(integer_log2_ratio_q8(4, 1), 2 * 256);
+        assert_eq!(integer_log2_ratio_q8(8, 1), 3 * 256);
+        assert!(integer_log2_ratio_q8(100, 1) > integer_log2_ratio_q8(10, 1));
+    }
+
+    #[test]
+    fn surprise_cusum_ignores_stable_level_and_detects_sustained_shift() {
+        let mut detector = SurpriseCusum::default();
+        let mut alarms = 0;
+        for _ in 0..512 {
+            if detector.observe(3 * 256) { alarms += 1; }
+        }
+        assert_eq!(alarms, 0);
+
+        for _ in 0..64 {
+            if detector.observe(7 * 256) { alarms += 1; }
+        }
+        assert!(alarms > 0);
+    }
+
+    #[test]
+    fn change_point_mixture_round_trips_paired_scm_streams() {
+        let observational = generate_scm(4096, 47, None).unwrap();
+        let interventional = generate_scm(
+            4096,
+            47,
+            Some(ScmIntervention {
+                variable: 1,
+                start_step: 1024,
+                end_step: 3072,
+                value: 20_000,
+            }),
+        ).unwrap();
+        round_trip::<ScmChangePointMixturePredictor>(&observational.stream, 8);
+        round_trip::<ScmChangePointMixturePredictor>(&interventional.stream, 8);
+    }
+
+    #[test]
+    fn change_point_mixture_detector_is_decoder_synchronous() {
+        let trace = generate_scm(
+            4096,
+            53,
+            Some(ScmIntervention {
+                variable: 1,
+                start_step: 1024,
+                end_step: 3072,
+                value: 20_000,
+            }),
+        ).unwrap();
+        let mut encoder = ScmChangePointMixturePredictor::default();
+        let frame = compress_with_predictor(&trace.stream, &mut encoder).unwrap();
+        let expected_weights = encoder.expert_weights();
+        let expected_alarms = encoder.alarm_count();
+
+        let mut decoder = ScmChangePointMixturePredictor::default();
+        let decoded = decompress_with_predictor(&frame, trace.stream.len(), &mut decoder).unwrap();
+        assert_eq!(decoded, trace.stream);
+        assert_eq!(decoder.expert_weights(), expected_weights);
+        assert_eq!(decoder.alarm_count(), expected_alarms);
+    }
+
+    #[test]
     fn all_scm_predictors_have_distinct_stable_ids() {
         assert_eq!(ScmFieldPredictor::default().model_id(), 2);
         assert_eq!(ScmParentPredictor::default().model_id(), 3);
@@ -891,12 +1133,14 @@ mod tests {
         assert_eq!(ScmHybridPredictor::default().model_id(), 5);
         assert_eq!(ScmShuffledParentPredictor::default().model_id(), 6);
         assert_eq!(ScmExpertMixturePredictor::default().model_id(), 7);
+        assert_eq!(ScmChangePointMixturePredictor::default().model_id(), 8);
         assert!(ScmFieldPredictor::state_bytes() > 0);
         assert!(ScmParentPredictor::state_bytes() > 0);
         assert!(ScmLagPredictor::state_bytes() > 0);
         assert!(ScmHybridPredictor::state_bytes() > 0);
         assert!(ScmShuffledParentPredictor::state_bytes() > 0);
         assert!(ScmExpertMixturePredictor::state_bytes() > ScmLagPredictor::state_bytes());
+        assert!(ScmChangePointMixturePredictor::state_bytes() > ScmExpertMixturePredictor::state_bytes());
         assert!(ScmExpertMixturePredictor::state_bytes() < 2 * std::mem::size_of::<StructuredState>());
     }
 }
