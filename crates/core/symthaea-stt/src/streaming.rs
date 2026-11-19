@@ -901,11 +901,14 @@ mod tests {
 
     fn small_stream_config() -> StreamConfig {
         StreamConfig {
-            sample_rate: 1_000,
+            // Use the production 16 kHz / 40-bin mel profile so the regression
+            // exercises a physically plausible frontend, not a 1 kHz test-only
+            // configuration whose mel filterbank exceeds Nyquist.
+            sample_rate: 16_000,
             frame_duration: 0.01,
             hop_duration: 0.01,
             buffer_duration: 0.1,
-            n_mels: 10,
+            n_mels: 40,
             min_frames: 1,
             smoothing_window: 2,
         }
@@ -917,11 +920,11 @@ mod tests {
         let mut total_frames = 0usize;
 
         // 1.2 seconds through a 100 ms buffer, processing after each irregular
-        // seven-sample chunk. This must not stall when the retained origin moves.
-        let samples: Vec<f32> = (0..1_200)
-            .map(|index| (index as f32 * 0.071).sin())
+        // 137-sample chunk. This must not stall as the absolute origin advances.
+        let samples: Vec<f32> = (0..19_200)
+            .map(|index| (index as f32 * 0.00071).sin())
             .collect();
-        for chunk in samples.chunks(7) {
+        for chunk in samples.chunks(137) {
             processor.push_audio(chunk).unwrap();
             total_frames += processor.process().len();
         }
@@ -937,17 +940,21 @@ mod tests {
     fn overrun_emits_exact_gap_and_starts_a_new_segment() {
         let mut processor = StreamProcessor::new(small_stream_config());
 
-        // Consume [0, 30) before blocking the consumer while 250 new samples
-        // arrive into the 100-sample buffer.
-        let initial: Vec<f32> = (0..30).map(|value| value as f32).collect();
+        // Consume three 10 ms frames (480 samples), then block the consumer
+        // while 4,000 new samples arrive into the 1,600-sample buffer.
+        let initial: Vec<f32> = (0..480)
+            .map(|value| (value as f32 * 0.001).sin())
+            .collect();
         processor.push_audio(&initial).unwrap();
         let first = processor.process();
         assert_eq!(first.len(), 3);
         assert_eq!(first[0].source_start_sample, 0);
-        assert_eq!(first[2].source_end_sample, 30);
+        assert_eq!(first[2].source_end_sample, 480);
         assert_eq!(processor.frame_count(), 3);
 
-        let overrun: Vec<f32> = (30..280).map(|value| value as f32).collect();
+        let overrun: Vec<f32> = (0..4_000)
+            .map(|value| (value as f32 * 0.0013).sin())
+            .collect();
         processor.push_audio(&overrun).unwrap();
         let resumed = processor.process();
 
@@ -955,18 +962,18 @@ mod tests {
             .take_discontinuity()
             .expect("overrun must be observable");
         assert_eq!(gap.segment_index, 1);
-        assert_eq!(gap.lost_start_sample, 30);
-        assert_eq!(gap.lost_end_sample, 180);
-        assert_eq!(gap.lost_samples(), 150);
-        assert_eq!(processor.dropped_sample_count(), 150);
+        assert_eq!(gap.lost_start_sample, 480);
+        assert_eq!(gap.lost_end_sample, 2_880);
+        assert_eq!(gap.lost_samples(), 2_400);
+        assert_eq!(processor.dropped_sample_count(), 2_400);
         assert_eq!(processor.skipped_frame_count(), 15);
         assert_eq!(processor.segment_index(), 1);
 
         assert!(!resumed.is_empty());
-        assert_eq!(resumed[0].source_start_sample, 180);
+        assert_eq!(resumed[0].source_start_sample, 2_880);
         assert_eq!(resumed[0].segment_index, 1);
         assert_eq!(resumed[0].frame_idx, 3, "frame IDs remain monotonic");
-        assert!(resumed.iter().all(|frame| frame.source_start_sample >= 180));
+        assert!(resumed.iter().all(|frame| frame.source_start_sample >= 2_880));
         assert!(resumed.iter().all(|frame| frame.segment_index == 1));
         assert!(resumed.windows(2).all(|pair| {
             pair[0].source_start_sample < pair[1].source_start_sample
@@ -977,8 +984,12 @@ mod tests {
     #[test]
     fn reset_starts_a_new_origin_and_clears_gap_counters() {
         let mut processor = StreamProcessor::new(small_stream_config());
-        let initial: Vec<f32> = (0..30).map(|value| value as f32).collect();
-        let overrun: Vec<f32> = (30..280).map(|value| value as f32).collect();
+        let initial: Vec<f32> = (0..480)
+            .map(|value| (value as f32 * 0.001).sin())
+            .collect();
+        let overrun: Vec<f32> = (0..4_000)
+            .map(|value| (value as f32 * 0.0013).sin())
+            .collect();
         processor.push_audio(&initial).unwrap();
         processor.process();
         processor.push_audio(&overrun).unwrap();
@@ -992,7 +1003,9 @@ mod tests {
         assert_eq!(processor.skipped_frame_count(), 0);
         assert!(processor.take_discontinuity().is_none());
 
-        let fresh: Vec<f32> = (0..20).map(|value| value as f32).collect();
+        let fresh: Vec<f32> = (0..320)
+            .map(|value| (value as f32 * 0.002).sin())
+            .collect();
         processor.push_audio(&fresh).unwrap();
         let frames = processor.process();
         assert_eq!(frames[0].source_start_sample, 0);
