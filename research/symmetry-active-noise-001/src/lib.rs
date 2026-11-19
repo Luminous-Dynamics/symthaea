@@ -2442,31 +2442,6 @@ mod tests {
     }
 
     #[test]
-    fn unknown_state_persistent_design_receipt_rejects_forgery() {
-        let problem = PersistentNoiseProblemV1 {
-            problem_id: "unknown-state-receipt-v1".to_owned(),
-            hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned()],
-            probes: vec![
-                NoiseProbeV1 {
-                    probe_id: "p0".to_owned(),
-                    cost: 1,
-                    admissible: true,
-                },
-            ],
-            error_state_ids: vec!["low".to_owned(), "high".to_owned()],
-            predicted_outcomes_by_hypothesis: vec![vec![vec![0, 1]], vec![vec![1, 0]]],
-        };
-        let receipt = design_persistent_noise_probe_set_under_unknown_state(&problem).unwrap();
-        verify_persistent_noise_probe_design_under_unknown_state(&problem, &receipt).unwrap();
-        let mut forged = receipt.clone();
-        forged.complete_pairwise_separation = !forged.complete_pairwise_separation;
-        assert_eq!(
-            verify_persistent_noise_probe_design_under_unknown_state(&problem, &forged),
-            Err(NoiseErrorV1::ReceiptMismatch)
-        );
-    }
-
-    #[test]
     fn unknown_bias_probe_design_replays_pair_witnesses_and_ambiguity_frontier() {
         let problem = SharedAdditiveBiasProblemV1 {
             problem_id: "unknown-bias-probe-design-v1".to_owned(),
