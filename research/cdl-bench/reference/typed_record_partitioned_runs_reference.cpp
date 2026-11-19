@@ -224,7 +224,8 @@ std::vector<std::uint8_t> encode_partitioned(const std::vector<Record>& records)
     std::uint64_t order_bits = 0U;
 
     if (order_mode == 1U) {
-        std::vector<std::uint32_t> previous_tie_template;
+        constexpr std::size_t max_tie_templates = 16U;
+        std::vector<std::vector<std::uint32_t>> tie_templates;
         for (std::size_t start = 0U; start < records.size();) {
             std::size_t end = start + 1U;
             while (end < records.size() &&
@@ -237,14 +238,20 @@ std::vector<std::uint8_t> encode_partitioned(const std::vector<Record>& records)
                     if (found == key_to_id.end()) throw std::runtime_error("missing key dictionary entry");
                     current_template.push_back(static_cast<std::uint32_t>(found->second));
                 }
-                if (!previous_tie_template.empty() && current_template == previous_tie_template) {
-                    order_bytes.push_back(0U); // reuse previous tie-group ID order
+                const auto found = std::find(tie_templates.begin(), tie_templates.end(), current_template);
+                if (found != tie_templates.end()) {
+                    const auto template_index = static_cast<std::size_t>(found - tie_templates.begin());
+                    order_bytes.push_back(static_cast<std::uint8_t>(template_index + 1U));
+                    auto reused = *found;
+                    tie_templates.erase(found);
+                    tie_templates.insert(tie_templates.begin(), std::move(reused));
                 } else {
-                    order_bytes.push_back(1U); // literal tie-group ID order follows
+                    order_bytes.push_back(0U); // literal tie-group ID order follows
                     BitWriter literal;
                     for (const auto id : current_template) literal.put(id, bits_per_id);
                     order_bytes.insert(order_bytes.end(), literal.bytes.begin(), literal.bytes.end());
-                    previous_tie_template = std::move(current_template);
+                    tie_templates.insert(tie_templates.begin(), std::move(current_template));
+                    if (tie_templates.size() > max_tie_templates) tie_templates.pop_back();
                 }
             }
             start = end;
@@ -388,7 +395,8 @@ bool decode_partitioned(const std::vector<std::uint8_t>& bytes, std::size_t max_
     if (order_mode == 1U) {
         if (schedule_len != order_bits / 8U) return false;
         std::vector<std::size_t> cursors(key_count, 0U);
-        std::vector<std::uint32_t> previous_tie_template;
+        constexpr std::size_t max_tie_templates = 16U;
+        std::vector<std::vector<std::uint32_t>> tie_templates;
         std::size_t schedule_cursor = 0U;
         while (output.size() < count64) {
             std::uint64_t min_timestamp = 0U;
@@ -426,9 +434,6 @@ bool decode_partitioned(const std::vector<std::uint8_t>& bytes, std::size_t max_
                 if (schedule_cursor >= schedule.size()) return false;
                 const auto control = schedule[schedule_cursor++];
                 if (control == 0U) {
-                    if (previous_tie_template.size() != tie_count) return false;
-                    tie_order = previous_tie_template;
-                } else if (control == 1U) {
                     if (bits != 0U && tie_count > (SIZE_MAX / bits)) return false;
                     const std::size_t literal_bits = tie_count * bits;
                     if (literal_bits > SIZE_MAX - 7U) return false;
@@ -450,9 +455,16 @@ bool decode_partitioned(const std::vector<std::uint8_t>& bytes, std::size_t max_
                     }
                     if (reader.position != literal_bits) return false;
                     schedule_cursor += literal_bytes;
-                    previous_tie_template = tie_order;
+                    tie_templates.insert(tie_templates.begin(), tie_order);
+                    if (tie_templates.size() > max_tie_templates) tie_templates.pop_back();
                 } else {
-                    return false;
+                    const std::size_t template_index = static_cast<std::size_t>(control - 1U);
+                    if (template_index >= tie_templates.size()) return false;
+                    if (tie_templates[template_index].size() != tie_count) return false;
+                    tie_order = tie_templates[template_index];
+                    auto reused = tie_templates[template_index];
+                    tie_templates.erase(tie_templates.begin() + static_cast<std::ptrdiff_t>(template_index));
+                    tie_templates.insert(tie_templates.begin(), std::move(reused));
                 }
             }
 
@@ -490,7 +502,7 @@ void write_file(const std::filesystem::path& path,const std::vector<std::uint8_t
 void require(bool v,const std::string& m){if(!v)throw std::runtime_error(m);}
 void test_empty_stream(){const std::vector<Record> records;const auto frame=encode_partitioned(records);std::vector<Record> decoded;require(decode_partitioned(frame,0U,decoded),"empty partitioned stream rejected");require(decoded.empty(),"empty partitioned stream produced records");}
 void test_roundtrips(){for(const std::string name:{"sparse","bursty","idle","noisy"}){const auto records=fixture(name,0x7878U);const auto frame=encode_partitioned(records);require(frame.size()>26U&&frame[25]==0U,name+" should use timestamp-merge mode");std::vector<Record> decoded;require(decode_partitioned(frame,records.size(),decoded),name+" partition decoder rejected frame");require(decoded==records,name+" partition order/data mismatch");}}
-void test_schedule_fallback(){auto records=fixture("sparse",0x887766U);for(std::size_t i=0U;i<records.size();++i)records[i].timestamp=static_cast<std::uint64_t>(i/kKeys)*1000U;const auto duplicate_frame=encode_partitioned(records);require(duplicate_frame.size()>26U&&duplicate_frame[25]==1U,"duplicate timestamps should use tie-template mode");std::vector<Record> decoded;require(decode_partitioned(duplicate_frame,records.size(),decoded)&&decoded==records,"duplicate timestamp fallback order mismatch");std::uint64_t tie_order_bits=0U;std::size_t offset=30U;require(get_u64(duplicate_frame,offset,tie_order_bits),"tie-template order bit count missing");require(tie_order_bits<records.size()*key_bits(kKeys),"repeated tie templates should compress below full schedule");require(tie_order_bits<5000U,"repeated tie templates should stay compact on identical groups");auto changing=records;for(std::size_t start=0U;start<changing.size();start+=kKeys)if((start/kKeys)%2U==1U)std::reverse(changing.begin()+static_cast<std::ptrdiff_t>(start),changing.begin()+static_cast<std::ptrdiff_t>(start+kKeys));const auto changing_frame=encode_partitioned(changing);require(changing_frame[25]==1U,"nondecreasing changing ties should use template mode");require(decode_partitioned(changing_frame,changing.size(),decoded)&&decoded==changing,"changing tie template order mismatch");auto out_of_order=fixture("bursty",0x778899U);std::swap(out_of_order[1],out_of_order[2]);const auto disorder_frame=encode_partitioned(out_of_order);require(disorder_frame.size()>26U&&disorder_frame[25]==2U,"out-of-order timestamps should use full schedule");require(decode_partitioned(disorder_frame,out_of_order.size(),decoded)&&decoded==out_of_order,"out-of-order fallback mismatch");}
+void test_schedule_fallback(){auto records=fixture("sparse",0x887766U);for(std::size_t i=0U;i<records.size();++i)records[i].timestamp=static_cast<std::uint64_t>(i/kKeys)*1000U;const auto duplicate_frame=encode_partitioned(records);require(duplicate_frame.size()>26U&&duplicate_frame[25]==1U,"duplicate timestamps should use tie-template mode");std::vector<Record> decoded;require(decode_partitioned(duplicate_frame,records.size(),decoded)&&decoded==records,"duplicate timestamp fallback order mismatch");std::uint64_t tie_order_bits=0U;std::size_t offset=30U;require(get_u64(duplicate_frame,offset,tie_order_bits),"tie-template order bit count missing");require(tie_order_bits<records.size()*key_bits(kKeys),"repeated tie templates should compress below full schedule");require(tie_order_bits<5000U,"repeated tie templates should stay compact on identical groups");auto changing=records;for(std::size_t start=0U;start<changing.size();start+=kKeys)if((start/kKeys)%2U==1U)std::reverse(changing.begin()+static_cast<std::ptrdiff_t>(start),changing.begin()+static_cast<std::ptrdiff_t>(start+kKeys));const auto changing_frame=encode_partitioned(changing);require(changing_frame[25]==1U,"nondecreasing changing ties should use template mode");require(decode_partitioned(changing_frame,changing.size(),decoded)&&decoded==changing,"changing tie template order mismatch");std::uint64_t changing_bits=0U;std::size_t changing_offset=30U;require(get_u64(changing_frame,changing_offset,changing_bits),"changing tie order bit count missing");require(changing_bits<10000U,"two recurring tie templates should be cached");auto out_of_order=fixture("bursty",0x778899U);std::swap(out_of_order[1],out_of_order[2]);const auto disorder_frame=encode_partitioned(out_of_order);require(disorder_frame.size()>26U&&disorder_frame[25]==2U,"out-of-order timestamps should use full schedule");require(decode_partitioned(disorder_frame,out_of_order.size(),decoded)&&decoded==out_of_order,"out-of-order fallback mismatch");}
 void test_randomized(){std::mt19937_64 rng(0x991122U);for(std::size_t trial=0U;trial<100U;++trial){std::vector<Record> records;std::array<Record,8U> states{};std::array<bool,8U> init{};const std::size_t n=static_cast<std::size_t>(rng()%300U);std::uint64_t time=0U;for(std::size_t i=0U;i<n;++i){const auto k=static_cast<std::size_t>(rng()%8U);time+=rng()%7U;Record r=init[k]?states[k]:Record{};r.timestamp=time;r.entity=static_cast<std::uint32_t>(k/4U);r.series=static_cast<std::uint32_t>(k%4U);if(!init[k])r.present=0xffU;for(std::size_t f=0U;f<kFields;++f){const auto bit=static_cast<std::uint8_t>(1U<<f);if(!init[k]||rng()%20U==0U){if(init[k]&&rng()%8U==0U)r.present=static_cast<std::uint8_t>(r.present^bit);r.values[f]=(r.present&bit)==0U?0U:value_for(f,rng());}}records.push_back(r);states[k]=r;init[k]=true;}const auto frame=encode_partitioned(records);std::vector<Record> decoded;require(decode_partitioned(frame,records.size(),decoded),"random partition decode rejected");require(decoded==records,"random partition mismatch");}}
 void test_corruption(){const auto rows=fixture("sparse",0x8877U);auto frame=encode_partitioned(rows);std::vector<Record> out;auto bad=frame;bad[0]^=1U;require(!decode_partitioned(bad,rows.size(),out),"bad magic/CRC accepted");bad=frame;bad.pop_back();require(!decode_partitioned(bad,rows.size(),out),"truncated partition frame accepted");bad=frame;bad.push_back(0U);require(!decode_partitioned(bad,rows.size(),out),"trailing partition bytes accepted");}
 void emit(const std::filesystem::path& dir) {
