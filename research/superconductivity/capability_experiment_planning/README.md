@@ -275,3 +275,20 @@ For the next benchmark tier, measure:
 - cost-to-first-qualified-phase and cost-to-application-qualified candidate;
 - false-positive synthesis burden, failed-phase frequency and fraction of candidate spend consumed by infeasible routes;
 - value of information under different application weights (high-field magnet, cryogenic device, ambient-pressure conductor), with the loss table preregistered before evaluation.
+
+### Risk-aware goal-oriented OED comparator (September 2026)
+
+Jakeman et al., *Risk-Aware Goal-Oriented Bayesian Optimal Experimental Design* (arXiv:2609.08023, 7 September 2026), generalize goal-oriented design by composing three risk levels: posterior predictive deviation, risk across the prediction domain, and risk across datasets. The authors report that their designs substantially outperform expected-information-gain baselines in their inverse-problem examples, where EIG was statistically indistinguishable from random allocation: https://arxiv.org/abs/2609.08023.
+
+This is a particularly relevant comparator for superconductivity because rare, high-consequence errors may dominate the value of an experiment: a false-positive bulk-superconductivity claim, an unstable/metastable phase mistaken for a realizable material, an incorrect high-field operating envelope, or an unsafe/unqualified synthesis route. The current v0.4 EVSI objective is risk-neutral expected Bayes loss under one supplied finite loss table; it does **not** yet implement a distributional risk functional or tail-risk control.
+
+The next risk-aware tier should compare:
+- expected-loss EVSI;
+- regret-sensitive EVSI against the best decision under full information;
+- CVaR / tail expectation over posterior decision losses;
+- worst-case or distributionally robust EVSI under bounded likelihood/prior misspecification;
+- asymmetric false-positive vs false-negative loss matrices, especially for bulk confirmation and synthesis admission.
+
+Report mean regret, upper-tail regret (e.g. 90th/95th percentile or CVaR), probability of catastrophic decision error, false-positive experiment burden, and decision quality at equal budget. The tail metric must not obscure the ordinary expected utility; publish both and show their Pareto frontier. The loss table and risk preference must be preregistered rather than fitted after seeing test outcomes.
+
+For cost-aware batch BO, Alvi et al. (npj Computational Materials, 4 February 2026) use deep Gaussian-process surrogates, heterotopic querying, cost-aware UCB and qEHVI on refractory high-entropy alloys. Their work compares conventional GPs, multitask GPs and hierarchical DGP variants across synthetic functions and an in-silico materials campaign, and explicitly notes that greater model complexity is not universally advantageous: https://www.nature.com/articles/s41524-026-01981-7. This should be a strong matched baseline, not a straw man. The superconductivity comparison must reproduce acquisition policies on the same frozen pool, costs, outcomes and stopping rules.
