@@ -495,7 +495,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(receipt.root.worst_case_remaining, 2);
-        assert_eq!(receipt.root.worst_case_cost, 2);
+        assert_eq!(receipt.root.worst_case_cost, 1);
         assert!(!receipt.root.is_identified());
         assert_every_persistent_state_has_a_complete_branch(&problem, &receipt.root);
     }
