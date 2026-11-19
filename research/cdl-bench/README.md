@@ -118,6 +118,38 @@ These counts are before the byte entropy coder and all framing. The smooth
 sequence is a significant regression, so this remains a selectable specialist,
 not a universal default or a claim of Gorilla/Chimp parity.
 
+## Independent RLE+XOR reference
+
+The checked-in C++20 program
+`research/cdl-bench/reference/float64_rle_xor_reference.cpp` independently
+implements exact-bit-pattern run grouping plus XOR-varint coding of each run
+value. It verifies exact u64 reconstruction and rejects seven malformed
+streams. Build and run it with:
+
+```sh
+g++ -O2 -std=c++20 -Wall -Wextra -Wconversion -Werror \
+  research/cdl-bench/reference/float64_rle_xor_reference.cpp \
+  -o /tmp/float64_rle_xor_reference
+/tmp/float64_rle_xor_reference
+```
+
+The strict-warning reference run covered 174,108 values and rejected seven
+malformed run/varint cases. Transform-only sizes, before the byte entropy
+coder and all F64C/F64S framing, were:
+
+| Fixture | XOR-varint | RLE+XOR | Change vs XOR-varint |
+|---|---:|---:|---:|
+| IEEE-754 edge values | 81 B | 87 B | +7.41% |
+| 4,096-value constant run | 4,104 B | 11 B | -99.73% |
+| 20,000-value plateaus | 20,663 B | 899 B | -95.65% |
+| 50,000 mostly-idle values | 51,762 B | 2,219 B | -95.71% |
+| 100,000 mixed random runs | 185,978 B | 106,196 B | -42.90% |
+
+RLE+XOR is harmful on the tiny edge fixture due to per-run count overhead, but
+dramatically improves repeated regimes. This supports retaining it as a
+portfolio specialist rather than making it a universal transform. These are
+transform-only reference measurements, not Rust arithmetic-coded results.
+
 The reusable XOR-leading/trailing window is a small Gorilla-style reference transform,
 not a Gorilla/Chimp implementation. Neither the single-stream XOR transforms
 nor these segment selectors implement ACTF, DeXOR, Rabbit or Dolphin. These are transparent
