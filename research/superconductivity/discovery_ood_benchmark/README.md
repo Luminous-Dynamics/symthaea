@@ -175,3 +175,17 @@ A May 2026 LLM active-learning study reports over 70% fewer experiments to reach
 ### Remaining scope
 
 This v0.2 contract does not train a model, admit external data, estimate calibration from a real population, or implement condition/family/source OOD splits; the existing OOD auditor remains responsible for those split checks. The next extension needs training-fold-only calibration, grouped bootstrap, prospective candidate freezes, condition- and source-qualified negative controls, and end-to-end false-positive experiment burden. The exact-head workflow now runs and lints both binaries and uploads separate evidence receipts.
+
+## Known experimental positive-control case: kagome discovery (2026)
+
+Albu Mustaf et al. report bulk superconductivity in machine-learning-guided, first-principles-screened kagome compounds YRu3B2 and LuRu3B2 (Phys. Rev. Research 8, 023308; published 17 June 2026; DOI: https://doi.org/10.1103/lpqj-7hyg). Reported (T_c) values are 0.81 K and 0.95 K; the paper reports magnetization, specific-heat and electrical-transport confirmation and nearly 100% superconducting volume fractions.
+
+This is a *known positive-control case study*, not a statistically sufficient benchmark corpus and not a result independently reproduced by this repository. A valid historical replay would freeze the training/source cutoff before 17 June 2026 and hold out the CeCo3B2-type prototype / related kagome family so the two compounds cannot leak across train and test. Use the source paper as the evidence authority; keep the three modalities and transition criteria distinct. Do not infer engineering utility: the reported sub-1 K transitions and abstract-level properties do not establish high-field/current conductor performance.
+
+## Cross-domain active-learning comparator
+
+Wang et al. (npj Computational Materials, 20 May 2026; https://www.nature.com/articles/s41524-026-02136-4) report a training-free LLM active-learning framework that used over 70% fewer experiments to reach top-performing candidates across four diverse materials datasets. This is a valuable **cross-domain experimental-efficiency comparator**, not a superconductivity-specific baseline. A fair superconductivity evaluation would need the same candidate pool, experimental costs, stopping rule, measurement authority and frozen splits.
+
+The 2026 critical examination of materials active-learning workflows (https://pubs.rsc.org/en/content/articlehtml/2026/dd/d6dd00081a) highlights that hidden workflow choices and implicit assumptions can influence reported performance. Therefore freeze acquisition policies, candidate pools, costs, preprocessing, splits and stop criteria before comparing methods. Report the full discovery trajectory and experimental burden, not only the final best candidate.
+
+A relevant system-level design reference is Lee et al., *Toward self-driving laboratory 2.0 for chemistry and materials discovery* (Materials Horizons, 4 March 2026; https://doi.org/10.1039/D5MH01984B), which emphasizes interoperability, collaboration, generalization, orchestration, safety and creativity. These are architectural requirements, not superconductivity discovery metrics.
