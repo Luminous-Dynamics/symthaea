@@ -1,16 +1,17 @@
 # CDL-Bench exact IEEE-754 f64 reference track v1
 
 **Date:** 2026-11-19  
-**Status:** Rust reference source, segment-local selector and authored tests committed; independent Python transform translation exercised; Rust compilation and arithmetic-coded size results pending.
+**Status:** Rust reference source, three reversible transforms, two segment selectors and authored tests committed; independent C++20 window-reference compiled and exercised; Rust compilation and arithmetic-coded size results pending.
 
 ## Why this track exists
 
 The SCM/i16 lane does not represent the dominant specialized lossless floating-point time-series competition. By 2026, several purpose-built codecs target bit patterns, decimal prefixes, oscillation, branch flags and segment-local encoding choices. A credible SOTA comparison needs a typed IEEE-754 track; it must not infer that success on synthetic SCM i16 streams transfers to f64 sensor streams.
 
 The branch adds a small correctness reference, not a competitive codec:
-- `research/cdl-bench/src/float64.rs`: typed `F64C` frame with raw bits or XOR-previous u64 varints; `F64S` segment container with policy IDs for offline best-of-six and decoder-synchronous historical-cost selection; inner CDL arithmetic coding, CRC-32 checksums and output limits.
+- `research/cdl-bench/src/float64.rs`: typed `F64C` frame with raw bits, XOR-previous u64 varints, and reusable XOR-leading/trailing windows; `F64S` segment container with policy IDs for offline best-of-six and decoder-synchronous historical-cost selection; inner CDL arithmetic coding, CRC-32 checksums and output limits.
 - `research/cdl-bench/src/main.rs`: `float --values N --seed N` experiment command comparing single-stream, offline segment-portfolio, and online historical-cost rows with frame size and encode/decode timings.
 - `research/cdl-bench/src/lib.rs`: public exports.
+- `research/cdl-bench/reference/float64_window_reference.cpp`: independent C++20 bit-window transform reference.
 - `research/cdl-bench/README.md`: usage and limits.
 - Tracking: [CDL-Bench-007 #12874](https://github.com/Luminous-Dynamics/symthaea/issues/12874).
 
@@ -86,15 +87,51 @@ The float CLI evaluates both policies at chunk sizes 64, 256 and 1,024. It repor
 
 ## Independent transform-logic check
 
-A separate Python translation exercised:
-- five fixture classes with 10,249 f64 bit patterns total;
-- exact u64-varint round trips at 0, 1, 127, 128, 255, 16,384, (2^{32}-1), (2^{63}), and (2^{64}-1);
-- exact XOR/reconstruction on every fixture;
-- rejection of three malformed varint cases (truncated, overlong and >64-bit).
+The reusable XOR-window implementation has an independent C++20 reference at
+`research/cdl-bench/reference/float64_window_reference.cpp`. It was compiled
+with strict warnings:
 
-All checks passed. This is **not** Rust compilation, F64C frame validation, arithmetic coder execution, or a compression-performance result.
+```sh
+g++ -O2 -std=c++20 -Wall -Wextra -Wconversion -Werror \
+  research/cdl-bench/reference/float64_window_reference.cpp \
+  -o /tmp/float64_window_reference
+/tmp/float64_window_reference
+```
 
-Rust tests are authored for raw/XOR-varint/XOR-leading-trailing exact reconstruction, deterministic encoding, truncated-prefix rejection, single-bit mutation rejection, output-limit enforcement, malformed u64-varint rejection and malformed bit-window rejection. Segmented tests cover bitwise round-trip at chunk sizes 1/64/256/1024, truncation, zero chunk size, output limit, header flags/policy validation, canonical best-of-six child selection, and single-bit mutation rejection. Historical-cost policy tests cover initial choice, cumulative six-candidate mean updates, stable tie-breaking, exact round-trip, child-policy mismatch rejection and corruption. An independent Python transform translation of the leading/trailing window-reuse implementation exercised 57,103 bit patterns across five fixture families and rejected malformed markers/spans/payloads. Transform-only payload sizes versus XOR-varint on those five fixtures were: -18.97% on a small edge fixture, +164.28% on a smooth bit-increment fixture, -10.01% on oscillating values, -5.23% on random bit patterns, and -0.33% on repeated values. These are pre-entropy transform bytes only; the smooth-ramp loss is an important negative result and supports keeping this as a selectable candidate rather than the universal default. A separate Python policy check reproduced the decision sequence [0, 3, 3] and stable tie-breaking. The Rust tests have not run because the local environment has no Rust toolchain. No SOTA or frame-size win is claimed.
+It exercised 57,105 bit patterns across five fixture classes and rejected
+seven malformed marker/span/payload cases. Exact output:
+
+| Fixture | Samples | XOR-varint bytes | Reusable XOR-window bytes | Change |
+|---|---:|---:|---:|---:|
+| Edge values | 9 | 78 | 60 | -23.08% |
+| Smooth bit increments | 2,048 | 2,329 | 6,155 | +164.28% |
+| Oscillating | 2,048 | 20,479 | 18,430 | -10.01% |
+| Random bit patterns | 50,000 | 474,699 | 450,002 | -5.20% |
+| Repeated values | 3,000 | 3,016 | 3,006 | -0.33% |
+
+These are **transform-only payload bytes**, before entropy coding, F64C/F64S
+headers, checksums and chunk selection. The large smooth-sequence regression
+is a real negative result; it is why this transform remains a selectable
+specialist rather than a universal default. The C++ program also round-trips
+every fixture and rejects malformed markers, reuse-before-window, invalid
+leading/trailing spans, empty windows, zero residuals encoded as nonzero, and
+nonzero unused payload bits.
+
+An earlier independent Python translation exercised the initial transform
+logic; the checked-in C++ run is the reproducible reference result reported
+above. Neither validates the Rust F64C/F64S framing or runs the Rust arithmetic
+coder.
+
+Rust tests are authored for raw/XOR-varint/XOR-window exact reconstruction,
+deterministic encoding, truncated-prefix rejection, single-bit mutation
+rejection, output-limit enforcement, malformed varint/window rejection and
+explicit window reuse. Segmented tests cover bitwise round-trip at chunk sizes
+1/64/256/1024, truncation, zero chunk size, output limit, header flags/policy
+validation, canonical best-of-six child selection and mutation rejection.
+Historical-cost policy tests cover initial choice, cumulative six-candidate
+mean updates, stable tie-breaking, exact round-trip, child-policy mismatch
+rejection and corruption. **No Rust compilation, cargo test or rustfmt pass
+has been obtained.** No SOTA or frame-size win is claimed.
 
 ## 2026 competitive comparison
 
