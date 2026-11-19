@@ -78,7 +78,7 @@ The Rust module `symthaea_aqua_bench::transient_trace` now has strict JSON decod
 | PT-NEG-028 | A matched event replay uses a different anti-alias filter, sampling rate, uncertainty contract or channel map | Matched replay | Reject comparison |
 | PT-NEG-029 | RFC3339 event or observation-window timestamp is invalid, or observation window end precedes start | Timestamp validation | Reject |
 
-The executable module currently contains 38 authored Rust tests. None is represented as executed until the exact-head Cargo test workflow completes with a successful conclusion.
+The executable module currently contains 40 authored Rust tests. None is represented as executed until the exact-head Cargo test workflow completes with a successful conclusion.
 
 | PT-NEG-030 | A channel references a raw-trace SHA-256 that is missing from the manifest's unfiltered-trace artifacts | Trace provenance admission | Reject; do not attach samples from an undeclared raw artifact |
 
@@ -92,3 +92,7 @@ The executable module currently contains 38 authored Rust tests. None is represe
 | PT-NEG-037 | The trace file contains a row for an undeclared channel ID | Raw trace decoder | Reject atomically; no channel may be partially attached |
 
 The module verifies unfiltered trace bytes but does not yet hash/authenticate event log, calibration, clock-sync or site-survey artifact bytes. Those remain explicitly outside this module's current claim ceiling.
+
+| PT-NEG-038 | Two unfiltered-trace artifact records declare the same SHA-256 identity | Manifest provenance admission | Reject as ambiguous before decoding |
+| PT-NEG-039 | A decoded sample is NaN, infinite or negative for a pressure/flow channel | Per-channel preflight | Reject atomically; no channel sample buffer is mutated |
+| PT-NEG-040 | A raw-trace CSV artifact is decoded without first satisfying the run's required artifact/media-type structure | Artifact admission | Reject before sample parsing |
