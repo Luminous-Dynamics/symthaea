@@ -21,7 +21,7 @@ One receipt describes exactly one render attempt. It joins:
 
 `source Score → authorized edit plan → candidate Score → MIDI manifest + exact MIDI bytes → renderer invocation → exact WAV bytes → independent evidence`
 
-The machine-readable shape is in [muse-render-execution-receipt-v1.schema.json](schemas/muse-render-execution-receipt-v1.schema.json). The schema checks field shape and basic state constraints. A semantic verifier must additionally check digest equality and cross-artifact relationships.
+The machine-readable shape is in [muse-render-execution-receipt-v1.schema.json](schemas/muse-render-execution-receipt-v1.schema.json). The MIDI fields intentionally follow the PartId-aware `muse-midi-performance-v1` manifest contract, including its 960 ticks-per-quarter resolution and separate score, timeline, instrument-binding, capability, manifest, and MIDI digests. The schema checks field shape and basic state constraints. A semantic verifier must additionally check digest equality and cross-artifact relationships.
 
 ### Required joins
 
@@ -50,7 +50,7 @@ Partial WAV bytes may be retained for diagnostics, but a partial output cannot b
 ## Trust and claim boundaries
 
 - A SHA-256 value proves byte identity relative to the bytes actually hashed; it does not prove who produced them.
-- The receipt's own digest seals the record under the declared canonicalization recipe. It is not an identity signature.
+- The receipt's own digest is computed over RFC 8785 JSON Canonicalization Scheme bytes after omitting `receipt_sha256`, prefixed with `luminous-dynamics-muse-render-execution-receipt-v1\\0`, then SHA-256 hashed. It seals the record but is not an identity signature.
 - `unsigned_local` is suitable for development fixtures only. `workflow_observed` means a workflow captured the execution; it is not automatically trusted hardware attestation. `signed` requires an external key registry and signature verification.
 - A process invocation record that names an input MIDI digest and output WAV digest is only as trustworthy as the executor that observed the process boundary. Stronger claims require capture inside a controlled runner/container and attestation of runner identity.
 - A deterministic MIDI manifest is not proof of acoustic realization. Audio conformance requires an independent observer, calibrated per renderer/asset stratum, plus explicit abstention for unidentifiable voices or instruments.
