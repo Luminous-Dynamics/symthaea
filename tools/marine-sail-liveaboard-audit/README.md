@@ -44,3 +44,8 @@ A SHA-256-shaped string is only a syntax/identity check. This CLI does not authe
 The `validate_corpus` binary checks policy-arm information boundaries, unique scenario identities, command/target consistency, mutation JSON Pointers, expected dispositions, required threat-family coverage and the benchmark metric contract. It then replays all sixteen frozen JSON-Pointer mutation vectors through the shared Rust library's actual `audit_case` and `compare_pair` functions, asserting expected dispositions plus required finding codes or exact mismatch fields. It emits `CORPUS_EXECUTED` only when every scenario agrees. Seven validator tests cover corpus shape, end-to-end vector replay, duplicate IDs, threat coverage, deployable information boundaries, pointer syntax and fixed challenge-target integrity. Rust formatting/build/Clippy/test outcomes remain subject to the exact-head CI run.
 
 The corpus is synthetic test material, not a weather dataset, vessel-performance dataset, or evidence of a successful passage. All seven arms share one declared compute-budget profile; S6 is evaluator-only and cannot be ranked as a deployable policy.
+
+
+## Forecast-replay source inventory
+
+The source inventory and Draft 2020-12 contract are in docs/research/marine/sources/. The register distinguishes operational forecast cycles, retrospective reanalysis, point observations and licensed commercial route outputs. The workflow checks that the expected six source records remain in their declared classes. It does not download, rehost, rights-clear or validate the physical quality of any source data. Deterministic replay implementation is tracked in Symtropy issue #6209.
