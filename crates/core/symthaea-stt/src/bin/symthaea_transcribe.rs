@@ -283,6 +283,11 @@ fn cmd_transcribe(
     // Initialize engine
     let mut engine = TranscriptionEngine::new();
 
+    engine
+        .projector
+        .validate_input_sample_rate(sample_rate)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
+
     // Load model if exists
     if model.exists() {
         if verbose {
