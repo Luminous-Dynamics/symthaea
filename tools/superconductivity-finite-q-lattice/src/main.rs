@@ -341,9 +341,15 @@ impl Model {
             );
             coefficients.push(sum.scale(1.0 / self.length as f64));
         }
-        let real_space_mean = field.iter().map(|v| v.norm_sqr()).sum::<f64>() / self.length as f64;
-        let reciprocal_sum = coefficients.iter().map(|v| v.norm_sqr()).sum::<f64>();
-        (coefficients, reciprocal_sum - real_space_mean)
+        let residual = self.parseval_residual(field, &coefficients);
+        (coefficients, residual)
+    }
+
+    fn parseval_residual(&self, field: &[Complex], spectrum: &[Complex]) -> f64 {
+        let real_space_mean = field.iter().map(|value| value.norm_sqr()).sum::<f64>()
+            / self.length as f64;
+        let reciprocal_sum = spectrum.iter().map(|value| value.norm_sqr()).sum::<f64>();
+        reciprocal_sum - real_space_mean
     }
 
     fn momentum_quartet_allowed(&self, a: usize, b: usize, c: usize, d: usize) -> bool {
@@ -622,6 +628,77 @@ mod tests {
             + 0.5 * model.beta * amplitude_squared * amplitude_squared);
         assert!((energy.local - expected_local).abs() < 1.0e-12);
         assert!(energy.gradient.abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn deliberately_corrupted_fourier_spectrum_fails_parseval_negative_control() {
+        let model = model_from(&inputs().1);
+        let field = model.physical_field();
+        let (mut spectrum, _) = model.fourier_spectrum(&field);
+        spectrum[0] = spectrum[0].add(Complex { re: 0.1, im: -0.03 });
+        assert!(model.parseval_residual(&field, &spectrum).abs() > 1.0e-4);
+    }
+
+    #[test]
+    fn mode_permutation_does_not_change_the_physical_field_or_energy() {
+        let mut fixture = inputs().1;
+        let original = model_from(&fixture);
+        fixture["modes"].as_array_mut().unwrap().reverse();
+        let permuted = model_from(&fixture);
+        assert!((original.energy().unwrap().total - permuted.energy().unwrap().total).abs() < 1.0e-12);
+        for (left, right) in original.physical_field().iter().zip(permuted.physical_field()) {
+            assert!((left.re - right.re).abs() < 1.0e-12);
+            assert!((left.im - right.im).abs() < 1.0e-12);
+        }
+    }
+
+    #[test]
+    fn one_site_translation_preserves_periodic_ring_energy() {
+        let mut fixture = inputs().1;
+        let original = model_from(&fixture);
+        let length = original.length;
+        for mode in fixture["modes"].as_array_mut().unwrap() {
+            let q = mode["q_index"].as_u64().unwrap() as usize;
+            let old: Vec<Complex> = mode["envelope"].as_array().unwrap().iter().map(|entry| Complex {
+                re: entry["real"].as_f64().unwrap(),
+                im: entry["imag"].as_f64().unwrap(),
+            }).collect();
+            let phase = std::f64::consts::TAU * q as f64 / length as f64;
+            let shifted: Vec<Value> = (0..length).map(|site| {
+                let value = old[(site + 1) % length].rotate(phase);
+                json!({"site_index":site,"real":value.re,"imag":value.im})
+            }).collect();
+            mode["envelope"] = json!(shifted);
+        }
+        let translated = model_from(&fixture);
+        assert!((original.energy().unwrap().total - translated.energy().unwrap().total).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn reconstructed_field_energy_matches_independent_real_space_sum() {
+        let model = model_from(&inputs().1);
+        let field = model.physical_field();
+        let independent_local: f64 = field.iter().map(|value| {
+            let rho = value.re * value.re + value.im * value.im;
+            model.alpha * rho + 0.5 * model.beta * rho * rho
+        }).sum();
+        let independent_gradient: f64 = model.links.iter().map(|edge| {
+            let angle = edge.gauge_phase;
+            let (sine, cosine) = angle.sin_cos();
+            let target = field[edge.target];
+            let transported = Complex {
+                re: cosine * target.re - sine * target.im,
+                im: sine * target.re + cosine * target.im,
+            };
+            let difference = Complex {
+                re: field[edge.source].re - transported.re,
+                im: field[edge.source].im - transported.im,
+            };
+            model.gradient_coupling * difference.norm_sqr()
+        }).sum();
+        let energy = model.energy().unwrap();
+        assert!((energy.local - independent_local).abs() < 1.0e-12);
+        assert!((energy.gradient - independent_gradient).abs() < 1.0e-12);
     }
 
     #[test]
