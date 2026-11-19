@@ -3177,7 +3177,7 @@ mod tests {
                 &problem,
                 &[NoiseObservationV1 {
                     probe_id: "p1".to_owned(),
-                    outcomes: vec![0]
+                    outcomes: vec![0],
                 abstained: false
                 }]
             ),
@@ -3190,7 +3190,7 @@ mod tests {
                 &problem,
                 &[NoiseObservationV1 {
                     probe_id: "missing".to_owned(),
-                    outcomes: vec![0]
+                    outcomes: vec![0],
                 abstained: false
                 }]
             ),
@@ -3218,7 +3218,7 @@ mod tests {
                 &persistent,
                 &[NoiseObservationV1 {
                     probe_id: "p-left".to_owned(),
-                    outcomes: vec![]
+                    outcomes: vec![],
                 abstained: false
                 }]
             ),
