@@ -1166,6 +1166,106 @@ mod tests {
     }
 
     #[test]
+    fn exact_digests_confirm_supported_response_and_unsupported_invariance() {
+        let cases: Vec<Case> = generate_cases(Cohort::Discovery)
+            .into_iter()
+            .filter(|case| case.style == "Classical" && case.seed == DISCOVERY_SEEDS[0])
+            .collect();
+        let digests_by_case: HashMap<String, String> = cases
+            .iter()
+            .map(|case| {
+                (
+                    case.case_id.clone(),
+                    format!("{:064x}", case.cell.valence as u64 + 1),
+                )
+            })
+            .collect();
+        let axes_by_block = HashMap::from([(
+            (
+                "DISCOVERY".to_string(),
+                "Classical".to_string(),
+                DISCOVERY_SEEDS[0],
+            ),
+            "valence".to_string(),
+        )]);
+
+        let rows = axis_invariance_report(&cases, &digests_by_case, &axes_by_block);
+        assert_eq!(rows.len(), 4);
+        let valence = rows.iter().find(|row| row.axis == "valence").unwrap();
+        assert_eq!(valence.declared_supported, Some(true));
+        assert_eq!(valence.complete_slices, 27);
+        assert_eq!(valence.changed_slices, 27);
+        assert_eq!(valence.identical_slices, 0);
+        assert_eq!(valence.disposition, "response_observed");
+
+        let energy = rows.iter().find(|row| row.axis == "energy").unwrap();
+        assert_eq!(energy.declared_supported, Some(false));
+        assert_eq!(energy.complete_slices, 27);
+        assert_eq!(energy.changed_slices, 0);
+        assert_eq!(energy.identical_slices, 27);
+        assert_eq!(energy.disposition, "negative_control_pass");
+    }
+
+    #[test]
+    fn exact_invariance_audit_detects_unexpected_change_on_declared_dead_axis() {
+        let cases: Vec<Case> = generate_cases(Cohort::Discovery)
+            .into_iter()
+            .filter(|case| case.style == "Classical" && case.seed == DISCOVERY_SEEDS[0])
+            .collect();
+        let digests_by_case: HashMap<String, String> = cases
+            .iter()
+            .map(|case| {
+                (
+                    case.case_id.clone(),
+                    format!("{:064x}", case.cell.energy as u64 + 1),
+                )
+            })
+            .collect();
+        let axes_by_block = HashMap::from([(
+            (
+                "DISCOVERY".to_string(),
+                "Classical".to_string(),
+                DISCOVERY_SEEDS[0],
+            ),
+            "valence".to_string(),
+        )]);
+
+        let rows = axis_invariance_report(&cases, &digests_by_case, &axes_by_block);
+        let energy = rows.iter().find(|row| row.axis == "energy").unwrap();
+        assert_eq!(energy.declared_supported, Some(false));
+        assert_eq!(energy.complete_slices, 27);
+        assert_eq!(energy.changed_slices, 27);
+        assert_eq!(energy.identical_slices, 0);
+        assert_eq!(energy.disposition, "unexpected_change");
+    }
+
+    #[test]
+    fn axis_invariance_report_marks_missing_artifacts_incomplete() {
+        let cases: Vec<Case> = generate_cases(Cohort::Discovery)
+            .into_iter()
+            .filter(|case| case.style == "Classical" && case.seed == DISCOVERY_SEEDS[0])
+            .collect();
+        let mut digests_by_case: HashMap<String, String> = cases
+            .iter()
+            .map(|case| (case.case_id.clone(), "a".repeat(64)))
+            .collect();
+        digests_by_case.remove(&cases[0].case_id);
+        let axes_by_block = HashMap::from([(
+            (
+                "DISCOVERY".to_string(),
+                "Classical".to_string(),
+                DISCOVERY_SEEDS[0],
+            ),
+            "valence".to_string(),
+        )]);
+
+        let rows = axis_invariance_report(&cases, &digests_by_case, &axes_by_block);
+        let valence = rows.iter().find(|row| row.axis == "valence").unwrap();
+        assert!(valence.unavailable_slices > 0);
+        assert_eq!(valence.disposition, "incomplete");
+    }
+
+    #[test]
     fn output_escapes_notes_and_empty_summary_statistics() {
         let field = csv_escape("failure, with \"quotes\"\nand newline");
         assert_eq!(field, "\"failure, with \"\"quotes\"\"\nand newline\"");
