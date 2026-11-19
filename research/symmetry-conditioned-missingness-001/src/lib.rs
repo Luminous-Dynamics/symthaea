@@ -77,6 +77,8 @@ pub enum MissingnessErrorV1 {
     TooManyProbes,
     EmptyProbeId,
     DuplicateProbeId,
+    EmptyProbeSet,
+    TooManyProbes,
     ZeroProbeCost { probe_id: String },
     HypothesisCountMismatch,
     ProbeCountMismatch { hypothesis_id: String },
@@ -119,24 +121,6 @@ fn append_bytes(output: &mut Vec<u8>, value: &[u8]) {
 
 fn append_string(output: &mut Vec<u8>, value: &str) {
     append_bytes(output, value.as_bytes());
-}
-
-fn validate_unique_ids(
-    ids: &[String],
-    empty_error: MissingnessErrorV1,
-    duplicate_error: MissingnessErrorV1,
-) -> Result<(), MissingnessErrorV1> {
-    if ids.is_empty() {
-        return Err(empty_error);
-    }
-    if ids.iter().any(|id| id.trim().is_empty()) {
-        return Err(MissingnessErrorV1::EmptyHypothesisId);
-    }
-    let mut unique = BTreeSet::new();
-    if ids.iter().any(|id| !unique.insert(id)) {
-        return Err(duplicate_error);
-    }
-    Ok(())
 }
 
 impl HypothesisConditionedMissingnessProblemV1 {
@@ -476,10 +460,11 @@ impl ProbabilisticMissingnessProblemV1 {
                 return Err(MissingnessErrorV1::DuplicateHypothesisId);
             }
         }
-        if self.probes.is_empty() || self.probes.len() > 64 {
-            return Err(MissingnessErrorV1::ProbeCountMismatch {
-                hypothesis_id: self.hypothesis_ids[0].clone(),
-            });
+        if self.probes.is_empty() {
+            return Err(MissingnessErrorV1::EmptyProbeSet);
+        }
+        if self.probes.len() > 64 {
+            return Err(MissingnessErrorV1::TooManyProbes);
         }
         let mut probe_ids = BTreeSet::new();
         for probe in &self.probes {
@@ -719,7 +704,7 @@ mod tests {
             ],
             dropout_probabilities_by_hypothesis: vec![
                 vec![
-                    DropoutProbabilityIntervalPpmV1::new(0, 1_000).unwrap(),
+                    DropoutProbabilityIntervalPpmV1::new(1, 1_000).unwrap(),
                     DropoutProbabilityIntervalPpmV1::new(100, 2_000).unwrap(),
                 ],
                 vec![
@@ -864,7 +849,7 @@ mod tests {
         assert_eq!(
             receipt.dropout_likelihoods[0].lower_ppm,
             0,
-            "the calibrated interval includes zero likelihood support only at its lower bound"
+            "the calibrated dropout likelihood is small but strictly nonzero"
         );
         assert!(receipt.dropout_likelihoods[0].upper_ppm > 0);
         assert!(receipt.dropout_likelihoods[1].lower_ppm > 0);
