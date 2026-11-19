@@ -20,9 +20,8 @@ dependencies.
 - CLI file encode/decode and an E0 length comparison against installed
   Zstandard, Brotli, XZ and gzip commands.
 - SCM-specific typed-field, temporal-lag, oracle-parent, hybrid and
-  shuffled-parent byte predictors, plus a fixed-share online mixture of
-  typed-field/lag/parent experts, all using the same arithmetic coder and exact
-  decoder path.
+  shuffled-parent byte predictors, plus fixed-share and CUSUM change-point
+  mixtures, all using the same arithmetic coder and exact decoder path.
 
 ## Independent fixed-share reference simulation
 
@@ -47,6 +46,27 @@ reproducibility report is
 `docs/research/CDL_EXPERT_MIXTURE_FIXED_SHARE_V1_2026-11-18.md`.
 These ideal-bit diagnostics must not be confused with actual arithmetic-coded
 frame lengths, which still require compiling and running the Rust CLI.
+
+## Independent CUSUM detector reference
+
+The controlled detector check is in
+`research/cdl-bench/reference/cusum_detector_reference.cpp`. It tests
+fixed-point log2 ratio and CUSUM behavior only; it does not replay SCM traces or
+the Rust encoder/decoder.
+
+```sh
+g++ -O2 -std=c++20 -Wall -Wextra -Wconversion -Werror \
+  research/cdl-bench/reference/cusum_detector_reference.cpp \
+  -o /tmp/cdl_cusum_reference
+/tmp/cdl_cusum_reference
+```
+
+The observed controlled checks are: zero alarms over 100,000 stationary
+observations; detection of a 3-bit surprisal step after three observations;
+and no alarm on a gradual 0.5-bit drift over 512 observations. These are
+specific synthetic detector checks, not an empirical false-alarm guarantee.
+See `docs/research/CDL_CHANGEPOINT_CUSUM_V1_2026-11-19.md`.
+
 
 ## Run
 
@@ -175,7 +195,7 @@ tolerance, entropy coder, context-bootstrap and resource accounting.
 
 ### Structure-aware SCM coding controls
 
-The `causal` command additionally evaluates six custom byte predictors on every
+The `causal` command additionally evaluates seven custom byte predictors on every
 SCM2 stream, including observational, interventional, training and held-out E3
 traces. All use the same arithmetic coder and 32-byte CDL frame as the built-in
 order-0/order-1 arms. The learner-visible SCM2 header is 16 bytes and contains
@@ -204,19 +224,34 @@ metadata is retained in the evaluator-side `ScmTrace` and never serialized:
   a weak expert can recover after a regime change without receiving an
   intervention label or expert-selection symbol.
 
-The mixture shares one header and field/base histogram set across all experts;
+- `change_point_frame`: adds an integer surprisal-CUSUM over the prequential
+  mixture. After a detector alarm, the model retains field-level base
+  histograms, resets fast lag/parent context tables, and re-primes expert
+  weights toward lag. Alarm decisions are derived from the same decoded prefix
+  in encoder and decoder; no reset marker, intervention label or boundary is
+  transmitted. The CLI reports alarm count and expert weights.
+
+The detector uses a slow surprisal baseline (1/64 EMA), a 0.25-bit per-byte
+CUSUM drift allowance, an 8-bit cumulative threshold, a 64-byte warmup and a
+256-byte cooldown. These are fixed v1 defaults, not tuned SOTA parameters.
+False alarms, detection delay, recovery time and extra coded bits must be
+measured separately before the reset policy is considered useful.
+Both mixture arms share one header and field/base histogram set across all experts;
 only lag and parent context tables are specialist-specific. This avoids
 duplicating identical per-stream statistics. Its state-size output exposes the
 memory cost, while its final expert weights are printed as diagnostics. The
 parent specialist still receives the known SCM topology and remains an oracle
 expert, not a learned mechanism.
 
-The mixture combines the specialists' original CDF probabilities using an
-exact common rational denominator (u128), then quantizes only the final CDF to
-the arithmetic coder's 32,768 frequency total. It does not first round each
-specialist to a coarse common probability table. The independent reference
-simulation and its small, public-development diagnostic are documented in
-[the fixed-share mixture report](../../docs/research/CDL_EXPERT_MIXTURE_FIXED_SHARE_V1_2026-11-18.md).
+The mixtures combine the specialists' original CDF probabilities using an
+exact common rational denominator (u128), then quantize only the final CDF to
+the arithmetic coder's 32,768 frequency total. Model 7 uses a 1/256 fixed-share
+weight update; model 8 additionally detects sustained surprisal increases and
+resets fast context tables. Neither receives intervention labels or transmits
+expert-selection/reset symbols. The fixed-share experiment is described in
+[its report](../../docs/research/CDL_EXPERT_MIXTURE_FIXED_SHARE_V1_2026-11-18.md);
+the CUSUM detector's controlled logic check is described in
+[the CUSUM report](../../docs/research/CDL_CHANGEPOINT_CUSUM_V1_2026-11-19.md).
 
 For parent, lag, hybrid and shuffled-parent arms, the predictor adds the
 field/lane base frequencies to the selected conditional-context frequencies
@@ -236,7 +271,8 @@ specific to the correct variable identities.
 
 The specialist predictors share header/field statistics within the online
 mixture; every model resets to deterministic empty state for each stream. The
-runner prints inline predictor-state sizes and mixture weights. Code/executable
+runner prints inline predictor-state sizes, mixture weights and CUSUM alarm
+counts. Model 8 adds detector state and surprisal/CUSUM logic; code/executable
 costs and shared model distributions must still be accounted for in cold-start
 comparison. The per-stream frame size alone is not a complete deployed-system
 size.
@@ -247,7 +283,10 @@ Interpretation order:
 3. Compare parent-oracle with lag to test whether known graph structure helps.
 4. Compare the fixed-share mixture with each specialist to measure adaptation
    and switching regret across observational/interventional regimes.
-5. Only then test a learned mechanism model against the oracle and the matched
+5. Compare the CUSUM-gated mixture with fixed-share without resets, measuring
+   false alarms, detection delay, post-shift regret, recovery and total coded
+   bits.
+6. Only then test a learned mechanism model against the oracle and the matched
    noncausal temporal control.
 
 No compression win is implied by source existence. The runner must be compiled
