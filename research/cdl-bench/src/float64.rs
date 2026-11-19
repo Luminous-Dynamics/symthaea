@@ -85,7 +85,7 @@ fn raw_bits_bytes(values: &[f64]) -> Result<Vec<u8>, NumericError> {
 fn encode_transform(values: &[f64], transform: Float64Transform) -> Result<Vec<u8>, NumericError> {
     let capacity = match transform {
         Float64Transform::Raw => values.len().checked_mul(8).ok_or(NumericError::LengthOverflow)?,
-        Float64Transform::XorPrevious => values
+        Float64Transform::XorPrevious | Float64Transform::XorLeadingTrailing => values
             .len()
             .checked_mul(MAX_TRANSFORMED_BYTES_PER_VALUE)
             .ok_or(NumericError::LengthOverflow)?,
