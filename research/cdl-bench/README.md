@@ -594,6 +594,26 @@ bash scripts/research/cdl_rabbit_branch_mapper_reference.sh
 
 The C++ runner uses a default block size of 1,000 symbols (Rabbit's paper default), checks exact flag round-trips including 100 randomized streams, and reports flag-only bits against fixed two-bit flags and an offline same-block fixed-or-dynamic oracle. These are synthetic flag costs only, not end-to-end Rabbit/ACTF or CDL compression results. See the research note for the ablation numbers and limitations.
 
+## Order-preserving per-series partitioned telemetry reference
+
+The C++20 reference `research/cdl-bench/reference/typed_record_partitioned_runs_reference.cpp` prototypes a hybrid layout for interleaved telemetry:
+- A first-seen-order dictionary of entity/series keys.
+- One timestamp/state-delta/heartbeat-run substream per key.
+- An explicit bit-packed key-ID schedule that restores the original interleaved arrival order.
+- A self-describing outer frame with record counts, child lengths, fixed field-kind schema and CRC32.
+
+It deliberately preserves the original row order on decode. The order schedule, dictionary and all child streams are part of the measured frame. The raw and global state-delta controls also use self-describing frames with a schema, count, payload length and CRC.
+
+Run from the repository root:
+
+```sh
+bash scripts/research/cdl_partitioned_telemetry_reference.sh
+```
+
+The runner compiles with `-O2 -std=c++20 -Wall -Wextra -Wconversion -Werror`, tests the empty stream, four deterministic 65,536-record fixtures, 100 randomized interleaved round-trips and malformed frames, then compares Zstd 1.5.7 at level 19 on equally framed raw, global-delta and partitioned representations. The experimental results and caveats are in `docs/research/CDL_TYPED_TELEMETRY_JOINT_SEGMENTATION_V1_2026-11-19.md`.
+
+**Limitations:** C++ reference only; eight fixed lanes, 64-key synthetic data, full-input materialization, no measured Rust build, no random-access index, no bounded-memory streaming, no production dataset, and no ALP/Pco/Gorilla/Chimp/Rabbit/WZS comparison. Do not treat this as a codec win or production format.
+
 ## Plugging in a custom predictor
 
 The library exposes:
