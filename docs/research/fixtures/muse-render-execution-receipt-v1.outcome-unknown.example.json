@@ -105,6 +105,6 @@
     "key_id": null,
     "signature": null
   },
-  "digest_recipe": "muse-render-execution-receipt-jcs-sha256-v1",
-  "receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  "digest_recipe": "muse-render-execution-receipt-sorted-json-sha256-v1",
+  "receipt_sha256": "2adb281dcf5b99c687fd415062cbce5a9633bac1c40b1b98d191c44f337a342b"
 }
