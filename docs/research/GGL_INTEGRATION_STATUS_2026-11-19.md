@@ -44,6 +44,22 @@ The initial fixture placeholder-digest issue was corrected: the source digest ma
 
 Required next gate: exact-head `cargo fmt --check`, `cargo test -p symthaea-ggl-canvas -p symthaea-canvas`, scoped Clippy and review of numeric/arc edge cases.
 
+
+## Atelier production integration
+
+A second Rust adapter now wraps the existing `symthaea_atelier::generate(config, snapshot, rng)` seam:
+
+- Explicit seed, namespaced stable call-site ID and request/scene digest receipt.
+- Reuses the existing Canvas `SceneNode`; it does not call Atelier's aesthetic score or automatic selection.
+- Registers single-family Atelier styles with conservative complete-output node ceilings: LSystem 3, ParametricCurve 11, PersistenceTexture 130, ColorField 15, ReactionDiffusion 1,027, StrangeAttractor 6,002, HofstadterButterfly 1,593, PersistenceDiagram 263. Composite remains excluded pending a separately qualified aggregate budget.
+- Preflights requested scene-node budget before generation; also caps viewport at 8,192 units, generator elements at 5,000, output nodes at 10,000, path bytes at 512 KiB and scene depth at 128.
+- Rejects any snapshot that would require Canvas sanitization/truncation rather than silently repairing it.
+- Validates output Canvas geometry/style/transform/resource bounds and wraps the resulting subtree in a stable GGL group.
+
+Rust adapter tests now include deterministic same-seed generation, stable wrapper ID, Canvas SVG rendering, Composite rejection, snapshot sanitation rejection, and a preflight rejection when a ReactionDiffusion request asks for fewer nodes than its registered worst-case bound.
+
+The per-family ceilings were derived from the current source bounds inspected on 2026-11-19: reaction-diffusion's 64×64 grid and 32×32 sample lattice; strange-attractor's 8,000 maximum iterations and integer step-downsampling; Hofstadter q≤13, three phase samples and 1,590 eigenvalues; and Canvas snapshot defaults of 64 persistence pairs / 64 Betti counts. They are conservative source-derived limits, not measured runtime benchmarks.
+
 ## Visual QD pilot
 
 - [Protocol](GGL_VISUAL_QD_BENCHMARK_V0.1.md)
