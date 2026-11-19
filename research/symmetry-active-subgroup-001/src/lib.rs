@@ -1110,7 +1110,7 @@ mod tests {
             .map(|index| {
                 let probe_cost = if group.group_id == "D4" {
                     // r, r2, r3, s, rs, r2s, r3s: total full-scan cost 11.
-                    [1_u64, 1, 1, 2, 2, 2, 3][index - 1]
+                    [1_u64, 1, 1, 2, 2, 2, 2][index - 1]
                 } else {
                     cost
                 };
