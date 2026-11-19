@@ -74,7 +74,15 @@ impl Default for MicCaptureConfig {
             sample_rate: 16_000,
             hv_channel_cap: 8,
             ringbuf_samples: 16_000,
-            stream_config: StreamConfig::low_latency(),
+            // Match AudioProjector's 10 ms training hop so live mel-delta
+            // sequences inhabit the same raw-frame prototype space by default.
+            // Callers may opt into a different cadence, but strict artifact
+            // metadata validation will then reject incompatible prototypes.
+            stream_config: StreamConfig {
+                min_frames: 2,
+                smoothing_window: 2,
+                ..StreamConfig::default()
+            },
             worker_idle_us: 1_000,
             min_frames_per_emit: 5,
             prototype_model_path: std::env::var_os("SYMTHAEA_STT_PROTOTYPES")
@@ -356,6 +364,19 @@ mod tests {
         (0..n)
             .map(|i| (2.0 * std::f32::consts::PI * freq_hz * i as f32 / sample_rate as f32).sin())
             .collect()
+    }
+
+    #[test]
+    fn default_mic_stream_cadence_matches_offline_raw_frame_encoder() {
+        let capture = MicCaptureConfig::default();
+        let offline = symthaea_stt::AudioProjector::default_config();
+        let stream = &capture.stream_config;
+        let audio = offline.config();
+
+        assert_eq!(stream.sample_rate, audio.sample_rate);
+        assert_eq!(stream.frame_duration, audio.frame_duration);
+        assert_eq!(stream.hop_duration, audio.hop_duration);
+        assert_eq!(stream.n_mels, audio.n_mels);
     }
 
     #[test]
