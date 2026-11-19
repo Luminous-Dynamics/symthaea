@@ -5,7 +5,7 @@
 **Architecture comparison:** #12875 / draft PR #12878  
 **Service qualification:** #12865 / PR #12867  
 **Wet-path design and biological methods:** #12703  
-**Implementation:** \`symthaea-aqua-bench::site_fit\`
+**Implementation:** `symthaea-aqua-bench::site_fit`
 
 ## 1. Decision problem
 
@@ -13,11 +13,11 @@ A product can perform well on a laboratory bench and still be unsuitable for a p
 
 The sequence must therefore be:
 
-\`measured site evidence
+`measured site evidence
  -> architecture-specific installation eligibility
  -> matched product/service trial
  -> independent completed-service qualification
- -> site-specific Pareto comparison\`
+ -> site-specific Pareto comparison`
 
 This protocol introduces an evidence gate before architectures enter the Pareto frontier. It does not select a winner, calculate engineering thresholds or replace local professional approval.
 
@@ -145,15 +145,38 @@ Only Eligible configurations may proceed as eligible entries in #12875's site-sp
 
 No site fit or service qualification is a substitute for competent local plumbing/electrical/building approval, product certification, microbiological clearance, human-factors assessment or physical commissioning.
 
-## 9. Software implementation status
+## 9. End-to-end comparison gate
+
+The Aqua benchmark crate now composes site eligibility with the existing matched-run and completed-service contracts through:
+
+`validate_site_eligible_qualified_matched_comparison`
+
+The composed path enforces the following sequence:
+
+1. Validate both canonical Aqua run records and their matched task, supply, room, measurement-protocol and resource-accounting context.
+2. Require control and candidate site profiles to identify the same surveyed site, survey revision and site-condition digest.
+3. Bind each site profile to the exact `DeviceConfiguration.device_configuration_sha256` used by its corresponding run.
+4. Evaluate each architecture against its own mandatory site prerequisites and method-scoped evidence.
+5. Run completed-service qualification only when **both** architectures are Eligible at that same site.
+
+The result retains both site-fit decisions. When either is Ineligible or Indeterminate, the matched service result is absent; no comparison claim is available. When both are Eligible, the independent service decision can still be Failed or Indeterminate. These are deliberately separate predicates:
+
+- `both_architectures_site_eligible()` means both configurations can proceed to a matched service evaluation at the surveyed site.
+- `candidate_service_qualified()` means the independent service decision qualified the candidate against a qualified control.
+
+Site eligibility is not bathing-service success. Bathing-service success is not water/energy superiority. Superiority still requires a preregistered statistical comparison of measured outcomes.
+
+This gate does not infer a site envelope from city or postal code, calculate local pressure or flow, select electrical/plumbing compliance rules, or authorize installation.
+
+## 10. Software implementation status
 
 The Rust module defines five architecture classes, fourteen capability domains, expected-authority mapping, mandatory baseline requirements, product-specific additive requirements (including ambient/freeze protection and connectivity where required), site/device/requirement/method digest binding, currentness handling, and Eligible / Ineligible / Indeterminate dispositions.
 
-It currently contains **45 authored unit tests** covering architecture-specific sets, missing/duplicate/unexpected evidence, stale/revoked/ambiguous evidence, wrong site/revision/architecture/device/requirements/method/authority, explicit failure vs uncertainty, additional product-specific connectivity and ambient/freeze protection, and site-to-site variation.
+It currently contains **45 authored site-fit unit tests** covering architecture-specific sets, missing/duplicate/unexpected evidence, stale/revoked/ambiguous evidence, wrong site/revision/architecture/device/requirements/method/authority, explicit failure vs uncertainty, additional product-specific connectivity and ambient/freeze protection, and site-to-site variation.
 
-These are authored tests, not execution passes. No cargo test, rustfmt, Clippy or repository CI pass is claimed until observed on the exact PR head.
+The full composed comparison adds six adapter tests for site-eligible success, explicit site ineligibility, missing site evidence, site-revision mismatch, exact device binding and the distinction between site eligibility and a failed bathing-service result. Together with the 43 service-qualification tests and eight earlier matched-service composition tests, these remain authored source inventories, not execution passes. No cargo test, rustfmt, Clippy or repository CI pass is claimed until observed on the exact PR head.
 
-## 10. Decision gate
+## 11. Decision gate
 
 Before a site is considered eligible:
 
