@@ -1,0 +1,101 @@
+{
+  "schema": "muse-render-execution-receipt-v1",
+  "attempt_id": "fixture.outcome-unknown.0001",
+  "attempt_state": "outcome_unknown",
+  "source": {
+    "source_score_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "candidate_score_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "score_digest_schema": "muse-score-serde-json-sha256-v1"
+  },
+  "edit": {
+    "plan_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "edit_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "verifier_id": "fixture-only-score-edit-verifier",
+    "verifier_version": "0.0.0-fixture",
+    "verification_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "verdict": "pass",
+    "authorized_operation_ids": [
+      "fixture-velocity-change"
+    ]
+  },
+  "midi": {
+    "manifest_schema": "midi-performance-manifest-v1",
+    "manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "midi_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "score_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "timeline_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "capability_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "byte_length": 4096,
+    "ticks_per_quarter": 480,
+    "note_count": 128
+  },
+  "renderer": {
+    "renderer_id": "fixture-only-fluidsynth",
+    "renderer_version": "0.0.0-fixture",
+    "binary_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "environment_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "configuration_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "asset_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "fallback_used": false,
+    "fallback_reason": null
+  },
+  "execution": {
+    "state": "unknown",
+    "executor_id": "fixture-only-executor",
+    "input_midi_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "output_audio_sha256": null,
+    "exit_code": null,
+    "started_at": "2026-11-19T10:00:00Z",
+    "finished_at": null,
+    "stdout_sha256": null,
+    "stderr_sha256": null,
+    "invocation_sha256": null
+  },
+  "audio": {
+    "disposition": "unknown",
+    "container": "unknown",
+    "audio_sha256": null,
+    "byte_length": null,
+    "sample_rate_hz": null,
+    "channels": null,
+    "frames": null
+  },
+  "verification": {
+    "midi_score_conformance": {
+      "verdict": "not_run",
+      "verifier_id": null,
+      "verifier_version": null,
+      "receipt_sha256": null,
+      "reason": "synthetic fixture; no MIDI was produced"
+    },
+    "rendered_score_conformance": {
+      "verdict": "abstain",
+      "verifier_id": null,
+      "verifier_version": null,
+      "receipt_sha256": null,
+      "reason": "execution outcome unknown"
+    },
+    "protected_audio_preservation": {
+      "verdict": "abstain",
+      "verifier_id": null,
+      "verifier_version": null,
+      "receipt_sha256": null,
+      "reason": "no reconciled audio output"
+    },
+    "human_evaluation": {
+      "verdict": "not_run",
+      "verifier_id": null,
+      "verifier_version": null,
+      "receipt_sha256": null,
+      "reason": "no reconciled audio output"
+    }
+  },
+  "attestation": {
+    "kind": "unsigned_local",
+    "identity": "synthetic-fixture",
+    "key_id": null,
+    "signature": null
+  },
+  "digest_recipe": "muse-render-execution-receipt-jcs-sha256-v1",
+  "receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+}
