@@ -170,5 +170,5 @@ A P0 pass means only that the composition contract, temporal-information rules a
 - The P0 standalone Rust audit is source-committed under `tools/marine-sail-liveaboard-audit/`.
 - The CLI separates `INVALID`, `BLOCKED`, `INCOMPLETE`, `SYNTHETIC_ONLY` and `ELIGIBLE_FOR_COMPARISON`; only the first four can arise from the current synthetic fixture.
 - Pair comparison checks identical mission/service/configuration/environment/gate inputs and excludes the sail-route candidate output from shared-input identity comparison.
-- Thirteen tests are authored for forecast-time leakage, impossible forecast timestamps, revoked evidence, missing resource dimensions, unresolved gates, malformed digests, evaluator-only truth, schema-version changes, mission mismatch and synthetic-only non-promotion.
+- Fifteen tests are authored for forecast-time leakage, impossible forecast timestamps, revoked evidence, missing resource dimensions, unresolved gates, malformed digests, evaluator-only truth, schema-version changes, mission mismatch and synthetic-only non-promotion.
 - Exact Rust formatting, compilation, Clippy and test execution are pending because the current environment does not expose a Rust toolchain. The workflow is path-scoped and will run independently; no CI pass is claimed.
