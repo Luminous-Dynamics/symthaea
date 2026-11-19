@@ -612,7 +612,7 @@ pub fn compress_f64_online_selector(
         let selected = history.choose();
         let child = encode_segment_candidate(segment, selected)?;
         frame.extend_from_slice(&child);
-        history.observe(segment)?;
+        history.observe_with_selected(segment, selected, child.len())?;
     }
     Ok(frame)
 }
@@ -715,7 +715,7 @@ pub fn decompress_f64_online_selector(
         if decoded.len() != expected_values {
             return Err(NumericError::LengthMismatch);
         }
-        history.observe(&decoded)?;
+        history.observe_with_selected(&decoded, expected_candidate, child.len())?;
         output.extend_from_slice(&decoded);
         cursor = child_end;
     }
