@@ -741,6 +741,44 @@ mod tests {
     }
 
     #[test]
+    fn missing_lipschitz_and_objective_constraint_provenance_fail_closed() {
+        let mut problem = qualified_fixture(RationalBoundV1::new(1, 1).unwrap(), &[10]);
+        problem.steps[0].map_lipschitz_certificate_id.clear();
+        assert_eq!(
+            problem.validate(),
+            Err(EnvelopeErrorV1::MissingMapLipschitzCertificate)
+        );
+
+        let mut problem = qualified_fixture(RationalBoundV1::new(1, 1).unwrap(), &[10]);
+        problem.objective = Some(ObjectiveComparisonV1 {
+            objective_unit_id: "objective-unit".to_owned(),
+            nominal_gap_lower: 100,
+            objective_lipschitz: RationalBoundV1::new(1, 1).unwrap(),
+            objective_lipschitz_certificate_id: String::new(),
+            direct_defect_upper: 1,
+            direct_defect_certificate_id: "objective-defect".to_owned(),
+        });
+        assert_eq!(
+            problem.validate(),
+            Err(EnvelopeErrorV1::MissingObjectiveCertificate)
+        );
+
+        let mut problem = qualified_fixture(RationalBoundV1::new(1, 1).unwrap(), &[10]);
+        problem.constraint = Some(ConstraintMarginV1 {
+            constraint_unit_id: "constraint-unit".to_owned(),
+            nominal_slack_lower: 100,
+            constraint_lipschitz: RationalBoundV1::new(1, 1).unwrap(),
+            constraint_lipschitz_certificate_id: "constraint-lipschitz".to_owned(),
+            direct_defect_upper: 1,
+            direct_defect_certificate_id: String::new(),
+        });
+        assert_eq!(
+            problem.validate(),
+            Err(EnvelopeErrorV1::MissingConstraintCertificate)
+        );
+    }
+
+    #[test]
     fn arithmetic_overflow_and_missing_identifiers_fail_closed() {
         let mut overflow = qualified_fixture(RationalBoundV1::new(2, 1).unwrap(), &[0]);
         overflow.initial_state_error_upper = u128::MAX;
