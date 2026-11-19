@@ -249,6 +249,32 @@ fn multiply(left: Matrix2, right: Matrix2) -> Matrix2 {
     product
 }
 
+fn validate_orthogonal_element(element: &Element) -> Result<(), String> {
+    for first_column in 0..2 {
+        for second_column in 0..2 {
+            let mut inner_product = 0_i128;
+            for row in 0..2 {
+                let term = element.matrix[row][first_column]
+                    .checked_mul(element.matrix[row][second_column])
+                    .ok_or_else(|| {
+                        format!("orthogonality product overflow for {}", element.id)
+                    })?;
+                inner_product = inner_product.checked_add(term).ok_or_else(|| {
+                    format!("orthogonality sum overflow for {}", element.id)
+                })?;
+            }
+            let expected = if first_column == second_column { 1 } else { 0 };
+            if inner_product != expected {
+                return Err(format!(
+                    "element {} is not orthogonal: column inner product ({first_column}, {second_column}) is {inner_product}, expected {expected}",
+                    element.id
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 impl Manifest {
     pub fn parse() -> Result<Self, String> {
         let root: Value = serde_json::from_str(include_str!("../../fixtures/v0.1/cases.json"))
@@ -337,6 +363,10 @@ impl Manifest {
             .iter()
             .find(|element| element.id == identity_id)
             .ok_or_else(|| "identity ID is not a declared element".to_owned())?;
+
+        for element in &self.elements {
+            validate_orthogonal_element(element)?;
+        }
 
         for left in &self.elements {
             for right in &self.elements {
@@ -1338,13 +1368,42 @@ mod tests {
     }
 
     #[test]
+    fn non_orthogonal_representation_of_the_abstract_group_is_rejected() {
+        let mut element = manifest().elements[1].clone();
+        // This shear-conjugated rotation may preserve the abstract D4 table,
+        // but it is not an isometry of the declared Euclidean point space.
+        element.matrix = [[-1, -2], [1, 1]];
+        assert!(validate_orthogonal_element(&element).is_err());
+    }
+
+    #[test]
+    fn every_declared_d4_element_preserves_the_frozen_euclidean_metric() {
+        let manifest = manifest();
+        for element in &manifest.elements {
+            validate_orthogonal_element(element).unwrap();
+        }
+    }
+
+    #[test]
     fn decimal_coordinates_are_parsed_exactly_without_binary_float_rounding() {
-        let exact = serde_json::json!(1.01);
+        let exact: Value = serde_json::from_str("1.01").unwrap();
         assert_eq!(decimal_scaled(&exact, 1000, "test"), Ok(1010));
-        let scientific = serde_json::json!(1e-3);
+
+        let scientific: Value = serde_json::from_str("1e-3").unwrap();
         assert_eq!(decimal_scaled(&scientific, 1000, "test"), Ok(1));
-        let not_representable = serde_json::json!(1.0001);
+
+        let not_representable: Value = serde_json::from_str("1.0001").unwrap();
         assert!(decimal_scaled(&not_representable, 1000, "test").is_err());
+
+        // These tokens collapse to the same f64 under ordinary serde_json
+        // parsing, but the exact-token feature must keep them distinct.
+        let near_one: Value = serde_json::from_str("1.00000000000000001").unwrap();
+        assert!(decimal_scaled(&near_one, 1000, "test").is_err());
+        let exact_small: Value = serde_json::from_str("0.000000000000000001").unwrap();
+        assert_eq!(
+            decimal_scaled(&exact_small, 1_000_000_000_000_000_000, "test"),
+            Ok(1)
+        );
     }
 
     #[test]
