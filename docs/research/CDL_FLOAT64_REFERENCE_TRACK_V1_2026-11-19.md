@@ -1,15 +1,15 @@
 # CDL-Bench exact IEEE-754 f64 reference track v1
 
 **Date:** 2026-11-19  
-**Status:** Rust reference source and authored tests committed; independent Python transform translation exercised; Rust compilation and arithmetic-coded size results pending.
+**Status:** Rust reference source, segment-local selector and authored tests committed; independent Python transform translation exercised; Rust compilation and arithmetic-coded size results pending.
 
 ## Why this track exists
 
 The SCM/i16 lane does not represent the dominant specialized lossless floating-point time-series competition. By 2026, several purpose-built codecs target bit patterns, decimal prefixes, oscillation, branch flags and segment-local encoding choices. A credible SOTA comparison needs a typed IEEE-754 track; it must not infer that success on synthetic SCM i16 streams transfers to f64 sensor streams.
 
 The branch adds a small correctness reference, not a competitive codec:
-- `research/cdl-bench/src/float64.rs`: typed `F64C` frame with raw bits or XOR-previous u64 varints, inner CDL arithmetic coding, CRC-32 checksums and output limits.
-- `research/cdl-bench/src/main.rs`: `float --values N --seed N` experiment command.
+- `research/cdl-bench/src/float64.rs`: typed `F64C` frame with raw bits or XOR-previous u64 varints; `F64S` segment container with fixed policy ID, segment count, header CRC, and best-of-four per-chunk subframe selection; inner CDL arithmetic coding, CRC-32 checksums and output limits.
+- `research/cdl-bench/src/main.rs`: `float --values N --seed N` experiment command comparing single-stream and segment-portfolio rows with frame size and encode/decode timings.
 - `research/cdl-bench/src/lib.rs`: public exports.
 - `research/cdl-bench/README.md`: usage and limits.
 - Tracking: [CDL-Bench-007 #12874](https://github.com/Luminous-Dynamics/symthaea/issues/12874).
@@ -43,14 +43,16 @@ From `research/cdl-bench`:
 cargo run --release -- float --values 10000 --seed 42
 ```
 
-The command emits frame lengths and encode/decode nanoseconds for:
+The command emits frame lengths and encode/decode nanoseconds for the single-stream arms and the segment portfolio at fixed chunk sizes 64, 256 and 1,024, across:
 - constant;
 - smooth-ramp;
 - oscillating/sign-alternating;
 - high-precision decimal-like;
 - random-bit-pattern streams.
 
-Each stream is evaluated with raw and XOR-previous transforms under order-0 and order-1 entropy models. Zstandard is measured on the original raw little-endian f64 bytes if installed. The current CLI does not yet invoke DeXOR, ACTF, Gorilla, Chimp, Rabbit or Dolphin.
+Each stream is evaluated with raw and XOR-previous transforms under order-0 and order-1 entropy models. The segment portfolio tries all four combinations per chunk and picks the smallest complete child F64C frame. The F64S container header, every F64C child header, child CRCs, and the inner CDL payloads are all counted in the reported frame size. Zstandard is measured on the original raw little-endian f64 bytes if installed. The CLI does not yet invoke DeXOR, ACTF, Gorilla, Chimp, Rabbit or Dolphin.
+
+**Selection caveat:** the current selector has the entire chunk available and tries all four encodings before choosing one. This is an offline size oracle, not an online selector and not a WZS reproduction. It is useful as a transparent fixed-chunk upper bound for the specific four candidate encodings; it does not establish that transmitted or inferred online segmentation would achieve the same result.
 
 ## Independent transform-logic check
 
@@ -62,7 +64,7 @@ A separate Python translation exercised:
 
 All checks passed. This is **not** Rust compilation, F64C frame validation, arithmetic coder execution, or a compression-performance result.
 
-Rust tests are authored for raw/XOR exact reconstruction, deterministic encoding, truncated-prefix rejection, single-bit mutation rejection, output-limit enforcement and malformed u64-varint rejection. They have not run because the local environment has no Rust toolchain. No SOTA or frame-size win is claimed.
+Rust tests are authored for raw/XOR exact reconstruction, deterministic encoding, truncated-prefix rejection, single-bit mutation rejection, output-limit enforcement and malformed u64-varint rejection. Segmented tests cover bitwise round-trip at chunk sizes 1/64/256/1024, truncation, zero chunk size, output limit, header flags/policy validation, and single-bit mutation rejection. They have not run because the local environment has no Rust toolchain. No SOTA or frame-size win is claimed.
 
 ## 2026 competitive comparison
 
