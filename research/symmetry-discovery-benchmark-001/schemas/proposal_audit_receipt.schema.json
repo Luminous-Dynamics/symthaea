@@ -1,0 +1,445 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/symmetry-discovery-benchmark-001/schemas/proposal_audit_receipt.schema.json",
+  "title": "Exact finite-group proposal audit receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "execution_id",
+    "execution_status",
+    "split",
+    "benchmark_track",
+    "method",
+    "case_manifest_binding",
+    "denominator",
+    "metrics",
+    "verification",
+    "case_results"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "benchmark_id": {
+      "const": "LUMINOUS-SYMM-QUALIFIED-DISCOVERY-001"
+    },
+    "execution_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "execution_status": {
+      "enum": [
+        "completed",
+        "partial"
+      ]
+    },
+    "split": {
+      "enum": [
+        "discovery",
+        "calibration",
+        "final_holdout",
+        "fixture_sanity"
+      ]
+    },
+    "benchmark_track": {
+      "enum": [
+        "exact_finite_structural_stabilizer",
+        "finite_reference_group_regression_discovery"
+      ]
+    },
+    "method": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "source_revision",
+        "configuration_digest_sha256"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "case_manifest_binding": {
+      "const": "embedded_exact_manifest_at_oracle_source_revision"
+    },
+    "denominator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cases_in_scope",
+        "cases_attempted",
+        "completed",
+        "abstained",
+        "failed",
+        "out_of_domain"
+      ],
+      "properties": {
+        "cases_in_scope": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cases_attempted": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "completed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "abstained": {
+          "const": 0
+        },
+        "failed": {
+          "const": 0
+        },
+        "out_of_domain": {
+          "const": 0
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposal_exact_match_rate",
+        "false_exact_promotion_case_rate",
+        "false_elimination_case_rate",
+        "invalid_group_proposal_case_rate"
+      ],
+      "properties": {
+        "proposal_exact_match_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "false_exact_promotion_case_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "false_elimination_case_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "invalid_group_proposal_case_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "oracle_audits_replayed",
+        "false_exact_promotion_cases",
+        "false_elimination_cases",
+        "invalid_group_proposal_cases"
+      ],
+      "properties": {
+        "oracle_audits_replayed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_exact_promotion_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_elimination_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "invalid_group_proposal_cases": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "case_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "proposed_subgroup_ids",
+          "exact_stabilizer",
+          "proposal_exact_match",
+          "false_exact_promotion",
+          "false_elimination",
+          "group_axioms_satisfied",
+          "axiom_violations",
+          "true_positive_elements",
+          "false_promotion_elements",
+          "missed_symmetry_elements",
+          "true_negative_elements",
+          "decisions",
+          "audit_replayed"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "proposed_subgroup_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "exact_stabilizer": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "proposal_exact_match": {
+            "type": "boolean"
+          },
+          "false_exact_promotion": {
+            "type": "boolean"
+          },
+          "false_elimination": {
+            "type": "boolean"
+          },
+          "group_axioms_satisfied": {
+            "type": "boolean"
+          },
+          "axiom_violations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "minProperties": 1,
+              "maxProperties": 1
+            }
+          },
+          "true_positive_elements": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "false_promotion_elements": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "missed_symmetry_elements": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "true_negative_elements": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "element_id",
+                "proposed",
+                "exact",
+                "witness"
+              ],
+              "properties": {
+                "element_id": {
+                  "type": "string"
+                },
+                "proposed": {
+                  "type": "boolean"
+                },
+                "exact": {
+                  "type": "boolean"
+                },
+                "witness": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "source_to_target"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "point_permutation"
+                        },
+                        "source_to_target": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "source",
+                        "transformed"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "moved_point"
+                        },
+                        "source": {
+                          "type": "array",
+                          "prefixItems": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ],
+                          "items": false,
+                          "minItems": 2,
+                          "maxItems": 2
+                        },
+                        "transformed": {
+                          "type": "array",
+                          "prefixItems": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "integer"
+                            }
+                          ],
+                          "items": false,
+                          "minItems": 2,
+                          "maxItems": 2
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "transformed_terms"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "polynomial_identity"
+                        },
+                        "transformed_terms": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "prefixItems": [
+                              {
+                                "type": "array",
+                                "prefixItems": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  }
+                                ],
+                                "items": false,
+                                "minItems": 2,
+                                "maxItems": 2
+                              },
+                              {
+                                "type": "integer"
+                              }
+                            ],
+                            "items": false,
+                            "minItems": 2,
+                            "maxItems": 2
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "exponents",
+                        "original_coefficient",
+                        "transformed_coefficient"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "polynomial_coefficient_mismatch"
+                        },
+                        "exponents": {
+                          "type": "array",
+                          "prefixItems": [
+                            {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          ],
+                          "items": false,
+                          "minItems": 2,
+                          "maxItems": 2
+                        },
+                        "original_coefficient": {
+                          "type": "integer"
+                        },
+                        "transformed_coefficient": {
+                          "type": "integer",
+                          "not": {
+                            "const": 0
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "audit_replayed": {
+            "const": true
+          }
+        }
+      }
+    }
+  }
+}
