@@ -153,7 +153,6 @@ pub struct LiftedCandidateV1 {
     pub inverse_group_element: usize,
 }
 
-
 /// One independently declared operating regime, boundary-condition family,
 /// intervention setting, or task variant over the same candidate universe.
 #[derive(Debug, Clone, PartialEq, Eq)]
