@@ -7,6 +7,7 @@
 //! surface in a context window. It cannot promote evidence, alter trust,
 //! authorize an action, delete memory, or override lifecycle controls.
 
+use broca_mace_ingress::{ConsolidationEvidenceRefV1, SourceTrustStatus};
 use broca_mace_policy::Scope;
 use sha2::{Digest, Sha256};
 
@@ -116,15 +117,127 @@ impl FutureUsePredictionV1 {
 
 /// Candidate must already be present in a verified evidence pack. The source
 /// digest is retained in the surfacing plan; salience never re-verifies it.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MemorySurfacingCandidateV1 {
-    pub event_id: u32,
+/// Access telemetry is a retrieval hint, never an evidence or trust claim.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MemoryAccessTelemetryV1 {
     pub context_token_cost: u32,
     pub last_accessed_at_ms: i64,
     pub historical_access_count: u32,
-    pub observed_failure: bool,
-    pub evidence_sha256: String,
-    pub prediction: Option<FutureUsePredictionV1>,
+}
+
+/// Opaque candidate constructed from an admitted, receipt-preserving evidence
+/// reference. Callers cannot manufacture an eligible memory by filling fields.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MemorySurfacingCandidateV1 {
+    event_id: u32,
+    context_token_cost: u32,
+    last_accessed_at_ms: i64,
+    historical_access_count: u32,
+    observed_failure: bool,
+    evidence_sha256: String,
+    prediction: Option<FutureUsePredictionV1>,
+}
+
+impl MemorySurfacingCandidateV1 {
+    pub fn from_verified_evidence(
+        evidence: &ConsolidationEvidenceRefV1,
+        access: MemoryAccessTelemetryV1,
+        prediction: Option<FutureUsePredictionV1>,
+        known_at_ms: i64,
+    ) -> Result<Self, SalienceReject> {
+        if evidence.event_id() == 0 {
+            return Err(SalienceReject::InvalidEventId);
+        }
+        if evidence.source_trust_status() != SourceTrustStatus::TrustedForScope {
+            return Err(SalienceReject::EvidenceNotTrusted);
+        }
+        if !evidence.outcome_reconciled() {
+            return Err(SalienceReject::EvidenceOutcomeUnreconciled);
+        }
+        if evidence.source_family() == 0
+            || !evidence.source_root_digest().is_known()
+        {
+            return Err(SalienceReject::EvidenceRootUnknown);
+        }
+        let error_bound = evidence.measurement_error_bound();
+        if !error_bound.is_finite() || !(0.0..=1.0).contains(&error_bound) {
+            return Err(SalienceReject::InvalidEvidenceMeasurement);
+        }
+        if access.context_token_cost == 0 {
+            return Err(SalienceReject::InvalidContextCost);
+        }
+        if access.last_accessed_at_ms > known_at_ms {
+            return Err(SalienceReject::FutureAccessTimestamp);
+        }
+
+        let evidence_sha256 = receipt_bound_evidence_digest(evidence);
+        if let Some(value) = &prediction {
+            if value.event_id != evidence.event_id() {
+                return Err(SalienceReject::PredictionEventMismatch);
+            }
+            if value.evidence_sha256 != evidence_sha256 {
+                return Err(SalienceReject::PredictionEvidenceMismatch);
+            }
+        }
+
+        Ok(Self {
+            event_id: evidence.event_id(),
+            context_token_cost: access.context_token_cost,
+            last_accessed_at_ms: access.last_accessed_at_ms,
+            historical_access_count: access.historical_access_count,
+            observed_failure: !evidence.outcome_success(),
+            evidence_sha256,
+            prediction,
+        })
+    }
+
+    pub fn event_id(&self) -> u32 {
+        self.event_id
+    }
+
+    pub fn evidence_sha256(&self) -> &str {
+        &self.evidence_sha256
+    }
+}
+
+fn receipt_bound_evidence_digest(evidence: &ConsolidationEvidenceRefV1) -> String {
+    let receipt = evidence.receipts();
+    let fields = vec![
+        evidence.event_id().to_string(),
+        evidence.session_id().to_owned(),
+        evidence.task_id().to_owned(),
+        scope_code(evidence.scope()).to_owned(),
+        evidence.action().name().to_owned(),
+        evidence.observed_utility().to_bits().to_string(),
+        evidence.measurement_error_bound().to_bits().to_string(),
+        evidence.source_family().to_string(),
+        evidence.source_root_id().to_string(),
+        evidence.source_root_digest().to_hex(),
+        receipt.raw_event_digest.clone(),
+        receipt.raw_event_receipt_digest.clone(),
+        receipt.canonical_event_hash.clone(),
+        receipt.authority_receipt_digest.clone(),
+        receipt.event_occurred_at_ms.to_string(),
+        receipt.authority_received_at_ms.to_string(),
+        receipt.lineage_digest.clone(),
+        receipt.source_acquisition_mode.clone(),
+        receipt.upstream_source_id.clone(),
+        receipt.source_artifact_digest.clone(),
+        receipt.transformation_digest.clone(),
+        receipt.source_issuer_id.clone(),
+        receipt.source_trust_policy_digest.clone(),
+        receipt.calibration_digest.clone(),
+        receipt.measurement_unit.clone(),
+        receipt.measurement_instrument_id.clone(),
+        receipt.calibration_method_id.clone(),
+        receipt.calibration_revision.clone(),
+        receipt.causal_assessment_digest.clone(),
+        receipt.outcome_success.to_string(),
+        receipt.outcome_observed_utility_bits.to_string(),
+        receipt.outcome_utility_unit.clone(),
+        receipt.outcome_digest.clone(),
+    ];
+    digest_fields(b"mycelix:mace:verified-memory-evidence:v1\\0", &fields)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -147,6 +260,10 @@ pub enum SalienceReject {
     InvalidModelDigest,
     InvalidRationaleDigest,
     InvalidPredictionDigest,
+    EvidenceNotTrusted,
+    EvidenceOutcomeUnreconciled,
+    EvidenceRootUnknown,
+    InvalidEvidenceMeasurement,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
