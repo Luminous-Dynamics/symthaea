@@ -1352,6 +1352,10 @@ mod tests {
         );
         assert!(prototypes.validate_encoder(&raw).is_ok());
         assert!(prototypes.validate_encoder(&temporal).is_err());
+
+        let encoded = serde_json::to_vec(&prototypes).unwrap();
+        let decoded: TrainedPrototypes = serde_json::from_slice(&encoded).unwrap();
+        assert!(decoded.validate_encoder(&raw).is_ok());
     }
 
     #[test]
