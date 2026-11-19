@@ -549,8 +549,14 @@ fn analyze(
         validate_metric(metric)?;
     }
 
+    let case_by_id: HashMap<&str, &Case> = cases
+        .iter()
+        .map(|case| (case.case_id.as_str(), case))
+        .collect();
     let mut by_case_metric: HashMap<(String, String), &InputRecord> =
         HashMap::with_capacity(records.len());
+    let mut digests_by_case: HashMap<String, String> = HashMap::new();
+    let mut axes_by_block: HashMap<(String, String, u64), String> = HashMap::new();
     for record in records {
         if !expected_case_ids.contains(&record.case_id) {
             return Err(format!("unexpected case_id {:?}", record.case_id));
@@ -564,6 +570,45 @@ fn analyze(
                 "duplicate observation for case {:?}, metric {:?}",
                 record.case_id, record.metric
             ));
+        }
+
+        if !record.artifact_sha256.is_empty() {
+            match digests_by_case.entry(record.case_id.clone()) {
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    entry.insert(record.artifact_sha256.clone());
+                }
+                std::collections::hash_map::Entry::Occupied(entry)
+                    if entry.get() != &record.artifact_sha256 =>
+                {
+                    return Err(format!(
+                        "artifact SHA-256 mismatch across metrics for case {:?}",
+                        record.case_id
+                    ));
+                }
+                std::collections::hash_map::Entry::Occupied(_) => {}
+            }
+        }
+
+        if let Some(case) = case_by_id.get(record.case_id.as_str())
+            && let Some(axes) = support_axes_from_note(&record.note)
+        {
+            let block_key = (
+                case.cohort.as_str().to_string(),
+                case.style.clone(),
+                case.seed,
+            );
+            match axes_by_block.entry(block_key) {
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    entry.insert(axes);
+                }
+                std::collections::hash_map::Entry::Occupied(entry) if entry.get() != &axes => {
+                    return Err(format!(
+                        "declared support-axis metadata mismatch within case block {:?}",
+                        record.case_id
+                    ));
+                }
+                std::collections::hash_map::Entry::Occupied(_) => {}
+            }
         }
     }
 
@@ -716,10 +761,13 @@ fn analyze(
         }
     }
 
+    let axis_invariance = axis_invariance_report(cases, &digests_by_case, &axes_by_block);
+
     Ok(Analysis {
         coverage,
         effects,
         summaries,
+        axis_invariance,
         incomplete_blocks,
     })
 }
@@ -766,6 +814,30 @@ fn coverage_csv(rows: &[CoverageRow]) -> String {
     output
 }
 
+fn axis_invariance_csv(rows: &[AxisInvarianceRow]) -> String {
+    let mut output = String::from(
+        "cohort,style,seed,axis,declared_supported,expected_slices,complete_slices,identical_slices,changed_slices,unavailable_slices,disposition\n",
+    );
+    for row in rows {
+        output.push_str(&csv_record(&[
+            row.cohort.clone(),
+            row.style.clone(),
+            row.seed.to_string(),
+            row.axis.clone(),
+            row.declared_supported
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+            row.expected_slices.to_string(),
+            row.complete_slices.to_string(),
+            row.identical_slices.to_string(),
+            row.changed_slices.to_string(),
+            row.unavailable_slices.to_string(),
+            row.disposition.clone(),
+        ]));
+    }
+    output
+}
+
 fn effects_csv(rows: &[EffectRow]) -> String {
     let mut output = String::from("cohort,style,seed,metric,term,order,estimate\n");
     for row in rows {
@@ -806,9 +878,9 @@ fn summary_csv(rows: &[SummaryRow]) -> String {
 
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().skip(1).collect();
-    if args.len() != 6 {
+    if args.len() != 7 {
         return Err(
-            "usage: analyze-results <discovery|confirmation|both> <observations.csv> <metric[,metric...]> <coverage.csv> <effects.csv> <summary.csv>"
+            "usage: analyze-results <discovery|confirmation|both> <observations.csv> <metric[,metric...]> <coverage.csv> <effects.csv> <summary.csv> <axis-invariance.csv>"
                 .to_string(),
         );
     }
@@ -826,10 +898,10 @@ fn run() -> Result<(), String> {
         PathBuf::from(&args[3]),
         PathBuf::from(&args[4]),
         PathBuf::from(&args[5]),
+        PathBuf::from(&args[6]),
     ];
-    if output_paths[0] == output_paths[1]
-        || output_paths[0] == output_paths[2]
-        || output_paths[1] == output_paths[2]
+    let unique_outputs: HashSet<&PathBuf> = output_paths.iter().collect();
+    if unique_outputs.len() != output_paths.len()
         || output_paths.iter().any(|path| path == &input_path)
     {
         return Err("input and output paths must all be distinct".to_string());
@@ -850,6 +922,8 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("cannot write {}: {error}", output_paths[1].display()))?;
     fs::write(&output_paths[2], summary_csv(&analysis.summaries))
         .map_err(|error| format!("cannot write {}: {error}", output_paths[2].display()))?;
+    fs::write(&output_paths[3], axis_invariance_csv(&analysis.axis_invariance))
+        .map_err(|error| format!("cannot write {}: {error}", output_paths[3].display()))?;
 
     if analysis.incomplete_blocks > 0 {
         return Err(format!(
