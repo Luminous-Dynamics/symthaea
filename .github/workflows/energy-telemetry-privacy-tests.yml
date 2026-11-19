@@ -1,0 +1,65 @@
+name: Energy Telemetry Privacy Contract
+
+on:
+  push:
+    branches:
+      - "research/privacy-preserving-satellite-energy-telemetry"
+    paths:
+      - "tools/energy_telemetry/**"
+      - "tests/test_energy_telemetry_*.py"
+      - "docs/research/energy_telemetry_envelope.schema.json"
+      - "docs/research/DOMAIN_GENERAL_DELAY_TOLERANT_TELEMETRY.md"
+      - "docs/research/SQLITE_DURABLE_TELEMETRY_LEDGER.md"
+      - "docs/research/DURABLE_DP_RELEASE_ACCOUNTING.md"
+      - "docs/research/DP_MECHANISM_QUALIFICATION_GATE.md"
+      - "docs/research/AUTHENTICATED_TELEMETRY_ENVELOPE.md"
+      - "docs/research/RECEIVER_INBOX_COMMIT_BEFORE_ACK.md"
+      - ".github/workflows/energy-telemetry-privacy-tests.yml"
+  pull_request:
+    paths:
+      - "tools/energy_telemetry/**"
+      - "tests/test_energy_telemetry_*.py"
+      - "docs/research/energy_telemetry_envelope.schema.json"
+      - "docs/research/DOMAIN_GENERAL_DELAY_TOLERANT_TELEMETRY.md"
+      - "docs/research/SQLITE_DURABLE_TELEMETRY_LEDGER.md"
+      - "docs/research/DURABLE_DP_RELEASE_ACCOUNTING.md"
+      - "docs/research/DP_MECHANISM_QUALIFICATION_GATE.md"
+      - "docs/research/RECEIVER_INBOX_COMMIT_BEFORE_ACK.md"
+      - ".github/workflows/energy-telemetry-privacy-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: energy-telemetry-privacy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  privacy-contract:
+    name: Compile and test telemetry privacy contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify Python runtime
+        run: python3 --version
+
+      - name: Install pinned telemetry crypto dependency
+        run: >-
+          python3 -m pip install --disable-pip-version-check
+          --only-binary=:all:
+          --requirement tools/energy_telemetry/requirements.txt
+
+      - name: Compile privacy, crypto and store-forward contracts
+        run: python3 -m py_compile tools/energy_telemetry/privacy_contract.py tools/energy_telemetry/release_guard.py tools/energy_telemetry/store_forward.py tools/energy_telemetry/authenticated_envelope.py tools/energy_telemetry/durable_queue.py tools/energy_telemetry/receiver_inbox.py tools/energy_telemetry/durable_privacy_ledger.py tools/energy_telemetry/qualified_output.py tests/test_energy_telemetry_durable_privacy_ledger.py tests/test_energy_telemetry_privacy_contract.py tests/test_energy_telemetry_release_guard.py tests/test_energy_telemetry_store_forward.py tests/test_energy_telemetry_durable_queue.py tests/test_energy_telemetry_authenticated_envelope.py tests/test_energy_telemetry_receiver_inbox.py tests/test_energy_telemetry_pipeline_integration.py
+
+      - name: Run deterministic telemetry contract tests
+        run: python3 -m unittest discover -s tests -p 'test_energy_telemetry_*.py' -v
