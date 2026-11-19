@@ -85,19 +85,21 @@ static std::vector<uint64_t> decode_window(const std::vector<uint8_t>& bytes, si
         if (marker == 0) {
             residual = 0;
         } else if (marker == 1 || marker == 2) {
+            const Window previous_window = window;
+            uint32_t leading = 0;
+            uint32_t trailing = 0;
             if (marker == 2) {
                 if (cursor + 2U > bytes.size()) throw std::runtime_error("truncated new window");
-                const uint32_t leading = bytes[cursor++];
-                const uint32_t trailing = bytes[cursor++];
+                leading = bytes[cursor++];
+                trailing = bytes[cursor++];
                 if (leading >= 64U || trailing >= 64U || leading + trailing >= 64U)
                     throw std::runtime_error("invalid new window span");
-                window.valid = true;
-                window.leading = leading;
-                window.trailing = trailing;
-            } else if (!window.valid) {
-                throw std::runtime_error("reuse before a window is defined");
+            } else {
+                if (!window.valid) throw std::runtime_error("reuse before a window is defined");
+                leading = window.leading;
+                trailing = window.trailing;
             }
-            const uint32_t width = 64U - window.leading - window.trailing;
+            const uint32_t width = 64U - leading - trailing;
             const uint32_t payload_bytes = (width + 7U) / 8U;
             const size_t end = cursor + static_cast<size_t>(payload_bytes);
             if (end > bytes.size()) throw std::runtime_error("truncated payload");
@@ -111,14 +113,20 @@ static std::vector<uint64_t> decode_window(const std::vector<uint8_t>& bytes, si
                     throw std::runtime_error("nonzero unused high bits");
             }
             if (meaningful == 0) throw std::runtime_error("zero residual must use marker zero");
-            residual = meaningful << window.trailing;
+            residual = meaningful << trailing;
             const uint32_t actual_leading = static_cast<uint32_t>(std::countl_zero(residual));
             const uint32_t actual_trailing = static_cast<uint32_t>(std::countr_zero(residual));
             if (marker == 2) {
                 if ((meaningful & 1ULL) == 0ULL || ((meaningful >> (width - 1U)) & 1ULL) == 0ULL ||
-                    actual_leading != window.leading || actual_trailing != window.trailing)
+                    actual_leading != leading || actual_trailing != trailing)
                     throw std::runtime_error("noncanonical new window payload");
-            } else if (actual_leading < window.leading || actual_trailing < window.trailing) {
+                if (previous_window.valid && actual_leading >= previous_window.leading &&
+                    actual_trailing >= previous_window.trailing)
+                    throw std::runtime_error("redundant new window; prior window is reusable");
+                window.valid = true;
+                window.leading = leading;
+                window.trailing = trailing;
+            } else if (actual_leading < leading || actual_trailing < trailing) {
                 throw std::runtime_error("reused residual does not fit window");
             }
         } else {
@@ -199,8 +207,9 @@ int main() {
     must_reject({2, 32, 32}, 1U, "empty significant window");
     must_reject({2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 1U, "zero residual with new window");
     must_reject({2, 0, 58, 0xc1}, 1U, "unused high payload bits");
+    must_reject({0, 2, 51, 12, 1, 2, 51, 12, 1}, 3U, "redundant new window");
 
     std::cout << "total_samples=" << total_samples << "\n";
-    std::cout << "malformed_cases_rejected=7\n";
+    std::cout << "malformed_cases_rejected=8\n";
     return 0;
 }
