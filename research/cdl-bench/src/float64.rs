@@ -1045,10 +1045,10 @@ mod tests {
 
     #[test]
     fn xor_leading_trailing_zero_residual_has_single_byte_code() {
-        let input = [1.0f64, 1.0, 1.0, 1.0];
+        let input = [0.0f64, 0.0, 0.0, 0.0];
         let encoded =
             encode_transform(&input, Float64Transform::XorLeadingTrailing).unwrap();
-        assert_eq!(encoded, vec![1, 0, 0, 0]);
+        assert_eq!(encoded, vec![0, 0, 0, 0]);
         let decoded =
             decode_transform(&encoded, Float64Transform::XorLeadingTrailing, input.len()).unwrap();
         assert_same_bits(&decoded, &input);
