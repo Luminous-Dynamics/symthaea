@@ -56,7 +56,8 @@ The command emits frame lengths and encode/decode nanoseconds for the single-str
 - mostly-idle telemetry-like streams with long exact repeats;
 - alternating positive/negative zero runs;
 - repeated distinct NaN payloads, infinities and zero runs;
-- random-bit-pattern streams.
+- random-bit-pattern streams;
+- alternating repeated-value/random-bit-pattern regimes with a 1,537-sample period, deliberately misaligned with all benchmark chunk sizes.
 
 Each stream is evaluated with raw, XOR-previous-varint, XOR-leading/trailing window, and RLE+XOR transforms under order-0 and order-1 entropy models. The F64S policies are: (1) offline best-of-eight oracle; (2) full past-only historical-cost selection; and (3) sparse-probe historical selection at K=1,4,16,64. Every child F64C header/CRC, outer F64S header and inner CDL payload counts toward the reported frame size. Zstandard is measured on original raw little-endian f64 bytes if installed. The CLI does not yet invoke DeXOR, ACTF, Gorilla, Chimp, Rabbit or Dolphin.
 
