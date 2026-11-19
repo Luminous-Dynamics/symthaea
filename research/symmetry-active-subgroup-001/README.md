@@ -32,6 +32,19 @@ The stabilizer of a task under a valid group action is a subgroup. Therefore a m
 
 The test suite also checks a D4 non-subgroup pattern {e, r, s} where r*s = rs is not preserved; the replay must return an empty candidate set and ModelInconsistent, never snap to the nearest subgroup.
 
+
+
+## Probe-cost benchmark fixtures
+
+The current frozen fixtures exclude the identity membership test because it is true for every subgroup and carries no information.
+
+| Fixture | Full admissible scan | Exact adaptive worst case | Exact static basis |
+|---|---:|---:|---:|
+| C4 (three non-identity probes, unit cost) | 3 | 2 | 2 |
+| D4 (seven non-identity probes, costs 1,1,1,2,2,2,3) | 11 | 9 | 10 |
+
+These are exact model-cost fixtures. They are not wall-clock speedups or evidence of fewer physical measurements in a real system. The certificate also reports the summed per-hypothesis path cost under a uniform subgroup prior, so the assumed prior is visible rather than implicit. The equality assertions are authored regression tests and remain pending the exact-head Rust 1.96 run.
+
 ## Reproduction
 
     cargo fmt --manifest-path research/symmetry-active-subgroup-001/Cargo.toml --all -- --check
