@@ -367,7 +367,7 @@ DIVE paper: https://arxiv.org/abs/2610.28405
 
 OASIS (CVPR 2026) reframes long streaming-video reasoning as **temporal routing**: when the current window and summary do not decide a question, the system should infer what historical evidence would decide it and retrieve that narrow event region. It uses three temporal tiers—high-fidelity short window, medium-resolution buffer and a multi-resolution event hierarchy—with coarse reasoning first and targeted fine retrieval only when needed.
 
-In the paper's StreamingBench table, the reproduced Qwen3-VL-8B baseline scores 72.83% Real-Time All; Qwen3-VL-8B + OASIS scores 78.22%, with reported gains in anomaly-context understanding (35.74% → 49.60%) and sequential QA (43.90% → 48.40%). These are paper-specific reproduced comparisons and should not be conflated with the current official leaderboard or an independent Symthaea result.
+In the paper's StreamingBench table, the reproduced Qwen3-VL-8B baseline scores 72.83% Real-Time All; Qwen3-VL-8B + OASIS scores 78.22%. Anomaly Context Understanding (ACU) rises from 35.63% to 42.74%, Misleading Context Understanding (MCU) from 35.74% to 49.60%, and Sequential QA from 43.90% to 48.40%. These are paper-specific reproduced comparisons and should not be conflated with the current official leaderboard or an independent Symthaea result.
 
 **Symthaea research hypothesis:** combine a persistent HDC/CfC event memory with evidence-indexed temporal retrieval. HDC similarity can propose candidate memories, but selection must be verified against exact source intervals, event identity, modality and clock uncertainty. Retrieval must not turn a semantically similar event into a claim that the same event occurred.
 
