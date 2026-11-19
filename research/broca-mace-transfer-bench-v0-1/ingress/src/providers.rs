@@ -291,7 +291,10 @@ pub fn normalize_capture_jsonl(
                 .filter(|value| !value.is_empty())
                 .map(str::to_owned),
         };
-        let stream_identity = thread_id.as_deref().unwrap_or("session");
+        let stream_identity = thread_id
+            .as_ref()
+            .map(|id| format!("thread:{id}"))
+            .unwrap_or_else(|| "session-stream".to_owned());
         let identity = native_event_id
             .as_ref()
             .map(|id| format!("{stream_identity}:native:{id}"))
