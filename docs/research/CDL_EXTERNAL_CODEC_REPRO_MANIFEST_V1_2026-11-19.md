@@ -106,6 +106,47 @@ zig build -Dtarget=x86_64-linux -Doptimize=ReleaseFast
 
 The expected Linux shared library path is `zig-out/lib/libtersets.so`. The helper then compiles `scripts/research/tersets_bitwise_gate.c` against `bindings/c/tersets.h` and the pinned shared library with `cc -std=c11 -O2 -Wall -Wextra -Werror`. It runs the strict bitwise gate: Uncompressed/Chimp64/Chimp128/Elf must preserve every u64 bit on IEEE-754 edge and signed-zero fixtures; RLE and BitPackedDelta are reported separately as conditional probes. Before adapter development, retain full Zig and C build logs and capture the library SHA-256. The upstream project does not pin a Zig release in the inspected root files; the compiler version must therefore be fixed in the reproduction record, not inferred.
 
+## 3. Apache Arrow / Parquet ALP benchmark
+
+This is a separate ALP reproduction path from the ALP implementation bundled in DeXOR. Use the upstream Parquet/Arrow implementation and its official benchmark harness.
+
+| Field | Pinned value |
+|---|---|
+| Repository | https://github.com/alamb/alp_benchmark |
+| Branch at audit | main |
+| Repository commit | 601e2b1849d86069cb3036950ab9db1ab74d08b4 |
+| README blob | a54465b454f4367f13072af3ffd0b4da67f40093 |
+| benchmark.sh blob | b371590c1b00bf452effa3089e3843fa65eb2caa |
+| download_data.sh blob | 36b5d3f3da9eb015dedabf360b6dcc7427c6cdb3 |
+| Cargo.toml blob | f854e1a782628d0a799562bde5d188c3377c8494 |
+| Arrow-rs / Parquet dependency revision | f9794b4f4ac9fa896ed507b6d7c6e7556db041a9 |
+| Dataset | 30 CWI f64 binary files |
+| Dataset archive | 6.7 GiB |
+| Dataset archive SHA-256 | 1070817918b9e2b2cc7003995927bd04fe7b942045383913d3f40437eda29831 |
+| Encoding | Raw little-endian IEEE-754 binary64, 8 bytes/value, no header |
+| Upstream runner | benchmark.sh (downloads/verifies/extracts corpus, prints environment, then cargo run --release --bin benchmark) |
+
+### Reproduction command
+
+```sh
+git clone https://github.com/alamb/alp_benchmark.git
+cd alp_benchmark
+git checkout 601e2b1849d86069cb3036950ab9db1ab74d08b4
+./benchmark.sh
+```
+
+The script pins the Arrow-rs ALP implementation revision in its Cargo manifest and the corpus archive digest in download_data.sh. It defaults to RUSTFLAGS=-C target-cpu=native, and records CPU model, architecture, SIMD, logical CPUs, OS/kernel, CPU governor, Rust/LLVM/Cargo versions, benchmark commit, worktree cleanliness and dataset hash. To use a pre-provisioned corpus, set ALP_DATASET_DIR; the upstream runner still checks for all 30 expected files.
+
+### Fairness and interpretation
+
+- ALP is best suited to decimal-like floating-point columns. Keep arbitrary full-range bit patterns, NaN-payload tests and sparse multi-field records as separate strata; ALP's own project overview warns that wide exponent/significance data is outside its target distribution.
+- Run the official CWI corpus unchanged first. Then adapt the same raw production-derived numeric columns from CDL-Bench datasets into Parquet columns without reordering or dropping values.
+- Compare ALP's own Parquet output with complete CDL frames and PLAIN+Zstd / BYTE_STREAM_SPLIT+Zstd controls. Count Parquet footer, page metadata, indexes, exceptions and any required dictionaries. Report random-access latency as well as complete file size.
+- Match the host CPU, SIMD build, thread/core budget, memory ceiling and warm-up/repetition protocol across CDL and ALP. The ALP runner's target-cpu=native flag must be matched by the CDL build when reporting SIMD-enabled throughput.
+- The public ALP benchmark README itself still contains a prepublication checklist. Pinning and running it reproduces that benchmark harness and commit; it does not turn its own published numbers into independently audited results.
+
+**Execution status at this audit:** repository scripts, dependency revision and corpus digest were inspected and pinned. The 6.7 GiB archive was not downloaded, and no ALP benchmark was built or run here because the environment lacks Rust/Cargo. No ALP reproduction result is claimed.
+
 ## 3. Reproduction helper
 
 The repository includes:
@@ -124,7 +165,7 @@ Both environment variables are optional; unset paths are explicitly skipped. Out
 
 The DeXOR CSV workflow requires Java 8 and Maven. The TerseTS workflow requires Zig and a C compiler. If a required toolchain is unavailable, the script fails closed rather than substituting another version.
 
-## 4. Matched benchmark rules
+## 5. Matched benchmark rules
 
 1. The same ordered f64 bit patterns and chunk boundaries go to every method.
 2. All exact-lossless methods must reconstruct every u64 bit pattern, including NaN payloads, signed zero, infinities and subnormals. Reject a method/result if even one bit differs.
@@ -136,11 +177,12 @@ The DeXOR CSV workflow requires Java 8 and Maven. The TerseTS workflow requires 
 8. Do not call TerseTS a production benchmark. Its upstream README marks it beta; label the harness accordingly.
 9. No results are considered reproduced until artifact commit, toolchain version, input hashes, parameters, commands and bitwise verification logs are attached.
 
-## 5. Current execution status
+## 6. Current execution status
 
-The repository and artifact inspection is complete. The helper passes `bash -n` and its unset-environment dry run correctly reports both external runs as skipped; the C gate passes `cc -std=c11 -O2 -Wall -Wextra -Werror -fsyntax-only` against the inspected API header shape. The current environment has Java 21.0.12.1 but does not have Maven, Zig or Rust/cargo. Therefore:
+The repository and artifact inspection is complete. The external helper passes `bash -n` and its unset-environment dry run correctly reports DeXOR/TerseTS as skipped; the TerseTS C gate passes `cc -std=c11 -O2 -Wall -Wextra -Werror -fsyntax-only` against the inspected API header shape. The current environment has Java 21.0.12.1 and C/C++ compilers, but does not have Maven, Zig or Rust/cargo. The ALP benchmark's 6.7 GiB CWI archive has not been downloaded. Therefore:
 - DeXOR has **not** been built or run.
 - TerseTS has **not** been built or run.
+- The upstream Arrow/Parquet ALP benchmark has **not** been built or run.
 - No external codec comparison numbers are claimed.
 - The setup script is authored and pinned, but its runtime workflow remains pending an environment with the required toolchains.
 
