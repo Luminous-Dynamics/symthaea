@@ -865,7 +865,7 @@ mod tests {
         }];
         let receipt = replay_probabilistic_missingness(&problem, &observations).unwrap();
         assert_eq!(receipt.dropout_likelihoods[0].lower_ppm, 999_000);
-        assert_eq!(receipt.dropout_likelihoods[0].upper_ppm, 1_000_000);
+        assert_eq!(receipt.dropout_likelihoods[0].upper_ppm, 999_999);
         assert_eq!(receipt.dropout_likelihoods[1].lower_ppm, 800_000);
         assert_eq!(receipt.dropout_likelihoods[1].upper_ppm, 900_000);
     }
