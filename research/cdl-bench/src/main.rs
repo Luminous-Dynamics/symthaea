@@ -567,6 +567,27 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
             }
         })
         .collect();
+    let signed_zero_switches: Vec<f64> = (0..count)
+        .map(|i| match (i / 16) % 4 {
+            0 => 0.0,
+            1 => -0.0,
+            2 => 1.0,
+            _ => -1.0,
+        })
+        .collect();
+    let nan_payload_runs: Vec<f64> = (0..count)
+        .map(|i| {
+            const PATTERNS: [u64; 6] = [
+                0x7ff8_0000_0000_0001,
+                0x7ff8_0000_0000_0002,
+                0xfff8_1234_5678_9abc,
+                0x7ff0_0000_0000_0000,
+                0xfff0_0000_0000_0000,
+                0x0000_0000_0000_0000,
+            ];
+            f64::from_bits(PATTERNS[(i / 8) % PATTERNS.len()])
+        })
+        .collect();
     let random_bytes = generate_e0(
         E0Kind::Incompressible,
         count.checked_mul(8).ok_or("float byte length overflow")?,
@@ -585,6 +606,8 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
         ("high-precision", high_precision),
         ("plateau-steps", plateau_steps),
         ("telemetry-idle-runs", telemetry_idle),
+        ("signed-zero-switches", signed_zero_switches),
+        ("nan-payload-runs", nan_payload_runs),
         ("random-bit-pattern", random_bits),
     ];
 
