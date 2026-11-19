@@ -19,7 +19,8 @@
 //! Each layer has a clear job:
 //! - The cpal callback must not allocate or block. It only pushes raw f32
 //!   samples into a lockfree ring buffer.
-//! - The worker drains the ring buffer, runs LTC + simple mel features, and
+//! - The worker drains the ring buffer, extracts log-mel frames, applies the shared
+//!   locality-preserving HDC encoder, and uses LTC for temporal/salience state.
 //!   periodically bundles N HV16 frames into one 16,384-dim `ContinuousHV`.
 //! - Perception polls the mpsc via `drain_latest()` — non-blocking, latest-wins.
 
