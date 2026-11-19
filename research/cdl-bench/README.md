@@ -66,6 +66,34 @@ Both policies use the 32-byte F64S outer header and count each F64C child
 header/CRC. They provide different reference points: an offline size oracle
 and a decoder-reproducible past-only selection policy.
 
+## Independent f64 bit-window reference
+
+The checked-in C++20 reference
+`research/cdl-bench/reference/float64_window_reference.cpp` independently
+implements the reusable leading/trailing XOR window. It compares transform-only
+payload bytes with XOR-varint and checks exact u64 reconstruction. Build and
+run it with:
+
+```sh
+g++ -O2 -std=c++20 -Wall -Wextra -Wconversion -Werror \
+  research/cdl-bench/reference/float64_window_reference.cpp \
+  -o /tmp/float64_window_reference
+/tmp/float64_window_reference
+```
+
+The strict-warning reference run covered 57,105 values and rejected seven
+malformed marker/span/payload cases. Transform-only byte counts versus
+XOR-varint were:
+- edge values: 78 → 60 bytes (-23.08%);
+- smooth bit increments: 2,329 → 6,155 (+164.28%);
+- oscillating values: 20,479 → 18,430 (-10.01%);
+- random patterns: 474,699 → 450,002 (-5.20%);
+- repeated values: 3,016 → 3,006 (-0.33%).
+
+These counts are before the byte entropy coder and all framing. The smooth
+sequence is a significant regression, so this remains a selectable specialist,
+not a universal default or a claim of Gorilla/Chimp parity.
+
 The XOR-leading/trailing window is a small Gorilla-style reference transform,
 not a Gorilla/Chimp implementation. Neither the single-stream XOR transforms
 nor these segment selectors implement ACTF, DeXOR, Rabbit or Dolphin. These are transparent
