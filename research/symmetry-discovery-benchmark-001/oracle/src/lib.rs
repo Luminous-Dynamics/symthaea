@@ -1401,12 +1401,40 @@ mod tests {
     }
 
     #[test]
-    fn non_orthogonal_representation_of_the_abstract_group_is_rejected() {
-        let mut element = manifest().elements[1].clone();
-        // This shear-conjugated rotation may preserve the abstract D4 table,
-        // but it is not an isometry of the declared Euclidean point space.
-        element.matrix = [[-1, -2], [1, 1]];
-        assert!(validate_orthogonal_element(&element).is_err());
+    fn non_orthogonal_conjugate_preserves_abstract_d4_but_fails_euclidean_action() {
+        let manifest = manifest();
+        let shear = [[1_i128, 1], [0, 1]];
+        let inverse_shear = [[1_i128, -1], [0, 1]];
+
+        let mut conjugated = Vec::with_capacity(manifest.elements.len());
+        let mut conjugated_by_id = BTreeMap::new();
+        for element in &manifest.elements {
+            let left = multiply(shear, element.matrix).unwrap();
+            let matrix = multiply(left, inverse_shear).unwrap();
+            assert!(conjugated_by_id.insert(element.id.clone(), matrix).is_none());
+            conjugated.push(Element {
+                id: element.id.clone(),
+                matrix,
+            });
+        }
+
+        // Conjugation preserves the complete abstract multiplication table.
+        for left in &conjugated {
+            for right in &conjugated {
+                let product = multiply(left.matrix, right.matrix).unwrap();
+                let expected_id =
+                    &manifest.multiplication[&(left.id.clone(), right.id.clone())];
+                assert_eq!(matrix_key(product), matrix_key(conjugated_by_id[expected_id]));
+            }
+        }
+
+        // But the conjugated representation no longer acts by Euclidean
+        // isometries; the exact group laws are not a substitute for the metric.
+        assert!(
+            conjugated
+                .iter()
+                .any(|element| validate_orthogonal_element(element).is_err())
+        );
     }
 
     #[test]
