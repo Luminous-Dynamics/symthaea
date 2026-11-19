@@ -57,6 +57,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .max(1);
         let path_id = format!("null-path-{path:05}");
         let mut previous_residual = 0.0_f64;
+        let mut single_crossed = false;
+        let mut mixture_crossed = false;
+        let mut leaked_crossed = false;
 
         let mut single =
             PredictableGaussianEProcess::new("registered-break-a", ALPHA)?;
@@ -139,27 +142,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 observed_residual,
             )?;
 
-            if single_update.crossed_alpha {
-                // The event is counted once per path, even if later looks
-                // remain above the boundary.
-                single_crossings += 1;
-                // Mark the path as already counted without changing the
-                // evidence process; a local flag is clearer than resetting it.
-                for remaining_step in (step + 1)..HORIZON {
-                    let _ = remaining_step;
-                }
-                break;
-            }
-            if mixture_update.crossed_alpha {
-                mixture_crossings += 1;
-                break;
-            }
-            if leaked_update.crossed_alpha {
-                leaked_crossings += 1;
-                break;
-            }
+            single_crossed |= single_update.crossed_alpha;
+            mixture_crossed |= mixture_update.crossed_alpha;
+            leaked_crossed |= leaked_update.crossed_alpha;
             previous_residual = observed_residual;
         }
+
+        single_crossings += u64::from(single_crossed);
+        mixture_crossings += u64::from(mixture_crossed);
+        leaked_crossings += u64::from(leaked_crossed);
     }
 
     let (single_lower, single_upper) = wilson_interval(single_crossings, PATHS);
