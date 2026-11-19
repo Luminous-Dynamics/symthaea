@@ -102,15 +102,20 @@ modal), not by taking an artificial average over category codes.
 
 ## Exact axis-invariance control
 
-The axis report uses the artifact digest repeated across metrics for each
-case. The importer requires those digests to agree; inconsistent hashes across
-metrics reject the input. It also requires the declared support-axis string in
+The axis report uses a canonical semantic score digest repeated across metrics
+for each case when available. The importer separately requires raw artifact
+SHA-256 values to agree, and requires canonical semantic digests to agree;
+inconsistent hashes across metrics reject the input. It also requires the declared support-axis string in
 the observation notes to be consistent within each style/seed block.
 
 Each factor has 27 matched slices: all combinations of the other three factors.
-For each slice, the analyzer compares the three complete score digests across
-the target factor's low/centre/high levels. A slice is identical only when all
-three digests match byte-for-byte; otherwise it is changed. Missing artifact
+For each slice, the analyzer compares the three canonical semantic score
+ digests across the target factor's low/centre/high levels. The adapter's
+semantic digest binds key/tonality, tempo, meter, total length, and a sorted event
+multiset containing PartId, role, pitch, exact rational onset/duration, velocity,
+emphasis and section intensity. A slice is identical only when all three
+semantic digests match; otherwise it is changed. Raw artifact digests remain in
+the coverage output to preserve serialization-level provenance. Missing artifact
 digests make the slice unavailable, never identical.
 
 This creates an exact negative-control check for styles that declare an axis
