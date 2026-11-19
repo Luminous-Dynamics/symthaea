@@ -1,0 +1,100 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "magnetosheath-electron-pressure-closure-v0.1",
+  "created_at": "2026-11-19",
+  "status": "source_review_specification_only",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12923",
+  "paper": {
+    "title": "Electron neural closure for turbulent magnetosheath simulations: Energy channels",
+    "doi": "10.1063/5.0300009",
+    "journal": "Physics of Plasmas",
+    "volume": 33,
+    "article": "012901",
+    "year": 2026,
+    "scope": "2D-3V turbulent magnetosheath electron pressure tensor closure"
+  },
+  "physical_reference": {
+    "solver": "energy-conserving semi-implicit PIC (ECsim)",
+    "run_A": {
+      "role": "high_particle_count_test",
+      "grid": [2048, 2048],
+      "particles_per_cell": 5000
+    },
+    "runs_B": {
+      "grid_before_downsample": [2048, 2048],
+      "grid_after_downsample": [512, 512],
+      "particles_per_cell": 256,
+      "filter": "4x4 boxcar"
+    },
+    "source_split": {
+      "train": ["B3", "B4", "B5", "B6"],
+      "validation": ["B2"],
+      "test": ["B1"],
+      "high_fidelity_test": ["A"]
+    }
+  },
+  "reported_baseline_ranges": {
+    "fcnn_diagonal_pressure_r2_approx": [0.80, 0.82],
+    "fcnn_off_diagonal_pressure_r2_approx": [0.37, 0.41],
+    "fcnn_heat_flux_r2_approx": [0.20, 0.30],
+    "status": "paper_reported_not_independently_reproduced"
+  },
+  "reproduction_blockers": [
+    "publisher data statement names only test datasets A and B1",
+    "B2 validation and B3-B6 training artifacts not yet admitted",
+    "Zenodo record version, exact filenames, sizes, hashes and record license pending audit",
+    "exact paper run/config mapping within the multi-project code repository not yet established"
+  ],
+  "code_reference": {
+    "repository": "https://github.com/georgemilosh/closure",
+    "revision": "826a6ef687a899f9c5aa4cf2436262862feae84c",
+    "revision_date": "2026-08-06",
+    "license": "MIT",
+    "license_evidence": "https://github.com/georgemilosh/closure/blob/826a6ef687a899f9c5aa4cf2436262862feae84c/LICENSE",
+    "verified_feature_sets_in_harris_scripts": {
+      "default": ["rho_e","Bx","By","Bz","Vx_e","Vy_e","Vz_e","Ex","Ey","Ez"],
+      "noE": ["rho_e","Bx","By","Bz","Vx_e","Vy_e","Vz_e"],
+      "noJ": ["rho_e","Bx","By","Bz","Ex","Ey","Ez"],
+      "noJnoE": ["rho_e","Bx","By","Bz"]
+    },
+    "configuration_caveat": "Harris Le2GEM15ppc scaffolding and Optuna files are not established as the exact magnetosheath paper configuration"
+  },
+  "candidate_models": [
+    "source_nonlocal_fcnn",
+    "source_pointwise_mlp",
+    "symbolic_anisotropic_closure",
+    "cgl_baseline",
+    "symmetry_tied_pressure_tensor",
+    "psd_preserving_pressure_tensor",
+    "rotation_equivariant_tensor_closure",
+    "frame_canonicalized_closure",
+    "noise_aware_cross_fidelity_closure"
+  ],
+  "required_metrics": [
+    "componentwise_R2_MAE_RMSE_bias",
+    "off_diagonal_Pxy_Pxz_Pyz",
+    "pressure_symmetry_residual",
+    "pressure_psd_minimum_eigenvalue",
+    "trace_determinant_anisotropy_agyrotropy",
+    "pressure_dilation_error",
+    "deviatoric_pressure_strain_error",
+    "scale_filtered_pressure_strain_spectrum",
+    "conditional_structure_statistics",
+    "frame_boost_and_rotation_metamorphic_error",
+    "particle_noise_cross_fidelity_error",
+    "parameter_ood_error",
+    "cost_per_stable_qualified_domain_time"
+  ],
+  "prospective_targets": {
+    "off_diagonal_component_r2_each": 0.60,
+    "must_preserve_source_diagonal_pressure_quality": true,
+    "must_preserve_pressure_symmetry_and_psd": true,
+    "status": "aspirational_not_passed"
+  },
+  "execution": {
+    "zenodo_download": "not_performed",
+    "paper_reproduction": "not_performed",
+    "training": "not_performed",
+    "physical_validation": "not_performed"
+  }
+}
