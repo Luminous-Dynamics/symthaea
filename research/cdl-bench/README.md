@@ -27,7 +27,8 @@ dependencies.
 ## Exact IEEE-754 f64 reference track
 
 The `float` command generates constant, smooth-ramp, oscillating,
-high-precision, plateau-step, idle-telemetry and random-bit-pattern streams.
+high-precision, plateau-step, idle-telemetry, signed-zero-switch, NaN-payload
+and random-bit-pattern streams.
 It compares:
 - raw IEEE-754 binary64 bit patterns;
 - XOR with the previous u64 bit pattern, encoded as a canonical u64 varint;
