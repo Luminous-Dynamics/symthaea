@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/symmetry-discovery-benchmark-001/schemas/dense_coordinate_representation.schema.json",
+  "title": "Dense coordinate finite representation covariance fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_id",
+    "coordinate_convention",
+    "ambient_group_id",
+    "canonical_metric",
+    "basis_matrix",
+    "inverse_basis_matrix",
+    "determinant_exact",
+    "transformed_metric",
+    "transformed_group_elements",
+    "expected",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "fixture_id": {
+      "const": "D4-DENSE-COORDINATE-REPRESENTATION-001"
+    },
+    "coordinate_convention": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ambient_group_id": {
+      "const": "D4"
+    },
+    "canonical_metric": {
+      "$ref": "#/$defs/matrix2Integer"
+    },
+    "basis_matrix": {
+      "$ref": "#/$defs/matrix2Integer"
+    },
+    "inverse_basis_matrix": {
+      "$ref": "#/$defs/matrix2Integer"
+    },
+    "determinant_exact": {
+      "const": 1
+    },
+    "transformed_metric": {
+      "$ref": "#/$defs/matrix2Integer"
+    },
+    "transformed_group_elements": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "element_id",
+          "matrix"
+        ],
+        "properties": {
+          "element_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "matrix": {
+            "$ref": "#/$defs/matrix2Integer"
+          }
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "abstract_multiplication_table_preserved",
+        "every_transformed_element_preserves_transformed_metric",
+        "at_least_one_transformed_element_fails_euclidean_orthogonality",
+        "every_transformed_element_fails_under_stale_identity_metric"
+      ],
+      "properties": {
+        "abstract_multiplication_table_preserved": {
+          "const": true
+        },
+        "every_transformed_element_preserves_transformed_metric": {
+          "const": true
+        },
+        "at_least_one_transformed_element_fails_euclidean_orthogonality": {
+          "const": true
+        },
+        "every_transformed_element_fails_under_stale_identity_metric": {
+          "type": "boolean"
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "matrix2Integer": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}
