@@ -1,0 +1,211 @@
+{
+  "contract": "SC-CORRELATED-EVIDENCE-0.1",
+  "instance_id": "synthetic-shared-calibration-mechanism-design-v0",
+  "fixture_only": true,
+  "models": [
+    { "model_id": "uniform_electron_phonon", "prior_probability": 0.35, "none_of_above": false },
+    { "model_id": "multiband_electron_phonon", "prior_probability": 0.25, "none_of_above": false },
+    { "model_id": "finite_q_pairing", "prior_probability": 0.25, "none_of_above": false },
+    { "model_id": "none_of_above", "prior_probability": 0.15, "none_of_above": true }
+  ],
+  "nuisance_states": [
+    { "state_id": "nominal_calibration", "prior_probability": 0.5 },
+    { "state_id": "shared_positive_drift", "prior_probability": 0.5 }
+  ],
+  "outcome_labels": ["signature_observed", "signature_not_observed"],
+  "initial_capabilities": ["transport_measurement", "stiffness_probe"],
+  "budget_units": 9,
+  "actions": [
+    {
+      "action_id": "qualify_thermodynamic_channel",
+      "action_type": "capability",
+      "label": "Qualify thermodynamic measurement channel",
+      "cost_units": 1,
+      "requires_capabilities": [],
+      "provides_capabilities": ["qualified_thermodynamic_channel"],
+      "eligible": true,
+      "exclusion_reason": "",
+      "model_likelihoods": []
+    },
+    {
+      "action_id": "bulk_thermodynamic_observation_a",
+      "action_type": "measurement",
+      "label": "Bulk thermodynamic signature observation A",
+      "cost_units": 1,
+      "requires_capabilities": ["qualified_thermodynamic_channel"],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "model_likelihoods": [
+        { "model_id": "uniform_electron_phonon", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.90, 0.10] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.98, 0.02] }
+        ]},
+        { "model_id": "multiband_electron_phonon", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.70, 0.30] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.98, 0.02] }
+        ]},
+        { "model_id": "finite_q_pairing", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.30, 0.70] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.98, 0.02] }
+        ]},
+        { "model_id": "none_of_above", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.10, 0.90] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.98, 0.02] }
+        ]}
+      ]
+    },
+    {
+      "action_id": "bulk_thermodynamic_observation_b",
+      "action_type": "replication",
+      "label": "Repeat bulk thermodynamic signature using the same calibrated channel",
+      "cost_units": 1,
+      "requires_capabilities": ["qualified_thermodynamic_channel"],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "model_likelihoods": [
+        { "model_id": "uniform_electron_phonon", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.90, 0.10] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.98, 0.02] }
+        ]},
+        { "model_id": "multiband_electron_phonon", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.70, 0.30] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.98, 0.02] }
+        ]},
+        { "model_id": "finite_q_pairing", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.30, 0.70] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.98, 0.02] }
+        ]},
+        { "model_id": "none_of_above", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.10, 0.90] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.98, 0.02] }
+        ]}
+      ]
+    },
+    {
+      "action_id": "qualify_reference_channel",
+      "action_type": "capability",
+      "label": "Qualify independent calibration-reference channel",
+      "cost_units": 1,
+      "requires_capabilities": [],
+      "provides_capabilities": ["calibration_reference"],
+      "eligible": true,
+      "exclusion_reason": "",
+      "model_likelihoods": []
+    },
+    {
+      "action_id": "shared_drift_reference_probe",
+      "action_type": "measurement",
+      "label": "Reference probe that identifies shared calibration drift",
+      "cost_units": 1,
+      "requires_capabilities": ["calibration_reference"],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "model_likelihoods": [
+        { "model_id": "uniform_electron_phonon", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.05, 0.95] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.95, 0.05] }
+        ]},
+        { "model_id": "multiband_electron_phonon", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.05, 0.95] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.95, 0.05] }
+        ]},
+        { "model_id": "finite_q_pairing", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.05, 0.95] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.95, 0.05] }
+        ]},
+        { "model_id": "none_of_above", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.05, 0.95] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.95, 0.05] }
+        ]}
+      ]
+    },
+    {
+      "action_id": "field_angle_hc2",
+      "action_type": "measurement",
+      "label": "Field-angle-dependent upper-critical-field signature",
+      "cost_units": 2,
+      "requires_capabilities": ["transport_measurement"],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "model_likelihoods": [
+        { "model_id": "uniform_electron_phonon", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.10, 0.90] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.50, 0.50] }
+        ]},
+        { "model_id": "multiband_electron_phonon", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.85, 0.15] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.95, 0.05] }
+        ]},
+        { "model_id": "finite_q_pairing", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.65, 0.35] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.90, 0.10] }
+        ]},
+        { "model_id": "none_of_above", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.45, 0.55] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.85, 0.15] }
+        ]}
+      ]
+    },
+    {
+      "action_id": "stiffness_tensor",
+      "action_type": "measurement",
+      "label": "Longitudinal/transverse stiffness-tensor signature",
+      "cost_units": 2,
+      "requires_capabilities": ["stiffness_probe"],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "model_likelihoods": [
+        { "model_id": "uniform_electron_phonon", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.10, 0.90] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.45, 0.55] }
+        ]},
+        { "model_id": "multiband_electron_phonon", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.30, 0.70] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.60, 0.40] }
+        ]},
+        { "model_id": "finite_q_pairing", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.90, 0.10] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.95, 0.05] }
+        ]},
+        { "model_id": "none_of_above", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.50, 0.50] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.85, 0.15] }
+        ]}
+      ]
+    },
+    {
+      "action_id": "unreviewed_high_field_probe",
+      "action_type": "measurement",
+      "label": "Deliberately ineligible high-field discriminator",
+      "cost_units": 1,
+      "requires_capabilities": ["high_field_facility"],
+      "provides_capabilities": [],
+      "eligible": false,
+      "exclusion_reason": "Independent facility and safety qualification is absent",
+      "model_likelihoods": [
+        { "model_id": "uniform_electron_phonon", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.99, 0.01] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.99, 0.01] }
+        ]},
+        { "model_id": "multiband_electron_phonon", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.95, 0.05] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.95, 0.05] }
+        ]},
+        { "model_id": "finite_q_pairing", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.90, 0.10] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.90, 0.10] }
+        ]},
+        { "model_id": "none_of_above", "nuisance_likelihoods": [
+          { "state_id": "nominal_calibration", "outcome_probabilities": [0.01, 0.99] },
+          { "state_id": "shared_positive_drift", "outcome_probabilities": [0.01, 0.99] }
+        ]}
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic shared-nuisance planning contract only; calibration states and likelihoods are illustrative, not fitted to a real specimen or physical instrument."
+}
