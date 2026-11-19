@@ -45,19 +45,26 @@ std::size_t id_width(std::size_t key_count) {
 using Groups = std::vector<std::vector<std::uint32_t>>;
 std::vector<std::uint8_t> encode(const Groups& groups, std::size_t key_count) {
     const std::size_t width = id_width(key_count);
+    constexpr std::size_t max_templates = 16U;
     std::vector<std::uint8_t> out;
-    std::vector<std::uint32_t> previous;
+    std::vector<std::vector<std::uint32_t>> templates;
     for (const auto& group : groups) {
         if (group.size() <= 1U) continue;
         for (const auto id : group) if (id >= key_count) throw std::runtime_error("invalid key ID");
-        if (!previous.empty() && group == previous) {
-            out.push_back(0U); // reuse previous tie-group template
+        const auto found = std::find(templates.begin(), templates.end(), group);
+        if (found != templates.end()) {
+            const auto index = static_cast<std::size_t>(found - templates.begin());
+            out.push_back(static_cast<std::uint8_t>(index + 1U));
+            auto reused = *found;
+            templates.erase(found);
+            templates.insert(templates.begin(), std::move(reused));
         } else {
-            out.push_back(1U); // literal key-ID order
+            out.push_back(0U); // literal key-ID order
             BitWriter literal;
             for (const auto id : group) literal.put(id, width);
             out.insert(out.end(), literal.bytes.begin(), literal.bytes.end());
-            previous = group;
+            templates.insert(templates.begin(), group);
+            if (templates.size() > max_templates) templates.pop_back();
         }
     }
     return out;
@@ -69,7 +76,8 @@ bool decode(const std::vector<std::uint8_t>& bytes, const std::vector<std::size_
     if (group_sizes.size() != expected_key_counts.size()) return false;
     const std::size_t width = id_width(key_count);
     std::size_t cursor = 0U;
-    std::vector<std::uint32_t> previous;
+    constexpr std::size_t max_templates = 16U;
+    std::vector<std::vector<std::uint32_t>> templates;
     for (std::size_t group_index = 0U; group_index < group_sizes.size(); ++group_index) {
         const std::size_t count = group_sizes[group_index];
         if (count == 0U || expected_key_counts[group_index].size() != key_count) return false;
@@ -87,9 +95,6 @@ bool decode(const std::vector<std::uint8_t>& bytes, const std::vector<std::size_
         const std::uint8_t control = bytes[cursor++];
         std::vector<std::uint32_t> ids;
         if (control == 0U) {
-            if (previous.size() != count) return false;
-            ids = previous;
-        } else if (control == 1U) {
             if (width != 0U && count > static_cast<std::size_t>(-1) / width) return false;
             const std::size_t literal_bits = count * width;
             if (literal_bits > static_cast<std::size_t>(-1) - 7U) return false;
@@ -110,9 +115,15 @@ bool decode(const std::vector<std::uint8_t>& bytes, const std::vector<std::size_
             }
             if (reader.pos != literal_bits) return false;
             cursor += literal_bytes;
-            previous = ids;
+            templates.insert(templates.begin(), ids);
+            if (templates.size() > max_templates) templates.pop_back();
         } else {
-            return false;
+            const std::size_t template_index = static_cast<std::size_t>(control - 1U);
+            if (template_index >= templates.size() || templates[template_index].size() != count) return false;
+            ids = templates[template_index];
+            auto reused = templates[template_index];
+            templates.erase(templates.begin() + static_cast<std::ptrdiff_t>(template_index));
+            templates.insert(templates.begin(), std::move(reused));
         }
         std::vector<std::size_t> observed(key_count, 0U);
         for (const auto id : ids) {
@@ -188,6 +199,30 @@ void test_randomized() {
         require(decoded == groups, "random schedule mismatch");
     }
 }
+void report_template_sizes() {
+    Groups repeated;
+    for (std::size_t i = 0U; i < 64U; ++i) repeated.push_back({0U,1U,2U,3U,4U,5U,6U,7U});
+    const auto repeated_bytes = encode(repeated, 8U);
+    const std::size_t repeated_fixed = (64U * 8U * id_width(8U) + 7U) / 8U;
+
+    Groups alternating;
+    for (std::size_t batch = 0U; batch < 20U; ++batch) {
+        std::vector<std::uint32_t> group(16U);
+        for (std::size_t i = 0U; i < group.size(); ++i)
+            group[i] = static_cast<std::uint32_t>((i + (batch % 2U)) % 16U);
+        alternating.push_back(std::move(group));
+    }
+    const auto alternating_bytes = encode(alternating, 16U);
+    const std::size_t alternating_fixed = (20U * 16U * id_width(16U) + 7U) / 8U;
+    const double repeated_saving = (1.0 - static_cast<double>(repeated_bytes.size()) / static_cast<double>(repeated_fixed)) * 100.0;
+    const double alternating_saving = (1.0 - static_cast<double>(alternating_bytes.size()) / static_cast<double>(alternating_fixed)) * 100.0;
+    std::cout << "repeated_tie_groups_bytes=" << repeated_bytes.size()
+              << " fixed_schedule_bytes=" << repeated_fixed
+              << " saving_pct=" << repeated_saving << "\n";
+    std::cout << "alternating_tie_templates_bytes=" << alternating_bytes.size()
+              << " fixed_schedule_bytes=" << alternating_fixed
+              << " saving_pct=" << alternating_saving << "\n";
+}
 void test_malformed_and_count_validation() {
     Groups decoded;
     require(!decode({2U}, {2U}, {{1U,1U}}, 2U, decoded), "unknown control accepted");
@@ -204,6 +239,7 @@ int main() {
         test_changed_templates();
         test_randomized();
         test_malformed_and_count_validation();
+        report_template_sizes();
         std::cout << "repeated_template=PASS changed_template=PASS randomized_groups=1000 malformed_rejections=5 status=PASS\n";
         return 0;
     } catch (const std::exception& e) {
