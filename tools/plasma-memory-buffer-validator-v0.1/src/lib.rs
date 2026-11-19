@@ -8,7 +8,7 @@
 //! This validator preserves both facts:
 //! - a slot must already have been computed before the query stage;
 //! - a same-step slot whose physical abscissa is later than the query must be
-//!   explicitly declared as an integrator dependency, unless PaperExact mode
+//!   explicitly declared as an integrator dependency, unless PaperReported mode
 //!   is reproducing the published buffer protocol unchanged.
 //!
 //! This crate validates buffer metadata and causal availability only. It does
@@ -56,7 +56,7 @@ pub enum BufferPolicy {
     /// Faithfully reproduce the paper's deployed buffer semantics.
     /// Earlier-computed provisional stages are allowed, including stages whose
     /// abscissa is later than the query. Such slots are surfaced separately.
-    PaperExact,
+    PaperReported,
     /// Only committed physical states may persist in the history buffer.
     AcceptedStateOnly,
     /// Provisional states require an exact tableau digest and an explicit
@@ -394,7 +394,7 @@ pub fn validate_buffer(
         match slot.kind {
             SlotKind::AcceptedPhysicalState => {
                 if contract.policy == BufferPolicy::AcceptedStateOnly
-                    || contract.policy == BufferPolicy::PaperExact
+                    || contract.policy == BufferPolicy::PaperReported
                     || contract.policy == BufferPolicy::StageExplicit
                 {
                     accepted_slot_ids.push(slot.sample_id.clone());
@@ -413,7 +413,7 @@ pub fn validate_buffer(
                     && slot.abscissa.compare(query.abscissa).is_gt()
                 {
                     match contract.policy {
-                        BufferPolicy::PaperExact => {
+                        BufferPolicy::PaperReported => {
                             non_monotone_stage_slot_ids.push(slot.sample_id.clone());
                         }
                         BufferPolicy::AcceptedStateOnly => {}
@@ -524,7 +524,7 @@ mod tests {
         let report = validate_buffer(
             &query(3, "stage-3", RationalAbscissa { numerator: 1, denominator: 2 }),
             &slots,
-            contract(BufferPolicy::PaperExact),
+            contract(BufferPolicy::PaperReported),
         );
         assert_eq!(report.disposition, BufferDisposition::Valid);
         assert_eq!(report.non_monotone_stage_slot_ids, vec!["sample-7-2"]);
@@ -578,7 +578,7 @@ mod tests {
         let report = validate_buffer(
             &query(2, "stage-2", RationalAbscissa::ONE),
             &[provisional(7, 3, "stage-3", RationalAbscissa::ZERO)],
-            contract(BufferPolicy::PaperExact),
+            contract(BufferPolicy::PaperReported),
         );
         assert_eq!(report.disposition, BufferDisposition::Invalid);
         assert!(report.issues.contains(
@@ -591,7 +591,7 @@ mod tests {
         let report = validate_buffer(
             &query(1, "stage-1", RationalAbscissa::ZERO),
             &[provisional(8, 1, "stage-1", RationalAbscissa::ZERO)],
-            contract(BufferPolicy::PaperExact),
+            contract(BufferPolicy::PaperReported),
         );
         assert_eq!(report.disposition, BufferDisposition::Invalid);
         assert!(report.issues.contains(&BufferIssue::FutureStep("sample-8-1".into())));
@@ -632,7 +632,7 @@ mod tests {
         let report = validate_buffer(
             &query(2, "stage-2", RationalAbscissa::ONE),
             &[provisional(7, 1, "stage-1", RationalAbscissa { numerator: 2, denominator: 1 })],
-            contract(BufferPolicy::PaperExact),
+            contract(BufferPolicy::PaperReported),
         );
         assert_eq!(report.disposition, BufferDisposition::Invalid);
         assert!(report.issues.contains(&BufferIssue::InvalidSlotAbscissa("sample-7-1".into())));
@@ -643,7 +643,7 @@ mod tests {
         let report = validate_buffer(
             &query(1, "stage-1", RationalAbscissa::ZERO),
             &[],
-            contract(BufferPolicy::PaperExact),
+            contract(BufferPolicy::PaperReported),
         );
         assert_eq!(report.disposition, BufferDisposition::Unknown);
         assert!(report.issues.is_empty());
@@ -657,7 +657,7 @@ mod tests {
                 provisional(7, 2, "stage-2", RationalAbscissa::ONE),
                 provisional(7, 1, "stage-1", RationalAbscissa::ZERO),
             ],
-            contract(BufferPolicy::PaperExact),
+            contract(BufferPolicy::PaperReported),
         );
         assert_eq!(report.disposition, BufferDisposition::Invalid);
         assert!(report.issues.contains(&BufferIssue::UnsortedWindow(1)));
@@ -685,7 +685,7 @@ mod tests {
         let report = validate_buffer(
             &query(3, "stage-3", RationalAbscissa { numerator: 1, denominator: 2 }),
             &[first, duplicate],
-            contract(BufferPolicy::PaperExact),
+            contract(BufferPolicy::PaperReported),
         );
         assert_eq!(report.disposition, BufferDisposition::Invalid);
         assert!(report.issues.contains(&BufferIssue::DuplicateSampleId("sample-7-1".into())));
