@@ -12,8 +12,10 @@ pub mod scm_predictor;
 pub use bounded_error::{compress_bounded_i16, decompress_bounded_i16, BoundedError, BoundedPredictor};
 pub use calibration::{categorical_byte_cdf_from_log2_logits, CdfCalibrationError, CALIBRATED_CDF_TOTAL, INVERSE_TEMPERATURE_Q16_ONE, MAX_MINIMUM_SYMBOL_FREQUENCY};
 pub mod numeric;
+pub mod float64;
 
 pub use numeric::{compress_i16, decompress_i16, NumericError, NumericTransform};
+pub use float64::{compress_f64, decompress_f64, Float64Transform};
 
 pub use causal::{e3_mechanism_splits, generate_fsm, generate_scm, generate_scm_with_config, FsmTrace, GeneratorError, ScmIntervention, ScmMechanismConfig, ScmResponse, ScmTrace};
 pub use scm_predictor::{ScmChangePointMixturePredictor, ScmExpertMixturePredictor, ScmFieldPredictor, ScmHybridPredictor, ScmLagPredictor, ScmParentPredictor, ScmShuffledParentPredictor};
