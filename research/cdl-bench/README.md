@@ -19,7 +19,7 @@ dependencies.
 - E3 public development fixtures with held-out combinations assembled from individually seen mechanism components; metadata is not serialized into learner-visible streams. These fixed tuples are visible in source and are not a blind test split.
 - CLI file encode/decode and an E0 length comparison against installed
   Zstandard, Brotli, XZ and gzip commands.
-- Exact IEEE-754 f64 raw/XOR-previous/XOR-leading-trailing framing, bit-preserving test fixtures, a fixed-chunk best-of-six size oracle, and a decoder-synchronous historical-cost online selector.
+- Exact IEEE-754 f64 raw/XOR-varint/reusable XOR-window framing, bit-preserving test fixtures, a fixed-chunk best-of-six size oracle, and a decoder-synchronous historical-cost online selector.
 - SCM-specific typed-field, temporal-lag, oracle-parent, hybrid and
   shuffled-parent byte predictors, plus fixed-share and CUSUM change-point
   mixtures, all using the same arithmetic coder and exact decoder path.
@@ -94,7 +94,7 @@ These counts are before the byte entropy coder and all framing. The smooth
 sequence is a significant regression, so this remains a selectable specialist,
 not a universal default or a claim of Gorilla/Chimp parity.
 
-The XOR-leading/trailing window is a small Gorilla-style reference transform,
+The reusable XOR-leading/trailing window is a small Gorilla-style reference transform,
 not a Gorilla/Chimp implementation. Neither the single-stream XOR transforms
 nor these segment selectors implement ACTF, DeXOR, Rabbit or Dolphin. These are transparent
 correctness baselines and a harness for those specialized comparators.
