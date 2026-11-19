@@ -258,7 +258,7 @@ The consolidation crate has 7 unit tests and one cross-crate regression in `cons
 
 The evaluator includes a provider-neutral JSONL raw-session ingestion path. It preserves original event lines, computes SHA-256 digests for the complete session and each event, rejects duplicate IDs and non-monotonic sequences, and reconstructs state at `(valid_at, known_at)`. A correction applies only if it was recorded by `known_at` and its effective `valid_from/valid_to` interval contains `valid_at`; absent `valid_from_ms`, its effective start defaults to `occurred_at_ms`. Corrections must target an existing `world_observation` and cannot predate the source in sequence, occurred time or recorded time.
 
-The raw-JSONL outcome receipt binds the exact preserved observation-line digest, event/action identity, observation timestamp, utility value and unit. Any mismatch rejects the observation before it enters candidate memory; the verifier's value is not used to silently repair a conflicting raw event.
+The raw-JSONL outcome receipt binds the exact preserved observation-line digest, event/action identity, observation timestamp, utility value and unit. Any mismatch rejects the observation before it enters candidate memory; the verifier's value is not used to silently repair a conflicting raw event. Replay of another event's receipt, timestamp drift and unit substitution are explicit negative controls.
 
 The raw event stream is not its own authority. Three externally verified receipt registries are required:
 - **Execution receipt (Symtropy seam):** binds the exact action-plan event, action ID, action, scope, dispatch time, pre-registration, intervention mode, confounder control and delayed-horizon completion.
@@ -269,7 +269,7 @@ A fourth registry gates memory lifecycle. Only a verified `PromoteToProcedure` r
 
 These registries are test seams for future Symtropy/Mycelix integrations, not cryptographic implementations or live connectors. The current JSONL envelope is provider-neutral; native OpenAI Agents SDK and Anthropic Managed Agents adapters remain future work.
 
-The raw-ingestion module has 25 authored tests. Controls cover tool-success misattribution, forged action claims, tampered outcome payloads, missing execution/outcome/consolidation receipts, post-dispatch plans, late-arriving observations, retroactive and future-effective corrections, unknown/wrong correction targets, correction chronology, bitemporal retraction, unknown source artifacts, malformed/duplicate/out-of-order events, invalid error bounds, valid-time boundaries, more than 256 later events without raw-history truncation, and content-digest replay.
+The raw-ingestion module has 26 authored tests. Controls cover tool-success misattribution, forged action claims, tampered outcome payloads, missing execution/outcome/consolidation receipts, post-dispatch plans, late-arriving observations, retroactive and future-effective corrections, unknown/wrong correction targets, correction chronology, bitemporal retraction, unknown source artifacts, malformed/duplicate/out-of-order events, invalid error bounds, valid-time boundaries, more than 256 later events without raw-history truncation, and content-digest replay.
 
 ### Consolidation-producer status (2026-11-18)
 
