@@ -19,9 +19,28 @@ dependencies.
 - E3 public development fixtures with held-out combinations assembled from individually seen mechanism components; metadata is not serialized into learner-visible streams. These fixed tuples are visible in source and are not a blind test split.
 - CLI file encode/decode and an E0 length comparison against installed
   Zstandard, Brotli, XZ and gzip commands.
+- Exact IEEE-754 f64 raw/XOR-previous framing and bit-preserving test fixtures.
 - SCM-specific typed-field, temporal-lag, oracle-parent, hybrid and
   shuffled-parent byte predictors, plus fixed-share and CUSUM change-point
   mixtures, all using the same arithmetic coder and exact decoder path.
+
+## Exact IEEE-754 f64 reference track
+
+The `float` command generates constant, smooth-ramp, oscillating,
+high-precision and random-bit-pattern streams. It compares:
+- raw IEEE-754 binary64 bit patterns;
+- XOR with the previous u64 bit pattern, encoded as a canonical u64 varint;
+- order-0 and order-1 byte CDF models;
+- Zstandard on the original raw little-endian bytes, when installed.
+
+The frame uses a 32-byte typed header, inner CDL frame and raw/inner CRC-32
+checksums. Decoding reconstructs via `f64::from_bits`; it does not perform
+floating-point subtraction or normalization. Tests compare `to_bits()` for
+each sample, including NaN payloads, infinities, signed zero and subnormals.
+
+This is a transparent reference transform, not Gorilla, Chimp, ACTF, DeXOR,
+Rabbit or Dolphin. Its purpose is to provide bit-preserving fixtures and a
+stable harness for those specialized comparators.
 
 ## Independent fixed-share reference simulation
 
@@ -77,6 +96,7 @@ cargo test
 cargo run --release -- e0 --bytes 65536 --seed 42
 cargo run --release -- causal --steps 10000 --seed 42
 cargo run --release -- numeric --values 10000 --seed 42
+cargo run --release -- float --values 10000 --seed 42
 cargo run --release -- bounded --values 10000 --seed 42 --tolerance 5
 cargo run --release -- encode --model order1 input.bin output.cdl
 cargo run --release -- decode output.cdl reconstructed.bin
