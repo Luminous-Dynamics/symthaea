@@ -286,7 +286,9 @@ impl AudioPerception {
         Ok(input)
     }
 
-    /// Process mono PCM samples already resampled to the configured sample rate.
+    /// Process mono PCM samples at `AudioPerceptionConfig::sample_rate`.
+    ///
+    /// Callers with a known source rate should prefer process_samples_at_rate().
     pub fn process_samples(&mut self, samples: &[f32]) -> Result<AudioPerceptionResult> {
         let start = std::time::Instant::now();
 
@@ -465,6 +467,14 @@ impl AudioPerception {
     }
 
     pub fn process_samples(&mut self, _samples: &[f32]) -> Result<AudioPerceptionResult> {
+        Err(anyhow!("Audio perception requires 'voice-stt' feature"))
+    }
+
+    pub fn process_samples_at_rate(
+        &mut self,
+        _samples: &[f32],
+        _sample_rate: u32,
+    ) -> Result<AudioPerceptionResult> {
         Err(anyhow!("Audio perception requires 'voice-stt' feature"))
     }
 
