@@ -21,7 +21,7 @@ One receipt describes exactly one render attempt. It joins:
 
 `source Score → authorized edit plan → candidate Score → MIDI manifest + exact MIDI bytes → renderer invocation → exact WAV bytes → independent evidence`
 
-The machine-readable shape is in [muse-render-execution-receipt-v1.schema.json](schemas/muse-render-execution-receipt-v1.schema.json). The MIDI fields intentionally follow the PartId-aware muse-midi-performance-v1 manifest contract, including its 960 ticks-per-quarter resolution and separate score, timeline, instrument-binding, capability, manifest, and MIDI digests. The standalone verifier in tools/muse-render-receipt checks receipt shape, canonical seal, execution-state invariants, and cross-artifact relationships.
+The machine-readable shape is in [muse-render-execution-receipt-v1.schema.json](schemas/muse-render-execution-receipt-v1.schema.json); the process record is specified by [muse-render-invocation-v1.schema.json](schemas/muse-render-invocation-v1.schema.json). The MIDI fields intentionally follow the PartId-aware muse-midi-performance-v1 manifest contract, including its 960 ticks-per-quarter resolution and separate score, timeline, instrument-binding, capability, manifest, and MIDI digests. The standalone verifier in tools/muse-render-receipt checks receipt shape, canonical seal, execution-state invariants, and cross-artifact relationships.
 
 ### Required joins
 
@@ -75,7 +75,7 @@ This is not a claim that the existing velocity edit has already been rendered or
 
 The isolated Rust package at [tools/muse-render-receipt](../../tools/muse-render-receipt/README.md) is outside the root Cargo workspace. It has receipt-only and full-bundle modes, documented in its README.
 
-The full-bundle mode checks exact byte hashes for the Score, edit plan/receipt/verification report, MIDI manifest, orchestration timeline, instrument bindings, capability profiles, MIDI, renderer binary/environment/configuration/asset, invocation, process streams and WAV. It verifies that every timeline segment maps one-to-one to a MIDI track, that instrument renderer/patch/program bindings explain each track, and that every used instrument has a hashed capability profile. It deserializes the PartId-aware MIDI manifest using the exporter's field order and digest recipe; parses the actual Standard MIDI File; and compares track names, program changes, note-on and note-off event multisets against the sidecar. It also checks WAV byte length, sample rate, channel count, frame count, PCM finiteness and non-silence.
+The full-bundle mode checks exact byte hashes for the Score, edit plan/receipt/verification report, MIDI manifest, orchestration timeline, instrument bindings, capability profiles, MIDI, renderer binary/environment/configuration/asset, invocation, process streams and WAV. The invocation JSON is parsed and checked against the renderer identity and hashes, exact MIDI input digest/path, WAV output path, execution timestamps and exit code. It verifies that every timeline segment maps one-to-one to a MIDI track, that instrument renderer/patch/program bindings explain each track, and that every used instrument has a hashed capability profile. It deserializes the PartId-aware MIDI manifest using the exporter's field order and digest recipe; parses the actual Standard MIDI File; and compares track names, program changes, note-on and note-off event multisets against the sidecar. It also checks WAV byte length, sample rate, channel count, frame count, PCM finiteness and non-silence. A structured invocation is still an executor-reported record, not cryptographic proof that an untrusted process consumed the declared input.
 
 The CLI returns exit code 3 for outcome_unknown; this is an unresolved execution, not a passing verification and not permission to retry under the same attempt ID. Receipt-only mode never claims bundle verification. Even a full bundle integrity pass sets acceptance_eligible=false: the verifier does not authenticate signatures, prove that an untrusted renderer consumed the named input, independently re-run the score-edit transformation, establish score-to-audio perceptual conformance, or authorize the musician's commit.
 
@@ -98,5 +98,6 @@ These are acceptance objectives, not current measurements.
 - `schemas/muse-render-execution-receipt-v1.schema.json` — JSON Schema 2020-12.
 - `fixtures/muse-render-execution-receipt-v1.completed.example.json` — synthetic shape fixture only; sentinel digests are not real artifacts.
 - `fixtures/muse-render-execution-receipt-v1.outcome-unknown.example.json` — synthetic unresolved-execution fixture only.
+- `schemas/muse-render-invocation-v1.schema.json` — structured renderer process record.
 - `tools/muse-render-receipt/` — isolated Rust receipt/MIDI/WAV integrity verifier and CLI.
 - `.github/workflows/muse-render-receipt.yml` — focused Rust format/test workflow.
