@@ -3104,6 +3104,49 @@
             "Do not transfer the numerical result to an Aqua design without matched whole-system testing.",
             "Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary."
           ]
+        },
+        {
+          "claim_id": "dhwr.2026.highlights-abstract-cop-discrepancy",
+          "parameter": "source_internal_numerical_discrepancy",
+          "original_value": "Published Highlights report experimental global COP up to 6.3; the Abstract reports experimentation up to 6.2. Both report simulation up to 8.0.",
+          "canonical_value": {
+            "kind": "text",
+            "text": "Source-internal figure discrepancy: Highlights = 6.3 experimental / 8.0 simulation; Abstract = 6.2 experimental / 8.0 simulation."
+          },
+          "evidence_class": "peer_reviewed_study_result",
+          "result_class": "measured",
+          "conditions": {
+            "mode": "Coupled shower DWHR + DHW storage / heat pump configurations studied in the article",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": "Domestic hot-water system performance",
+            "method": "Publisher landing-page Highlights and Abstract comparison",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "authoritative corrected numerical figure in article body / erratum",
+              "full configuration-specific COP conditions"
+            ],
+            "notes": "Do not silently select 6.2 or 6.3 as a universal value; keep this difference source-scoped until the full article or authors resolve it."
+          },
+          "source": {
+            "url": "https://doi.org/10.1016/j.enbuild.2026.117761",
+            "publisher": "Bouvenot and Beaudet, Energy and Buildings",
+            "source_type": "peer_reviewed_article",
+            "published_on": "2026-10-01",
+            "accessed_on": "2026-11-19",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "The source page itself reports different experimental COP values in Highlights and Abstract. Preserve the discrepancy and do not use one figure as an Aqua design target."
+          },
+          "limitations": [
+            "Both figures are study-specific and not transferable to an Aqua design.",
+            "Use the exact article body, configuration and boundary before any comparative model calibration.",
+            "Simulation COP of 8.0 must remain distinct from experimental results."
+          ]
         }
       ]
     },
