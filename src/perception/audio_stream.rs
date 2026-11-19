@@ -4,9 +4,9 @@
 //! # Real-time Microphone Capture for STT → Perception
 //!
 //! Wires a cpal input stream + ringbuf on the audio thread, a background
-//! worker that runs `symthaea_stt::StreamProcessor`, and an mpsc channel
-//! that delivers `ContinuousHV` snapshots to the cognitive loop's perception
-//! phase.
+//! worker that runs the shared mel-HDC `symthaea_stt::StreamProcessor`, and
+//! an mpsc channel that delivers `ContinuousHV` snapshots to the cognitive
+//! loop's perception phase.
 //!
 //! ```text
 //! cpal callback (audio RT) ─► ringbuf (lockfree) ─► STT worker thread
