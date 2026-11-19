@@ -71,8 +71,8 @@
         "transition_criterion": "unknown",
         "evidence_scope": "unknown_or_not_reported",
         "scope_description": "Synthetic fixture: database absence is not evidence of non-superconductivity",
-        "measurement_field_t": 0,
-        "field_orientation": "polycrystalline",
+        "measurement_field_t": null,
+        "field_orientation": "unknown",
         "minimum_detectable_tc_k": null,
         "detection_limit_description": "No qualified lower detection floor is asserted for this record"
       },
@@ -146,8 +146,8 @@
         "transition_criterion": "unknown",
         "evidence_scope": "unknown_or_not_reported",
         "scope_description": "Synthetic fixture: no condition-qualified observation is available",
-        "measurement_field_t": 0,
-        "field_orientation": "polycrystalline",
+        "measurement_field_t": null,
+        "field_orientation": "unknown",
         "minimum_detectable_tc_k": null,
         "detection_limit_description": "No qualified lower detection floor is asserted for this record"
       },
