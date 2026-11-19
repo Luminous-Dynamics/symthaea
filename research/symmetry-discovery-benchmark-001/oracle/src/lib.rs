@@ -1460,25 +1460,64 @@ mod tests {
     #[test]
     fn dense_conjugation_preserves_the_pulled_back_metric_exactly() {
         let manifest = manifest();
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../fixtures/v0.1/dense_coordinate_representation.json"
+        ))
+        .expect("dense coordinate fixture is valid JSON");
 
-        // q = S y with det(S) = +1. The D4 matrices are no longer generally
-        // Euclidean-orthogonal in y, but remain isometries of G_y = S^T G_q S.
-        let basis = [[2_i128, 1], [1, 1]];
-        let inverse_basis = [[1_i128, -1], [-1, 2]];
-        let euclidean = [[1_i128, 0], [0, 1]];
-        let transformed_metric =
-            multiply(transpose(basis), multiply(euclidean, basis).unwrap()).unwrap();
+        let basis = matrix_from_json(field(&fixture, "basis_matrix").unwrap(), "basis").unwrap();
+        let inverse_basis =
+            matrix_from_json(field(&fixture, "inverse_basis_matrix").unwrap(), "inverse").unwrap();
+        let euclidean = matrix_from_json(
+            field(&fixture, "canonical_metric").unwrap(),
+            "canonical_metric",
+        )
+        .unwrap();
+        let transformed_metric = matrix_from_json(
+            field(&fixture, "transformed_metric").unwrap(),
+            "transformed_metric",
+        )
+        .unwrap();
+        assert_eq!(
+            basis[0][0] * basis[1][1] - basis[0][1] * basis[1][0],
+            1
+        );
+        assert_eq!(
+            multiply(basis, inverse_basis).unwrap(),
+            [[1, 0], [0, 1]]
+        );
+        assert_eq!(
+            multiply(inverse_basis, basis).unwrap(),
+            [[1, 0], [0, 1]]
+        );
+        assert_eq!(
+            multiply(transpose(basis), multiply(euclidean, basis).unwrap()).unwrap(),
+            transformed_metric
+        );
 
-        assert_eq!(transformed_metric, [[5, 3], [3, 2]]);
+        let declared_values = field(&fixture, "transformed_group_elements")
+            .unwrap()
+            .as_array()
+            .unwrap();
+        let declared: BTreeMap<String, Matrix2> = declared_values
+            .iter()
+            .map(|value| {
+                let id = string_field(value, "element_id").unwrap();
+                let matrix = matrix_from_json(field(value, "matrix").unwrap(), &id).unwrap();
+                (id, matrix)
+            })
+            .collect();
+        assert_eq!(declared.len(), manifest.elements.len());
+
         let mut saw_non_euclidean_matrix = false;
         let mut transformed_by_id = BTreeMap::new();
-
         for element in &manifest.elements {
             let conjugated = multiply(
                 multiply(inverse_basis, element.matrix).unwrap(),
                 basis,
             )
             .unwrap();
+            assert_eq!(conjugated, declared[&element.id]);
             validate_metric_isometry(conjugated, transformed_metric)
                 .expect("conjugated action must preserve the pulled-back metric");
             if validate_orthogonal_element(&Element {
@@ -1506,8 +1545,8 @@ mod tests {
             }
         }
 
-        // A deliberately stale identity metric must reject a transformed
-        // action that is only orthogonal under the correct congruent metric.
+        // A deliberately stale identity metric must reject at least one
+        // transformed action that is only orthogonal under the congruent metric.
         assert!(transformed_by_id.values().any(|matrix| {
             validate_metric_isometry(*matrix, euclidean).is_err()
         }));
