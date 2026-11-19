@@ -92,6 +92,21 @@ The 2022 CLASP report recommended that a future national showerhead standard:
 
 These are research recommendations in a 2022 report, not proof that a national showerhead SANS or WELS scheme has been adopted. The report's test pressures, WaterSense's 140/310/550 kPa points, and Aqua's local low-head stress tests are different methods and must remain explicitly distinct.
 
+#### Latest status check — 19 November 2026
+
+The WRC's September/October 2025 *Water Wheel* article reported that a mature draft WELS standard covering taps, showerheads and toilet systems had been submitted to SABS for the standards-development process. It also said that the voluntary-versus-mandatory decision remained unresolved at that time.
+
+I reviewed the South African Government Gazette standards notices dated 9 October 2026 (Notice 4190), 6 November 2026 (Notice 4246) and 11 November 2026 (Notice 4255). None of those notices lists a showerhead-specific SANS or WELS document. This is a limited notice check, not an exhaustive SABS standards-catalogue search or a formal legal opinion. Accordingly, CLASP's 4.5–6 L/min band remains a **proposed future rating recommendation** in this protocol until SABS / DWS confirms the current publication, edition, scope and any regulatory reference.
+
+Before publishing a certification or compliance claim, obtain the exact current standard and confirmation from SABS / DWS. SABS explains that a published standard is not automatically a compulsory regulation unless a law or regulation references it.
+
+Additional status sources:
+- WRC *The Water Wheel*, September/October 2025: https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf
+- Government Gazette Notice 4190 (9 October 2026): https://www.gov.za/sites/default/files/gcis_document/202610/55525gen4190.pdf
+- Government Gazette Notice 4246 (6 November 2026): https://www.gov.za/sites/default/files/gcis_document/202611/55674gon4246.pdf
+- Government Gazette Notice 4255 (11 November 2026): https://www.gov.za/sites/default/files/gcis_document/202611/55717gen4255.pdf
+- SABS standards-development process: https://www.sabs.co.za/standards-process-and-procedure
+
 **Aqua's local competitive target:** a 4.5–5.5 L/min operating band at the declared 300 kPa reference is plausible as a design hypothesis, but it must be coupled to (a) pressure-compensated flow over a declared site envelope, (b) category-correct spray-force and coverage tests, (c) task-completion/comfort qualification, and (d) measured flow at 150 and 300 kPa. Compete on the service vector, not the nominal flow setting.
 
 Sources:
