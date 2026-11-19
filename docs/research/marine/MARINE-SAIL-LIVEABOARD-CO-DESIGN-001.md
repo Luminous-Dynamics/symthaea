@@ -37,9 +37,13 @@ The opposite may also occur: a longer sailing route may create a more reliable s
 | #10988 / #11115 / #11126 | Mission evidence join, service continuity and restoration | Evidence ontology / service-continuity evaluator |
 | #8082 / #11442 / #11513 / #11765 | Hydro/propulsor, model V&V, fidelity and robust Pareto | CFD, hydrodynamics, optimizer, Pareto engine |
 | #11064 / #11093 | Physical campaign binding and staged demonstrator | Instrument registry / acquisition hardware |
-| Sol-Atlas #115 / #654 / #809 | Source-qualified spatial/temporal maritime projection and metocean/access context; CRS/datum, coverage, uncertainty, rights and reversible source links | Navigation, weather forecasting or bathymetric authority |\n| Mycelix #5968 / #5974 / #6154 | Cross-stack golden-trace coordination and serialized vessel/component configuration, manufacturing, inspection and repair lineage | Naval-architecture approval or engineering qualification |\n| Symtropy #2048 | Shipbuilding design-for-manufacture and assembly | Shipyard scheduler / manufacturing ledger |
+| Sol-Atlas #115 / #654 / #809 | Source-qualified spatial/temporal maritime projection and metocean/access context; CRS/datum, coverage, uncertainty, rights and reversible source links | Navigation, weather forecasting or bathymetric authority |
+| Mycelix #5968 / #5974 / #6154 | Cross-stack golden-trace coordination and serialized vessel/component configuration, manufacturing, inspection and repair lineage | Naval-architecture approval or engineering qualification |
+| Symtropy #2048 | Shipbuilding design-for-manufacture and assembly | Shipyard scheduler / manufacturing ledger |
 
-Sol-Atlas context is read-only and source-reversible: it may qualify where/when a metocean or access observation applies, but does not turn a mapped value into a forecast or navigation instruction. Mycelix binds exact component/configuration/maintenance evidence and the cross-stack golden trace; it does not make the originating engineering claim true.\n\n## 4. Comparison protocol
+Sol-Atlas context is read-only and source-reversible: it may qualify where/when a metocean or access observation applies, but does not turn a mapped value into a forecast or navigation instruction. Mycelix binds exact component/configuration/maintenance evidence and the cross-stack golden trace; it does not make the originating engineering claim true.
+
+## 4. Comparison protocol
 
 Every policy arm receives the same craft identity, loading, mission/service fingerprint, forecast issue-time snapshots, route constraints, resource inventory, hard gates and compute budget.
 
@@ -136,8 +140,24 @@ Do not force an energy reduction target where it would trade away safety, schedu
 - [ISO 16315:2026](https://www.iso.org/standard/84203.html): AC/DC electrical propulsion and hybrid electrical systems for small craft up to 24 m LH.
 - [ISO/DIS 12217-2.2:2026](https://www.iso.org/standard/88606.html): draft stability/buoyancy assessment for sailing boats, principally 6–24 m; includes relevant habitable-multihull inversion/escape subjects; not yet final.
 - [IMO MASS Code](https://www.imo.org/en/mediacentre/pressbriefings/pages/imo-adopts-mass-code.aspx): non-mandatory code adopted May 2026, effective 1 July 2026 for SOLAS cargo ships; application to a small private liveaboard must not be presumed.
-- [ISO/AWI 25930](https://www.iso.org/standard/92074.html): approved work item, under development; its ODD/OE taxonomy is a reference, not a released requirement in this profile.
+- [ISO/AWI 25927](https://www.iso.org/standard/92072.html): collision-avoidance scenario-generation process for MASS; approved work item under development. Useful for the scenario corpus, not an established compliance procedure.
+- [ISO/AWI 25929](https://www.iso.org/standard/92073.html): minimum safe lookout area method for MASS; approved work item under development. Useful for specifying perception/observation coverage, not evidence that a sensor suite is safe.
+- [ISO/AWI 25930](https://www.iso.org/standard/92074.html): ODD/OE taxonomy and definition format for MASS; approved work item under development. It explicitly does not define attribute test procedures or monitoring requirements.
+- [ISO/CD 25928](https://www.iso.org/committee/10281240/x/catalogue/): software functional-safety management for MASS; committee draft under development.
+- [ISO/CD 25934.2](https://www.iso.org/committee/10281240/x/catalogue/): verification procedures for autonomous navigation systems; committee draft under development.
+These projects are standards-watch inputs only. Do not treat a work item or committee draft as a published requirement or claim conformance from schema similarity.
 
-## 12. Claim ceiling
+## 12. Industry comparison: what is already commercially available
+
+The comparison must recognize capabilities that already exist in commercial sailing systems:
+
+- [PredictWind Sail Routing](https://help.predictwind.com/en/articles/2884532-how-to-use-weather-routing-for-sailboats-on-the-forecast-website) offers fastest-time and comfort routing, sail polars, forecast-driven routes and motion metrics (RMS roll, vertical acceleration and slamming). Its guidance says route quality depends on the boat polar and forecast accuracy, and recommends rerouting as forecasts update.
+- [PredictWind AI Polars](https://www.predictwind.com/features/ai-polars) uses connected vessel data to adapt polars to a boat and sailing style, including wave conditions and separate night behaviour. This means learning personalized performance polars is not, by itself, a differentiator.
+- [Raymarine wind-vane / steer-to-wind modes](https://docs.raymarine.com/81406/en-US/latest/AutopilotWindVaneMode-6A57E8F8.html) include apparent-wind, true-wind and polar-target wind-angle steering. This means holding a wind angle or following a polar target is a baseline capability, not a novel autonomy claim.
+- [Garmin SmartDrive (announced 1 September 2026)](https://www.garmin.com/en-US/newsroom/press-release/marine/garmin-launches-innovative-smartdrive-autopilot-for-sailboats-and-catamarans/) extends the installed autopilot ecosystem with a brushless linear actuator, integrated ECU and rudder feedback for sailboats/catamarans up to 45 ft and declared displacement limits. This is hardware/control-system evidence, not proof of autonomous mission planning.
+
+**What would actually differentiate this programme:** not steering accuracy, a learned polar, or another weather route. It is a reproducible, owner-independent evaluation of route choices against complete onboard service delivery and multidimensional resource autonomy, with temporal evidence admissibility, fault/revocation propagation, per-configuration capability scope, and blind forecast-regret evaluation. Commercial products may already optimize comfort, route time and boat-specific polars; our benchmark must compare those outputs fairly rather than dismiss them.
+
+## 13. Claim ceiling
 
 A P0 pass means only that the composition contract, temporal-information rules and frozen synthetic examples behave as specified. It does not validate polar data, weather forecasts, hull stability, actual sailing performance, battery endurance, solar yield, water quality, habitability, autonomous navigation, COLREG compliance, seaworthiness, class/flag certification or permission to operate. Every physical claim requires source-bound, independent validation on the exact configuration and operating envelope.
