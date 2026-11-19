@@ -1014,6 +1014,7 @@ fn verify_timeline_binding_bundle(
     root: &Path,
     receipt: &ReceiptV1,
     manifest: &MidiPerformanceManifestV1,
+    candidate_score: &Value,
 ) -> Result<(), String> {
     let timeline_bytes = read(&root.join("orchestration-timeline.json"), "orchestration timeline")?;
     if domain_sha256(MIDI_TIMELINE_DIGEST_SCHEMA_V1.as_bytes(), &timeline_bytes) != receipt.midi.timeline_sha256 {
@@ -1027,6 +1028,10 @@ fn verify_timeline_binding_bundle(
     {
         return Err("orchestration timeline schema/source Score binding mismatch".into());
     }
+    let score_end = EditBeat::parse(
+        candidate_score.get("total_beats").ok_or("candidate Score total_beats missing")?,
+        "num", "den", "candidate.total_beats",
+    )?;
     let segments = timeline.get("segments").and_then(Value::as_array)
         .ok_or("timeline.segments must be an array")?;
     if segments.len() != manifest.tracks.len() {
@@ -1049,12 +1054,19 @@ fn verify_timeline_binding_bundle(
         let part_id = segment.get("part_id").and_then(Value::as_u64)
             .ok_or("timeline segment part_id must be an integer")?;
         let instrument_id = string_field(segment, "instrument_id", "timeline segment")?;
-        let start = rational_beat_to_ticks(segment.get("start").ok_or("timeline segment start missing")?)?;
-        let end = rational_beat_to_ticks(segment.get("end").ok_or("timeline segment end missing")?)?;
-        if part_id != u64::from(track.part_id) || instrument_id != track.instrument_id
-            || start != track.segment_start_tick || end != track.segment_end_tick || start >= end
+        let start_value = segment.get("start").ok_or("timeline segment start missing")?;
+        let end_value = segment.get("end").ok_or("timeline segment end missing")?;
+        let start_beat = EditBeat::parse(start_value, "numerator", "denominator", "timeline.start")?;
+        let end_beat = EditBeat::parse(end_value, "numerator", "denominator", "timeline.end")?;
+        let start = rational_beat_to_ticks(start_value)?;
+        let end = rational_beat_to_ticks(end_value)?;
+        if part_id == u64::from(u16::MAX) || part_id != u64::from(track.part_id)
+            || instrument_id != track.instrument_id
+            || start_beat.cmp(end_beat) != std::cmp::Ordering::Less
+            || end_beat.cmp(score_end) == std::cmp::Ordering::Greater
+            || start != track.segment_start_tick || end != track.segment_end_tick
         {
-            return Err(format!("timeline segment {} does not explain its MIDI track", track.segment_id));
+            return Err(format!("timeline segment {} does not explain its MIDI track within the candidate Score", track.segment_id));
         }
     }
 
@@ -1177,8 +1189,8 @@ fn verify_midi_bundle(root: &Path, r: &ReceiptV1) -> Result<(), String> {
         || m.capability_digest_schema != MIDI_CAPABILITY_DIGEST_SCHEMA_V1
         || m.ticks_per_quarter != MIDI_TICKS_PER_QUARTER_V1
     { return Err("unsupported MIDI manifest/digest recipe".into()); }
-    verify_timeline_binding_bundle(root, r, &m)?;
     let candidate_score = json_file(&root.join("candidate-score.json"), "candidate Score")?;
+    verify_timeline_binding_bundle(root, r, &m, &candidate_score)?;
     verify_midi_manifest_matches_candidate_score(&m, &candidate_score)?;
     let encoded = serde_json::to_vec(&m).map_err(|e| format!("manifest serialization failed: {e}"))?;
     if domain_sha256(MIDI_MANIFEST_DIGEST_SCHEMA_V1.as_bytes(), &encoded) != r.midi.manifest_sha256 {
