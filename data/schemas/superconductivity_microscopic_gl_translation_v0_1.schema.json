@@ -784,7 +784,10 @@
       }
     },
     "claim_ceiling": {
-      "const": "Provenance-bound microscopic/effective response record only; no coefficient is promoted beyond its declared evidence status and no material Tc or phase is independently established by this fixture."
+      "enum": [
+        "Provenance-bound microscopic/effective response record only; no coefficient is promoted beyond its declared evidence status and no material Tc or phase is independently established by this fixture.",
+        "Calculated numerical observables transcribed from the paper-reported arXiv:2603.05123v2 tables only; not independently reproduced and not reconciled against the 2026-11-03 PRL publication version. No phenomenological GL coefficient is derived by this fixture."
+      ]
     }
   }
 }
