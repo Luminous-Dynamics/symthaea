@@ -1,0 +1,11 @@
+[package]
+name = "vocal-correction-trajectory-eval"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Assurance evaluator for bounded closed-loop vocal correction trajectories"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
