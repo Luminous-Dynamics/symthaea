@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <iostream>
 #include <numeric>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -16,10 +17,7 @@ constexpr std::size_t kDefaultBlock = 1000U;
 using Counts = std::array<std::uint64_t, kBranches>;
 using Mapping = std::array<std::uint8_t, kBranches>;
 
-struct Encoded {
-    std::vector<std::uint8_t> bytes;
-    std::size_t bit_count{};
-};
+struct Encoded { std::vector<std::uint8_t> bytes; std::size_t bit_count{}; };
 
 class BitWriter {
 public:
@@ -72,20 +70,18 @@ std::uint8_t rank_of(const Mapping& ranked, std::uint8_t branch) {
 
 void write_dynamic_flag(BitWriter& writer, std::uint8_t rank) {
     switch (rank) {
-        case 0U: writer.write_bit(false); break;              // 0
-        case 1U: writer.write_bits(0b10U, 2U); break;         // 10
-        case 2U: writer.write_bits(0b110U, 3U); break;        // 110
-        case 3U: writer.write_bits(0b111U, 3U); break;        // 111
+        case 0U: writer.write_bit(false); break;       // 0
+        case 1U: writer.write_bits(0b10U, 2U); break;  // 10
+        case 2U: writer.write_bits(0b110U, 3U); break; // 110
+        case 3U: writer.write_bits(0b111U, 3U); break; // 111
         default: throw std::runtime_error("invalid branch rank");
     }
 }
-
 std::uint8_t read_dynamic_flag(BitReader& reader) {
     if (!reader.read_bit()) return 0U;
     if (!reader.read_bit()) return 1U;
     return reader.read_bit() ? 3U : 2U;
 }
-
 void write_fixed_flag(BitWriter& writer, std::uint8_t branch) { writer.write_bits(branch, 2U); }
 std::uint8_t read_fixed_flag(BitReader& reader) {
     return static_cast<std::uint8_t>((reader.read_bit() ? 2U : 0U) | (reader.read_bit() ? 1U : 0U));
@@ -118,7 +114,7 @@ enum class Policy { RabbitPreviousBlock, GuardedPreviousBlock };
 
 bool use_dynamic(Policy policy, std::size_t block_index, const Counts& previous,
                  const Counts& before_previous, std::uint64_t block_size) {
-    if (policy == Policy::RabbitPreviousBlock) return true; // first block uses default rank {0,1,2,3}
+    if (policy == Policy::RabbitPreviousBlock) return true; // first block default rank {0,1,2,3}
     if (block_index == 0U) return false; // guarded control uses fixed flags while bootstrapping
     if (!predicted_dynamic_gain(previous)) return false;
     if (block_index == 1U) return true; // one prior block exists; gain condition is available
@@ -187,6 +183,7 @@ std::vector<std::uint8_t> decode_flags(const Encoded& encoded, std::size_t count
 }
 
 std::size_t fixed_two_bit_cost(const std::vector<std::uint8_t>& branches) { return branches.size() * 2U; }
+
 std::size_t same_block_oracle_cost(const std::vector<std::uint8_t>& branches, std::size_t block_size) {
     std::size_t total = 0U;
     for (std::size_t start = 0U; start < branches.size(); start += block_size) {
@@ -217,12 +214,37 @@ std::vector<std::uint8_t> repeated_blocks(const std::vector<std::array<std::uint
 void require(bool condition, const std::string& message) {
     if (!condition) throw std::runtime_error(message);
 }
-
 void test_codewords_and_round_trip() {
     const std::vector<std::uint8_t> all = {0U,1U,2U,3U,0U,1U,2U,3U};
     for (const Policy policy : {Policy::RabbitPreviousBlock, Policy::GuardedPreviousBlock}) {
         const auto encoded = encode_flags(all, 4U, policy);
         require(decode_flags(encoded, all.size(), 4U, policy) == all, "flag mapper round-trip failed");
+    }
+}
+void test_prefix_code_lengths() {
+    const std::array<std::size_t, kBranches> expected = {1U, 2U, 3U, 3U};
+    for (std::uint8_t branch = 0U; branch < kBranches; ++branch) {
+        const auto encoded = encode_flags({branch}, 1U, Policy::RabbitPreviousBlock);
+        require(encoded.bit_count == expected[branch], "unexpected default prefix-code length");
+    }
+}
+void test_randomized_round_trips() {
+    for (std::uint64_t seed = 0U; seed < 100U; ++seed) {
+        std::mt19937_64 rng(seed + 0x52414242ULL);
+        const std::size_t count = static_cast<std::size_t>(rng() % 5000U);
+        const std::size_t block = 1U + static_cast<std::size_t>(rng() % 1024U);
+        std::vector<std::uint8_t> branches;
+        branches.reserve(count);
+        const std::uint8_t dominant = static_cast<std::uint8_t>(rng() % kBranches);
+        for (std::size_t i = 0U; i < count; ++i) {
+            const std::uint64_t sample = rng() % 100U;
+            branches.push_back(sample < 70U ? dominant : static_cast<std::uint8_t>(rng() % kBranches));
+        }
+        for (const Policy policy : {Policy::RabbitPreviousBlock, Policy::GuardedPreviousBlock}) {
+            const auto encoded = encode_flags(branches, block, policy);
+            require(decode_flags(encoded, branches.size(), block, policy) == branches,
+                    "randomized branch stream failed exact round-trip");
+        }
     }
 }
 void test_rabbit_gain_lemma() {
@@ -302,18 +324,20 @@ void report(const std::string& name, const std::vector<std::uint8_t>& branches,
               << ",same_block_oracle_bits=" << oracle
               << ",rabbit_vs_fixed_pct=" << pct(rabbit.bit_count, fixed)
               << ",guarded_vs_rabbit_pct=" << pct(guarded.bit_count, rabbit.bit_count)
-              << '\n';
+              << '\\n';
 }
 } // namespace
 
 int main() {
     try {
         test_codewords_and_round_trip();
+        test_prefix_code_lengths();
+        test_randomized_round_trips();
         test_rabbit_gain_lemma();
         test_stationary_skew_and_uniform();
         test_shift_and_alternation();
         test_determinism_and_bad_symbols();
-        std::cout << "tests=5 status=PASS\n";
+        std::cout << "tests=7 status=PASS randomized_streams=100\\n";
         constexpr std::size_t block = 1000U;
         report("stationary-skew", repeated_blocks({{800U,100U,60U,40U},{800U,100U,60U,40U},
                                                       {800U,100U,60U,40U},{800U,100U,60U,40U}}, block));
@@ -326,7 +350,7 @@ int main() {
         report("one-block-shift-subblocks", shift, 500U);
         const auto alternating = repeated_blocks({{800U,100U,60U,40U},{40U,60U,100U,800U},
                                                   {800U,100U,60U,40U},{40U,60U,100U,800U}}, block);
-        report("alternating-dominant", alternating);
+        report("alternating-dominant", alternating, block);
         report("alternating-subblocks", alternating, 250U);
         report("alternating-subblocks", alternating, 500U);
         return 0;
