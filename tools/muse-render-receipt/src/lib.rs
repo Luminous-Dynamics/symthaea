@@ -1101,10 +1101,25 @@ mod tests {
         let renderer_binary = b"synthetic-renderer-binary".to_vec();
         let renderer_environment = b"{\"runtime\":\"synthetic\"}".to_vec();
         let renderer_config = b"{\"sample_rate\":44100}".to_vec();
-        let invocation = b"{\"argv\":[\"synthetic-renderer\",\"performance.mid\"]}".to_vec();
         std::fs::write(root.join("renderer-binary"), &renderer_binary).unwrap();
         std::fs::write(root.join("renderer-environment.json"), &renderer_environment).unwrap();
         std::fs::write(root.join("renderer-config.json"), &renderer_config).unwrap();
+        let invocation = serde_json::to_vec(&json!({
+            "schema":"muse-render-invocation-v1",
+            "renderer_id":"test-renderer",
+            "renderer_version":"1",
+            "executable_sha256":sha256_hex(&renderer_binary),
+            "environment_sha256":sha256_hex(&renderer_environment),
+            "configuration_sha256":sha256_hex(&renderer_config),
+            "asset_sha256":null,
+            "input_midi_path":"performance.mid",
+            "input_midi_sha256":midi_sha,
+            "output_audio_path":"output.wav",
+            "arguments":["--input","performance.mid","--output","output.wav"],
+            "started_at":"2026-11-19T10:00:00Z",
+            "finished_at":"2026-11-19T10:00:01Z",
+            "exit_code":0
+        })).unwrap();
         std::fs::write(root.join("render-invocation.json"), &invocation).unwrap();
 
         let wav_path = root.join("output.wav");
