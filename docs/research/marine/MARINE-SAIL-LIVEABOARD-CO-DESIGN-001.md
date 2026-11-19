@@ -221,3 +221,19 @@ Freeze vessel/configuration, displacement/loading, occupancy, service profile, s
 
 The 10% figures are aspirational research gates, not forecasts or reported performance. Failure to beat the baseline is a valid result. If uncertainty intervals overlap, or the vendor baseline cannot be reproduced with equivalent information, report no demonstrated superiority.
 
+
+
+## 17. Forecast replay source qualification
+
+The source inventory is pinned in docs/research/marine/sources/marine-forecast-replay-source-register-0001.json; deterministic implementation and actual dataset retrieval are tracked separately in [Symtropy #6209 — MARINE-FORECAST-BLIND-REPLAY-001](https://github.com/Luminous-Dynamics/symtropy/issues/6209).
+
+The key distinction is information class, not just dataset format:
+
+- **Deployable forecast candidates:** historical NOAA/NCEP GFS forecast cycles with cycle issue time, forecast lead, first demonstrable publication/availability time, valid time, object digest, parameter set, grid and units preserved. GFS is a forecast product; archived copies and source migration/retention limitations still require per-object qualification.
+- **Evaluator-only retrospective context:** ERA5 atmospheric reanalysis and Copernicus Global Ocean Waves Reanalysis. They can help reconstruct a retrospective environment, but reanalysis assimilates observations and is not an operational forecast or direct in-situ ground truth. They must never be visible to a deployable policy.
+- **Independent point checks:** NOAA NDBC buoy/C-MAN observations, subject to station coverage, sensor metadata, quality flags and representativeness uncertainty. They do not provide a continuous route-wide field.
+- **Commercial route references:** PredictWind GPX/KML/CSV exports, where access is licensed. A route geometry file alone does not reproduce the forecast cycle, vessel polar, route constraints, comfort settings or fallback behaviour; absent inputs make the benchmark incomplete.
+
+For each forecast object, preserve source_issue_time, first_available_at, valid_time, decision_cutoff, forecast_lead, exact model/cycle/version, product/grid/CRS/units, URI and immutable SHA-256 digest. retrieval_time is a separate field and may not be substituted for first availability. An archive's ingest time is not presumed to equal original operational publication time.
+
+No raw dataset has been downloaded or declared rights-cleared by this source inventory. The first replay milestone is a small rights-reviewed set of whole weather episodes, frozen with raw object manifests and availability receipts, independent evaluator-side reanalysis, representative buoy checks and held-out voyage/episode splits. If original forecast availability cannot be reconstructed, classify the episode as non-deployable replay or incomplete rather than backfilling with reanalysis.
