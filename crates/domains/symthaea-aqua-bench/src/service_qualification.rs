@@ -87,6 +87,16 @@ impl QualificationDomain {
     }
 }
 
+/// Currentness is asserted by the canonical evidence owner after its own
+/// issuer-authentication, revocation and validity checks. Aqua preserves that state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QualificationEvidenceStatus {
+    Current,
+    Stale,
+    Revoked,
+    Ambiguous,
+}
+
 /// A claim profile fixes which independent domains must be assessed.
 /// More ambitious claims require more evidence; profiles cannot be weakened at runtime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -275,6 +285,11 @@ impl ServiceQualificationProfile {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QualificationEvidenceRef {
     pub authority: QualificationAuthority,
+    /// Stable principal identity returned by the canonical authority registry.
+    pub issuer_principal_id: String,
+    /// Receipt from the canonical owner that it authenticated and checked this evidence.
+    pub authority_verification_receipt_sha256: String,
+    pub status: QualificationEvidenceStatus,
     pub record_id: String,
     pub evidence_sha256: String,
     pub method_sha256: String,
@@ -288,6 +303,11 @@ impl QualificationEvidenceRef {
         domain: QualificationDomain,
         profile: &ServiceQualificationProfile,
     ) -> Result<(), ServiceQualificationError> {
+        require_text("assessment.issuer_principal_id", &self.issuer_principal_id)?;
+        require_digest(
+            "assessment.authority_verification_receipt_sha256",
+            &self.authority_verification_receipt_sha256,
+        )?;
         require_text("assessment.record_id", &self.record_id)?;
         require_digest("assessment.evidence_sha256", &self.evidence_sha256)?;
         require_digest("assessment.method_sha256", &self.method_sha256)?;
@@ -306,6 +326,12 @@ impl QualificationEvidenceRef {
                 domain,
                 expected,
                 actual: self.authority,
+            });
+        }
+        if self.status != QualificationEvidenceStatus::Current {
+            return Err(ServiceQualificationError::EvidenceNotCurrent {
+                domain,
+                status: self.status,
             });
         }
         let binding = profile
@@ -363,6 +389,11 @@ pub enum ServiceQualificationError {
     MissingDomain { domain: QualificationDomain },
     UnexpectedDomain { domain: QualificationDomain },
     DuplicateDomain { domain: QualificationDomain },
+    DuplicateEvidenceRecord { record_id: String },
+    EvidenceNotCurrent {
+        domain: QualificationDomain,
+        status: QualificationEvidenceStatus,
+    },
     WrongAuthority {
         domain: QualificationDomain,
         expected: QualificationAuthority,
@@ -408,6 +439,12 @@ impl Display for ServiceQualificationError {
             }
             Self::DuplicateDomain { domain } => {
                 write!(f, "claim domain has more than one assessment: {domain:?}")
+            }
+            Self::DuplicateEvidenceRecord { record_id } => {
+                write!(f, "independent evidence record is reused: {record_id}")
+            }
+            Self::EvidenceNotCurrent { domain, status } => {
+                write!(f, "evidence for {domain:?} is not current: {status:?}")
             }
             Self::WrongAuthority {
                 domain,
@@ -458,6 +495,7 @@ impl ServiceQualificationRecord {
 
         let required = profile.claim.required_domains();
         let mut seen = HashSet::with_capacity(required.len());
+        let mut evidence_record_ids = HashSet::with_capacity(self.assessments.len());
         for assessment in &self.assessments {
             if !required.contains(&assessment.domain) {
                 return Err(ServiceQualificationError::UnexpectedDomain {
@@ -467,6 +505,11 @@ impl ServiceQualificationRecord {
             if !seen.insert(assessment.domain) {
                 return Err(ServiceQualificationError::DuplicateDomain {
                     domain: assessment.domain,
+                });
+            }
+            if !evidence_record_ids.insert(assessment.evidence.record_id.clone()) {
+                return Err(ServiceQualificationError::DuplicateEvidenceRecord {
+                    record_id: assessment.evidence.record_id.clone(),
                 });
             }
             assessment.evidence.validate(assessment.domain, profile)?;
@@ -632,6 +675,9 @@ mod tests {
             outcome,
             evidence: QualificationEvidenceRef {
                 authority: domain.expected_authority(),
+                issuer_principal_id: format!("issuer-{domain:?}"),
+                authority_verification_receipt_sha256: digest('f'),
+                status: QualificationEvidenceStatus::Current,
                 record_id: format!("assessment-{domain:?}"),
                 evidence_sha256: digest('c'),
                 method_sha256: profile
@@ -666,6 +712,90 @@ mod tests {
                 .map(|domain| assessment(*domain, outcome, profile))
                 .collect(),
         }
+    }
+
+    #[test]
+    fn stale_evidence_is_rejected() {
+        let profile = profile(QualificationClaim::FunctionalService);
+        let mut record = record("candidate-01", &profile, AssessmentOutcome::Pass);
+        record.assessments[0].evidence.status = QualificationEvidenceStatus::Stale;
+        assert_eq!(
+            record.validate(&profile),
+            Err(ServiceQualificationError::EvidenceNotCurrent {
+                domain: QualificationDomain::MeasurementValidity,
+                status: QualificationEvidenceStatus::Stale
+            })
+        );
+    }
+
+    #[test]
+    fn revoked_evidence_is_rejected() {
+        let profile = profile(QualificationClaim::FunctionalService);
+        let mut record = record("candidate-01", &profile, AssessmentOutcome::Pass);
+        record.assessments[0].evidence.status = QualificationEvidenceStatus::Revoked;
+        assert!(matches!(
+            record.validate(&profile),
+            Err(ServiceQualificationError::EvidenceNotCurrent {
+                status: QualificationEvidenceStatus::Revoked,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn ambiguous_evidence_is_rejected() {
+        let profile = profile(QualificationClaim::FunctionalService);
+        let mut record = record("candidate-01", &profile, AssessmentOutcome::Pass);
+        record.assessments[0].evidence.status = QualificationEvidenceStatus::Ambiguous;
+        assert!(matches!(
+            record.validate(&profile),
+            Err(ServiceQualificationError::EvidenceNotCurrent {
+                status: QualificationEvidenceStatus::Ambiguous,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn blank_issuer_principal_identity_is_rejected() {
+        let profile = profile(QualificationClaim::FunctionalService);
+        let mut record = record("candidate-01", &profile, AssessmentOutcome::Pass);
+        record.assessments[0].evidence.issuer_principal_id.clear();
+        assert_eq!(
+            record.validate(&profile),
+            Err(ServiceQualificationError::MissingField {
+                field: "assessment.issuer_principal_id"
+            })
+        );
+    }
+
+    #[test]
+    fn invalid_authority_verification_receipt_is_rejected() {
+        let profile = profile(QualificationClaim::FunctionalService);
+        let mut record = record("candidate-01", &profile, AssessmentOutcome::Pass);
+        record.assessments[0]
+            .evidence
+            .authority_verification_receipt_sha256 = "invalid".to_owned();
+        assert_eq!(
+            record.validate(&profile),
+            Err(ServiceQualificationError::InvalidDigest {
+                field: "assessment.authority_verification_receipt_sha256"
+            })
+        );
+    }
+
+    #[test]
+    fn evidence_record_cannot_be_reused_for_two_domains() {
+        let profile = profile(QualificationClaim::FunctionalService);
+        let mut record = record("candidate-01", &profile, AssessmentOutcome::Pass);
+        let first_record_id = record.assessments[0].evidence.record_id.clone();
+        record.assessments[1].evidence.record_id = first_record_id.clone();
+        assert_eq!(
+            record.validate(&profile),
+            Err(ServiceQualificationError::DuplicateEvidenceRecord {
+                record_id: first_record_id
+            })
+        );
     }
 
     #[test]
