@@ -976,6 +976,24 @@ mod tests {
     }
 
     #[test]
+    fn direct_mel_hdc_preserves_local_quantization_neighborhoods() {
+        let baseline = vec![-0.2_f32; 40];
+        let adjacent = vec![0.0_f32; 40];
+        let distant = vec![0.8_f32; 40];
+
+        let reference = AudioProjector::direct_mel_hv(&baseline, None);
+        let near = AudioProjector::direct_mel_hv(&adjacent, None);
+        let far = AudioProjector::direct_mel_hv(&distant, None);
+
+        let near_similarity = reference.similarity(&near);
+        let far_similarity = reference.similarity(&far);
+        assert!(
+            near_similarity > far_similarity,
+            "adjacent mel levels should remain closer than distant levels: near={near_similarity}, far={far_similarity}"
+        );
+    }
+
+    #[test]
     fn test_audio_projector() {
         let mut projector = AudioProjector::default_config();
 
