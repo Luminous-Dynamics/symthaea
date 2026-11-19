@@ -237,3 +237,12 @@ The key distinction is information class, not just dataset format:
 For each forecast object, preserve source_issue_time, first_available_at, valid_time, decision_cutoff, forecast_lead, exact model/cycle/version, product/grid/CRS/units, URI and immutable SHA-256 digest. retrieval_time is a separate field and may not be substituted for first availability. An archive's ingest time is not presumed to equal original operational publication time.
 
 No raw dataset has been downloaded or declared rights-cleared by this source inventory. The first replay milestone is a small rights-reviewed set of whole weather episodes, frozen with raw object manifests and availability receipts, independent evaluator-side reanalysis, representative buoy checks and held-out voyage/episode splits. If original forecast availability cannot be reconstructed, classify the episode as non-deployable replay or incomplete rather than backfilling with reanalysis.
+
+
+## 18. Grouped forecast-replay holdout protocol
+
+The Symtropy replay-admission work [#6209 / PR #6215](https://github.com/Luminous-Dynamics/symtropy/pull/6215) now includes a versioned split-manifest schema and validator. The split unit is explicitly joint voyage/weather-event grouping: no complete voyage or declared weather event may cross development, validation or test. An identical replay-bundle digest may not be reused across folds, and overlapping episode windows within one voyage are rejected.
+
+Each frozen episode binds its voyage ID, weather-event ID, replay-bundle digest, exact craft-configuration digest, start/end times, environment strata and ordered decision-snapshot references. The split manifest pins the dataset-manifest digest, split algorithm and seed, and carries its own immutable output identity. The current synthetic fixture contains nine independent episode groups (three per fold) and eighteen decision samples; the held-out test fold covers multiple environment strata.
+
+Random row-level and adjacent-timestep train/test splits are not admissible for forecast-regret or mission-generalization claims. The validator establishes only that the declared partition is grouped and internally consistent. It does not prove statistical independence between real weather events, guarantee sample size, establish statistical power or establish superior performance. Sample size must still be set by prospective power analysis, and inference should use whole-voyage/weather-episode blocks.
