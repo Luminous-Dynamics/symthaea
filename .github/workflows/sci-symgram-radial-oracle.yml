@@ -1,0 +1,45 @@
+name: SCI-SYMGRAM radial polynomial oracle
+
+on:
+  pull_request:
+    paths:
+      - "research/sci-symgram-001/radial-oracle/**"
+      - ".github/workflows/sci-symgram-radial-oracle.yml"
+      - "docs/research/SCI_SYMGRAM_001_RADIAL_FORCE_MINIPILOT_V0.md"
+  push:
+    branches:
+      - "research/symmetry-quotient-shared-grammar-v0-2026-11-18"
+    paths:
+      - "research/sci-symgram-001/radial-oracle/**"
+      - ".github/workflows/sci-symgram-radial-oracle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sci-symgram-radial-oracle-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact polynomial reference (Rust 1.96)
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+      - name: Formatting
+        run: cargo fmt --manifest-path research/sci-symgram-001/radial-oracle/Cargo.toml -- --check
+      - name: Unit tests
+        run: cargo test --locked --manifest-path research/sci-symgram-001/radial-oracle/Cargo.toml --all-targets
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path research/sci-symgram-001/radial-oracle/Cargo.toml --all-targets -- -D warnings
