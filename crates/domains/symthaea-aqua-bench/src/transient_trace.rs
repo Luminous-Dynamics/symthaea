@@ -1374,8 +1374,8 @@ mod tests {
         value.event_family = EventFamily::RapidValveEvent;
         value.command.kind = CommandKind::ValveState;
         value.command.samples[0].value = CommandValue::Boolean(false);
-        value.command.samples[1].value = CommandValue::ValveOpen(true);
-        value.command.samples[2].value = CommandValue::ValveOpen(false);
+        value.command.samples[1].value = CommandValue::Boolean(true);
+        value.command.samples[2].value = CommandValue::Boolean(false);
         assert_eq!(value.validate(), Err(TransientTraceError::InsufficientSpatialPressureChannels));
     }
 
@@ -1384,9 +1384,9 @@ mod tests {
         let mut value = profile();
         value.event_family = EventFamily::RapidValveEvent;
         value.command.kind = CommandKind::ValveState;
-        value.command.samples[0].value = CommandValue::ValveOpen(false);
-        value.command.samples[1].value = CommandValue::ValveOpen(true);
-        value.command.samples[2].value = CommandValue::ValveOpen(false);
+        value.command.samples[0].value = CommandValue::Boolean(false);
+        value.command.samples[1].value = CommandValue::Boolean(true);
+        value.command.samples[2].value = CommandValue::Boolean(false);
         value.acquisition.channels.insert(1, pressure_channel("adjacent-branch-pressure", "adjacent-terminal-branch"));
         assert_eq!(value.validate(), Ok(()));
     }
@@ -1395,7 +1395,7 @@ mod tests {
     fn rejects_supply_sag_label_without_a_pressure_decrease() {
         let mut value = profile();
         value.command.samples.iter_mut().for_each(|sample| {
-            sample.value = CommandValue::PressureKpa(300.0);
+            sample.value = CommandValue::Numeric(300.0);
         });
         assert_eq!(value.validate(), Err(TransientTraceError::CommandShapeMismatch));
     }
@@ -1405,7 +1405,7 @@ mod tests {
         let mut value = profile();
         value.event_family = EventFamily::IntermittentSupply;
         value.command.samples.iter_mut().for_each(|sample| {
-            sample.value = CommandValue::PressureKpa(150.0);
+            sample.value = CommandValue::Numeric(150.0);
         });
         assert_eq!(value.validate(), Err(TransientTraceError::CommandShapeMismatch));
     }
@@ -1416,7 +1416,7 @@ mod tests {
         value.event_family = EventFamily::RapidValveEvent;
         value.command.kind = CommandKind::ValveState;
         value.command.samples.iter_mut().for_each(|sample| {
-            sample.value = CommandValue::ValveOpen(true);
+            sample.value = CommandValue::Boolean(true);
         });
         assert_eq!(value.validate(), Err(TransientTraceError::CommandShapeMismatch));
     }
