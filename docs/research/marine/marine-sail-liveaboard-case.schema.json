@@ -17,7 +17,9 @@
     "owner_receipts",
     "required_resource_dimensions",
     "evaluator_boundary",
-    "claim_ceiling"
+    "claim_ceiling",
+    "hard_gate_ids",
+    "hard_gate_evaluations"
   ],
   "$defs": {
     "sha256": {
@@ -505,12 +507,12 @@
     },
     "hard_gate_ids": {
       "type": "array",
+      "minItems": 1,
       "uniqueItems": true,
       "items": {
         "type": "string",
         "minLength": 1
-      },
-      "description": "Canonical, non-compensable gate IDs consumed from owner reports. A case with a missing required gate is not eligible."
+      }
     },
     "evaluator_boundary": {
       "type": "object",
@@ -546,6 +548,77 @@
     },
     "claim_ceiling": {
       "const": "cross_owner_composition_only"
+    },
+    "hard_gate_evaluations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "gate_id",
+          "status",
+          "owner_receipt_roles",
+          "evidence_ids",
+          "rationale"
+        ],
+        "properties": {
+          "gate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "unknown",
+              "blocked"
+            ]
+          },
+          "owner_receipt_roles": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "sailing_route_candidate",
+                "tack_gybe_transition",
+                "sail_capability_graph",
+                "operational_design_domain",
+                "COLREG_encounter",
+                "mission_energy_budget",
+                "voyage_power_trace",
+                "resource_service_schedule",
+                "resource_autonomy_vector",
+                "watermaker_service",
+                "service_continuity",
+                "habitat_metabolism",
+                "hydrodynamic_validation",
+                "physical_campaign",
+                "spatial_metocean_context",
+                "spatial_test_site_context",
+                "component_product_lifecycle",
+                "maritime_cross_stack_golden_trace"
+              ]
+            }
+          },
+          "evidence_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
     }
   }
 }
