@@ -55,6 +55,7 @@ pub enum CaptureReasonCode {
     MissingCalibrationEvidence,
     InvalidInterfaceSpecification,
     NonFiniteMeasurement,
+    InvalidMeasurementRange,
     EpochMismatch,
     RelativePositionOutOfTolerance,
     RelativeSpeedOutOfTolerance,
@@ -327,6 +328,9 @@ pub fn evaluate_readiness(
     if !finite {
         reasons.push(CaptureReasonCode::NonFiniteMeasurement);
     }
+    if observation.interface_orientation_error_rad < 0.0 || observation.clearance_m < 0.0 {
+        reasons.push(CaptureReasonCode::InvalidMeasurementRange);
+    }
 
     if finite
         && (observation.measurement_epoch_s - spec.reference_epoch_s).abs()
@@ -534,14 +538,27 @@ pub fn evaluate_capture(
         }
     }
 
+    let hard_rejection = reasons.iter().any(|reason| {
+        matches!(
+            reason,
+            CaptureReasonCode::ReadinessNotAccepted
+                | CaptureReasonCode::AttemptIdentityMismatch
+                | CaptureReasonCode::InterfaceIdentityMismatch
+                | CaptureReasonCode::InterfaceRevisionMismatch
+                | CaptureReasonCode::ContactNotDetected
+                | CaptureReasonCode::ContactImpulseExceeded
+                | CaptureReasonCode::ContactForceExceeded
+                | CaptureReasonCode::LatchNotEngaged
+                | CaptureReasonCode::RetentionTestFailed
+                | CaptureReasonCode::PostCaptureRelativeSpeedExceeded
+        )
+    });
     let status = if reasons.is_empty() {
         CaptureStatus::Captured
-    } else if reasons.contains(&CaptureReasonCode::LatchStateUnknown)
-        || reasons.contains(&CaptureReasonCode::RetentionTestNotPerformed)
-    {
-        CaptureStatus::Indeterminate
-    } else {
+    } else if hard_rejection {
         CaptureStatus::Rejected
+    } else {
+        CaptureStatus::Indeterminate
     };
 
     CaptureReceipt {
