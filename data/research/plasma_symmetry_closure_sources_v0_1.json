@@ -52,7 +52,28 @@
         "Section2_Data.zip: approximately 3.6 GB of Section 2 diagnostics used for the closure study."
       ],
       "artifact_rights_state": "ZENODO_RECORD_LICENSE_NOT_YET_AUDITED",
-      "article_license": "CC-BY-4.0"
+      "article_license": "CC-BY-4.0",
+      "artifact_version": "Zenodo record 10.5281/zenodo.15498576; version/revision metadata pending direct record audit",
+      "artifact_files": [
+        {
+          "name": "input_Section1.2d",
+          "size_bytes": 4300,
+          "md5": "f7e10c59a1e020e87d14663e625bcc94",
+          "role": "OSIRIS PIC input deck; Section1 diagnostics (~500GB) not included"
+        },
+        {
+          "name": "input_Section2.2d",
+          "size_bytes": 7500,
+          "md5": "06245143acfdc82382c5ec35368a9dcf",
+          "role": "OSIRIS PIC input deck for machine-learned closure dataset"
+        },
+        {
+          "name": "Section2_Data.zip",
+          "size_bytes_approx": 3600000000,
+          "md5": "69d7038b82e1f0293e8c25bb8c5b489e",
+          "role": "Section2 diagnostics for pressure-tensor/closure study"
+        }
+      ]
     },
     {
       "source_id": "burles_online_fno_landaudamping_2026",
@@ -130,6 +151,18 @@
       "dataset_inventory": [
         "Linear_Landau_Damping_training_data.mat: approximately 41.0 MB.",
         "Nonlinear_Landau_Damping_training_data.mat: approximately 41.0 MB."
+      ],
+      "artifact_files": [
+        {
+          "name": "Linear_Landau_Damping_training_data.mat",
+          "size_bytes_approx": 41000000,
+          "md5": "6370e709ce0a825148917fabc8638a2a"
+        },
+        {
+          "name": "Noninear_Landau_Damping_training_data.mat",
+          "size_bytes_approx": 41000000,
+          "md5": "6370e709ce0a825148917fabc8638a2a"
+        }
       ]
     },
     {
