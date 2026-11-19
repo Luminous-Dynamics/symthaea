@@ -5547,7 +5547,7 @@
           "canonical_value": {
             "kind": "scalar",
             "value": 0.3,
-            "unit": "% of reading"
+            "unit": "%"
           },
           "evidence_class": "independent_market_sample",
           "result_class": "measured",
@@ -5589,7 +5589,7 @@
           "canonical_value": {
             "kind": "scalar",
             "value": 2.9,
-            "unit": "% of reading"
+            "unit": "%"
           },
           "evidence_class": "independent_market_sample",
           "result_class": "measured",
@@ -5627,11 +5627,12 @@
         {
           "claim_id": "clasp.sa.2022.test-pressure-range",
           "parameter": "sampled_test_pressure_range",
-          "original_value": "Flow profiles recorded across approximately 250–550 kPa; summary interpolated at 250, 300 and 500 kPa",
+          "original_value": "Flow profiles recorded across approximately 250–550 kPa; summary interpolated at 250, 300 and 500 kPa.",
           "canonical_value": {
-            "kind": "scalar",
-            "value": null,
-            "unit": ""
+            "kind": "range",
+            "minimum": 250,
+            "maximum": 550,
+            "unit": "kPa"
           },
           "evidence_class": "independent_market_sample",
           "result_class": "measured",
