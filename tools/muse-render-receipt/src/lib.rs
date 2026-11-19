@@ -1825,6 +1825,39 @@ mod tests {
         assert!(report.wav_integrity_verified);
         assert!(!report.acceptance_eligible);
 
+        // Capability digests cannot disguise a pitch outside the declared range.
+        let bad_range_capability_bytes = serde_json::to_vec(&serde_json::json!([{
+            "id":"inst-a","kind":"piano",
+            "sounding_range":{"lowest_midi":61,"highest_midi":127},
+            "max_polyphony":16
+        }])).unwrap();
+        std::fs::write(root.join("instrument-capabilities.json"), &bad_range_capability_bytes).unwrap();
+        let mut bad_range_receipt = parsed.clone();
+        bad_range_receipt.midi.capability_sha256 =
+            domain_sha256(MIDI_CAPABILITY_DIGEST_SCHEMA_V1.as_bytes(), &bad_range_capability_bytes);
+        assert!(verify_timeline_binding_bundle(
+            &root,&bad_range_receipt,&midi_manifest,&candidate_value
+        ).unwrap_err().contains("outside capability range"));
+
+        // A correct range with too small a simultaneous-note budget is also rejected.
+        let low_polyphony_capability_bytes = serde_json::to_vec(&serde_json::json!([{
+            "id":"inst-a","kind":"piano",
+            "sounding_range":{"lowest_midi":0,"highest_midi":127},
+            "max_polyphony":1
+        }])).unwrap();
+        std::fs::write(root.join("instrument-capabilities.json"), &low_polyphony_capability_bytes).unwrap();
+        let mut bad_polyphony_receipt = parsed.clone();
+        bad_polyphony_receipt.midi.capability_sha256 =
+            domain_sha256(MIDI_CAPABILITY_DIGEST_SCHEMA_V1.as_bytes(), &low_polyphony_capability_bytes);
+        let mut overlapping_manifest = midi_manifest.clone();
+        let mut overlapping_note = overlapping_manifest.notes[0].clone();
+        overlapping_note.source_note_ordinal = 1;
+        overlapping_manifest.notes.push(overlapping_note);
+        assert!(verify_timeline_binding_bundle(
+            &root,&bad_polyphony_receipt,&overlapping_manifest,&candidate_value
+        ).unwrap_err().contains("exceeding declared polyphony"));
+        std::fs::write(root.join("instrument-capabilities.json"), &capability_bytes).unwrap();
+
         // Re-seal a receipt around an invocation file whose hash is correct
         // but whose claimed MIDI input differs. The semantic join must fail.
         let mut altered_invocation: Value = serde_json::from_slice(&invocation).unwrap();
