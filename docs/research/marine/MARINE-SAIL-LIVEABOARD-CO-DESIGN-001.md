@@ -246,3 +246,21 @@ The Symtropy replay-admission work [#6209 / PR #6215](https://github.com/Luminou
 Each frozen episode binds its voyage ID, weather-event ID, replay-bundle digest, exact craft-configuration digest, start/end times, environment strata and ordered decision-snapshot references. The split manifest pins the dataset-manifest digest, split algorithm and seed, and carries its own immutable output identity. The current synthetic fixture contains nine independent episode groups (three per fold) and eighteen decision samples; the held-out test fold covers multiple environment strata.
 
 Random row-level and adjacent-timestep train/test splits are not admissible for forecast-regret or mission-generalization claims. The validator establishes only that the declared partition is grouped and internally consistent. It does not prove statistical independence between real weather events, guarantee sample size, establish statistical power or establish superior performance. Sample size must still be set by prospective power analysis, and inference should use whole-voyage/weather-episode blocks.
+
+
+## 19. Forecast skill versus mission decision value
+
+The next scorecard work is tracked in [Symtropy #6220 — MARINE-FORECAST-SKILL-001](https://github.com/Luminous-Dynamics/symtropy/issues/6220), consuming the information-set admission and grouped split controls from [Symtropy PR #6215](https://github.com/Luminous-Dynamics/symtropy/pull/6215).
+
+Keep two evaluation questions separate:
+
+1. Was the forecast skillful and calibrated for the wind/wave variables, lead times, thresholds and regions relevant to the mission?
+2. Did using that forecast improve route feasibility, arrival, essential services and resource outcomes against the strongest information-matched policy?
+
+A single global RMSE or CRPS cannot answer both. WeatherBench 2 deliberately publishes a range of metrics and scorecards rather than claiming one universal weather score. ECMWF's 2026 verification discussion references RMSE, anomaly correlation, Brier score and CRPS; decision-focused evaluation research notes that CRPS can be dominated by common conditions and obscure tail failures. Those are methodology anchors, not evidence that a global model benchmark is a sailing benchmark.
+
+Forecast layer: publish variable/lead/region-stratified bias, MAE/RMSE and anomaly correlation where appropriate; CRPS for full forecast distributions; Brier score and reliability diagrams for pre-registered threshold events; spread-skill, interval coverage/width and rank/PIT diagnostics; and explicit extreme-event performance for high winds, large/steep waves, rapid wind shifts and threshold crossings. Avoid reporting direction error in calm-wind regimes as though it had the same meaning as strong-wind direction error.
+
+Decision layer: independently report route and arrival regret, robust feasibility, service-floor violations, motor-assist and purchased-energy consequences, multidimensional resource-autonomy changes, comfort/fallback status, plan churn, abstentions and runtime. Forecast improvement is not a mission improvement unless it changes outcomes beneficially under matched conditions.
+
+Every score record must resolve to the exact admitted forecast cycle/lead, variable units/grid, verification source and quality metadata, transformations and digest, decision cutoff and grouped held-out fold. Reanalysis remains evaluator-only; buoy data remains point validation with representativeness uncertainty. The grouped split manifest in #6215 keeps whole voyages and weather events out of other folds. Forecast metrics, mission-utility metrics and non-compensable safety/service gates remain distinct.
