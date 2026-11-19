@@ -11,7 +11,7 @@ use crate::{compress, crc32, decompress, CodecError, ModelKind};
 const MAGIC: &[u8; 4] = b"F64C";
 const VERSION: u16 = 1;
 const HEADER_LEN: usize = 32;
-const MAX_TRANSFORMED_BYTES_PER_VALUE: usize = 11;
+const MAX_TRANSFORMED_BYTES_PER_VALUE: usize = 20;
 
 /// Reversible f64 transform. All operations are on IEEE-754 bits, not floats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,6 +23,8 @@ pub enum Float64Transform {
     XorPrevious = 1,
     /// Store XOR residual leading/trailing zero counts plus packed meaningful bits.
     XorLeadingTrailing = 2,
+    /// Run-length encode identical bit patterns, then XOR-varint encode each run value.
+    RleXorPrevious = 3,
 }
 
 impl Float64Transform {
@@ -31,6 +33,7 @@ impl Float64Transform {
             0 => Ok(Self::Raw),
             1 => Ok(Self::XorPrevious),
             2 => Ok(Self::XorLeadingTrailing),
+            3 => Ok(Self::RleXorPrevious),
             _ => Err(NumericError::UnsupportedTransform(value)),
         }
     }
@@ -141,6 +144,23 @@ fn encode_transform(values: &[f64], transform: Float64Transform) -> Result<Vec<u
                         output.push((meaningful >> (byte * 8)) as u8);
                     }
                 }
+        Float64Transform::RleXorPrevious => {
+            let mut previous = 0u64;
+            let mut index = 0usize;
+            while index < values.len() {
+                let current = values[index].to_bits();
+                let mut end = index + 1;
+                while end < values.len() && values[end].to_bits() == current {
+                    end += 1;
+                }
+                let run_length =
+                    u64::try_from(end - index).map_err(|_| NumericError::LengthOverflow)?;
+                write_varint_u64(run_length, &mut output);
+                write_varint_u64(current ^ previous, &mut output);
+                previous = current;
+                index = end;
+            }
+        }
                 previous = current;
             }
         }
@@ -251,6 +271,33 @@ fn decode_transform(
                 values.push(f64::from_bits(current));
                 previous = current;
             }
+        Float64Transform::RleXorPrevious => {
+            let mut previous = 0u64;
+            let mut has_previous_run = false;
+            while values.len() < count {
+                let run_length = read_varint_u64(bytes, &mut cursor)?;
+                if run_length == 0 {
+                    return Err(NumericError::NonCanonicalVarint);
+                }
+                let remaining = count - values.len();
+                if run_length > remaining as u64 {
+                    return Err(NumericError::NumericOverflow);
+                }
+                let residual = read_varint_u64(bytes, &mut cursor)?;
+                let current = previous ^ residual;
+                if has_previous_run && current == previous {
+                    return Err(NumericError::NonCanonicalVarint);
+                }
+                for _ in 0..run_length {
+                    values.push(f64::from_bits(current));
+                }
+                previous = current;
+                has_previous_run = true;
+            }
+            if cursor != bytes.len() {
+                return Err(NumericError::LengthMismatch);
+            }
+        }
             if cursor != bytes.len() {
                 return Err(NumericError::LengthMismatch);
             }
@@ -364,10 +411,10 @@ pub fn decompress_f64(frame: &[u8], max_values: usize) -> Result<Vec<f64>, Numer
 const SEGMENTED_MAGIC: &[u8; 4] = b"F64S";
 const SEGMENTED_VERSION: u16 = 1;
 const SEGMENTED_HEADER_LEN: usize = 32;
-const SEGMENT_SELECTION_POLICY_BEST_OF_SIX: u8 = 1;
+const SEGMENT_SELECTION_POLICY_BEST_OF_EIGHT: u8 = 1;
 
 const SEGMENT_SELECTION_POLICY_HISTORICAL_COST: u8 = 2;
-const SEGMENT_CANDIDATES: usize = 6;
+const SEGMENT_CANDIDATES: usize = 8;
 
 fn encode_segment_candidate(
     values: &[f64],
@@ -380,6 +427,8 @@ fn encode_segment_candidate(
         3 => (Float64Transform::XorPrevious, ModelKind::Order1),
         4 => (Float64Transform::XorLeadingTrailing, ModelKind::Order0),
         5 => (Float64Transform::XorLeadingTrailing, ModelKind::Order1),
+        6 => (Float64Transform::RleXorPrevious, ModelKind::Order0),
+        7 => (Float64Transform::RleXorPrevious, ModelKind::Order1),
         _ => return Err(NumericError::UnsupportedTransform(candidate)),
     };
     compress_f64(values, transform, model)
@@ -408,6 +457,8 @@ fn segment_candidate_from_child_header(child: &[u8]) -> Result<u8, NumericError>
         (1, 1) => Ok(3),
         (2, 0) => Ok(4),
         (2, 1) => Ok(5),
+        (3, 0) => Ok(6),
+        (3, 1) => Ok(7),
         _ => Err(NumericError::UnsupportedTransform(transform)),
     }
 }
@@ -651,7 +702,7 @@ fn best_segment_candidate_frame(
 }
 
 /// Encode fixed-size f64 chunks by selecting the smallest complete subframe
-/// among Raw/XorPrevious/XorLeadingTrailing x Order0/Order1. Every selected F64C frame (including
+/// among Raw/XorPrevious/XorLeadingTrailing/RleXorPrevious x Order0/Order1. Every selected F64C frame (including
 /// its own header and CRCs) is retained in the output, so selection overhead is
 /// included. This is an offline segment-local size oracle, not an online or
 /// WZS-equivalent algorithm.
@@ -877,6 +928,7 @@ mod tests {
             Float64Transform::Raw,
             Float64Transform::XorPrevious,
             Float64Transform::XorLeadingTrailing,
+            Float64Transform::RleXorPrevious,
         ] {
             for model in [ModelKind::Order0, ModelKind::Order1] {
                 for input in bit_fixtures() {
@@ -891,8 +943,8 @@ mod tests {
     #[test]
     fn f64_encoding_is_deterministic() {
         let input = bit_fixtures().pop().unwrap();
-        let first = compress_f64(&input, Float64Transform::XorLeadingTrailing, ModelKind::Order1).unwrap();
-        let second = compress_f64(&input, Float64Transform::XorLeadingTrailing, ModelKind::Order1).unwrap();
+        let first = compress_f64(&input, Float64Transform::RleXorPrevious, ModelKind::Order1).unwrap();
+        let second = compress_f64(&input, Float64Transform::RleXorPrevious, ModelKind::Order1).unwrap();
         assert_eq!(first, second);
     }
 
@@ -1101,6 +1153,45 @@ mod tests {
             assert!(
                 decode_transform(&payload, Float64Transform::XorLeadingTrailing, 1).is_err(),
                 "malformed XOR leading/trailing payload was accepted: {payload:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn rle_xor_merges_identical_ieee_bit_patterns() {
+        let input = [0.0f64, 0.0, -0.0, -0.0, f64::INFINITY, f64::INFINITY];
+        let encoded = encode_transform(&input, Float64Transform::RleXorPrevious).unwrap();
+        // Runs: +0 (2, residual 0), -0 (2, sign-bit residual), +inf (2, residual).
+        assert_eq!(encoded[0], 2);
+        assert_eq!(encoded[1], 0);
+        let decoded =
+            decode_transform(&encoded, Float64Transform::RleXorPrevious, input.len()).unwrap();
+        assert_same_bits(&decoded, &input);
+    }
+
+    #[test]
+    fn rle_xor_constant_run_has_two_byte_transform() {
+        let input = vec![42.5f64; 4096];
+        let encoded = encode_transform(&input, Float64Transform::RleXorPrevious).unwrap();
+        assert_eq!(encoded, vec![0x80, 0x20, 0]);
+        let decoded =
+            decode_transform(&encoded, Float64Transform::RleXorPrevious, input.len()).unwrap();
+        assert_same_bits(&decoded, &input);
+    }
+
+    #[test]
+    fn rle_xor_rejects_malformed_runs() {
+        let bad_payloads = [
+            vec![0, 0],           // zero run length
+            vec![1],              // missing residual
+            vec![2, 0],            // run exceeds declared output count
+            vec![1, 0, 1, 0],      // adjacent equal-valued runs are noncanonical
+            vec![0x80, 0, 0],      // overlong run length varint
+        ];
+        for payload in bad_payloads {
+            assert!(
+                decode_transform(&payload, Float64Transform::RleXorPrevious, 2).is_err(),
+                "malformed RLE-XOR payload accepted: {payload:?}"
             );
         }
     }
