@@ -1,0 +1,137 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "plasma-closure-reliability-envelope-v0.1",
+  "created_at": "2026-11-19",
+  "status": "specification_only",
+  "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12907",
+  "substage_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12910",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12914",
+  "scope": {
+    "primary_task": "one_dimensional_electrostatic_landau_damping",
+    "excluded_tasks": [
+      "magnetic_reconnection_pressure_tensor_closure",
+      "tokamak_disruption_prediction",
+      "multimodal_tokamak_foundation_model",
+      "dusty_plasma"
+    ],
+    "claim_ceiling": "benchmark specification only; no reproduction, closure training, solver execution, or physical validation"
+  },
+  "qualification_envelopes": [
+    {
+      "id": "accuracy",
+      "required": true,
+      "metrics": [
+        "trajectory_relative_l2_by_field",
+        "electric_field_energy_trajectory_error",
+        "oscillation_phase_error",
+        "damping_rate_error",
+        "stable_rollout_fraction",
+        "time_to_first_failure"
+      ]
+    },
+    {
+      "id": "physical_admissibility",
+      "required": true,
+      "metrics": [
+        "mass_balance_residual",
+        "momentum_balance_residual",
+        "energy_balance_residual",
+        "pressure_realizability_when_applicable",
+        "characteristic_speed_and_hyperbolicity_when_applicable",
+        "finite_state_and_stability",
+        "spurious_growing_modes"
+      ]
+    },
+    {
+      "id": "epistemic",
+      "required": true,
+      "metrics": [
+        "ood_auroc",
+        "ood_auprc",
+        "false_safe_rate",
+        "selective_risk_coverage",
+        "abstention_rate",
+        "prediction_interval_coverage",
+        "prediction_interval_width",
+        "failure_detection_lead_time"
+      ]
+    },
+    {
+      "id": "portability",
+      "required": true,
+      "metrics": [
+        "zero_shot_timestep_transfer",
+        "zero_shot_grid_transfer",
+        "zero_shot_integrator_transfer",
+        "zero_shot_solver_transfer_when_available",
+        "fine_tuned_adaptation_cost"
+      ]
+    }
+  ],
+  "candidate_families": [
+    "hammett_perkins_analytic",
+    "offline_fno",
+    "paper_exact_online_fno",
+    "accepted_state_only_online_memory",
+    "stage_explicit_online_memory",
+    "markovian_fno_ablation",
+    "fixed_window_sequence",
+    "sparse_regression_if_source_admitted",
+    "symthaea_cfc_ltc_research_candidate",
+    "hybrid_explicit_window_latent_memory_research_candidate"
+  ],
+  "interventions": [
+    "in_distribution_amplitudes",
+    "held_out_interpolation_amplitudes",
+    "below_training_amplitude_extrapolation",
+    "above_training_amplitude_extrapolation",
+    "wavenumber_shift",
+    "phase_shift",
+    "initial_condition_translation",
+    "irregular_temporal_cadence",
+    "missing_or_stale_memory",
+    "memory_lag_ablation",
+    "timestep_shift",
+    "spatial_resolution_shift",
+    "integrator_shift",
+    "solver_shift_when_matched"
+  ],
+  "strata": [
+    "linear_landau_damping",
+    "transition_onset",
+    "nonlinear_trapping"
+  ],
+  "entropy_diagnostic": {
+    "status": "candidate_diagnostic_not_safety_gate",
+    "fluid_and_kinetic_definitions_must_remain_separate": true,
+    "requires_held_out_kinetic_calibration": true,
+    "unvalidated_label": "UNVALIDATED_ENTROPY_SENTINEL"
+  },
+  "source_records": [
+    {
+      "id": "pnas-2025-vlasov-training-data",
+      "doi": "10.5281/zenodo.14915239",
+      "uri": "https://zenodo.org/records/14915239",
+      "admission_status": "blocked_pending_duplicate_md5_resolution_and_license_audit"
+    },
+    {
+      "id": "online-fno-2026-code-data",
+      "doi": "10.5281/zenodo.22800112",
+      "uri": "https://zenodo.org/records/22800112",
+      "admission_status": "blocked_pending_version_manifest_hashes_and_license_audit"
+    },
+    {
+      "id": "magnetic-reconnection-pic-data",
+      "doi": "10.5281/zenodo.15498576",
+      "uri": "https://zenodo.org/records/15498576",
+      "admission_status": "separate_task_blocked_pending_license_audit_and_section1_diagnostics"
+    }
+  ],
+  "execution": {
+    "results": null,
+    "rust_implementation": "not_started",
+    "dataset_download": "not_performed",
+    "paper_reproduction": "not_performed",
+    "physical_validation": "not_performed"
+  }
+}
