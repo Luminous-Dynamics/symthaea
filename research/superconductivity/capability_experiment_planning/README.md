@@ -107,3 +107,44 @@ The exact oracle is exponential in action count and is intended for small benchm
 ## Claim ceiling
 
 This is a synthetic decision-planning benchmark. It does not prescribe physical experiments, replace institutional safety review, authorize synthesis or establish any superconducting material or property.
+
+## v0.2 research track: mechanism / model discrimination
+
+The new `SC-MODEL-DISCRIMINATION-0.1` synthetic contract tests a different question from v0.1. Rather than asking only which action reduces uncertainty *inside one assumed model*, it asks which feasible plan best distinguishes several competing explanations, while preserving an explicit `none_of_above` hypothesis.
+
+The Rust binary `sc_model_discrimination_audit`:
+- validates the model prior, requires exactly one `none_of_above` model, and requires every observation action to define a normalized likelihood for every model;
+- rejects capability actions that claim to directly observe an outcome;
+- computes exact expected mutual information (I(M;Y_S \\mid D)) in nats by enumerating all binary joint outcomes for the selected observation set;
+- enumerates feasible action subsets under the budget and capability-order constraints;
+- compares the exact oracle with a myopic marginal information-gain-per-cost policy;
+- emits SHA-256-bound schema/fixture receipts and negative-control results;
+- hard-excludes ineligible actions even when their nominal likelihoods appear highly discriminating.
+
+### Synthetic fixture result (derived from illustrative probabilities only)
+
+The fixture uses four hypothetical model classes: uniform electron-phonon, multiband electron-phonon, finite-(Q) pairing, and `none_of_above`. It makes no claim that these likelihoods are physically calibrated.
+
+Under a six-unit budget, the exact oracle selects:
+1. thermodynamic-channel qualification;
+2. independent bulk thermodynamic cross-check;
+3. field-angle (H_{c2}) signature;
+4. stiffness-tensor signature.
+
+The fixture's exact expected model information gain is approximately **0.556959 nats**. The myopic policy cannot select the zero-immediate-information qualification step and therefore misses the thermodynamic cross-check; the two direct measurements yield approximately **0.371839 nats**. A deliberately sharp but ineligible high-field action must be excluded. A low-cost resistivity repeat with identical likelihood under every hypothesis adds zero model information.
+
+These values are algebraic results of a synthetic fixture, not physical evidence, instrument recommendations, or a prediction about any real sample.
+
+### Mathematical and benchmark boundary
+
+For discrete model (M), selected binary outcomes (Y_S), prior (p(M\mid D)), and the fixture's explicit conditional-independence assumption:
+
+[
+I(M;Y_S\mid D)=H(M\mid D)-\\mathbb{E}_{Y_S\mid D}[H(M\mid D,Y_S)].
+]
+
+The first executable version assumes known likelihood tables, independent outcomes conditional on model identity, binary outcome categories, and at most 12 actions for exact subset enumeration. It does **not** yet model shared calibration errors, correlated observations, likelihood uncertainty, sequential outcome-adaptive policies, or posterior predictive model discrepancy beyond the explicit `none_of_above` class.
+
+Next qualification steps are likelihood calibration on held-out synthetic cases, proper scoring rules (Brier/log score), selective-risk and abstention metrics, robust planning under likelihood misspecification, and replay against specimen-linked historical campaigns only after the underlying evidence and rights are admitted. Report parameter precision, model discrimination, cost and qualified-answer probability as a Pareto surface rather than hiding them in one scalar.
+
+No physical experiment is authorized or performed by this contract. The existing v0.1 target-variance planner remains a separate objective and benchmark.
