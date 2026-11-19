@@ -1,0 +1,277 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/symmetry-discovery-benchmark-001/schemas/missingness_case_manifest.schema.json",
+  "title": "Symmetry experiment missingness benchmark manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "status",
+    "probability_scale",
+    "independence_semantics",
+    "cases",
+    "preregistered_targets",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "benchmark_id": {
+      "const": "LUMINOUS-SYMM-MISSINGNESS-001"
+    },
+    "status": {
+      "const": "frozen_synthetic_cases_not_benchmark_results"
+    },
+    "probability_scale": {
+      "const": "parts_per_million"
+    },
+    "independence_semantics": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "mechanism",
+          "validity_domain_id",
+          "hypothesis_ids",
+          "probes",
+          "expected_relationship",
+          "split_ids"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mechanism": {
+            "enum": [
+              "MCAR",
+              "MAR",
+              "MNAR",
+              "hard_support",
+              "shifted_MNAR"
+            ]
+          },
+          "validity_domain_id": {
+            "type": "string"
+          },
+          "calibration_domain_id": {
+            "type": "string"
+          },
+          "evaluation_domain_id": {
+            "type": "string"
+          },
+          "calibration_evidence_id": {
+            "type": "string"
+          },
+          "independence_contract_id": {
+            "type": "string"
+          },
+          "hypothesis_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "probes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "probe_id",
+                "cost"
+              ],
+              "properties": {
+                "probe_id": {
+                  "type": "string"
+                },
+                "cost": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "minItems": 1
+          },
+          "dropout_probability_intervals_ppm_by_hypothesis": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "lower_ppm",
+                  "upper_ppm"
+                ],
+                "properties": {
+                  "lower_ppm": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000
+                  },
+                  "upper_ppm": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000
+                  }
+                }
+              }
+            }
+          },
+          "observed_context_variable": {
+            "type": "string"
+          },
+          "context_strata": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "stratum_id",
+                "dropout_probability_intervals_ppm_by_probe"
+              ],
+              "properties": {
+                "stratum_id": {
+                  "type": "string"
+                },
+                "dropout_probability_intervals_ppm_by_probe": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "probe_id",
+                      "lower_ppm",
+                      "upper_ppm"
+                    ],
+                    "properties": {
+                      "probe_id": {
+                        "type": "string"
+                      },
+                      "lower_ppm": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000000
+                      },
+                      "upper_ppm": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000000
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "expected_relationship": {
+            "type": "string",
+            "minLength": 1
+          },
+          "abstention_possible_by_hypothesis": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            }
+          },
+          "impossibility_justifications_by_hypothesis": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "evidence_id",
+                      "evidence_kind",
+                      "validity_domain_id"
+                    ],
+                    "properties": {
+                      "evidence_id": {
+                        "type": "string"
+                      },
+                      "evidence_kind": {
+                        "enum": [
+                          "EngineeringInterlock",
+                          "ProvenPhysicalBound",
+                          "FormalProof",
+                          "ExternalCertificate"
+                        ]
+                      },
+                      "validity_domain_id": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "evaluation_dropout_intervals_available": {
+            "type": "boolean"
+          },
+          "expected_policy": {
+            "type": "string"
+          },
+          "split_ids": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "calibration",
+              "validation",
+              "final_holdout"
+            ],
+            "properties": {
+              "calibration": {
+                "type": "string"
+              },
+              "validation": {
+                "type": "string"
+              },
+              "final_holdout": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "preregistered_targets": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "established",
+        "not_established"
+      ],
+      "properties": {
+        "established": {
+          "type": "string"
+        },
+        "not_established": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
