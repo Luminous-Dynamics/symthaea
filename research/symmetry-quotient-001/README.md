@@ -71,3 +71,10 @@ The hand-auditable D4 ordered-pair fixture now distinguishes:
 This is not permission to reuse a C4 certificate in the isotropic or asymmetric context. The caller must present the certificate whose exact context ID matches the active environment. A missing or unknown context should abstain rather than inherit another environment's pruning permission.
 
 The common-intersection compiler remains available and returns C1 for the same three-environment family. The contextual atlas demonstrates the more useful alternative: **preserve the maximal exact symmetry locally, while binding pruning authority to the operating context**. Both approaches are exact finite-group constructions; neither accepts soft/spectral proposals as proof.
+
+## Outer certificate provenance (v0.4)
+
+The multi-environment common-subgroup certificate and contextual atlas now bind the **entire ordered environment family**, the complete ambient action contract, and the original total qualification budget. Their canonical environment encoding includes every environment ID, every candidate ID, and every task-semantic field. This is separate from the per-environment quotient certificates, which continue to bind their own exact local task, restricted action, and stage budget.
+
+Replay rejects a certificate after a uniform mutation that leaves every environment's local symmetry relation valid, a changed but structurally valid action identity, or a changed total budget—even when integer division would give the same local stage allowance. The canonical bytes are versioned replay identities, not cryptographic hashes or signatures.
+
