@@ -78,8 +78,17 @@ The Rust module `symthaea_aqua_bench::transient_trace` now has strict JSON decod
 | PT-NEG-028 | A matched event replay uses a different anti-alias filter, sampling rate, uncertainty contract or channel map | Matched replay | Reject comparison |
 | PT-NEG-029 | RFC3339 event or observation-window timestamp is invalid, or observation window end precedes start | Timestamp validation | Reject |
 
-The executable module currently contains 34 authored Rust tests. None is represented as executed until the exact-head Cargo test workflow completes with a successful conclusion.
+The executable module currently contains 38 authored Rust tests. None is represented as executed until the exact-head Cargo test workflow completes with a successful conclusion.
 
 | PT-NEG-030 | A channel references a raw-trace SHA-256 that is missing from the manifest's unfiltered-trace artifacts | Trace provenance admission | Reject; do not attach samples from an undeclared raw artifact |
 
 | PT-NEG-031 | A channel has a syntactically valid raw-trace SHA-256, but no unfiltered-trace artifact in this run's manifest has that digest | Channel-to-artifact provenance admission | Reject; samples must be linked to an artifact declared by the same run |
+
+| PT-NEG-032 | The bytes supplied for a declared unfiltered trace do not hash to its declared SHA-256 | Raw artifact verification | Reject before parsing or attaching samples |
+| PT-NEG-033 | Raw CSV byte length differs from the manifest byte length | Raw artifact verification | Reject before parsing or attaching samples |
+| PT-NEG-034 | An unfiltered trace declares a non-canonical media type | Raw artifact admission | Reject |
+| PT-NEG-035 | CSV header is not exactly `offset_us,channel_id,value` | Raw trace decoder | Reject |
+| PT-NEG-036 | Decoded rows do not match the per-channel declared sample count | Raw trace decoder | Reject atomically; no channel may be partially attached |
+| PT-NEG-037 | The trace file contains a row for an undeclared channel ID | Raw trace decoder | Reject atomically; no channel may be partially attached |
+
+The module verifies unfiltered trace bytes but does not yet hash/authenticate event log, calibration, clock-sync or site-survey artifact bytes. Those remain explicitly outside this module's current claim ceiling.
