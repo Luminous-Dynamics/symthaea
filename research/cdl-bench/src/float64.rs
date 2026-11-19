@@ -11,7 +11,7 @@ use crate::{compress, crc32, decompress, CodecError, ModelKind};
 const MAGIC: &[u8; 4] = b"F64C";
 const VERSION: u16 = 1;
 const HEADER_LEN: usize = 32;
-const MAX_TRANSFORMED_BYTES_PER_VALUE: usize = 10;
+const MAX_TRANSFORMED_BYTES_PER_VALUE: usize = 11;
 
 /// Reversible f64 transform. All operations are on IEEE-754 bits, not floats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,6 +21,8 @@ pub enum Float64Transform {
     Raw = 0,
     /// Store the XOR of each bit pattern with the preceding bit pattern as a u64 varint.
     XorPrevious = 1,
+    /// Store XOR residual leading/trailing zero counts plus packed meaningful bits.
+    XorLeadingTrailing = 2,
 }
 
 impl Float64Transform {
@@ -28,6 +30,7 @@ impl Float64Transform {
         match value {
             0 => Ok(Self::Raw),
             1 => Ok(Self::XorPrevious),
+            2 => Ok(Self::XorLeadingTrailing),
             _ => Err(NumericError::UnsupportedTransform(value)),
         }
     }
@@ -102,6 +105,29 @@ fn encode_transform(values: &[f64], transform: Float64Transform) -> Result<Vec<u
                 previous = current;
             }
         }
+        Float64Transform::XorLeadingTrailing => {
+            let mut previous = 0u64;
+            for value in values {
+                let current = value.to_bits();
+                let residual = current ^ previous;
+                if residual == 0 {
+                    output.push(0);
+                } else {
+                    output.push(1);
+                    let leading = residual.leading_zeros() as u8;
+                    let trailing = residual.trailing_zeros() as u8;
+                    let width = 64 - leading as u32 - trailing as u32;
+                    output.push(leading);
+                    output.push(trailing);
+                    let meaningful = residual >> trailing;
+                    let payload_bytes = (width as usize + 7) / 8;
+                    for byte in 0..payload_bytes {
+                        output.push((meaningful >> (byte * 8)) as u8);
+                    }
+                }
+                previous = current;
+            }
+        }
     }
     Ok(output)
 }
@@ -130,6 +156,64 @@ fn decode_transform(
             let mut previous = 0u64;
             for _ in 0..count {
                 let residual = read_varint_u64(bytes, &mut cursor)?;
+                let current = previous ^ residual;
+                values.push(f64::from_bits(current));
+                previous = current;
+            }
+            if cursor != bytes.len() {
+                return Err(NumericError::LengthMismatch);
+            }
+        }
+        Float64Transform::XorLeadingTrailing => {
+            let mut previous = 0u64;
+            for _ in 0..count {
+                let marker = *bytes.get(cursor).ok_or(NumericError::TruncatedVarint)?;
+                cursor += 1;
+                let residual = match marker {
+                    0 => 0,
+                    1 => {
+                        let leading = *bytes.get(cursor).ok_or(NumericError::TruncatedVarint)? as u32;
+                        cursor += 1;
+                        let trailing = *bytes.get(cursor).ok_or(NumericError::TruncatedVarint)? as u32;
+                        cursor += 1;
+                        if leading >= 64 || trailing >= 64 || leading + trailing >= 64 {
+                            return Err(NumericError::NumericOverflow);
+                        }
+                        let width = 64 - leading - trailing;
+                        let payload_bytes = (width as usize + 7) / 8;
+                        let end = cursor
+                            .checked_add(payload_bytes)
+                            .ok_or(NumericError::LengthOverflow)?;
+                        if end > bytes.len() {
+                            return Err(NumericError::TruncatedVarint);
+                        }
+                        let mut meaningful = 0u64;
+                        for byte in 0..payload_bytes {
+                            meaningful |= (bytes[cursor + byte] as u64) << (byte * 8);
+                        }
+                        cursor = end;
+
+                        if width % 8 != 0 {
+                            let used = width % 8;
+                            if (bytes[end - 1] >> used) != 0 {
+                                return Err(NumericError::NonCanonicalVarint);
+                            }
+                        }
+                        if (meaningful & 1) == 0
+                            || ((meaningful >> (width - 1)) & 1) == 0
+                        {
+                            return Err(NumericError::NonCanonicalVarint);
+                        }
+                        let residual = meaningful << trailing;
+                        if residual.leading_zeros() != leading
+                            || residual.trailing_zeros() != trailing
+                        {
+                            return Err(NumericError::NonCanonicalVarint);
+                        }
+                        residual
+                    }
+                    other => return Err(NumericError::UnsupportedTransform(other)),
+                };
                 let current = previous ^ residual;
                 values.push(f64::from_bits(current));
                 previous = current;
@@ -250,7 +334,7 @@ const SEGMENTED_HEADER_LEN: usize = 32;
 const SEGMENT_SELECTION_POLICY_BEST_OF_FOUR: u8 = 1;
 
 const SEGMENT_SELECTION_POLICY_HISTORICAL_COST: u8 = 2;
-const SEGMENT_CANDIDATES: usize = 4;
+const SEGMENT_CANDIDATES: usize = 6;
 
 fn encode_segment_candidate(
     values: &[f64],
@@ -261,6 +345,8 @@ fn encode_segment_candidate(
         1 => (Float64Transform::Raw, ModelKind::Order1),
         2 => (Float64Transform::XorPrevious, ModelKind::Order0),
         3 => (Float64Transform::XorPrevious, ModelKind::Order1),
+        4 => (Float64Transform::XorLeadingTrailing, ModelKind::Order0),
+        5 => (Float64Transform::XorLeadingTrailing, ModelKind::Order1),
         _ => return Err(NumericError::UnsupportedTransform(candidate)),
     };
     compress_f64(values, transform, model)
@@ -287,6 +373,8 @@ fn segment_candidate_from_child_header(child: &[u8]) -> Result<u8, NumericError>
         (0, 1) => Ok(1),
         (1, 0) => Ok(2),
         (1, 1) => Ok(3),
+        (2, 0) => Ok(4),
+        (2, 1) => Ok(5),
         _ => Err(NumericError::UnsupportedTransform(transform)),
     }
 }
@@ -530,7 +618,7 @@ fn best_segment_candidate_frame(
 }
 
 /// Encode fixed-size f64 chunks by selecting the smallest complete subframe
-/// among Raw/XorPrevious x Order0/Order1. Every selected F64C frame (including
+/// among Raw/XorPrevious/XorLeadingTrailing x Order0/Order1. Every selected F64C frame (including
 /// its own header and CRCs) is retained in the output, so selection overhead is
 /// included. This is an offline segment-local size oracle, not an online or
 /// WZS-equivalent algorithm.
@@ -752,7 +840,11 @@ mod tests {
 
     #[test]
     fn raw_and_xor_round_trip_all_bit_patterns() {
-        for transform in [Float64Transform::Raw, Float64Transform::XorPrevious] {
+        for transform in [
+            Float64Transform::Raw,
+            Float64Transform::XorPrevious,
+            Float64Transform::XorLeadingTrailing,
+        ] {
             for model in [ModelKind::Order0, ModelKind::Order1] {
                 for input in bit_fixtures() {
                     let frame = compress_f64(&input, transform, model).unwrap();
@@ -766,8 +858,8 @@ mod tests {
     #[test]
     fn f64_encoding_is_deterministic() {
         let input = bit_fixtures().pop().unwrap();
-        let first = compress_f64(&input, Float64Transform::XorPrevious, ModelKind::Order1).unwrap();
-        let second = compress_f64(&input, Float64Transform::XorPrevious, ModelKind::Order1).unwrap();
+        let first = compress_f64(&input, Float64Transform::XorLeadingTrailing, ModelKind::Order1).unwrap();
+        let second = compress_f64(&input, Float64Transform::XorLeadingTrailing, ModelKind::Order1).unwrap();
         assert_eq!(first, second);
     }
 
@@ -775,7 +867,7 @@ mod tests {
     fn every_truncated_prefix_is_rejected() {
         let frame = compress_f64(
             &[0.0, -0.0, f64::INFINITY, f64::from_bits(0x7ff8_0000_0000_0001)],
-            Float64Transform::XorPrevious,
+            Float64Transform::XorLeadingTrailing,
             ModelKind::Order0,
         )
         .unwrap();
@@ -793,7 +885,7 @@ mod tests {
             f64::from_bits(0x7ff8_0000_0000_0001),
             f64::from_bits(1),
         ];
-        let frame = compress_f64(&input, Float64Transform::XorPrevious, ModelKind::Order1).unwrap();
+        let frame = compress_f64(&input, Float64Transform::XorLeadingTrailing, ModelKind::Order1).unwrap();
         for index in 0..frame.len() {
             for bit in 0..8 {
                 let mut changed = frame.clone();
