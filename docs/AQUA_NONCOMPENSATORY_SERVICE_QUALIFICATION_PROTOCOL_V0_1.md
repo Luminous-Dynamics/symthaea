@@ -84,15 +84,20 @@ The full-platform profile currently has thirteen required domains. The source-le
 
 Every assessment receipt binds:
 
-- exact assessment record ID;
+- exact assessment record ID, unique within the qualification record;
+- issuer principal identity;
+- authority-verification receipt SHA-256 from the canonical owner;
 - evidence SHA-256;
 - domain-specific method SHA-256;
 - domain-specific method-condition SHA-256;
 - the full matched-trial conditions SHA-256;
 - domain-specific authority;
+- canonical evidence currentness: Current, Stale, Revoked or Ambiguous;
 - one of three independent outcomes.
 
-The claim profile carries one frozen method binding for every required domain. These are intentionally allowed to differ: Mycelix metrology, a spray-force / coverage test, thermal stability, hygiene sampling and resource closure do not share one method or one apparatus. The profile's overall protocol digest identifies the preregistered claim package; each receipt must match its own domain method and its method-specific conditions while also matching the shared trial conditions. Missing, duplicate or out-of-scope method bindings are rejected.
+The evidence owner must authenticate the issuer against its trusted principal registry and check revocation / validity before returning a Current verification receipt. The Aqua module requires that receipt, issuer identity and Current status, and rejects Stale, Revoked or Ambiguous evidence. The module checks receipt presence and digest syntax; it does **not** itself verify cryptographic signatures, contact the authority registry, or establish that a principal is trustworthy. That verification remains with the canonical owner / independent assessor.
+
+The claim profile carries one frozen method binding for every required domain. These are intentionally allowed to differ: Mycelix metrology, a spray-force / coverage test, thermal stability, hygiene sampling and resource closure do not share one method or one apparatus. The profile's overall protocol digest identifies the preregistered claim package; each receipt must match its own domain method and its method-specific conditions while also matching the shared trial conditions. Missing, duplicate, stale, revoked, ambiguous or out-of-scope evidence and method bindings are rejected.
 
 ### Outcomes
 
@@ -270,7 +275,7 @@ Synthetic tests validate the evidence gate only. They cannot prove physical perf
 
 The Rust module defines seven claim profiles, thirteen evidence domains, explicit authority mapping, per-domain method and method-condition bindings, shared matched-trial condition binding, three-state decisions and matched control/candidate qualification.
 
-It currently contains **36 authored unit tests**. This is a source inventory, not an execution pass. No cargo test, rustfmt, Clippy or repository CI pass is claimed for this branch until actually observed on its exact head.
+It currently contains **42 authored unit tests**. This is a source inventory, not an execution pass. No cargo test, rustfmt, Clippy or repository CI pass is claimed for this branch until actually observed on its exact head.
 
 ## 11. Decision gate
 
