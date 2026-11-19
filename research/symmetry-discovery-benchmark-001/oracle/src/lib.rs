@@ -884,7 +884,7 @@ impl Manifest {
         Ok(stabilizer)
     }
 
-    fn validate_all_cases(&self) -> Result<(usize, usize), String> {
+    pub fn validate_all_cases(&self) -> Result<(usize, usize), String> {
         let cases = field(&self.root, "cases")?
             .as_array()
             .ok_or_else(|| "cases must be an array".to_owned())?;
