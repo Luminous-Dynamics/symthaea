@@ -189,25 +189,15 @@
           "type": "string",
           "minLength": 1
         },
+        "timestamp_basis": {
+          "enum": ["monotonic", "utc_disciplined", "ptp", "other_declared"]
+        },
         "clock_sync_uncertainty_us": {
           "type": "number",
           "minimum": 0
         },
-        "sample_rate_hz": {
-          "type": "number",
-          "exclusiveMinimum": 0
-        },
-        "effective_bandwidth_hz": {
-          "type": "number",
-          "exclusiveMinimum": 0
-        },
-        "anti_alias_filter_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "dropped_sample_count": {
-          "type": "integer",
-          "minimum": 0
+        "clock_sync_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
         },
         "channels": {
           "type": "array",
@@ -383,8 +373,42 @@
         "measurement_uncertainty": {
           "type": "number",
           "minimum": 0
+        },
+        "sample_rate_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "effective_bandwidth_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "anti_alias_filter_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "dropped_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sample_gap_report_sha256": {
+          "$ref": "#/$defs/sha256"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "dropped_sample_count": { "minimum": 1 }
+            },
+            "required": ["dropped_sample_count"]
+          },
+          "then": { "required": ["sample_gap_report_sha256"] }
+        }
+      ]
     }
   }
 }
