@@ -12,8 +12,9 @@ license = "AGPL-3.0-or-later"
 serde = { workspace = true }
 
 [dev-dependencies]
-# Spec JSON round-trip test.
+# Spec JSON round-trip and deterministic score artifact hashing in research example.
 serde_json = { workspace = true }
+sha2 = { workspace = true }
 # Only for the standalone `render_wav` example — a tiny self-contained synth so
 # a Score can be HEARD without pulling in muse's heavy (wgpu) synthesis stack.
 hound = { workspace = true }
