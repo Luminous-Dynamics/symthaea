@@ -246,8 +246,11 @@ fn valid_sha256(value: &str) -> bool {
         && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
-/// Receipt profile has integer-only numbers and default serde_json sorted-map
-/// semantics, giving stable compact JSON with lexicographically ordered keys.
+/// Receipt v1 uses a project-specific canonical serialization profile:
+/// typed fields contain strings, booleans, nulls, arrays and integers only;
+/// serde_json's default map representation orders object keys lexicographically;
+/// compact serialization is then domain-separated before hashing. This is
+/// deterministic for this schema, but is not claimed as full RFC 8785 JCS.
 fn canonical_receipt_bytes(value: &Value) -> Result<Vec<u8>, String> {
     serde_json::to_vec(value).map_err(|e| format!("canonical JSON serialization failed: {e}"))
 }
