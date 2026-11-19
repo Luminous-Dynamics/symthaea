@@ -68,6 +68,32 @@ Important invariants:
 
 A state-delta arm should be compared with scalar RLE, field-vector RLE, whole-record RLE, per-column ALP/Pco, and the current fixed-chunk codecs. Report update density (changed fields / total fields), state-table hit rate, checkpoint bytes, eviction frequency, decode replay depth, and random-access latency. This is a research candidate, not an implementation claim or novelty claim by itself; sparse updates and delta coding are established ideas. The proposed research contribution would be the decoder-verifiable integration with typed schema, bounded state, adaptive segmentation and a fully charged compute/size budget.
 
+## Independent synthetic state-delta reference (2026-11-19)
+
+A standalone C++20 transform-level reference is checked in at `research/cdl-bench/reference/typed_record_delta_reference.cpp`. It maintains prior typed field state per 32 keys and encodes each row as timestamp delta/absolute marker, key, changed-field bitmap, explicit presence/null operation, and exact u64 bits for changed present fields. The first observation for a key is a full checkpoint. It compares against a simple raw record layout with an 8-byte timestamp, 4-byte key, 1-byte presence bitmap and eight 8-byte field slots.
+
+The reference compiled with:
+
+```sh
+g++ -O2 -std=c++20 -Wall -Wextra -Wconversion -Werror \
+  research/cdl-bench/reference/typed_record_delta_reference.cpp \
+  -o /tmp/typed_record_delta_reference
+/tmp/typed_record_delta_reference
+```
+
+Observed transform-only results for four deterministic synthetic workloads (65,536 records each):
+
+| Workload | Raw bytes | State-delta bytes | Reduction |
+|---|---:|---:|---:|
+| Sparse updates | 5,046,284 | 339,876 | 93.26% |
+| Bursty updates | 5,046,284 | 549,257 | 89.12% |
+| Noisy updates | 5,046,284 | 3,160,871 | 37.36% |
+| Mostly idle | 5,046,284 | 269,400 | 94.66% |
+
+The reference also round-trips each fixture exactly and rejects five malformed streams: truncated payload, truncated header, unknown timestamp mode, invalid presence marker and trailing byte.
+
+**Evidence boundary:** these are synthetic C++ transform-only bytes, not a Rust run, entropy-coded frame sizes, production telemetry measurements or a comparison to ALP/Pco/Gorilla/Chimp/ACTF/Rabbit/DeXOR. The raw baseline is an explicit simple record serialization; no schema dictionary, checksum, random-access index, checkpoint schedule, state-table bound, or general-purpose codec is included. The exceptionally high reduction therefore demonstrates that sparse per-key updates create exploitable structure in this generator, not expected end-to-end production compression. The next implementation must add bounded per-key state, checkpoint/recovery and a complete framed stream before these numbers can be interpreted operationally.
+
 ## New hypothesis: jointly choose segmentation and codec
 
 The current fixed chunks make boundary placement exogenous. Production data can contain long idle periods, sharp bursts and mixed regimes that do not align with 64/256/1024 boundaries.
