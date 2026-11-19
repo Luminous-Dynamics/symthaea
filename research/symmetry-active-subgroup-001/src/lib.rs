@@ -420,6 +420,14 @@ pub fn enumerate_subgroups(
         }
     }
 
+    // Match the independent fixture oracle: ascending subgroup size,
+    // then lexicographic element-index list. This ordering is canonical with
+    // respect to the frozen multiplication-table element order.
+    subgroups.sort_by(|left, right| {
+        (left.element_indices.len(), &left.element_indices)
+            .cmp(&(right.element_indices.len(), &right.element_indices))
+    });
+
     let total_work_units = validated
         .axiom_checks
         .checked_add(raw_subset_masks_scanned)
@@ -1160,6 +1168,10 @@ mod tests {
                 enumeration.subgroups.last().unwrap().element_indices.len(),
                 group.element_ids.len()
             );
+            assert!(enumeration.subgroups.windows(2).all(|pair| {
+                (pair[0].element_indices.len(), &pair[0].element_indices)
+                    <= (pair[1].element_indices.len(), &pair[1].element_indices)
+            }));
         }
     }
 
