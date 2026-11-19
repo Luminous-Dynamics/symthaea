@@ -2262,6 +2262,181 @@ mod tests {
     }
 
     #[test]
+    fn categorical_abstention_preserves_candidates_and_requires_probe_opt_in() {
+        let mut problem = bounded_fixture();
+        problem.probes[0].may_abstain = true;
+        let observations = vec![
+            NoiseObservationV1 {
+                probe_id: "p0".to_owned(),
+                abstained: false,
+                outcomes: vec![1],
+            },
+            NoiseObservationV1 {
+                probe_id: "p0".to_owned(),
+                abstained: true,
+                outcomes: Vec::new(),
+            },
+        ];
+        let receipt = replay_bounded_observations(&problem, &observations).unwrap();
+        assert_eq!(
+            receipt.snapshots[1].active_hypothesis_ids,
+            vec!["H-A".to_owned(), "H-B".to_owned()]
+        );
+        assert_eq!(
+            receipt.snapshots[2].active_hypothesis_ids,
+            receipt.snapshots[1].active_hypothesis_ids
+        );
+        assert_eq!(
+            receipt.snapshots[2].model_consistent,
+            receipt.snapshots[1].model_consistent
+        );
+
+        let unauthorized = bounded_fixture();
+        assert_eq!(
+            replay_bounded_observations(
+                &unauthorized,
+                &[NoiseObservationV1 {
+                    probe_id: "p0".to_owned(),
+                    abstained: true,
+                    outcomes: Vec::new(),
+                }]
+            ),
+            Err(NoiseErrorV1::UnexpectedAbstention {
+                probe_id: "p0".to_owned()
+            })
+        );
+        assert_eq!(
+            replay_bounded_observations(
+                &problem,
+                &[NoiseObservationV1 {
+                    probe_id: "p0".to_owned(),
+                    abstained: true,
+                    outcomes: vec![1],
+                }]
+            ),
+            Err(NoiseErrorV1::InvalidAbstentionObservation)
+        );
+    }
+
+    #[test]
+    fn persistent_categorical_abstention_does_not_change_latent_state_frontier() {
+        let mut problem = persistent_fixture();
+        problem.probes[0].may_abstain = true;
+        let receipt = replay_persistent_observations(
+            &problem,
+            &[NoiseObservationV1 {
+                probe_id: "p-left".to_owned(),
+                abstained: true,
+                outcomes: Vec::new(),
+            }],
+        )
+        .unwrap();
+        assert_eq!(
+            receipt.snapshots[0].hypotheses,
+            receipt.snapshots[1].hypotheses
+        );
+        assert_eq!(
+            receipt.snapshots[0].active_hypothesis_ids,
+            receipt.snapshots[1].active_hypothesis_ids
+        );
+    }
+
+    #[test]
+    fn numeric_interval_abstention_preserves_the_accumulated_measurement_interval() {
+        let problem = BoundedIntervalProblemV1 {
+            problem_id: "numeric-abstention-v1".to_owned(),
+            quantity_unit_id: "millimetre-integer".to_owned(),
+            hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned()],
+            probes: vec![NoiseProbeV1 {
+                probe_id: "p0".to_owned(),
+                cost: 1,
+                admissible: true,
+                may_abstain: true,
+            }],
+            predicted_intervals_by_hypothesis: vec![
+                vec![FixedIntervalV1::new(0, 10).unwrap()],
+                vec![FixedIntervalV1::new(20, 30).unwrap()],
+            ],
+        };
+        let observations = vec![
+            IntervalObservationV1 {
+                probe_id: "p0".to_owned(),
+                abstained: false,
+                observed: FixedIntervalV1::new(2, 4).unwrap(),
+            },
+            IntervalObservationV1 {
+                probe_id: "p0".to_owned(),
+                abstained: true,
+                observed: FixedIntervalV1::point(999),
+            },
+        ];
+        let receipt = replay_bounded_intervals(&problem, &observations).unwrap();
+        assert_eq!(receipt.snapshots[1].active_hypothesis_ids, vec!["H-A"]);
+        assert_eq!(
+            receipt.snapshots[2].active_hypothesis_ids,
+            receipt.snapshots[1].active_hypothesis_ids
+        );
+
+        let mut unauthorized = problem.clone();
+        unauthorized.probes[0].may_abstain = false;
+        assert_eq!(
+            replay_bounded_intervals(&unauthorized, &observations[1..]),
+            Err(NoiseErrorV1::UnexpectedAbstention {
+                probe_id: "p0".to_owned()
+            })
+        );
+    }
+
+    #[test]
+    fn shared_additive_bias_abstention_does_not_narrow_the_campaign_bias() {
+        let problem = SharedAdditiveBiasProblemV1 {
+            problem_id: "shared-bias-abstention-v1".to_owned(),
+            quantity_unit_id: "millimetre-integer".to_owned(),
+            hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned()],
+            probes: vec![NoiseProbeV1 {
+                probe_id: "p0".to_owned(),
+                cost: 1,
+                admissible: true,
+                may_abstain: true,
+            }],
+            nominal_predictions_by_hypothesis: vec![vec![0], vec![100]],
+            global_bias_interval: FixedIntervalV1::new(0, 0).unwrap(),
+        };
+        let observations = vec![
+            IntervalObservationV1 {
+                probe_id: "p0".to_owned(),
+                abstained: false,
+                observed: FixedIntervalV1::point(0),
+            },
+            IntervalObservationV1 {
+                probe_id: "p0".to_owned(),
+                abstained: true,
+                observed: FixedIntervalV1::point(i128::MAX),
+            },
+        ];
+        let receipt = replay_shared_additive_bias(&problem, &observations).unwrap();
+        assert_eq!(receipt.snapshots[1].active_hypothesis_ids, vec!["H-A"]);
+        assert_eq!(
+            receipt.snapshots[2].active_hypothesis_ids,
+            receipt.snapshots[1].active_hypothesis_ids
+        );
+        assert_eq!(
+            receipt.snapshots[2].hypotheses,
+            receipt.snapshots[1].hypotheses
+        );
+    }
+
+    #[test]
+    fn abstainable_probes_are_not_guaranteed_identifiability_witnesses() {
+        let mut problem = bounded_fixture();
+        problem.probes[0].may_abstain = true;
+        let report = bounded_pair_identifiability(&problem, 0, 2).unwrap();
+        assert!(report.indistinguishable_under_available_probes);
+        assert!(report.separating_probe_ids.is_empty());
+        assert_eq!(report.overlapping_probe_ids, vec!["p1".to_owned()]);
+    }
+
+    #[test]
     fn bounded_identifiability_reports_a_witness_or_unavoidable_pair_ambiguity() {
         let problem = bounded_fixture();
         let separable = bounded_pair_identifiability(&problem, 0, 2).unwrap();
