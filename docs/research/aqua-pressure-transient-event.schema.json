@@ -177,11 +177,9 @@
       "additionalProperties": false,
       "required": [
         "clock_id",
+        "timestamp_basis",
         "clock_sync_uncertainty_us",
-        "sample_rate_hz",
-        "effective_bandwidth_hz",
-        "anti_alias_filter_id",
-        "dropped_sample_count",
+        "clock_sync_receipt_sha256",
         "channels"
       ],
       "properties": {
@@ -302,6 +300,35 @@
           "generator_sha256",
           "generator_parameters_sha256"
         ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "profile_kind": {
+            "const": "site_observed"
+          }
+        },
+        "required": [
+          "profile_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "raw_artifacts": {
+            "contains": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "const": "site_observation_record"
+                }
+              },
+              "required": [
+                "role"
+              ]
+            }
+          }
+        }
       }
     }
   ],
