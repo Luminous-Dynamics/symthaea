@@ -348,3 +348,25 @@ wiring, hardware/qualification/institutional-adoption tracks). This crate
 sits at tier 4-5 in the robotics roadmap priority (behind subterranean,
 infrastructure) — treat this README and the plan as ready-to-go, not as
 signaling active development.
+
+
+## Capture handoff contract (research v0.1)
+
+The new `capture.rs` module makes one critical distinction explicit:
+
+`RendezvousOutcome::Docked` means only that the relative-motion scenario entered its configured position/speed window. It does **not** mean that an end effector contacted a port, that a latch engaged, or that a client is retained.
+
+The module provides two separate gates:
+
+1. `evaluate_readiness()`: checks the approach result alongside interface identity/revision, frame and epoch, transform/calibration evidence, relative position/speed/angular rate, interface orientation error, end-effector pose, arm joint positions/velocities, and clearance. A pass means **ready for contact evaluation only**.
+2. `evaluate_capture()`: requires a matching readiness receipt plus explicit contact, load/impulse, latch and retention-test evidence. Missing/unknown evidence is Indeterminate; failed or over-limit evidence is Rejected.
+
+This is deliberately a contract boundary, not a contact dynamics implementation, autonomous capture controller, actuator command, fluid/electrical mate, servicing authorization, or flight qualification. The current simulator's end-effector pose is expressed in its own arm/base convention; a caller must provide a separately identified transform into the named target-port frame. The module does not invent that transform or an end-effector orientation measurement.
+
+The interface limits are mission-specific inputs, not values inferred from the placeholder/default simulator configuration. All new v0.1 tests use synthetic values and establish software gate behavior only.
+
+Next increments:
+- add a validated frame/pose transform from the existing servicing-arm kinematics to the target port frame;
+- couple the existing CW approach and arm dynamics under one declared reference epoch;
+- add an independently checked reduced-order contact/retention model;
+- compare against public RPOD test profiles and a physical testbed before any HIL or flight claim.
