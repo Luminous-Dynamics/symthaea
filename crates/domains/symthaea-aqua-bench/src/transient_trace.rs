@@ -631,6 +631,8 @@ pub struct TransientEventProfile {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TransientTraceError {
     MissingField { field: &'static str },
+    InvalidProfileId,
+    ChannelSamplesAlreadyAttached { channel_id: String },
     InvalidDigest { field: &'static str },
     InvalidRevision { field: &'static str },
     InvalidEventDuration,
@@ -676,6 +678,8 @@ impl Display for TransientTraceError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::MissingField { field } => write!(f, "missing transient trace field: {field}"),
+            Self::InvalidProfileId => write!(f, "profile ID must be a 2-128 character lowercase slug"),
+            Self::ChannelSamplesAlreadyAttached { channel_id } => write!(f, "raw samples are already attached for channel: {channel_id}"),
             Self::InvalidDigest { field } => write!(f, "invalid SHA-256 digest for: {field}"),
             Self::InvalidRevision { field } => write!(f, "invalid profile revision: {field}"),
             Self::InvalidEventDuration => write!(f, "event duration must be finite and greater than zero"),
@@ -777,12 +781,17 @@ impl TransientEventProfile {
             .ok_or_else(|| TransientTraceError::UnknownChannel {
                 channel_id: channel_id.to_owned(),
             })?;
-        channel.samples = samples;
-        if channel.sample_count != channel.samples.len() {
+        if !channel.samples.is_empty() {
+            return Err(TransientTraceError::ChannelSamplesAlreadyAttached {
+                channel_id: channel.channel_id.clone(),
+            });
+        }
+        if channel.sample_count != samples.len() {
             return Err(TransientTraceError::SampleCountMismatch {
                 channel_id: channel.channel_id.clone(),
             });
         }
+        channel.samples = samples;
         Ok(())
     }
 
@@ -792,6 +801,16 @@ impl TransientEventProfile {
             return Err(TransientTraceError::InvalidRevision { field: "schema_version" });
         }
         require_text("profile_id", &self.profile_id)?;
+        if self.profile_id.len() < 2
+            || self.profile_id.len() > 128
+            || !self.profile_id.as_bytes()[0].is_ascii_lowercase()
+                && !self.profile_id.as_bytes()[0].is_ascii_digit()
+            || !self.profile_id.bytes().all(|byte| {
+                byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'.' || byte == b'_' || byte == b'-'
+            })
+        {
+            return Err(TransientTraceError::InvalidProfileId);
+        }
         require_text("task_profile_id", &self.task_profile_id)?;
         require_text("event_start", &self.event_start)?;
         DateTime::parse_from_rfc3339(&self.event_start)
@@ -991,7 +1010,7 @@ pub fn validate_matched_event_replay(
 
 fn channel_signature(
     channel: &TraceChannel,
-) -> (String, String, String, String, String, String, String, u64, u64, u64, u64, u64) {
+) -> (String, String, String, String, String, String, String, String, u64, u64, u64, u64, u64) {
     (
         channel.channel_id.clone(),
         format!("{:?}", channel.role),
@@ -999,6 +1018,7 @@ fn channel_signature(
         format!("{:?}", channel.datum),
         format!("{:?}", channel.unit),
         channel.instrument_id.clone(),
+        channel.calibration_receipt_sha256.clone(),
         channel.anti_alias_filter_id.clone(),
         channel.sample_rate_hz.to_bits(),
         channel.effective_bandwidth_hz.to_bits(),
@@ -1211,6 +1231,55 @@ mod tests {
             TransientEventProfile::from_json_manifest(&manifest.to_string()),
             Err(TransientTraceError::ManifestDecode { .. })
         ));
+    }
+
+    #[test]
+    fn failed_sample_attachment_does_not_mutate_channel_state() {
+        let mut value = TransientEventProfile::from_json_manifest(
+            &serde_json::json!({
+                "schema_version": "0.1.0",
+                "profile_id": "minimal",
+                "profile_revision": 1,
+                "profile_kind": "synthetic",
+                "event_family": "supply_sag",
+                "task_profile_id": "task",
+                "conditions_sha256": "c".repeat(64),
+                "protocol_sha256": "d".repeat(64),
+                "event_start": "2026-11-19T00:00:00Z",
+                "event_duration_ms": 1,
+                "synthetic_profile": {
+                    "generator_id": "g",
+                    "generator_sha256": "e".repeat(64),
+                    "generator_parameters_sha256": "f".repeat(64)
+                },
+                "command": {
+                    "input_kind": "upstream_pressure_command",
+                    "channel_id": "command",
+                    "unit": "kPa",
+                    "waveform_sha256": "1".repeat(64),
+                    "samples": [
+                        {"offset_us": 0, "value": 300.0},
+                        {"offset_us": 1000, "value": 200.0}
+                    ]
+                },
+                "acquisition": {
+                    "clock_id": "clock",
+                    "timestamp_basis": "ptp",
+                    "clock_sync_uncertainty_us": 1.0,
+                    "maximum_clock_sync_uncertainty_us": 2.0,
+                    "maximum_channel_alignment_skew_us": 0,
+                    "clock_sync_receipt_sha256": "2".repeat(64),
+                    "channels": []
+                },
+                "raw_artifacts": [
+                    {"role":"unfiltered_trace","sha256":"3".repeat(64),"byte_length":1},
+                    {"role":"event_log","sha256":"4".repeat(64),"byte_length":1}
+                ]
+            })
+            .to_string(),
+        )
+        .unwrap_err();
+        assert!(matches!(value, TransientTraceError::ManifestDecode { .. }));
     }
 
     #[test]
