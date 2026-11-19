@@ -50,7 +50,7 @@ Every composition routes through the style's canonical
 compose_with_grammar_plan entry point and its frozen grammar profile/spec.
 
 For each symbolic score, it serializes the score with serde_json, computes a
-SHA-256 digest over those exact bytes, and emits 28 scalar metrics:
+SHA-256 digest over those exact bytes, and emits 52 scalar/identity metrics:
 
 1. note count
 2. actual score length in beats
@@ -80,6 +80,22 @@ SHA-256 digest over those exact bytes, and emits 28 scalar metrics:
 26. voice-role entropy in bits
 27. distinct note-duration count
 28. section-intensity standard deviation
+29. meter in beats per bar
+30. distinct absolute MIDI-pitch count
+31. tonic pitch-class code (0–11)
+32. tonality code (0=major, 1=minor, 2=modal; exact modal name remains in the receipt note)
+33–36. note counts for Normal, Climax, Cadential and PhraseStart emphasis
+37. explicit form-section count (not applicable when no Form object is emitted)
+38–39. plan-requested and plan-realized bars (only for CallResponse/JazzChorus plans that expose both)
+40–50. eleven structural-fingerprint layer distances from the same style/seed's centre condition: form, harmony, orchestration, rhythm, contour, tempo/meter, pitch class, interval, chord quality, cadence and motif
+51–52. exact fingerprint high/low 32-bit words, preserving the 64-bit identity without lossy f64 conversion
+
+The centre factorial condition (valence 0, arousal 0.5, energy 0.5,
+bars 16) is executed first for each style/seed. It becomes that block's
+within-style reference. Each other condition reports eleven L2 layer distances
+from that reference. This adds no additional composer calls: the reference
+condition is already part of the 81-case factorial block. Its own layer
+distances are zero by construction.
 
 The pitch, melody, rhythm and role metrics are structural descriptors. They are
 not proxies for beauty, cultural authenticity, complexity or quality. In
