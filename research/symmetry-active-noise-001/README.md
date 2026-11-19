@@ -139,3 +139,13 @@ The frozen D4 toy case has an adaptive worst-case cost of 2. The noise-aware sta
 ## Current qualification status
 
 Earlier exact-head code checks passed with smaller test sets, but the expanded source now includes the exact static-set-cover comparison and the numeric identifiability additions. The latest source is not treated as qualified until the new PR merge commit passes format, the complete test suite and strict Clippy against the current deterministic-planner base. The broad repository CI remains a separate qualification track.
+
+
+## Nuisance-state calibration is part of identifiability
+
+A late adversarial review separated two previously easy-to-confuse semantics:
+
+- **Known/common nuisance state:** compare two hypotheses under the same externally calibrated nuisance-state index or the same fixed additive bias. The existing `persistent_pair_identifiability`, `design_persistent_noise_probe_set`, and `shared_bias_pair_identifiability` are conditional on this stronger assumption.
+- **Unobserved candidate-specific nuisance state:** each candidate may explain the history using a different allowed latent state or bias value. The new `persistent_pair_identifiability_under_unknown_state` compares every state-A/state-B pair and emits complete-signature collision witnesses. Its probe designer expands each cross-state pair to a separate coverage obligation. The numeric `shared_bias_pair_identifiability_under_unknown_bias` checks whether one constant bias difference can cancel every nominal prediction difference; if not, it provides one- or two-probe witnesses. Its probe designer unions a witness bundle for every resolvable pair and is explicitly **not globally optimal**.
+
+The difference is observable in the cross-state negative controls: two hypotheses can be separable under the same state index but still produce identical full records under different allowed state indices. A planner must not claim robust identification until the nuisance-state calibration assumption is explicit and qualified.
