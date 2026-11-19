@@ -96,3 +96,8 @@ not-applicable 81-row block is an explicit disposition, not a failed run.
 The fourth output compares exact score digests across all 27 matched slices for
 each of the four control axes. It checks declared unsupported axes as exact
 negative controls and distinguishes flat supported axes from measured response.
+
+
+## Composer execution adapter
+
+The source-pinned symbolic composer example validates the frozen case manifest, executes the exact factorial conditions, hashes serialized score artifacts, and emits 54 scalar/identity channels, including eleven canonical structural-layer distances from each style/seed's centre-case reference. See [COMPOSER_ADAPTER.md](COMPOSER_ADAPTER.md) for commands, metric registry, negative-control semantics and evidence limits. The adapter cannot compile through Cargo until root workspace member-glob exclusions are repaired (see [PR #12843](https://github.com/Luminous-Dynamics/symthaea/pull/12843)). No composer execution result is claimed.
