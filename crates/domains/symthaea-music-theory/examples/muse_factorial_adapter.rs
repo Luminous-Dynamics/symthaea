@@ -100,7 +100,7 @@ const DISCOVERY_SEEDS: [u64; 4] = [90_210, 130_363, 222_731, 918_273];
 const PINNED_COMPOSER_SOURCE_COMMIT: &str =
     "bd227d416878a4373eb87a53e182e7067a2411a5";
 
-const PINNED_COMPOSER_BLOBS: [(&str, &str); 13] = [
+const PINNED_COMPOSER_BLOBS: [(&str, &str); 15] = [
     (
         "crates/domains/symthaea-music-theory/src/style.rs",
         "81192045a724823b47107702185b814cb9921cbf",
@@ -150,6 +150,8 @@ const PINNED_COMPOSER_BLOBS: [(&str, &str); 13] = [
         "crates/domains/symthaea-music-theory/Cargo.toml",
         "2b2ce7caed933be6837ca50f2f34ddd254de224a",
     ),
+    ("Cargo.toml", "9a6eafdce0b03ab08aef24dee6ed384cab2a63f3"),
+    ("rust-toolchain.toml", "4f0430eac96d545bcfaa0df23ce475faf4aee96a"),
 ];
 
 const CONFIRMATION_SEEDS: [u64; 12] = [
@@ -1220,7 +1222,7 @@ mod tests {
 
     #[test]
     fn pinned_composer_manifest_has_thirteen_valid_blob_pins() {
-        assert_eq!(PINNED_COMPOSER_BLOBS.len(), 13);
+        assert_eq!(PINNED_COMPOSER_BLOBS.len(), 15);
         assert!(is_commit_sha(PINNED_COMPOSER_SOURCE_COMMIT));
         for (path, blob) in PINNED_COMPOSER_BLOBS {
             assert!(!path.is_empty());
