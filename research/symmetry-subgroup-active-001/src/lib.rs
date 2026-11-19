@@ -988,7 +988,7 @@ mod tests {
             .sum();
         assert_eq!(c4_full_scan, 3);
         assert_eq!(c4.adaptive_policy.root_worst_case_cost, 2);
-        assert_eq!(c4_full_scan / c4.adaptive_policy.root_worst_case_cost, 1);
+        assert_eq!(2 * c4_full_scan, 3 * c4.adaptive_policy.root_worst_case_cost);
 
         let d4_problem = problem(dihedral_group(4, "D4"), (1..8).collect());
         let SubgroupPolicyOutcomeV1::Identifiable(d4) =
