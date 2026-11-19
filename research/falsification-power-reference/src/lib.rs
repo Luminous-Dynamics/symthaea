@@ -1,3 +1,5 @@
+pub mod conformal;
+
 //! A small, dependency-free power oracle for declared Gaussian model discrepancies.
 //!
 //! This crate is intentionally narrower than a model-adequacy test or experiment
