@@ -19,7 +19,7 @@ dependencies.
 - E3 public development fixtures with held-out combinations assembled from individually seen mechanism components; metadata is not serialized into learner-visible streams. These fixed tuples are visible in source and are not a blind test split.
 - CLI file encode/decode and an E0 length comparison against installed
   Zstandard, Brotli, XZ and gzip commands.
-- Exact IEEE-754 f64 raw/XOR-previous framing and bit-preserving test fixtures.
+- Exact IEEE-754 f64 raw/XOR-previous framing, bit-preserving test fixtures, and a fixed-chunk best-of-four segment-local portfolio baseline.
 - SCM-specific typed-field, temporal-lag, oracle-parent, hybrid and
   shuffled-parent byte predictors, plus fixed-share and CUSUM change-point
   mixtures, all using the same arithmetic coder and exact decoder path.
@@ -33,14 +33,29 @@ high-precision and random-bit-pattern streams. It compares:
 - order-0 and order-1 byte CDF models;
 - Zstandard on the original raw little-endian bytes, when installed.
 
-The frame uses a 32-byte typed header, inner CDL frame and raw/inner CRC-32
-checksums. Decoding reconstructs via `f64::from_bits`; it does not perform
-floating-point subtraction or normalization. Tests compare `to_bits()` for
-each sample, including NaN payloads, infinities, signed zero and subnormals.
+The single-stream frames use a 32-byte typed header, inner CDL frame and
+raw/inner CRC-32 checksums. Decoding reconstructs via `f64::from_bits`; it
+does not perform floating-point subtraction or normalization. Tests compare
+`to_bits()` for each sample, including NaN payloads, infinities, signed zero
+and subnormals.
 
-This is a transparent reference transform, not Gorilla, Chimp, ACTF, DeXOR,
-Rabbit or Dolphin. Its purpose is to provide bit-preserving fixtures and a
-stable harness for those specialized comparators.
+The command also emits a `segment_portfolio` row at chunk sizes 64, 256 and
+1,024. The F64S outer frame contains a fixed policy ID, count, chunk size,
+segment count and CRC-protected header. For every chunk, the encoder tries
+Raw/Order0, Raw/Order1, XOR/Order0 and XOR/Order1 and retains the smallest
+complete F64C child frame. Every child header and CRC, plus the outer F64S
+header, is counted in the result. The decoder reads the fixed segment lengths
+and the chosen child-frame metadata; no per-segment selector symbols are sent.
+
+This is an **offline best-of-four size oracle**: it has the entire chunk
+available while choosing the smallest candidate. It is not a streaming
+algorithm, an online predictive gate, or a WZS reproduction. Its purpose is
+to establish the upper bound available from simple fixed-chunk transform/model
+selection before implementing a causal or learned online selector.
+
+Neither the single-stream XOR transform nor this segment-local oracle is
+Gorilla, Chimp, ACTF, DeXOR, Rabbit or Dolphin. These are transparent
+correctness baselines and a harness for those specialized comparators.
 
 ## Independent fixed-share reference simulation
 
