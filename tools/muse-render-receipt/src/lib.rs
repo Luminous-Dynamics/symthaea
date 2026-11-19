@@ -1550,6 +1550,29 @@ mod tests {
         let manifest_sha = domain_sha256(MIDI_MANIFEST_DIGEST_SCHEMA_V1.as_bytes(), &manifest_bytes);
         std::fs::write(root.join("midi-manifest.json"), &manifest_bytes).unwrap();
 
+        let source_value: Value = serde_json::from_slice(&source_bytes).unwrap();
+        let candidate_value: Value = serde_json::from_slice(&candidate_bytes).unwrap();
+        let plan_value: Value = serde_json::from_slice(&plan_bytes).unwrap();
+        let edit_value: Value = serde_json::from_slice(&edit_bytes).unwrap();
+        let verification_value: Value = serde_json::from_slice(&verification_bytes).unwrap();
+        verify_score_edit_semantics(
+            &source_value,&candidate_value,&plan_value,&edit_value,&verification_value,
+            &source_sha,&candidate_sha
+        ).unwrap();
+        verify_midi_manifest_matches_candidate_score(&midi_manifest,&candidate_value).unwrap();
+
+        // Re-sealing a new candidate digest must not make an unauthorized
+        // velocity edit acceptable under the original plan/verifier report.
+        let mut substituted_candidate = candidate_value.clone();
+        substituted_candidate["notes"][0]["velocity"] = serde_json::json!(0.5);
+        assert!(verify_score_edit_semantics(
+            &source_value,&substituted_candidate,&plan_value,&edit_value,&verification_value,
+            &source_sha,&sha256_hex(b"substituted-candidate")
+        ).unwrap_err().contains("velocity does not match"));
+        assert!(verify_midi_manifest_matches_candidate_score(
+            &midi_manifest,&substituted_candidate
+        ).unwrap_err().contains("candidate Score PartId/pitch/time/velocity"));
+
         let renderer_binary = b"synthetic-renderer-binary".to_vec();
         let renderer_environment = b"{\"runtime\":\"synthetic\"}".to_vec();
         let renderer_config = b"{\"sample_rate\":44100}".to_vec();
