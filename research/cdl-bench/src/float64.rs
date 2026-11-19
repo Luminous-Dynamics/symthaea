@@ -1201,6 +1201,36 @@ mod tests {
     }
 
     #[test]
+    fn empty_f64_stream_round_trips_all_transforms_and_segment_policies() {
+        let input: [f64; 0] = [];
+
+        for transform in [
+            Float64Transform::Raw,
+            Float64Transform::XorPrevious,
+            Float64Transform::XorLeadingTrailing,
+            Float64Transform::RleXorPrevious,
+        ] {
+            for model in [ModelKind::Order0, ModelKind::Order1] {
+                let frame = compress_f64(&input, transform, model).unwrap();
+                let decoded = decompress_f64(&frame, 0).unwrap();
+                assert!(decoded.is_empty());
+            }
+        }
+
+        for (chunk_size, probe_interval) in [(64, 1), (256, 4), (1024, 16)] {
+            let offline = compress_f64_segmented(&input, chunk_size).unwrap();
+            assert!(decompress_f64_segmented(&offline, 0).unwrap().is_empty());
+
+            let historical = compress_f64_online_selector(&input, chunk_size).unwrap();
+            assert!(decompress_f64_online_selector(&historical, 0).unwrap().is_empty());
+
+            let sparse =
+                compress_f64_budgeted_selector(&input, chunk_size, probe_interval).unwrap();
+            assert!(decompress_f64_budgeted_selector(&sparse, 0).unwrap().is_empty());
+        }
+    }
+
+    #[test]
     fn f64_encoding_is_deterministic() {
         let input = bit_fixtures().pop().unwrap();
         let first = compress_f64(&input, Float64Transform::RleXorPrevious, ModelKind::Order1).unwrap();
