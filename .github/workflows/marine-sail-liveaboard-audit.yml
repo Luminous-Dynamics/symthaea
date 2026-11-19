@@ -37,6 +37,11 @@ jobs:
       - name: Run independent semantic tests
         run: cargo test --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml
 
+      - name: Check schema and synthetic fixture structure
+        run: |
+          jq -e '.\u0024schema == "https://json-schema.org/draft/2020-12/schema" and (.required | index("hard_gate_evaluations") != null) and (.required | index("comfort_requirement") == null)' docs/research/marine/marine-sail-liveaboard-case.schema.json
+          jq -e '(.hard_gate_ids | sort) == ([.hard_gate_evaluations[].gate_id] | sort) and (.required_resource_dimensions | length == 10) and (.required_resource_dimensions | unique | length == 10) and (.record_status == "synthetic") and (.mission.comfort_requirement == "hard") and (.policy_arm.comfort_fallback_status == "none")' docs/research/marine/fixtures/synthetic-sail-liveaboard-case-0001.json
+
       - name: Audit synthetic fixture (must remain non-operational)
         run: |
           cargo run --quiet --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml -- audit-case docs/research/marine/fixtures/synthetic-sail-liveaboard-case-0001.json > /tmp/marine-audit.json
