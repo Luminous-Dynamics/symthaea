@@ -92,6 +92,19 @@ Observed transform-only results for four deterministic synthetic workloads (65,5
 
 The reference also round-trips each fixture exactly and rejects five malformed streams: truncated payload, truncated header, unknown timestamp mode, invalid presence marker and trailing byte.
 
+A second, separately labelled diagnostic applied **Zstandard CLI 1.5.7 at level 19** to both byte representations, using identical Zstd settings and no trained dictionary. The state-delta stream is thus a transform followed by Zstd; the control is Zstd on the raw canonical record serialization:
+
+| Workload | Zstd(raw records) | Zstd(state-delta stream) | Change vs Zstd(raw) |
+|---|---:|---:|---:|
+| Sparse updates | 197,774 B | 90,001 B | -54.49% |
+| Bursty updates | 434,115 B | 296,363 B | -31.73% |
+| Noisy updates | 2,842,524 B | 2,780,315 B | -2.19% |
+| Mostly idle | 75,071 B | 3,834 B | -94.89% |
+
+The run also decompressed both Zstd outputs and byte-compared them with their respective inputs. The reproducer is `scripts/research/cdl_state_delta_zstd_reference.sh`; it compiles the reference with strict warnings, generates temporary raw/delta fixtures, compresses both at the configured level (default 19), verifies exact Zstd decompression, and prints CSV. The source can emit the two binary inputs with `--emit-dir`.
+
+This diagnostic suggests that the state-delta grammar can expose additional structure to a general-purpose backend, especially at low update density. It does **not** show that the grammar alone beats Zstd: on the sparse fixture the uncompressed delta stream (339,876 B) is larger than Zstd(raw) (197,774 B), while Zstd(delta) is smaller after applying the second stage. No throughput comparison was collected, and Zstd+delta is not yet a complete random-access or bounded-state codec.
+
 **Evidence boundary:** these are synthetic C++ transform-only bytes, not a Rust run, entropy-coded frame sizes, production telemetry measurements or a comparison to ALP/Pco/Gorilla/Chimp/ACTF/Rabbit/DeXOR. The raw baseline is an explicit simple record serialization; no schema dictionary, checksum, random-access index, checkpoint schedule, state-table bound, or general-purpose codec is included. The exceptionally high reduction therefore demonstrates that sparse per-key updates create exploitable structure in this generator, not expected end-to-end production compression. The next implementation must add bounded per-key state, checkpoint/recovery and a complete framed stream before these numbers can be interpreted operationally.
 
 ## New hypothesis: jointly choose segmentation and codec
