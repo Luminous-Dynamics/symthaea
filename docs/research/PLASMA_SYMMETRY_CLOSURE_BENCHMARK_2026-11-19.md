@@ -79,6 +79,16 @@ This leads to a central benchmark rule:
 
 The machine-readable source/task register is `data/research/plasma_symmetry_closure_sources_v0_1.json`. It preserves the magnetic-reconnection and electrostatic tasks as separate lanes, records source-reported claims and claim ceilings, and leaves data/code access and redistribution-rights states explicitly unaudited until verified. All entries retain `luminous_reproduction=false`.
 
+### Newly admitted public data artifacts — 2026-11-19
+
+The machine-readable register now records three public artifact locators, with each dataset's license still independently audited:
+
+- **2025 Landau FNO Vlasov data:** Zenodo 10.5281/zenodo.14915239. The record lists separate linear and nonlinear MAT files (~81.9 MB total). The PNAS article states these are the training datasets; its article license is CC BY-NC-ND, which must not be assumed to govern the dataset.
+- **2026 online FNO code + data:** Zenodo 10.5281/zenodo.22800112, version 1.0. The publisher confirms both code and training data are openly available. The article is CC BY 4.0; the Zenodo record's own file/license metadata still needs pinning.
+- **2026 magnetic-reconnection symmetry data:** Zenodo 10.5281/zenodo.15498576. It contains two OSIRIS input decks and a ~3.6 GB Section 2 diagnostics archive for the closure study. The Section 1 diagnostics (~500 GB) are not included. The associated APS article is CC BY 4.0; the dataset record license remains to be inspected.
+
+The first source-reproduction implementation track is now separate at [PLASMA-LANDAU-CLOSURE-REPRO-001 #12907](https://github.com/Luminous-Dynamics/symthaea/issues/12907). It must keep the 2025 offline FNO, 2026 online/a-posteriori FNO, analytic Hammett–Perkins and sparse regression baselines distinct.
+
 ## 3. Existing Luminous capability and concrete gap
 
 ### Symthaea
