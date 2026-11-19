@@ -1,0 +1,80 @@
+{
+  "schema_version": "0.1.0",
+  "contracts": [
+    {
+      "contract_id": "synthetic-markovian-baseline",
+      "physics_model_id": "synthetic-vlasov-poisson-1d",
+      "regime_id": "synthetic-linear-landau",
+      "trajectory_id": "synthetic-run-001",
+      "trajectory_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "model_artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "solver_build_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "tableau_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "stage_semantics": "accepted_state_only",
+      "mechanism": {
+        "kind": "markovian",
+        "input_fields": ["density", "velocity", "pressure"]
+      }
+    },
+    {
+      "contract_id": "synthetic-online-fno-history",
+      "physics_model_id": "synthetic-vlasov-poisson-1d",
+      "regime_id": "synthetic-linear-landau",
+      "trajectory_id": "synthetic-run-001",
+      "trajectory_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "model_artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "solver_build_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "tableau_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "stage_semantics": "source_reported",
+      "mechanism": {
+        "kind": "trailing_history",
+        "input_fields": ["density", "velocity", "pressure", "electric_field", "heat_flux_divergence"],
+        "sample_count": 50,
+        "sample_period": { "numerator": 1, "denominator": 10 },
+        "physical_horizon": { "numerator": 5, "denominator": 1 },
+        "time_unit": "omega_p^-1",
+        "warmup_policy": "equilibrium_padding"
+      }
+    },
+    {
+      "contract_id": "synthetic-adept-latent-state",
+      "physics_model_id": "synthetic-vlasov-poisson-1d",
+      "regime_id": "synthetic-nonlinear-landau",
+      "trajectory_id": "synthetic-run-002",
+      "trajectory_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "model_artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "solver_build_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "tableau_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "stage_semantics": "accepted_state_only",
+      "mechanism": {
+        "kind": "prognostic_latent",
+        "state_dimension": 1,
+        "initializer": "equilibrium",
+        "update_law_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "reset_policy": "at_trajectory_boundary",
+        "uncertainty_evidence_sha256": null
+      }
+    },
+    {
+      "contract_id": "synthetic-fourier-hermite-reservoir",
+      "physics_model_id": "synthetic-vlasov-poisson-1d-fourier-hermite",
+      "regime_id": "synthetic-nonlinear-landau",
+      "trajectory_id": "synthetic-run-003",
+      "trajectory_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "model_artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "solver_build_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "tableau_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "stage_semantics": "stage_explicit",
+      "mechanism": {
+        "kind": "fourier_hermite_reservoir",
+        "configuration_basis": "fourier",
+        "velocity_basis": "hermite",
+        "retained_configuration_modes": 32,
+        "retained_velocity_modes": 24,
+        "first_closed_velocity_mode": 25,
+        "reservoir_artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "reset_policy": "at_trajectory_boundary"
+      }
+    }
+  ]
+}
