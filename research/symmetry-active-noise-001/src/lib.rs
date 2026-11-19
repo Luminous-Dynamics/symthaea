@@ -1562,8 +1562,12 @@ pub fn shared_bias_pair_identifiability(
 pub struct ProbeDesignObligationV1 {
     pub hypothesis_a: String,
     pub hypothesis_b: String,
-    /// Present for models with campaign-persistent nuisance states.
+    /// Present when both hypotheses are compared under one calibrated,
+    /// common campaign state.
     pub error_state_id: Option<String>,
+    /// Present when nuisance states are unobserved and each candidate may
+    /// use a different persistent state over the campaign.
+    pub error_state_pair: Option<(String, String)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1592,6 +1596,7 @@ fn pair_obligation(
         hypothesis_a: hypothesis_ids[hypothesis_a].clone(),
         hypothesis_b: hypothesis_ids[hypothesis_b].clone(),
         error_state_id,
+        error_state_pair: None,
     }
 }
 
@@ -1800,12 +1805,12 @@ pub fn design_persistent_noise_probe_set_under_unknown_state(
         for hypothesis_b in (hypothesis_a + 1)..problem.hypothesis_ids.len() {
             for (state_a_index, state_a_id) in problem.error_state_ids.iter().enumerate() {
                 for (state_b_index, state_b_id) in problem.error_state_ids.iter().enumerate() {
-                    let obligation = pair_obligation(
-                        &problem.hypothesis_ids,
-                        hypothesis_a,
-                        hypothesis_b,
-                        Some(format!("{state_a_id}::{state_b_id}")),
-                    );
+                    let obligation = ProbeDesignObligationV1 {
+                        hypothesis_a: problem.hypothesis_ids[hypothesis_a].clone(),
+                        hypothesis_b: problem.hypothesis_ids[hypothesis_b].clone(),
+                        error_state_id: None,
+                        error_state_pair: Some((state_a_id.clone(), state_b_id.clone())),
+                    };
                     let separating_probes: Vec<usize> = problem
                         .probes
                         .iter()
@@ -2381,12 +2386,12 @@ mod tests {
         assert!(!robust.complete_pairwise_separation);
         assert_eq!(robust.unresolved_obligations.len(), 2);
         assert_eq!(
-            robust.unresolved_obligations[0].error_state_id.as_deref(),
-            Some("low::high")
+            robust.unresolved_obligations[0].error_state_pair.as_ref(),
+            Some(&("low".to_owned(), "high".to_owned()))
         );
         assert_eq!(
-            robust.unresolved_obligations[1].error_state_id.as_deref(),
-            Some("high::low")
+            robust.unresolved_obligations[1].error_state_pair.as_ref(),
+            Some(&("high".to_owned(), "low".to_owned()))
         );
         assert!(!robust.optimality_certified);
     }
