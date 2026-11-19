@@ -1349,6 +1349,7 @@ mod tests {
             role: RawArtifactRole::SiteObservationRecord,
             sha256: digest('7'),
             byte_length: 4_096,
+            media_type: Some("application/json".to_owned()),
         });
 
         assert_eq!(value.validate(), Ok(()));
@@ -1357,6 +1358,8 @@ mod tests {
     #[test]
     fn decodes_json_manifest_and_attaches_trace_samples() {
         let digest = |character: char| character.to_string().repeat(64);
+        let trace_bytes = b"offset_us,channel_id,value\n0,terminal-pressure,250.0\n1000,terminal-pressure,250.0\n2000,terminal-pressure,250.0\n0,primary-flow,5.0\n1000,primary-flow,5.0\n2000,primary-flow,5.0\n";
+        let trace_sha256 = hex::encode(Sha256::digest(trace_bytes));
         let channel = |channel_id: &str,
                        role: &str,
                        location: &str,
@@ -1374,7 +1377,7 @@ mod tests {
                 "unit": unit,
                 "instrument_id": instrument_id,
                 "calibration_receipt_sha256": digest(calibration),
-                "raw_trace_sha256": digest('3'),
+                "raw_trace_sha256": trace_sha256,
                 "measurement_uncertainty": uncertainty,
                 "sample_rate_hz": 1000.0,
                 "effective_bandwidth_hz": 400.0,
@@ -1425,19 +1428,26 @@ mod tests {
                 ]
             },
             "raw_artifacts": [
-                {"role": "unfiltered_trace", "sha256": digest('3'), "byte_length": 10000},
-                {"role": "event_log", "sha256": digest('4'), "byte_length": 1024}
+                {
+                    "role": "unfiltered_trace",
+                    "sha256": trace_sha256,
+                    "byte_length": trace_bytes.len(),
+                    "media_type": TRANSIENT_TRACE_CSV_MEDIA_TYPE
+                },
+                {
+                    "role": "event_log",
+                    "sha256": digest('4'),
+                    "byte_length": 1024,
+                    "media_type": "application/json"
+                }
             ]
         });
 
         let mut decoded = TransientEventProfile::from_json_manifest(&manifest.to_string())
             .expect("valid manifest decodes");
         decoded
-            .attach_channel_samples("terminal-pressure", samples(250.0))
-            .expect("pressure samples attach to declared channel");
-        decoded
-            .attach_channel_samples("primary-flow", samples(5.0))
-            .expect("flow samples attach to declared channel");
+            .attach_unfiltered_trace_csv(trace_bytes)
+            .expect("raw CSV bytes verify and samples attach to declared channels");
 
         assert_eq!(decoded.validate(), Ok(()));
     }
@@ -1457,23 +1467,28 @@ mod tests {
     }
 
     #[test]
-    fn failed_sample_attachment_does_not_mutate_channel_state() {
+    fn rejects_raw_trace_byte_length_mismatch_without_mutating_samples() {
         let mut value = profile();
-        value.acquisition.channels[0].samples.clear();
+        let trace = b"offset_us,channel_id,value\n0,terminal-pressure,250\n1000,terminal-pressure,250\n2000,terminal-pressure,250\n0,primary-flow,5\n1000,primary-flow,5\n2000,primary-flow,5\n";
+        let trace_sha256 = hex::encode(Sha256::digest(trace));
+        let artifact = value
+            .raw_artifacts
+            .iter_mut()
+            .find(|artifact| artifact.role == RawArtifactRole::UnfilteredTrace)
+            .unwrap();
+        artifact.sha256 = trace_sha256.clone();
+        artifact.byte_length = trace.len() as u64;
+        for channel in &mut value.acquisition.channels {
+            channel.raw_trace_sha256 = trace_sha256.clone();
+            channel.samples.clear();
+        }
+        artifact.byte_length += 1;
 
         assert_eq!(
-            value.attach_channel_samples(
-                "terminal-pressure",
-                vec![
-                    TraceSample { offset_us: 0, value: 1.0 },
-                    TraceSample { offset_us: 1_000, value: 2.0 },
-                ],
-            ),
-            Err(TransientTraceError::SampleCountMismatch {
-                channel_id: "terminal-pressure".to_owned()
-            })
+            value.attach_unfiltered_trace_csv(trace),
+            Err(TransientTraceError::RawArtifactLengthMismatch)
         );
-        assert!(value.acquisition.channels[0].samples.is_empty());
+        assert!(value.acquisition.channels.iter().all(|channel| channel.samples.is_empty()));
     }
 
     #[test]
@@ -1489,14 +1504,29 @@ mod tests {
     }
 
     #[test]
-    fn raw_trace_decoder_cannot_attach_samples_to_unknown_channel() {
+    fn raw_trace_decoder_rejects_unknown_channel_rows() {
         let mut value = profile();
+        let trace = b"offset_us,channel_id,value\n0,unknown-channel,1\n1000,unknown-channel,1\n";
+        let trace_sha256 = hex::encode(Sha256::digest(trace));
+        let artifact = value
+            .raw_artifacts
+            .iter_mut()
+            .find(|artifact| artifact.role == RawArtifactRole::UnfilteredTrace)
+            .unwrap();
+        artifact.sha256 = trace_sha256.clone();
+        artifact.byte_length = trace.len() as u64;
+        for channel in &mut value.acquisition.channels {
+            channel.raw_trace_sha256 = trace_sha256.clone();
+            channel.samples.clear();
+        }
+
         assert_eq!(
-            value.attach_channel_samples("not-a-channel", samples(1.0)),
+            value.attach_unfiltered_trace_csv(trace),
             Err(TransientTraceError::UnknownChannel {
-                channel_id: "not-a-channel".to_owned()
+                channel_id: "unknown-channel".to_owned()
             })
         );
+        assert!(value.acquisition.channels.iter().all(|channel| channel.samples.is_empty()));
     }
 
     #[test]
