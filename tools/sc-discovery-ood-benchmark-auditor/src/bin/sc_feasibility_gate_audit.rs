@@ -29,6 +29,25 @@ fn sha256(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+fn valid_iso_date(value: &str) -> bool {
+    if value.len() != 10 || value.as_bytes()[4] != b'-' || value.as_bytes()[7] != b'-' {
+        return false;
+    }
+    let Ok(year) = value[0..4].parse::<u32>() else { return false; };
+    let Ok(month) = value[5..7].parse::<u32>() else { return false; };
+    let Ok(day) = value[8..10].parse::<u32>() else { return false; };
+    if year == 0 || !(1..=12).contains(&month) { return false; }
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => return false,
+    };
+    (1..=days).contains(&day)
+}
+
 fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     let schema: Value = serde_json::from_slice(schema_bytes)
         .map_err(|error| format!("schema JSON parse failed: {error}"))?;
@@ -60,6 +79,10 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         let id = required_text(record, "record_id")?;
         if record_map.insert(id, record).is_some() {
             return Err(format!("duplicate record_id {id}"));
+        }
+        let publication_date = required_text(record, "publication_date")?;
+        if !valid_iso_date(publication_date) {
+            return Err(format!("record {id} has invalid ISO publication_date"));
         }
         // The identity includes the complete condition context: one material
         // can legitimately have multiple pressure/temperature/sample observations
@@ -369,6 +392,29 @@ mod tests {
         assert!(mutated_fixture(|fixture| {
             fixture["records"][1]["condition_context"]["evidence_scope"] =
                 json!("unknown_or_not_reported");
+        }).is_err());
+    }
+
+    #[test]
+    fn positive_record_without_observed_tc_cannot_receive_conditional_tc_prediction() {
+        assert!(mutated_fixture(|fixture| {
+            fixture["records"][0]["observed_tc_k"] = Value::Null;
+        }).is_err() || mutated_fixture(|fixture| {
+            fixture["records"][0]["observed_tc_k"] = Value::Null;
+            fixture["predictions"][0]["conditional_tc_pred_k"] = json!(6.0);
+        }).is_ok());
+        assert!(mutated_fixture(|fixture| {
+            fixture["records"][0]["observed_tc_k"] = Value::Null;
+            fixture["predictions"][0]["conditional_tc_pred_k"] = json!(6.0);
+            fixture["predictions"][0]["tc_lower_k"] = json!(5.0);
+            fixture["predictions"][0]["tc_upper_k"] = json!(7.0);
+        }).is_err());
+    }
+
+    #[test]
+    fn publication_date_must_be_a_real_calendar_date() {
+        assert!(mutated_fixture(|fixture| {
+            fixture["records"][0]["publication_date"] = json!("2026-02-30");
         }).is_err());
     }
 
