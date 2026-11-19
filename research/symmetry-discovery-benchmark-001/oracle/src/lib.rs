@@ -318,6 +318,15 @@ impl Manifest {
 
     pub fn verify_group_axioms(&self) -> Result<(), String> {
         let identity_id = string_field(field(&self.root, "ambient_group")?, "identity_element_id")?;
+        let declared_order = field(field(&self.root, "ambient_group")?, "group_order")?
+            .as_u64()
+            .ok_or_else(|| "ambient_group.group_order must be an unsigned integer".to_owned())?;
+        if declared_order != self.elements.len() as u64 {
+            return Err(format!(
+                "ambient_group.group_order={declared_order}, but {} matrices are declared",
+                self.elements.len()
+            ));
+        }
         if self.elements.len() != 8 || self.multiplication.len() != 64 || self.inverses.len() != 8 {
             return Err(
                 "D4 manifest must contain 8 elements, 64 products and 8 inverses".to_owned(),
@@ -804,10 +813,26 @@ impl Manifest {
         if field(polynomial, "exact_rational")?.as_bool() != Some(true) {
             return Err("finite exact regression oracle requires exact_rational=true".to_owned());
         }
+        let variables = field(polynomial, "variables")?
+            .as_array()
+            .ok_or_else(|| "polynomial.variables must be an array".to_owned())?;
+        if variables.len() != 2
+            || variables[0].as_str() != Some("x")
+            || variables[1].as_str() != Some("y")
+        {
+            return Err("finite regression oracle requires variables exactly [x, y]".to_owned());
+        }
         let terms = field(polynomial, "terms")?
             .as_array()
             .ok_or_else(|| "polynomial.terms must be an array".to_owned())?;
+        if terms.is_empty() {
+            return Err("polynomial.terms must not be empty".to_owned());
+        }
+        if terms.len() > 256 {
+            return Err("polynomial term count exceeds the exact-oracle bound 256".to_owned());
+        }
         let mut result = Polynomial::new();
+        let mut seen_exponents = BTreeSet::new();
         for (index, term) in terms.iter().enumerate() {
             let exponents = field(term, "exponents")?
                 .as_array()
@@ -833,13 +858,18 @@ impl Manifest {
                     "term {index} total degree exceeds the exact-oracle bound {MAX_TOTAL_DEGREE}"
                 ));
             }
+            if !seen_exponents.insert((x, y)) {
+                return Err(format!("duplicate polynomial monomial ({x}, {y})"));
+            }
             let coefficient = integer(field(term, "coefficient")?, "polynomial coefficient")?;
-            let entry = result.entry((x, y)).or_insert(0);
-            *entry = entry
-                .checked_add(coefficient)
-                .ok_or_else(|| "polynomial coefficient overflow".to_owned())?;
+            if coefficient == 0 {
+                return Err(format!("polynomial term {index} has a zero coefficient"));
+            }
+            result.insert((x, y), coefficient);
         }
-        result.retain(|_, coefficient| *coefficient != 0);
+        if result.is_empty() {
+            return Err("polynomial must not be the zero polynomial".to_owned());
+        }
         Ok(result)
     }
 
@@ -1315,6 +1345,41 @@ mod tests {
         assert_eq!(decimal_scaled(&scientific, 1000, "test"), Ok(1));
         let not_representable = serde_json::json!(1.0001);
         assert!(decimal_scaled(&not_representable, 1000, "test").is_err());
+    }
+
+    #[test]
+    fn polynomial_oracle_rejects_out_of_bound_degree_fractional_and_duplicate_terms() {
+        let manifest = manifest();
+
+        let too_large = serde_json::json!({
+            "polynomial": {
+                "variables": ["x", "y"],
+                "exact_rational": true,
+                "terms": [{"exponents": [33, 0], "coefficient": 1}]
+            }
+        });
+        assert!(manifest.polynomial_from_json(&too_large).is_err());
+
+        let fractional = serde_json::json!({
+            "polynomial": {
+                "variables": ["x", "y"],
+                "exact_rational": true,
+                "terms": [{"exponents": [4, 0], "coefficient": 0.5}]
+            }
+        });
+        assert!(manifest.polynomial_from_json(&fractional).is_err());
+
+        let duplicate = serde_json::json!({
+            "polynomial": {
+                "variables": ["x", "y"],
+                "exact_rational": true,
+                "terms": [
+                    {"exponents": [4, 0], "coefficient": 1},
+                    {"exponents": [4, 0], "coefficient": -1}
+                ]
+            }
+        });
+        assert!(manifest.polynomial_from_json(&duplicate).is_err());
     }
 
     #[test]
