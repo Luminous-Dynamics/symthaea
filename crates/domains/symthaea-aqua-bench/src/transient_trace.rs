@@ -441,6 +441,15 @@ impl AcquisitionMetadata {
                     });
                 }
             }
+            for sample in &channel.samples {
+                let nearest = nearest_sample_distance(&reference.samples, sample.offset_us);
+                if nearest > self.maximum_channel_alignment_skew_us {
+                    return Err(TransientTraceError::ChannelAlignmentExceeded {
+                        reference_channel_id: reference.channel_id.clone(),
+                        channel_id: channel.channel_id.clone(),
+                    });
+                }
+            }
         }
         Ok(())
     }
@@ -642,7 +651,7 @@ impl TransientEventProfile {
         if self.profile_revision == 0 {
             return Err(TransientTraceError::InvalidRevision { field: "profile_revision" });
         }
-        if self.event_duration_ms == 0 || self.event_start_unix_ms == 0 {
+        if self.event_duration_ms == 0 {
             return Err(TransientTraceError::InvalidEventDuration);
         }
         let duration_us = self
@@ -650,17 +659,25 @@ impl TransientEventProfile {
             .checked_mul(1_000)
             .ok_or(TransientTraceError::InvalidEventDuration)?;
 
-        match (self.profile_kind, &self.site_observation, &self.synthetic_profile) {
-            (ProfileKind::SiteObserved, Some(site), None) => {
-                site.validate()?;
+        match self.profile_kind {
+            ProfileKind::SiteObserved => {
+                if self.synthetic_profile.is_some() {
+                    return Err(TransientTraceError::ContradictoryProfileProvenance);
+                }
+                self.site_observation
+                    .as_ref()
+                    .ok_or(TransientTraceError::MissingProfileProvenance)?
+                    .validate()?;
             }
-            (ProfileKind::Synthetic, None, Some(synthetic)) => {
-                synthetic.validate()?;
+            ProfileKind::Synthetic => {
+                if self.site_observation.is_some() {
+                    return Err(TransientTraceError::ContradictoryProfileProvenance);
+                }
+                self.synthetic_profile
+                    .as_ref()
+                    .ok_or(TransientTraceError::MissingProfileProvenance)?
+                    .validate()?;
             }
-            (ProfileKind::SiteObserved, None, _) | (ProfileKind::Synthetic, _, None) => {
-                return Err(TransientTraceError::MissingProfileProvenance);
-            }
-            _ => return Err(TransientTraceError::ContradictoryProfileProvenance),
         }
 
         self.command.validate(self.event_family, duration_us)?;
@@ -699,10 +716,16 @@ impl TransientEventProfile {
     }
 
     fn validate_artifacts(&self) -> Result<(), TransientTraceError> {
+        // A raw trace may be sharded by channel or time window. Other artifact roles are
+        // singleton references so their identity cannot be silently ambiguous.
+        let mut singleton_roles = HashSet::with_capacity(self.raw_artifacts.len());
         let mut roles = HashSet::with_capacity(self.raw_artifacts.len());
         for artifact in &self.raw_artifacts {
             artifact.validate()?;
-            if !roles.insert(artifact.role) {
+            roles.insert(artifact.role);
+            if artifact.role != RawArtifactRole::UnfilteredTrace
+                && !singleton_roles.insert(artifact.role)
+            {
                 return Err(TransientTraceError::DuplicateArtifactRole { role: artifact.role });
             }
         }
@@ -767,6 +790,13 @@ pub fn validate_matched_event_replay(
             field: "maximum_channel_alignment_skew_us",
         });
     }
+    if control.acquisition.maximum_clock_sync_uncertainty_us
+        != candidate.acquisition.maximum_clock_sync_uncertainty_us
+    {
+        return Err(TransientTraceError::EventReplayMismatch {
+            field: "maximum_clock_sync_uncertainty_us",
+        });
+    }
 
     let mut control_channels: Vec<_> = control
         .acquisition
@@ -809,8 +839,11 @@ pub fn validate_matched_event_replay(
     Ok(())
 }
 
-fn channel_signature(channel: &TraceChannel) -> (String, String, String, String, u64, u64) {
+fn channel_signature(
+    channel: &TraceChannel,
+) -> (String, String, String, String, String, u64, u64) {
     (
+        channel.channel_id.clone(),
         format!("{:?}", channel.role),
         channel.location.clone(),
         format!("{:?}", channel.datum),
