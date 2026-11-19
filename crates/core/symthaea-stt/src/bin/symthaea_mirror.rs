@@ -52,11 +52,6 @@ fn main() {
             std::process::exit(1);
         }
     };
-    let projector = AudioProjector::default_config();
-    if let Err(error) = projector.validate_input_sample_rate(sample_rate) {
-        eprintln!("ERROR: audio sample rate does not match projector: {error}");
-        std::process::exit(1);
-    }
     let duration_sec = audio.len() as f32 / sample_rate as f32;
     println!(
         "  Duration: {:.2}s, Sample rate: {} Hz, {} samples",
@@ -94,6 +89,10 @@ fn main() {
     println!("═══════════════════════════════════════════════════════════════");
 
     let mut projector = AudioProjector::default_config();
+    if let Err(error) = projector.validate_input_sample_rate(sample_rate) {
+        eprintln!("ERROR: audio sample rate does not match projector: {error}");
+        std::process::exit(1);
+    }
     projector.reset();
     let hvs = projector.project(&audio);
 
