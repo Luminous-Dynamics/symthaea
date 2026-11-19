@@ -561,12 +561,11 @@ fn f64s_candidate_trace(frame: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(trace)
 }
 
-fn candidate_trace_metrics(trace: &[u8]) -> (usize, usize) {
-    let switches = trace
+fn candidate_switch_count(trace: &[u8]) -> usize {
+    trace
         .windows(2)
         .filter(|pair| pair[0] != pair[1])
-        .count();
-    (switches, 0)
+        .count()
 }
 
 fn candidate_trace_vs_oracle(trace: &[u8], oracle: &[u8]) -> Result<(usize, usize), Box<dyn Error>> {
@@ -767,7 +766,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
             let encode_started = Instant::now();
             let frame = compress_f64_segmented(&values, segment_size)?;
             let oracle_trace = f64s_candidate_trace(&frame)?;
-            let (oracle_switches, _) = candidate_trace_metrics(&oracle_trace);
+            let oracle_switches = candidate_switch_count(&oracle_trace);
             let encode_ns = encode_started.elapsed().as_nanos();
             let decode_started = Instant::now();
             let decoded = decompress_f64_segmented(&frame, values.len())?;
