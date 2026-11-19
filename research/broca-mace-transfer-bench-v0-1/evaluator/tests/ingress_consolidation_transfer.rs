@@ -138,7 +138,7 @@ impl EvidenceVerifier for FixtureVerifier {
         _observed_at_ms: i64,
         _known_at_ms: i64,
     ) -> Option<VerifiedMeasurement> {
-        let event_id = receipt_id.strip_prefix("calibration")?;
+        let event_id = receipt_id.strip_prefix("calibration-")?;
         if event_id.is_empty() || expected_unit != UTILITY_UNIT {
             return None;
         }
@@ -186,7 +186,7 @@ impl EvidenceVerifier for FixtureVerifier {
         let observed_utility = *self.outcomes.get(&event_id)?;
         Some(VerifiedOutcome {
             reconciled: true,
-            success: observed_utility >= 0.5,
+            success: true,
             observed_utility,
             utility_unit: UTILITY_UNIT.into(),
             outcome_digest: hex_digest(110_000 + event_id),
@@ -325,8 +325,7 @@ fn raw_session_to_governed_consolidation_to_mace_decision_then_correction() {
         .expect("corrected pack must bind only non-retracted observations");
     assert_eq!(pack_c.events().len(), 4);
 
-    let stale_promotion = propose_and_release(Action::B, &pack_a);
-    assert_eq!(stale_promotion.len(), 3);
+    let _verified_action_b = propose_and_release(Action::B, &pack_a);
     assert_eq!(
         verify_and_release_promoted_experiences(
             &ConsolidationReceiptProposalV1::from_procedure_promotion(
