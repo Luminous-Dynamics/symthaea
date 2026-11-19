@@ -5,6 +5,7 @@
 //! JSON parsing is delegated to serde_json; all group, point-set and
 //! polynomial calculations use exact integer arithmetic.
 
+use serde::Serialize;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -12,7 +13,8 @@ type Matrix2 = [[i128; 2]; 2];
 type Point = (i128, i128);
 type Polynomial = BTreeMap<(u32, u32), i128>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum StabilizerWitnessV1 {
     PointPermutation {
         source_to_target: Vec<usize>,
@@ -31,21 +33,21 @@ pub enum StabilizerWitnessV1 {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ElementDecisionV1 {
     pub element_id: String,
     pub accepted: bool,
     pub witness: StabilizerWitnessV1,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct StabilizerCertificateV1 {
     pub case_id: String,
     pub accepted_subgroup: Vec<String>,
     pub decisions: Vec<ElementDecisionV1>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum SubgroupAxiomViolationV1 {
     MissingIdentity { identity_element_id: String },
     MissingInverse {
@@ -59,7 +61,7 @@ pub enum SubgroupAxiomViolationV1 {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ProposalElementAuditV1 {
     pub element_id: String,
     pub proposed: bool,
@@ -69,7 +71,7 @@ pub struct ProposalElementAuditV1 {
     pub witness: StabilizerWitnessV1,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SubgroupProposalAuditV1 {
     pub case_id: String,
     pub proposed_elements: Vec<String>,
@@ -735,6 +737,68 @@ impl Manifest {
         Ok(())
     }
 
+    fn find_case(&self, case_id: &str) -> Result<&Value, String> {
+        field(&self.root, "cases")?
+            .as_array()
+            .ok_or_else(|| "cases must be an array".to_owned())?
+            .iter()
+            .find(|case| {
+                string_field(case, "case_id")
+                    .is_ok_and(|candidate| candidate == case_id)
+            })
+            .ok_or_else(|| format!("unknown benchmark case ID: {case_id}"))
+    }
+
+    pub fn case_track_and_split(&self, case_id: &str) -> Result<(String, String), String> {
+        let case = self.find_case(case_id)?;
+        Ok((
+            string_field(case, "track")?,
+            string_field(case, "split")?,
+        ))
+    }
+
+    /// Public manifest-bound proposal audit entry point. It computes exact
+    /// ground truth and counterexamples; caller-supplied labels are never
+    /// accepted as verifier authority.
+    pub fn audit_case_proposal(
+        &self,
+        case_id: &str,
+        proposal_ids: &[String],
+    ) -> Result<SubgroupProposalAuditV1, String> {
+        let case = self.find_case(case_id)?;
+        self.audit_proposed_subgroup(case, proposal_ids)
+    }
+
+    /// Replay and verify a proposal audit against the exact manifest case.
+    pub fn verify_case_proposal_audit(
+        &self,
+        case_id: &str,
+        audit: &SubgroupProposalAuditV1,
+    ) -> Result<(), String> {
+        let case = self.find_case(case_id)?;
+        self.verify_proposal_audit(case, audit)
+    }
+
+    pub fn case_ids_for_split_and_track(
+        &self,
+        split: &str,
+        track: &str,
+    ) -> Result<Vec<String>, String> {
+        let cases = field(&self.root, "cases")?
+            .as_array()
+            .ok_or_else(|| "cases must be an array".to_owned())?;
+        let mut result = Vec::new();
+        for case in cases {
+            if string_field(case, "split")? == split
+                && string_field(case, "track")? == track
+            {
+                result.push(string_field(case, "case_id")?);
+            }
+        }
+        result.sort();
+        Ok(result)
+    }
+
     fn polynomial_from_json(&self, case: &Value) -> Result<Polynomial, String> {
         let polynomial = field(case, "polynomial")?;
         if field(polynomial, "exact_rational")?.as_bool() != Some(true) {
@@ -751,14 +815,24 @@ impl Manifest {
             if exponents.len() != 2 {
                 return Err(format!("term {index} must have two exponents"));
             }
-            let x = exponents[0]
-                .as_u64()
-                .ok_or_else(|| format!("term {index} x exponent must be nonnegative"))?
-                as u32;
-            let y = exponents[1]
-                .as_u64()
-                .ok_or_else(|| format!("term {index} y exponent must be nonnegative"))?
-                as u32;
+            let x = u32::try_from(
+                exponents[0]
+                    .as_u64()
+                    .ok_or_else(|| format!("term {index} x exponent must be nonnegative"))?,
+            )
+            .map_err(|_| format!("term {index} x exponent exceeds u32"))?;
+            let y = u32::try_from(
+                exponents[1]
+                    .as_u64()
+                    .ok_or_else(|| format!("term {index} y exponent must be nonnegative"))?,
+            )
+            .map_err(|_| format!("term {index} y exponent exceeds u32"))?;
+            const MAX_TOTAL_DEGREE: u32 = 32;
+            if x.checked_add(y).is_none_or(|degree| degree > MAX_TOTAL_DEGREE) {
+                return Err(format!(
+                    "term {index} total degree exceeds the exact-oracle bound {MAX_TOTAL_DEGREE}"
+                ));
+            }
             let coefficient = integer(field(term, "coefficient")?, "polynomial coefficient")?;
             let entry = result.entry((x, y)).or_insert(0);
             *entry = entry
@@ -960,7 +1034,7 @@ mod tests {
     }
 
     #[test]
-    fn all_303_structural_stabilizers_match_exact_oracle() {
+    fn all_903_structural_stabilizers_match_exact_oracle() {
         let counts = manifest()
             .validate_all_cases()
             .expect("all frozen labels must agree with exact integer oracle");
