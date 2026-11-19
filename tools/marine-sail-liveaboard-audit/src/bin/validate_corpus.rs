@@ -419,7 +419,7 @@ fn execute_corpus(corpus: &Value, source_fixture: &Value) -> Result<Vec<Value>, 
         }
         let mut mismatched_fields_pass = true;
         if let Some(expected_fields) = scenario.get("expected_mismatched_fields") {
-            mismatched_fields_pass = actual_mismatches == *expected_fields;
+            mismatched_fields_pass = &actual_mismatches == expected_fields;
             case_passed &= mismatched_fields_pass;
         }
         if !case_passed {
@@ -464,7 +464,7 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("{fixture_path}: {error}"))?;
     let fixture: Value = serde_json::from_str(&fixture_text)
         .map_err(|error| format!("{fixture_path}: invalid JSON: {error}"))?;
-    let results = execute_corpus(&corpus, &fixture).map_err(|errors| errors.join("\\n"))?;
+    let results = execute_corpus(&corpus, &fixture).map_err(|errors| errors.join("\n"))?;
     report["status"] = json!("CORPUS_EXECUTED");
     report["executed_scenario_count"] = json!(results.len());
     report["scenario_results"] = Value::Array(results);
@@ -509,7 +509,7 @@ mod tests {
         let results = execute_corpus(&corpus, &source_fixture)
             .expect("all frozen mutation vectors should match the current audit engine");
         assert_eq!(results.len(), 16);
-        assert!(results.iter().all(|result| result["passed"] == true));
+        assert!(results.iter().all(|result| result["passed"].as_bool() == Some(true)));
     }
 
     #[test]
