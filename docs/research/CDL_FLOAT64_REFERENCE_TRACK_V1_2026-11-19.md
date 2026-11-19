@@ -66,7 +66,7 @@ For each complete chunk the encoder tries:
 3. XOR-previous / Order0
 4. XOR-previous / Order1
 
-It stores the smallest complete F64C frame. Ties resolve by candidate order. This is a size oracle with full current-chunk access, not a streaming selector or a WZS reproduction. It gives an upper reference for the four candidates and fixed chunk size.
+It stores the smallest complete F64C frame. Ties resolve by candidate order. The decoder independently reconstructs the chunk, recomputes all four canonical F64C frames, and rejects a child that is not the exact smallest candidate frame. This is a size oracle with full current-chunk access, not a streaming selector or a WZS reproduction. It gives an upper reference for the four candidates and fixed chunk size.
 
 ### Policy 2: decoder-synchronous historical-cost selection
 
@@ -91,7 +91,7 @@ A separate Python translation exercised:
 
 All checks passed. This is **not** Rust compilation, F64C frame validation, arithmetic coder execution, or a compression-performance result.
 
-Rust tests are authored for raw/XOR exact reconstruction, deterministic encoding, truncated-prefix rejection, single-bit mutation rejection, output-limit enforcement and malformed u64-varint rejection. Segmented tests cover bitwise round-trip at chunk sizes 1/64/256/1024, truncation, zero chunk size, output limit, header flags/policy validation, and single-bit mutation rejection. They have not run because the local environment has no Rust toolchain. No SOTA or frame-size win is claimed.
+Rust tests are authored for raw/XOR exact reconstruction, deterministic encoding, truncated-prefix rejection, single-bit mutation rejection, output-limit enforcement and malformed u64-varint rejection. Segmented tests cover bitwise round-trip at chunk sizes 1/64/256/1024, truncation, zero chunk size, output limit, header flags/policy validation, canonical best-of-four child selection, and single-bit mutation rejection. Historical-cost policy tests cover initial choice, cumulative mean updates, stable tie-breaking, exact round-trip, child-policy mismatch rejection and corruption. An independent Python check reproduced the decision sequence [0, 3, 3] from example historical sizes and confirmed stable tie-breaking. The Rust tests have not run because the local environment has no Rust toolchain. No SOTA or frame-size win is claimed.
 
 ## 2026 competitive comparison
 
