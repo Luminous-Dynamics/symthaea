@@ -767,6 +767,16 @@ fn audit_case(value: &Value) -> AuditReport {
         );
     }
 
+    if string_at(value, &["schema_version"]) != Some("0.1.0") {
+        add(
+            &mut findings,
+            "UNSUPPORTED_SCHEMA_VERSION",
+            "ERROR",
+            "schema_version",
+            "This audit implements only the declared 0.1.0 case contract.",
+        );
+    }
+
     if string_at(value, &["claim_ceiling"]) != Some("cross_owner_composition_only") {
         add(
             &mut findings,
@@ -821,6 +831,24 @@ fn audit_case(value: &Value) -> AuditReport {
     }
 
     let family = string_at(value, &["policy_arm", "family"]).unwrap_or("unknown");
+    const POLICY_FAMILIES: &[&str] = &[
+        "fixed_conservative",
+        "polar_vmg",
+        "transition_aware_vmg",
+        "weather_routing",
+        "reserve_aware_weather_routing",
+        "integrated_advisory",
+        "perfect_foresight_oracle",
+    ];
+    if !POLICY_FAMILIES.contains(&family) {
+        add(
+            &mut findings,
+            "INVALID_POLICY_FAMILY",
+            "ERROR",
+            "policy_arm.family",
+            "Policy family is not part of the versioned benchmark arm set.",
+        );
+    }
     let information_policy =
         string_at(value, &["policy_arm", "information_policy"]).unwrap_or("unknown");
 
@@ -859,6 +887,30 @@ fn audit_case(value: &Value) -> AuditReport {
 
     check_mission_window(value, &mut findings);
     let latest_decision = check_decision_snapshots(value, family, &mut findings);
+    if family != "perfect_foresight_oracle" {
+        let realized_digest = string_at(
+            value,
+            &["environment", "realized_environment_ref", "artifact_sha256"],
+        );
+        if let (Some(realized_digest), Some(snapshots)) = (
+            realized_digest,
+            at(value, &["environment", "decision_snapshots"]).and_then(Value::as_array),
+        ) {
+            for (index, snapshot) in snapshots.iter().enumerate() {
+                if string_at(snapshot, &["forecast_ref", "artifact_sha256"])
+                    == Some(realized_digest)
+                {
+                    add(
+                        &mut findings,
+                        "REALIZED_ENVIRONMENT_LEAKAGE",
+                        "BLOCKER",
+                        &format!("environment.decision_snapshots[{index}].forecast_ref"),
+                        "The evaluator-only realized environment cannot be supplied as a deployable forecast input.",
+                    );
+                }
+            }
+        }
+    }
     check_resource_dimensions(value, &mut findings);
     check_required_owner_roles(value, &mut findings);
     check_hard_gates(value, synthetic, &mut findings);
@@ -950,6 +1002,7 @@ fn compare_pair(baseline: &Value, candidate: &Value) -> Value {
     let mut mismatches = Vec::new();
 
     let required_equal_paths: &[&[&str]] = &[
+        &["record_status"],
         &["comparison", "comparison_group_id"],
         &["comparison", "service_fingerprint_sha256"],
         &["craft", "craft_identity", "id"],
@@ -1181,7 +1234,7 @@ mod tests {
         value["required_resource_dimensions"]
             .as_array_mut()
             .unwrap()
-            .retain(|dimension| dimension != "potable_water");
+            .retain(|dimension| dimension.as_str() != Some("potable_water"));
         let report = audit_case(&value);
         assert_eq!(report.disposition, "INCOMPLETE");
         assert!(report.has_code("RESOURCE_DIMENSION_OMITTED"));
@@ -1195,6 +1248,27 @@ mod tests {
         let report = audit_case(&value);
         assert_eq!(report.disposition, "BLOCKED");
         assert!(report.has_code("HARD_GATE_UNRESOLVED"));
+    }
+
+    #[test]
+    fn realized_environment_cannot_be_used_as_a_deployable_forecast() {
+        let mut value = fixture();
+        let realized_digest = value["environment"]["realized_environment_ref"]["artifact_sha256"]
+            .clone();
+        value["environment"]["decision_snapshots"][0]["forecast_ref"]["artifact_sha256"] =
+            realized_digest;
+        let report = audit_case(&value);
+        assert_eq!(report.disposition, "BLOCKED");
+        assert!(report.has_code("REALIZED_ENVIRONMENT_LEAKAGE"));
+    }
+
+    #[test]
+    fn unsupported_schema_version_is_invalid() {
+        let mut value = fixture();
+        value["schema_version"] = json!("0.2.0");
+        let report = audit_case(&value);
+        assert_eq!(report.disposition, "INVALID");
+        assert!(report.has_code("UNSUPPORTED_SCHEMA_VERSION"));
     }
 
     #[test]
