@@ -12,12 +12,19 @@
       "label_state": "observed_superconducting",
       "condition_context": {
         "pressure_gpa": 0,
-        "measurement_temperature_range_k": [1.8, 20],
+        "measurement_temperature_range_k": [
+          1.8,
+          20
+        ],
         "sample_form": "bulk_crystal",
         "measurement_method": "transport+magnetization+specific_heat",
         "transition_criterion": "bulk_thermodynamic",
         "evidence_scope": "targeted_experiment",
-        "scope_description": "Synthetic fixture: multiple independent bulk-sensitive measurements on one specimen"
+        "scope_description": "Synthetic fixture: multiple independent bulk-sensitive measurements on one specimen",
+        "measurement_field_t": 0,
+        "field_orientation": "polycrystalline",
+        "minimum_detectable_tc_k": null,
+        "detection_limit_description": "No qualified lower detection floor is asserted for this record"
       },
       "observed_tc_k": 6.4
     },
@@ -30,12 +37,19 @@
       "label_state": "observed_non_superconducting_under_conditions",
       "condition_context": {
         "pressure_gpa": 0,
-        "measurement_temperature_range_k": [1.8, 50],
+        "measurement_temperature_range_k": [
+          1.8,
+          50
+        ],
         "sample_form": "bulk_crystal",
         "measurement_method": "transport+magnetization",
         "transition_criterion": "none",
         "evidence_scope": "targeted_experiment",
-        "scope_description": "Synthetic fixture: no transition detected within the stated temperature/pressure/sample scope"
+        "scope_description": "Synthetic fixture: no transition detected within the stated temperature/pressure/sample scope",
+        "measurement_field_t": 0,
+        "field_orientation": "polycrystalline",
+        "minimum_detectable_tc_k": 1.8,
+        "detection_limit_description": "No transition detected above 1.8 K within the stated field, pressure, sample and method scope"
       },
       "observed_tc_k": null
     },
@@ -48,12 +62,19 @@
       "label_state": "unknown_or_not_reported",
       "condition_context": {
         "pressure_gpa": null,
-        "measurement_temperature_range_k": [0, 300],
+        "measurement_temperature_range_k": [
+          0,
+          300
+        ],
         "sample_form": "unknown",
         "measurement_method": "not reported",
         "transition_criterion": "unknown",
         "evidence_scope": "unknown_or_not_reported",
-        "scope_description": "Synthetic fixture: database absence is not evidence of non-superconductivity"
+        "scope_description": "Synthetic fixture: database absence is not evidence of non-superconductivity",
+        "measurement_field_t": 0,
+        "field_orientation": "polycrystalline",
+        "minimum_detectable_tc_k": null,
+        "detection_limit_description": "No qualified lower detection floor is asserted for this record"
       },
       "observed_tc_k": null
     },
@@ -66,12 +87,19 @@
       "label_state": "observed_superconducting",
       "condition_context": {
         "pressure_gpa": 18,
-        "measurement_temperature_range_k": [2, 120],
+        "measurement_temperature_range_k": [
+          2,
+          120
+        ],
         "sample_form": "bulk_crystal",
         "measurement_method": "transport+diamagnetism+specific_heat",
         "transition_criterion": "bulk_thermodynamic",
         "evidence_scope": "targeted_experiment",
-        "scope_description": "Synthetic fixture: pressure-tagged bulk transition; operating pressure remains part of the material state"
+        "scope_description": "Synthetic fixture: pressure-tagged bulk transition; operating pressure remains part of the material state",
+        "measurement_field_t": 0,
+        "field_orientation": "polycrystalline",
+        "minimum_detectable_tc_k": null,
+        "detection_limit_description": "No qualified lower detection floor is asserted for this record"
       },
       "observed_tc_k": 21
     },
@@ -84,12 +112,19 @@
       "label_state": "observed_non_superconducting_under_conditions",
       "condition_context": {
         "pressure_gpa": 0,
-        "measurement_temperature_range_k": [1.6, 100],
+        "measurement_temperature_range_k": [
+          1.6,
+          100
+        ],
         "sample_form": "thin_film",
         "measurement_method": "transport+magnetization",
         "transition_criterion": "none",
         "evidence_scope": "targeted_literature_review",
-        "scope_description": "Synthetic fixture: condition-specific targeted review with a stated detection range"
+        "scope_description": "Synthetic fixture: condition-specific targeted review with a stated detection range",
+        "measurement_field_t": 0,
+        "field_orientation": "polycrystalline",
+        "minimum_detectable_tc_k": 1.6,
+        "detection_limit_description": "No transition detected above 1.6 K within the stated field, pressure, sample and method scope"
       },
       "observed_tc_k": null
     },
@@ -102,12 +137,19 @@
       "label_state": "unknown_or_not_reported",
       "condition_context": {
         "pressure_gpa": null,
-        "measurement_temperature_range_k": [0, 300],
+        "measurement_temperature_range_k": [
+          0,
+          300
+        ],
         "sample_form": "unknown",
         "measurement_method": "not reported",
         "transition_criterion": "unknown",
         "evidence_scope": "unknown_or_not_reported",
-        "scope_description": "Synthetic fixture: no condition-qualified observation is available"
+        "scope_description": "Synthetic fixture: no condition-qualified observation is available",
+        "measurement_field_t": 0,
+        "field_orientation": "polycrystalline",
+        "minimum_detectable_tc_k": null,
+        "detection_limit_description": "No qualified lower detection floor is asserted for this record"
       },
       "observed_tc_k": null
     }
