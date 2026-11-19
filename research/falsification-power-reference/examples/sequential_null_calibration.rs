@@ -1,8 +1,8 @@
 use std::f64::consts::TAU;
 
 use falsification_power_reference::{
-    MixtureAlternative, MixtureDiscrepancy, PredictableGaussianEProcess,
-    PredictableGaussianMixture,
+    FiniteReferenceConformalEProcess, MixtureAlternative, MixtureDiscrepancy,
+    PredictableGaussianEProcess, PredictableGaussianMixture,
 };
 
 const ALPHA: f64 = 0.05;
@@ -49,6 +49,7 @@ fn variance_at(step: u64) -> f64 {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut single_crossings = 0_u64;
     let mut mixture_crossings = 0_u64;
+    let mut conformal_crossings = 0_u64;
     let mut leaked_crossings = 0_u64;
 
     for path in 0..PATHS {
@@ -59,6 +60,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut previous_residual = 0.0_f64;
         let mut single_crossed = false;
         let mut mixture_crossed = false;
+        let mut conformal_crossed = false;
         let mut leaked_crossed = false;
 
         let mut single =
@@ -76,6 +78,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ],
             ALPHA,
         )?;
+        let mut conformal = ConformalEProcess_PLACEHOLDER::new("simulator-null-rotation", ALPHA)?;
         let mut intentionally_leaky =
             PredictableGaussianEProcess::new("invalid-posthoc-break", ALPHA)?;
 
@@ -113,9 +116,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ],
             )?;
 
+            // A positive score is selected from history before the next
+            // observation. The same score profile is applied to the observed
+            // residual and five fresh simulator draws under the candidate null.
+            let conformal_strength = 0.30 + 0.10 * history_signal;
+            let reference_batch_id = format!("simulator-null-{path_id}-{step:03}");
+            conformal.commit_score(
+                observation_id.clone(),
+                decision_digest.clone(),
+                "positive-score-exp-v1",
+                reference_batch_id.clone(),
+                5,
+            )?;
+
             // Under the simple conditional null, residual/sigma is standard
             // normal. Each sigma_t is known before the current residual.
-            let observed_residual = sigma * standard_normal(&mut rng);
+            let standardized_observation = standard_normal(&mut rng);
+            let observed_residual = sigma * standardized_observation;
+            let observed_score = (conformal_strength * standardized_observation).exp();
+            let mut reference_scores = Vec::with_capacity(5);
+            for _ in 0..5 {
+                let reference_residual = standard_normal(&mut rng);
+                reference_scores.push((conformal_strength * reference_residual).exp());
+            }
+            let conformal_update = conformal.observe(
+                &observation_id,
+                &decision_digest,
+                "positive-score-exp-v1",
+                &reference_batch_id,
+                observed_score,
+                &reference_scores,
+            )?;
             let single_update = single.observe(
                 &observation_id,
                 &decision_digest,
@@ -144,6 +175,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             single_crossed |= single_update.crossed_alpha;
             mixture_crossed |= mixture_update.crossed_alpha;
+            conformal_crossed |= conformal_update.update.crossed_alpha;
             leaked_crossed |= leaked_update.crossed_alpha;
             previous_residual = observed_residual;
         }
@@ -154,6 +186,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if mixture_crossed {
             mixture_crossings += 1;
         }
+        if conformal_crossed {
+            conformal_crossings += 1;
+        }
         if leaked_crossed {
             leaked_crossings += 1;
         }
@@ -161,10 +196,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (single_lower, single_upper) = wilson_interval(single_crossings, PATHS);
     let (mixture_lower, mixture_upper) = wilson_interval(mixture_crossings, PATHS);
+    let (conformal_lower, conformal_upper) = wilson_interval(conformal_crossings, PATHS);
     let (leaked_lower, leaked_upper) = wilson_interval(leaked_crossings, PATHS);
 
     println!(
-        "{{\"seed\":{},\"paths\":{},\"horizon\":{},\"alpha\":{},\"predictable_single\":{{\"crossings\":{},\"rate\":{},\"wilson95\":[{},{}]}},\"predictable_fixed_mixture\":{{\"crossings\":{},\"rate\":{},\"wilson95\":[{},{}]}},\"invalid_posthoc_leak\":{{\"crossings\":{},\"rate\":{},\"wilson95\":[{},{}]}}}}",
+        "{{\"seed\":{},\"paths\":{},\"horizon\":{},\"alpha\":{},\"predictable_single\":{{\"crossings\":{},\"rate\":{},\"wilson95\":[{},{}]}},\"predictable_fixed_mixture\":{{\"crossings\":{},\"rate\":{},\"wilson95\":[{},{}]}},\"predictable_finite_reference_conformal\":{{\"crossings\":{},\"rate\":{},\"wilson95\":[{},{}]}},\"invalid_posthoc_leak\":{{\"crossings\":{},\"rate\":{},\"wilson95\":[{},{}]}}}}",
         MASTER_SEED,
         PATHS,
         HORIZON,
@@ -177,6 +213,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         mixture_crossings as f64 / PATHS as f64,
         mixture_lower,
         mixture_upper,
+        conformal_crossings,
+        conformal_crossings as f64 / PATHS as f64,
+        conformal_lower,
+        conformal_upper,
         leaked_crossings,
         leaked_crossings as f64 / PATHS as f64,
         leaked_lower,
@@ -185,7 +225,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // This is a regression sanity gate, not a formal proof or a substitute for
     // a calibrated campaign. The tolerance allows Monte Carlo variation.
-    if single_upper > ALPHA + 0.02 || mixture_upper > ALPHA + 0.02 {
+    if single_upper > ALPHA + 0.02
+        || mixture_upper > ALPHA + 0.02
+        || conformal_upper > ALPHA + 0.02
+    {
         return Err(std::io::Error::other(
             "predictable null crossing rate exceeded the calibration tolerance",
         )
