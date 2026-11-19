@@ -660,6 +660,8 @@ fn verify_score_edit_semantics(
     if !valid_sha256(source_score_sha256) || !valid_sha256(candidate_score_sha256) {
         return Err("source or candidate Score digest is invalid".into());
     }
+    require_fields(source, &["key","tempo_bpm","meter","notes","total_beats"], "source Score")?;
+    require_fields(candidate, &["key","tempo_bpm","meter","notes","total_beats"], "candidate Score")?;
     if string_field(plan, "schema", "edit plan")? != SCORE_EDIT_SCHEMA_V1
         || string_field(plan, "input_digest_schema", "edit plan")? != SCORE_EDIT_INPUT_DIGEST_SCHEMA_V1
         || string_field(plan, "input_score_sha256", "edit plan")? != source_score_sha256
@@ -780,6 +782,11 @@ fn verify_score_edit_semantics(
     let mut changed_count = 0usize;
     let mut preserved_count = 0usize;
     for (index, (source_note, candidate_note)) in source_notes.iter().zip(candidate_notes.iter()).enumerate() {
+        let note_fields = ["part","pitch","onset","duration","velocity","role","emphasis","section_intensity"];
+        require_fields(source_note, &note_fields, "source note")?;
+        require_fields(candidate_note, &note_fields, "candidate note")?;
+        require_fields(source_note.get("pitch").ok_or("source note pitch missing")?, &["midi"], "source note pitch")?;
+        require_fields(candidate_note.get("pitch").ok_or("candidate note pitch missing")?, &["midi"], "candidate note pitch")?;
         let source_non_velocity = remove_object_field(source_note, "velocity", "source note")?;
         let candidate_non_velocity = remove_object_field(candidate_note, "velocity", "candidate note")?;
         if source_non_velocity != candidate_non_velocity {
