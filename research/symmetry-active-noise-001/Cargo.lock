@@ -1,0 +1,12 @@
+version = 4
+
+[[package]]
+name = "symmetry-active-experiment-reference"
+version = "0.1.0"
+
+[[package]]
+name = "symmetry-active-noise-reference"
+version = "0.1.0"
+dependencies = [
+ "symmetry-active-experiment-reference",
+]
