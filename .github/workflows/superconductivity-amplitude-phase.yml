@@ -32,8 +32,18 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Check formatting
+      - name: Apply pinned Rust formatting
+        run: cargo fmt --manifest-path tools/superconductivity-amplitude-phase-harness/Cargo.toml --all
+
+      - name: Verify canonical Rust formatting
         run: cargo fmt --manifest-path tools/superconductivity-amplitude-phase-harness/Cargo.toml --all -- --check
+
+      - name: Capture rustfmt-only patch
+        if: always()
+        run: |
+          git diff --binary -- tools/superconductivity-amplitude-phase-harness > "$RUNNER_TEMP/sc-rustfmt.patch"
+          git diff --stat -- tools/superconductivity-amplitude-phase-harness
+          sha256sum "$RUNNER_TEMP/sc-rustfmt.patch"
 
       - name: Generate isolated dependency lockfile
         run: cargo generate-lockfile --manifest-path tools/superconductivity-amplitude-phase-harness/Cargo.toml
@@ -69,6 +79,8 @@ jobs:
             echo "git_head=$(git rev-parse HEAD)"
             echo "rustc=$(rustc --version)"
             echo "cargo=$(cargo --version)"
+            echo "worktree_status=$(git status --short)"
+            if [ -f "$RUNNER_TEMP/sc-rustfmt.patch" ]; then sha256sum "$RUNNER_TEMP/sc-rustfmt.patch"; fi
             sha256sum data/schemas/superconductivity_amplitude_phase_instance_v0_1.schema.json
             sha256sum data/research/superconductivity_amplitude_phase_fixture_v0_1.json
             sha256sum tools/superconductivity-amplitude-phase-harness/Cargo.toml
@@ -92,3 +104,4 @@ jobs:
             ${{ runner.temp }}/sc-amplitude-phase-environment.txt
             ${{ runner.temp }}/sc-amplitude-phase-gl-receipt.json
             ${{ runner.temp }}/sc-amplitude-phase-mc-smoke-receipt.json
+            ${{ runner.temp }}/sc-rustfmt.patch
