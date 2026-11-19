@@ -1027,6 +1027,34 @@ mod tests {
     }
 
     #[test]
+    fn xor_leading_trailing_rejects_malformed_markers_and_spans() {
+        for payload in [
+            vec![2],                         // unsupported marker
+            vec![1, 64, 0],                   // leading span out of range
+            vec![1, 0, 64],                   // trailing span out of range
+            vec![1, 32, 32],                  // empty meaningful window
+            vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // zero meaningful residual
+            vec![1, 0, 58, 0b1100_0001],      // nonzero unused upper bits
+        ] {
+            assert!(
+                decode_transform(&payload, Float64Transform::XorLeadingTrailing, 1).is_err(),
+                "malformed XOR leading/trailing payload was accepted: {payload:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn xor_leading_trailing_zero_residual_has_single_byte_code() {
+        let input = [1.0f64, 1.0, 1.0, 1.0];
+        let encoded =
+            encode_transform(&input, Float64Transform::XorLeadingTrailing).unwrap();
+        assert_eq!(encoded, vec![1, 0, 0, 0]);
+        let decoded =
+            decode_transform(&encoded, Float64Transform::XorLeadingTrailing, input.len()).unwrap();
+        assert_same_bits(&decoded, &input);
+    }
+
+    #[test]
     fn malformed_u64_varints_are_rejected() {
         let mut cursor = 0;
         assert_eq!(
