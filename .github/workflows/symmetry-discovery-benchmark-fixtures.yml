@@ -101,5 +101,26 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum "$RUNNER_TEMP/structural-proposal-audit.json" "$RUNNER_TEMP/regression-proposal-audit.json" | tee "$RUNNER_TEMP/proposal-audit-receipts.sha256"
+      - name: Record exact proposal audit evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/symmetry-proposal-audit-evidence"
+          mkdir -p "$evidence"
+          cp research/symmetry-discovery-benchmark-001/fixtures/v0.1/cases.json "$evidence/cases.json"
+          cp research/symmetry-discovery-benchmark-001/fixtures/v0.1/proposal_smoke_input.json "$evidence/structural-proposal-input.json"
+          cp research/symmetry-discovery-benchmark-001/fixtures/v0.1/regression_proposal_smoke_input.json "$evidence/regression-proposal-input.json"
+          cp "$RUNNER_TEMP/structural-proposal-audit.json" "$evidence/structural-proposal-audit.json"
+          cp "$RUNNER_TEMP/regression-proposal-audit.json" "$evidence/regression-proposal-audit.json"
+          printf 'oracle_revision=%s\n' "$GITHUB_SHA" > "$evidence/identity.txt"
+          printf 'rust_toolchain=1.96.0\n' >> "$evidence/identity.txt"
+          sha256sum "$evidence"/*.json "$evidence/identity.txt" > "$evidence/SHA256SUMS"
+      - name: Upload exact proposal audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: symmetry-proposal-audit-${{ github.sha }}
+          path: ${{ runner.temp }}/symmetry-proposal-audit-evidence/
+          if-no-files-found: error
+          retention-days: 90
       - name: Strict Clippy for exact oracle
         run: cargo clippy --locked --manifest-path research/symmetry-discovery-benchmark-001/oracle/Cargo.toml --all-targets -- -D warnings
