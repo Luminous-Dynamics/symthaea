@@ -100,7 +100,11 @@ pub(super) type VerifiedConsolidationRegistry =
 pub(super) struct VerifiedOutcomeReceipt {
     pub event_id: u32,
     pub action_id: String,
+    /// SHA-256 of the exact preserved JSONL observation event line.
+    pub observation_event_sha256: String,
+    pub observed_at_ms: u64,
     pub observed_utility: f64,
+    pub utility_unit: String,
     pub reconciled: bool,
 }
 pub(super) type VerifiedOutcomeRegistry = BTreeMap<String, VerifiedOutcomeReceipt>;
@@ -417,11 +421,23 @@ pub(super) fn derive_as_known(
             report.unverified_outcome_receipt_count += 1;
             continue;
         };
-        if event
+        let raw_value_matches = event
             .number("observed_utility")
-            .is_some_and(|claimed| (claimed - outcome.observed_utility).abs() > f64::EPSILON)
-        {
+            .is_some_and(|claimed| claimed.to_bits() == outcome.observed_utility.to_bits());
+        let raw_unit_matches =
+            event.string("utility_unit") == Some(outcome.utility_unit.as_str());
+        let receipt_binds_exact_event = outcome.observation_event_sha256
+            == event.raw_line_sha256
+            && outcome.observed_at_ms == event.occurred_at_ms;
+        if !raw_value_matches || !raw_unit_matches || !receipt_binds_exact_event {
             report.raw_payload_outcome_mismatch_count += 1;
+            continue;
+        }
+        if !outcome.observed_utility.is_finite()
+            || !(0.0..=1.0).contains(&outcome.observed_utility)
+        {
+            report.unverified_outcome_receipt_count += 1;
+            continue;
         }
 
         let Some(consolidation) = verified_consolidations.get(&event.event_id).filter(|receipt| {
@@ -566,6 +582,7 @@ mod tests {
                 json!({
                     "action_id": action_id,
                     "observed_utility": utility,
+                    "utility_unit": "normalized_utility",
                     "observation_receipt": format!("receipt-{observation_id}"),
                     "source_artifact_digest": digest
                 }),
@@ -612,14 +629,24 @@ mod tests {
             (9, "b1", 0.32),
             (12, "b2", 0.34),
         ];
+        let events = observation_events();
         rows.into_iter()
             .map(|(event_id, action_id, observed_utility)| {
+                let event = events
+                    .iter()
+                    .find(|event| event["event_id"] == json!(event_id))
+                    .expect("observation event exists");
+                let exact_line = serde_json::to_string(event)
+                    .expect("fixture event serializes deterministically");
                 (
                     format!("receipt-{event_id}"),
                     VerifiedOutcomeReceipt {
                         event_id,
                         action_id: action_id.to_owned(),
+                        observation_event_sha256: sha256_hex(exact_line.as_bytes()),
+                        observed_at_ms: 30,
                         observed_utility,
+                        utility_unit: "normalized_utility".to_owned(),
                         reconciled: true,
                     },
                 )
@@ -927,16 +954,76 @@ mod tests {
     }
 
     #[test]
-    fn raw_payload_cannot_self_attest_action_causality_or_measurement_value() {
+    fn raw_payload_outcome_mismatch_rejects_the_entire_observation() {
         let mut events = observation_events();
         events[2]["payload"]["observed_utility"] = json!(0.01);
         let report = derive_fixture(&jsonl(events), 100, 100).unwrap();
-        let item = report.experiences.iter().find(|item| item.event_id == 3).unwrap();
-        assert_eq!(item.observed_utility, 0.92);
+        assert!(
+            !report.experiences.iter().any(|item| item.event_id == 3),
+            "a mismatched event must not enter candidate memory"
+        );
         assert_eq!(report.raw_payload_outcome_mismatch_count, 1);
-        assert!(item.intervention);
-        assert!(item.prediction_pre_registered);
-        assert!(item.confounders_controlled);
+        assert_eq!(report.experiences.len(), 3);
+    }
+
+    #[test]
+    fn outcome_receipt_cannot_be_replayed_against_another_observation_event() {
+        let events = observation_events();
+        let mut outcomes = outcome_registry();
+        let other_event_digest = outcomes
+            .get("receipt-6")
+            .expect("second outcome receipt exists")
+            .observation_event_sha256
+            .clone();
+        outcomes
+            .get_mut("receipt-3")
+            .expect("first outcome receipt exists")
+            .observation_event_sha256 = other_event_digest;
+        let report = derive_with_sources(
+            &jsonl(events),
+            100,
+            100,
+            &action_registry(),
+            &outcomes,
+            &source_registry(),
+        )
+        .unwrap();
+        assert!(
+            !report.experiences.iter().any(|item| item.event_id == 3),
+            "receipt for another observation cannot authorize this event"
+        );
+        assert_eq!(report.raw_payload_outcome_mismatch_count, 1);
+    }
+
+    #[test]
+    fn outcome_receipt_must_match_the_observation_time_and_unit() {
+        let mut outcomes = outcome_registry();
+        outcomes.get_mut("receipt-3").unwrap().observed_at_ms = 31;
+        let report = derive_with_sources(
+            &jsonl(observation_events()),
+            100,
+            100,
+            &action_registry(),
+            &outcomes,
+            &source_registry(),
+        )
+        .unwrap();
+        assert!(!report.experiences.iter().any(|item| item.event_id == 3));
+        assert_eq!(report.raw_payload_outcome_mismatch_count, 1);
+
+        let mut outcomes = outcome_registry();
+        outcomes.get_mut("receipt-3").unwrap().utility_unit = "percent".to_owned();
+        let report = derive_with_sources(
+            &jsonl(observation_events()),
+            100,
+            100,
+            &action_registry(),
+            &outcomes,
+            &source_registry(),
+        )
+        .unwrap();
+        assert!(!report.experiences.iter().any(|item| item.event_id == 3));
+        assert_eq!(report.raw_payload_outcome_mismatch_count, 1);
     }
 
     #[test]
