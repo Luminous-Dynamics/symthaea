@@ -15,7 +15,7 @@ These are not interchangeable. SSPRK-style stages can have (c = 0, 1, 1/2) while
 
 ## Three policies
 
-- `PaperExact`: permits previously computed provisional stages to reproduce the published buffer behavior. It explicitly reports same-step provisional slots with later (c)-values.
+- `PaperReported`: permits previously computed provisional stages to reproduce the published buffer behavior. It explicitly reports same-step provisional slots with later (c)-values.
 - `AcceptedStateOnly`: allows only committed physical-time states; provisional stage values invalidate this policy.
 - `StageExplicit`: requires an exact tableau digest and explicit declaration of same-step prior-stage dependencies when their (c)-value is later than the query.
 
