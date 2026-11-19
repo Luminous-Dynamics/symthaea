@@ -96,6 +96,46 @@
       "claim_ceiling": "Calculated-label spectral-function prediction and candidate screening baseline. Its MAE must not be compared as if it were measured experimental Tc."
     },
     {
+      "baseline_id": "nemad-llm-2026",
+      "title": "Large language models for superconductor discovery",
+      "doi": "10.1016/j.jmmm.2026.174189",
+      "source_preprint": "https://arxiv.org/abs/2512.10847",
+      "publication_date": "2026-08-15",
+      "data_url": "https://www.nemad.org",
+      "code_repository": "https://github.com/sumanitani/LLM_for_Superconductors",
+      "model_adapter_index": "https://huggingface.co/sumanitani",
+      "label_authority": "experimental_literature_extraction",
+      "dataset": {
+        "reported_records": 78203,
+        "unique_compositions": 19058,
+        "record_count_discrepancy": "The paper abstract reports 78,203 records; a methods description has been reported as 78,204. Resolve from immutable released row IDs before reproduction.",
+        "coverage": [
+          "superconductors",
+          "experimentally reported non-superconductors"
+        ],
+        "fields": [
+          "chemical composition",
+          "critical temperature",
+          "measurement pressure",
+          "structural descriptors",
+          "critical fields where available"
+        ],
+        "sources": "APS and Elsevier literature plus domain handbooks, as described by the paper",
+        "rights": "Dataset, code and checkpoint-specific terms have not yet been fully admitted by this repository; verify before copying, redistribution, or retraining."
+      },
+      "published_findings": {
+        "tasks": [
+          "superconductor/non-superconductor classification",
+          "composition or structure-informed Tc prediction",
+          "inverse design conditioned on target Tc"
+        ],
+        "inverse_design_novelty_fraction": 0.28,
+        "unreported_candidate_claim": "GNoME screening produced candidates with predicted Tc > 10 K; predictions are unverified and are not discoveries."
+      },
+      "reproduction_status": "not_reproduced",
+      "claim_ceiling": "Published LLM extraction/prediction/inverse-design baseline; the 28% novelty fraction is relative to the paper's training set and does not establish physical novelty or synthesizability."
+    },
+    {
       "baseline_id": "geisler-hcfield-2026",
       "title": "Towards the discovery of high critical magnetic field superconductors",
       "source": "https://doi.org/10.1038/s41524-026-02266-9",
