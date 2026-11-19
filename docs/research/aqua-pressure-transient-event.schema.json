@@ -342,6 +342,7 @@
       "additionalProperties": false,
       "required": [
         "channel_id",
+        "quality_state",
         "role",
         "location",
         "datum",
@@ -349,7 +350,11 @@
         "instrument_id",
         "calibration_receipt_sha256",
         "measurement_uncertainty",
-        "quality_state"
+        "sample_rate_hz",
+        "effective_bandwidth_hz",
+        "anti_alias_filter_id",
+        "sample_count",
+        "dropped_sample_count"
       ],
       "properties": {
         "channel_id": {
