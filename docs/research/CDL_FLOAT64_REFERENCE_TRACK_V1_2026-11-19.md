@@ -12,6 +12,7 @@ The branch adds correctness references and selector baselines, not a competitive
 - `research/cdl-bench/src/main.rs`: `float --values N --seed N` experiment command comparing single-stream, offline segment-portfolio and online historical-cost rows across plateau/idle regimes as well as smooth, oscillating and random streams.
 - `research/cdl-bench/src/lib.rs`: public exports.
 - `research/cdl-bench/reference/float64_window_reference.cpp`: independent C++20 bit-window transform reference.
+- `research/cdl-bench/reference/float64_rle_xor_reference.cpp`: independent C++20 RLE+XOR reference and malformed-input checks.
 - `research/cdl-bench/README.md`: usage and limits.
 - Tracking: [CDL-Bench-007 #12874](https://github.com/Luminous-Dynamics/symthaea/issues/12874).
 
@@ -56,7 +57,7 @@ The command emits frame lengths and encode/decode nanoseconds for the single-str
 
 Each stream is evaluated with raw, XOR-previous-varint, XOR-leading/trailing window, and RLE+XOR transforms under order-0 and order-1 entropy models. The segment portfolio tries all eight combinations per chunk and picks the smallest complete child F64C frame. The F64S container header, every F64C child header, child CRCs, and the inner CDL payloads are all counted in the reported frame size. Zstandard is measured on the original raw little-endian f64 bytes if installed. The CLI does not yet invoke DeXOR, ACTF, Gorilla, Chimp, Rabbit or Dolphin.
 
-**Selection caveat:** the offline selector has the entire chunk available and tries all eight encodings before choosing one. This is an offline size oracle, not an online selector and not a WZS reproduction. It is useful as a transparent fixed-chunk upper bound for the specific six candidate encodings; it does not establish that transmitted or inferred online segmentation would achieve the same result.
+**Selection caveat:** the offline selector has the entire chunk available and tries all eight encodings before choosing one. This is an offline size oracle, not an online selector and not a WZS reproduction. It is useful as a transparent fixed-chunk upper bound for the specific eight candidate encodings; it does not establish that transmitted or inferred online segmentation would achieve the same result.
 
 ## Two segment-local selection policies
 
@@ -126,16 +127,50 @@ logic; the checked-in C++ run is the reproducible reference result reported
 above. Neither validates the Rust F64C/F64S framing or runs the Rust arithmetic
 coder.
 
-Rust tests are authored for raw/XOR-varint/XOR-window exact reconstruction,
+Rust tests are authored for raw/XOR-varint/XOR-window/RLE+XOR exact reconstruction,
 deterministic encoding, truncated-prefix rejection, single-bit mutation
 rejection, output-limit enforcement, malformed varint/window rejection and
 explicit window reuse. Segmented tests cover bitwise round-trip at chunk sizes
 1/64/256/1024, truncation, zero chunk size, output limit, header flags/policy
-validation, canonical best-of-six child selection and mutation rejection.
-Historical-cost policy tests cover initial choice, cumulative six-candidate
+validation, canonical best-of-eight child selection and mutation rejection.
+Historical-cost policy tests cover initial choice, cumulative eight-candidate
 mean updates, stable tie-breaking, exact round-trip, child-policy mismatch
 rejection and corruption. **No Rust compilation, cargo test or rustfmt pass
 has been obtained.** No SOTA or frame-size win is claimed.
+
+## Independent RLE+XOR transform-logic check
+
+The checked-in C++20 reference
+`research/cdl-bench/reference/float64_rle_xor_reference.cpp` independently
+implements exact-bit-pattern run grouping plus XOR-varint coding of run
+values. It compiled under `-Wall -Wextra -Wconversion -Werror`, round-tripped
+174,108 u64 bit patterns over edge, constant, plateau, mostly-idle and mixed
+random-run fixtures, and rejected seven malformed run/varint streams.
+
+Command:
+
+```sh
+g++ -O2 -std=c++20 -Wall -Wextra -Wconversion -Werror \
+  research/cdl-bench/reference/float64_rle_xor_reference.cpp \
+  -o /tmp/float64_rle_xor_reference
+/tmp/float64_rle_xor_reference
+```
+
+Transform-only output before entropy coding and F64C/F64S framing:
+
+| Fixture | Values | XOR-varint bytes | RLE+XOR bytes | Change vs XOR-varint |
+|---|---:|---:|---:|---:|
+| IEEE-754 edge values | 12 | 81 | 87 | +7.41% |
+| Constant run | 4,096 | 4,104 | 11 | -99.73% |
+| Plateau steps | 20,000 | 20,663 | 899 | -95.65% |
+| Mostly-idle telemetry | 50,000 | 51,762 | 2,219 | -95.71% |
+| Mixed random runs | 100,000 | 185,978 | 106,196 | -42.90% |
+
+The edge fixture regresses because per-run lengths add overhead. Repeated-value
+regimes improve dramatically, so RLE+XOR should remain a specialist in the
+portfolio, not the universal default. This is transform-level evidence only:
+it does not run the Rust implementation, arithmetic coder, or full typed
+frames, and it does not reproduce the Dynatrace implementation.
 
 ## 2026 competitive comparison
 
