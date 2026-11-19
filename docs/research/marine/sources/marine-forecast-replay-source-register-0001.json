@@ -196,7 +196,8 @@
       "known_limits": [
         "Commercial rights and access are required",
         "The provider's help says route accuracy depends on forecast and boat polars and that routes require skipper safety review",
-        "Do not infer missing forecast or polar inputs from the route geometry"
+        "Do not infer missing forecast or polar inputs from the route geometry",
+        "PredictWind states its DataHub AI Polars are proprietary and cannot be downloaded/exported for use in other systems; do not infer them from GPX/KML/CSV route geometry."
       ],
       "rights_review": "No redistribution or public hosting without applicable license/permission"
     }
