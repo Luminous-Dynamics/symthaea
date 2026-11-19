@@ -1362,6 +1362,7 @@ mod tests {
         let mut value = profile();
         value.event_family = EventFamily::ConcurrentDemandStep;
         value.command.kind = CommandKind::BranchDemand;
+        value.command.unit = CommandUnit::LitresPerMinute;
         value.command.samples.iter_mut().enumerate().for_each(|(index, sample)| {
             sample.value = CommandValue::Numeric(if index == 0 { 0.0 } else { 3.0 });
         });
@@ -1373,6 +1374,7 @@ mod tests {
         let mut value = profile();
         value.event_family = EventFamily::RapidValveEvent;
         value.command.kind = CommandKind::ValveState;
+        value.command.unit = CommandUnit::Boolean;
         value.command.samples[0].value = CommandValue::Boolean(false);
         value.command.samples[1].value = CommandValue::Boolean(true);
         value.command.samples[2].value = CommandValue::Boolean(false);
@@ -1415,6 +1417,7 @@ mod tests {
         let mut value = profile();
         value.event_family = EventFamily::RapidValveEvent;
         value.command.kind = CommandKind::ValveState;
+        value.command.unit = CommandUnit::Boolean;
         value.command.samples.iter_mut().for_each(|sample| {
             sample.value = CommandValue::Boolean(true);
         });
@@ -1464,9 +1467,12 @@ mod tests {
             site_profile_revision: 1,
             site_conditions_sha256: digest('5'),
             survey_receipt_sha256: digest('6'),
-            observation_window_start: "2026-01-01T00:00:00Z".to_owned(),
-            observation_window_end: "2026-01-01T00:10:00Z".to_owned(),
-            coverage_statement: "complete".to_owned(),
+            observation_window: ObservationWindow {
+                start: "2026-01-01T00:00:00Z".to_owned(),
+                end: "2026-01-01T00:10:00Z".to_owned(),
+                coverage_statement: "complete".to_owned(),
+                known_gaps: Vec::new(),
+            },
         });
         assert_eq!(value.validate(), Err(TransientTraceError::MissingSiteObservationArtifact));
     }
