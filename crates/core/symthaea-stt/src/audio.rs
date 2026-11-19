@@ -406,6 +406,21 @@ impl AudioProjector {
         self.frontend.config()
     }
 
+    /// Reject audio whose source sample rate does not match this projector.
+    ///
+    /// The projector does not implicitly resample. Callers must resample with
+    /// an explicit, qualified resampler before feature extraction.
+    pub fn validate_input_sample_rate(&self, observed_sample_rate: u32) -> Result<(), String> {
+        let expected_sample_rate = self.frontend.config().sample_rate;
+        if observed_sample_rate == expected_sample_rate && observed_sample_rate > 0 {
+            Ok(())
+        } else {
+            Err(format!(
+                "audio sample-rate mismatch: received {observed_sample_rate} Hz, projector requires {expected_sample_rate} Hz; resample explicitly before projection"
+            ))
+        }
+    }
+
     /// Reset projector state
     pub fn reset(&mut self) {
         self.ltc.reset();
@@ -973,6 +988,14 @@ mod tests {
         for filter in &filters {
             assert_eq!(filter.len(), config.n_fft / 2 + 1);
         }
+    }
+
+    #[test]
+    fn audio_projector_rejects_unresampled_source_sample_rates() {
+        let projector = AudioProjector::default_config();
+        assert!(projector.validate_input_sample_rate(16_000).is_ok());
+        assert!(projector.validate_input_sample_rate(48_000).is_err());
+        assert!(projector.validate_input_sample_rate(0).is_err());
     }
 
     #[test]
