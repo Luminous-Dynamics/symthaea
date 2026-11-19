@@ -270,3 +270,24 @@ The smoke inputs are deliberately split by task: structural point-set stabilizer
 The structural negative control proposes D4 for the chiral C4 orbit. D4 is a mathematically valid subgroup of the ambient D4 group, but four proposed reflections do not stabilize the object. The expected result is therefore `group_axioms_satisfied=true` **and** four `false_promotion_elements`, each accompanied by a moved-point counterexample. This is the central adversarial distinction: group validity is not object invariance.
 
 The exact-head workflow runs both smoke lanes and asserts the expected element-level outcome. These are oracle/adapter conformance checks, not external learner benchmark results. The Rust polynomial parser caps total degree at 32 and term count at 256, rejects duplicate/zero terms and fractional coefficients, and uses checked integer expansion to bound work and avoid lossy parsing.
+
+
+## Active finite-subgroup identification lane
+
+The companion fixture `fixtures/v0.1/active_subgroup_identification.json` freezes complete multiplication tables, exact subgroup lists, membership-probe costs and independently computed reference costs for C4, V4, S3 and D4. It is separate from point-set stabilizer and regression-learning tracks: the oracle input is a known abstract finite group plus exact task-preservation membership checks.
+
+| Group | Subgroups | Full scan | Greedy worst case | Exact static basis | Exact adaptive worst case |
+|---|---:|---:|---:|---:|---:|
+| C4 | 3 | 3 | 2 | 2 | 2 |
+| V4 | 5 | 3 | 3 | 3 | 3 |
+| S3 | 6 | 7 | 6 | 6 | 6 |
+| D4 | 10 | 11 | 9 | 10 | 9 |
+
+Costs are dimensionless frozen probe-cost units. The table is a small exact reference computation, not measured physical acquisition throughput. It shows where adaptive planning actually helps (C4 and D4) and where it does not (V4 and S3), rather than presuming every subgroup lattice admits savings.
+
+The critical negatives are:
+- a preserving set that contains the identity but is not closed under products, which must be reported as inconsistent;
+- unknown membership results, which must preserve the current hypothesis frontier;
+- an incomplete set of admissible membership probes, which must expose unresolved subgroup pairs.
+
+The full-task checker and its evidence references remain outside this active identification fixture. A subgroup candidate never authorizes quotient pruning; the finite quotient compiler must still independently qualify the complete task semantics.
