@@ -789,9 +789,10 @@ pub fn compress_f64_budgeted_selector(
         frame.extend_from_slice(&child);
 
         if segment_index % probe_interval == 0 {
+            // Only probe chunks update the cross-candidate cost estimates.
+            // Adding extra observations for just the incumbent between probes
+            // would bias the candidate means toward a non-random sample.
             history.observe_with_selected(segment, selected, child.len())?;
-        } else {
-            history.observe_candidate(selected, child.len())?;
         }
     }
     Ok(frame)
@@ -911,9 +912,9 @@ pub fn decompress_f64_budgeted_selector(
         }
 
         if segment_index % probe_interval == 0 {
+            // Keep candidate statistics on identical probe segments at both
+            // encoder and decoder; do not bias the incumbent's sample set.
             history.observe_with_selected(&decoded, expected_candidate, child.len())?;
-        } else {
-            history.observe_candidate(expected_candidate, child.len())?;
         }
         output.extend_from_slice(&decoded);
         cursor = child_end;
@@ -1347,6 +1348,79 @@ mod tests {
                 expected: 0,
                 actual: 3
             })
+        );
+    }
+
+    #[test]
+    fn budgeted_selector_round_trips_for_sparse_probe_intervals() {
+        for input in bit_fixtures() {
+            for segment_size in [64, 256, 1024] {
+                for probe_interval in [1, 2, 4, 16, 64, 128] {
+                    let frame =
+                        compress_f64_budgeted_selector(&input, segment_size, probe_interval)
+                            .unwrap();
+                    assert_eq!(frame[6], probe_interval.trailing_zeros() as u8);
+                    let decoded =
+                        decompress_f64_budgeted_selector(&frame, input.len()).unwrap();
+                    assert_same_bits(&decoded, &input);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn budgeted_selector_interval_one_matches_full_historical_policy() {
+        let input = bit_fixtures().remove(3);
+        let sparse = compress_f64_budgeted_selector(&input, 64, 1).unwrap();
+        let full = compress_f64_online_selector(&input, 64).unwrap();
+        assert_eq!(sparse, full);
+        assert_same_bits(
+            &decompress_f64_budgeted_selector(&sparse, input.len()).unwrap(),
+            &input,
+        );
+    }
+
+    #[test]
+    fn budgeted_selector_rejects_invalid_probe_intervals() {
+        let input = [0.0, 1.0, -0.0];
+        for interval in [0usize, 3, 5, 129, 256] {
+            assert_eq!(
+                compress_f64_budgeted_selector(&input, 2, interval),
+                Err(NumericError::InvalidProbeInterval),
+                "accepted probe interval {interval}"
+            );
+        }
+        assert_eq!(
+            compress_f64_budgeted_selector(&input, 0, 4),
+            Err(NumericError::InvalidSegmentSize)
+        );
+    }
+
+    #[test]
+    fn budgeted_selector_rejects_policy_mismatch_and_header_corruption() {
+        let input = [0.0f64, -0.0, 1.0, 1.0, 1.0, 2.0];
+        let frame = compress_f64_budgeted_selector(&input, 2, 4).unwrap();
+        let mut bad_policy = frame.clone();
+        bad_policy[7] = SEGMENT_SELECTION_POLICY_HISTORICAL_COST;
+        assert_eq!(
+            decompress_f64_budgeted_selector(&bad_policy, input.len()),
+            Err(NumericError::UnsupportedTransform(
+                SEGMENT_SELECTION_POLICY_HISTORICAL_COST
+            ))
+        );
+
+        let mut bad_interval = frame.clone();
+        bad_interval[6] = 8;
+        assert_eq!(
+            decompress_f64_budgeted_selector(&bad_interval, input.len()),
+            Err(NumericError::InvalidProbeInterval)
+        );
+
+        let mut bad_crc = frame;
+        bad_crc[6] ^= 1;
+        assert_eq!(
+            decompress_f64_budgeted_selector(&bad_crc, input.len()),
+            Err(NumericError::ChecksumMismatch)
         );
     }
 
