@@ -25,8 +25,8 @@ use std::path::PathBuf;
 
 use symthaea_stt::hdc::BundleAccumulator;
 use symthaea_stt::{
-    AudioFrontend, AudioProjector, BootstrapConfig, HV16, TrainedPrototypes, id_to_audio_path,
-    load_alignments,
+    AudioFrontend, AudioProjector, BootstrapConfig, HV16, PrototypeEncoderMetadata,
+    TrainedPrototypes, id_to_audio_path, load_alignments,
 };
 
 #[derive(Parser)]
@@ -306,6 +306,9 @@ fn main() {
             counts: HashMap::new(),
             config: BootstrapConfig::default(),
             version: env!("CARGO_PKG_VERSION").to_string(),
+        encoder_metadata: Some(PrototypeEncoderMetadata::direct_mel_frame_v1(
+            projector.config().clone(),
+        )),
         };
 
         trained.enforce_separation(cli.min_separation);
@@ -393,6 +396,9 @@ fn main() {
         counts: counts.iter().map(|(k, v)| (k.clone(), *v)).collect(),
         config: BootstrapConfig::default(),
         version: env!("CARGO_PKG_VERSION").to_string(),
+    encoder_metadata: Some(PrototypeEncoderMetadata::direct_mel_frame_v1(
+        projector.config().clone(),
+    )),
     };
 
     if let Err(e) = trained.save(&cli.output) {
