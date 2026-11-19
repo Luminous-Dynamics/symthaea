@@ -47,6 +47,7 @@ EXPECTED_VALUES = {
     "pressure_flow_declaration": ("text", None),
     "inlet_supply_capacity": ("text", None),
     "installation_requirements": ("text", None),
+    "source_internal_numerical_discrepancy": ("text", None),
     "operating_environment_requirements": ("text", None),
     "floor_drain_geometry": ("text", None),
     "fuse_dependent_flow_capacity": ("text", None),
