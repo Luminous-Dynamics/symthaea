@@ -1270,6 +1270,111 @@ mod tests {
         assert_eq!(result.receipt.changes[0].operation_id, "soften-answer");
         assert_eq!(result.receipt.changes[0].before, 0.8);
         assert_eq!(result.receipt.changes[0].after, 0.4);
+        assert!(result.verification.verified);
+        assert_eq!(result.verification.authorized_note_count, 2);
+        assert_eq!(result.verification.changed_note_count, 2);
+        assert_eq!(result.verification.preserved_note_count, 2);
+        assert!(result.verification.issues.is_empty());
+    }
+
+    #[test]
+    fn independent_verifier_rejects_non_target_note_mutation() {
+        let source = source_score();
+        let edit_plan = plan(vec![operation("soften-answer", 0, 2)]);
+        let mut result = apply_score_edit_plan(&source, &edit_plan, &digest())
+            .expect("valid localized candidate");
+        result.candidate.notes[3].pitch = Pitch::from_midi(50);
+
+        let report = verify_score_edit_candidate(
+            &source,
+            &result.candidate,
+            &edit_plan,
+            &result.receipt,
+            &digest(),
+        );
+        assert!(!report.verified);
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == ScoreEditVerificationIssueCodeV1::UnauthorizedNoteMutation
+                && issue.note_index == Some(3)
+        }));
+    }
+
+    #[test]
+    fn independent_verifier_rejects_score_metadata_mutation() {
+        let source = source_score();
+        let edit_plan = plan(vec![operation("soften-answer", 0, 2)]);
+        let mut result = apply_score_edit_plan(&source, &edit_plan, &digest())
+            .expect("valid localized candidate");
+        result.candidate.tempo_bpm = 101.0;
+
+        let report = verify_score_edit_candidate(
+            &source,
+            &result.candidate,
+            &edit_plan,
+            &result.receipt,
+            &digest(),
+        );
+        assert!(!report.verified);
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == ScoreEditVerificationIssueCodeV1::CandidateMetadataMutation
+        }));
+    }
+
+    #[test]
+    fn independent_verifier_rejects_tampered_receipt_delta() {
+        let source = source_score();
+        let edit_plan = plan(vec![operation("soften-answer", 0, 2)]);
+        let mut result = apply_score_edit_plan(&source, &edit_plan, &digest())
+            .expect("valid localized candidate");
+        result.receipt.changes[0].before = 0.7;
+
+        let report = verify_score_edit_candidate(
+            &source,
+            &result.candidate,
+            &edit_plan,
+            &result.receipt,
+            &digest(),
+        );
+        assert!(!report.verified);
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == ScoreEditVerificationIssueCodeV1::ReceiptDeltaMismatch
+                && issue.note_index == Some(0)
+        }));
+    }
+
+    #[test]
+    fn independent_verifier_rejects_candidate_event_reordering() {
+        let source = source_score();
+        let edit_plan = plan(vec![operation("soften-answer", 0, 2)]);
+        let mut result = apply_score_edit_plan(&source, &edit_plan, &digest())
+            .expect("valid localized candidate");
+        result.candidate.notes.swap(0, 3);
+
+        let report = verify_score_edit_candidate(
+            &source,
+            &result.candidate,
+            &edit_plan,
+            &result.receipt,
+            &digest(),
+        );
+        assert!(!report.verified);
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == ScoreEditVerificationIssueCodeV1::UnauthorizedNoteMutation
+        }));
+    }
+
+    #[test]
+    fn rejects_an_edit_that_selects_only_already_zero_velocity() {
+        let mut source = source_score();
+        source.notes[0].velocity = 0.0;
+        let result = apply_score_edit_plan(
+            &source,
+            &plan(vec![operation("ineffective-soften", 0, 1)]),
+            &digest(),
+        );
+        assert!(result.unwrap_err().iter().any(|issue| {
+            issue.code == ScoreEditIssueCodeV1::NoOpVelocityScale
+        }));
     }
 
     #[test]
