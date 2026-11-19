@@ -9,7 +9,9 @@
 use clap::Parser;
 use std::path::PathBuf;
 
-use symthaea_stt::{AudioFrontend, AudioProjector, PhonemeDecoder, TrainedPrototypes};
+use symthaea_stt::{
+    AudioFrontend, AudioProjector, PhonemeDecoder, PrototypeEncoderMetadata, TrainedPrototypes,
+};
 
 #[derive(Parser)]
 #[command(name = "symthaea-mirror")]
@@ -68,7 +70,17 @@ fn main() {
             std::process::exit(1);
         }
     };
-    println!("  Loaded {} phoneme prototypes", prototypes.len());
+    let expected_encoder = PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(
+        AudioProjector::default_config().config().clone(),
+    );
+    if let Err(error) = prototypes.validate_encoder(&expected_encoder) {
+        eprintln!("ERROR: prototype encoder is incompatible with temporal projection: {error}");
+        std::process::exit(1);
+    }
+    println!(
+        "  Loaded {} compatible temporal-window phoneme prototypes",
+        prototypes.len()
+    );
     println!();
 
     // Project audio through inference pipeline
