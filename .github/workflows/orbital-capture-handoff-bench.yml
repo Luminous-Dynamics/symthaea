@@ -60,11 +60,11 @@ jobs:
             .result == "pass"
             and (.source_commit | test("^[0-9a-f]{40}$"))
             and (.fixture_sha256 | test("^[0-9a-f]{64}$"))
-            and .report.summary.case_count == 19
+            and .report.summary.case_count == 20
             and .report.summary.accepted_for_handoff == 1
-            and .report.summary.rejected == 14
+            and .report.summary.rejected == 15
             and .report.summary.indeterminate == 4
-            and .report.summary.proximity_only_false_accepts == 17
+            and .report.summary.proximity_only_false_accepts == 18
             and .report.summary.expected_result_mismatches == 0
             and (.report.cases | all(.authority_granted == false))
           ' orbital-capture-handoff-receipt.json
