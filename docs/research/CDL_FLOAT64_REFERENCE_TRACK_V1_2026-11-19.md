@@ -1,15 +1,15 @@
 # CDL-Bench exact IEEE-754 f64 reference track v1
 
 **Date:** 2026-11-19  
-**Status:** Rust reference source, three reversible transforms, two segment selectors and authored tests committed; independent C++20 window-reference compiled and exercised; Rust compilation and arithmetic-coded size results pending.
+**Status:** Rust reference source, four reversible transforms, eight-candidate segment selectors and authored tests committed; independent transform-logic translations exercised; Rust compilation and arithmetic-coded size results pending.
 
 ## Why this track exists
 
 The SCM/i16 lane does not represent the dominant specialized lossless floating-point time-series competition. By 2026, several purpose-built codecs target bit patterns, decimal prefixes, oscillation, branch flags and segment-local encoding choices. A credible SOTA comparison needs a typed IEEE-754 track; it must not infer that success on synthetic SCM i16 streams transfers to f64 sensor streams.
 
-The branch adds a small correctness reference, not a competitive codec:
-- `research/cdl-bench/src/float64.rs`: typed `F64C` frame with raw bits, XOR-previous u64 varints, and reusable XOR-leading/trailing windows; `F64S` segment container with policy IDs for offline best-of-six and decoder-synchronous historical-cost selection; inner CDL arithmetic coding, CRC-32 checksums and output limits.
-- `research/cdl-bench/src/main.rs`: `float --values N --seed N` experiment command comparing single-stream, offline segment-portfolio, and online historical-cost rows with frame size and encode/decode timings.
+The branch adds correctness references and selector baselines, not a competitive codec:
+- `research/cdl-bench/src/float64.rs`: typed `F64C` frame with raw bits, XOR-previous u64 varints, reusable XOR-leading/trailing windows, and exact-bit-pattern RLE+XOR run coding; `F64S` segment container with offline best-of-eight and decoder-synchronous historical-cost policies; inner CDL arithmetic coding, CRC-32 checksums and output limits.
+- `research/cdl-bench/src/main.rs`: `float --values N --seed N` experiment command comparing single-stream, offline segment-portfolio and online historical-cost rows across plateau/idle regimes as well as smooth, oscillating and random streams.
 - `research/cdl-bench/src/lib.rs`: public exports.
 - `research/cdl-bench/reference/float64_window_reference.cpp`: independent C++20 bit-window transform reference.
 - `research/cdl-bench/README.md`: usage and limits.
@@ -24,6 +24,7 @@ Values are converted only with `f64::to_bits` and `f64::from_bits`. The current 
 | Raw | Original u64 bit pattern, little-endian | Exact control |
 | XOR previous | `bits_t XOR bits_(t-1)`, first previous = 0, canonical u64 varint | Simple temporal bit-pattern baseline |
 | XOR leading/trailing window | XOR residual; define a new leading/trailing significant-bit window only when needed, otherwise reuse the prior window and write only its payload | Simple reversible Gorilla-style bit-window reference; not a Gorilla/Chimp implementation |
+| RLE + XOR previous | Merge identical u64 bit patterns into runs; encode each run length and XOR residual of the run value against the previous run value | Transparent record-level RLE plus predictive-value baseline |
 
 No float subtraction, rounding, decimal parsing, NaN canonicalization, or normalization occurs. Tests compare each reconstructed `to_bits()` result with the input. Edge fixtures include:
 - positive and negative zero;
@@ -33,9 +34,9 @@ No float subtraction, rounding, decimal parsing, NaN canonicalization, or normal
 - repeated constants, smooth bit increments, sign-alternating/oscillating patterns;
 - deterministic random 64-bit patterns.
 
-The F64C frame has a 32-byte header: magic/version, transform ID, inner model ID, element count, inner frame length, CRC-32 of original raw u64 bytes, and CRC-32 of inner frame. The decoder applies the element-count limit before allocating and caps transformed output to eleven bytes per f64 for the XOR-leading/trailing window transform (a reuse marker, or a new-window marker plus two span bytes and up to eight payload bytes).
+The F64C frame has a 32-byte header: magic/version, transform ID, inner model ID, element count, inner frame length, CRC-32 of original raw u64 bytes, and CRC-32 of inner frame. The decoder applies the element-count limit before allocating and caps transformed output to twenty bytes per f64 for RLE+XOR (a ten-byte run length plus a ten-byte XOR residual); XOR-leading/trailing requires at most eleven bytes.
 
-The u64 varint parser rejects truncation, overlong encodings and values exceeding 64 bits. The window transform uses markers 0/1/2 for zero residual, reuse prior window, or define new window. Reused residuals must fit the stored window; new windows must have canonical endpoint bits and valid spans. All three transforms must reproduce every IEEE-754 bit exactly.
+The u64 varint parser rejects truncation, overlong encodings and values exceeding 64 bits. The window transform uses markers 0/1/2 for zero residual, reuse prior window, or define new window. Reused residuals must fit the stored window; new windows must have canonical endpoint bits and valid spans. The RLE decoder rejects zero/overlong runs, runs beyond the output count, adjacent duplicate runs and trailing bytes. All transforms must reproduce every IEEE-754 bit exactly.
 
 ## Current CLI
 
@@ -46,42 +47,45 @@ cargo run --release -- float --values 10000 --seed 42
 ```
 
 The command emits frame lengths and encode/decode nanoseconds for the single-stream arms, the offline segment portfolio and the historical-cost online selector at fixed chunk sizes 64, 256 and 1,024, across:
-- constant;
-- smooth-ramp;
+- constant and smooth-ramp;
 - oscillating/sign-alternating;
 - high-precision decimal-like;
+- long plateau steps;
+- mostly-idle telemetry-like streams with long exact repeats;
 - random-bit-pattern streams.
 
-Each stream is evaluated with raw, XOR-previous-varint and XOR-leading/trailing window transforms under order-0 and order-1 entropy models. The segment portfolio tries all six combinations per chunk and picks the smallest complete child F64C frame. The F64S container header, every F64C child header, child CRCs, and the inner CDL payloads are all counted in the reported frame size. Zstandard is measured on the original raw little-endian f64 bytes if installed. The CLI does not yet invoke DeXOR, ACTF, Gorilla, Chimp, Rabbit or Dolphin.
+Each stream is evaluated with raw, XOR-previous-varint, XOR-leading/trailing window, and RLE+XOR transforms under order-0 and order-1 entropy models. The segment portfolio tries all eight combinations per chunk and picks the smallest complete child F64C frame. The F64S container header, every F64C child header, child CRCs, and the inner CDL payloads are all counted in the reported frame size. Zstandard is measured on the original raw little-endian f64 bytes if installed. The CLI does not yet invoke DeXOR, ACTF, Gorilla, Chimp, Rabbit or Dolphin.
 
-**Selection caveat:** the offline selector has the entire chunk available and tries all six encodings before choosing one. This is an offline size oracle, not an online selector and not a WZS reproduction. It is useful as a transparent fixed-chunk upper bound for the specific six candidate encodings; it does not establish that transmitted or inferred online segmentation would achieve the same result.
+**Selection caveat:** the offline selector has the entire chunk available and tries all eight encodings before choosing one. This is an offline size oracle, not an online selector and not a WZS reproduction. It is useful as a transparent fixed-chunk upper bound for the specific six candidate encodings; it does not establish that transmitted or inferred online segmentation would achieve the same result.
 
 ## Two segment-local selection policies
 
 Both segmented policies use F64S outer framing, then concatenate self-describing F64C child frames. Each F64C child has its own transform/model IDs, inner frame length, and CRCs; the outer F64S header records version, policy ID, element count, chunk size, segment count, raw CRC and header CRC. The child headers and outer header are all included in reported bytes.
 
-### Policy 1: offline best-of-six size oracle
+### Policy 1: offline best-of-eight size oracle
 
-For each complete chunk the encoder tries six candidates:
+For each complete chunk the encoder tries eight candidates:
 1. Raw / Order0
 2. Raw / Order1
 3. XOR-previous-varint / Order0
 4. XOR-previous-varint / Order1
 5. XOR-leading/trailing window / Order0
 6. XOR-leading/trailing window / Order1
+7. RLE+XOR / Order0
+8. RLE+XOR / Order1
 
-It stores the smallest complete F64C frame. Ties resolve by candidate order. The decoder independently reconstructs the chunk, recomputes all six canonical F64C frames, and rejects a child that is not the exact smallest candidate frame. This is a size oracle with full current-chunk access, not a streaming selector or a WZS reproduction. It gives an upper reference for the six candidates and fixed chunk size.
+It stores the smallest complete F64C frame. Ties resolve by candidate order. The decoder independently reconstructs the chunk, recomputes all eight canonical F64C frames, and rejects a child that is not the exact smallest candidate frame. This is a size oracle with full current-chunk access, not a streaming selector or a WZS reproduction. It gives an upper reference for the eight candidates and fixed chunk size.
 
 ### Policy 2: decoder-synchronous historical-cost selection
 
-The new `compress_f64_online_selector` / `decompress_f64_online_selector` pair uses a six-candidate past-only policy:
+The new `compress_f64_online_selector` / `decompress_f64_online_selector` pair uses an eight-candidate past-only policy:
 - first chunk defaults deterministically to Raw / Order0;
 - before each later chunk, select the candidate with the smallest mean complete F64C frame length over previous chunks;
 - encode the current chunk with that candidate;
-- after each chunk, both encoder and decoder recompute all six complete candidate sizes from that chunk and update the same integer totals;
+- after each chunk, both encoder and decoder recompute all eight complete candidate sizes from that chunk and update the same integer totals;
 - the child F64C header exposes the selected transform/model IDs; the decoder independently computes the expected candidate and rejects a child whose IDs violate the historical policy.
 
-This transmits no additional selector symbols. The selected transform/model IDs already live in the child header and are counted as part of the F64C frame. The policy is decoder-synchronous and uses only prior chunks to select the current chunk, but it is **compute-heavy**: both sides perform six candidate encodings after every chunk to update historical cost. It is a diagnostic online baseline, not yet a practical throughput-optimized selector. The policy is not a learned causal mechanism, and it should be compared against simpler features, fixed share, and WZS-style selectors.
+This transmits no additional selector symbols. The selected transform/model IDs already live in the child header and are counted as part of the F64C frame. The policy is decoder-synchronous and uses only prior chunks to select the current chunk, but it is **compute-heavy**: both sides perform eight candidate encodings after every chunk to update historical cost. It is a diagnostic online baseline, not yet a practical throughput-optimized selector. The policy is not a learned causal mechanism, and it should be compared against simpler features, fixed share, and WZS-style selectors.
 
 The float CLI evaluates both policies at chunk sizes 64, 256 and 1,024. It reports size ratio and encode/decode nanoseconds for each complete outer frame. Rust tests are authored for exact bitwise reconstruction, policy mismatch rejection, corruption/truncation, zero chunk size and output limits; they have not run.
 
@@ -134,6 +138,33 @@ rejection and corruption. **No Rust compilation, cargo test or rustfmt pass
 has been obtained.** No SOTA or frame-size win is claimed.
 
 ## 2026 competitive comparison
+
+### Production telemetry: RLE+XOR and adaptive block selection
+
+Urbanides, Weninger and Ertl (SIGMOD Companion 2026) identify a material
+dataset-bias problem: application-monitoring values often have long runs of
+unchanged samples, unlike many academic finance/weather benchmarks. Their
+paper reports a multi-layer record-level RLE+XOR approach with about 23%
+better compression ratio and 34% faster execution than standalone methods.
+A lightweight per-block selector is reported within 2% of the optimal ratio
+and over 13% better than their best single RLE-enhanced compressor. These
+are author-reported figures, not measurements reproduced by CDL-Bench.
+
+- Publication: https://doi.org/10.1145/3788853.3803097
+- Dynatrace summary:
+  https://www.dynatrace.com/research/publications/analyzing-and-improving-floating-point-compression-for-application-monitoring-time-series/
+
+CDL-Bench adds `RleXorPrevious`: exact-bit-pattern runs followed by XOR-varint
+coding of run values. It is a transparent comparison baseline, not a
+reimplementation of the Dynatrace codec or its heuristic. New plateau-step
+and idle-telemetry fixtures expose the opportunity, but production telemetry
+still requires a real, licensed or public corpus.
+
+This changes the novelty boundary: RLE+XOR and block-level adaptive selection
+are not novel by themselves. A possible differentiation remains the
+decoder-synchronous selector contract, exact end-to-end frame accounting, and
+causal/interventional multichannel evaluation. Even this combination needs a
+full related-work review and reproduction against the 2026 systems.
 
 ### DeXOR — direct reproduction priority
 
