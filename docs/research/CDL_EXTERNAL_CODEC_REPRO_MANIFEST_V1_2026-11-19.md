@@ -104,7 +104,7 @@ zig build test -Dtarget=x86_64-linux -Doptimize=ReleaseFast
 zig build -Dtarget=x86_64-linux -Doptimize=ReleaseFast
 ```
 
-The expected Linux shared library path is `zig-out/lib/libtersets.so`. Before adapter development, confirm this build against the pinned compiler version, retain the full build logs, and capture the resulting library SHA-256. The upstream project does not pin a Zig release in the inspected root files; the compiler version must therefore be fixed in the reproduction record, not inferred.
+The expected Linux shared library path is `zig-out/lib/libtersets.so`. The helper then compiles `scripts/research/tersets_bitwise_gate.c` against `bindings/c/tersets.h` and the pinned shared library with `cc -std=c11 -O2 -Wall -Wextra -Werror`. It runs the strict bitwise gate: Uncompressed/Chimp64/Chimp128/Elf must preserve every u64 bit on IEEE-754 edge and signed-zero fixtures; RLE and BitPackedDelta are reported separately as conditional probes. Before adapter development, retain full Zig and C build logs and capture the library SHA-256. The upstream project does not pin a Zig release in the inspected root files; the compiler version must therefore be fixed in the reproduction record, not inferred.
 
 ## 3. Reproduction helper
 
@@ -122,7 +122,7 @@ bash scripts/research/cdl_external_codec_repro.sh
 
 Both environment variables are optional; unset paths are explicitly skipped. Output defaults to `target/cdl-external` and can be changed with `CDL_EXTERNAL_OUT`.
 
-The DeXOR CSV workflow requires Java 8 and Maven. The TerseTS workflow requires Zig. If a required toolchain is unavailable, the script fails closed rather than substituting another version.
+The DeXOR CSV workflow requires Java 8 and Maven. The TerseTS workflow requires Zig and a C compiler. If a required toolchain is unavailable, the script fails closed rather than substituting another version.
 
 ## 4. Matched benchmark rules
 
@@ -138,7 +138,7 @@ The DeXOR CSV workflow requires Java 8 and Maven. The TerseTS workflow requires 
 
 ## 5. Current execution status
 
-The repository and artifact inspection is complete. The helper passes `bash -n` and its unset-environment dry run correctly reports both external runs as skipped. The current environment has Java 21.0.12.1 but does not have Maven or Zig; it also does not have Rust/cargo. Therefore:
+The repository and artifact inspection is complete. The helper passes `bash -n` and its unset-environment dry run correctly reports both external runs as skipped; the C gate passes a strict-warning syntax-only compile against the inspected API shape. The current environment has Java 21.0.12.1 but does not have Maven, Zig or Rust/cargo. Therefore:
 - DeXOR has **not** been built or run.
 - TerseTS has **not** been built or run.
 - No external codec comparison numbers are claimed.
