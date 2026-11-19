@@ -8,8 +8,8 @@
 The SCM/i16 lane does not represent the dominant specialized lossless floating-point time-series competition. By 2026, several purpose-built codecs target bit patterns, decimal prefixes, oscillation, branch flags and segment-local encoding choices. A credible SOTA comparison needs a typed IEEE-754 track; it must not infer that success on synthetic SCM i16 streams transfers to f64 sensor streams.
 
 The branch adds a small correctness reference, not a competitive codec:
-- `research/cdl-bench/src/float64.rs`: typed `F64C` frame with raw bits or XOR-previous u64 varints; `F64S` segment container with fixed policy ID, segment count, header CRC, and best-of-four per-chunk subframe selection; inner CDL arithmetic coding, CRC-32 checksums and output limits.
-- `research/cdl-bench/src/main.rs`: `float --values N --seed N` experiment command comparing single-stream and segment-portfolio rows with frame size and encode/decode timings.
+- `research/cdl-bench/src/float64.rs`: typed `F64C` frame with raw bits or XOR-previous u64 varints; `F64S` segment container with policy IDs for offline best-of-four and decoder-synchronous historical-cost selection; inner CDL arithmetic coding, CRC-32 checksums and output limits.
+- `research/cdl-bench/src/main.rs`: `float --values N --seed N` experiment command comparing single-stream, offline segment-portfolio, and online historical-cost rows with frame size and encode/decode timings.
 - `research/cdl-bench/src/lib.rs`: public exports.
 - `research/cdl-bench/README.md`: usage and limits.
 - Tracking: [CDL-Bench-007 #12874](https://github.com/Luminous-Dynamics/symthaea/issues/12874).
@@ -53,6 +53,33 @@ The command emits frame lengths and encode/decode nanoseconds for the single-str
 Each stream is evaluated with raw and XOR-previous transforms under order-0 and order-1 entropy models. The segment portfolio tries all four combinations per chunk and picks the smallest complete child F64C frame. The F64S container header, every F64C child header, child CRCs, and the inner CDL payloads are all counted in the reported frame size. Zstandard is measured on the original raw little-endian f64 bytes if installed. The CLI does not yet invoke DeXOR, ACTF, Gorilla, Chimp, Rabbit or Dolphin.
 
 **Selection caveat:** the current selector has the entire chunk available and tries all four encodings before choosing one. This is an offline size oracle, not an online selector and not a WZS reproduction. It is useful as a transparent fixed-chunk upper bound for the specific four candidate encodings; it does not establish that transmitted or inferred online segmentation would achieve the same result.
+
+## Two segment-local selection policies
+
+Both segmented policies use F64S outer framing, then concatenate self-describing F64C child frames. Each F64C child has its own transform/model IDs, inner frame length, and CRCs; the outer F64S header records version, policy ID, element count, chunk size, segment count, raw CRC and header CRC. The child headers and outer header are all included in reported bytes.
+
+### Policy 1: offline best-of-four size oracle
+
+For each complete chunk the encoder tries:
+1. Raw / Order0
+2. Raw / Order1
+3. XOR-previous / Order0
+4. XOR-previous / Order1
+
+It stores the smallest complete F64C frame. Ties resolve by candidate order. This is a size oracle with full current-chunk access, not a streaming selector or a WZS reproduction. It gives an upper reference for the four candidates and fixed chunk size.
+
+### Policy 2: decoder-synchronous historical-cost selection
+
+The new `compress_f64_online_selector` / `decompress_f64_online_selector` pair uses a past-only policy:
+- first chunk defaults deterministically to Raw / Order0;
+- before each later chunk, select the candidate with the smallest mean complete F64C frame length over previous chunks;
+- encode the current chunk with that candidate;
+- after each chunk, both encoder and decoder recompute all four complete candidate sizes from that chunk and update the same integer totals;
+- the child F64C header exposes the selected transform/model IDs; the decoder independently computes the expected candidate and rejects a child whose IDs violate the historical policy.
+
+This transmits no additional selector symbols. The selected transform/model IDs already live in the child header and are counted as part of the F64C frame. The policy is decoder-synchronous and uses only prior chunks to select the current chunk, but it is **compute-heavy**: both sides perform four candidate encodings after every chunk to update historical cost. It is a diagnostic online baseline, not yet a practical throughput-optimized selector. The policy is not a learned causal mechanism, and it should be compared against simpler features, fixed share, and WZS-style selectors.
+
+The float CLI evaluates both policies at chunk sizes 64, 256 and 1,024. It reports size ratio and encode/decode nanoseconds for each complete outer frame. Rust tests are authored for exact bitwise reconstruction, policy mismatch rejection, corruption/truncation, zero chunk size and output limits; they have not run.
 
 ## Independent transform-logic check
 
