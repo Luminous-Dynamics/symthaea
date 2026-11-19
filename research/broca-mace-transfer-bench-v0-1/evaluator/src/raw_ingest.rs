@@ -6,7 +6,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use broca_mace_policy::{Action, Experience, Objective, Regime, Scope};
+use broca_mace_policy::{
+    Action, Experience, Objective, Regime, Scope, SourceRootDigest,
+};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
@@ -51,6 +53,7 @@ impl RawEvent {
 pub(super) struct VerifiedSource {
     pub source_family: u16,
     pub source_root_id: u32,
+    pub source_root_digest: SourceRootDigest,
     pub measurement_error_bound: f64,
     pub trusted: bool,
 }
@@ -435,10 +438,14 @@ pub(super) fn derive_as_known(
         let source_key = event.string("source_artifact_digest").unwrap_or("");
         let source = verified_sources.get(source_key);
         let source_trusted = source.is_some_and(|receipt| {
-            receipt.trusted && receipt.source_family != 0 && receipt.source_root_id != 0
+            receipt.trusted
+                && receipt.source_family != 0
+                && receipt.source_root_digest.is_known()
         });
         let source_family = source.map_or(0, |receipt| receipt.source_family);
         let source_root_id = source.map_or(0, |receipt| receipt.source_root_id);
+        let source_root_digest =
+            source.map_or(SourceRootDigest::UNKNOWN, |receipt| receipt.source_root_digest);
         let measurement_error_bound =
             source.map_or(1.0, |receipt| receipt.measurement_error_bound);
         let source_retracted = retracted_ids.contains(&event.event_id);
@@ -450,6 +457,7 @@ pub(super) fn derive_as_known(
             event_id: event.event_id,
             source_family,
             source_root_id,
+            source_root_digest,
             scope: plan.scope,
             action: plan.action,
             observed_utility: outcome.observed_utility,
@@ -636,29 +644,39 @@ mod tests {
             .collect()
     }
 
+    fn fixture_root_digest(seed: u32) -> SourceRootDigest {
+        let mut bytes = [0_u8; 32];
+        bytes[..4].copy_from_slice(&seed.to_be_bytes());
+        SourceRootDigest::from_bytes(bytes)
+    }
+
     fn source_registry() -> VerifiedSourceRegistry {
         BTreeMap::from([
             ("digest-a1".to_owned(), VerifiedSource {
                 source_family: 10,
                 source_root_id: 100,
+                source_root_digest: fixture_root_digest(100),
                 measurement_error_bound: 0.02,
                 trusted: true,
             }),
             ("digest-a2".to_owned(), VerifiedSource {
                 source_family: 11,
                 source_root_id: 101,
+                source_root_digest: fixture_root_digest(101),
                 measurement_error_bound: 0.02,
                 trusted: true,
             }),
             ("digest-b1".to_owned(), VerifiedSource {
                 source_family: 20,
                 source_root_id: 200,
+                source_root_digest: fixture_root_digest(200),
                 measurement_error_bound: 0.02,
                 trusted: true,
             }),
             ("digest-b2".to_owned(), VerifiedSource {
                 source_family: 21,
                 source_root_id: 201,
+                source_root_digest: fixture_root_digest(201),
                 measurement_error_bound: 0.02,
                 trusted: true,
             }),
@@ -959,6 +977,7 @@ mod tests {
         let item = report.experiences.iter().find(|item| item.event_id == 3).unwrap();
         assert!(!item.source_trusted);
         assert_eq!(item.source_root_id, 0);
+        assert!(!item.source_root_digest.is_known());
     }
 
     #[test]
@@ -980,6 +999,7 @@ mod tests {
             VerifiedSource {
                 source_family: 10,
                 source_root_id: 100,
+                source_root_digest: fixture_root_digest(100),
                 measurement_error_bound: f64::NAN,
                 trusted: true,
             },
