@@ -1,0 +1,107 @@
+name: Superconductivity Amplitude-Phase GL Contract
+
+on:
+  pull_request:
+    paths:
+      - "tools/superconductivity-amplitude-phase-harness/**"
+      - "data/schemas/superconductivity_amplitude_phase_instance_v0_1.schema.json"
+      - "data/research/superconductivity_amplitude_phase_fixture_v0_1.json"
+      - "research/superconductivity/amplitude_phase/**"
+      - ".github/workflows/superconductivity-amplitude-phase.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: superconductivity-amplitude-phase-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  amplitude-phase-contract:
+    name: GL input contract, free energy and gauge invariance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Apply pinned Rust formatting
+        run: cargo fmt --manifest-path tools/superconductivity-amplitude-phase-harness/Cargo.toml --all
+
+      - name: Verify canonical Rust formatting
+        run: cargo fmt --manifest-path tools/superconductivity-amplitude-phase-harness/Cargo.toml --all -- --check
+
+      - name: Capture rustfmt-only patch
+        if: always()
+        run: |
+          git diff --binary -- tools/superconductivity-amplitude-phase-harness > "$RUNNER_TEMP/sc-rustfmt.patch"
+          git diff --stat -- tools/superconductivity-amplitude-phase-harness
+          sha256sum "$RUNNER_TEMP/sc-rustfmt.patch"
+
+      - name: Generate isolated dependency lockfile
+        run: cargo generate-lockfile --manifest-path tools/superconductivity-amplitude-phase-harness/Cargo.toml
+
+      - name: Run GL contract, analytic energy and gauge-invariance tests
+        run: cargo test --locked --manifest-path tools/superconductivity-amplitude-phase-harness/Cargo.toml --bin sc_amplitude_phase_audit
+
+      - name: Audit synthetic GL fixture and evaluate static free energy
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-amplitude-phase-harness/Cargo.toml --bin sc_amplitude_phase_audit -- \
+            --schema data/schemas/superconductivity_amplitude_phase_instance_v0_1.schema.json \
+            --fixture data/research/superconductivity_amplitude_phase_fixture_v0_1.json \
+            --out "$RUNNER_TEMP/sc-amplitude-phase-gl-receipt.json"
+          cat "$RUNNER_TEMP/sc-amplitude-phase-gl-receipt.json"
+
+      - name: Run short complex-field Metropolis pilot
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-amplitude-phase-harness/Cargo.toml --bin sc_amplitude_phase_audit -- \
+            --schema data/schemas/superconductivity_amplitude_phase_instance_v0_1.schema.json \
+            --fixture data/research/superconductivity_amplitude_phase_fixture_v0_1.json \
+            --monte-carlo --warmup-sweeps 2 --measurement-sweeps 4 \
+            --thinning 1 --chains 2 --seed 17 \
+            --out "$RUNNER_TEMP/sc-amplitude-phase-mc-smoke-receipt.json"
+          cat "$RUNNER_TEMP/sc-amplitude-phase-mc-smoke-receipt.json"
+
+      - name: Run Clippy
+        run: cargo clippy --locked --manifest-path tools/superconductivity-amplitude-phase-harness/Cargo.toml --bin sc_amplitude_phase_audit -- -D warnings
+
+      - name: Record exact-run identity
+        if: always()
+        run: |
+          {
+            echo "git_head=$(git rev-parse HEAD)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "worktree_status=$(git status --short)"
+            if [ -f "$RUNNER_TEMP/sc-rustfmt.patch" ]; then sha256sum "$RUNNER_TEMP/sc-rustfmt.patch"; fi
+            sha256sum data/schemas/superconductivity_amplitude_phase_instance_v0_1.schema.json
+            sha256sum data/research/superconductivity_amplitude_phase_fixture_v0_1.json
+            sha256sum tools/superconductivity-amplitude-phase-harness/Cargo.toml
+            sha256sum tools/superconductivity-amplitude-phase-harness/src/main.rs
+            sha256sum tools/superconductivity-amplitude-phase-harness/src/sampling.rs
+            if [ -f tools/superconductivity-amplitude-phase-harness/Cargo.lock ]; then
+              sha256sum tools/superconductivity-amplitude-phase-harness/Cargo.lock
+            else
+              echo "cargo_lock=not-generated"
+            fi
+          } > "$RUNNER_TEMP/sc-amplitude-phase-environment.txt"
+
+      - name: Upload exact-run evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sc-amplitude-phase-exact-run-evidence
+          if-no-files-found: warn
+          path: |
+            tools/superconductivity-amplitude-phase-harness/Cargo.lock
+            ${{ runner.temp }}/sc-amplitude-phase-environment.txt
+            ${{ runner.temp }}/sc-amplitude-phase-gl-receipt.json
+            ${{ runner.temp }}/sc-amplitude-phase-mc-smoke-receipt.json
+            ${{ runner.temp }}/sc-rustfmt.patch

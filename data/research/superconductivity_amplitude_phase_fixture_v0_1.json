@@ -1,0 +1,615 @@
+{
+  "contract": "SC-AMPLITUDE-PHASE-0.1",
+  "instance_id": "synthetic-square-gl-4x4-uniform-v0",
+  "fixture_only": true,
+  "model": {
+    "kind": "static_classical_lattice_gl",
+    "free_energy_unit": "dimensionless_lattice_energy",
+    "order_parameter_unit": "dimensionless",
+    "gauge_convention": "psi_i_minus_exp_iAij_psi_j",
+    "vortex_phase_amplitude_threshold": 0.05,
+    "notes": "Synthetic 4x4 static lattice GL gauge-invariance fixture. Uniform local potential has a=-1,b=1 and |psi|=1; gradient coupling K=1. No Monte Carlo or material calibration is attached."
+  },
+  "graph": {
+    "spatial_dimension": 2,
+    "embedding": "physical_coordinates",
+    "topology_family": "regular_periodic_square_lattice",
+    "box_lengths": [
+      4,
+      4
+    ],
+    "periodic_axes": [
+      0,
+      1
+    ],
+    "nodes": [
+      {
+        "node_id": "n0_0",
+        "position": [
+          0,
+          0
+        ],
+        "psi_real": 1,
+        "psi_imag": 0,
+        "a_coefficient": -1,
+        "b_coefficient": 1
+      },
+      {
+        "node_id": "n0_1",
+        "position": [
+          0,
+          1
+        ],
+        "psi_real": 1,
+        "psi_imag": 0,
+        "a_coefficient": -1,
+        "b_coefficient": 1
+      },
+      {
+        "node_id": "n0_2",
+        "position": [
+          0,
+          2
+        ],
+        "psi_real": 1,
+        "psi_imag": 0,
+        "a_coefficient": -1,
+        "b_coefficient": 1
+      },
+      {
+        "node_id": "n0_3",
+        "position": [
+          0,
+          3
+        ],
+        "psi_real": 1,
+        "psi_imag": 0,
+        "a_coefficient": -1,
+        "b_coefficient": 1
+      },
+      {
+        "node_id": "n1_0",
+        "position": [
+          1,
+          0
+        ],
+        "psi_real": 1,
+        "psi_imag": 0,
+        "a_coefficient": -1,
+        "b_coefficient": 1
+      },
+      {
+        "node_id": "n1_1",
+        "position": [
+          1,
+          1
+        ],
+        "psi_real": 1,
+        "psi_imag": 0,
+        "a_coefficient": -1,
+        "b_coefficient": 1
+      },
+      {
+        "node_id": "n1_2",
+        "position": [
+          1,
+          2
+        ],
+        "psi_real": 1,
+        "psi_imag": 0,
+        "a_coefficient": -1,
+        "b_coefficient": 1
+      },
+      {
+        "node_id": "n1_3",
+        "position": [
+          1,
+          3
+        ],
+        "psi_real": 1,
+        "psi_imag": 0,
+        "a_coefficient": -1,
+        "b_coefficient": 1
+      },
+      {
+        "node_id": "n2_0",
+        "position": [
+          2,
+          0
+        ],
+        "psi_real": 1,
+        "psi_imag": 0,
+        "a_coefficient": -1,
+        "b_coefficient": 1
+      },
+      {
+        "node_id": "n2_1",
+        "position": [
+          2,
+          1
+        ],
+        "psi_real": 1,
+        "psi_imag": 0,
+        "a_coefficient": -1,
+        "b_coefficient": 1
+      },
+      {
+        "node_id": "n2_2",
+        "position": [
+          2,
+          2
+        ],
+        "psi_real": 1,
+        "psi_imag": 0,
+        "a_coefficient": -1,
+        "b_coefficient": 1
+      },
+      {
+        "node_id": "n2_3",
+        "position": [
+          2,
+          3
+        ],
+        "psi_real": 1,
+        "psi_imag": 0,
+        "a_coefficient": -1,
+        "b_coefficient": 1
+      },
+      {
+        "node_id": "n3_0",
+        "position": [
+          3,
+          0
+        ],
+        "psi_real": 1,
+        "psi_imag": 0,
+        "a_coefficient": -1,
+        "b_coefficient": 1
+      },
+      {
+        "node_id": "n3_1",
+        "position": [
+          3,
+          1
+        ],
+        "psi_real": 1,
+        "psi_imag": 0,
+        "a_coefficient": -1,
+        "b_coefficient": 1
+      },
+      {
+        "node_id": "n3_2",
+        "position": [
+          3,
+          2
+        ],
+        "psi_real": 1,
+        "psi_imag": 0,
+        "a_coefficient": -1,
+        "b_coefficient": 1
+      },
+      {
+        "node_id": "n3_3",
+        "position": [
+          3,
+          3
+        ],
+        "psi_real": 1,
+        "psi_imag": 0,
+        "a_coefficient": -1,
+        "b_coefficient": 1
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "e0_0_r",
+        "source": "n0_0",
+        "target": "n0_1",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e0_0_d",
+        "source": "n0_0",
+        "target": "n1_0",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e0_1_r",
+        "source": "n0_1",
+        "target": "n0_2",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e0_1_d",
+        "source": "n0_1",
+        "target": "n1_1",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e0_2_r",
+        "source": "n0_2",
+        "target": "n0_3",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e0_2_d",
+        "source": "n0_2",
+        "target": "n1_2",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e0_3_r",
+        "source": "n0_3",
+        "target": "n0_0",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ]
+      },
+      {
+        "edge_id": "e0_3_d",
+        "source": "n0_3",
+        "target": "n1_3",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e1_0_r",
+        "source": "n1_0",
+        "target": "n1_1",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e1_0_d",
+        "source": "n1_0",
+        "target": "n2_0",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e1_1_r",
+        "source": "n1_1",
+        "target": "n1_2",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e1_1_d",
+        "source": "n1_1",
+        "target": "n2_1",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e1_2_r",
+        "source": "n1_2",
+        "target": "n1_3",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e1_2_d",
+        "source": "n1_2",
+        "target": "n2_2",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e1_3_r",
+        "source": "n1_3",
+        "target": "n1_0",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ]
+      },
+      {
+        "edge_id": "e1_3_d",
+        "source": "n1_3",
+        "target": "n2_3",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e2_0_r",
+        "source": "n2_0",
+        "target": "n2_1",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e2_0_d",
+        "source": "n2_0",
+        "target": "n3_0",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e2_1_r",
+        "source": "n2_1",
+        "target": "n2_2",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e2_1_d",
+        "source": "n2_1",
+        "target": "n3_1",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e2_2_r",
+        "source": "n2_2",
+        "target": "n2_3",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e2_2_d",
+        "source": "n2_2",
+        "target": "n3_2",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e2_3_r",
+        "source": "n2_3",
+        "target": "n2_0",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ]
+      },
+      {
+        "edge_id": "e2_3_d",
+        "source": "n2_3",
+        "target": "n3_3",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e3_0_r",
+        "source": "n3_0",
+        "target": "n3_1",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e3_0_d",
+        "source": "n3_0",
+        "target": "n0_0",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ]
+      },
+      {
+        "edge_id": "e3_1_r",
+        "source": "n3_1",
+        "target": "n3_2",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e3_1_d",
+        "source": "n3_1",
+        "target": "n0_1",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ]
+      },
+      {
+        "edge_id": "e3_2_r",
+        "source": "n3_2",
+        "target": "n3_3",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          0
+        ]
+      },
+      {
+        "edge_id": "e3_2_d",
+        "source": "n3_2",
+        "target": "n0_2",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ]
+      },
+      {
+        "edge_id": "e3_3_r",
+        "source": "n3_3",
+        "target": "n3_0",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0,
+          1
+        ]
+      },
+      {
+        "edge_id": "e3_3_d",
+        "source": "n3_3",
+        "target": "n0_3",
+        "gradient_coupling": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1,
+          0
+        ]
+      }
+    ]
+  },
+  "electromagnetism": {
+    "mode": "fixed_link_field",
+    "link_field_source": "zero",
+    "external_flux_quanta": 0,
+    "notes": "All link phases are zero. Self-consistent Maxwell screening is not represented."
+  },
+  "thermal": {
+    "temperature": 0.5,
+    "temperature_unit": "dimensionless_GL_temperature"
+  },
+  "source_references": [
+    "https://doi.org/10.1103/PhysRevB.110.134501",
+    "https://doi.org/10.1103/PhysRevB.63.132504",
+    "https://doi.org/10.1103/PhysRevB.96.174505"
+  ],
+  "claim_ceiling": "Synthetic static GL input only; no Monte Carlo, Tc, material property, or experimental result is established.",
+  "sampling": {
+    "algorithm": "single_site_complex_field_metropolis",
+    "random_seed": 1729,
+    "warmup_sweeps": 20,
+    "measurement_sweeps": 100,
+    "thinning": 1,
+    "proposal_scale": 0.25,
+    "independent_chains": 4
+  }
+}

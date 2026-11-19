@@ -1,0 +1,298 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_amplitude_phase_instance_v0_1.schema.json",
+  "title": "Superconductivity Amplitude-Phase GL Instance",
+  "description": "Condition-bound synthetic input for a static gauge-covariant lattice Ginzburg-Landau model; not an experimental observation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "instance_id",
+    "fixture_only",
+    "model",
+    "graph",
+    "electromagnetism",
+    "thermal",
+    "source_references",
+    "claim_ceiling",
+    "sampling"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SC-AMPLITUDE-PHASE-0.1"
+    },
+    "instance_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_only": {
+      "type": "boolean"
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "free_energy_unit",
+        "order_parameter_unit",
+        "gauge_convention",
+        "vortex_phase_amplitude_threshold"
+      ],
+      "properties": {
+        "kind": {
+          "const": "static_classical_lattice_gl"
+        },
+        "free_energy_unit": {
+          "const": "dimensionless_lattice_energy"
+        },
+        "order_parameter_unit": {
+          "const": "dimensionless"
+        },
+        "gauge_convention": {
+          "const": "psi_i_minus_exp_iAij_psi_j"
+        },
+        "vortex_phase_amplitude_threshold": {
+          "type": "number",
+          "minimum": 0
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spatial_dimension",
+        "embedding",
+        "topology_family",
+        "box_lengths",
+        "periodic_axes",
+        "nodes",
+        "edges"
+      ],
+      "properties": {
+        "spatial_dimension": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 3
+        },
+        "embedding": {
+          "const": "physical_coordinates"
+        },
+        "topology_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "box_lengths": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 3,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "periodic_axes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "uniqueItems": true
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "node_id",
+              "position",
+              "psi_real",
+              "psi_imag",
+              "a_coefficient",
+              "b_coefficient"
+            ],
+            "properties": {
+              "node_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "position": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 3,
+                "items": {
+                  "type": "number"
+                }
+              },
+              "psi_real": {
+                "type": "number"
+              },
+              "psi_imag": {
+                "type": "number"
+              },
+              "a_coefficient": {
+                "type": "number"
+              },
+              "b_coefficient": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
+          }
+        },
+        "edges": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "edge_id",
+              "source",
+              "target",
+              "gradient_coupling",
+              "gauge_link_phase_rad",
+              "physical_edge_length",
+              "periodic_image_shift"
+            ],
+            "properties": {
+              "edge_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source": {
+                "type": "string",
+                "minLength": 1
+              },
+              "target": {
+                "type": "string",
+                "minLength": 1
+              },
+              "gradient_coupling": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "gauge_link_phase_rad": {
+                "type": "number"
+              },
+              "physical_edge_length": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "periodic_image_shift": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 3,
+                "items": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "electromagnetism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "link_field_source",
+        "external_flux_quanta"
+      ],
+      "properties": {
+        "mode": {
+          "const": "fixed_link_field"
+        },
+        "link_field_source": {
+          "enum": [
+            "zero",
+            "explicit_link_phases"
+          ]
+        },
+        "external_flux_quanta": {
+          "type": "number"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "thermal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "temperature",
+        "temperature_unit"
+      ],
+      "properties": {
+        "temperature": {
+          "type": "number",
+          "minimum": 0
+        },
+        "temperature_unit": {
+          "const": "dimensionless_GL_temperature"
+        }
+      }
+    },
+    "source_references": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      }
+    },
+    "claim_ceiling": {
+      "const": "Synthetic static GL input only; no Monte Carlo, Tc, material property, or experimental result is established."
+    },
+    "sampling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "random_seed",
+        "warmup_sweeps",
+        "measurement_sweeps",
+        "thinning",
+        "proposal_scale",
+        "independent_chains"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "single_site_complex_field_metropolis"
+        },
+        "random_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warmup_sweeps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "measurement_sweeps": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "thinning": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "proposal_scale": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "independent_chains": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        }
+      }
+    }
+  }
+}
