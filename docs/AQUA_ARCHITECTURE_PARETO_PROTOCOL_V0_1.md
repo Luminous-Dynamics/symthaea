@@ -120,8 +120,10 @@ Do not compare only "incumbent" against "fully loaded Aqua". That would confound
 ### Ablation rule
 
 - A1 vs A0 estimates the change associated with passive fixture geometry and service architecture.
-- A2 vs A1 isolates DWHR contribution.
-- A4 vs A3 isolates DWHR contribution under power modulation.
+- A2a vs A1 isolates mixer-side, unbalanced DWHR contribution.
+- A2b vs A1 isolates tank-side / balanced DWHR contribution and any standing-loss penalty.
+- A4a vs A3 isolates mixer-side DWHR under power modulation.
+- A4b vs A3 isolates tank-side / balanced DWHR under power modulation.
 - A5/A6 vs A0 compare distinct recirculating system classes, but only after task, installation and complete resource boundaries are normalized.
 - A7 vs A5/A6 tests whether Aqua can improve the recirculation architecture rather than merely reproduce it.
 - A8 proceeds only if its extra complexity yields an independently measurable improvement that cannot be obtained more simply.
