@@ -128,7 +128,8 @@
         "input_kind",
         "channel_id",
         "unit",
-        "samples"
+        "samples",
+        "waveform_sha256"
       ],
       "properties": {
         "input_kind": {
@@ -169,6 +170,9 @@
             "minItems": 2,
             "maxItems": 2
           }
+        },
+        "waveform_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     },
@@ -180,7 +184,9 @@
         "timestamp_basis",
         "clock_sync_uncertainty_us",
         "clock_sync_receipt_sha256",
-        "channels"
+        "channels",
+        "maximum_clock_sync_uncertainty_us",
+        "maximum_channel_alignment_skew_us"
       ],
       "properties": {
         "clock_id": {
@@ -208,6 +214,14 @@
           "items": {
             "$ref": "#/$defs/channel"
           }
+        },
+        "maximum_clock_sync_uncertainty_us": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_channel_alignment_skew_us": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
