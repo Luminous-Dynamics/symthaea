@@ -598,12 +598,11 @@ The C++ runner uses a default block size of 1,000 symbols (Rabbit's paper defaul
 
 The C++20 research frame at `research/cdl-bench/reference/typed_record_partitioned_runs_reference.cpp` prototypes a hybrid event/column layout:
 
-- A stable dictionary of entity/series keys.
-- One timestamp/state-delta/heartbeat-run substream per key.
-- Two decoder-synchronous order modes:
-  - **Timestamp merge:** if original timestamps are strictly increasing and unique, restore global order with a deterministic k-way merge and transmit no order schedule.
-  - **Explicit schedule fallback:** if timestamps are duplicated or out of order, transmit a bit-packed key-ID schedule and replay it exactly.
-- A self-describing outer frame with schema, record counts, child lengths, schedule metadata and CRC32.
+- A stable dictionary of entity/series keys and one state-delta/heartbeat child stream per key.
+- **Mode 0:** strict unique timestamps are restored with a deterministic k-way merge, without an order schedule.
+- **Mode 1:** nondecreasing timestamps with duplicates use tie-group key-order templates. A bounded 16-entry move-to-front dictionary reuses recurring tie orders; new orders are stored literally.
+- **Mode 2:** timestamp regressions use the full bit-packed key-ID schedule to restore exact arrival order.
+- The outer frame includes schema, counts, child lengths, order-mode metadata and CRC32.
 
 Run from the repository root:
 
@@ -611,9 +610,17 @@ Run from the repository root:
 bash scripts/research/cdl_partitioned_telemetry_reference.sh
 ```
 
-The runner compiles with `-O2 -std=c++20 -Wall -Wextra -Wconversion -Werror`, tests empty input, four deterministic 65,536-record fixtures, 100 randomized interleaved round-trips, both order modes and malformed frames. It then compares Zstd 1.5.7 level 19 on equivalently framed raw, global state-delta and partitioned representations and checks exact decompression.
+The partition runner compiles with `-O2 -std=c++20 -Wall -Wextra -Wconversion -Werror`, tests empty input, timestamp-merge fixtures, randomized interleavings, duplicate/out-of-order fallback and malformed frames, then compares Zstd on equally framed raw, global state-delta and partitioned representations. The latest integrated mode-1 tie-template change is authored but has not yet been compiled in the full PRN1 C++ frame.
 
-The synthetic results and full caveats are recorded in `docs/research/CDL_TYPED_TELEMETRY_JOINT_SEGMENTATION_V1_2026-11-19.md`. This remains an independent C++ transform+Zstd prototype, not the Rust CDL codec or production telemetry result. It uses fixed eight-lane schema and 64-key fixtures, materializes the full input, and has not yet measured bounded-memory streaming, throughput, RSS, random access, indexes, checkpoint recovery or schema-name costs.
+The tie-schedule primitive is separately reproducible:
+
+```sh
+bash scripts/research/cdl_tie_group_order_template_reference.sh
+```
+
+Its standalone reference compiled locally with strict GCC 14.2 warnings and passed 1,000 randomized tie-group round-trips plus five malformed-input checks. It reduced the schedule from 192 to 67 bytes for 64 repeated groups of eight keys, and from 160 to 36 bytes for 20 alternating groups of 16 keys. This validates the schedule subgrammar only, not the integrated PRN1 mode-1 decoder.
+
+Full-frame synthetic results and caveats are recorded in `docs/research/CDL_TYPED_TELEMETRY_JOINT_SEGMENTATION_V1_2026-11-19.md`. The current prototype remains an independent C++ research frame, not the Rust CDL codec or a production telemetry result. It uses a fixed eight-lane schema and synthetic keys, materializes the input, and has not yet measured bounded-memory streaming, throughput, RSS, random access, indexes, checkpoint recovery or schema-name costs.
 
 ## Plugging in a custom predictor
 
