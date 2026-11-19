@@ -67,7 +67,7 @@ This is **not yet** the composer execution adapter. A later adapter must:
 5. Feed complete scalar metric blocks to `estimate_block`.
 6. Keep generation errors, categorical outputs, not-applicable channels and missing metrics explicit.
 
-The source-pinned composer example now connects the case manifest to symbolic score output. Its code and tests are authored but remain uncompiled and unexecuted until the root workspace repair lands. No composer output, causal effect or musical-quality result is asserted by this repository addition.
+The case generator and contrast engine are ready to be connected; no composer output, causal effect or musical-quality result is asserted by this repository addition.
 
 ## Evidence labels
 
@@ -79,7 +79,8 @@ The source-pinned composer example now connects the case manifest to symbolic sc
 ## Import and analyze composer results
 
 After an adapter emits one outcome row per expected case and registered metric,
-use the strict importer described in [RESULTS_SCHEMA.md](RESULTS_SCHEMA.md):
+use the strict importer described in [RESULTS_SCHEMA.md](RESULTS_SCHEMA.md). It
+writes coverage, effects, cross-seed summaries, and exact axis-invariance reports:
 
 ```sh
 cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin analyze-results -- \
@@ -89,18 +90,14 @@ cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin analyze-re
 The metric list is explicit so wholly absent metrics are visible as 81/81 missing
 within every expected block. Incomplete blocks remain in coverage reports and
 produce no contrast estimates; the command exits non-zero after writing reports.
-Missing, failed, and not-applicable values are never imputed as zero. The axis-invariance report compares full-score digests across 27 matched slices for each control axis; fully not-applicable blocks remain explicit and do not fail the run.
+Missing, failed, and not-applicable values are never imputed as zero. A fully
+not-applicable 81-row block is an explicit disposition, not a failed run.
+
+The fourth output compares exact score digests across all 27 matched slices for
+each of the four control axes. It checks declared unsupported axes as exact
+negative controls and distinguishes flat supported axes from measured response.
 
 
 ## Composer execution adapter
 
-The source-pinned symbolic composer adapter is now authored. It validates the
-complete frozen case manifest, invokes each style's canonical grammar-plan
-composition path, hashes each serialized score, and emits 54 scalar/identity channels, including eleven layer distances from each style/seed's centre-case reference.
-See [COMPOSER_ADAPTER.md](COMPOSER_ADAPTER.md) for the exact run commands,
-metric registry, evidence boundary, and workspace prerequisite.
-
-The adapter source is an example under
-`crates/domains/symthaea-music-theory/examples/`; it cannot be compiled until
-the separate root Cargo workspace member-exclusion repair is applied. No
-composer execution or Rust test result is claimed by this PR.
+The source-pinned symbolic composer example validates the complete frozen case manifest, composes the exact 3^4 matrix, hashes each serialized score, emits 54 scalar/identity channels, and computes eleven structural-layer distances from each style/seed centre-case reference. See [COMPOSER_ADAPTER.md](COMPOSER_ADAPTER.md) for commands and evidence limits. The adapter cannot compile through Cargo until the root workspace missing-manifest exclusions in PR #12843 are repaired. No composer execution result is claimed.
