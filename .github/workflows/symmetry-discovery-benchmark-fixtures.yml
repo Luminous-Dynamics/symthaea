@@ -164,3 +164,9 @@ jobs:
         run: cargo test --locked --manifest-path research/symmetry-discovery-benchmark-001/permutation-oracle/Cargo.toml
       - name: Strict Clippy for S3 permutation-action oracle
         run: cargo clippy --locked --manifest-path research/symmetry-discovery-benchmark-001/permutation-oracle/Cargo.toml --all-targets -- -D warnings
+      - name: Format active subgroup benchmark oracle
+        run: cargo fmt --manifest-path research/symmetry-discovery-benchmark-001/subgroup-oracle/Cargo.toml --all -- --check
+      - name: Verify subgroup lattices and active-probe costs
+        run: cargo test --locked --manifest-path research/symmetry-discovery-benchmark-001/subgroup-oracle/Cargo.toml
+      - name: Strict Clippy for active subgroup benchmark oracle
+        run: cargo clippy --locked --manifest-path research/symmetry-discovery-benchmark-001/subgroup-oracle/Cargo.toml --all-targets -- -D warnings
