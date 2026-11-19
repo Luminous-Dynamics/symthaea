@@ -44,7 +44,9 @@ jobs:
           echo "checked_out_sha=$(git rev-parse HEAD)"
       - name: Format check
         run: cargo fmt --manifest-path tools/muse-render-receipt/Cargo.toml --all -- --check
-      - name: Standalone tests
-        run: cargo test --manifest-path tools/muse-render-receipt/Cargo.toml --all-targets
+      - name: Standalone tests (locked dependency graph)
+        run: cargo test --locked --manifest-path tools/muse-render-receipt/Cargo.toml --all-targets
+      - name: Clippy (warnings are errors)
+        run: cargo clippy --locked --manifest-path tools/muse-render-receipt/Cargo.toml --all-targets -- -D warnings
       - name: CLI help smoke
-        run: cargo run --manifest-path tools/muse-render-receipt/Cargo.toml -- --help
+        run: cargo run --locked --manifest-path tools/muse-render-receipt/Cargo.toml -- --help
