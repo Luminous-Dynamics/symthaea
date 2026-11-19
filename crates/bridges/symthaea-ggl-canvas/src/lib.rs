@@ -341,6 +341,7 @@ pub fn adapt_compiled_scene(json: &str, namespace: &str) -> AdapterResult<Adapte
         }
     };
     let mut ids = BTreeSet::new();
+    let mut canvas_ids = BTreeSet::new();
     let mut wrappers = Vec::with_capacity(primitives.len());
     let mut entries = Vec::with_capacity(primitives.len());
 
@@ -351,6 +352,9 @@ pub fn adapt_compiled_scene(json: &str, namespace: &str) -> AdapterResult<Adapte
         }
         let (primitive_type, kind) = compile_primitive(primitive)?;
         let canvas_id = safe_group_id(namespace, &semantic_id);
+        if !canvas_ids.insert(canvas_id.clone()) {
+            return fail(format!("generated Canvas group ID collision for semantic ID: {semantic_id}"));
+        }
         let leaf = make_node(kind, empty_style());
         let wrapper = SceneNode::group(Some(&canvas_id)).with_child(leaf);
         wrappers.push(wrapper);
