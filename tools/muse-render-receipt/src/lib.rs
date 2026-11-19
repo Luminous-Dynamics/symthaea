@@ -641,7 +641,11 @@ fn verify_timeline_binding_bundle(
             return Err("timeline contains duplicate segment IDs".into());
         }
     }
+    let mut referenced_segments = std::collections::BTreeSet::new();
     for track in &manifest.tracks {
+        if !referenced_segments.insert(track.segment_id.as_str()) {
+            return Err("multiple MIDI tracks reference the same timeline segment".into());
+        }
         let segment = by_id.get(&track.segment_id)
             .ok_or_else(|| format!("MIDI track references missing timeline segment {}", track.segment_id))?;
         let part_id = segment.get("part_id").and_then(Value::as_u64)
@@ -656,6 +660,10 @@ fn verify_timeline_binding_bundle(
         }
     }
 
+    if referenced_segments.len() != by_id.len() {
+        return Err("timeline contains an unreferenced orchestration segment".into());
+    }
+
     let binding_bytes = read(&root.join("instrument-bindings.json"), "instrument bindings")?;
     if domain_sha256(MIDI_BINDING_DIGEST_SCHEMA_V1.as_bytes(), &binding_bytes) != receipt.midi.binding_sha256 {
         return Err("instrument-binding digest mismatch".into());
@@ -667,6 +675,13 @@ fn verify_timeline_binding_bundle(
     }
     let binding_map: BTreeMap<&str, &MidiInstrumentBindingV1> =
         bindings.iter().map(|binding| (binding.instrument_id.as_str(), binding)).collect();
+    let used_instruments: std::collections::BTreeSet<&str> =
+        manifest.tracks.iter().map(|track| track.instrument_id.as_str()).collect();
+    if binding_map.len() != bindings.len() || binding_map.len() != used_instruments.len()
+        || binding_map.keys().any(|id| !used_instruments.contains(id))
+    {
+        return Err("instrument bindings are duplicated, unexpected, or incomplete".into());
+    }
     for track in &manifest.tracks {
         let binding = binding_map.get(track.instrument_id.as_str())
             .ok_or_else(|| format!("missing binding for instrument {}", track.instrument_id))?;
