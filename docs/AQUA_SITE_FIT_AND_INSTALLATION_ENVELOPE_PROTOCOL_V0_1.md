@@ -111,7 +111,11 @@ Sources:
 - Ren et al., *Journal of Environmental Sciences* (available online 30 May 2026): https://doi.org/10.1016/j.jes.2026.02.034
 - Wet-path engineering and independent test ownership: #12703
 
-## 7. Evidence identity and invalidation
+## 7. High-risk building water-age and stagnation
+
+A site profile may add `WaterAgeAndStagnationManagement` where a declared healthcare, aged-care, low-use, long-stagnation or other vulnerable-use context requires an independent building-water risk assessment. This is an additive site-specific prerequisite, not a universal numerical minimum-flow rule. The competent hygiene/exposure assessor determines method and acceptance; Aqua only checks that the current decision is bound to the exact site and architecture.
+
+## 8. Evidence identity and invalidation
 
 Every current site capability receipt binds:
 
@@ -131,7 +135,7 @@ A new site survey, changed pressure/flow or water chemistry, changed pipework/dr
 
 The canonical owner must authenticate the issuer and issue the verification receipt. The Rust module checks receipt presence, digest syntax, expected authority and declared currentness. It does not implement cryptographic signature verification, trusted registry lookup, or live revocation checks.
 
-## 8. State machine and claim ceiling
+## 9. State machine and claim ceiling
 
 - Missing assessment or evidence -> Indeterminate.
 - Stale, Revoked or Ambiguous evidence -> Indeterminate.
@@ -145,7 +149,7 @@ Only Eligible configurations may proceed as eligible entries in #12875's site-sp
 
 No site fit or service qualification is a substitute for competent local plumbing/electrical/building approval, product certification, microbiological clearance, human-factors assessment or physical commissioning.
 
-## 9. End-to-end comparison gate
+## 10. End-to-end comparison gate
 
 The Aqua benchmark crate now composes site eligibility with the existing matched-run and completed-service contracts through:
 
@@ -168,15 +172,15 @@ Site eligibility is not bathing-service success. Bathing-service success is not 
 
 This gate does not infer a site envelope from city or postal code, calculate local pressure or flow, select electrical/plumbing compliance rules, or authorize installation.
 
-## 10. Software implementation status
+## 11. Software implementation status
 
 The Rust module defines five architecture classes, fourteen capability domains, expected-authority mapping, mandatory baseline requirements, product-specific additive requirements (including ambient/freeze protection and connectivity where required), site/device/requirement/method digest binding, currentness handling, and Eligible / Ineligible / Indeterminate dispositions.
 
-It currently contains **45 authored site-fit unit tests** covering architecture-specific sets, missing/duplicate/unexpected evidence, stale/revoked/ambiguous evidence, wrong site/revision/architecture/device/requirements/method/authority, explicit failure vs uncertainty, additional product-specific connectivity and ambient/freeze protection, and site-to-site variation.
+It currently contains **47 authored site-fit unit tests** covering architecture-specific sets, missing/duplicate/unexpected evidence, stale/revoked/ambiguous evidence, wrong site/revision/architecture/device/requirements/method/authority, explicit failure vs uncertainty, additional product-specific connectivity and ambient/freeze protection, and site-to-site variation.
 
 The full composed comparison adds six adapter tests for site-eligible success, explicit site ineligibility, missing site evidence, site-revision mismatch, exact device binding and the distinction between site eligibility and a failed bathing-service result. Together with the 43 service-qualification tests and eight earlier matched-service composition tests, these remain authored source inventories, not execution passes. No cargo test, rustfmt, Clippy or repository CI pass is claimed until observed on the exact PR head.
 
-## 11. Decision gate
+## 12. Decision gate
 
 Before a site is considered eligible:
 
