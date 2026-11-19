@@ -1572,6 +1572,16 @@ mod tests {
     }
 
     #[test]
+    fn rejects_unfiltered_trace_with_wrong_media_type() {
+        let mut value = profile();
+        value.raw_artifacts[0].media_type = Some("application/octet-stream".to_owned());
+        assert_eq!(
+            value.validate(),
+            Err(TransientTraceError::RawArtifactMediaTypeMismatch)
+        );
+    }
+
+    #[test]
     fn rejects_channel_trace_digest_absent_from_raw_artifact_manifest() {
         let mut value = profile();
         value.acquisition.channels[0].raw_trace_sha256 = digest('9');
@@ -1601,7 +1611,7 @@ mod tests {
         }
 
         assert_eq!(
-            value.attach_unfiltered_trace_csv(trace),
+            value.attach_unfiltered_trace_csv(&trace_sha256, trace),
             Err(TransientTraceError::UnknownChannel {
                 channel_id: "unknown-channel".to_owned()
             })
