@@ -564,6 +564,14 @@ This is an initial fixed eight-lane reference, not a general Arrow/Parquet schem
 
 Authored Rust tests cover empty and populated streams, two entropy models, multiple state capacities, segment resets, bitwise f64 payloads, null transitions, truncated prefixes, single-bit mutations, malformed varints, invalid values, and record/state output limits. They have **not** been compiler-run in the current environment.
 
+## Prefix-only LZV segmentation control
+
+The experimental `segmentation` module provides `segment_lzv(&[u64], LzvConfig)`, returning deterministic segment-boundary indices from leading-zero counts of exact XOR residuals. It uses separate fast/slow windows, integer mean and population-variance comparisons, a pending-change latch, minimum segment length, cooldown and maximum segment length. It reads only the already-decoded prefix and transmits no boundary labels.
+
+This is a **WZS-inspired control**, not the authors' WZS implementation. The independently compiled C++ reference is at `research/cdl-bench/reference/lzv_segmentation_reference.cpp`; run `bash scripts/research/cdl_lzv_segmentation_reference.sh` from the repository root. It checks stationary, constant and abrupt/recurring shift fixtures. It measures boundary behaviour only, not compressed bits or WZS performance.
+
+The Rust module has authored tests for constant streams, stationary random streams, abrupt/recurring shifts, empty/singleton inputs, determinism and invalid configurations. They have not been compiler-run here because the Rust toolchain is unavailable.
+
 ## Plugging in a custom predictor
 
 The library exposes:
