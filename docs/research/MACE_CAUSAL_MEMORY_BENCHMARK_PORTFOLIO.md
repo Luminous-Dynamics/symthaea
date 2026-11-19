@@ -272,3 +272,7 @@ requalification when provider event schemas change.
 ### Multi-agent thread ordering
 
 The provider capture envelope accepts an optional thread_id (or stream_id). Sequence numbers are validated within each thread, not globally across concurrently executing subagents. The normalized event retains provider_sequence and provider_thread_id. MACE's raw JSONL requires one ingest sequence, so the exporter assigns a separate import-order sequence while preserving the provider's per-thread ordering metadata. This records a partial order without claiming a causal order between independent threads.
+
+## Provider trace qualification benchmark
+
+See [MACE Provider-Native Trace Integrity and Outcome Grounding Benchmark v0.1](MACE_PROVIDER_TRACE_INTEGRITY_BENCHMARK_V0_1.md). It defines separate tracks for provider trace fidelity, outcome grounding, source/measurement/causal qualification, consolidation lifecycle, cross-session transfer, and cross-provider harness robustness. It deliberately scores these axes separately from memory recall and official leaderboard accuracy.

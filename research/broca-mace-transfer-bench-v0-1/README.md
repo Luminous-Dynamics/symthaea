@@ -328,7 +328,7 @@ uses event_type provider_trace_capture, which the causal ingester does not
 promote to a world observation or candidate Experience. Execution, outcome,
 source, calibration and consolidation receipts remain separate requirements.
 
-Nine provider-module tests cover classification, reconnect deduplication,
+Eleven provider-module tests cover classification, reconnect deduplication,
 changed-payload collisions, preview rejection, session separation,
 chronological order, unknown-event preservation and digest-only export. A raw
 MACE integration test asserts provider traces alone produce zero Experiences.
@@ -338,3 +338,7 @@ These tests are authored, not runner-verified.
 ### Multi-agent thread ordering
 
 The provider capture envelope accepts an optional thread_id (or stream_id). Sequence numbers are validated within each thread, not globally across concurrently executing subagents. The normalized event retains provider_sequence and provider_thread_id. MACE's raw JSONL requires one ingest sequence, so the exporter assigns a separate import-order sequence while preserving the provider's per-thread ordering metadata. This records a partial order without claiming a causal order between independent threads.
+
+## Provider trace benchmark
+
+See [MACE Provider-Native Trace Integrity and Outcome Grounding Benchmark v0.1](../../docs/research/MACE_PROVIDER_TRACE_INTEGRITY_BENCHMARK_V0_1.md) for the proposed trace-integrity, outcome-grounding, source-lineage, lifecycle, transfer and cross-provider evaluation tracks, baselines and qualification targets.
