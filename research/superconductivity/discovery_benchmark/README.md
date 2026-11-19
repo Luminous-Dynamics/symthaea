@@ -61,3 +61,14 @@ The version 0.1 auditor validates a seven-row synthetic adversarial fixture. It 
 - Gibson et al., BEE-NET, npj Computational Materials 12, 95 (27 Jan 2026): https://doi.org/10.1038/s41524-026-01964-8
 - HTSC-2025 family/system-aware dataset: https://doi.org/10.1088/1674-1056/adf042
 - Finite-momentum SCDFT framework, PRL 137, 196001 (3 Nov 2026): https://doi.org/10.1103/lrhl-j9bt
+
+
+## Additional critical-field baseline (August 2026)
+
+Geisler et al., *Towards the discovery of high critical magnetic field superconductors*, npj Computational Materials (12 August 2026), reports an approximately 7,300-material **calculated** electron-phonon database with Hc, Hc1, Hc2, coherence length, London penetration depth and Ginzburg-Landau parameters. It combines alpha-squared-F spectral functions and DFT Fermi surfaces with clean-limit Eliashberg theory, including strong-coupling and electron-phonon mass-renormalization effects. This is a separate theoretical baseline from AutoSuperCon's measured-property dataset; never combine their labels or scores. The publisher page identifies Supporting Information, but a row-level machine-readable archive and exact dataset digest have not yet been verified.
+
+The published baseline registry now includes this source as `geisler-hcfield-2026`, with reproduction status `not_reproduced` and an explicit claim ceiling. The detailed reproduction contract is tracked in [SC-HIGH-FIELD-REPRO-001 #12916](https://github.com/Luminous-Dynamics/symthaea/issues/12916). Source: https://doi.org/10.1038/s41524-026-02266-9 (preprint: https://arxiv.org/abs/2601.21044).
+
+## AutoSuperCon artifact-access status (19 November 2026)
+
+The public arXiv HTML for AutoSuperCon describes the extraction method and evaluation in detail: 47,000+ arXiv superconductivity preprints through March 2026; 2,500-character overlapping text segments with 500-character overlap; structured extraction using the 2025-08-07 snapshot of gpt-5-mini; formula normalization with pymatgen; condition-aware duplicate aggregation; and 639 added Roberts (1976) records. The article's accessible HTML does not expose a machine-readable dataset URL or code repository, so the row-level dataset/checkpoint release is not yet admitted for reproduction. Do not recreate/redistribute the data from the paper; obtain the authors' artifact locations and use terms, or keep a paper-derived summary fixture strictly non-training. See [SC-AUTOSUPERCON-REPRO-001 #12908](https://github.com/Luminous-Dynamics/symthaea/issues/12908).
