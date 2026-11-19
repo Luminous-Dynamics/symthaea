@@ -183,3 +183,26 @@ The information objective is (I(M;Y_1,\ldots,Y_k\mid D)), evaluated by exact bin
 The fixture assumes one discrete nuisance state shared by all selected observations and conditional independence given that state and the model. It does not yet model multiple nuisance groups, continuous random effects, partially shared specimen/batch factors, unknown nuisance priors, posterior likelihood uncertainty, adaptive sequential decision trees, or causal dependence among measurement outcomes. Those are the next research requirements before any historical or physical campaign use.
 
 The workflow now tests and lints all three planning binaries and produces a separate correlated-evidence receipt with exact input hashes. No physical experiment is authorized or performed.
+
+## Industry comparison: baseline ladder for the planner
+
+A benchmark that compares only one greedy policy with a small exact oracle is insufficient to establish superiority over modern active learning. The next frozen suite should compare the same candidate pool, cost model, capability graph and evaluation seeds against:
+
+1. random feasible acquisition;
+2. greedy target-variance reduction per cost (v0.1);
+3. expected improvement / upper-confidence-bound policies where a candidate objective is defined;
+4. cost-aware batch Bayesian optimization, including the multi-property and heterotopic-query style used in Alvi et al. (2026, https://www.nature.com/articles/s41524-026-01981-7);
+5. D-optimal / log-determinant design and goal-oriented risk-aware optimal experimental design;
+6. training-free LLM active learning as a *cross-domain method comparator*, not a superconductivity baseline. Wang et al. (20 May 2026) report over 70% fewer experiments to reach top-performing candidates across four materials datasets (https://www.nature.com/articles/s41524-026-02136-4); this result must not be attributed to superconductors;
+7. myopic model-information-gain-per-cost (v0.2);
+8. shared-nuisance exact planning and its factorized-likelihood ablation (v0.3);
+9. capability-aware receding-horizon planning with an explicit stop/abstain option;
+10. exact feasible-plan oracle on bounded instances.
+
+Report paired candidate trajectories and confidence intervals over fixed seeds. Metrics should include oracle regret, target-risk reduction, model Brier/log score, cost-to-qualified-answer, probability of obtaining an answer within budget, false-positive experiment burden, idle capability/resource costs and validated discovery yield. A model with higher information gain but worse downstream decision quality is not necessarily the better experiment planner.
+
+Lee et al.'s 2026 *Self-driving laboratory 2.0* review identifies interoperability, collaboration, generalization, orchestration, safety and creativity as system-level requirements (https://doi.org/10.1039/D5MH01984B). The 2026 critical examination of materials active-learning workflows warns that implicit design choices and hidden biases can dominate reported efficiency (https://pubs.rsc.org/en/content/articlehtml/2026/dd/d6dd00081a). These motivate frozen splits, cost transparency, fail-closed capability admission, robust calibration and exact replay—not leaderboard-only evaluation.
+
+## What v0.3 adds, and what it does not
+
+`sc_correlated_evidence_audit` adds a discrete shared-calibration latent state. It handles one common cause shared across the selected action set, while retaining the v0.2 conditional-independence assumption *given* that state and model. It is not yet a full hierarchical Bayesian model of all sample, batch, instrument and operator effects. Next steps are multiple partially shared nuisance groups, continuous random effects, unknown nuisance-prior inference, likelihood calibration, and outcome-adaptive decision trees. Do not claim real-world calibration robustness until those are validated on source/specimen-linked observations.
