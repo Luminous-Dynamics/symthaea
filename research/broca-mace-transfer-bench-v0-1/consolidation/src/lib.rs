@@ -95,6 +95,10 @@ pub struct ConsolidationReceiptProposalV1 {
     pub destination_abstraction_id: String,
     pub output_artifact_digest: String,
     pub retention_policy_id: String,
+    pub minimum_qualified_success_events: usize,
+    pub minimum_independent_source_families: usize,
+    pub minimum_independent_source_roots: usize,
+    pub maximum_measurement_error_bound_bits: u64,
     pub reversibility: ReversibilityClassV1,
     pub source_bindings: Vec<ConsolidationSourceBindingV1>,
 }
@@ -316,6 +320,11 @@ impl ConsolidationReceiptProposalV1 {
             destination_abstraction_id: context.destination_abstraction_id,
             output_artifact_digest: context.output_artifact_digest,
             retention_policy_id: context.retention_policy_id,
+            minimum_qualified_success_events: proposal.minimum_qualified_success_events,
+            minimum_independent_source_families: proposal.minimum_independent_source_families,
+            minimum_independent_source_roots: proposal.minimum_independent_source_roots,
+            maximum_measurement_error_bound_bits:
+                proposal.maximum_measurement_error_bound.to_bits(),
             reversibility: ReversibilityClassV1::ReversibleWithSourceLinks,
             source_bindings,
         })
@@ -350,6 +359,10 @@ impl ConsolidationReceiptProposalV1 {
             self.destination_abstraction_id.clone(),
             self.output_artifact_digest.clone(),
             self.retention_policy_id.clone(),
+            self.minimum_qualified_success_events.to_string(),
+            self.minimum_independent_source_families.to_string(),
+            self.minimum_independent_source_roots.to_string(),
+            self.maximum_measurement_error_bound_bits.to_string(),
             match self.reversibility {
                 ReversibilityClassV1::ReversibleWithSourceLinks => "reversible_with_source_links",
                 ReversibilityClassV1::IrreversiblePrivacyErase => "irreversible_privacy_erase",
@@ -373,7 +386,9 @@ pub fn verify_and_release_promoted_experiences(
     if proposal.disposition != ConsolidationDispositionV1::PromoteToProcedure {
         return Err(ReceiptUseReject::NotProcedurePromotion);
     }
-    if pack.as_known() != proposal.as_known {
+    if pack.as_known() != proposal.as_known
+        || transfer_known_at_ms != proposal.as_known.known_at_ms
+    {
         return Err(ReceiptUseReject::KnowledgeSnapshotMismatch);
     }
 

@@ -157,7 +157,7 @@ impl ConsolidationReceiptVerifierV1 for FixtureConsolidationVerifier {
             verifier_role: "independent_test_verifier".into(),
             verified_at_ms: self
                 .verified_at_ms
-                .unwrap_or(proposal.as_known.known_at_ms + 1),
+                .unwrap_or(proposal.as_known.known_at_ms),
             authority_scope: proposal.target_scope,
         })
     }
@@ -285,14 +285,14 @@ fn raw_session_a_governed_proposal_session_b_decision_session_c_retraction() {
     let (_receipt_a, mut memory_b) = verify_and_release_promoted_experiences(
         &receipt_proposal_a,
         &pack_a,
-        260,
+        250,
         &attestor,
     )
     .expect("independent verifier must attest A-side proposal");
     let (_receipt_b, memory_b_side) = verify_and_release_promoted_experiences(
         &receipt_proposal_b,
         &pack_a,
-        260,
+        250,
         &attestor,
     )
     .expect("independent verifier must attest B-side proposal");
@@ -347,7 +347,7 @@ fn raw_session_a_governed_proposal_session_b_decision_session_c_retraction() {
     let (_receipt_c, memory_c) = verify_and_release_promoted_experiences(
         &receipt_proposal_b_c,
         &pack_c,
-        280,
+        270,
         &FixtureConsolidationVerifier {
             verified_at_ms: None,
         },
@@ -455,5 +455,47 @@ fn consolidation_proposal_digest_binds_output_and_policy_identity() {
     )
     .unwrap();
     assert_ne!(original.canonical_digest(), changed.canonical_digest());
+}
+
+
+#[test]
+fn promotion_receipt_cannot_be_reused_after_the_knowledge_snapshot_advances() {
+    let raw_events = vec![
+        raw_event(100, Action::A, 0.91),
+        raw_event(101, Action::A, 0.90),
+        raw_event(102, Action::A, 0.89),
+    ];
+    let batch = ingest_batch_as_known(
+        &raw_events,
+        as_known(250),
+        &FixtureVerifier::default(),
+    )
+    .unwrap();
+    let pack = build_consolidation_evidence_pack(&batch, &[100, 101, 102]).unwrap();
+    let evidence = pack.summarize_action_for_scope(target_scope(), Action::A);
+    let ConsolidationProposalV1::ProposeProcedure(procedure) =
+        ConsolidationPolicyV1::default().decide_procedure_promotion(&evidence)
+    else {
+        panic!("evidence should propose promotion");
+    };
+    let proposal = ConsolidationReceiptProposalV1::from_procedure_promotion(
+        &procedure,
+        &pack,
+        receipt_context(Action::A),
+    )
+    .unwrap();
+    let verifier = FixtureConsolidationVerifier {
+        verified_at_ms: None,
+    };
+    assert_eq!(
+        verify_and_release_promoted_experiences(
+            &proposal,
+            &pack,
+            260,
+            &verifier,
+        )
+        .unwrap_err(),
+        broca_mace_consolidation::ReceiptUseReject::KnowledgeSnapshotMismatch
+    );
 }
 
