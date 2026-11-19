@@ -57,6 +57,7 @@ struct CoverageRow {
     failed: usize,
     missing: usize,
     disposition: String,
+    analysis_mode: String,
     artifact_sha256s: String,
     notes: String,
 }
@@ -500,7 +501,7 @@ fn analyze(
         let status = disposition(block_cases.len(), observed, not_applicable, failed, missing);
         if status != "complete" {
             incomplete_blocks += 1;
-        } else {
+        } else if !metric.starts_with("identity_") {
             let first = block_cases[0];
             let estimates = estimate_block(
                 first.cohort,
@@ -540,6 +541,11 @@ fn analyze(
             failed,
             missing,
             disposition: status.to_string(),
+            analysis_mode: if metric.starts_with("identity_") {
+                "identity_only".to_string()
+            } else {
+                "effect_estimated".to_string()
+            },
             artifact_sha256s: artifact_sha256s.join(";"),
             notes: notes.join(" | "),
         });
@@ -595,7 +601,7 @@ fn csv_record(fields: &[String]) -> String {
 
 fn coverage_csv(rows: &[CoverageRow]) -> String {
     let mut output = String::from(
-        "cohort,style,seed,metric,expected,observed,not_applicable,failed,missing,disposition,artifact_sha256s,notes\n",
+        "cohort,style,seed,metric,expected,observed,not_applicable,failed,missing,disposition,analysis_mode,artifact_sha256s,notes\n",
     );
     for row in rows {
         output.push_str(&csv_record(&[
@@ -609,6 +615,7 @@ fn coverage_csv(rows: &[CoverageRow]) -> String {
             row.failed.to_string(),
             row.missing.to_string(),
             row.disposition.clone(),
+            row.analysis_mode.clone(),
             row.artifact_sha256s.clone(),
             row.notes.clone(),
         ]));
@@ -809,6 +816,39 @@ mod tests {
             .unwrap();
         assert!((main.estimate.estimate - 2.0).abs() < 1.0e-12);
         assert!(analysis.coverage[0].artifact_sha256s.split(';').count() == 81);
+    }
+
+    #[test]
+    fn identity_metrics_are_coverage_audited_but_never_effect_estimated() {
+        let (cases, mut records) = one_complete_block();
+        let identity_rows: Vec<InputRecord> = records
+            .iter()
+            .map(|record| {
+                let mut identity = record.clone();
+                identity.metric = "identity_fingerprint_word".to_string();
+                identity.value = Some(12_345.0);
+                identity
+            })
+            .collect();
+        records.extend(identity_rows);
+
+        let analysis = analyze(
+            &cases,
+            &["response".to_string(), "identity_fingerprint_word".to_string()],
+            &records,
+        )
+        .unwrap();
+        assert_eq!(analysis.incomplete_blocks, 0);
+        assert_eq!(analysis.coverage.len(), 2);
+        assert_eq!(analysis.effects.len(), 80);
+        assert_eq!(analysis.summaries.len(), 80);
+        let identity = analysis
+            .coverage
+            .iter()
+            .find(|row| row.metric == "identity_fingerprint_word")
+            .unwrap();
+        assert_eq!(identity.disposition, "complete");
+        assert_eq!(identity.analysis_mode, "identity_only");
     }
 
     #[test]
