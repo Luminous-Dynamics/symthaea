@@ -63,6 +63,27 @@ std::vector<std::uint8_t> global_state_delta(const std::vector<Record>& records)
     for(std::size_t i=0U;i<records.size();++i){const auto& r=records[i];if(!valid_record(r))throw std::runtime_error("invalid record");if(i%4096U==0U){previous.clear();have_time=false;}if(have_time&&r.timestamp>=last_time){o.push_back(0U);put_var(r.timestamp-last_time,o);}else{o.push_back(1U);put_var(r.timestamp,o);}last_time=r.timestamp;have_time=true;put_var(r.entity,o);put_var(r.series,o);const Key key=key_of(r);auto it=previous.find(key);const bool is_new=it==previous.end();const std::uint8_t mask=is_new?static_cast<std::uint8_t>(0xffU):changed_mask(it->second,r);o.push_back(is_new?1U:0U);o.push_back(mask);o.push_back(r.present);for(std::size_t f=0U;f<kFields;++f){const auto bit=static_cast<std::uint8_t>(1U<<f);if((mask&bit)!=0U&&(r.present&bit)!=0U)put_u64(r.values[f],o);}previous[key]=r;}
     return o;
 }
+
+std::vector<std::uint8_t> wrap_simple_frame(const char magic[4], std::size_t count,
+                                            const std::vector<std::uint8_t>& payload) {
+    std::vector<std::uint8_t> frame;
+    frame.insert(frame.end(), magic, magic + 4);
+    put_u64(static_cast<std::uint64_t>(count), frame);
+    put_u64(static_cast<std::uint64_t>(payload.size()), frame);
+    frame.insert(frame.end(), payload.begin(), payload.end());
+    put_u32(crc32(frame.data(), frame.size()), frame);
+    return frame;
+}
+std::vector<std::uint8_t> framed_raw(const std::vector<Record>& records) {
+    const auto payload = raw_bytes(records);
+    return wrap_simple_frame("RAW1", records.size(), payload);
+}
+std::vector<std::uint8_t> framed_global_state_delta(const std::vector<Record>& records) {
+    auto payload = global_state_delta(records);
+    payload.insert(payload.begin(), kSchema.begin(), kSchema.end());
+    return wrap_simple_frame("GSD1", records.size(), payload);
+}
+
 std::vector<std::uint8_t> encode_one_series(const std::vector<Record>& rows){
     std::vector<std::uint8_t> o;o.reserve(rows.size()*12U);if(rows.empty())return o;
     for(std::size_t i=0U;i<rows.size();){const auto& r=rows[i];if(!valid_record(r))throw std::runtime_error("invalid series row");
@@ -215,6 +236,24 @@ void test_empty_stream(){const std::vector<Record> records;const auto frame=enco
 void test_roundtrips(){for(const std::string name:{"sparse","bursty","idle","noisy"}){const auto records=fixture(name,0x7878U);const auto frame=encode_partitioned(records);std::vector<Record> decoded;require(decode_partitioned(frame,records.size(),decoded),name+" partition decoder rejected frame");require(decoded==records,name+" partition order/data mismatch");}}
 void test_randomized(){std::mt19937_64 rng(0x991122U);for(std::size_t trial=0U;trial<100U;++trial){std::vector<Record> records;std::array<Record,8U> states{};std::array<bool,8U> init{};const std::size_t n=static_cast<std::size_t>(rng()%300U);std::uint64_t time=0U;for(std::size_t i=0U;i<n;++i){const auto k=static_cast<std::size_t>(rng()%8U);time+=rng()%7U;Record r=init[k]?states[k]:Record{};r.timestamp=time;r.entity=static_cast<std::uint32_t>(k/4U);r.series=static_cast<std::uint32_t>(k%4U);if(!init[k])r.present=0xffU;for(std::size_t f=0U;f<kFields;++f){const auto bit=static_cast<std::uint8_t>(1U<<f);if(!init[k]||rng()%20U==0U){if(init[k]&&rng()%8U==0U)r.present=static_cast<std::uint8_t>(r.present^bit);r.values[f]=(r.present&bit)==0U?0U:value_for(f,rng());}}records.push_back(r);states[k]=r;init[k]=true;}const auto frame=encode_partitioned(records);std::vector<Record> decoded;require(decode_partitioned(frame,records.size(),decoded),"random partition decode rejected");require(decoded==records,"random partition mismatch");}}
 void test_corruption(){const auto rows=fixture("sparse",0x8877U);auto frame=encode_partitioned(rows);std::vector<Record> out;auto bad=frame;bad[0]^=1U;require(!decode_partitioned(bad,rows.size(),out),"bad magic/CRC accepted");bad=frame;bad.pop_back();require(!decode_partitioned(bad,rows.size(),out),"truncated partition frame accepted");bad=frame;bad.push_back(0U);require(!decode_partitioned(bad,rows.size(),out),"trailing partition bytes accepted");}
-void emit(const std::filesystem::path& dir){std::filesystem::create_directories(dir);for(const std::string name:{"sparse","bursty","idle","noisy"}){const auto rows=fixture(name,0x7e1e0001U);const auto raw=raw_bytes(rows);const auto delta=global_state_delta(rows);const auto partitioned=encode_partitioned(rows);std::vector<Record> decoded;require(decode_partitioned(partitioned,rows.size(),decoded)&&decoded==rows,name+" emission roundtrip failed");write_file(dir/(name+"_raw.bin"),raw);write_file(dir/(name+"_global_delta.bin"),delta);write_file(dir/(name+"_partitioned.bin"),partitioned);std::cout<<name<<",records="<<rows.size()<<",raw="<<raw.size()<<",global_delta="<<delta.size()<<",partitioned="<<partitioned.size()<<"\\n";}}
+void emit(const std::filesystem::path& dir) {
+    std::filesystem::create_directories(dir);
+    for (const std::string name : {"sparse", "bursty", "idle", "noisy"}) {
+        const auto rows = fixture(name, 0x7e1e0001U);
+        const auto raw = framed_raw(rows);
+        const auto delta = framed_global_state_delta(rows);
+        const auto partitioned = encode_partitioned(rows);
+        std::vector<Record> decoded;
+        require(decode_partitioned(partitioned, rows.size(), decoded) && decoded == rows,
+                name + " emission round-trip failed");
+        write_file(dir / (name + "_raw.bin"), raw);
+        write_file(dir / (name + "_global_delta.bin"), delta);
+        write_file(dir / (name + "_partitioned.bin"), partitioned);
+        std::cout << name << ",records=" << rows.size()
+                  << ",raw_frame=" << raw.size()
+                  << ",global_delta_frame=" << delta.size()
+                  << ",partitioned_frame=" << partitioned.size() << "\n";
+    }
 }
+
 int main(int argc,char** argv){try{test_empty_stream();test_roundtrips();test_randomized();test_corruption();std::cout<<"empty_stream=PASS fixture_roundtrips=4 randomized_roundtrips=100 corruption_rejections=3 status=PASS\\n";if(argc==3&&std::string(argv[1])=="--emit-dir")emit(argv[2]);else if(argc!=1){std::cerr<<"usage: "<<argv[0]<<" [--emit-dir DIR]\\n";return 2;}return 0;}catch(const std::exception& e){std::cerr<<"partitioned reference failed: "<<e.what()<<"\\n";return 1;}}
