@@ -498,6 +498,27 @@ pub fn decompress_f64_online_selector(
 }
 
 
+fn best_segment_candidate_frame(
+    values: &[f64],
+) -> Result<(u8, Vec<u8>), NumericError> {
+    let mut best_candidate = 0u8;
+    let mut best_frame: Option<Vec<u8>> = None;
+    for candidate in 0..SEGMENT_CANDIDATES as u8 {
+        let frame = encode_segment_candidate(values, candidate)?;
+        if best_frame
+            .as_ref()
+            .map_or(true, |current| frame.len() < current.len())
+        {
+            best_candidate = candidate;
+            best_frame = Some(frame);
+        }
+    }
+    Ok((
+        best_candidate,
+        best_frame.ok_or(NumericError::LengthMismatch)?,
+    ))
+}
+
 /// Encode fixed-size f64 chunks by selecting the smallest complete subframe
 /// among Raw/XorPrevious x Order0/Order1. Every selected F64C frame (including
 /// its own header and CRCs) is retained in the output, so selection overhead is
@@ -536,19 +557,7 @@ pub fn compress_f64_segmented(
     debug_assert_eq!(frame.len(), SEGMENTED_HEADER_LEN);
 
     for segment in values.chunks(segment_size) {
-        let mut best: Option<Vec<u8>> = None;
-        for transform in [Float64Transform::Raw, Float64Transform::XorPrevious] {
-            for model in [ModelKind::Order0, ModelKind::Order1] {
-                let candidate = compress_f64(segment, transform, model)?;
-                if best
-                    .as_ref()
-                    .map_or(true, |current| candidate.len() < current.len())
-                {
-                    best = Some(candidate);
-                }
-            }
-        }
-        let best = best.ok_or(NumericError::LengthMismatch)?;
+        let (_, best) = best_segment_candidate_frame(segment)?;
         frame.extend_from_slice(&best);
     }
     Ok(frame)
@@ -661,6 +670,17 @@ pub fn decompress_f64_segmented(
         let decoded = decompress_f64(&frame[cursor..child_end], expected_values)?;
         if decoded.len() != expected_values {
             return Err(NumericError::LengthMismatch);
+        }
+        let (expected_candidate, canonical_child) =
+            best_segment_candidate_frame(&decoded)?;
+        let actual_candidate = segment_candidate_from_child_header(&frame[cursor..child_end])?;
+        if actual_candidate != expected_candidate
+            || frame[cursor..child_end] != canonical_child
+        {
+            return Err(NumericError::SegmentPolicyMismatch {
+                expected: expected_candidate,
+                actual: actual_candidate,
+            });
         }
         output.extend_from_slice(&decoded);
         cursor = child_end;
