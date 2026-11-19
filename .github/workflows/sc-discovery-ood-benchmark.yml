@@ -1,5 +1,7 @@
 name: Superconductivity OOD discovery benchmark contract
 
+# Pinned exact-head qualification covers both the OOD split auditor and tri-state feasibility gate.
+
 on:
   pull_request:
     paths:
