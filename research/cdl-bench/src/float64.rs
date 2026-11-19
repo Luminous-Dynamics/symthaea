@@ -487,9 +487,9 @@ impl HistoricalSegmentCosts {
         }
         let mut best = 0usize;
         for candidate in 1..SEGMENT_CANDIDATES {
-            let candidate_average = self.totals[candidate] / self.segments;
-            let best_average = self.totals[best] / self.segments;
-            if candidate_average < best_average {
+            // Every candidate is measured on every segment in this v1 policy,
+            // so all sample counts are identical and comparing sums is exact.
+            if self.totals[candidate] < self.totals[best] {
                 best = candidate;
             }
         }
@@ -740,7 +740,7 @@ pub fn compress_f64_segmented(
     frame.extend_from_slice(SEGMENTED_MAGIC);
     frame.extend_from_slice(&SEGMENTED_VERSION.to_le_bytes());
     frame.push(0); // flags
-    frame.push(SEGMENT_SELECTION_POLICY_BEST_OF_SIX);
+    frame.push(SEGMENT_SELECTION_POLICY_BEST_OF_EIGHT);
     frame.extend_from_slice(&count.to_le_bytes());
     frame.extend_from_slice(&segment_size_u32.to_le_bytes());
     frame.extend_from_slice(&segment_count_u32.to_le_bytes());
@@ -775,7 +775,7 @@ pub fn decompress_f64_segmented(
     if frame[6] != 0 {
         return Err(NumericError::UnsupportedFlags(frame[6]));
     }
-    if frame[7] != SEGMENT_SELECTION_POLICY_BEST_OF_SIX {
+    if frame[7] != SEGMENT_SELECTION_POLICY_BEST_OF_EIGHT {
         return Err(NumericError::UnsupportedTransform(frame[7]));
     }
 
@@ -1071,16 +1071,16 @@ mod tests {
         let mut policy = HistoricalSegmentCosts::default();
         assert_eq!(policy.choose(), 0, "the first segment must use Raw/Order0");
 
-        policy.observe_sizes([100, 80, 60, 40, 90, 70]).unwrap();
+        policy.observe_sizes([100, 80, 60, 40, 90, 70, 50, 30]).unwrap();
         assert_eq!(policy.choose(), 3);
 
         // A later chunk contributes to future choices, not its own selection.
         // The mean costs after two observations are [60, 55, 50, 45].
-        policy.observe_sizes([20, 30, 40, 50, 45, 60]).unwrap();
+        policy.observe_sizes([20, 30, 40, 50, 45, 60, 70, 80]).unwrap();
         assert_eq!(policy.choose(), 3);
 
         let mut tied = HistoricalSegmentCosts::default();
-        tied.observe_sizes([10, 20, 20, 20, 20, 20]).unwrap();
+        tied.observe_sizes([10, 20, 20, 20, 20, 20, 20, 20]).unwrap();
         assert_eq!(tied.choose(), 0);
     }
 
