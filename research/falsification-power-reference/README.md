@@ -64,3 +64,14 @@ These are authored Rust tests. They must be compiled and executed on the exact c
 
 
 The alpha level is per declared alternative. A campaign-level claim that searches across alternatives must separately control family-wise error or use a qualified joint/sequential test; this reference does not do that.
+
+
+### Symmetry-discovery interpretation
+
+For one proposed transformation or group action, take the working null to be **zero mean paired residual** under the declared transformation. Each registered break alternative supplies a predictable nonzero mean residual (d_{j,t}) for the next paired measurement. The evaluator commits the candidate/action identity, probe/observation identity, decision digest, discrepancy and known (sigma_t) before observing the residual (Y_t).
+
+A fixed mixture over registered break alternatives can then accumulate evidence against the proposed symmetry. Crossing the anytime boundary is evidence to **falsify the proposed invariance under this observation model**. Not crossing is *unresolved*, not evidence that the transformation is a symmetry. The mixture prevents choosing the most favorable break alternative after looking at the data.
+
+This does not automatically test a whole group: required generators/elements and probe strata must be declared, and the campaign must control multiplicity across candidate actions and probe families. A successful statistical test is still only a proposal/falsification result; it does not replace exact group closure, Lie-algebra, complete-task or physical step-map qualification, and it never authorizes quotient pruning.
+
+The implementation uses binary64 arithmetic and is a research reference, not a formally verified floating-point e-process certificate. Conditional-model assumptions, numerical error, null calibration and actual adaptive action logs require independent review. Persistent or correlated nuisance effects are not covered merely because the caller uses a mixture; use the explicit persistent-noise model or a separately justified conditional law.
