@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/plasma-memory-contract-v0.1.schema.json",
+  "title": "Plasma closure memory contract v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "contract_id", "physics_model_id", "regime_id",
+    "trajectory_id", "trajectory_sha256", "model_artifact_sha256",
+    "solver_build_sha256", "tableau_sha256", "stage_semantics", "mechanism"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "contract_id": { "type": "string", "minLength": 1 },
+    "physics_model_id": { "type": "string", "minLength": 1 },
+    "regime_id": { "type": "string", "minLength": 1 },
+    "trajectory_id": { "type": "string", "minLength": 1 },
+    "trajectory_sha256": { "$ref": "#/$defs/sha256" },
+    "model_artifact_sha256": { "$ref": "#/$defs/sha256" },
+    "solver_build_sha256": { "$ref": "#/$defs/sha256" },
+    "tableau_sha256": { "$ref": "#/$defs/sha256" },
+    "stage_semantics": { "enum": ["accepted_state_only", "stage_explicit", "source_reported"] },
+    "mechanism": {
+      "oneOf": [
+        { "$ref": "#/$defs/markovian" },
+        { "$ref": "#/$defs/trailing_history" },
+        { "$ref": "#/$defs/prognostic_latent" },
+        { "$ref": "#/$defs/fourier_hermite_reservoir" }
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+    "rational": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["numerator", "denominator"],
+      "properties": {
+        "numerator": { "type": "integer", "minimum": 1 },
+        "denominator": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "markovian": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "input_fields"],
+      "properties": {
+        "kind": { "const": "markovian" },
+        "input_fields": { "$ref": "#/$defs/fields" }
+      }
+    },
+    "trailing_history": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind", "input_fields", "sample_count", "sample_period",
+        "physical_horizon", "time_unit", "warmup_policy"
+      ],
+      "properties": {
+        "kind": { "const": "trailing_history" },
+        "input_fields": { "$ref": "#/$defs/fields" },
+        "sample_count": { "type": "integer", "minimum": 1 },
+        "sample_period": { "$ref": "#/$defs/rational" },
+        "physical_horizon": { "$ref": "#/$defs/rational" },
+        "time_unit": { "type": "string", "minLength": 1 },
+        "warmup_policy": { "enum": ["equilibrium_padding", "abstain_until_full_window"] }
+      }
+    },
+    "prognostic_latent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind", "state_dimension", "initializer", "update_law_sha256",
+        "reset_policy", "uncertainty_evidence_sha256"
+      ],
+      "properties": {
+        "kind": { "const": "prognostic_latent" },
+        "state_dimension": { "type": "integer", "minimum": 1 },
+        "initializer": { "enum": ["zero", "equilibrium", "learned_prior"] },
+        "update_law_sha256": { "$ref": "#/$defs/sha256" },
+        "reset_policy": { "enum": ["at_trajectory_boundary", "at_regime_or_solver_change", "every_independent_run"] },
+        "uncertainty_evidence_sha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] }
+      }
+    },
+    "fourier_hermite_reservoir": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind", "configuration_basis", "velocity_basis",
+        "retained_configuration_modes", "retained_velocity_modes",
+        "first_closed_velocity_mode", "reservoir_artifact_sha256", "reset_policy"
+      ],
+      "properties": {
+        "kind": { "const": "fourier_hermite_reservoir" },
+        "configuration_basis": { "const": "fourier" },
+        "velocity_basis": { "const": "hermite" },
+        "retained_configuration_modes": { "type": "integer", "minimum": 1 },
+        "retained_velocity_modes": { "type": "integer", "minimum": 1 },
+        "first_closed_velocity_mode": { "type": "integer", "minimum": 2 },
+        "reservoir_artifact_sha256": { "$ref": "#/$defs/sha256" },
+        "reset_policy": { "enum": ["at_trajectory_boundary", "at_regime_or_solver_change", "every_independent_run"] }
+      }
+    }
+  }
+}
