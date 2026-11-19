@@ -164,8 +164,21 @@ fn main() {
     };
     println!("  ✓ Loaded {} utterance alignments", alignments.len());
 
-    // Create audio projector
+    // Create audio projector.
     let mut projector = AudioProjector::default_config();
+
+    // Frame timestamps used for forced-alignment indexing must describe the
+    // actual projector cadence, not a separately configured approximation.
+    let projector_hop = projector.config().hop_duration;
+    if (cli.frame_hop - projector_hop).abs() > 1e-6 {
+        eprintln!(
+            "{} --frame-hop ({:.6}s) must match AudioProjector hop ({:.6}s); refusing to train misaligned prototypes",
+            style("ERROR:").red().bold(),
+            cli.frame_hop,
+            projector_hop
+        );
+        std::process::exit(2);
+    }
 
     // Accumulator for phoneme prototypes
     let mut accumulator = PhonemeAccumulator::new();
