@@ -166,5 +166,22 @@
     "symtropy_pr": "https://github.com/Luminous-Dynamics/symtropy/pull/6243",
     "status": "synthetic_periodic_shared_face_reference_only_not_ecsim_equivalent",
     "requirement": "future_ECsim_adapter_must_pin_actual_stencil_grid_staggering_halos_and_boundaries"
-  }
+  },
+  "separate_research_frontiers": [
+    {
+      "id": "kinetic_ion_learned_electron_hybrid",
+      "source": "https://meetingorganizer.copernicus.org/EGU26/EGU26-12428.html",
+      "status": "research_direction_reported_in_EGU26_abstract_not_reproduction_or_full_simulation_validation",
+      "required_gates": [
+        "kinetic_ion_solver_and_field_solver_pinned",
+        "species_field_charge_current_consistency",
+        "species_resolved_and_total_energy_exchange",
+        "momentum_and_applicable_invariant_audit",
+        "coupled_solver_stability_and_timestep_sensitivity",
+        "matched_fully_kinetic_pic_and_hybrid_baselines",
+        "total_cost_including_kinetic_ion_and_field_solve"
+      ],
+      "claim_ceiling": "no_hybrid_simulation_advantage_claim_before_coupled_solver_and_conservation_qualification"
+    }
+  ]
 }
