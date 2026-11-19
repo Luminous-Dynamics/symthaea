@@ -42,6 +42,7 @@ pub struct ContactEvidence {
     pub interface_id: Option<String>,
     pub interface_revision: Option<u64>,
     pub position_error_m: Option<f64>,
+    pub attitude_error_rad: Option<f64>,
     pub relative_speed_mps: Option<f64>,
     pub relative_angular_rate_rad_s: Option<f64>,
     pub contact_impulse_ns: Option<f64>,
@@ -80,12 +81,14 @@ pub struct Profile {
     pub max_approach_distance_m: f64,
     pub max_approach_speed_mps: f64,
     pub max_contact_position_error_m: f64,
+    pub max_attitude_error_rad: f64,
     pub max_contact_speed_mps: f64,
     pub max_relative_angular_rate_rad_s: f64,
     pub max_contact_impulse_ns: f64,
     pub max_end_effector_error_m: f64,
     pub min_collision_clearance_m: f64,
     pub max_joint_abs_rad: f64,
+    pub min_joint_limit_margin_rad: f64,
     pub max_bus_angular_rate_rad_s: f64,
 }
 
@@ -175,6 +178,7 @@ fn check_profile(profile: &Profile) -> Result<(), String> {
     positive(profile.max_approach_distance_m, "approach_distance")?;
     positive(profile.max_approach_speed_mps, "approach_speed")?;
     positive(profile.max_contact_position_error_m, "contact_position_error")?;
+    positive(profile.max_attitude_error_rad, "attitude_error")?;
     positive(profile.max_contact_speed_mps, "contact_speed")?;
     positive(
         profile.max_relative_angular_rate_rad_s,
@@ -184,6 +188,13 @@ fn check_profile(profile: &Profile) -> Result<(), String> {
     positive(profile.max_end_effector_error_m, "end_effector_error")?;
     nonnegative(profile.min_collision_clearance_m, "collision_clearance")?;
     positive(profile.max_joint_abs_rad, "joint_angle")?;
+    nonnegative(
+        profile.min_joint_limit_margin_rad,
+        "joint_limit_margin",
+    )?;
+    if profile.min_joint_limit_margin_rad >= profile.max_joint_abs_rad {
+        return Err("profile_invalid_joint_limit_margin".to_owned());
+    }
     positive(profile.max_bus_angular_rate_rad_s, "bus_angular_rate")?;
     Ok(())
 }
@@ -236,6 +247,11 @@ pub fn evaluate_case(profile: &Profile, case: &Case) -> CaseResult {
             profile.max_contact_position_error_m,
         ),
         (
+            "attitude_error",
+            finite(contact.attitude_error_rad),
+            profile.max_attitude_error_rad,
+        ),
+        (
             "contact_speed",
             finite(contact.relative_speed_mps),
             profile.max_contact_speed_mps,
@@ -272,8 +288,11 @@ pub fn evaluate_case(profile: &Profile, case: &Case) -> CaseResult {
 
     match contact.joint_angles_rad.as_ref() {
         Some(values) if values.len() == 7 && values.iter().all(|v| v.is_finite()) => {
-            if values.iter().any(|value| value.abs() > profile.max_joint_abs_rad) {
-                violates("joint_limit", &mut reasons);
+            if values.iter().any(|value| {
+                profile.max_joint_abs_rad - value.abs()
+                    < profile.min_joint_limit_margin_rad
+            }) {
+                violates("joint_limit_margin", &mut reasons);
             }
         }
         Some(_) => missing("valid_seven_axis_joint_state", &mut reasons),
@@ -365,13 +384,21 @@ pub fn evaluate(fixture: &Fixture) -> Result<Report, String> {
         if case.id.trim().is_empty() || !ids.insert(case.id.as_str()) {
             return Err("case_id_empty_or_duplicate".to_owned());
         }
+        if !["positive_control", "negative_control"].contains(&case.case_class.as_str()) {
+            return Err(format!("case_{}_has_unknown_class", case.id));
+        }
         let result = evaluate_case(&fixture.profile, case);
         if case.approach.outcome == ApproachOutcome::Docked
             && result.status != GateStatus::AcceptedForHandoff
         {
             proximity_only_false_accepts += 1;
         }
-        if format!("{:?}", result.status).to_lowercase() != case.expected {
+        let status_label = match &result.status {
+            GateStatus::AcceptedForHandoff => "accepted_for_handoff",
+            GateStatus::Rejected => "rejected",
+            GateStatus::Indeterminate => "indeterminate",
+        };
+        if status_label != case.expected {
             mismatches += 1;
         }
         if result
@@ -449,12 +476,12 @@ mod tests {
     fn complete_capture_fixture_matches_all_expected_results() {
         let report = evaluate(&fixture()).expect("fixture should validate");
         assert_eq!(report.result, "pass");
-        assert_eq!(report.summary.case_count, 15);
+        assert_eq!(report.summary.case_count, 19);
         assert_eq!(report.summary.accepted_for_handoff, 1);
-        assert_eq!(report.summary.rejected, 10);
+        assert_eq!(report.summary.rejected, 14);
         assert_eq!(report.summary.indeterminate, 4);
         assert_eq!(report.summary.expected_result_mismatches, 0);
-        assert_eq!(report.summary.proximity_only_false_accepts, 14);
+        assert_eq!(report.summary.proximity_only_false_accepts, 17);
         assert!(report.cases.iter().all(|case| !case.authority_granted));
     }
 
@@ -521,6 +548,28 @@ mod tests {
     fn high_joint_angle_is_rejected() {
         let data = fixture();
         let case = data.cases.iter().find(|case| case.id == "JOINT_LIMIT_MARGIN_VIOLATION").unwrap();
+        assert_eq!(evaluate_case(&data.profile, case).status, GateStatus::Rejected);
+    }
+
+    #[test]
+    fn insufficient_joint_limit_margin_is_rejected() {
+        let data = fixture();
+        let case = data
+            .cases
+            .iter()
+            .find(|case| case.id == "JOINT_LIMIT_MARGIN_VIOLATION")
+            .unwrap();
+        assert_eq!(evaluate_case(&data.profile, case).status, GateStatus::Rejected);
+    }
+
+    #[test]
+    fn attitude_misalignment_is_rejected() {
+        let data = fixture();
+        let case = data
+            .cases
+            .iter()
+            .find(|case| case.id == "ATTITUDE_MISALIGNMENT")
+            .unwrap();
         assert_eq!(evaluate_case(&data.profile, case).status, GateStatus::Rejected);
     }
 
