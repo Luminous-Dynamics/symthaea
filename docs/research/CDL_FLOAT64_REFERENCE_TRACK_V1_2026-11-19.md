@@ -1,7 +1,7 @@
 # CDL-Bench exact IEEE-754 f64 reference track v1
 
 **Date:** 2026-11-19  
-**Status:** Rust reference source, four reversible transforms, three eight-candidate segment policies and authored tests committed; independent C++/Python transform checks exercised; Rust compilation and arithmetic-coded size results pending.
+**Status:** Rust reference source, four reversible transforms, three eight-candidate segment policies and authored tests committed; independent C++ transform references and TerseTS C-gate syntax check exercised; Rust/external codec builds and arithmetic-coded size results pending.
 
 ## Why this track exists
 
@@ -9,10 +9,11 @@ The SCM/i16 lane does not represent the dominant specialized lossless floating-p
 
 The branch adds correctness references and selector baselines, not a competitive codec:
 - `research/cdl-bench/src/float64.rs`: typed `F64C` frame with raw bits, XOR-previous u64 varints, reusable XOR-leading/trailing windows, and exact-bit-pattern RLE+XOR run coding; `F64S` segment container with offline best-of-eight, full historical-cost and sparse-probe decoder-synchronous policies; inner CDL arithmetic coding, CRC-32 checksums and output limits.
-- `research/cdl-bench/src/main.rs`: `float --values N --seed N` experiment command comparing single-stream, offline segment-portfolio, full historical-cost and sparse-probe policies across plateau/idle regimes as well as smooth, oscillating and random streams; it records oracle gap and probe compute.
+- `research/cdl-bench/src/main.rs`: `float --values N --seed N` command comparing single transforms, offline best-of-eight, full historical-cost and sparse-probe policies across smooth, oscillating, plateau/idle, signed-zero, NaN-payload and random workloads; it records oracle gap and encoder/decoder candidate work.
 - `research/cdl-bench/src/lib.rs`: public exports.
 - `research/cdl-bench/reference/float64_window_reference.cpp`: independent C++20 bit-window transform reference.
 - `research/cdl-bench/reference/float64_rle_xor_reference.cpp`: independent C++20 RLE+XOR reference and malformed-input checks.
+- `scripts/research/tersets_bitwise_gate.c`: native TerseTS C API gate for exact IEEE-754 bit-pattern validation of the strict lossless candidate shortlist.
 - `research/cdl-bench/README.md`: usage and limits.
 - Tracking: [CDL-Bench-007 #12874](https://github.com/Luminous-Dynamics/symthaea/issues/12874).
 
@@ -47,7 +48,7 @@ From `research/cdl-bench`:
 cargo run --release -- float --values 10000 --seed 42
 ```
 
-The command emits frame lengths and encode/decode nanoseconds for the single-stream arms, the offline segment portfolio and the historical-cost online selector at fixed chunk sizes 64, 256 and 1,024, across:
+The command emits frame lengths and encode/decode nanoseconds for the single-stream arms and three F64S policies at fixed chunk sizes 64, 256 and 1,024, across:
 - constant and smooth-ramp;
 - oscillating/sign-alternating;
 - high-precision decimal-like;
@@ -57,7 +58,9 @@ The command emits frame lengths and encode/decode nanoseconds for the single-str
 - repeated distinct NaN payloads, infinities and zero runs;
 - random-bit-pattern streams.
 
-Each stream is evaluated with raw, XOR-previous-varint, XOR-leading/trailing window, and RLE+XOR transforms under order-0 and order-1 entropy models. The segment portfolio tries all eight combinations per chunk and picks the smallest complete child F64C frame. The F64S container header, every F64C child header, child CRCs, and the inner CDL payloads are all counted in the reported frame size. Zstandard is measured on the original raw little-endian f64 bytes if installed. The CLI does not yet invoke DeXOR, ACTF, Gorilla, Chimp, Rabbit or Dolphin.
+Each stream is evaluated with raw, XOR-previous-varint, XOR-leading/trailing window, and RLE+XOR transforms under order-0 and order-1 entropy models. The F64S policies are: (1) offline best-of-eight oracle; (2) full past-only historical-cost selection; and (3) sparse-probe historical selection at K=1,4,16,64. Every child F64C header/CRC, outer F64S header and inner CDL payload counts toward the reported frame size. Zstandard is measured on original raw little-endian f64 bytes if installed. The CLI does not yet invoke DeXOR, ACTF, Gorilla, Chimp, Rabbit or Dolphin.
+
+The CSV reports `encoder_extra_candidate_encodes` and `decoder_candidate_reencodes` separately. Offline oracle rows are 7/8 per segment (the decoder re-encodes all eight candidates to verify the canonical minimum); full historical rows are 7/7 per segment; sparse rows are 7/7 per scheduled probe and zero between probes. The selected child frame's actual length is reused in both online policies. The CSV includes `oracle_gap_pct`, probe interval/count and encode/decode nanoseconds. The online policies are asserted never to produce smaller complete frames than the offline oracle for identical source/chunking.
 
 **Selection caveat:** the offline selector has the entire chunk available and tries all eight encodings before choosing one. This is an offline size oracle, not an online selector and not a WZS reproduction. It is useful as a transparent fixed-chunk upper bound for the specific eight candidate encodings; it does not establish that transmitted or inferred online segmentation would achieve the same result.
 
