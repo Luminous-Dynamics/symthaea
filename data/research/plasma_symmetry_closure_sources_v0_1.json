@@ -71,13 +71,18 @@
         "The closure uses a trailing window of resolved-moment history and is non-Markovian.",
         "The authors report linear and nonlinear Landau-damping reproduction, interpolation to unseen initial perturbation amplitudes, and stability in independent fluid simulations."
       ],
-      "metric_policy": "Preserve the 1D electrostatic regime, rollout horizon, initial-amplitude scan, solver and memory-window details. Do not promote to magnetic-reconnection or tokamak evidence.",
-      "data_access_state": "NOT_YET_AUDITED",
-      "code_access_state": "NOT_YET_AUDITED",
-      "redistribution_rights_state": "NOT_YET_AUDITED",
+      "metric_policy": "The publisher confirms code and training data are openly available at Zenodo version 1.0 (DOI 10.5281/zenodo.22800112). Pin the exact record files, hashes, package versions and record license before reproduction. Preserve the 1D electrostatic regime and online-a-posteriori setup.",
+      "data_access_state": "OPEN_ACCESS_ZENODO_VERSION_1.0",
+      "code_access_state": "OPEN_ACCESS_ZENODO_VERSION_1.0",
+      "redistribution_rights_state": "ARTICLE_CC_BY_4_0; DATA_AND_CODE_LICENSE_PENDING_ZENODO_RECORD_AUDIT",
       "source_revision": "publisher_version_2026-10-30",
       "luminous_reproduction": false,
-      "claim_ceiling": "PUBLISHED_1D_ELECTROSTATIC_NUMERICAL_STUDY_ONLY_NO_LUMINOUS_REPRODUCTION_OR_CROSS_REGIME_CLAIM"
+      "claim_ceiling": "PUBLISHED_1D_ELECTROSTATIC_NUMERICAL_STUDY_ONLY_NO_LUMINOUS_REPRODUCTION_OR_CROSS_REGIME_CLAIM",
+      "data_artifact_url": "https://doi.org/10.5281/zenodo.22800112",
+      "code_artifact_url": "https://doi.org/10.5281/zenodo.22800112",
+      "artifact_version": "1.0",
+      "artifact_rights_state": "ZENODO_RECORD_LICENSE_NOT_YET_AUDITED",
+      "article_license": "CC-BY-4.0"
     },
     {
       "source_id": "huang_fno_landaudamping_2025",
@@ -102,21 +107,25 @@
       "reported_findings": [
         "The authors report a learned heat-flux closure that reproduces linear and nonlinear Landau-damping evolution against their Vlasov references."
       ],
-      "metric_policy": "Keep this offline-training/online-deployment setup distinct from the 2026 online a-posteriori FNO training paper.",
-      "data_access_state": "ZENODO_DATASET_REPORTED_RIGHTS_AUDIT_PENDING",
-      "code_access_state": "NOT_YET_AUDITED",
-      "redistribution_rights_state": "NOT_YET_AUDITED",
+      "metric_policy": "Publisher states the linear and nonlinear Vlasov training datasets are deposited on Zenodo (DOI 10.5281/zenodo.14915239). Pin exact record files and hashes; do not assume the dataset's license from the article license.",
+      "data_access_state": "ZENODO_DATASET_AVAILABLE",
+      "code_access_state": "TRAINING_DATA_AVAILABLE; TRAINING_CODE_NOT_YET_AUDITED",
+      "redistribution_rights_state": "ARTICLE_CC_BY_NC_ND_4_0; DATASET_LICENSE_PENDING_ZENODO_RECORD_AUDIT",
       "source_revision": "publisher_version_2025-03-18",
       "luminous_reproduction": false,
-      "claim_ceiling": "PUBLISHED_1D_ELECTROSTATIC_NUMERICAL_STUDY_ONLY_NO_LUMINOUS_REPRODUCTION_OR_CROSS_REGIME_CLAIM"
+      "claim_ceiling": "PUBLISHED_1D_ELECTROSTATIC_NUMERICAL_STUDY_ONLY_NO_LUMINOUS_REPRODUCTION_OR_CROSS_REGIME_CLAIM",
+      "data_artifact_url": "https://doi.org/10.5281/zenodo.14915239",
+      "artifact_version": "NOT_YET_PINNED",
+      "article_license": "CC-BY-NC-ND-4.0",
+      "artifact_rights_state": "ZENODO_RECORD_LICENSE_NOT_YET_AUDITED"
     },
     {
       "source_id": "ingelsten_sparse_heatflux_2025",
       "title": "Data-driven discovery of a heat flux closure for electrostatic plasma phenomena",
       "authors": [
         "Emil R. Ingelsten",
-        "M. C. McGrae-Menge",
-        "E. P. Alves",
+        "Madox C. McGrae-Menge",
+        "E. Paulo Alves",
         "Istvan Pusztai"
       ],
       "doi": "10.1017/S0022377825000285",
@@ -138,10 +147,11 @@
       "metric_policy": "The >95 percent figure is source- and task-specific. Do not combine it with FNO rollout metrics or magnetic-reconnection closure results.",
       "data_access_state": "NOT_YET_AUDITED",
       "code_access_state": "NOT_YET_AUDITED",
-      "redistribution_rights_state": "NOT_YET_AUDITED",
+      "redistribution_rights_state": "ARTICLE_CC_BY_4_0; SOURCE_DATA_AND_CODE_RIGHTS_NOT_YET_AUDITED",
       "source_revision": "publisher_version_2025",
       "luminous_reproduction": false,
-      "claim_ceiling": "PUBLISHED_ELECTROSTATIC_SIMULATION_ANALYSIS_ONLY_NO_LUMINOUS_REPRODUCTION_OR_CROSS_REGIME_CLAIM"
+      "claim_ceiling": "PUBLISHED_ELECTROSTATIC_SIMULATION_ANALYSIS_ONLY_NO_LUMINOUS_REPRODUCTION_OR_CROSS_REGIME_CLAIM",
+      "article_license": "CC-BY-4.0"
     },
     {
       "source_id": "plasma_moment_closure_review_2026",
