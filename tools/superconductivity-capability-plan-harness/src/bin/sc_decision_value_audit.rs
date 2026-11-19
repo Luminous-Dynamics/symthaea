@@ -755,8 +755,8 @@ mod tests {
     #[test]
     fn capability_actions_cannot_claim_observations() {
         assert!(mutated_fixture(|fixture| {
-            fixture["actions"][0]["model_likelihoods"] =
-                fixture["actions"][3]["model_likelihoods"].clone();
+            let observation_likelihoods = fixture["actions"][3]["model_likelihoods"].clone();
+            fixture["actions"][0]["model_likelihoods"] = observation_likelihoods;
         }).is_err());
     }
 
