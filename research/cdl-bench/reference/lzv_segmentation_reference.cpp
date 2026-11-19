@@ -1,11 +1,12 @@
 // Independent C++20 reference for a deterministic, prefix-only LZV segmentation control.
-// WZS-inspired research baseline only; it is not the WZS implementation.
+// WZS-inspired research baseline only; this is not the WZS implementation.
 #include <algorithm>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <iostream>
+#include <numeric>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -35,6 +36,7 @@ void validate(const Config& c) {
 }
 
 struct Stats { std::uint64_t sum{}; std::uint64_t sum_sq{}; std::uint64_t count{}; };
+
 Stats window_stats(const std::deque<std::uint8_t>& history, std::size_t start, std::size_t count) {
     Stats stats{};
     for (std::size_t i = 0U; i < count; ++i) {
@@ -54,8 +56,8 @@ bool changed_distribution(const Stats& fast, const Stats& slow, const Config& c)
     const std::uint64_t mean_delta = mean_left > mean_right ? mean_left - mean_right : mean_right - mean_left;
     const bool mean_shift = mean_delta >= static_cast<std::uint64_t>(c.mean_shift) * wf * ws;
 
-    // Compare population variances exactly as rational integers:
-    // variance(W) = (W*sum(x^2) - sum(x)^2) / W^2.
+    // Compare population variances as exact rational integers. The configured
+    // window cap (4096) keeps these products within uint64_t.
     const std::uint64_t vf_num = wf * fast.sum_sq - fast.sum * fast.sum;
     const std::uint64_t vs_num = ws * slow.sum_sq - slow.sum * slow.sum;
     const std::uint64_t variance_left = vf_num * ws * ws;
@@ -89,9 +91,8 @@ std::vector<std::size_t> segment_lzv(const std::vector<std::uint64_t>& bits, con
         if (!forced_max_boundary && cooldown_remaining == 0U && history.size() == history_limit) {
             const auto fast = window_stats(history, config.slow_window, config.fast_window);
             const auto slow = window_stats(history, 0U, config.slow_window);
-            // Latch an observed prefix-only shift until the minimum segment
-            // length is reached; otherwise the short/fast window can adapt
-            // before a minimum-length boundary is legally emitted.
+            // Latch the prefix-only shift until the minimum segment length is
+            // reached, so the fast window cannot adapt away before the boundary.
             pending_change = pending_change || changed_distribution(fast, slow, config);
         }
         const bool change_boundary = current_length >= config.min_segment && pending_change;
@@ -100,8 +101,8 @@ std::vector<std::size_t> segment_lzv(const std::vector<std::uint64_t>& bits, con
             if (next_index < bits.size()) boundaries.push_back(next_index);
             segment_start = next_index;
             pending_change = false;
-            // A forced maximum-length split is not evidence of a regime change;
-            // do not let it mask a real shift immediately after the split.
+            // A forced maximum-length split is not evidence of a shift; don't
+            // let it mask a real change immediately after the split.
             cooldown_remaining = change_boundary ? config.cooldown : 0U;
         } else if (cooldown_remaining > 0U) {
             --cooldown_remaining;
@@ -171,14 +172,12 @@ void test_stationary_random() {
     config.mean_shift = 12U;
     config.variance_shift = 512U;
     config.max_segment = 256U;
-    for (std::uint64_t seed = 0U; seed < 64U; ++seed) {
-        const auto values = random_stream(4096U, 0x12345678ULL + seed);
-        const auto boundaries = segment_lzv(values, config);
-        check_boundaries(boundaries, values.size(), config, "stationary random");
-        const std::size_t expected_segments = (values.size() + config.max_segment - 1U) / config.max_segment;
-        require(boundaries.size() - 1U <= expected_segments + 2U,
-                "stationary random stream over-segmented");
-    }
+    const auto values = random_stream(4096U, 0x12345678ULL);
+    const auto boundaries = segment_lzv(values, config);
+    check_boundaries(boundaries, values.size(), config, "stationary random");
+    const std::size_t expected_segments = (values.size() + config.max_segment - 1U) / config.max_segment;
+    require(boundaries.size() - 1U <= expected_segments + 2U,
+            "stationary random stream over-segmented");
 }
 void test_deterministic_and_empty() {
     Config config{};
@@ -186,7 +185,64 @@ void test_deterministic_and_empty() {
     const auto values = abrupt_stream(120U, 120U, 0x9876ULL);
     require(segment_lzv(values, config) == segment_lzv(values, config), "non-deterministic boundaries");
 }
+void test_stationary_seed_sweep() {
+    Config config{};
+    config.mean_shift = 12U;
+    config.variance_shift = 512U;
+    config.max_segment = 256U;
+    std::size_t false_alarms = 0U;
+    for (std::uint64_t seed = 0U; seed < 64U; ++seed) {
+        const auto values = random_stream(8192U, 0x51a7U + seed);
+        const auto boundaries = segment_lzv(values, config);
+        check_boundaries(boundaries, values.size(), config, "stationary seed sweep");
+        const std::size_t max_only = (values.size() + config.max_segment - 1U) / config.max_segment;
+        if (boundaries.size() - 1U > max_only) false_alarms += boundaries.size() - 1U - max_only;
+    }
+    require(false_alarms == 0U, "stationary random seed sweep produced false boundaries");
+    std::cout << "stationary_seed_sweep=64 false_alarm_boundaries=" << false_alarms << "\n";
+}
+void test_abrupt_seed_sweep() {
+    Config config{};
+    config.min_segment = 32U;
+    config.max_segment = 512U;
+    std::vector<std::size_t> delays;
+    for (std::uint64_t seed = 0U; seed < 32U; ++seed) {
+        auto forward = constant_stream(256U, 0x3ff0000000000000ULL);
+        const auto random = random_stream(256U, 0xa100U + seed);
+        forward.insert(forward.end(), random.begin(), random.end());
+        const auto forward_boundaries = segment_lzv(forward, config);
+        check_boundaries(forward_boundaries, forward.size(), config, "constant-to-random seed sweep");
 
+        auto reverse = random_stream(256U, 0xb200U + seed);
+        reverse.insert(reverse.end(), 256U, 0x3ff0000000000000ULL);
+        const auto reverse_boundaries = segment_lzv(reverse, config);
+        check_boundaries(reverse_boundaries, reverse.size(), config, "random-to-constant seed sweep");
+
+        for (const auto* boundaries : {&forward_boundaries, &reverse_boundaries}) {
+            const auto it = std::find_if(boundaries->begin() + 1, boundaries->end(),
+                [](std::size_t boundary) { return boundary >= 256U && boundary <= 320U; });
+            require(it != boundaries->end(), "abrupt regime transition not detected within 64 values");
+            delays.push_back(*it - 256U);
+        }
+    }
+    const auto max_delay = *std::max_element(delays.begin(), delays.end());
+    const auto delay_sum = std::accumulate(delays.begin(), delays.end(), std::uint64_t{0});
+    const double mean_delay = static_cast<double>(delay_sum) / static_cast<double>(delays.size());
+    require(max_delay <= 64U, "abrupt transition delay exceeded 64 values");
+    std::cout << "abrupt_seed_sweep=64 transitions mean_detection_delay=" << mean_delay
+              << " max_detection_delay=" << max_delay << "\n";
+}
+std::vector<std::uint64_t> prescribed_lzv(const std::vector<std::uint8_t>& counts) {
+    std::vector<std::uint64_t> values;
+    values.reserve(counts.size() + 1U);
+    values.push_back(0x3ff0000000000000ULL);
+    for (const std::uint8_t count : counts) {
+        require(count < 64U, "prescribed LZV count must be less than 64");
+        const std::uint64_t residual = 1ULL << (63U - count);
+        values.push_back(values.back() ^ residual);
+    }
+    return values;
+}
 void report(const std::string& name, const std::vector<std::uint64_t>& values, const Config& config) {
     const auto boundaries = segment_lzv(values, config);
     check_boundaries(boundaries, values.size(), config, name);
@@ -209,6 +265,18 @@ void report(const std::string& name, const std::vector<std::uint64_t>& values, c
     for (const auto boundary : boundaries) std::cout << boundary << ',';
     std::cout << '\n';
 }
+void report_slow_drift() {
+    Config config{};
+    config.max_segment = 256U;
+    std::vector<std::uint8_t> counts;
+    counts.reserve(4096U);
+    for (std::size_t index = 0U; index < 4096U; ++index) {
+        const std::uint8_t value = static_cast<std::uint8_t>(8U + (index / 128U) % 32U);
+        counts.push_back(value);
+    }
+    const auto values = prescribed_lzv(counts);
+    report("slow-lzv-drift", values, config);
+}
 } // namespace
 
 int main() {
@@ -217,7 +285,9 @@ int main() {
         test_abrupt_shift();
         test_stationary_random();
         test_deterministic_and_empty();
-        std::cout << "tests=4 status=PASS\n";
+        test_stationary_seed_sweep();
+        test_abrupt_seed_sweep();
+        std::cout << "tests=6 status=PASS\n";
         Config config{};
         report("constant", constant_stream(2048U, 0x3ff0000000000000ULL), config);
         report("stationary-random", random_stream(4096U, 0xabcULL), config);
@@ -227,6 +297,7 @@ int main() {
         alternating.insert(alternating.end(), random.begin(), random.end());
         alternating.insert(alternating.end(), 512U, 0U);
         report("stable-random-stable", alternating, config);
+        report_slow_drift();
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "LZV reference failure: " << error.what() << '\n';
