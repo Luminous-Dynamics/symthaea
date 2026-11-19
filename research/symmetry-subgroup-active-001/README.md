@@ -12,7 +12,7 @@ A probe asks whether one group element preserves the complete frozen task in one
 
 - Complete finite-group table validation: range, Latin rows/columns, identity, two-sided inverses and associativity.
 - Exhaustive subgroup enumeration with identity, inverse and product closure.
-- Explicit group-order, subgroup-count and work budgets; no partial lattice is returned as complete.
+- Explicit group-order, subgroup-count and work budgets; preflight covers group-table validation, inverse search and the maximum identity-containing subset closure work. No partial lattice is returned as complete.
 - Candidate subgroup hypotheses compiled into the existing exact adaptive minimax planner.
 - Exact minimum-cost static probe-basis baseline on bounded probe families.
 - Explicit unresolved-pair frontier when available probes cannot separate all subgroup hypotheses.
