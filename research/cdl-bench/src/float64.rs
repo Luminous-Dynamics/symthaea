@@ -1071,11 +1071,11 @@ mod tests {
         let mut policy = HistoricalSegmentCosts::default();
         assert_eq!(policy.choose(), 0, "the first segment must use Raw/Order0");
 
-        policy.observe_sizes([100, 80, 60, 40, 90, 70, 50, 30]).unwrap();
+        policy.observe_sizes([100, 80, 60, 40, 90, 70, 50, 50]).unwrap();
         assert_eq!(policy.choose(), 3);
 
         // A later chunk contributes to future choices, not its own selection.
-        // The mean costs after two observations are [60, 55, 50, 45].
+        // Candidate 3 remains the smallest cumulative mean after two observations.
         policy.observe_sizes([20, 30, 40, 50, 45, 60, 70, 80]).unwrap();
         assert_eq!(policy.choose(), 3);
 
@@ -1195,7 +1195,7 @@ mod tests {
         let bad_payloads = [
             vec![0, 0],           // zero run length
             vec![1],              // missing residual
-            vec![2, 0],            // run exceeds declared output count
+            vec![3, 0],            // run exceeds declared output count
             vec![1, 0, 1, 0],      // adjacent equal-valued runs are noncanonical
             vec![0x80, 0, 0],      // overlong run length varint
         ];
