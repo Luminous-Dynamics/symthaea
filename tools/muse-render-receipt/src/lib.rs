@@ -1003,9 +1003,32 @@ mod tests {
         let midi_bytes = simple_midi();
         let midi_sha = sha256_hex(&midi_bytes);
         std::fs::write(root.join("performance.mid"), &midi_bytes).unwrap();
+        let timeline_bytes = serde_json::to_vec(&json!({
+            "schema":"orchestration-timeline-v1",
+            "score_digest_schema":MIDI_SCORE_DIGEST_SCHEMA_V1,
+            "score_sha256":candidate_sha,
+            "segments":[{
+                "id":"seg-a","part_id":1,"instrument_id":"inst-a",
+                "start":{"numerator":0,"denominator":1},
+                "end":{"numerator":1,"denominator":1},
+                "musical_function":"melody","handoff":null
+            }]
+        })).unwrap();
+        let binding_bytes = serde_json::to_vec(&json!([{
+            "instrument_id":"inst-a","renderer_id":"test-renderer",
+            "patch_id":"test-patch","gm_program":0,"asset_sha256":null
+        }])).unwrap();
+        let capability_bytes = serde_json::to_vec(&json!([{"id":"inst-a"}])).unwrap();
+        std::fs::write(root.join("orchestration-timeline.json"), &timeline_bytes).unwrap();
+        std::fs::write(root.join("instrument-bindings.json"), &binding_bytes).unwrap();
+        std::fs::write(root.join("instrument-capabilities.json"), &capability_bytes).unwrap();
+
         let mut midi_manifest = manifest();
         midi_manifest.score_sha256 = candidate_sha.clone();
         midi_manifest.midi_sha256 = midi_sha.clone();
+        midi_manifest.timeline_sha256 = domain_sha256(MIDI_TIMELINE_DIGEST_SCHEMA_V1.as_bytes(), &timeline_bytes);
+        midi_manifest.binding_sha256 = domain_sha256(MIDI_BINDING_DIGEST_SCHEMA_V1.as_bytes(), &binding_bytes);
+        midi_manifest.capability_sha256 = domain_sha256(MIDI_CAPABILITY_DIGEST_SCHEMA_V1.as_bytes(), &capability_bytes);
         let manifest_bytes = serde_json::to_vec(&midi_manifest).unwrap();
         let manifest_sha = domain_sha256(MIDI_MANIFEST_DIGEST_SCHEMA_V1.as_bytes(), &manifest_bytes);
         std::fs::write(root.join("midi-manifest.json"), &manifest_bytes).unwrap();
