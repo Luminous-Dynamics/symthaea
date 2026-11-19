@@ -9,7 +9,7 @@
 
 use std::collections::BTreeMap;
 
-use broca_mace_policy::{Action, Experience, Scope};
+use broca_mace_policy::{Action, Experience, Scope, SourceRootDigest};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AsKnownQuery {
@@ -58,7 +58,9 @@ pub enum SourceTrustStatus {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerifiedLineage {
     pub source_family: u16,
+    /// Legacy/display identifier; digest is the actual independence key.
     pub source_root_id: u32,
+    pub source_root_digest: SourceRootDigest,
     pub trust_status: SourceTrustStatus,
     /// Digest of the trust policy revision used to classify the source.
     pub trust_policy_digest: String,
@@ -201,6 +203,7 @@ pub struct EvidenceReceiptBundle {
     pub lineage_digest: String,
     pub source_family: u16,
     pub source_root_id: u32,
+    pub source_root_digest: SourceRootDigest,
     pub source_acquisition_mode: String,
     pub upstream_source_id: String,
     pub source_artifact_digest: String,
@@ -360,7 +363,7 @@ pub fn ingest_as_known(
             query.known_at_ms,
         )
         .ok_or(IngestReject::UnverifiedLineage)?;
-    if lineage.source_root_id == 0 {
+    if !lineage.source_root_digest.is_known() {
         return Err(IngestReject::UnknownSourceRoot);
     }
     if lineage.source_family == 0 {
@@ -446,6 +449,7 @@ pub fn ingest_as_known(
             event_id: raw.event_id,
             source_family: lineage.source_family,
             source_root_id: lineage.source_root_id,
+            source_root_digest: lineage.source_root_digest,
             scope: raw.scope,
             action: raw.action,
             observed_utility: outcome.observed_utility,
@@ -471,6 +475,7 @@ pub fn ingest_as_known(
             lineage_digest: lineage.receipt_digest,
             source_family: lineage.source_family,
             source_root_id: lineage.source_root_id,
+            source_root_digest: lineage.source_root_digest,
             source_acquisition_mode: lineage.acquisition_mode,
             upstream_source_id: lineage.upstream_source_id,
             source_artifact_digest: lineage.source_artifact_digest,
@@ -524,6 +529,7 @@ pub struct ConsolidationEvidenceRefV1 {
     measurement_error_bound: f64,
     source_family: u16,
     source_root_id: u32,
+    source_root_digest: SourceRootDigest,
     source_trust_status: SourceTrustStatus,
     intervention: bool,
     prediction_pre_registered: bool,
@@ -543,6 +549,7 @@ impl ConsolidationEvidenceRefV1 {
             event_id: self.event_id,
             source_family: self.source_family,
             source_root_id: self.source_root_id,
+            source_root_digest: self.source_root_digest,
             scope: self.scope,
             action: self.action,
             observed_utility: self.observed_utility,
@@ -591,6 +598,10 @@ impl ConsolidationEvidenceRefV1 {
 
     pub fn source_root_id(&self) -> u32 {
         self.source_root_id
+    }
+
+    pub fn source_root_digest(&self) -> SourceRootDigest {
+        self.source_root_digest
     }
 
     pub fn source_trust_status(&self) -> SourceTrustStatus {
@@ -674,12 +685,12 @@ impl ConsolidationEvidencePackV1 {
             .collect();
         let trusted_families: BTreeSet<u16> =
             trusted.iter().map(|event| event.source_family).collect();
-        let trusted_roots: BTreeSet<u32> =
-            trusted.iter().map(|event| event.source_root_id).collect();
+        let trusted_roots: BTreeSet<SourceRootDigest> =
+            trusted.iter().map(|event| event.source_root_digest).collect();
         let successful_families: BTreeSet<u16> =
             successful.iter().map(|event| event.source_family).collect();
-        let successful_roots: BTreeSet<u32> =
-            successful.iter().map(|event| event.source_root_id).collect();
+        let successful_roots: BTreeSet<SourceRootDigest> =
+            successful.iter().map(|event| event.source_root_digest).collect();
         let all_trusted_predictions_pre_registered = !trusted.is_empty()
             && trusted.iter().all(|event| event.prediction_pre_registered);
 
@@ -746,12 +757,12 @@ impl ConsolidationEvidencePackV1 {
 
         let trusted_families: BTreeSet<u16> =
             trusted.iter().map(|event| event.source_family).collect();
-        let trusted_roots: BTreeSet<u32> =
-            trusted.iter().map(|event| event.source_root_id).collect();
+        let trusted_roots: BTreeSet<SourceRootDigest> =
+            trusted.iter().map(|event| event.source_root_digest).collect();
         let successful_families: BTreeSet<u16> =
             successful.iter().map(|event| event.source_family).collect();
-        let successful_roots: BTreeSet<u32> =
-            successful.iter().map(|event| event.source_root_id).collect();
+        let successful_roots: BTreeSet<SourceRootDigest> =
+            successful.iter().map(|event| event.source_root_digest).collect();
         let max_success_measurement_error_bound = successful
             .iter()
             .map(|event| event.measurement_error_bound)
@@ -895,7 +906,7 @@ pub fn build_consolidation_evidence_pack(
     let mut requested = BTreeSet::new();
     let mut events = Vec::with_capacity(requested_event_ids.len());
     let mut source_families = BTreeSet::new();
-    let mut source_roots = BTreeSet::new();
+    let mut source_roots = BTreeSet::<SourceRootDigest>::new();
     let mut trusted_event_count = 0usize;
     let mut untrusted_event_count = 0usize;
     let mut unknown_trust_event_count = 0usize;
@@ -908,13 +919,13 @@ pub fn build_consolidation_evidence_pack(
             .get(event_id)
             .ok_or(ConsolidationPackReject::MissingAdmittedEvent(*event_id))?;
         let experience = &item.experience;
-        if experience.source_family == 0 || experience.source_root_id == 0 {
+        if experience.source_family == 0 || !experience.source_root_digest.is_known() {
             return Err(ConsolidationPackReject::InconsistentKnowledgeSnapshot);
         }
         match item.receipts.source_trust_status {
             SourceTrustStatus::TrustedForScope => {
                 source_families.insert(experience.source_family);
-                source_roots.insert(experience.source_root_id);
+                source_roots.insert(experience.source_root_digest);
                 trusted_event_count += 1;
             }
             SourceTrustStatus::Untrusted => untrusted_event_count += 1,
@@ -930,6 +941,7 @@ pub fn build_consolidation_evidence_pack(
             measurement_error_bound: experience.measurement_error_bound,
             source_family: experience.source_family,
             source_root_id: experience.source_root_id,
+            source_root_digest: experience.source_root_digest,
             source_trust_status: item.receipts.source_trust_status,
             intervention: experience.intervention,
             prediction_pre_registered: experience.prediction_pre_registered,
@@ -970,7 +982,7 @@ pub fn ingest_batch_as_known(
 ) -> Result<IngestBatch, IngestBatchReject> {
     let mut digests = BTreeMap::<u32, &str>::new();
     let mut receipt_bundles = BTreeMap::<u32, EvidenceReceiptBundle>::new();
-    let mut root_by_upstream_id = BTreeMap::<String, u32>::new();
+    let mut root_by_upstream_id = BTreeMap::<String, SourceRootDigest>::new();
     let mut duplicate_event_ids = Vec::new();
     let mut admitted = Vec::new();
 
@@ -991,7 +1003,7 @@ pub fn ingest_batch_as_known(
         }
         if root_by_upstream_id
             .get(&ingested.receipts.upstream_source_id)
-            .is_some_and(|root| *root != ingested.receipts.source_root_id)
+            .is_some_and(|root| *root != ingested.receipts.source_root_digest)
         {
             return Err(IngestBatchReject::ConflictingRootForUpstreamSource(
                 raw.event_id,
@@ -999,7 +1011,7 @@ pub fn ingest_batch_as_known(
         }
         root_by_upstream_id.insert(
             ingested.receipts.upstream_source_id.clone(),
-            ingested.receipts.source_root_id,
+            ingested.receipts.source_root_digest,
         );
         digests.insert(raw.event_id, raw.payload_sha256.as_str());
         receipt_bundles.insert(raw.event_id, ingested.receipts.clone());
@@ -1018,9 +1030,16 @@ mod tests {
     use super::*;
     use broca_mace_policy::{is_qualified, Objective, Query, Regime};
 
+    fn fixture_root_digest(seed: u32) -> SourceRootDigest {
+        let mut bytes = [0_u8; 32];
+        bytes[..4].copy_from_slice(&seed.to_be_bytes());
+        SourceRootDigest::from_bytes(bytes)
+    }
+
     #[derive(Clone)]
     struct TestVerifier {
         root_id: u32,
+        root_digest: SourceRootDigest,
         family_id: u16,
         error_bound: f64,
         reconciled: bool,
@@ -1048,6 +1067,8 @@ mod tests {
         unknown_trust_event_id: Option<u32>,
         trust_policy_digest_valid: bool,
         vary_root_without_source_id: bool,
+        vary_root_digest_by_event: bool,
+        unknown_root_digest: bool,
         lifecycle_event_id: Option<u32>,
     }
 
@@ -1055,6 +1076,7 @@ mod tests {
         fn default() -> Self {
             Self {
                 root_id: 700,
+                root_digest: fixture_root_digest(700),
                 family_id: 7,
                 error_bound: 0.02,
                 reconciled: true,
@@ -1082,6 +1104,8 @@ mod tests {
                 unknown_trust_event_id: None,
                 trust_policy_digest_valid: true,
                 vary_root_without_source_id: false,
+                vary_root_digest_by_event: false,
+                unknown_root_digest: false,
                 lifecycle_event_id: None,
             }
         }
@@ -1140,6 +1164,17 @@ mod tests {
                     1_000 + event_id
                 } else {
                     self.root_id
+                },
+                source_root_digest: if self.unknown_root_digest {
+                    SourceRootDigest::UNKNOWN
+                } else if self.vary_root_digest_by_event {
+                    fixture_root_digest(3_000 + event_id)
+                } else if self.vary_root_without_source_id {
+                    fixture_root_digest(2_000 + event_id)
+                } else if self.vary_lineage_by_event {
+                    fixture_root_digest(1_000 + event_id)
+                } else {
+                    self.root_digest
                 },
                 trust_status: if self.untrusted_event_id == Some(event_id) {
                     SourceTrustStatus::Untrusted
@@ -1883,6 +1918,7 @@ mod tests {
                 Some(VerifiedLineage {
                     source_family: 7,
                     source_root_id: 700,
+                    source_root_digest: fixture_root_digest(700),
                     trust_status: SourceTrustStatus::TrustedForScope,
                     trust_policy_digest: "8".repeat(64),
                     acquisition_mode: "api".into(),
@@ -2078,13 +2114,50 @@ mod tests {
         };
         let second = TestVerifier {
             family_id: 11,
-            root_id: 700,
+            root_id: 701,
             ..TestVerifier::default()
         };
         let a = ingest_as_known(&raw(), query(180, 250), &first).unwrap();
         let b = ingest_as_known(&raw(), query(180, 250), &second).unwrap();
         assert_ne!(a.experience.source_family, b.experience.source_family);
-        assert_eq!(a.experience.source_root_id, b.experience.source_root_id);
+        assert_ne!(a.experience.source_root_id, b.experience.source_root_id);
+        assert_eq!(
+            a.experience.source_root_digest,
+            b.experience.source_root_digest
+        );
+    }
+
+    #[test]
+    fn same_numeric_root_id_with_distinct_verified_digests_is_not_collapsed() {
+        let mut first = raw();
+        first.event_id = 80;
+        first.payload_sha256 = format!("{:064x}", 80);
+        first.raw_event_receipt_id = "raw-80".into();
+        first.lineage_receipt_id = "lineage-80".into();
+        first.calibration_receipt_id = "calibration-80".into();
+        first.causal_assessment_receipt_id = "causal-80".into();
+        first.outcome_receipt_id = "outcome-80".into();
+
+        let mut second = first.clone();
+        second.event_id = 81;
+        second.payload_sha256 = format!("{:064x}", 81);
+        second.raw_event_receipt_id = "raw-81".into();
+        second.lineage_receipt_id = "lineage-81".into();
+        second.calibration_receipt_id = "calibration-81".into();
+        second.causal_assessment_receipt_id = "causal-81".into();
+        second.outcome_receipt_id = "outcome-81".into();
+
+        let verifier = TestVerifier {
+            vary_root_digest_by_event: true,
+            root_id: 700,
+            ..TestVerifier::default()
+        };
+        let batch = ingest_batch_as_known(&[first, second], query(180, 250), &verifier)
+            .expect("verified 256-bit roots distinguish numeric-ID collisions");
+        let pack = build_consolidation_evidence_pack(&batch, &[80, 81])
+            .expect("both verified roots remain in the receipt pack");
+        let summary = pack.summarize_action_for_scope(scope(), Action::A);
+        assert_eq!(summary.qualified_success_source_root_count, 2);
     }
 
     #[test]
@@ -2127,6 +2200,19 @@ mod tests {
             admitted.receipts.source_artifact_digest,
             "e".repeat(64)
         );
+    }
+
+    #[test]
+    fn unknown_digest_is_rejected_even_when_numeric_root_id_is_present() {
+        let verifier = TestVerifier {
+            root_id: 700,
+            unknown_root_digest: true,
+            ..TestVerifier::default()
+        };
+        assert!(matches!(
+            ingest_as_known(&raw(), query(180, 250), &verifier),
+            Err(IngestReject::UnknownSourceRoot)
+        ));
     }
 
     #[test]
