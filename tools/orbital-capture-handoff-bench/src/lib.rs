@@ -301,11 +301,10 @@ pub fn evaluate_case(profile: &Profile, case: &Case) -> CaseResult {
 
     match contact.bus_angular_velocity_rad_s.as_ref() {
         Some(values) if values.len() == 3 && values.iter().all(|v| v.is_finite()) => {
-            if values
-                .iter()
-                .any(|value| value.abs() > profile.max_bus_angular_rate_rad_s)
-            {
-                violates("bus_angular_rate", &mut reasons);
+            let angular_rate_magnitude =
+                values.iter().map(|value| value * value).sum::<f64>().sqrt();
+            if angular_rate_magnitude > profile.max_bus_angular_rate_rad_s {
+                violates("bus_angular_rate_magnitude", &mut reasons);
             }
         }
         Some(_) => missing("valid_three_axis_bus_rate", &mut reasons),
@@ -599,6 +598,19 @@ mod tests {
         let data = fixture();
         let case = data.cases.iter().find(|case| case.id == "BUS_RATE_LIMIT_VIOLATION").unwrap();
         assert_eq!(evaluate_case(&data.profile, case).status, GateStatus::Rejected);
+    }
+
+    #[test]
+    fn bus_rate_vector_magnitude_is_checked_not_only_axis_components() {
+        let data = fixture();
+        let mut case = data
+            .cases
+            .iter()
+            .find(|case| case.id == "NOMINAL_CAPTURE")
+            .unwrap()
+            .clone();
+        case.contact.bus_angular_velocity_rad_s = Some([0.015, 0.015, 0.015].to_vec());
+        assert_eq!(evaluate_case(&data.profile, &case).status, GateStatus::Rejected);
     }
 
     #[test]
