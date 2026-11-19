@@ -1045,7 +1045,7 @@ mod tests {
         let plan_bytes = serde_json::to_vec(&json!({
             "schema":SCORE_EDIT_SCHEMA_V1,
             "input_digest_schema":SCORE_EDIT_INPUT_DIGEST_SCHEMA_V1,
-            "input_score_sha256":source_sha,
+            "input_score_sha256":source_sha.clone(),
             "operations":[{"id":"op-1"}],
             "protected_windows":[{"id":"keep-1"}]
         })).unwrap();
@@ -1071,7 +1071,7 @@ mod tests {
         let timeline_bytes = serde_json::to_vec(&json!({
             "schema":"orchestration-timeline-v1",
             "score_digest_schema":MIDI_SCORE_DIGEST_SCHEMA_V1,
-            "score_sha256":candidate_sha,
+            "score_sha256":candidate_sha.clone(),
             "segments":[{
                 "id":"seg-a","part_id":1,"instrument_id":"inst-a",
                 "start":{"numerator":0,"denominator":1},
@@ -1113,7 +1113,7 @@ mod tests {
             "configuration_sha256":sha256_hex(&renderer_config),
             "asset_sha256":null,
             "input_midi_path":"performance.mid",
-            "input_midi_sha256":midi_sha,
+            "input_midi_sha256":midi_sha.clone(),
             "output_audio_path":"output.wav",
             "arguments":["--input","performance.mid","--output","output.wav"],
             "started_at":"2026-11-19T10:00:00Z",
