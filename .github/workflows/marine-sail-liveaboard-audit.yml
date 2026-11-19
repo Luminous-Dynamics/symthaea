@@ -44,8 +44,8 @@ jobs:
 
       - name: Validate frozen paired-mission adversarial corpus
         run: |
-          cargo run --quiet --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml --bin validate-corpus -- docs/research/marine/fixtures/marine-sail-liveaboard-corpus-0001.json > /tmp/marine-corpus.json
-          jq -e '.status == "DECLARATIVE_CORPUS_VALID" and .scenario_count == 16 and .policy_arm_count == 7 and .required_threat_classes_covered == 13' /tmp/marine-corpus.json
+          cargo run --quiet --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml --bin validate_corpus -- docs/research/marine/fixtures/marine-sail-liveaboard-corpus-0001.json > /tmp/marine-corpus.json
+          jq -e '.status == "CORPUS_EXECUTED" and .scenario_count == 16 and .executed_scenario_count == 16 and .policy_arm_count == 7 and .required_threat_classes_covered == 13 and ([.scenario_results[].passed] | all)' /tmp/marine-corpus.json
 
       - name: Audit synthetic fixture (must remain non-operational)
         run: |
