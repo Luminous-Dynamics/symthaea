@@ -171,7 +171,7 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     }
     if prediction_map.len() != record_map.len() {
         let missing: Vec<&str> = record_map.keys()
-            .filter(|id| !prediction_map.contains_key(**id)).copied().collect();
+            .filter(|id| !prediction_map.contains_key(*id)).copied().collect();
         return Err(format!("prediction coverage incomplete; missing {missing:?}"));
     }
 
@@ -187,7 +187,7 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     let mut positive_with_tc_count = 0_u64;
 
     for (id, record) in &record_map {
-        let prediction = *prediction_map.get(*id).ok_or_else(|| format!("prediction missing for {id}"))?;
+        let prediction = *prediction_map.get(id).ok_or_else(|| format!("prediction missing for {id}"))?;
         let label = required_text(record, "label_state")?;
         let abstained = prediction["feasibility_abstained"].as_bool()
             .ok_or_else(|| format!("prediction {id} feasibility_abstained must be boolean"))?;
