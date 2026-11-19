@@ -40,6 +40,28 @@ The output manifest binds the source/program/geometry/scene digests to the gener
 - Arc start angles are reduced modulo one revolution before trigonometric evaluation.
 - Styles are intentionally not translated in this first geometry adapter; creative profiles remain an independent layer.
 
+
+## Atelier production adapter
+
+The `atelier` module calls the existing `symthaea_atelier::generate` API and returns a Canvas `SceneNode`. It is not a second generator. Calls use an explicit `StdRng` seed, stable GGL instance ID, and a receipt binding request and scene digests. Atelier's aesthetic score and selection loop are not invoked; human/Creative-QD selection remains with existing owners.
+
+Registered single-family styles and conservative complete-output node ceilings (including the GGL wrapper):
+
+| Atelier style | Output ceiling |
+|---|---:|
+| LSystem | 3 |
+| ParametricCurve | 11 |
+| PersistenceTexture | 130 |
+| ColorField | 15 |
+| ReactionDiffusion | 1,027 |
+| StrangeAttractor | 6,002 |
+| HofstadterButterfly | 1,593 |
+| PersistenceDiagram | 263 |
+
+The all-in-one `Composite` style is not registered because its aggregate compute/output budget has not been independently qualified. The request must declare a node cap at least as large as the selected style's conservative ceiling; the preflight happens before generation.
+
+Additional bounds include an 8,192 scene-unit viewport, max_elements 5,000, max 10,000 visited nodes, depth 128, 256 polygon vertices, 256 gradient stops, 512 KiB per path, bounded scene strings and transforms, and a snapshot check that rejects rather than silently sanitizing/truncating inputs. Negative scale is allowed for reflection, while near-zero and unbounded transforms are rejected.
+
 ## Qualification
 
 `tests/adapter.rs` exercises all four supported primitives, raw source SHA binding, deterministic output, actual Canvas SVG rendering, stable IDs and malformed-input controls. `symthaea-canvas/tests/ggl_adapter_conformance.rs` independently checks the serialized Canvas fixture against the Rust types and renderer.
