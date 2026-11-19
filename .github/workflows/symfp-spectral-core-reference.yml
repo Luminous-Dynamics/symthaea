@@ -7,7 +7,7 @@ on:
       - "research/symfp-spectral-core-001/**"
       - ".github/workflows/symfp-spectral-core-reference.yml"
   push:
-    branches: [main]
+    branches: [main, research/symfp-uncertainty-envelope-v0-1]
     paths:
       - "research/symfp-spectral-core-001/**"
       - ".github/workflows/symfp-spectral-core-reference.yml"
