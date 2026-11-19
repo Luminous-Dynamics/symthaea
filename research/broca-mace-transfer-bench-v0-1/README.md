@@ -79,21 +79,21 @@ The oracle is evaluator-only and is not linked as a dependency into the candidat
 
 ## What v0.1 can and cannot establish
 
-The harness can regression-test whether transparent policy rules reject these specific synthetic failure modes. The causal-qualified policy is deliberately hand-authored against visible fixture structure. A zero-overclaim or high-accuracy result on these seventeen fixed cases is **not** evidence of causal discovery, real-world transfer, general intelligence or SOTA.
+The harness regression-tests transparent policy rules against fixed and generated synthetic failure modes. The causal-qualified and invariant-transport policies are hand-authored, not learned causal models. A zero-overclaim or high-accuracy result on these eighteen fixed cases is **not** evidence of causal discovery, real-world transfer, general intelligence or SOTA.
 
-It does not yet include:
+Remaining gaps:
 - hidden external evaluator custody or sealed labels;
-- randomized multi-seed worlds and source-/seed-held-out intervals;
-- Session C delayed corrections or a full Session A → consolidation → Session B → correction chain;
-- official MemoryArena / AMA-Bench adapters or licensed benchmark data;
-- learned policies, model training or model-provider comparisons;
-- token, tool-call, CPU/GPU, energy and p95/p99 lifecycle cost measurement.
+- randomized multi-seed worlds and source-/seed-/mechanism-held-out intervals;
+- a production Mycelix/Symtropy verifier and direct consumption of #12731's full retention, forgetting, privacy-erasure and reversibility lifecycle;
+- provider-native OpenAI/Anthropic session adapters wired end-to-end (the current provider capture and source-span validators are separate untrusted-input seams);
+- official MemoryArena / AMA-Bench and AML Add/Search submissions under their exact rules;
+- learned policies, model-provider ablations, calibration and full token/tool/CPU/GPU/energy/p95/p99 lifecycle-cost measurement.
 
 ## Next qualification gates
 
 1. Move evaluator code and hidden labels to evaluator-controlled custody (#11816).
 2. Generate source- and seed-held-out worlds with randomized task prevalence and confounders.
-3. Add Session C corrections and connect the output of consolidation #9139 / PR #12731 to Session B transfer.
+3. Connect #12731's broader consolidation lifecycle, including reversible forgetting, supersession and privacy erasure, to the MACE evidence pack; the current Session-A/B/C integration uses the MACE-specific proposal consumer and synthetic verifier.
 4. Add causal-certificate mutation tests and replayable prediction-before-action receipts.
 5. Reuse canonical source/claim/scope/action-effect contracts from #9075, #8265, #9016 and #9490.
 6. Add official benchmark adapters only after dataset license and evaluator contracts are verified.
@@ -121,7 +121,7 @@ Do not pool percentages across these tasks. Reproduce each official protocol sep
 
 ## Generated stress tranche (MACE v0.6 research)
 
-A second evaluator binary adds **256 deterministic clusters × 17 scenario families = 4,352 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, a shared-common-root attack, an error-interval negative control, qualified negative experience, few-shot invariant transport, a mechanism-break negative control, and an unseen-target case that triggers active probing.
+A second evaluator binary adds **256 deterministic clusters × 17 scenario families = 4,352 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, a shared-common-root attack, an error-interval negative control, a common-mode baseline-shift positive control, qualified negative experience, few-shot invariant transport, a mechanism-break negative control, and an unseen-target case that triggers active probing.
 
 Run it independently:
 
@@ -130,7 +130,7 @@ cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p 
 cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-evaluator --bin mace_generated_stress
 ```
 
-The candidate gate requires unique event IDs, at least two distinct nonzero source-family IDs and at least two distinct nonzero verified 256-bit source-root digests for each action; source-family ID zero is rejected by both exact-scope and transfer qualification. MACE v0.5 also requires both action alternatives to have qualified support and checks transport using worst-case effect intervals including candidate-supplied measurement bounds; the bounds remain untrusted until an ingress calibration receipt verifies them. A comparative choice also requires qualified evidence for both candidate actions; one-sided support is not treated as proof that the unsupported alternative is inferior. Different family labels cannot turn a shared upstream source into independent evidence. Root digests are supplied by the ingress verifier; the current verifier itself is still a mock. The runner reports aggregate metrics for all policies and per-family metrics for both exact-scope causal memory and invariant transport. It also reports paired utility lift versus no-memory with a deterministic **cluster-bootstrap 95% interval**, resampling world clusters rather than individual scenarios, and a Session-B / Session-C known-retraction recovery control.
+The candidate gate requires unique event IDs, at least two distinct nonzero source-family IDs and at least two distinct nonzero verified 256-bit source-root digests for each action; source-family ID zero is rejected by both exact-scope and transfer qualification. MACE v0.6 requires both action alternatives to have qualified support and compares the treatment contrast mean(A)-mean(B) across regimes, using worst-case effect intervals including measurement bounds; the bounds remain untrusted until an ingress calibration receipt verifies them. A comparative choice also requires qualified evidence for both candidate actions; one-sided support is not treated as proof that the unsupported alternative is inferior. Different family labels cannot turn a shared upstream source into independent evidence. Root digests are supplied by the ingress verifier; the current verifier itself is still a mock. The runner reports aggregate metrics for all policies and per-family metrics for both exact-scope causal memory and invariant transport. It also reports paired utility lift versus no-memory with a deterministic **cluster-bootstrap 95% interval**, resampling world clusters rather than individual scenarios, and a Session-B / Session-C known-retraction recovery control.
 
 This is a generated synthetic stress distribution—not an official MemoryArena/AMA-Bench adapter, learned-policy train/test split, sealed external oracle or real-world causal discovery. Source-family IDs vary to expose correlation/identity failures, but independence is not cryptographically attested. Bootstrap intervals quantify variation over these generated clusters only; they do not establish external validity. Session-C corrections are applied as observed source-state updates before the next decision.
 
@@ -140,7 +140,7 @@ The candidate crate adds an `invariant_transport` policy alongside exact-scope `
 
 The generated suite includes a few-shot invariant positive control, a common-mode baseline-shift positive control, and a mechanism-break negative control. Exact-scope policy should abstain on the positive few-shot case; invariant transport may transfer. It must abstain when treatment effects move beyond the tolerance, target action witnesses are missing, or source-family/root lineage overlaps.
 
-This is a transparent empirical-invariance heuristic, not a general transportability proof. The 0.12 margin is a preregistered prototype constant, not empirically calibrated. Each observation carries a claimed absolute measurement-error bound; transport requires `abs(mean_source - mean_target) + mean_error_source + mean_error_target <= 0.12`. This is a deterministic worst-case interval-containment condition, not a statistical confidence interval. The bounds and root IDs remain candidate-visible claims and need sensor/protocol and source-ledger attestation.
+This is a transparent empirical-invariance heuristic, not a general transportability proof. The 0.12 margin is a prototype constant, not empirically calibrated. For source regime s and target regime t, it requires `abs((mean_A_s - mean_B_s) - (mean_A_t - mean_B_t)) + err_A_s + err_B_s + err_A_t + err_B_t <= 0.12`. This is a deterministic worst-case interval-containment condition, not a statistical confidence interval. Root digests and measurement-error bounds must originate in receipt-verified source lineage and calibration; direct candidate-provided values are not trust anchors.
 
 ## Benchmark portfolio
 
@@ -183,9 +183,9 @@ TimlMemBench reports 208 reviewed samples, 1,566 sessions, 1,715 questions and 1
 
 ### Agent Memory Challenge Cycle 2
 
-As checked on **November 19, 2026**, the official Cycle 2 page still labels leaderboard publication **expected November 19, 2026**; the page does not yet provide an official result table. The Cycle 2 submission deadline was October 31 and evaluation closed November 4, so this cycle is no longer open for new submissions. The platform standardizes Add/Search from the memory system and delegates Answer/Eval to the platform, with separate textual, coding and multimodal tracks. See the [official competition page](https://agentmemoryleaderboard.ai/competition/).
+As checked on **November 19, 2026**, the official competition page marks Cycle 2 as published. The separately accessible Textual / Closed-source Methods board reports **MemoraX #1 at 69.26/100 among 125 entries**. This is a commercial-method result, not the Open-source Methods score; the open-method Cycle 2 table was not retrieved in this research pass, so no open-source rank is claimed. The Cycle 2 materials deadline (October 31) and evaluation close (November 4) have passed. The platform fixes the data, Answer and Eval contracts, while participants implement Add/Search; it publishes separate Textual, Coding and Multimodal boards. See the [official competition page](https://agentmemoryleaderboard.ai/competition/) and [Textual / Closed-source Methods results](https://agentmemories.ai/leaderboard/industry/textual).
 
-**Implication for Luminous:** prepare a provider-neutral Add/Search adapter and target the next eligible cycle. Do not claim a Cycle 2 rank or infer results from interim displays. The MACE synthetic causal-transfer score is a separate axis and must never be presented as an AML leaderboard score.
+**Implication for Luminous:** the existing `broca-aml-adapter` is a protocol core, not a hosted service. A future open-method submission requires participant-hosted Add/Search endpoints, a fixed public commit/API version, operational capacity and review. Cycle 2's academic/open-method profile also specifies `text-embedding-v4` and `gpt-4o-mini` for embedding/LLM components; keep that benchmark-specific profile separate from Symthaea's native provider-neutral architecture. Target the next eligible cycle. MACE's synthetic causal-transfer score is a separate axis and must never be presented as an AML score.
 
 ### Cross-platform reference architecture
 
@@ -253,7 +253,7 @@ The default prototype gate mirrors the governed benchmark's three-support thresh
 
 The proposal contains the exact action/scope, as-known coordinates, evidence event IDs, family/root counts, maximum measurement bound, all threshold parameters and policy revision. Invalid configurations (zero support thresholds or non-finite/out-of-range measurement ceilings) fail closed to provisional. It is a candidate recommendation, not an authorization or storage transaction.
 
-The consolidation crate has 7 unit tests and one cross-crate regression in `consolidation/tests/raw_session_pipeline.rs`. It exercises raw Session-A ingestion → receipt pack → action-specific consolidation proposals → Session-B causal decision → Session-C source retraction → rebuilt pack → abstention/active-probe request. The test verifier is synthetic; no production Mycelix verifier is claimed.
+The consolidation crate has 7 unit tests and 5 cross-crate tests in `consolidation/tests/raw_session_pipeline.rs`. They exercise raw Session-A ingestion, action-specific consolidation proposals, receipt-gated release, Session-B decisions, Session-C retraction/rebuild, correction of stale evidence, and the new common-mode-shift treatment-effect transfer from raw Session A into a shifted raw Session B. The test verifier is synthetic; no production Mycelix verifier is claimed.
 
 
 ## Raw-native ingestion and bitemporal replay (MACE v0.7 research)
@@ -360,7 +360,7 @@ See [MACE AML Add/Search Adapter v0.1](../../docs/research/MACE_AML_ADD_SEARCH_A
 
 ## Current end-to-end integration inventory (2026-11-19)
 
-The MACE branch now has five Rust packages: candidate policy, synthetic evaluator, receipt-gated ingress, proposal-only consolidation and AML Add/Search contract core. The current authored regression inventory is 19 policy tests, 26 raw-JSONL evaluator tests, 36 ingress receipt/bitemporal tests, 11 provider-trace tests, 9 source-span claim tests, 7 consolidation unit tests plus the raw-session integration test, and 14 AML adapter tests. These are source counts, **not executed test results**.
+The MACE branch has five Rust packages: candidate policy, synthetic evaluator, receipt-gated ingress, proposal-only consolidation and AML Add/Search contract core. Current authored source counts are 21 policy tests, 13 fixed-evaluator tests, 11 generated-stress tests, 26 raw-JSONL evaluator tests, 36 ingress receipt/bitemporal tests, 11 provider-trace tests, 9 source-span claim tests, 7 consolidation unit tests plus 5 raw-session integration tests, and 14 AML adapter tests. These are source counts, **not executed test results**.
 
 The three evidence planes remain deliberately distinct:
 - provider capture / source spans prove what bytes were captured and where a claim came from; they do not prove execution or truth;
