@@ -274,5 +274,42 @@
     "no_authority_grant": true,
     "perfect_foresight_is_non_deployable": true
   },
-  "claim_ceiling": "cross_owner_composition_only"
+  "claim_ceiling": "cross_owner_composition_only",
+  "hard_gate_evaluations": [
+    {
+      "gate_id": "SYNTHETIC-ODD-GATE",
+      "status": "unknown",
+      "owner_receipt_roles": [
+        "operational_design_domain"
+      ],
+      "evidence_ids": [
+        "SYNTHETIC-ODD-RECEIPT"
+      ],
+      "rationale": "Synthetic fixture contains no operational-domain qualification."
+    },
+    {
+      "gate_id": "SYNTHETIC-SERVICE-FLOOR-GATE",
+      "status": "unknown",
+      "owner_receipt_roles": [
+        "service_continuity",
+        "resource_service_schedule"
+      ],
+      "evidence_ids": [
+        "SYNTHETIC-SERVICE-RECEIPT"
+      ],
+      "rationale": "Synthetic fixture contains no measured service-continuity evidence."
+    },
+    {
+      "gate_id": "SYNTHETIC-ENERGY-RESERVE-GATE",
+      "status": "unknown",
+      "owner_receipt_roles": [
+        "mission_energy_budget",
+        "resource_autonomy_vector"
+      ],
+      "evidence_ids": [
+        "SYNTHETIC-ENERGY-RECEIPT"
+      ],
+      "rationale": "Synthetic fixture contains no measured mission energy or resource reserve evidence."
+    }
+  ]
 }
