@@ -77,36 +77,96 @@ std::vector<std::uint8_t> encode_one_series(const std::vector<Record>& rows){
     }
     return o;
 }
-bool decode_one_series(const std::vector<std::uint8_t>& bytes,std::size_t count,Key key,std::vector<Record>& out){
-    out.clear();out.reserve(count);std::size_t p=0U;std::uint64_t last_time=0U;
-    while(out.size()<count){
-        if(p>=bytes.size()) return false;
-        const auto mode=bytes[p++];
-        if(mode==2U){
-            if(out.empty()) return false;
-            std::uint64_t delta=0U,run=0U;
-            if(!get_var(bytes,p,delta)||!get_var(bytes,p,run)||run<2U||run>count-out.size()) return false;
-            std::uint64_t t=out.back().timestamp;Record r=out.back();
-            for(std::uint64_t j=0U;j<run;++j){if(delta>UINT64_MAX-t)return false;t+=delta;r.timestamp=t;out.push_back(r);}
-            last_time=t;continue;
+bool decode_one_series(const std::vector<std::uint8_t>& bytes, std::size_t count,
+                       Key key, std::vector<Record>& out) {
+    out.clear();
+    out.reserve(count);
+    std::size_t cursor = 0U;
+    std::uint64_t last_time = 0U;
+
+    while (out.size() < count) {
+        if (cursor >= bytes.size()) return false;
+        const auto mode = bytes[cursor++];
+
+        if (mode == 2U) {
+            if (out.empty()) return false;
+            std::uint64_t delta = 0U;
+            std::uint64_t run = 0U;
+            if (!get_var(bytes, cursor, delta) || !get_var(bytes, cursor, run) ||
+                run < 2U || run > count - out.size()) return false;
+
+            std::uint64_t timestamp = out.back().timestamp;
+            Record repeated = out.back();
+            for (std::uint64_t index = 0U; index < run; ++index) {
+                if (delta > UINT64_MAX - timestamp) return false;
+                timestamp += delta;
+                repeated.timestamp = timestamp;
+                out.push_back(repeated);
+            }
+            last_time = timestamp;
+            continue;
         }
-        if(mode>1U)return false;
-        std::uint64_t tv=0U;if(!get_var(bytes,p,tv))return false;
-        std::uint64_t timestamp=0U;
-        if(out.empty()){
-            if(mode!=1U)return false;timestamp=tv;if(p>=bytes.size())return false;
-            const auto present=bytes[p++];Record r{};r.timestamp=timestamp;r.entity=key.first;r.series=key.second;r.present=present;
-            for(std::size_t f=0U;f<kFields;++f)if((present&(1U<<f))!=0U){std::uint64_t value=0U;if(!get_u64(bytes,p,value))return false;r.values[f]=value;}
-            if(!valid_record(r))return false;out.push_back(r);last_time=timestamp;continue;
+
+        if (mode > 1U) return false;
+        std::uint64_t time_value = 0U;
+        if (!get_var(bytes, cursor, time_value)) return false;
+
+        std::uint64_t timestamp = 0U;
+        if (out.empty()) {
+            if (mode != 1U) return false;
+            timestamp = time_value;
+            if (cursor >= bytes.size()) return false;
+
+            const auto present = bytes[cursor++];
+            Record record{};
+            record.timestamp = timestamp;
+            record.entity = key.first;
+            record.series = key.second;
+            record.present = present;
+            for (std::size_t field = 0U; field < kFields; ++field) {
+                if ((present & (1U << field)) != 0U) {
+                    std::uint64_t value = 0U;
+                    if (!get_u64(bytes, cursor, value)) return false;
+                    record.values[field] = value;
+                }
+            }
+            if (!valid_record(record)) return false;
+            out.push_back(record);
+            last_time = timestamp;
+            continue;
         }
-        if(mode==0U){if(tv>UINT64_MAX-last_time)return false;timestamp=last_time+tv;}
-        else{if(tv>=last_time)return false;timestamp=tv;}
-        last_time=timestamp;if(bytes.size()-p<2U)return false;
-        const auto mask=bytes[p++];const auto present=bytes[p++];Record r=out.back();r.timestamp=timestamp;
-        for(std::size_t f=0U;f<kFields;++f){const auto bit=static_cast<std::uint8_t>(1U<<f);if((mask&bit)!=0U){if((present&bit)!=0U){std::uint64_t value=0U;if(!get_u64(bytes,p,value))return false;r.values[f]=value;}else r.values[f]=0U;}}
-        r.present=present;if(!valid_record(r)||mask!=changed_mask(out.back(),r))return false;out.push_back(r);
+
+        if (mode == 0U) {
+            if (time_value > UINT64_MAX - last_time) return false;
+            timestamp = last_time + time_value;
+        } else {
+            if (time_value >= last_time) return false;
+            timestamp = time_value;
+        }
+        last_time = timestamp;
+
+        if (bytes.size() - cursor < 2U) return false;
+        const auto mask = bytes[cursor++];
+        const auto present = bytes[cursor++];
+        Record record = out.back();
+        record.timestamp = timestamp;
+        for (std::size_t field = 0U; field < kFields; ++field) {
+            const auto bit = static_cast<std::uint8_t>(1U << field);
+            if ((mask & bit) != 0U) {
+                if ((present & bit) != 0U) {
+                    std::uint64_t value = 0U;
+                    if (!get_u64(bytes, cursor, value)) return false;
+                    record.values[field] = value;
+                } else {
+                    record.values[field] = 0U;
+                }
+            }
+        }
+        record.present = present;
+        if (!valid_record(record) || mask != changed_mask(out.back(), record)) return false;
+        out.push_back(record);
     }
-    return p==bytes.size();
+    return cursor == bytes.size();
 }
 std::vector<std::uint8_t> encode_partitioned(const std::vector<Record>& records){
     std::map<Key,std::size_t> key_to_id;std::vector<Key> keys;std::vector<std::vector<Record>> per_key;std::vector<std::size_t> schedule;schedule.reserve(records.size());
