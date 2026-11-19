@@ -513,6 +513,82 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
 }
 
 
+fn f64s_candidate_trace(frame: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
+    const OUTER_HEADER_LEN: usize = 32;
+    const CHILD_HEADER_LEN: usize = 32;
+    if frame.len() < OUTER_HEADER_LEN || &frame[0..4] != b"F64S" {
+        return Err("invalid F64S selector frame".into());
+    }
+    let segment_count = u32::from_le_bytes(
+        frame[20..24].try_into().map_err(|_| "invalid F64S segment count")?,
+    ) as usize;
+    let mut cursor = OUTER_HEADER_LEN;
+    let mut trace = Vec::with_capacity(segment_count);
+    for _ in 0..segment_count {
+        let header_end = cursor
+            .checked_add(CHILD_HEADER_LEN)
+            .ok_or("F64C header offset overflow")?;
+        if header_end > frame.len() || &frame[cursor..cursor + 4] != b"F64C" {
+            return Err("truncated or invalid F64C child header".into());
+        }
+        let transform = frame[cursor + 6];
+        let model = frame[cursor + 7];
+        if transform > 3 || model > 1 {
+            return Err(format!("unsupported F64C candidate IDs: transform={transform}, model={model}").into());
+        }
+        let candidate = transform * 2 + model;
+
+        let inner_len = u64::from_le_bytes(
+            frame[cursor + 16..cursor + 24]
+                .try_into()
+                .map_err(|_| "invalid F64C inner length")?,
+        );
+        let inner_len = usize::try_from(inner_len).map_err(|_| "F64C inner length overflow")?;
+        let child_len = CHILD_HEADER_LEN
+            .checked_add(inner_len)
+            .ok_or("F64C child frame length overflow")?;
+        cursor = cursor
+            .checked_add(child_len)
+            .ok_or("F64C child end overflow")?;
+        if cursor > frame.len() {
+            return Err("F64C child extends beyond F64S frame".into());
+        }
+        trace.push(candidate);
+    }
+    if cursor != frame.len() {
+        return Err("trailing bytes after F64S child frames".into());
+    }
+    Ok(trace)
+}
+
+fn candidate_trace_metrics(trace: &[u8]) -> (usize, usize) {
+    let switches = trace
+        .windows(2)
+        .filter(|pair| pair[0] != pair[1])
+        .count();
+    (switches, 0)
+}
+
+fn candidate_trace_vs_oracle(trace: &[u8], oracle: &[u8]) -> Result<(usize, usize), Box<dyn Error>> {
+    if trace.len() != oracle.len() {
+        return Err(format!(
+            "candidate trace length mismatch: online={}, oracle={}",
+            trace.len(),
+            oracle.len()
+        ).into());
+    }
+    let switches = trace
+        .windows(2)
+        .filter(|pair| pair[0] != pair[1])
+        .count();
+    let mismatches = trace
+        .iter()
+        .zip(oracle)
+        .filter(|(selected, optimal)| selected != optimal)
+        .count();
+    Ok((switches, mismatches))
+}
+
 fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     let mut count = 10_000usize;
     let mut seed = 0xf64cu64;
@@ -628,7 +704,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# values={count}");
     println!("# seed={seed}");
     println!("# representation=IEEE-754-binary64 exact bit preservation");
-    println!("source,mode,transform,model,segment_size,probe_interval,probe_count,encoder_extra_candidate_encodes,decoder_candidate_reencodes,oracle_gap_pct,raw_bytes,frame_bytes,zstd_raw_bytes,ratio,encode_ns,decode_ns,round_trip");
+    println!("source,mode,transform,model,segment_size,probe_interval,probe_count,encoder_extra_candidate_encodes,decoder_candidate_reencodes,oracle_gap_pct,candidate_switches,oracle_candidate_mismatch_segments,raw_bytes,frame_bytes,zstd_raw_bytes,ratio,encode_ns,decode_ns,round_trip");
 
     for (name, values) in sources {
         let raw_len = values.len().checked_mul(8).ok_or("float raw length overflow")?;
@@ -670,7 +746,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                     Float64Transform::RleXorPrevious => "rle_xor_previous",
                 };
                 println!(
-                    "{name},single,{transform_name},{model_name},NA,NA,0,0,0,NA,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
+                    "{name},single,{transform_name},{model_name},NA,NA,0,0,0,NA,NA,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
                     raw.len(),
                     frame.len()
                 );
@@ -690,6 +766,8 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
 
             let encode_started = Instant::now();
             let frame = compress_f64_segmented(&values, segment_size)?;
+            let oracle_trace = f64s_candidate_trace(&frame)?;
+            let (oracle_switches, _) = candidate_trace_metrics(&oracle_trace);
             let encode_ns = encode_started.elapsed().as_nanos();
             let decode_started = Instant::now();
             let decoded = decompress_f64_segmented(&frame, values.len())?;
@@ -705,7 +783,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 format!("{:.6}", frame.len() as f64 / raw.len() as f64)
             };
             println!(
-                "{name},segment_portfolio,best_of_eight,best_of_eight,{segment_size},1,{full_probe_count},{full_encoder_extra_encodes},{offline_decoder_reencodes},0.000000,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
+                "{name},segment_portfolio,best_of_eight,best_of_eight,{segment_size},1,{full_probe_count},{full_encoder_extra_encodes},{offline_decoder_reencodes},0.000000,{oracle_switches},0,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
                 raw.len(),
                 frame.len()
             );
@@ -732,13 +810,16 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
             } else {
                 (online_frame.len() as f64 / frame.len() as f64 - 1.0) * 100.0
             };
+            let online_trace = f64s_candidate_trace(&online_frame)?;
+            let (online_switches, online_mismatches) =
+                candidate_trace_vs_oracle(&online_trace, &oracle_trace)?;
             if online_oracle_gap_pct < -1e-9 {
                 return Err(format!(
                     "historical selector beat offline best-of-eight oracle for {name}/{segment_size}"
                 ).into());
             }
             println!(
-                "{name},online_historical_cost,past_segment_mean,best_of_eight,{segment_size},1,{full_probe_count},{full_encoder_extra_encodes},{historical_decoder_reencodes},{online_oracle_gap_pct:.6},{},{},{zstd},{online_ratio},{online_encode_ns},{online_decode_ns},exact",
+                "{name},online_historical_cost,past_segment_mean,best_of_eight,{segment_size},1,{full_probe_count},{full_encoder_extra_encodes},{historical_decoder_reencodes},{online_oracle_gap_pct:.6},{online_switches},{online_mismatches},{},{},{zstd},{online_ratio},{online_encode_ns},{online_decode_ns},exact",
                 raw.len(),
                 online_frame.len()
             );
@@ -772,6 +853,9 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 } else {
                     (budgeted_frame.len() as f64 / frame.len() as f64 - 1.0) * 100.0
                 };
+                let budgeted_trace = f64s_candidate_trace(&budgeted_frame)?;
+                let (budgeted_switches, budgeted_mismatches) =
+                    candidate_trace_vs_oracle(&budgeted_trace, &oracle_trace)?;
                 if oracle_gap_pct < -1e-9 {
                     return Err(format!(
                         "budgeted selector beat offline best-of-eight oracle for {name}/{segment_size}/{probe_interval}"
@@ -785,7 +869,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 let encoder_extra_candidate_encodes = probe_count * 7;
                 let decoder_candidate_reencodes = probe_count * 7;
                 println!(
-                    "{name},budgeted_sparse_probe,historical_probe,best_of_eight,{segment_size},{probe_interval},{probe_count},{encoder_extra_candidate_encodes},{decoder_candidate_reencodes},{oracle_gap_pct:.6},{},{},{zstd},{budgeted_ratio},{budgeted_encode_ns},{budgeted_decode_ns},exact",
+                    "{name},budgeted_sparse_probe,historical_probe,best_of_eight,{segment_size},{probe_interval},{probe_count},{encoder_extra_candidate_encodes},{decoder_candidate_reencodes},{oracle_gap_pct:.6},{budgeted_switches},{budgeted_mismatches},{},{},{zstd},{budgeted_ratio},{budgeted_encode_ns},{budgeted_decode_ns},exact",
                     raw.len(),
                     budgeted_frame.len()
                 );
