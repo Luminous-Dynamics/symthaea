@@ -147,9 +147,7 @@ g++ -O2 -std=c++20 -Wall -Wextra -Wconversion -Werror \
 /tmp/float64_window_reference
 ```
 
-The strict-warning reference run covered 57,105 values and rejected seven
-malformed marker/span/payload cases. Transform-only byte counts versus
-XOR-varint were:
+The updated strict-warning reference source covers 57,105 values and includes eight malformed marker/span/payload cases, adding rejection of a redundant new-window marker when the previous window already fits. Transform-only byte counts versus XOR-varint were:
 - edge values: 78 → 60 bytes (-23.08%);
 - smooth bit increments: 2,329 → 6,155 (+164.28%);
 - oscillating values: 20,479 → 18,430 (-10.01%);
