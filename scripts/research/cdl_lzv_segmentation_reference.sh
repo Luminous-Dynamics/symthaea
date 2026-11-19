@@ -1,19 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Independent WZS-inspired prefix-only LZV segmentation control.
-# This does not reproduce the WZS paper implementation and does not measure
-# compression ratios; it checks deterministic segmentation boundaries only.
+# WZS-inspired leading-zero-variance segmentation control.
+# This is not the WZS implementation and does not encode/compress the data.
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 SOURCE="${ROOT}/research/cdl-bench/reference/lzv_segmentation_reference.cpp"
 CXX="${CXX:-g++}"
+OUT_DIR="${CDL_LZV_OUT:-${ROOT}/target/cdl-lzv-reference}"
 
-command -v "${CXX}" >/dev/null 2>&1 || { echo "missing C++ compiler: ${CXX}" >&2; exit 2; }
+command -v "${CXX}" >/dev/null 2>&1 || { echo "missing compiler: ${CXX}" >&2; exit 2; }
 [[ -f "${SOURCE}" ]] || { echo "missing source: ${SOURCE}" >&2; exit 2; }
+mkdir -p "${OUT_DIR}"
 
-TMP="$(mktemp -d)"
-trap 'rm -rf "${TMP}"' EXIT
 "${CXX}" -O2 -std=c++20 -Wall -Wextra -Wconversion -Werror \
-  "${SOURCE}" -o "${TMP}/lzv_segmentation_reference"
-"${TMP}/lzv_segmentation_reference"
+  "${SOURCE}" -o "${OUT_DIR}/lzv_segmentation_reference"
+"${OUT_DIR}/lzv_segmentation_reference"
