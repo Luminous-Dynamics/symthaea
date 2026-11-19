@@ -639,7 +639,7 @@ pub fn decompress_f64_online_selector(
         return Err(NumericError::UnsupportedFlags(frame[6]));
     }
     if frame[7] != SEGMENT_SELECTION_POLICY_HISTORICAL_COST {
-        return Err(NumericError::UnsupportedTransform(frame[7]));
+        return Err(NumericError::UnsupportedPolicy(frame[7]));
     }
 
     let count = u64::from_le_bytes(
@@ -820,7 +820,7 @@ pub fn decompress_f64_budgeted_selector(
         return Err(NumericError::InvalidProbeInterval);
     }
     if frame[7] != SEGMENT_SELECTION_POLICY_BUDGETED {
-        return Err(NumericError::UnsupportedTransform(frame[7]));
+        return Err(NumericError::UnsupportedPolicy(frame[7]));
     }
     let probe_interval = 1usize
         .checked_shl(probe_log2 as u32)
@@ -1015,7 +1015,7 @@ pub fn decompress_f64_segmented(
         return Err(NumericError::UnsupportedFlags(frame[6]));
     }
     if frame[7] != SEGMENT_SELECTION_POLICY_BEST_OF_EIGHT {
-        return Err(NumericError::UnsupportedTransform(frame[7]));
+        return Err(NumericError::UnsupportedPolicy(frame[7]));
     }
 
     let count = u64::from_le_bytes(
@@ -1279,7 +1279,7 @@ mod tests {
         bad_policy[7] = 99;
         assert_eq!(
             decompress_f64_segmented(&bad_policy, input.len()),
-            Err(NumericError::UnsupportedTransform(99))
+            Err(NumericError::UnsupportedPolicy(99))
         );
 
         for index in 0..frame.len() {
@@ -1411,7 +1411,7 @@ mod tests {
         bad_policy[7] = SEGMENT_SELECTION_POLICY_HISTORICAL_COST;
         assert_eq!(
             decompress_f64_budgeted_selector(&bad_policy, input.len()),
-            Err(NumericError::UnsupportedTransform(
+            Err(NumericError::UnsupportedPolicy(
                 SEGMENT_SELECTION_POLICY_HISTORICAL_COST
             ))
         );
