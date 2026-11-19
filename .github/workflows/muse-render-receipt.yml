@@ -1,0 +1,49 @@
+name: MUSE Render Receipt Verifier
+
+on:
+  pull_request:
+    paths:
+      - "tools/muse-render-receipt/**"
+      - "docs/research/MUSE_RENDER_EXECUTION_RECEIPT_V1.md"
+      - "docs/research/schemas/muse-render-execution-receipt-v1.schema.json"
+      - ".github/workflows/muse-render-receipt.yml"
+  push:
+    branches:
+      - "research/muse-render-execution-receipt-v1-20261119"
+    paths:
+      - "tools/muse-render-receipt/**"
+      - ".github/workflows/muse-render-receipt.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-render-receipt-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  standalone:
+    name: Standalone Rust receipt verifier
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Record exact source head
+        run: |
+          set -euo pipefail
+          echo "checked_out_sha=$(git rev-parse HEAD)"
+      - name: Format check
+        run: cargo fmt --manifest-path tools/muse-render-receipt/Cargo.toml --all -- --check
+      - name: Standalone tests
+        run: cargo test --manifest-path tools/muse-render-receipt/Cargo.toml --all-targets
+      - name: CLI help smoke
+        run: cargo run --manifest-path tools/muse-render-receipt/Cargo.toml -- --help
