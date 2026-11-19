@@ -20,14 +20,16 @@ Run the composer adapter from the repository root:
 The cohort selector is discovery, confirmation, or both. The adapter validates
 the manifest against the exact frozen style, seed, and 3^4 cell set before
 composing anything. The final argument is a required 40-hex source commit SHA. The adapter verifies
-that it equals the checked-out HEAD and refuses a dirty worktree before
-composing anything; the SHA is retained in every result row. Put generated
-manifests and reports outside the source checkout (for example under /tmp) so
-they do not contaminate the next run.
+that it equals the checked-out HEAD, refuses a dirty worktree, checks 13 pinned
+source/lockfile blob digests, and verifies that the entire music-theory source
+tree is unchanged from the preregistered composer reference. The pinned base
+commit must exist in local Git history. The SHA is retained in every result
+row. Put generated manifests and reports outside the source checkout (for
+example under /tmp) so they do not contaminate the next run.
 
 Analyze the resulting observations. The metric registry must be explicit:
 
-    cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin analyze-results -- discovery /tmp/muse-observations.csv score_note_count,score_total_beats,score_total_seconds,score_tempo_bpm,score_notes_per_beat,score_mean_pitch_midi,score_pitch_span_semitones,score_pitch_stddev_midi,score_mean_velocity,score_velocity_stddev,score_mean_section_intensity,score_mean_note_duration_beats,score_assigned_part_fraction,score_universal_fatal_count,score_style_fatal_count,score_warning_count,score_universal_valid,score_full_validation_valid coverage.csv effects.csv summary.csv
+    cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin analyze-results -- discovery /tmp/muse-observations.csv score_note_count,score_total_beats,score_total_seconds,score_tempo_bpm,score_notes_per_beat,score_mean_pitch_midi,score_pitch_span_semitones,score_pitch_stddev_midi,score_mean_velocity,score_velocity_stddev,score_mean_section_intensity,score_mean_note_duration_beats,score_assigned_part_fraction,score_universal_fatal_count,score_style_fatal_count,score_warning_count,score_universal_valid,score_full_validation_valid,score_pitch_class_diversity,score_pitch_class_entropy_bits,score_melody_mean_interval_semitones,score_melody_step_fraction,score_melody_leap_fraction,score_onset_ioi_stddev_beats,score_offbeat_onset_fraction,score_voice_role_entropy_bits,score_duration_variety_count,score_section_intensity_stddev coverage.csv effects.csv summary.csv
 
 The root Cargo workspace currently needs the separate unmanifested-member
 exclusion repair before this example can be compiled through Cargo. Do not
@@ -48,7 +50,7 @@ Every composition routes through the style's canonical
 compose_with_grammar_plan entry point and its frozen grammar profile/spec.
 
 For each symbolic score, it serializes the score with serde_json, computes a
-SHA-256 digest over those exact bytes, and emits 18 scalar metrics:
+SHA-256 digest over those exact bytes, and emits 28 scalar metrics:
 
 1. note count
 2. actual score length in beats
@@ -68,6 +70,21 @@ SHA-256 digest over those exact bytes, and emits 18 scalar metrics:
 16. warning count
 17. universal structural validity
 18. full default-validator validity
+19. pitch-class diversity (distinct classes present)
+20. pitch-class entropy in bits
+21. mean absolute melodic interval in semitones
+22. melody step fraction (intervals at most two semitones)
+23. melody leap fraction (intervals greater than seven semitones)
+24. onset inter-onset-interval standard deviation in beats
+25. offbeat-onset fraction relative to the quarter-note beat grid
+26. voice-role entropy in bits
+27. distinct note-duration count
+28. section-intensity standard deviation
+
+The pitch, melody, rhythm and role metrics are structural descriptors. They are
+not proxies for beauty, cultural authenticity, complexity or quality. In
+particular, offbeat fraction is defined against the score's quarter-note beat
+coordinate and must be interpreted alongside meter and style.
 
 The two validity metrics are deliberately separate. The universal metric only
 counts the validator's universal malformed-score invariants. The full validator
