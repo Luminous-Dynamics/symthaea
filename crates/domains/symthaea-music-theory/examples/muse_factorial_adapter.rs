@@ -1221,7 +1221,7 @@ mod tests {
     }
 
     #[test]
-    fn pinned_composer_manifest_has_thirteen_valid_blob_pins() {
+    fn pinned_composer_manifest_has_fifteen_valid_blob_pins() {
         assert_eq!(PINNED_COMPOSER_BLOBS.len(), 15);
         assert!(is_commit_sha(PINNED_COMPOSER_SOURCE_COMMIT));
         for (path, blob) in PINNED_COMPOSER_BLOBS {
