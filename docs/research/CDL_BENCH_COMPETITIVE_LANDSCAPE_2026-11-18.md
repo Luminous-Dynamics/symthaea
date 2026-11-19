@@ -85,6 +85,41 @@ References:
 
 **CDL-Bench consequence:** WZS is a mandatory comparison target, not merely optional related work. First seek an official implementation/configuration and reproduce its declared datasets. If code is not available, reproduce its disclosed algorithmic components as a separately labelled WZS-inspired control; never equate that control with the paper's method or results. Include the same non-stationary regime-change suite and measure segmentation overhead, adaptation delay, false switches and online compute.
 
+### 1.4.1 WZS artifact availability audit (2026-11-19)
+
+A public GitHub repository titled [wwj10/Wave-zeros](https://github.com/wwj10/Wave-zeros) matches the WZS paper title. Its inspected README blob (SHA e9b566e0931de10102e63dcd3161a92d8db85dda) states: “The detailed code will be uploaded after the paper is accepted.” The visible repository snapshot contains a partial segmentation file (blob 1caf8d10f60cab103fdc898e0ab914fa2f3c0183), HGA.py (blob 688bac8690c91773b23ceef8391c58d1d349e26c) and GA20240627_2.py (blob c2ff23206d590ee9039517e3427071b7588ab294), but not a complete benchmark runner, environment manifest or data/parameter package.
+
+Source inspection found immediate reproducibility blockers in the currently exposed partial scripts:
+- The segmentation file's Args and Returns prose is not enclosed in a docstring, so the file is not syntactically valid Python as published.
+- HGA.py contains an unterminated random.sample(..., tournament_size call and a hard-coded Windows path to E:\chimp-main\src\IoT1.csv.
+- GA20240627_2.py calls the genetic optimizer with xor_results at module scope without defining that variable in the visible file.
+
+This is an audit of the current public repository snapshot, not a claim that the paper's experiments are invalid. It means we cannot currently claim an exact WZS reproduction from the publicly visible artifact. The issue is now explicit in CDL-Bench-009: seek the complete author implementation, data manifest and parameter setup; until then, any independently implemented LZV-segmentation/GA/selector control must be labeled WZS-inspired, never WZS.
+
+### 1.4.2 Rabbit — strong streaming baseline, but implementation access is incomplete
+
+Lei et al., Rabbit: Adaptive Lossless Compression for Floating-Point Time Series via Temporal Locality-Aware Dynamic Encoding (Symmetry 2026, 18(4), 558), reports results on 28 datasets with 1,000-value blocks. The paper describes:
+- Four XOR-derived branches.
+- Previous-block branch-frequency statistics to assign the next block's flag codes with code lengths {1,2,3,3}, avoiding mapping side information.
+- Trailing-One Elision (TOE) for eligible significant-bit payloads.
+- Constant auxiliary state and linear-time streaming complexity.
+
+The authors report average compression ratio improving from 25.76% for ACTF to 24.69% for Rabbit (4.15% relative improvement), mean encoding time 14.57 μs versus 15.22 μs per 1,000-value block, and decoding time 15.69 μs versus 16.30 μs. Their article also reports 549.07 MB/s compression and 509.88 MB/s decompression throughput. The gains are reported to depend on temporal locality and stable branch-frequency distributions; the paper warns that rapidly changing branch distributions can reduce the advantage.
+
+References:
+- https://doi.org/10.3390/sym18040558
+- https://www.mdpi.com/2073-8994/18/4/558
+
+Reproduction boundary: the article's Data Availability Statement says original contributions are included in the article and further inquiries can be directed to the corresponding author; the publication page has no Rabbit source-code repository link. The paper supplies algorithm pseudocode, default block size, equipment/runtime description (Windows 10, Intel i5-13490F, 32 GB RAM, JDK 1.8) and a list of 28 datasets, so a clearly labeled paper-spec reimplementation is feasible. It must not be described as the authors' implementation or a reproduced Rabbit result until validated against author-provided code or reference outputs. Record dataset licenses/hashes, Java version, block semantics, mapping tie-breaking, and exact TOE edge behavior. Use at least the 1,000-value block setting for a matched paper-protocol stratum, plus CDL's streaming/intervention regime-change stratum.
+
+### 1.4.3 GRASP — efficiency-based selection belongs in the bounded-error track
+
+Middlezong, Striking the Balance Between Speed and Compression Ratio: A Fast Bit-Grouping Algorithm and Adaptive Compressor Selection for Scientific Data (Future Generation Computer Systems 180, July 2026, 108370), introduces GRASP and a sampling-based compressor selector using an efficiency measure that combines compression ratio and storage/I/O speed. The paper reports roughly 2–4× throughput over SZ3/ZFP with similar compression quality under tight error bounds, and around 70% accuracy selecting the best of four compressors in its evaluation. This is primarily a bounded-error/lossy scientific-data contribution, not an exact-lossless competitor. It is nevertheless relevant to the broader CDL product objective: optimize end-to-end time saved, not compression ratio in isolation.
+
+Reference: https://doi.org/10.1016/j.future.2026.108370
+
+CDL-Bench consequence: preserve a separate bounded-error track and add an end-to-end utility metric such as net_io_time_saved = raw_bytes / storage_bandwidth - (compressed_bytes / storage_bandwidth + encode_time). Also measure query/decode time and error constraints. Do not rank lossy GRASP numbers on the exact-lossless leaderboard.
+
 ### 1.5 Sprintz, Gorilla and Chimp — edge and time-series baselines
 
 Sprintz was designed for IoT sensor streams with low memory and latency; its paper reports less than 1 KB of memory and virtually no added latency, with a high-throughput decompression path. It is an important edge baseline even though it predates the recent neural-compression work.
