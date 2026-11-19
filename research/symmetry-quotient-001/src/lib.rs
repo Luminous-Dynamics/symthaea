@@ -230,6 +230,10 @@ pub struct EnvironmentQuotientV1 {
 pub struct MultiEnvironmentQuotientCertificateV1 {
     pub schema_version: u32,
     pub problem_id: String,
+    /// Exact canonical bytes for all declared environments and all task fields.
+    pub problem_contract_bytes: Vec<u8>,
+    pub action_contract_bytes: Vec<u8>,
+    pub qualification_budget: QualificationBudgetV1,
     pub common_subgroup: CommonTaskPreservingSubgroupV1,
     pub environment_quotients: Vec<EnvironmentQuotientV1>,
 }
@@ -257,6 +261,10 @@ pub struct ContextualMultiEnvironmentCertificateV1 {
     pub schema_version: u32,
     pub problem_id: String,
     pub ambient_action_id: String,
+    /// Exact canonical bytes for all declared contexts and complete task semantics.
+    pub problem_contract_bytes: Vec<u8>,
+    pub action_contract_bytes: Vec<u8>,
+    pub qualification_budget: QualificationBudgetV1,
     /// Canonically ordered exactly as the declared environment list.
     pub environment_quotients: Vec<ContextualEnvironmentQuotientV1>,
 }
@@ -384,6 +392,32 @@ pub fn canonical_search_problem_bytes(problem: &SearchProblemV1) -> Vec<u8> {
 }
 
 /// Canonical versioned byte encoding for the complete finite group action.
+/// Canonical versioned bytes for the complete multi-environment task contract.
+/// Each environment is encoded in its declared order and contains the complete
+/// candidate list plus all task-semantic fields for every candidate.
+pub fn canonical_multi_environment_problem_bytes(
+    problem: &MultiEnvironmentProblemV1,
+) -> Vec<u8> {
+    let mut bytes = b"luminous.symmetry_quotient.multi_environment_problem.v1\\0".to_vec();
+    append_contract_string(&mut bytes, &problem.problem_id);
+    bytes.extend_from_slice(&(problem.candidate_ids.len() as u64).to_le_bytes());
+    for candidate_id in &problem.candidate_ids {
+        append_contract_string(&mut bytes, candidate_id);
+    }
+    bytes.extend_from_slice(&(problem.environments.len() as u64).to_le_bytes());
+    for environment in &problem.environments {
+        append_contract_string(&mut bytes, &environment.environment_id);
+        let local = SearchProblemV1 {
+            problem_id: format!("{}::{}", problem.problem_id, environment.environment_id),
+            candidate_ids: problem.candidate_ids.clone(),
+            semantics: environment.semantics.clone(),
+        };
+        let local_bytes = canonical_search_problem_bytes(&local);
+        append_contract_field(&mut bytes, &local_bytes);
+    }
+    bytes
+}
+
 pub fn canonical_finite_action_bytes(action: &FiniteActionV1) -> Vec<u8> {
     let mut bytes = b"luminous.symmetry_quotient.finite_action.v1\0".to_vec();
     append_contract_string(&mut bytes, &action.action_id);
@@ -1304,6 +1338,9 @@ pub fn compile_multi_environment_quotient(
     Ok(MultiEnvironmentQuotientCertificateV1 {
         schema_version: 1,
         problem_id: problem.problem_id.clone(),
+        problem_contract_bytes: canonical_multi_environment_problem_bytes(problem),
+        action_contract_bytes: canonical_finite_action_bytes(ambient_action),
+        qualification_budget: budget,
         common_subgroup,
         environment_quotients,
     })
@@ -1377,6 +1414,9 @@ pub fn compile_contextual_multi_environment_quotient(
         schema_version: 1,
         problem_id: problem.problem_id.clone(),
         ambient_action_id: ambient_action.action_id.clone(),
+        problem_contract_bytes: canonical_multi_environment_problem_bytes(problem),
+        action_contract_bytes: canonical_finite_action_bytes(ambient_action),
+        qualification_budget: budget,
         environment_quotients,
     })
 }
@@ -1393,6 +1433,9 @@ pub fn verify_contextual_multi_environment_quotient(
     if certificate.schema_version != 1
         || certificate.problem_id != problem.problem_id
         || certificate.ambient_action_id != ambient_action.action_id
+        || certificate.problem_contract_bytes != canonical_multi_environment_problem_bytes(problem)
+        || certificate.action_contract_bytes != canonical_finite_action_bytes(ambient_action)
+        || certificate.qualification_budget != budget
         || certificate.environment_quotients.len() != problem.environments.len()
     {
         return Err(QuotientErrorV1::EnvironmentCertificateMismatch);
@@ -1454,7 +1497,12 @@ pub fn verify_multi_environment_quotient(
     certificate: &MultiEnvironmentQuotientCertificateV1,
     budget: QualificationBudgetV1,
 ) -> Result<MultiEnvironmentVerificationReceiptV1, QuotientErrorV1> {
-    if certificate.schema_version != 1 || certificate.problem_id != problem.problem_id {
+    if certificate.schema_version != 1
+        || certificate.problem_id != problem.problem_id
+        || certificate.problem_contract_bytes != canonical_multi_environment_problem_bytes(problem)
+        || certificate.action_contract_bytes != canonical_finite_action_bytes(ambient_action)
+        || certificate.qualification_budget != budget
+    {
         return Err(QuotientErrorV1::EnvironmentCertificateMismatch);
     }
     let expected = compile_multi_environment_quotient(problem, ambient_action, budget)?;
@@ -1920,6 +1968,78 @@ mod tests {
         assert_eq!(
             compile_multi_environment_quotient(&problem, &action, budget),
             Err(QuotientErrorV1::WorkBudgetExceeded)
+        );
+    }
+
+    #[test]
+    fn outer_environment_certificates_bind_full_environment_action_and_total_budget() {
+        let action = d4_action();
+        let problem = MultiEnvironmentProblemV1 {
+            problem_id: "outer-certificate-identity-v1".to_owned(),
+            candidate_ids: (0..16).map(|index| format!("p{index:02}")).collect(),
+            environments: vec![
+                TaskEnvironmentV1 {
+                    environment_id: "isotropic".to_owned(),
+                    semantics: vec![semantics(1, 1, "boundary-a", "output-a"); 16],
+                },
+                TaskEnvironmentV1 {
+                    environment_id: "rotating".to_owned(),
+                    semantics: (0..16)
+                        .map(|index| semantics(1, (index % 4) as i64, "boundary-b", "output-b"))
+                        .collect(),
+                },
+            ],
+        };
+        let budget = QualificationBudgetV1::default();
+        let common = compile_multi_environment_quotient(&problem, &action, budget).unwrap();
+        verify_multi_environment_quotient(&problem, &action, &common, budget).unwrap();
+        let contextual =
+            compile_contextual_multi_environment_quotient(&problem, &action, budget).unwrap();
+        verify_contextual_multi_environment_quotient(&problem, &action, &contextual, budget)
+            .unwrap();
+
+        let mut uniformly_mutated = problem.clone();
+        for environment in &mut uniformly_mutated.environments {
+            for task in &mut environment.semantics {
+                task.objective_cost += 5;
+                task.boundary_condition_id = "new-uniform-boundary".to_owned();
+            }
+        }
+        assert_eq!(
+            verify_multi_environment_quotient(
+                &uniformly_mutated,
+                &action,
+                &common,
+                budget
+            ),
+            Err(QuotientErrorV1::EnvironmentCertificateMismatch)
+        );
+        assert_eq!(
+            verify_contextual_multi_environment_quotient(
+                &uniformly_mutated,
+                &action,
+                &contextual,
+                budget
+            ),
+            Err(QuotientErrorV1::EnvironmentCertificateMismatch)
+        );
+
+        let changed_budget = QualificationBudgetV1 {
+            maximum_work_units: budget.maximum_work_units + 1,
+            ..budget
+        };
+        assert_eq!(
+            verify_multi_environment_quotient(&problem, &action, &common, changed_budget),
+            Err(QuotientErrorV1::EnvironmentCertificateMismatch)
+        );
+        assert_eq!(
+            verify_contextual_multi_environment_quotient(
+                &problem,
+                &action,
+                &contextual,
+                changed_budget
+            ),
+            Err(QuotientErrorV1::EnvironmentCertificateMismatch)
         );
     }
 
