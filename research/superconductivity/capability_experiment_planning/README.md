@@ -262,3 +262,16 @@ These are exact calculations over the synthetic fixture only. The decision losse
 Compare EVSI planning against (a) mutual-information maximization, (b) target-variance reduction, (c) expected improvement / knowledge gradient where a scalar candidate objective is meaningful, (d) cost-aware batch Bayesian optimization, (e) D-optimal/log-determinant and risk-aware goal-oriented OED, and (f) random feasible / domain-expert policy baselines. Freeze the candidate pool, priors, loss table, costs, capabilities, measurement likelihoods and stopping rules. Evaluate decision regret and realized decision quality, not just information gained.
 
 The v0.4 finite oracle has known discrete likelihoods and losses, one shared nuisance factor, binary observations and at most ten actions. It does not implement posterior decision trees, unknown loss functions, distributionally robust EVSI, multiple correlated nuisance groups, continuous observations or real-money/sample/time accounting. Its synthetic result does not establish superiority over SOTA. The hosted exact-head workflow now tests/lints all four planning binaries and emits a separate decision-value receipt.
+
+### Connection to the prediction and engineering challenges
+
+The PNAS 2026 programmatic roadmap explicitly separates the Prediction Challenge (many predicted conventional superconductors are not experimentally synthesizable) from the Engineering Challenge (the effect of pressure, nanostructuring, light and other control knobs is not yet predictively understood). It argues for moving beyond (T_c) and dynamic stability alone toward predictive thermodynamics/synthesis, while integrating theory and experiment in a continuous loop: https://doi.org/10.1073/pnas.2520324123.
+
+This means future EVSI loss tables should not encode only “correct mechanism” versus “wrong mechanism.” They should represent downstream outcomes such as target-phase realization, phase purity, pressure/temperature envelope, field/current performance, sample survival, manufacturability and cost. A measurement is valuable when it changes what we should do next: continue synthesis, switch precursors/process, test a mechanism, change the control knob, or stop an unpromising route. The current v0.4 fixture only demonstrates the mathematical decision-value distinction; it contains no synthesis probabilities or application-calibrated losses.
+
+For the next benchmark tier, measure:
+- expected regret against an oracle with complete synthetic ground truth;
+- realized utility after outcome-adaptive decisions, not only one-shot EVSI;
+- cost-to-first-qualified-phase and cost-to-application-qualified candidate;
+- false-positive synthesis burden, failed-phase frequency and fraction of candidate spend consumed by infeasible routes;
+- value of information under different application weights (high-field magnet, cryogenic device, ambient-pressure conductor), with the loss table preregistered before evaluation.
