@@ -6,7 +6,9 @@ use cdl_bench::{
     ScmFieldPredictor, ScmHybridPredictor, ScmIntervention, ScmLagPredictor, ScmParentPredictor,
     ScmChangePointMixturePredictor, ScmExpertMixturePredictor, ScmShuffledParentPredictor,
     compress_f64, compress_f64_segmented, compress_f64_online_selector,
+    compress_f64_budgeted_selector,
     decompress_f64, decompress_f64_segmented, decompress_f64_online_selector,
+    decompress_f64_budgeted_selector,
     Float64Transform,
 };
 use std::error::Error;
@@ -590,7 +592,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# values={count}");
     println!("# seed={seed}");
     println!("# representation=IEEE-754-binary64 exact bit preservation");
-    println!("source,mode,transform,model,segment_size,raw_bytes,frame_bytes,zstd_raw_bytes,ratio,encode_ns,decode_ns,round_trip");
+    println!("source,mode,transform,model,segment_size,probe_interval,probe_count,extra_candidate_encodes,raw_bytes,frame_bytes,zstd_raw_bytes,ratio,encode_ns,decode_ns,round_trip");
 
     for (name, values) in sources {
         let raw_len = values.len().checked_mul(8).ok_or("float raw length overflow")?;
@@ -632,7 +634,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                     Float64Transform::RleXorPrevious => "rle_xor_previous",
                 };
                 println!(
-                    "{name},single,{transform_name},{model_name},NA,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
+                    "{name},single,{transform_name},{model_name},NA,NA,NA,NA,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
                     raw.len(),
                     frame.len()
                 );
@@ -657,7 +659,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 format!("{:.6}", frame.len() as f64 / raw.len() as f64)
             };
             println!(
-                "{name},segment_portfolio,best_of_eight,best_of_eight,{segment_size},{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
+                "{name},segment_portfolio,best_of_eight,best_of_eight,{segment_size},NA,NA,NA,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
                 raw.len(),
                 frame.len()
             );
@@ -680,10 +682,52 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 format!("{:.6}", online_frame.len() as f64 / raw.len() as f64)
             };
             println!(
-                "{name},online_historical_cost,past_segment_mean,best_of_eight,{segment_size},{},{},{zstd},{online_ratio},{online_encode_ns},{online_decode_ns},exact",
+                "{name},online_historical_cost,past_segment_mean,best_of_eight,{segment_size},NA,NA,NA,{},{},{zstd},{online_ratio},{online_encode_ns},{online_decode_ns},exact",
                 raw.len(),
                 online_frame.len()
             );
+
+            for probe_interval in [1usize, 4, 16, 64] {
+                let encode_started = Instant::now();
+                let budgeted_frame =
+                    compress_f64_budgeted_selector(&values, segment_size, probe_interval)?;
+                let budgeted_encode_ns = encode_started.elapsed().as_nanos();
+                let decode_started = Instant::now();
+                let budgeted_decoded =
+                    decompress_f64_budgeted_selector(&budgeted_frame, values.len())?;
+                let budgeted_decode_ns = decode_started.elapsed().as_nanos();
+                let budgeted_exact = values.len() == budgeted_decoded.len()
+                    && values
+                        .iter()
+                        .zip(&budgeted_decoded)
+                        .all(|(a, b)| a.to_bits() == b.to_bits());
+                if !budgeted_exact {
+                    return Err(format!(
+                        "budgeted f64 selector round-trip failure for {name}/{segment_size}/{probe_interval}"
+                    ).into());
+                }
+                let budgeted_ratio = if raw.is_empty() {
+                    "n/a".to_owned()
+                } else {
+                    format!("{:.6}", budgeted_frame.len() as f64 / raw.len() as f64)
+                };
+                let segment_count = if values.is_empty() {
+                    0
+                } else {
+                    (values.len() - 1) / segment_size + 1
+                };
+                let probe_count = if segment_count == 0 {
+                    0
+                } else {
+                    (segment_count - 1) / probe_interval + 1
+                };
+                let extra_candidate_encodes = probe_count * 7;
+                println!(
+                    "{name},budgeted_sparse_probe,historical_probe,best_of_eight,{segment_size},{probe_interval},{probe_count},{extra_candidate_encodes},{},{},{zstd},{budgeted_ratio},{budgeted_encode_ns},{budgeted_decode_ns},exact",
+                    raw.len(),
+                    budgeted_frame.len()
+                );
+            }
         }
     }
 
@@ -693,7 +737,10 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# note=segment_portfolio is not an online selector or a WZS reproduction");
     println!("# note=online_historical_cost chooses each chunk using only prior chunks; after each chunk both sides recompute all eight candidate sizes to update shared policy state");
     println!("# note=online_historical_cost uses the chosen transform/model ID in the child F64C header and rejects policy-mismatched children");
-    println!("# note=online_historical_cost is compute-heavy diagnostic adaptation, not a tuned practical selector");
+    println!("# note=online_historical_cost measures seven counterfactual candidates per chunk and reuses the selected child size");
+    println!("# note=budgeted_sparse_probe compares candidates only on identical scheduled probe chunks; no incumbent-only updates occur between probes");
+    println!("# note=budgeted_sparse_probe intervals are powers of two from 1 through 128, recorded in the CRC-protected F64S flags byte");
+    println!("# note=budgeted_sparse_probe performs seven extra candidate encodes on each probe chunk and none between probes");
     println!("# note=compare against DeXOR, Gorilla, Chimp, ACTF, Rabbit and Dolphin only with matching data and framing");
     Ok(())
 }
