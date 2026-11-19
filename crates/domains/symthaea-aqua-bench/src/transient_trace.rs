@@ -62,7 +62,7 @@ pub enum CommandKind {
     ValveState,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CommandValue {
     PressureKpa(f64),
     BranchFlowLpm(f64),
@@ -1144,10 +1144,10 @@ mod tests {
         let mut value = profile();
         value.event_family = EventFamily::RapidValveEvent;
         value.command.kind = CommandKind::ValveState;
-        value.command.samples.iter_mut().for_each(|sample| {
-            sample.value = CommandValue::ValveOpen(true);
-        });
-        assert_eq!(value.validate(), Err(TransientTraceError::CommandShapeMismatch));
+        value.command.samples[0].value = CommandValue::ValveOpen(false);
+        value.command.samples[1].value = CommandValue::ValveOpen(true);
+        value.command.samples[2].value = CommandValue::ValveOpen(false);
+        assert_eq!(value.validate(), Err(TransientTraceError::InsufficientSpatialPressureChannels));
     }
 
     #[test]
