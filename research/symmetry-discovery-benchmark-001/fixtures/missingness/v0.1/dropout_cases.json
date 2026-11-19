@@ -1,0 +1,275 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "LUMINOUS-SYMM-MISSINGNESS-001",
+  "status": "frozen_synthetic_cases_not_benchmark_results",
+  "probability_scale": "parts_per_million",
+  "independence_semantics": "dropout events are conditionally independent only across distinct probes when the case carries an explicit independence contract id",
+  "cases": [
+    {
+      "case_id": "MCAR-EQUAL-DROPOUT-001",
+      "mechanism": "MCAR",
+      "validity_domain_id": "lab-site-A-load-20-80-temp-10-40",
+      "calibration_evidence_id": "synthetic-calibration-mcar-001",
+      "independence_contract_id": "distinct-probe-iid-given-case-v1",
+      "hypothesis_ids": [
+        "H-normal",
+        "H-overload"
+      ],
+      "probes": [
+        {
+          "probe_id": "strain-gauge",
+          "cost": 4
+        },
+        {
+          "probe_id": "thermal-camera",
+          "cost": 2
+        }
+      ],
+      "dropout_probability_intervals_ppm_by_hypothesis": [
+        [
+          {
+            "lower_ppm": 1000,
+            "upper_ppm": 3000
+          },
+          {
+            "lower_ppm": 2000,
+            "upper_ppm": 4000
+          }
+        ],
+        [
+          {
+            "lower_ppm": 1000,
+            "upper_ppm": 3000
+          },
+          {
+            "lower_ppm": 2000,
+            "upper_ppm": 4000
+          }
+        ]
+      ],
+      "expected_relationship": "identical_dropout_intervals_for_all_hypotheses",
+      "split_ids": {
+        "calibration": "mcar-calibration-v1",
+        "validation": "mcar-validation-v1",
+        "final_holdout": "mcar-holdout-v1"
+      }
+    },
+    {
+      "case_id": "MAR-LOAD-STRATA-001",
+      "mechanism": "MAR",
+      "validity_domain_id": "lab-site-A-load-20-80-temp-10-40",
+      "calibration_evidence_id": "synthetic-calibration-mar-001",
+      "independence_contract_id": "distinct-probe-iid-conditional-on-load-band-v1",
+      "observed_context_variable": "load_band",
+      "context_strata": [
+        {
+          "stratum_id": "low-load",
+          "dropout_probability_intervals_ppm_by_probe": [
+            {
+              "probe_id": "strain-gauge",
+              "lower_ppm": 1000,
+              "upper_ppm": 4000
+            },
+            {
+              "probe_id": "thermal-camera",
+              "lower_ppm": 2000,
+              "upper_ppm": 5000
+            }
+          ]
+        },
+        {
+          "stratum_id": "high-load",
+          "dropout_probability_intervals_ppm_by_probe": [
+            {
+              "probe_id": "strain-gauge",
+              "lower_ppm": 50000,
+              "upper_ppm": 80000
+            },
+            {
+              "probe_id": "thermal-camera",
+              "lower_ppm": 10000,
+              "upper_ppm": 30000
+            }
+          ]
+        }
+      ],
+      "expected_relationship": "dropout_depends_on_observed_load_stratum_not_unobserved_hypothesis",
+      "split_ids": {
+        "calibration": "mar-calibration-v1",
+        "validation": "mar-validation-v1",
+        "final_holdout": "mar-holdout-v1"
+      }
+    },
+    {
+      "case_id": "MNAR-HYPOTHESIS-STATE-001",
+      "mechanism": "MNAR",
+      "validity_domain_id": "lab-site-A-load-20-80-temp-10-40",
+      "calibration_evidence_id": "synthetic-calibration-mnar-001",
+      "independence_contract_id": "distinct-probe-iid-given-hypothesis-v1",
+      "hypothesis_ids": [
+        "H-normal",
+        "H-overload"
+      ],
+      "probes": [
+        {
+          "probe_id": "strain-gauge",
+          "cost": 4
+        },
+        {
+          "probe_id": "thermal-camera",
+          "cost": 2
+        }
+      ],
+      "dropout_probability_intervals_ppm_by_hypothesis": [
+        [
+          {
+            "lower_ppm": 100,
+            "upper_ppm": 1000
+          },
+          {
+            "lower_ppm": 500,
+            "upper_ppm": 2000
+          }
+        ],
+        [
+          {
+            "lower_ppm": 100000,
+            "upper_ppm": 200000
+          },
+          {
+            "lower_ppm": 300000,
+            "upper_ppm": 500000
+          }
+        ]
+      ],
+      "expected_relationship": "dropout_distribution_depends_on_unobserved_hypothesis",
+      "split_ids": {
+        "calibration": "mnar-calibration-v1",
+        "validation": "mnar-validation-v1",
+        "final_holdout": "mnar-holdout-v1"
+      }
+    },
+    {
+      "case_id": "HARD-SUPPORT-INTERLOCK-001",
+      "mechanism": "hard_support",
+      "validity_domain_id": "lab-site-A-load-20-80-temp-10-40",
+      "hypothesis_ids": [
+        "H-normal",
+        "H-overload"
+      ],
+      "probes": [
+        {
+          "probe_id": "strain-gauge",
+          "cost": 4
+        },
+        {
+          "probe_id": "thermal-camera",
+          "cost": 2
+        }
+      ],
+      "abstention_possible_by_hypothesis": [
+        [
+          false,
+          true
+        ],
+        [
+          true,
+          true
+        ]
+      ],
+      "impossibility_justifications_by_hypothesis": [
+        [
+          {
+            "evidence_id": "synthetic-interlock-proof-001",
+            "evidence_kind": "EngineeringInterlock",
+            "validity_domain_id": "lab-site-A-load-20-80-temp-10-40"
+          },
+          null
+        ],
+        [
+          null,
+          null
+        ]
+      ],
+      "expected_relationship": "one_hypothesis_has_hard_zero_support_for_dropout_on_strain_gauge",
+      "split_ids": {
+        "calibration": "hard-support-calibration-v1",
+        "validation": "hard-support-validation-v1",
+        "final_holdout": "hard-support-holdout-v1"
+      }
+    },
+    {
+      "case_id": "MNAR-CALIBRATION-SHIFT-001",
+      "mechanism": "shifted_MNAR",
+      "calibration_domain_id": "site-A-load-20-80-temp-10-40",
+      "evaluation_domain_id": "site-B-load-80-120-temp-10-50",
+      "calibration_evidence_id": "synthetic-calibration-site-A-001",
+      "hypothesis_ids": [
+        "H-normal",
+        "H-overload"
+      ],
+      "probes": [
+        {
+          "probe_id": "strain-gauge",
+          "cost": 4
+        },
+        {
+          "probe_id": "thermal-camera",
+          "cost": 2
+        }
+      ],
+      "calibration_dropout_probability_intervals_ppm_by_hypothesis": [
+        [
+          {
+            "lower_ppm": 100,
+            "upper_ppm": 1000
+          },
+          {
+            "lower_ppm": 500,
+            "upper_ppm": 2000
+          }
+        ],
+        [
+          {
+            "lower_ppm": 100000,
+            "upper_ppm": 200000
+          },
+          {
+            "lower_ppm": 300000,
+            "upper_ppm": 500000
+          }
+        ]
+      ],
+      "evaluation_dropout_intervals_available": false,
+      "expected_policy": "calibration_is_out_of_domain; do_not_use_for_hard_elimination_or_probability_claims",
+      "split_ids": {
+        "calibration": "shift-calibration-site-A-v1",
+        "validation": "shift-validation-site-B-v1",
+        "final_holdout": "shift-holdout-site-B-v1"
+      }
+    }
+  ],
+  "preregistered_targets": {
+    "false_hard_elimination_rate": 0,
+    "hard_support_violation_detection": "100% on explicit synthetic violations",
+    "dropout_interval_coverage_target": 0.95,
+    "calibration_error_maximum": null,
+    "out_of_domain_probability_promotions": 0,
+    "unknown_missingness_model_action": "retain_candidates_or_abstain",
+    "performance_metrics": [
+      "per-mechanism calibration error",
+      "dropout interval coverage",
+      "hard-support violation rate",
+      "false candidate elimination",
+      "risk-coverage",
+      "unresolved-candidate rate",
+      "expected cost",
+      "worst-case cost",
+      "replay overhead"
+    ]
+  },
+  "claim_boundary": {
+    "established": "schema-shaped synthetic scenario definitions and target metrics",
+    "not_established": "probability calibration, MCAR/MAR/MNAR identification from real data, hard-support truth, baseline superiority, sensor or physical-system behavior"
+  }
+}
