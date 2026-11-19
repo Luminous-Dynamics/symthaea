@@ -111,6 +111,26 @@ Published scores are context, not matched GGL results. No superiority claim with
 5. Extend #7933 with visual QD; reuse #8919's grammar-recovery methodology.
 6. Add Symtropy higher-dimensional adapters after 2D qualification.
 
+
+
+## Implementation update — 2026-11-19
+
+A bounded Rust adapter crate now exists at `crates/bridges/symthaea-ggl-canvas`. It consumes compiled GGL 0.1 JSON (it is not a source parser) and maps circles, segments, polygons and circular arcs into the existing Canvas `SceneNode`. It creates deterministic Group wrapper IDs and an identity sidecar; no Canvas public type or renderer was forked.
+
+The adapter rejects unsupported primitive kinds, duplicate semantic IDs, invalid/non-finite/out-of-`f32` geometry, zero-length segments, invalid arcs, malformed digests, malformed units, mismatched/missing primitive counts, unsafe namespaces and input over 32 MiB. It preserves units as metadata and performs no silent unit-to-pixel conversion. Its manifest states the digest-encoding version explicitly.
+
+The branch also contains Rust tests for the raw GGL source SHA, all four primitive mappings, Canvas SVG rendering and stable-ID survival, deterministic repeated adaptation, duplicate IDs, unsupported types, invalid arcs, malformed count/units, namespace errors, non-finite numbers, large finite arc-angle normalization and oversized input. A second Canvas-side test exercises the actual serde/render contract against the frozen four-primitive fixture.
+
+**Execution boundary:** these Rust source files and tests are authored, but no Cargo/Rust compiler is available in the current authoring environment. They have not been compiled or executed locally. The draft PR's GitHub checks are skipped, not passed. The earlier 95/95 Python reference tests do not qualify the Rust implementation. Exact-head `cargo fmt --check`, `cargo test -p symthaea-ggl-canvas -p symthaea-canvas` and scoped Clippy remain outstanding.
+
+A visual QD pilot has also been defined under #7933:
+- `docs/research/GGL_VISUAL_QD_BENCHMARK_V0.1.md`
+- `docs/research/fixtures/ggl-visual-qd-pilot-v0.1.json`
+
+The manifest has 18 brief/contract records across six families and fixes a candidate budget of eight per arm for later matched-budget comparisons. It is explicitly **not** an executable or confirmatory corpus yet: SVG/PNG stimuli, target programs, licensing clearance and human annotations are not materialized. No model scores or artist-preference results are claimed.
+
+The updated local Python reference suite remains 95/95 passing (4.19 s). This is separate from the unexecuted Rust qualification.
+
 ## Claim ceiling
 
-The current GGL v0.4 Python implementation and adapter are research references. Thirteen local adapter tests pass, but Rust conformance has not run. No production Rust GGL crate, SOTA result, artist preference study, or real crop-formation qualification is claimed. CI queued/pending/skipped is not PASS.
+GGL's Python interpreter, Canvas reference adapter, and Rust bridge are research-stage. The Rust bridge is written but uncompiled/unexecuted here; skipped checks are not passes. The 18-entry visual QD manifest is a brief metadata pilot without art stimuli or human labels. No SOTA superiority, human-preference improvement, universal theory of beauty, historical authoring recovery, or real crop-formation decoding claim is made.
