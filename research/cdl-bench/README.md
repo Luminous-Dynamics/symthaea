@@ -66,6 +66,7 @@ observations; detection of a 3-bit surprisal step after three observations;
 and no alarm on a gradual 0.5-bit drift over 512 observations. These are
 specific synthetic detector checks, not an empirical false-alarm guarantee.
 See `docs/research/CDL_CHANGEPOINT_CUSUM_V1_2026-11-19.md`.
+Implementation tracking: [CDL-Bench-006 #12873](https://github.com/Luminous-Dynamics/symthaea/issues/12873).
 
 
 ## Run
