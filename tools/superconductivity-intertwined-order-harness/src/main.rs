@@ -178,9 +178,9 @@ fn parse_symmetric_matrix(
                 .collect::<Result<Vec<_>, _>>()?,
         );
     }
-    for i in 0..size {
-        for j in 0..size {
-            if !close_enough(matrix[i][j], matrix[j][i], 1.0e-10) {
+    for (i, row) in matrix.iter().enumerate() {
+        for (j, value) in row.iter().enumerate() {
+            if !close_enough(*value, matrix[j][i], 1.0e-10) {
                 return Err(format!("{context} must be symmetric"));
             }
         }
@@ -199,10 +199,10 @@ fn minimum_symmetric_eigenvalue(matrix: &[Vec<f64>]) -> Result<f64, String> {
         let mut p = 0;
         let mut q = 0;
         let mut largest = 0.0_f64;
-        for i in 0..size {
-            for j in (i + 1)..size {
-                if work[i][j].abs() > largest {
-                    largest = work[i][j].abs();
+        for (i, row) in work.iter().enumerate() {
+            for (j, value) in row.iter().enumerate().skip(i + 1) {
+                if value.abs() > largest {
+                    largest = value.abs();
                     p = i;
                     q = j;
                 }
@@ -218,14 +218,23 @@ fn minimum_symmetric_eigenvalue(matrix: &[Vec<f64>]) -> Result<f64, String> {
         let angle = 0.5 * (2.0 * apq).atan2(aqq - app);
         let (sine, cosine) = angle.sin_cos();
 
-        for k in 0..size {
-            if k == p || k == q {
-                continue;
-            }
-            let akp = work[k][p];
-            let akq = work[k][q];
-            let new_kp = cosine * akp - sine * akq;
-            let new_kq = sine * akp + cosine * akq;
+        let rotated_rows: Vec<(usize, f64, f64)> = work
+            .iter()
+            .enumerate()
+            .filter_map(|(k, row)| {
+                if k == p || k == q {
+                    return None;
+                }
+                let akp = row[p];
+                let akq = row[q];
+                Some((
+                    k,
+                    cosine * akp - sine * akq,
+                    sine * akp + cosine * akq,
+                ))
+            })
+            .collect();
+        for (k, new_kp, new_kq) in rotated_rows {
             work[k][p] = new_kp;
             work[p][k] = new_kp;
             work[k][q] = new_kq;
@@ -570,9 +579,9 @@ impl IntertwinedModel {
                         - sites[source].position[direction],
                 );
             }
-            for direction in 0..dimension {
+            for (direction, actual) in displacement.iter().enumerate() {
                 let expected = if direction == axis { 1.0 } else { 0.0 };
-                if !close_enough(displacement[direction], expected, 1.0e-10) {
+                if !close_enough(*actual, expected, 1.0e-10) {
                     return Err(format!(
                         "edge {id} must be an oriented positive unit bond on axis {axis}"
                     ));
@@ -1021,8 +1030,7 @@ impl IntertwinedModel {
         let mut secondary_order = 0.0;
         let mut gradient = 0.0;
 
-        for site_index in 0..self.sites.len() {
-            let site_fields = &fields[site_index];
+        for (site_index, site_fields) in fields.iter().enumerate() {
             for first in 0..component_count {
                 for second in 0..component_count {
                     quadratic += self.quadratic[first][second]
@@ -1056,17 +1064,15 @@ impl IntertwinedModel {
 
         for (edge_index, edge) in self.edges.iter().enumerate() {
             let gauge_phase = link_phases[edge_index];
-            let mut differences = Vec::with_capacity(component_count);
-            for component in 0..component_count {
-                differences.push(
-                    fields[edge.source][component]
-                        .sub(fields[edge.target][component].rotate(gauge_phase)),
-                );
-            }
+            let differences: Vec<Complex> = fields[edge.source]
+                .iter()
+                .zip(&fields[edge.target])
+                .map(|(source, target)| source.sub(target.rotate(gauge_phase)))
+                .collect();
             let stiffness_matrix = &self.gradient_by_axis[edge.axis];
-            for first in 0..component_count {
-                for second in 0..component_count {
-                    gradient += stiffness_matrix[first][second]
+            for (first, row) in stiffness_matrix.iter().enumerate() {
+                for (second, coefficient) in row.iter().enumerate() {
+                    gradient += coefficient
                         * differences[first].conj_product_real(differences[second]);
                 }
             }
