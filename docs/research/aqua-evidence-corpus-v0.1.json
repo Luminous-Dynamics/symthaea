@@ -4511,7 +4511,7 @@
         },
         {
           "claim_id": "orbital.shower.tile-thickness",
-          "parameter": "installation_requirements",
+          "parameter": "tile_thickness_limit",
           "original_value": "Shower-zone tile thickness maximum 10 mm.",
           "canonical_value": {
             "kind": "scalar",
