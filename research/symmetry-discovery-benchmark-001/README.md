@@ -336,3 +336,19 @@ The frozen fixture `fixtures/v0.1/dense_coordinate_representation.json` pins \(S
 
 This is the finite-group analogue of the Symtropy dense-coordinate RATTLE work. It prevents a coordinate representation from being rejected merely because the chart is non-orthogonal, while also preventing abstract group closure from being mistaken for a metric-preserving physical action. It is still a mathematical representation fixture, not evidence that a particular physical system has D4 symmetry.
 
+
+
+## H. Hypothesis-conditioned sensor missingness (new separate track)
+
+The first machine-readable suite is `fixtures/missingness/v0.1/dropout_cases.json`, validated by `schemas/missingness_case_manifest.schema.json`. It defines separate MCAR, MAR, MNAR, hard-support, and calibration-domain-shift cases.
+
+This track connects to the executable hard-support and probability-interval reference in [SYMM-MNAR-001 #12932](https://github.com/Luminous-Dynamics/symthaea/issues/12932) and [PR #12933](https://github.com/Luminous-Dynamics/symthaea/pull/12933), and to the conservative non-eliminating abstention model in [PR #12690](https://github.com/Luminous-Dynamics/symthaea/pull/12690).
+
+Its benchmark rules are stricter than a generic missing-data score:
+- a probabilistic dropout interval with nonzero upper probability cannot hard-eliminate a candidate;
+- a hard-support elimination is audited against the true generated dropout mechanism on an independent holdout;
+- support guarantees are valid only inside their frozen validity domain;
+- using a calibration distribution outside its domain counts as an out-of-domain promotion;
+- report dropout interval coverage, calibration error, false hard eliminations, support violations, risk/coverage, unresolved hypotheses and acquisition cost separately.
+
+MCAR, MAR and MNAR are data-generating mechanisms, not labels to infer from one observed dropout. The current v0.1 probabilistic crate assumes conditional independence across distinct probes and does not yet model observed-covariate strata; the MAR fixture is a benchmark specification for that next implementation step. No real sensor has been classified as MCAR/MAR/MNAR, and no probability calibration or baseline superiority is claimed from these synthetic fixtures.
