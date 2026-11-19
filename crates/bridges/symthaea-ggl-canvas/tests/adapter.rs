@@ -195,3 +195,94 @@ fn normalizes_large_finite_arc_angles() {
         NodeKind::Path { d } if d.starts_with("M ")
     ));
 }
+
+
+#[test]
+fn atelier_production_is_seeded_bounded_and_canvas_owned() {
+    use symthaea_atelier::AtelierStyle;
+    use symthaea_canvas::CognitiveSnapshot;
+    use symthaea_ggl_canvas::atelier::{
+        AtelierProductionRequest, generate_atelier_production,
+    };
+
+    let request = AtelierProductionRequest {
+        namespace: "visual-qd-fixture".into(),
+        instance_id: "tree-study-01".into(),
+        style: AtelierStyle::LSystem,
+        width: 512.0,
+        height: 512.0,
+        max_elements: 256,
+        max_scene_nodes: 2_000,
+        seed: 42,
+    };
+    let snapshot = CognitiveSnapshot::dormant();
+
+    let first = generate_atelier_production(&request, &snapshot)
+        .expect("bounded Atelier production");
+    let second = generate_atelier_production(&request, &snapshot)
+        .expect("same seeded production");
+    assert_eq!(first.receipt, second.receipt);
+    assert_eq!(
+        serde_json::to_vec(&first.scene).unwrap(),
+        serde_json::to_vec(&second.scene).unwrap()
+    );
+    assert!(first.receipt.generated_scene_nodes < request.max_scene_nodes);
+    assert_eq!(first.receipt.seed, request.seed);
+    assert_eq!(first.receipt.style, request.style);
+
+    match &first.scene.kind {
+        NodeKind::Group { id: Some(id) } => {
+            assert!(id.starts_with("ggl-"));
+            assert_eq!(id, &first.receipt.canvas_group_id);
+        }
+        other => panic!("Atelier output must be wrapped in a stable GGL group: {other:?}"),
+    }
+    assert_eq!(first.scene.children.len(), 1);
+
+    let svg = render_svg(&first.scene, snapshot.consciousness_level);
+    assert!(svg.starts_with("<svg"));
+    assert!(svg.contains(&first.receipt.canvas_group_id));
+}
+
+#[test]
+fn atelier_production_rejects_unbounded_or_unregistered_requests() {
+    use symthaea_atelier::AtelierStyle;
+    use symthaea_canvas::CognitiveSnapshot;
+    use symthaea_ggl_canvas::atelier::{
+        AtelierProductionRequest, generate_atelier_production,
+    };
+
+    let mut request = AtelierProductionRequest {
+        namespace: "visual-qd-fixture".into(),
+        instance_id: "callsite-01".into(),
+        style: AtelierStyle::LSystem,
+        width: 512.0,
+        height: 512.0,
+        max_elements: 256,
+        max_scene_nodes: 2_000,
+        seed: 7,
+    };
+    let snapshot = CognitiveSnapshot::dormant();
+
+    request.max_scene_nodes = 1;
+    assert!(generate_atelier_production(&request, &snapshot).is_err());
+    request.max_scene_nodes = 2_000;
+
+    request.width = f32::NAN;
+    assert!(generate_atelier_production(&request, &snapshot).is_err());
+    request.width = 512.0;
+
+    request.namespace = "invalid namespace".into();
+    assert!(generate_atelier_production(&request, &snapshot).is_err());
+    request.namespace = "visual-qd-fixture".into();
+
+    request.style = AtelierStyle::Composite;
+    assert!(generate_atelier_production(&request, &snapshot).is_err());
+    request.style = AtelierStyle::LSystem;
+
+    let oversized_snapshot = CognitiveSnapshot {
+        thought_vector: vec![0.0; 300],
+        ..CognitiveSnapshot::dormant()
+    };
+    assert!(generate_atelier_production(&request, &oversized_snapshot).is_err());
+}
