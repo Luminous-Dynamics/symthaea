@@ -256,7 +256,7 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
         return Err("causal generator limit is 1,000,000 steps per trace".into());
     }
 
-    println!("# benchmark=CDL-Bench-E1-E3-structure-aware-v2");
+    println!("# benchmark=CDL-Bench-E1-E3-adaptive-v3");
     println!("# steps={steps}");
     println!("# seed={seed}");
     println!("source,raw_bytes,cdl_order0_frame,cdl_order1_frame,field_frame,lag_frame,parent_oracle_frame,hybrid_frame,shuffled_parent_frame,online_mixture_frame,change_point_frame,zstd,round_trip");
