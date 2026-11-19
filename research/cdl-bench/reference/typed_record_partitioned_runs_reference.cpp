@@ -10,6 +10,7 @@
 #include <iostream>
 #include <map>
 #include <random>
+#include <queue>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -189,51 +190,200 @@ bool decode_one_series(const std::vector<std::uint8_t>& bytes, std::size_t count
     }
     return cursor == bytes.size();
 }
-std::vector<std::uint8_t> encode_partitioned(const std::vector<Record>& records){
-    std::map<Key,std::size_t> key_to_id;std::vector<Key> keys;std::vector<std::vector<Record>> per_key;std::vector<std::size_t> schedule;schedule.reserve(records.size());
-    for(const auto& r:records){const Key key=key_of(r);auto [it,inserted]=key_to_id.emplace(key,keys.size());if(inserted){keys.push_back(key);per_key.emplace_back();}const auto id=it->second;per_key[id].push_back(r);schedule.push_back(id);}
-    std::vector<std::vector<std::uint8_t>> streams;streams.reserve(keys.size());for(const auto& rows:per_key)streams.push_back(encode_one_series(rows));
-    const std::size_t bits_per_id=key_bits(keys.size());BitWriter order;for(const auto id:schedule)order.put(static_cast<std::uint32_t>(id),bits_per_id);
-    std::vector<std::uint8_t> out;out.insert(out.end(),{'P','R','N','1'});put_u64(records.size(),out);put_u32(static_cast<std::uint32_t>(keys.size()),out);out.push_back(static_cast<std::uint8_t>(kFields));out.insert(out.end(),kSchema.begin(),kSchema.end());put_u32(static_cast<std::uint32_t>(bits_per_id),out);put_u64(order.bits,out);
-    for(std::size_t i=0U;i<keys.size();++i){put_u32(keys[i].first,out);put_u32(keys[i].second,out);put_u64(per_key[i].size(),out);put_u64(streams[i].size(),out);out.insert(out.end(),streams[i].begin(),streams[i].end());}
-    put_u64(order.bytes.size(),out);out.insert(out.end(),order.bytes.begin(),order.bytes.end());put_u32(crc32(out.data(),out.size()),out);return out;
+std::vector<std::uint8_t> encode_partitioned(const std::vector<Record>& records) {
+    std::map<Key, std::size_t> key_to_id;
+    std::vector<Key> keys;
+    std::vector<std::vector<Record>> per_key;
+    std::vector<std::size_t> schedule;
+    schedule.reserve(records.size());
+    bool strictly_timestamp_ordered = true;
+    for (std::size_t i = 1U; i < records.size(); ++i) {
+        if (records[i].timestamp <= records[i - 1U].timestamp) {
+            strictly_timestamp_ordered = false;
+            break;
+        }
+    }
+
+    for (const auto& record : records) {
+        const Key key = key_of(record);
+        auto [it, inserted] = key_to_id.emplace(key, keys.size());
+        if (inserted) {
+            keys.push_back(key);
+            per_key.emplace_back();
+        }
+        const auto id = it->second;
+        per_key[id].push_back(record);
+        if (!strictly_timestamp_ordered) schedule.push_back(id);
+    }
+
+    std::vector<std::vector<std::uint8_t>> streams;
+    streams.reserve(keys.size());
+    for (const auto& rows : per_key) streams.push_back(encode_one_series(rows));
+
+    const std::uint8_t order_mode = strictly_timestamp_ordered ? 0U : 1U;
+    const std::size_t bits_per_id = strictly_timestamp_ordered ? 0U : key_bits(keys.size());
+    BitWriter order;
+    if (!strictly_timestamp_ordered) {
+        for (const auto id : schedule) order.put(static_cast<std::uint32_t>(id), bits_per_id);
+    }
+
+    std::vector<std::uint8_t> out;
+    out.insert(out.end(), {'P', 'R', 'N', '1'});
+    put_u64(records.size(), out);
+    put_u32(static_cast<std::uint32_t>(keys.size()), out);
+    out.push_back(static_cast<std::uint8_t>(kFields));
+    out.insert(out.end(), kSchema.begin(), kSchema.end());
+    out.push_back(order_mode); // 0 = timestamp k-way merge, 1 = explicit order schedule
+    put_u32(static_cast<std::uint32_t>(bits_per_id), out);
+    put_u64(order.bits, out);
+
+    for (std::size_t i = 0U; i < keys.size(); ++i) {
+        put_u32(keys[i].first, out);
+        put_u32(keys[i].second, out);
+        put_u64(per_key[i].size(), out);
+        put_u64(streams[i].size(), out);
+        out.insert(out.end(), streams[i].begin(), streams[i].end());
+    }
+    put_u64(order.bytes.size(), out);
+    out.insert(out.end(), order.bytes.begin(), order.bytes.end());
+    put_u32(crc32(out.data(), out.size()), out);
+    return out;
 }
-bool decode_partitioned(const std::vector<std::uint8_t>& bytes,std::size_t max_records,std::vector<Record>& output){
-    output.clear();if(bytes.size()<4U+8U+4U+1U+8U+4U+8U+8U+4U)return false;const std::size_t crc_pos=bytes.size()-4U;std::size_t crc_cursor=crc_pos;std::uint32_t stored_crc=0U;if(!get_u32(bytes,crc_cursor,stored_crc)||crc32(bytes.data(),crc_pos)!=stored_crc)return false;
-    std::size_t p=0U;
-    if(bytes[p++]!='P'||bytes[p++]!='R'||bytes[p++]!='N'||bytes[p++]!='1')return false;
-    std::uint64_t count64=0U;
-    std::uint32_t key_count=0U;
-    if(!get_u64(bytes,p,count64)||count64>max_records||!get_u32(bytes,p,key_count)||
-       key_count>count64||key_count>1'000'000U)return false;
-    if((count64==0U)!=(key_count==0U))return false;
-    if(p>=crc_pos||bytes[p++]!=kFields)return false;
-    if(bytes.size()-p<kFields)return false;
-    for(auto kind:kSchema)if(bytes[p++]!=kind)return false;
-    std::uint32_t bits=0U;
-    std::uint64_t order_bits=0U;
-    if(!get_u32(bytes,p,bits)||!get_u64(bytes,p,order_bits)||
-       bits!=key_bits(key_count)||(bits!=0U&&count64>UINT64_MAX/bits)||
-       order_bits!=count64*bits||order_bits>UINT64_MAX-7U)return false;
-    std::vector<Key> keys;std::vector<std::vector<Record>> rows;keys.reserve(key_count);rows.resize(key_count);std::uint64_t total_rows=0U;
-    for(std::uint32_t i=0U;i<key_count;++i){std::uint32_t entity=0U,series=0U;std::uint64_t n=0U,len=0U;if(!get_u32(bytes,p,entity)||!get_u32(bytes,p,series)||!get_u64(bytes,p,n)||!get_u64(bytes,p,len)||n==0U||n>count64||p>crc_pos||len>crc_pos-p)return false;keys.emplace_back(entity,series);for(std::uint32_t j=0U;j<i;++j)if(keys[j]==keys.back())return false;std::vector<std::uint8_t> child(bytes.begin()+static_cast<std::ptrdiff_t>(p),bytes.begin()+static_cast<std::ptrdiff_t>(p+static_cast<std::size_t>(len)));p+=static_cast<std::size_t>(len);if(!decode_one_series(child,static_cast<std::size_t>(n),keys.back(),rows[i]))return false;total_rows+=n;}
-    if(total_rows!=count64)return false;
-    std::uint64_t schedule_len=0U;
-    if(!get_u64(bytes,p,schedule_len)||p>crc_pos||schedule_len>crc_pos-p||p+schedule_len!=crc_pos)return false;
-    std::vector<std::uint8_t> schedule(bytes.begin()+static_cast<std::ptrdiff_t>(p),bytes.begin()+static_cast<std::ptrdiff_t>(p+static_cast<std::size_t>(schedule_len)));
-    if(schedule.size()!=(order_bits+7U)/8U)return false;
-    if((order_bits&7U)!=0U&&!schedule.empty()){const auto mask=static_cast<std::uint8_t>((1U<<(8U-(order_bits&7U)))-1U);if((schedule.back()&mask)!=0U)return false;}
-    BitReader reader{schedule,static_cast<std::size_t>(order_bits),0U};
-    std::vector<std::size_t> cursors(key_count,0U);output.reserve(static_cast<std::size_t>(count64));
-    for(std::uint64_t i=0U;i<count64;++i){std::uint32_t id=0U;if(!reader.get(bits,id)||id>=key_count||cursors[id]>=rows[id].size())return false;output.push_back(rows[id][cursors[id]++]);}
-    if(reader.position!=reader.bits)return false;
-    for(std::size_t i=0U;i<rows.size();++i)if(cursors[i]!=rows[i].size())return false;
+
+bool decode_partitioned(const std::vector<std::uint8_t>& bytes, std::size_t max_records,
+                        std::vector<Record>& output) {
+    output.clear();
+    if (bytes.size() < 4U + 8U + 4U + 1U + 8U + 1U + 4U + 8U + 8U + 4U) return false;
+    const std::size_t crc_pos = bytes.size() - 4U;
+    std::size_t crc_cursor = crc_pos;
+    std::uint32_t stored_crc = 0U;
+    if (!get_u32(bytes, crc_cursor, stored_crc) || crc32(bytes.data(), crc_pos) != stored_crc) return false;
+
+    std::size_t cursor = 0U;
+    if (bytes[cursor++] != 'P' || bytes[cursor++] != 'R' ||
+        bytes[cursor++] != 'N' || bytes[cursor++] != '1') return false;
+
+    std::uint64_t count64 = 0U;
+    std::uint32_t key_count = 0U;
+    if (!get_u64(bytes, cursor, count64) || count64 > max_records ||
+        !get_u32(bytes, cursor, key_count) || key_count > count64 ||
+        key_count > 1'000'000U) return false;
+    if ((count64 == 0U) != (key_count == 0U)) return false;
+    if (cursor >= crc_pos || bytes[cursor++] != kFields) return false;
+    if (bytes.size() - cursor < kFields) return false;
+    for (const auto kind : kSchema) {
+        if (bytes[cursor++] != kind) return false;
+    }
+
+    if (cursor >= crc_pos) return false;
+    const auto order_mode = bytes[cursor++];
+    if (order_mode > 1U) return false;
+
+    std::uint32_t bits = 0U;
+    std::uint64_t order_bits = 0U;
+    if (!get_u32(bytes, cursor, bits) || !get_u64(bytes, cursor, order_bits)) return false;
+    if (order_mode == 0U) {
+        if (bits != 0U || order_bits != 0U) return false;
+    } else {
+        if (bits != key_bits(key_count) ||
+            (bits != 0U && count64 > UINT64_MAX / bits) ||
+            order_bits != count64 * bits || order_bits > UINT64_MAX - 7U) return false;
+    }
+
+    std::vector<Key> keys;
+    std::vector<std::vector<Record>> rows;
+    keys.reserve(key_count);
+    rows.resize(key_count);
+    std::uint64_t total_rows = 0U;
+    for (std::uint32_t i = 0U; i < key_count; ++i) {
+        std::uint32_t entity = 0U;
+        std::uint32_t series = 0U;
+        std::uint64_t row_count = 0U;
+        std::uint64_t child_len = 0U;
+        if (!get_u32(bytes, cursor, entity) || !get_u32(bytes, cursor, series) ||
+            !get_u64(bytes, cursor, row_count) || !get_u64(bytes, cursor, child_len) ||
+            row_count == 0U || row_count > count64 || cursor > crc_pos ||
+            child_len > crc_pos - cursor) return false;
+
+        keys.emplace_back(entity, series);
+        for (std::uint32_t j = 0U; j < i; ++j) {
+            if (keys[j] == keys.back()) return false;
+        }
+        std::vector<std::uint8_t> child(
+            bytes.begin() + static_cast<std::ptrdiff_t>(cursor),
+            bytes.begin() + static_cast<std::ptrdiff_t>(cursor + static_cast<std::size_t>(child_len)));
+        cursor += static_cast<std::size_t>(child_len);
+        if (!decode_one_series(child, static_cast<std::size_t>(row_count), keys.back(), rows[i])) return false;
+        if (order_mode == 0U) {
+            for (std::size_t j = 1U; j < rows[i].size(); ++j) {
+                if (rows[i][j].timestamp <= rows[i][j - 1U].timestamp) return false;
+            }
+        }
+        if (row_count > count64 - total_rows) return false;
+        total_rows += row_count;
+    }
+    if (total_rows != count64) return false;
+
+    std::uint64_t schedule_len = 0U;
+    if (!get_u64(bytes, cursor, schedule_len) || cursor > crc_pos ||
+        schedule_len > crc_pos - cursor || cursor + schedule_len != crc_pos) return false;
+    std::vector<std::uint8_t> schedule(
+        bytes.begin() + static_cast<std::ptrdiff_t>(cursor),
+        bytes.begin() + static_cast<std::ptrdiff_t>(cursor + static_cast<std::size_t>(schedule_len)));
+
+    output.reserve(static_cast<std::size_t>(count64));
+    if (order_mode == 0U) {
+        if (schedule_len != 0U) return false;
+        using HeapEntry = std::pair<std::uint64_t, std::size_t>;
+        std::priority_queue<HeapEntry, std::vector<HeapEntry>, std::greater<HeapEntry>> heap;
+        std::vector<std::size_t> cursors(key_count, 0U);
+        for (std::size_t key = 0U; key < rows.size(); ++key) {
+            if (!rows[key].empty()) heap.emplace(rows[key][0].timestamp, key);
+        }
+        bool have_previous = false;
+        std::uint64_t previous_timestamp = 0U;
+        while (!heap.empty()) {
+            const auto [timestamp, key] = heap.top();
+            heap.pop();
+            if (have_previous && timestamp <= previous_timestamp) return false;
+            const auto row_index = cursors[key]++;
+            if (row_index >= rows[key].size() || rows[key][row_index].timestamp != timestamp) return false;
+            output.push_back(rows[key][row_index]);
+            previous_timestamp = timestamp;
+            have_previous = true;
+            if (cursors[key] < rows[key].size()) {
+                heap.emplace(rows[key][cursors[key]].timestamp, key);
+            }
+        }
+        for (std::size_t key = 0U; key < rows.size(); ++key) {
+            if (cursors[key] != rows[key].size()) return false;
+        }
+        return output.size() == count64;
+    }
+
+    if (schedule.size() != (order_bits + 7U) / 8U) return false;
+    if ((order_bits & 7U) != 0U && !schedule.empty()) {
+        const auto mask = static_cast<std::uint8_t>((1U << (8U - (order_bits & 7U))) - 1U);
+        if ((schedule.back() & mask) != 0U) return false;
+    }
+    BitReader reader{schedule, static_cast<std::size_t>(order_bits), 0U};
+    std::vector<std::size_t> cursors(key_count, 0U);
+    for (std::uint64_t i = 0U; i < count64; ++i) {
+        std::uint32_t id = 0U;
+        if (!reader.get(bits, id) || id >= key_count || cursors[id] >= rows[id].size()) return false;
+        output.push_back(rows[id][cursors[id]++]);
+    }
+    if (reader.position != reader.bits) return false;
+    for (std::size_t i = 0U; i < rows.size(); ++i) {
+        if (cursors[i] != rows[i].size()) return false;
+    }
     return true;
 }
 void write_file(const std::filesystem::path& path,const std::vector<std::uint8_t>& bytes){std::ofstream f(path,std::ios::binary);if(!f)throw std::runtime_error("open failed");f.write(reinterpret_cast<const char*>(bytes.data()),static_cast<std::streamsize>(bytes.size()));if(!f)throw std::runtime_error("write failed");}
 void require(bool v,const std::string& m){if(!v)throw std::runtime_error(m);}
 void test_empty_stream(){const std::vector<Record> records;const auto frame=encode_partitioned(records);std::vector<Record> decoded;require(decode_partitioned(frame,0U,decoded),"empty partitioned stream rejected");require(decoded.empty(),"empty partitioned stream produced records");}
-void test_roundtrips(){for(const std::string name:{"sparse","bursty","idle","noisy"}){const auto records=fixture(name,0x7878U);const auto frame=encode_partitioned(records);std::vector<Record> decoded;require(decode_partitioned(frame,records.size(),decoded),name+" partition decoder rejected frame");require(decoded==records,name+" partition order/data mismatch");}}
+void test_roundtrips(){for(const std::string name:{"sparse","bursty","idle","noisy"}){const auto records=fixture(name,0x7878U);const auto frame=encode_partitioned(records);require(frame.size()>26U&&frame[25]==0U,name+" should use timestamp-merge mode");std::vector<Record> decoded;require(decode_partitioned(frame,records.size(),decoded),name+" partition decoder rejected frame");require(decoded==records,name+" partition order/data mismatch");}}
+void test_schedule_fallback(){auto records=fixture("sparse",0x887766U);for(std::size_t i=0U;i<records.size();++i)records[i].timestamp=static_cast<std::uint64_t>(i/kKeys)*1000U;const auto duplicate_frame=encode_partitioned(records);require(duplicate_frame.size()>26U&&duplicate_frame[25]==1U,"duplicate timestamps should use explicit schedule");std::vector<Record> decoded;require(decode_partitioned(duplicate_frame,records.size(),decoded)&&decoded==records,"duplicate timestamp fallback order mismatch");auto out_of_order=fixture("bursty",0x778899U);std::swap(out_of_order[1],out_of_order[2]);const auto disorder_frame=encode_partitioned(out_of_order);require(disorder_frame.size()>26U&&disorder_frame[25]==1U,"out-of-order timestamps should use explicit schedule");require(decode_partitioned(disorder_frame,out_of_order.size(),decoded)&&decoded==out_of_order,"out-of-order fallback mismatch");}
 void test_randomized(){std::mt19937_64 rng(0x991122U);for(std::size_t trial=0U;trial<100U;++trial){std::vector<Record> records;std::array<Record,8U> states{};std::array<bool,8U> init{};const std::size_t n=static_cast<std::size_t>(rng()%300U);std::uint64_t time=0U;for(std::size_t i=0U;i<n;++i){const auto k=static_cast<std::size_t>(rng()%8U);time+=rng()%7U;Record r=init[k]?states[k]:Record{};r.timestamp=time;r.entity=static_cast<std::uint32_t>(k/4U);r.series=static_cast<std::uint32_t>(k%4U);if(!init[k])r.present=0xffU;for(std::size_t f=0U;f<kFields;++f){const auto bit=static_cast<std::uint8_t>(1U<<f);if(!init[k]||rng()%20U==0U){if(init[k]&&rng()%8U==0U)r.present=static_cast<std::uint8_t>(r.present^bit);r.values[f]=(r.present&bit)==0U?0U:value_for(f,rng());}}records.push_back(r);states[k]=r;init[k]=true;}const auto frame=encode_partitioned(records);std::vector<Record> decoded;require(decode_partitioned(frame,records.size(),decoded),"random partition decode rejected");require(decoded==records,"random partition mismatch");}}
 void test_corruption(){const auto rows=fixture("sparse",0x8877U);auto frame=encode_partitioned(rows);std::vector<Record> out;auto bad=frame;bad[0]^=1U;require(!decode_partitioned(bad,rows.size(),out),"bad magic/CRC accepted");bad=frame;bad.pop_back();require(!decode_partitioned(bad,rows.size(),out),"truncated partition frame accepted");bad=frame;bad.push_back(0U);require(!decode_partitioned(bad,rows.size(),out),"trailing partition bytes accepted");}
 void emit(const std::filesystem::path& dir) {
@@ -256,4 +406,4 @@ void emit(const std::filesystem::path& dir) {
     }
 }
 
-int main(int argc,char** argv){try{test_empty_stream();test_roundtrips();test_randomized();test_corruption();std::cout<<"empty_stream=PASS fixture_roundtrips=4 randomized_roundtrips=100 corruption_rejections=3 status=PASS\\n";if(argc==3&&std::string(argv[1])=="--emit-dir")emit(argv[2]);else if(argc!=1){std::cerr<<"usage: "<<argv[0]<<" [--emit-dir DIR]\\n";return 2;}return 0;}catch(const std::exception& e){std::cerr<<"partitioned reference failed: "<<e.what()<<"\\n";return 1;}}
+int main(int argc,char** argv){try{test_empty_stream();test_roundtrips();test_schedule_fallback();test_randomized();test_corruption();std::cout<<"empty_stream=PASS timestamp_merge=PASS duplicate_and_disorder_schedule_fallback=PASS fixture_roundtrips=4 randomized_roundtrips=100 corruption_rejections=3 status=PASS\\n";if(argc==3&&std::string(argv[1])=="--emit-dir")emit(argv[2]);else if(argc!=1){std::cerr<<"usage: "<<argv[0]<<" [--emit-dir DIR]\\n";return 2;}return 0;}catch(const std::exception& e){std::cerr<<"partitioned reference failed: "<<e.what()<<"\\n";return 1;}}
