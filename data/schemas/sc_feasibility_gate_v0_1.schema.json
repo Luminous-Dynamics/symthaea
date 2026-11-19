@@ -5,11 +5,25 @@
   "description": "Synthetic-only contract for condition-qualified feasibility labels, mandatory unknown abstention, and Tc prediction only on observed superconductors.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["contract", "fixture_only", "instance_id", "records", "predictions", "claim_ceiling"],
+  "required": [
+    "contract",
+    "fixture_only",
+    "instance_id",
+    "records",
+    "predictions",
+    "claim_ceiling"
+  ],
   "properties": {
-    "contract": { "const": "SC-FEASIBILITY-GATE-0.1" },
-    "fixture_only": { "const": true },
-    "instance_id": { "type": "string", "minLength": 1 },
+    "contract": {
+      "const": "SC-FEASIBILITY-GATE-0.1"
+    },
+    "fixture_only": {
+      "const": true
+    },
+    "instance_id": {
+      "type": "string",
+      "minLength": 1
+    },
     "records": {
       "type": "array",
       "minItems": 2,
@@ -18,15 +32,36 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "record_id", "material_id", "family_id", "source_id", "publication_date",
-          "label_state", "condition_context", "observed_tc_k"
+          "record_id",
+          "material_id",
+          "family_id",
+          "source_id",
+          "publication_date",
+          "label_state",
+          "condition_context",
+          "observed_tc_k"
         ],
         "properties": {
-          "record_id": { "type": "string", "minLength": 1 },
-          "material_id": { "type": "string", "minLength": 1 },
-          "family_id": { "type": "string", "minLength": 1 },
-          "source_id": { "type": "string", "minLength": 1 },
-          "publication_date": { "type": "string", "format": "date" },
+          "record_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "material_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "publication_date": {
+            "type": "string",
+            "format": "date"
+          },
           "label_state": {
             "enum": [
               "observed_superconducting",
@@ -38,32 +73,106 @@
             "type": "object",
             "additionalProperties": false,
             "required": [
-              "pressure_gpa", "measurement_temperature_range_k", "sample_form",
-              "measurement_method", "transition_criterion", "evidence_scope", "scope_description"
+              "pressure_gpa",
+              "measurement_temperature_range_k",
+              "sample_form",
+              "measurement_method",
+              "transition_criterion",
+              "evidence_scope",
+              "scope_description",
+              "measurement_field_t",
+              "field_orientation",
+              "minimum_detectable_tc_k",
+              "detection_limit_description"
             ],
             "properties": {
-              "pressure_gpa": { "type": ["number", "null"], "minimum": 0 },
+              "pressure_gpa": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
               "measurement_temperature_range_k": {
-                "type": "array", "minItems": 2, "maxItems": 2,
-                "items": { "type": "number", "minimum": 0 }
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                }
               },
               "sample_form": {
-                "enum": ["bulk_crystal", "thin_film", "powder", "wire_or_tape", "unknown"]
+                "enum": [
+                  "bulk_crystal",
+                  "thin_film",
+                  "powder",
+                  "wire_or_tape",
+                  "unknown"
+                ]
               },
-              "measurement_method": { "type": "string", "minLength": 1 },
+              "measurement_method": {
+                "type": "string",
+                "minLength": 1
+              },
               "transition_criterion": {
                 "enum": [
-                  "bulk_thermodynamic", "zero_resistance", "diamagnetic_onset",
-                  "resistive_onset", "none", "unknown"
+                  "bulk_thermodynamic",
+                  "zero_resistance",
+                  "diamagnetic_onset",
+                  "resistive_onset",
+                  "none",
+                  "unknown"
                 ]
               },
               "evidence_scope": {
-                "enum": ["targeted_experiment", "targeted_literature_review", "unknown_or_not_reported"]
+                "enum": [
+                  "targeted_experiment",
+                  "targeted_literature_review",
+                  "unknown_or_not_reported"
+                ]
               },
-              "scope_description": { "type": "string", "minLength": 1 }
+              "scope_description": {
+                "type": "string",
+                "minLength": 1
+              },
+              "measurement_field_t": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "field_orientation": {
+                "enum": [
+                  "parallel",
+                  "perpendicular",
+                  "in_plane",
+                  "out_of_plane",
+                  "polycrystalline",
+                  "unknown"
+                ]
+              },
+              "minimum_detectable_tc_k": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "exclusiveMinimum": 0
+              },
+              "detection_limit_description": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           },
-          "observed_tc_k": { "type": ["number", "null"], "exclusiveMinimum": 0 }
+          "observed_tc_k": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          }
         }
       }
     },
@@ -75,16 +184,50 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "record_id", "feasibility_abstained", "p_superconducting",
-          "conditional_tc_pred_k", "tc_lower_k", "tc_upper_k"
+          "record_id",
+          "feasibility_abstained",
+          "p_superconducting",
+          "conditional_tc_pred_k",
+          "tc_lower_k",
+          "tc_upper_k"
         ],
         "properties": {
-          "record_id": { "type": "string", "minLength": 1 },
-          "feasibility_abstained": { "type": "boolean" },
-          "p_superconducting": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
-          "conditional_tc_pred_k": { "type": ["number", "null"], "exclusiveMinimum": 0 },
-          "tc_lower_k": { "type": ["number", "null"], "minimum": 0 },
-          "tc_upper_k": { "type": ["number", "null"], "minimum": 0 }
+          "record_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "feasibility_abstained": {
+            "type": "boolean"
+          },
+          "p_superconducting": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "conditional_tc_pred_k": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "tc_lower_k": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "tc_upper_k": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          }
         }
       }
     },
