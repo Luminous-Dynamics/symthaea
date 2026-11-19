@@ -856,6 +856,22 @@ fn audit_case(value: &Value) -> AuditReport {
         string_at(value, &["mission", "comfort_requirement"]).unwrap_or("unknown");
     let comfort_fallback =
         string_at(value, &["policy_arm", "comfort_fallback_status"]).unwrap_or("unknown");
+    if comfort_fallback != "none"
+        && string_at(
+            value,
+            &["policy_arm", "comfort_fallback_evidence_id"],
+        )
+        .is_none_or(str::is_empty)
+    {
+        add(
+            &mut findings,
+            "MISSING_COMFORT_FALLBACK_EVIDENCE",
+            "ERROR",
+            "policy_arm.comfort_fallback_evidence_id",
+            "Any comfort-limit relaxation or no-feasible-route outcome requires an evidence reference for its disposition.",
+        );
+    }
+
     match (comfort_requirement, comfort_fallback) {
         ("hard", "none") | ("soft", "none") | ("not_applicable", "none") => {}
         ("hard", "no_feasible_route")
@@ -1321,6 +1337,7 @@ mod tests {
     fn automatic_comfort_relaxation_cannot_pass_a_hard_requirement() {
         let mut value = fixture();
         value["policy_arm"]["comfort_fallback_status"] = json!("automatically_relaxed");
+        value["policy_arm"]["comfort_fallback_evidence_id"] = json!("SYNTHETIC-COMFORT-RELAXATION-RECEIPT");
         let report = audit_case(&value);
         assert_eq!(report.disposition, "BLOCKED");
         assert!(report.has_code("HARD_COMFORT_CONSTRAINT_NOT_MET"));
@@ -1331,9 +1348,20 @@ mod tests {
         let mut value = fixture();
         value["mission"]["comfort_requirement"] = json!("soft");
         value["policy_arm"]["comfort_fallback_status"] = json!("automatically_relaxed");
+        value["policy_arm"]["comfort_fallback_evidence_id"] = json!("SYNTHETIC-COMFORT-RELAXATION-RECEIPT");
         let report = audit_case(&value);
         assert_eq!(report.disposition, "INCOMPLETE");
         assert!(report.has_code("SOFT_COMFORT_PREFERENCE_UNMET"));
+    }
+
+    #[test]
+    fn comfort_fallback_without_evidence_is_invalid() {
+        let mut value = fixture();
+        value["mission"]["comfort_requirement"] = json!("soft");
+        value["policy_arm"]["comfort_fallback_status"] = json!("automatically_relaxed");
+        let report = audit_case(&value);
+        assert_eq!(report.disposition, "INVALID");
+        assert!(report.has_code("MISSING_COMFORT_FALLBACK_EVIDENCE"));
     }
 
     #[test]
