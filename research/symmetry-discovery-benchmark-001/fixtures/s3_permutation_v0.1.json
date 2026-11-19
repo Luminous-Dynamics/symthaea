@@ -1,0 +1,424 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "LUMINOUS-SYMM-PERMUTATION-001",
+  "action": {
+    "group_id": "S3",
+    "action_kind": "coordinate_permutation_on_R3",
+    "identity_element_id": "e",
+    "elements": [
+      {
+        "id": "e",
+        "image": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "id": "s12",
+        "image": [
+          0,
+          2,
+          1
+        ]
+      },
+      {
+        "id": "s01",
+        "image": [
+          1,
+          0,
+          2
+        ]
+      },
+      {
+        "id": "c012",
+        "image": [
+          1,
+          2,
+          0
+        ]
+      },
+      {
+        "id": "c021",
+        "image": [
+          2,
+          0,
+          1
+        ]
+      },
+      {
+        "id": "s02",
+        "image": [
+          2,
+          1,
+          0
+        ]
+      }
+    ],
+    "multiplication_table": [
+      {
+        "left": "e",
+        "right": "e",
+        "product": "e"
+      },
+      {
+        "left": "e",
+        "right": "s12",
+        "product": "s12"
+      },
+      {
+        "left": "e",
+        "right": "s01",
+        "product": "s01"
+      },
+      {
+        "left": "e",
+        "right": "c012",
+        "product": "c012"
+      },
+      {
+        "left": "e",
+        "right": "c021",
+        "product": "c021"
+      },
+      {
+        "left": "e",
+        "right": "s02",
+        "product": "s02"
+      },
+      {
+        "left": "s12",
+        "right": "e",
+        "product": "s12"
+      },
+      {
+        "left": "s12",
+        "right": "s12",
+        "product": "e"
+      },
+      {
+        "left": "s12",
+        "right": "s01",
+        "product": "c012"
+      },
+      {
+        "left": "s12",
+        "right": "c012",
+        "product": "s01"
+      },
+      {
+        "left": "s12",
+        "right": "c021",
+        "product": "s02"
+      },
+      {
+        "left": "s12",
+        "right": "s02",
+        "product": "c021"
+      },
+      {
+        "left": "s01",
+        "right": "e",
+        "product": "s01"
+      },
+      {
+        "left": "s01",
+        "right": "s12",
+        "product": "c021"
+      },
+      {
+        "left": "s01",
+        "right": "s01",
+        "product": "e"
+      },
+      {
+        "left": "s01",
+        "right": "c012",
+        "product": "s02"
+      },
+      {
+        "left": "s01",
+        "right": "c021",
+        "product": "s12"
+      },
+      {
+        "left": "s01",
+        "right": "s02",
+        "product": "c012"
+      },
+      {
+        "left": "c012",
+        "right": "e",
+        "product": "c012"
+      },
+      {
+        "left": "c012",
+        "right": "s12",
+        "product": "s02"
+      },
+      {
+        "left": "c012",
+        "right": "s01",
+        "product": "s12"
+      },
+      {
+        "left": "c012",
+        "right": "c012",
+        "product": "c021"
+      },
+      {
+        "left": "c012",
+        "right": "c021",
+        "product": "e"
+      },
+      {
+        "left": "c012",
+        "right": "s02",
+        "product": "s01"
+      },
+      {
+        "left": "c021",
+        "right": "e",
+        "product": "c021"
+      },
+      {
+        "left": "c021",
+        "right": "s12",
+        "product": "s01"
+      },
+      {
+        "left": "c021",
+        "right": "s01",
+        "product": "s02"
+      },
+      {
+        "left": "c021",
+        "right": "c012",
+        "product": "e"
+      },
+      {
+        "left": "c021",
+        "right": "c021",
+        "product": "c012"
+      },
+      {
+        "left": "c021",
+        "right": "s02",
+        "product": "s12"
+      },
+      {
+        "left": "s02",
+        "right": "e",
+        "product": "s02"
+      },
+      {
+        "left": "s02",
+        "right": "s12",
+        "product": "c012"
+      },
+      {
+        "left": "s02",
+        "right": "s01",
+        "product": "c021"
+      },
+      {
+        "left": "s02",
+        "right": "c012",
+        "product": "s12"
+      },
+      {
+        "left": "s02",
+        "right": "c021",
+        "product": "s01"
+      },
+      {
+        "left": "s02",
+        "right": "s02",
+        "product": "e"
+      }
+    ],
+    "inverse_table": [
+      {
+        "element": "e",
+        "inverse": "e"
+      },
+      {
+        "element": "s12",
+        "inverse": "s12"
+      },
+      {
+        "element": "s01",
+        "inverse": "s01"
+      },
+      {
+        "element": "c012",
+        "inverse": "c021"
+      },
+      {
+        "element": "c021",
+        "inverse": "c012"
+      },
+      {
+        "element": "s02",
+        "inverse": "s02"
+      }
+    ]
+  },
+  "seed_point": [
+    11,
+    23,
+    47
+  ],
+  "cases": [
+    {
+      "case_id": "S3-C1",
+      "split": "fixture_sanity",
+      "target_subgroup_ids": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "point_orbit": [
+        [
+          11,
+          23,
+          47
+        ]
+      ]
+    },
+    {
+      "case_id": "S3-C2_s12",
+      "split": "fixture_sanity",
+      "target_subgroup_ids": [
+        "e",
+        "s12"
+      ],
+      "expected_subgroup_label": "C2_s12",
+      "point_orbit": [
+        [
+          11,
+          23,
+          47
+        ],
+        [
+          11,
+          47,
+          23
+        ]
+      ]
+    },
+    {
+      "case_id": "S3-C2_s01",
+      "split": "fixture_sanity",
+      "target_subgroup_ids": [
+        "e",
+        "s01"
+      ],
+      "expected_subgroup_label": "C2_s01",
+      "point_orbit": [
+        [
+          11,
+          23,
+          47
+        ],
+        [
+          23,
+          11,
+          47
+        ]
+      ]
+    },
+    {
+      "case_id": "S3-C3",
+      "split": "fixture_sanity",
+      "target_subgroup_ids": [
+        "c012",
+        "c021",
+        "e"
+      ],
+      "expected_subgroup_label": "C3",
+      "point_orbit": [
+        [
+          11,
+          23,
+          47
+        ],
+        [
+          23,
+          47,
+          11
+        ],
+        [
+          47,
+          11,
+          23
+        ]
+      ]
+    },
+    {
+      "case_id": "S3-C2_s02",
+      "split": "fixture_sanity",
+      "target_subgroup_ids": [
+        "e",
+        "s02"
+      ],
+      "expected_subgroup_label": "C2_s02",
+      "point_orbit": [
+        [
+          11,
+          23,
+          47
+        ],
+        [
+          47,
+          23,
+          11
+        ]
+      ]
+    },
+    {
+      "case_id": "S3-S3",
+      "split": "fixture_sanity",
+      "target_subgroup_ids": [
+        "c012",
+        "c021",
+        "e",
+        "s01",
+        "s02",
+        "s12"
+      ],
+      "expected_subgroup_label": "S3",
+      "point_orbit": [
+        [
+          11,
+          23,
+          47
+        ],
+        [
+          11,
+          47,
+          23
+        ],
+        [
+          23,
+          11,
+          47
+        ],
+        [
+          23,
+          47,
+          11
+        ],
+        [
+          47,
+          11,
+          23
+        ],
+        [
+          47,
+          23,
+          11
+        ]
+      ]
+    }
+  ]
+}
