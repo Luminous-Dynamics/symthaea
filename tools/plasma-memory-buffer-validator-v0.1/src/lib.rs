@@ -9,7 +9,7 @@
 //! - a slot must already have been computed before the query stage;
 //! - a same-step slot whose physical abscissa is later than the query must be
 //!   explicitly declared as an integrator dependency, unless PaperReported mode
-//!   is reproducing the published buffer protocol unchanged.
+//!   permits the provisional-stage inclusion described in the published source;
 //!
 //! This crate validates buffer metadata and causal availability only. It does
 //! not validate a PDE solver, numerical solution, plasma physics, labels,
@@ -53,9 +53,9 @@ pub enum SlotKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BufferPolicy {
-    /// Faithfully reproduce the paper's deployed buffer semantics.
-    /// Earlier-computed provisional stages are allowed, including stages whose
-    /// abscissa is later than the query. Such slots are surfaced separately.
+    /// Permit the provisional-stage inclusion described in the paper. This is
+    /// a validator policy, not proof of a full numerical reproduction. Earlier-
+    /// computed stages with later abscissae are surfaced separately.
     PaperReported,
     /// Only committed physical states may persist in the history buffer.
     AcceptedStateOnly,
