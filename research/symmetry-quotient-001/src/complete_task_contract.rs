@@ -88,10 +88,37 @@ impl SearchProblemMetadataV1 {
     }
 
     pub fn validate(&self) -> Result<(), QuotientErrorV1> {
-        for value in self.fields() {
+        // "not-applicable" is allowed only where a task family can genuinely
+        // omit that semantic dimension. Core identity fields may never be
+        // replaced by a placeholder.
+        const NOT_APPLICABLE_ALLOWED: [bool; SearchProblemMetadataV1::FIELD_COUNT] = [
+            false, // candidate universe
+            false, // action domain
+            false, // objective definition
+            false, // constraint schema (use an explicit no-constraints schema)
+            false, // units (use an explicit dimensionless unit system)
+            true,  // coordinate chart
+            true,  // initial conditions for static problems
+            true,  // boundary conditions for non-dynamical problems
+            false, // observable map
+            false, // dataset revision
+            false, // evaluator revision
+            false, // source revision
+            true,  // solver profile for non-solver search
+            false, // precision policy
+            false, // resource budget policy
+            false, // termination policy
+            true,  // randomness policy for deterministic tasks
+            true,  // intervention family for non-interventional tasks
+            true,  // measurement model for purely mathematical tasks
+            true,  // noise model for exact/noiseless tasks
+            false, // context-selection policy
+        ];
+        for (index, value) in self.fields().into_iter().enumerate() {
             let normalized = value.trim().to_ascii_lowercase();
             if normalized.is_empty()
                 || matches!(normalized.as_str(), "unknown" | "unspecified" | "tbd" | "todo")
+                || (normalized == "not-applicable" && !NOT_APPLICABLE_ALLOWED[index])
             {
                 return Err(QuotientErrorV1::InvalidIdentifier);
             }
@@ -372,6 +399,17 @@ mod tests {
             compile_complete_task_quotient(
                 &problem,
                 &empty,
+                &action,
+                QualificationBudgetV1::default()
+            ),
+            Err(QuotientErrorV1::InvalidIdentifier)
+        );
+        let mut missing_objective = metadata();
+        missing_objective.objective_definition_id = "not-applicable".to_owned();
+        assert_eq!(
+            compile_complete_task_quotient(
+                &problem,
+                &missing_objective,
                 &action,
                 QualificationBudgetV1::default()
             ),
