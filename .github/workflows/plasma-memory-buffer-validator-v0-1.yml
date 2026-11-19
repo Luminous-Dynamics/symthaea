@@ -1,0 +1,37 @@
+name: Plasma memory buffer validator
+
+on:
+  push:
+    branches: [research/plasma-memory-buffer-validator-v0-1-2026-11-19]
+    paths:
+      - "tools/plasma-memory-buffer-validator-v0.1/**"
+      - ".github/workflows/plasma-memory-buffer-validator-v0-1.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/plasma-memory-buffer-validator-v0.1/**"
+      - ".github/workflows/plasma-memory-buffer-validator-v0-1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plasma-memory-buffer-validator-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validator:
+    name: Format, tests and strict Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Formatting
+        run: cargo fmt --manifest-path tools/plasma-memory-buffer-validator-v0.1/Cargo.toml -- --check
+      - name: Tests
+        run: cargo test --manifest-path tools/plasma-memory-buffer-validator-v0.1/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path tools/plasma-memory-buffer-validator-v0.1/Cargo.toml --locked --all-targets -- -D warnings
