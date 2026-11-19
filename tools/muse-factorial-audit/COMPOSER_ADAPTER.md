@@ -37,7 +37,7 @@ branch history before running:
     fi
     git cat-file -e 'bd227d416878a4373eb87a53e182e7067a2411a5^{commit}'
 
-The adapter also checks the 13 pinned file blobs, so the fetch does not replace
+The adapter also checks the 15 pinned file blobs, so the fetch does not replace
 the exact source checks. Put generated manifests and reports outside the source
 checkout (for example under /tmp) so they do not contaminate the next run.
 
