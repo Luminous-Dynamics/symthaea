@@ -29,7 +29,8 @@ example under /tmp) so they do not contaminate the next run.
 
 Analyze the resulting observations. The metric registry must be explicit:
 
-    cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin analyze-results -- discovery /tmp/muse-observations.csv score_note_count,score_total_beats,score_total_seconds,score_tempo_bpm,score_notes_per_beat,score_mean_pitch_midi,score_pitch_span_semitones,score_pitch_stddev_midi,score_mean_velocity,score_velocity_stddev,score_mean_section_intensity,score_mean_note_duration_beats,score_assigned_part_fraction,score_universal_fatal_count,score_style_fatal_count,score_warning_count,score_universal_valid,score_full_validation_valid,score_pitch_class_diversity,score_pitch_class_entropy_bits,score_melody_mean_interval_semitones,score_melody_step_fraction,score_melody_leap_fraction,score_onset_ioi_stddev_beats,score_offbeat_onset_fraction,score_voice_role_entropy_bits,score_duration_variety_count,score_section_intensity_stddev coverage.csv effects.csv summary.csv
+    METRICS='score_note_count,score_total_beats,score_total_seconds,score_tempo_bpm,score_notes_per_beat,score_mean_pitch_midi,score_pitch_span_semitones,score_pitch_stddev_midi,score_mean_velocity,score_velocity_stddev,score_mean_section_intensity,score_mean_note_duration_beats,score_assigned_part_fraction,score_universal_fatal_count,score_style_fatal_count,score_warning_count,score_universal_valid,score_full_validation_valid,score_pitch_class_diversity,score_pitch_class_entropy_bits,score_melody_mean_interval_semitones,score_melody_step_fraction,score_melody_leap_fraction,score_onset_ioi_stddev_beats,score_offbeat_onset_fraction,score_voice_role_entropy_bits,score_duration_variety_count,score_section_intensity_stddev,identity_score_meter_beats,score_distinct_midi_pitches,identity_score_key_tonic_pc,score_key_major_indicator,score_key_minor_indicator,score_key_modal_indicator,score_emphasis_normal_count,score_emphasis_climax_count,score_emphasis_cadential_count,score_emphasis_phrase_start_count,score_form_section_count,score_plan_requested_bars,score_plan_realized_bars,score_fingerprint_form_distance,score_fingerprint_harmony_distance,score_fingerprint_orchestration_distance,score_fingerprint_rhythm_distance,score_fingerprint_contour_distance,score_fingerprint_tempo_meter_distance,score_fingerprint_pitch_class_distance,score_fingerprint_interval_distance,score_fingerprint_chord_quality_distance,score_fingerprint_cadence_distance,score_fingerprint_motif_distance,identity_exact_fingerprint_high32,identity_exact_fingerprint_low32'
+    cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin analyze-results -- discovery /tmp/muse-observations.csv "$METRICS" coverage.csv effects.csv summary.csv
 
 The root Cargo workspace currently needs the separate unmanifested-member
 exclusion repair before this example can be compiled through Cargo. Do not
@@ -50,7 +51,7 @@ Every composition routes through the style's canonical
 compose_with_grammar_plan entry point and its frozen grammar profile/spec.
 
 For each symbolic score, it serializes the score with serde_json, computes a
-SHA-256 digest over those exact bytes, and emits 52 scalar/identity metrics:
+SHA-256 digest over those exact bytes, and emits 54 scalar/identity metrics:
 
 1. note count
 2. actual score length in beats
@@ -80,15 +81,15 @@ SHA-256 digest over those exact bytes, and emits 52 scalar/identity metrics:
 26. voice-role entropy in bits
 27. distinct note-duration count
 28. section-intensity standard deviation
-29. meter in beats per bar
+29. meter in beats per bar (identity-only channel)
 30. distinct absolute MIDI-pitch count
-31. tonic pitch-class code (0–11)
-32. tonality code (0=major, 1=minor, 2=modal; exact modal name remains in the receipt note)
-33–36. note counts for Normal, Climax, Cadential and PhraseStart emphasis
-37. explicit form-section count (not applicable when no Form object is emitted)
-38–39. plan-requested and plan-realized bars (only for CallResponse/JazzChorus plans that expose both)
-40–50. eleven structural-fingerprint layer distances from the same style/seed's centre condition: form, harmony, orchestration, rhythm, contour, tempo/meter, pitch class, interval, chord quality, cadence and motif
-51–52. exact fingerprint high/low 32-bit words, preserving the 64-bit identity without lossy f64 conversion
+31. tonic pitch-class code (identity-only channel)
+32–34. major, minor and modal one-hot indicators
+35–38. note counts for Normal, Climax, Cadential and PhraseStart emphasis
+39. explicit form-section count (not applicable when no Form object is emitted)
+40–41. plan-requested and plan-realized bars (only for CallResponse/JazzChorus plans that expose both)
+42–52. eleven structural-fingerprint layer distances from the same style/seed's centre condition: form, harmony, orchestration, rhythm, contour, tempo/meter, pitch class, interval, chord quality, cadence and motif
+53–54. exact fingerprint high/low 32-bit words (identity-only channels), preserving the 64-bit identity without lossy f64 conversion
 
 The centre factorial condition (valence 0, arousal 0.5, energy 0.5,
 bars 16) is executed first for each style/seed. It becomes that block's
@@ -101,6 +102,12 @@ The pitch, melody, rhythm and role metrics are structural descriptors. They are
 not proxies for beauty, cultural authenticity, complexity or quality. In
 particular, offbeat fraction is defined against the score's quarter-note beat
 coordinate and must be interpreted alongside meter and style.
+
+Metric names beginning with identity_ are emitted and coverage-audited but are
+not submitted to the scalar contrast estimator. This applies to meter, tonic
+pitch-class identifiers and exact fingerprint words; the numeric encoding is
+not a meaningful interval scale. Tonality uses major/minor/modal 0/1 indicators
+instead.
 
 The two validity metrics are deliberately separate. The universal metric only
 counts the validator's universal malformed-score invariants. The full validator
