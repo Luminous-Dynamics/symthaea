@@ -17,6 +17,7 @@ pub mod site_fit;
 pub mod spray_field;
 pub mod standard_methods;
 pub mod task_phase;
+pub mod transient_trace;
 
 pub const CONTRACT_VERSION: &str = "0.1.0";
 
