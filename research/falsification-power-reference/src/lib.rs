@@ -775,13 +775,17 @@ impl PredictableGaussianMixture {
         }
 
         let mut next_components = Vec::with_capacity(self.alternatives.len());
-        for index in 0..self.alternatives.len() {
+        for (discrepancy, current_component) in pending
+            .expected_discrepancies
+            .iter()
+            .zip(self.component_log_e_values.iter())
+        {
             let increment = gaussian_log_likelihood_ratio(
-                pending.expected_discrepancies[index],
+                *discrepancy,
                 observed_residual,
                 pending.sigma,
             )?;
-            let next = self.component_log_e_values[index] + increment;
+            let next = current_component + increment;
             if !next.is_finite() {
                 return Err(SequentialError::NumericalOverflow);
             }
@@ -883,7 +887,8 @@ fn mixture_log_e_value(
     let maximum = terms
         .iter()
         .copied()
-        .fold(f64::NEG_INFINITY, f64::max);
+        .reduce(f64::max)
+        .ok_or(SequentialError::MixturePredictionCountMismatch)?;
     if !maximum.is_finite() {
         return Err(SequentialError::NumericalOverflow);
     }
@@ -903,10 +908,7 @@ fn anytime_p_value(running_max_log_e_value: f64) -> f64 {
     if running_max_log_e_value <= 0.0 {
         return 1.0;
     }
-    (-running_max_log_e_value)
-        .exp()
-        .max(f64::MIN_POSITIVE)
-        .min(1.0)
+    (-(running_max_log_e_value)).exp().clamp(f64::MIN_POSITIVE, 1.0)
 }
 
 #[cfg(test)]
