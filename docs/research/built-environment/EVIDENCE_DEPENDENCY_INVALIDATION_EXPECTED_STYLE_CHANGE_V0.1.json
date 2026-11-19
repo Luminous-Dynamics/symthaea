@@ -1,0 +1,26 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "SYNTH-HOME-EVIDENCE-GRAPH-001",
+  "change_case_id": "STYLE-INTENT-ONLY-CHANGE",
+  "prior_revision": "REV-A",
+  "new_revision": "REV-B",
+  "changed_node_ids": [
+    "style-intent"
+  ],
+  "invalidated_node_ids": [
+    "energy-evaluation",
+    "geometry",
+    "style-intent"
+  ],
+  "invalidated_evidence_node_ids": [
+    "energy-evaluation",
+    "geometry",
+    "style-intent"
+  ],
+  "preserved_evidence_node_ids": [
+    "typology-intent",
+    "water-evaluation",
+    "water-policy"
+  ],
+  "note": "Graph and payload fixture are frozen; BLAKE3 hashes are derived from payload bytes at test runtime. The expected receipt digest is computed and then replay-verified by the Rust test."
+}

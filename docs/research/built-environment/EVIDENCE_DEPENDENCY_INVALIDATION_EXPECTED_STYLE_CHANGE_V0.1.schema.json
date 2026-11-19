@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Expected synthetic evidence invalidation receipt v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_id",
+    "change_case_id",
+    "prior_revision",
+    "new_revision",
+    "changed_node_ids",
+    "invalidated_node_ids",
+    "invalidated_evidence_node_ids",
+    "preserved_evidence_node_ids",
+    "note"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "fixture_id": {
+      "const": "SYNTH-HOME-EVIDENCE-GRAPH-001"
+    },
+    "change_case_id": {
+      "const": "STYLE-INTENT-ONLY-CHANGE"
+    },
+    "prior_revision": {
+      "const": "REV-A"
+    },
+    "new_revision": {
+      "const": "REV-B"
+    },
+    "changed_node_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "invalidated_node_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "invalidated_evidence_node_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "preserved_evidence_node_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "note": {
+      "type": "string"
+    }
+  }
+}

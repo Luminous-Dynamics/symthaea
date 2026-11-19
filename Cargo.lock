@@ -18378,6 +18378,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-built-environment"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
+ "sha1",
+]
+
+[[package]]
 name = "symthaea-canvas"
 version = "0.1.0"
 dependencies = [
