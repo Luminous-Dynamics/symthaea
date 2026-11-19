@@ -1,0 +1,11 @@
+[package]
+name = "marine-sail-liveaboard-audit"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Independent semantic audit and matched-case oracle for sail/liveaboard mission evidence"
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+serde_json = "1.0"
