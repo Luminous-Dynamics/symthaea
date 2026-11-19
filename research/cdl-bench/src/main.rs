@@ -634,7 +634,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                     Float64Transform::RleXorPrevious => "rle_xor_previous",
                 };
                 println!(
-                    "{name},single,{transform_name},{model_name},NA,NA,NA,NA,NA,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
+                    "{name},single,{transform_name},{model_name},NA,NA,0,0,NA,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
                     raw.len(),
                     frame.len()
                 );
@@ -642,6 +642,14 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
         }
 
         for segment_size in [64usize, 256, 1024] {
+            let segment_count = if values.is_empty() {
+                0
+            } else {
+                (values.len() - 1) / segment_size + 1
+            };
+            let full_probe_count = segment_count;
+            let full_extra_candidate_encodes = full_probe_count * 7;
+
             let encode_started = Instant::now();
             let frame = compress_f64_segmented(&values, segment_size)?;
             let encode_ns = encode_started.elapsed().as_nanos();
@@ -659,7 +667,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 format!("{:.6}", frame.len() as f64 / raw.len() as f64)
             };
             println!(
-                "{name},segment_portfolio,best_of_eight,best_of_eight,{segment_size},NA,NA,NA,NA,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
+                "{name},segment_portfolio,best_of_eight,best_of_eight,{segment_size},1,{full_probe_count},{full_extra_candidate_encodes},0.000000,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
                 raw.len(),
                 frame.len()
             );
@@ -681,8 +689,18 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
             } else {
                 format!("{:.6}", online_frame.len() as f64 / raw.len() as f64)
             };
+            let online_oracle_gap_pct = if frame.is_empty() {
+                0.0
+            } else {
+                (online_frame.len() as f64 / frame.len() as f64 - 1.0) * 100.0
+            };
+            if online_oracle_gap_pct < -1e-9 {
+                return Err(format!(
+                    "historical selector beat offline best-of-eight oracle for {name}/{segment_size}"
+                ).into());
+            }
             println!(
-                "{name},online_historical_cost,past_segment_mean,best_of_eight,{segment_size},NA,NA,NA,NA,{},{},{zstd},{online_ratio},{online_encode_ns},{online_decode_ns},exact",
+                "{name},online_historical_cost,past_segment_mean,best_of_eight,{segment_size},1,{full_probe_count},{full_extra_candidate_encodes},{online_oracle_gap_pct:.6},{},{},{zstd},{online_ratio},{online_encode_ns},{online_decode_ns},exact",
                 raw.len(),
                 online_frame.len()
             );
@@ -721,11 +739,6 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                         "budgeted selector beat offline best-of-eight oracle for {name}/{segment_size}/{probe_interval}"
                     ).into());
                 }
-                let segment_count = if values.is_empty() {
-                    0
-                } else {
-                    (values.len() - 1) / segment_size + 1
-                };
                 let probe_count = if segment_count == 0 {
                     0
                 } else {
@@ -745,7 +758,8 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# note=raw, XOR-varint, reusable XOR-window and RLE+XOR are simple reversible reference transforms, not Gorilla, Chimp, ACTF or DeXOR");
     println!("# note=segment_portfolio is an offline best-of-eight per-chunk size oracle; every child header plus the outer F64S header is counted");
     println!("# note=segment_portfolio is not an online selector or a WZS reproduction");
-    println!("# note=online_historical_cost chooses each chunk using only prior chunks; after each chunk both sides recompute all eight candidate sizes to update shared policy state");
+    println!("# note=offline and full historical policies evaluate eight candidates per segment: one chosen child plus seven additional candidate encodes per side");
+    println!("# note=online_historical_cost chooses each chunk using only prior chunks and records the same 7-per-segment compute count");
     println!("# note=online_historical_cost uses the chosen transform/model ID in the child F64C header and rejects policy-mismatched children");
     println!("# note=online_historical_cost measures seven counterfactual candidates per chunk and reuses the selected child size");
     println!("# note=budgeted_sparse_probe compares candidates only on identical scheduled probe chunks; no incumbent-only updates occur between probes");
