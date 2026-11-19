@@ -1373,7 +1373,8 @@ mod tests {
         let input = bit_fixtures().remove(3);
         let sparse = compress_f64_budgeted_selector(&input, 64, 1).unwrap();
         let full = compress_f64_online_selector(&input, 64).unwrap();
-        assert_eq!(sparse, full);
+        // F64S policy IDs and header CRCs differ; child frames must be identical.
+        assert_eq!(&sparse[SEGMENTED_HEADER_LEN..], &full[SEGMENTED_HEADER_LEN..]);
         assert_same_bits(
             &decompress_f64_budgeted_selector(&sparse, input.len()).unwrap(),
             &input,
