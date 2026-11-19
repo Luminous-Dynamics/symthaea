@@ -851,10 +851,158 @@ mod tests {
         verify_midi_event_manifest(&manifest(), &simple_midi()).unwrap();
     }
     #[test]
-    fn midi_event_manifest_rejects_wrong_pitch() {
-        let mut bytes = simple_midi();
-        let at = bytes.iter().rposition(|x| *x == 60).unwrap();
-        bytes[at] = 61;
-        assert!(verify_midi_event_manifest(&manifest(), &bytes).is_err());
+    fn complete_bundle_integrity_passes_then_rejects_midi_tampering() {
+        let root = std::env::temp_dir().join(format!("muse-render-receipt-bundle-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+
+        let source_bytes = br#"{"score":"source-fixture"}"#.to_vec();
+        let candidate_bytes = br#"{"score":"candidate-fixture"}"#.to_vec();
+        std::fs::write(root.join("source-score.json"), &source_bytes).unwrap();
+        std::fs::write(root.join("candidate-score.json"), &candidate_bytes).unwrap();
+        let source_sha = sha256_hex(&source_bytes);
+        let candidate_sha = sha256_hex(&candidate_bytes);
+
+        let plan_bytes = serde_json::to_vec(&json!({
+            "schema":SCORE_EDIT_SCHEMA_V1,
+            "input_digest_schema":SCORE_EDIT_INPUT_DIGEST_SCHEMA_V1,
+            "input_score_sha256":source_sha,
+            "operations":[{"id":"op-1"}],
+            "protected_windows":[{"id":"keep-1"}]
+        })).unwrap();
+        let edit_bytes = serde_json::to_vec(&json!({
+            "schema":SCORE_EDIT_SCHEMA_V1,
+            "input_digest_schema":SCORE_EDIT_INPUT_DIGEST_SCHEMA_V1,
+            "input_score_sha256":source_sha,
+            "operation_ids":["op-1"],
+            "protected_window_ids":["keep-1"],
+            "changes":[]
+        })).unwrap();
+        let verification_bytes = serde_json::to_vec(&json!({
+            "input_score_sha256":source_sha,
+            "verified":true
+        })).unwrap();
+        std::fs::write(root.join("edit-plan.json"), &plan_bytes).unwrap();
+        std::fs::write(root.join("edit-receipt.json"), &edit_bytes).unwrap();
+        std::fs::write(root.join("edit-verification.json"), &verification_bytes).unwrap();
+
+        let midi_bytes = simple_midi();
+        let midi_sha = sha256_hex(&midi_bytes);
+        std::fs::write(root.join("performance.mid"), &midi_bytes).unwrap();
+        let mut midi_manifest = manifest();
+        midi_manifest.score_sha256 = candidate_sha.clone();
+        midi_manifest.midi_sha256 = midi_sha.clone();
+        let manifest_bytes = serde_json::to_vec(&midi_manifest).unwrap();
+        let manifest_sha = domain_sha256(MIDI_MANIFEST_DIGEST_SCHEMA_V1.as_bytes(), &manifest_bytes);
+        std::fs::write(root.join("midi-manifest.json"), &manifest_bytes).unwrap();
+
+        let renderer_binary = b"synthetic-renderer-binary".to_vec();
+        let renderer_environment = b"{\"runtime\":\"synthetic\"}".to_vec();
+        let renderer_config = b"{\"sample_rate\":44100}".to_vec();
+        let invocation = b"{\"argv\":[\"synthetic-renderer\",\"performance.mid\"]}".to_vec();
+        std::fs::write(root.join("renderer-binary"), &renderer_binary).unwrap();
+        std::fs::write(root.join("renderer-environment.json"), &renderer_environment).unwrap();
+        std::fs::write(root.join("renderer-config.json"), &renderer_config).unwrap();
+        std::fs::write(root.join("render-invocation.json"), &invocation).unwrap();
+
+        let wav_path = root.join("output.wav");
+        let spec = hound::WavSpec {
+            channels:2, sample_rate:44100, bits_per_sample:16,
+            sample_format:hound::SampleFormat::Int
+        };
+        let mut writer = hound::WavWriter::create(&wav_path, spec).unwrap();
+        for sample in 0..64_i16 {
+            writer.write_sample::<i16>(1000 - sample).unwrap();
+        }
+        writer.finalize().unwrap();
+        let wav_bytes = std::fs::read(&wav_path).unwrap();
+        let wav_sha = sha256_hex(&wav_bytes);
+
+        let d = |c: char| std::iter::repeat(c).take(64).collect::<String>();
+        let mut receipt = ReceiptV1 {
+            schema:RECEIPT_SCHEMA_V1.into(),
+            attempt_id:"synthetic-bundle.1".into(),
+            attempt_state:"completed".into(),
+            source:SourceBindingV1 {
+                source_score_sha256:source_sha.clone(),
+                candidate_score_sha256:candidate_sha.clone(),
+                score_digest_schema:MIDI_SCORE_DIGEST_SCHEMA_V1.into()
+            },
+            edit:EditBindingV1 {
+                plan_sha256:sha256_hex(&plan_bytes),
+                edit_receipt_sha256:sha256_hex(&edit_bytes),
+                verifier_id:"synthetic-independent-verifier".into(),
+                verifier_version:"test-1".into(),
+                verification_receipt_sha256:sha256_hex(&verification_bytes),
+                verdict:"pass".into(),
+                authorized_operation_ids:vec!["op-1".into()]
+            },
+            midi:MidiBindingV1 {
+                manifest_schema:MIDI_MANIFEST_SCHEMA_V1.into(),
+                manifest_digest_schema:MIDI_MANIFEST_DIGEST_SCHEMA_V1.into(),
+                manifest_sha256:manifest_sha,
+                score_digest_schema:MIDI_SCORE_DIGEST_SCHEMA_V1.into(),
+                score_sha256:candidate_sha,
+                timeline_digest_schema:MIDI_TIMELINE_DIGEST_SCHEMA_V1.into(),
+                timeline_sha256:midi_manifest.timeline_sha256.clone(),
+                binding_digest_schema:MIDI_BINDING_DIGEST_SCHEMA_V1.into(),
+                binding_sha256:midi_manifest.binding_sha256.clone(),
+                capability_digest_schema:MIDI_CAPABILITY_DIGEST_SCHEMA_V1.into(),
+                capability_sha256:midi_manifest.capability_sha256.clone(),
+                midi_sha256:midi_sha.clone(),
+                byte_length:midi_bytes.len(),
+                ticks_per_quarter:960,
+                tempo_microseconds_per_quarter:500000,
+                meter_numerator:4,meter_denominator:4,note_count:1
+            },
+            renderer:RendererBindingV1 {
+                renderer_id:"test-renderer".into(),renderer_version:"1".into(),
+                binary_sha256:sha256_hex(&renderer_binary),
+                environment_sha256:sha256_hex(&renderer_environment),
+                configuration_sha256:sha256_hex(&renderer_config),
+                asset_sha256:None,fallback_used:false,fallback_reason:None
+            },
+            execution:ExecutionBindingV1 {
+                state:"completed".into(),executor_id:"synthetic-runner".into(),
+                input_midi_sha256:Some(midi_sha.clone()),output_audio_sha256:Some(wav_sha.clone()),
+                exit_code:Some(0),started_at:Some("2026-11-19T10:00:00Z".into()),
+                finished_at:Some("2026-11-19T10:00:01Z".into()),
+                stdout_sha256:None,stderr_sha256:None,
+                invocation_sha256:Some(sha256_hex(&invocation))
+            },
+            audio:AudioBindingV1 {
+                disposition:"produced".into(),container:"wav".into(),audio_sha256:Some(wav_sha),
+                byte_length:Some(wav_bytes.len()),sample_rate_hz:Some(44100),
+                channels:Some(2),frames:Some(32)
+            },
+            verification:VerificationBindingV1 {
+                midi_score_conformance:EvidenceResultV1 {verdict:"not_run".into(),verifier_id:None,verifier_version:None,receipt_sha256:None,reason:Some("fixture".into())},
+                rendered_score_conformance:EvidenceResultV1 {verdict:"not_run".into(),verifier_id:None,verifier_version:None,receipt_sha256:None,reason:Some("fixture".into())},
+                protected_audio_preservation:EvidenceResultV1 {verdict:"not_run".into(),verifier_id:None,verifier_version:None,receipt_sha256:None,reason:Some("fixture".into())},
+                human_evaluation:EvidenceResultV1 {verdict:"not_run".into(),verifier_id:None,verifier_version:None,receipt_sha256:None,reason:Some("fixture".into())}
+            },
+            attestation:AttestationV1 {
+                kind:"unsigned_local".into(),identity:"synthetic-test".into(),key_id:None,signature:None
+            },
+            digest_recipe:RECEIPT_DIGEST_RECIPE_V1.into(),
+            receipt_sha256:d('0')
+        };
+        let value = serde_json::to_value(&receipt).unwrap();
+        receipt.receipt_sha256 = receipt_digest(&value).unwrap();
+        let sealed = serde_json::to_vec(&receipt).unwrap();
+        let parsed = verify_receipt_bytes(&sealed).unwrap();
+        let report = verify_bundle(&root, &parsed).unwrap();
+        assert!(report.bundle_integrity_verified);
+        assert!(report.midi_event_manifest_verified);
+        assert!(report.wav_integrity_verified);
+        assert!(!report.acceptance_eligible);
+
+        let mut corrupted = midi_bytes;
+        let index = corrupted.iter().rposition(|x| *x == 60).unwrap();
+        corrupted[index] = 61;
+        std::fs::write(root.join("performance.mid"), corrupted).unwrap();
+        assert!(verify_bundle(&root, &parsed).is_err());
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 }
