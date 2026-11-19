@@ -26,6 +26,15 @@ The lift operation first replays the certificate, then maps a selected represent
 
 The canonical byte encodings are deterministic replay identities, not cryptographic hashes or signatures. External benchmark harnesses should hash these bytes (and the source/checker revision) when publishing a scorecard. This reference verifier compares the exact byte encodings directly, so it does not rely on a caller-supplied digest. Formal proof artifacts and content-addressed multi-party receipts remain future work.
 
+## Complete scientific task contract (V2 wrapper)
+
+The V1 finite candidate contract is intentionally compact. The new `complete_task_contract` module layers a mandatory metadata record over it without changing V1 call sites. The 17 required identities cover candidate-universe revision, action domain, objective definition, constraint schema, units, coordinate chart, initial conditions, boundary-condition family, observable map, dataset revision, evaluator revision, source revision, solver profile, precision policy, resource-budget policy, termination policy and randomness policy.
+
+Empty, `unknown`, `unspecified`, `tbd` or `todo` values are rejected. A policy that genuinely does not apply must say `not-applicable` explicitly. The V2 wrapper binds these fields together with the complete V1 candidate/task semantics, then delegates finite-group/action/orbit qualification and lifting to the unchanged V1 compiler. The resulting certificate cannot be replayed after changing the dataset, evaluator, solver profile, units, coordinate chart or any other declared metadata—even when the finite action still preserves all candidate-level fields.
+
+The 17 metadata strings are caller-declared identities, not proof that the referenced source/evaluator/data artefacts exist or are honest. The complete wrapper closes an identity omission in the finite reference; it does not establish physical truth or replace external source attestation.
+
+
 ## Reproduction
 
     cargo fmt --manifest-path research/symmetry-quotient-001/Cargo.toml --all -- --check
