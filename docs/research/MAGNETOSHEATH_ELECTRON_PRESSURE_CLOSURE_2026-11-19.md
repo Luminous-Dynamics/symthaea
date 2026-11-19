@@ -172,3 +172,19 @@ The ≥0.60 off-diagonal milestone is a proposed research target, not a measured
 ## 9. Claim ceiling
 
 This document is a source review and reproduction protocol. It does not claim successful reproduction, broad magnetosheath generalization, a 3D closure, a superior model, or experimental/space-weather validation.
+
+
+## 10. Separate frontier: kinetic-ion / learned-electron hybrid
+
+The EGU26 abstract [EGU26-12428](https://meetingorganizer.copernicus.org/EGU26/EGU26-12428.html), updated 14 March 2026, reports coupling this learned electron closure with kinetic ion dynamics as a step toward hybrid kinetic simulations.
+
+Treat this as a **separate research lane**, not a reproduction result or an extension that inherits the fully kinetic ECsim paper's validation:
+- pin the kinetic-ion solver, field solve, time integrator and species/field coupling;
+- define charge/current consistency and electron/ion exchange terms;
+- audit species-resolved and total energy transfer;
+- check momentum and applicable invariants of the chosen hybrid equations;
+- test coupled stability, time-step sensitivity and OOD behavior;
+- compare to the same physical scenario with fully kinetic PIC and established hybrid baselines;
+- report total runtime and memory, including the kinetic-ion and field solves.
+
+No hybrid-simulation advantage may be claimed until the coupled equations, numerical operators and species exchange are independently qualified. Symtropy #6274 currently provides a synthetic periodic pressure-divergence reference, not the ECsim or hybrid solver stencil.
