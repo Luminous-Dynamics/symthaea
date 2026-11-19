@@ -532,6 +532,28 @@ and a C compiler. Neither external codec has been built or run in the current
 environment. TerseTS is beta, and lossy/bit-nonexact methods are excluded from
 the exact-lossless comparison.
 
+## Typed telemetry records and bounded state-delta coding
+
+The experimental `telemetry` module adds a typed multi-field record frame:
+
+- Eight schema-declared 64-bit lanes (`U64`, `I64`, `F64Bits`, `U32`, `Boolean`, `Opaque64`).
+- Per-record timestamp, entity ID, series ID, presence bitmap and exact field payload bits.
+- Explicit changed-field bitmap and null/presence operations; unchanged values are reconstructed from the prior state for that series.
+- First-seen or re-admitted series are encoded as full checkpoints.
+- A deterministic least-recently-seen eviction policy bounds state to the frame-declared capacity; ties break by entity/series key.
+- Predictor state is reset at the declared segment-record interval, making every segment start an explicit checkpoint for all series.
+- Header CRC, inner-frame CRC and canonical uncompressed-stream CRC; the inner payload uses the shared arithmetic coder.
+- Decoder caps both record count and state capacity before allocation. Boolean/U32 field kinds are range-checked, absent field payloads must be zero, and varints/update masks are canonical.
+
+The public API is:
+- `TelemetryFieldKind`, `TelemetrySchema`, `TelemetryRecord`, `TelemetryStream`.
+- `compress_telemetry_records(records, schema, state_capacity, segment_records, model)`.
+- `decompress_telemetry_records(frame, max_records, max_state_entries)`.
+
+This is an initial fixed eight-lane reference, not a general Arrow/Parquet schema container. The frame preserves row order and exact values, but this first version does not include a random-access index, timestamps dictionary, schema evolution, multi-segment independent child frames, or production recovery protocol. Segment resets bound predictor replay/state but do not by themselves make the monolithic outer frame randomly seekable. The frame stores only the field-kind IDs, not semantic field names; a higher-level schema registry is still required and must be included in total system accounting.
+
+Authored Rust tests cover empty and populated streams, two entropy models, multiple state capacities, segment resets, bitwise f64 payloads, null transitions, truncated prefixes, single-bit mutations, malformed varints, invalid values, and record/state output limits. They have **not** been compiler-run in the current environment.
+
 ## Plugging in a custom predictor
 
 The library exposes:
