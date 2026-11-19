@@ -333,9 +333,9 @@ mod tests {
             problem_id: "robust-bounded-adaptive-three-hypothesis-v1".to_owned(),
             hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned(), "H-C".to_owned()],
             probes: vec![
-                NoiseProbeV1 { probe_id: "p0".to_owned(), cost: 1, admissible: true },
-                NoiseProbeV1 { probe_id: "p1".to_owned(), cost: 1, admissible: true },
-                NoiseProbeV1 { probe_id: "p2".to_owned(), cost: 1, admissible: true },
+                NoiseProbeV1 { probe_id: "p0".to_owned(), cost: 1, admissible: true, may_abstain: false },
+                NoiseProbeV1 { probe_id: "p1".to_owned(), cost: 1, admissible: true, may_abstain: false },
+                NoiseProbeV1 { probe_id: "p2".to_owned(), cost: 1, admissible: true, may_abstain: false },
             ],
             allowed_outcomes_by_hypothesis: vec![
                 vec![vec![0, 1], vec![0], vec![8]],
