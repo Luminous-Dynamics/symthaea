@@ -18,12 +18,12 @@ use symthaea_canvas::{CognitiveSnapshot, SnapshotLimits};
 use crate::{digest_json, safe_group_id, validate_namespace, AdapterError, AdapterResult};
 
 const MAX_VIEWPORT_DIMENSION: f32 = 8_192.0;
-const MAX_GENERATOR_ELEMENTS: usize = 5_000;
+const MAX_GENERATOR_ELEMENTS: usize = 500;
 const MAX_SCENE_NODES: usize = 10_000;
 const MAX_SCENE_DEPTH: usize = 128;
 const MAX_POLYGON_POINTS: usize = 256;
 const MAX_GRADIENT_STOPS: usize = 256;
-const MAX_PATH_BYTES: usize = 512 * 1024;
+const MAX_PATH_BYTES: usize = 2 * 1024 * 1024;
 const MAX_SCENE_TEXT_BYTES: usize = 512;
 
 /// Request one deterministic, registered Atelier production.
