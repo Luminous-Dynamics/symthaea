@@ -84,7 +84,7 @@ pub struct SearchRequest {
     pub top_k: usize,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SearchItem {
     pub id: String,
     pub content: MessageContent,
@@ -92,7 +92,7 @@ pub struct SearchItem {
     pub created_at: Option<String>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SearchResponse {
     pub data: Vec<SearchItem>,
 }
@@ -114,6 +114,8 @@ pub enum AmlReject {
     SearchImageBudgetExceeded,
     EmptyOptions,
     EmptyOption,
+    TooManyWords,
+    EmptyCreatedAt,
     InvalidTopK,
     EmptySearchUserId,
     AddNotPersistedAndSearchable,
@@ -217,7 +219,7 @@ fn validate_message(track: Track, message: &Message) -> Result<usize, AmlReject>
         return Err(AmlReject::InvalidTimestamp);
     }
     if track == Track::Textual || track == Track::Coding {
-        if !matches!(message.content, MessageContent::Text(_)) {
+        if !matches!(&message.content, MessageContent::Text(_)) {
             return Err(AmlReject::TrackContentMismatch);
         }
     }
@@ -244,9 +246,7 @@ pub fn validate_add_request(track: Track, request: &AddRequest) -> Result<(), Am
     for message in &request.messages {
         image_bytes = image_bytes.saturating_add(validate_message(track, message)?);
     }
-    if track == Track::Multimodal && image_bytes > MAX_SEARCH_RESPONSE_IMAGE_BYTES {
-        return Err(AmlReject::SearchImageBudgetExceeded);
-    }
+    let _ = image_bytes;
     Ok(())
 }
 
@@ -256,6 +256,34 @@ pub fn validate_add_request(track: Track, request: &AddRequest) -> Result<(), Am
 pub trait FrozenAdapterWordCounter {
     fn adapter_version(&self) -> &str;
     fn count_words(&self, messages: &[Message]) -> usize;
+}
+
+/// Validate one Textual Add chunk using the frozen adapter's counter.
+pub fn validate_textual_chunk(
+    request: &AddRequest,
+    counter: &impl FrozenAdapterWordCounter,
+) -> Result<(), AmlReject> {
+    validate_add_request(Track::Textual, request)?;
+    if counter.adapter_version().trim().is_empty() {
+        return Err(AmlReject::WordCounterVersionMissing);
+    }
+    if counter.count_words(&request.messages) > TEXTUAL_MAX_WORDS {
+        return Err(AmlReject::TooManyWords);
+    }
+    Ok(())
+}
+
+pub fn validate_search_request_for_track(
+    track: Track,
+    request: &SearchRequest,
+) -> Result<(), AmlReject> {
+    validate_search_request(request)?;
+    if track != Track::Multimodal
+        && !matches!(&request.query, MessageContent::Text(_))
+    {
+        return Err(AmlReject::TrackContentMismatch);
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -494,7 +522,15 @@ pub fn validate_search_response(
     request: &SearchRequest,
     response: &SearchResponse,
 ) -> Result<(), AmlReject> {
-    validate_search_request(request)?;
+    validate_search_response_for_track(Track::Textual, request, response)
+}
+
+pub fn validate_search_response_for_track(
+    track: Track,
+    request: &SearchRequest,
+    response: &SearchResponse,
+) -> Result<(), AmlReject> {
+    validate_search_request_for_track(track, request)?;
     if response.data.len() > request.top_k {
         return Err(AmlReject::SearchResponseTooLarge);
     }
@@ -512,21 +548,24 @@ pub fn validate_search_response(
         }
         if let Some(created_at) = &item.created_at {
             if created_at.trim().is_empty() {
-                return Err(AmlReject::EmptyMemoryContent);
+                return Err(AmlReject::EmptyCreatedAt);
             }
         }
-        let track = match &item.content {
-            MessageContent::Text(_) => Track::Textual,
-            MessageContent::Parts(_) => Track::Multimodal,
-        };
         if let MessageContent::Text(content) = &item.content {
             if content.trim().is_empty() {
                 return Err(AmlReject::EmptyMemoryContent);
             }
         }
-        image_bytes = image_bytes.saturating_add(validate_content(track, &item.content)?);
+        let item_track = match (&item.content, track) {
+            (MessageContent::Text(_), _) => track,
+            (MessageContent::Parts(_), Track::Multimodal) => Track::Multimodal,
+            (MessageContent::Parts(_), _) => {
+                return Err(AmlReject::TrackContentMismatch);
+            }
+        };
+        image_bytes = image_bytes.saturating_add(validate_content(item_track, &item.content)?);
     }
-    if image_bytes > MAX_SEARCH_RESPONSE_IMAGE_BYTES {
+    if track == Track::Multimodal && image_bytes > MAX_SEARCH_RESPONSE_IMAGE_BYTES {
         return Err(AmlReject::SearchImageBudgetExceeded);
     }
     Ok(())
@@ -819,6 +858,41 @@ mod tests {
         assert_eq!(
             validate_add_request(Track::Multimodal, &invalid),
             Err(AmlReject::InvalidImageDataUri)
+        );
+    }
+
+    #[test]
+    fn textual_add_chunk_enforces_the_injected_frozen_word_counter() {
+        let request = AddRequest {
+            request_id: "word-limit".into(),
+            messages: vec![message(Role::User, &vec!["x"; 2_001].join(" "))],
+            user_id: "user".into(),
+            session_id: "session".into(),
+        };
+        assert_eq!(
+            validate_textual_chunk(&request, &WhitespaceCounter),
+            Err(AmlReject::TooManyWords)
+        );
+    }
+
+    #[test]
+    fn track_specific_search_rejects_multimodal_payload_for_textual_track() {
+        let request = SearchRequest {
+            query: MessageContent::Parts(vec![
+                ContentPart::Text("describe".into()),
+                ContentPart::ImageDataUri("data:image/png;base64,aGVsbG8=".into()),
+            ]),
+            options: None,
+            user_id: "user".into(),
+            top_k: FORMAL_TOP_K,
+        };
+        assert_eq!(
+            validate_search_request_for_track(Track::Textual, &request),
+            Err(AmlReject::TrackContentMismatch)
+        );
+        assert_eq!(
+            validate_search_request_for_track(Track::Multimodal, &request),
+            Ok(())
         );
     }
 
