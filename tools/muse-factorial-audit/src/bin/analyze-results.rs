@@ -687,7 +687,10 @@ fn analyze(
         }
 
         let status = disposition(block_cases.len(), observed, not_applicable, failed, missing);
-        if status != "complete" {
+        if status == "not_applicable" {
+            // Every expected case explicitly declared this metric unsupported;
+            // preserve the block in coverage without treating it as execution failure.
+        } else if status != "complete" {
             incomplete_blocks += 1;
         } else if !metric.starts_with("identity_") {
             let first = block_cases[0];
@@ -927,17 +930,18 @@ fn run() -> Result<(), String> {
 
     if analysis.incomplete_blocks > 0 {
         return Err(format!(
-            "wrote coverage/effect/summary reports, but {} of {} blocks are incomplete; only complete 81/81 observed blocks were analyzed",
+            "wrote all reports, but {} of {} blocks contain failed, missing, or mixed outcomes; only complete 81/81 observed blocks were effect-estimated",
             analysis.incomplete_blocks,
             analysis.coverage.len()
         ));
     }
 
     eprintln!(
-        "analyzed {} complete blocks; wrote {} per-seed contrast rows and {} cross-seed summary rows",
+        "audited {} expected blocks; wrote {} per-seed contrast rows, {} cross-seed summary rows, and {} axis-invariance rows",
         analysis.coverage.len(),
         analysis.effects.len(),
-        analysis.summaries.len()
+        analysis.summaries.len(),
+        analysis.axis_invariance.len()
     );
     Ok(())
 }
@@ -1085,6 +1089,23 @@ mod tests {
         assert_eq!(analysis.coverage[0].observed, 80);
         assert_eq!(analysis.effects.len(), 0);
         assert_eq!(analysis.summaries.len(), 0);
+    }
+
+    #[test]
+    fn fully_not_applicable_metric_is_explicit_but_not_an_execution_failure() {
+        let (cases, mut records) = one_complete_block();
+        for record in &mut records {
+            record.status = OutcomeStatus::NotApplicable;
+            record.value = None;
+            record.artifact_sha256.clear();
+            record.note = "metric not exposed by this grammar plan".to_string();
+        }
+        let analysis = analyze(&cases, &["response".to_string()], &records).unwrap();
+        assert_eq!(analysis.incomplete_blocks, 0);
+        assert_eq!(analysis.coverage[0].disposition, "not_applicable");
+        assert_eq!(analysis.coverage[0].not_applicable, 81);
+        assert!(analysis.effects.is_empty());
+        assert!(analysis.summaries.is_empty());
     }
 
     #[test]
