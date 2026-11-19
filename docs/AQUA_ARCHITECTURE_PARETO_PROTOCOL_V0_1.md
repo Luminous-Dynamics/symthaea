@@ -74,7 +74,7 @@ These are US programme certification criteria, not South African law and not Aqu
 
 Internal AQS-1 research targets, not achieved results:
 - At least 80% of maximum rated flow at 20 psi and at least 85% at 45 / 80 psi, compared with WaterSense's 60% and 75% minima, respectively.
-- Meet the applicable 2.0-ounce spray-force minimum at 20 psi while also checking user comfort; do not assume that maximizing force is always better.
+- Meet the applicable WaterSense/ASME/CSA spray-force procedure at 140 kPa flowing pressure (the current evidence corpus records 0.56 N for the handheld procedure and 0.40 N for the rain-shower procedure) while also checking user comfort; do not assume that maximizing force is always better. Use the exact category-specific method for the evaluated fixture.
 - Meet the applicable annular-ring coverage constraints, then optimize normalized spatial uniformity and task-specific rinsing on a separate preregistered metric.
 - Continue low-head site-envelope experiments (e.g. 50 / 75 / 100 kPa dynamic points) as a distinct local stress test. Do not label those points WaterSense-equivalent without a method-approved conversion.
 
