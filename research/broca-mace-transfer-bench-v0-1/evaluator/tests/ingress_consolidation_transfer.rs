@@ -14,12 +14,12 @@ use broca_mace_consolidation::{
 };
 use broca_mace_ingress::{
     build_consolidation_evidence_pack, ingest_as_known, ingest_batch_as_known,
-    Action, AsKnownQuery, AuthorityStatus, EvidenceVerifier, RawInteractionV1,
+    AsKnownQuery, AuthorityStatus, EvidenceVerifier, RawInteractionV1,
     SourceLifecycleStatus, SourceTrustStatus, VerifiedCausalAssessment,
     VerifiedLineage, VerifiedMeasurement, VerifiedOutcome, VerifiedRawEvent,
 };
 use broca_mace_policy::{
-    decide, Objective, Policy, Query, Regime, Scope, SourceRootDigest,
+    decide, Action, Objective, Policy, Query, Regime, Scope, SourceRootDigest,
 };
 
 const UTILITY_UNIT: &str = "normalized_utility";
