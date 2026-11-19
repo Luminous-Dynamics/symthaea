@@ -873,6 +873,10 @@ impl TransientEventProfile {
             });
         }
 
+        let duration_us = self
+            .event_duration_ms
+            .checked_mul(1_000)
+            .ok_or(TransientTraceError::InvalidEventDuration)?;
         let mut samples_by_channel: HashMap<String, Vec<TraceSample>> = HashMap::new();
         for record in reader.records() {
             let record = record.map_err(|error| TransientTraceError::RawTraceCsvDecode {
@@ -937,6 +941,9 @@ impl TransientEventProfile {
                     channel_id: channel.channel_id.clone(),
                 });
             }
+            let mut candidate = channel.clone();
+            candidate.samples = samples.clone();
+            candidate.validate(duration_us)?;
             pending.push((channel.channel_id.clone(), samples));
         }
         if pending.is_empty() || !samples_by_channel.is_empty() {
@@ -1550,6 +1557,32 @@ mod tests {
             value.attach_unfiltered_trace_csv(&declared, trace),
             Err(TransientTraceError::RawTraceCsvDecode { .. })
         ));
+        assert!(value.acquisition.channels.iter().all(|channel| channel.samples.is_empty()));
+    }
+
+    #[test]
+    fn rejects_nonmonotonic_or_out_of_range_csv_rows_atomically() {
+        let mut value = profile();
+        let trace = b"offset_us,channel_id,value\n0,terminal-pressure,250\n1000,terminal-pressure,250\n1000,terminal-pressure,250\n0,primary-flow,5\n1000,primary-flow,5\n2000,primary-flow,5\n";
+        let declared = hex::encode(Sha256::digest(trace));
+        let artifact = value
+            .raw_artifacts
+            .iter_mut()
+            .find(|artifact| artifact.role == RawArtifactRole::UnfilteredTrace)
+            .unwrap();
+        artifact.sha256 = declared.clone();
+        artifact.byte_length = trace.len() as u64;
+        for channel in &mut value.acquisition.channels {
+            channel.raw_trace_sha256 = declared.clone();
+            channel.samples.clear();
+        }
+
+        assert_eq!(
+            value.attach_unfiltered_trace_csv(&declared, trace),
+            Err(TransientTraceError::NonMonotonicSampleTime {
+                channel_id: "terminal-pressure".to_owned()
+            })
+        );
         assert!(value.acquisition.channels.iter().all(|channel| channel.samples.is_empty()));
     }
 
