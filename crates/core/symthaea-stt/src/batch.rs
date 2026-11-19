@@ -286,6 +286,8 @@ impl BatchProcessor {
         let (audio, sample_rate) =
             AudioFrontend::load_audio(path).map_err(|e| format!("Failed to load audio: {e}"))?;
 
+        projector.validate_input_sample_rate(sample_rate)?;
+
         let audio_duration = audio.len() as f32 / sample_rate as f32;
 
         // Project to HDC
@@ -506,6 +508,7 @@ impl BatchTrainer {
         let (audio, sample_rate) =
             AudioFrontend::load_audio(path).map_err(|e| format!("Load error: {e}"))?;
 
+        projector.validate_input_sample_rate(sample_rate)?;
         let duration = audio.len() as f32 / sample_rate as f32;
 
         // Project audio
@@ -703,6 +706,7 @@ impl BatchTrainer {
         let (audio, sample_rate) =
             AudioFrontend::load_audio(path).map_err(|e| format!("Load error: {e}"))?;
 
+        projector.validate_input_sample_rate(sample_rate)?;
         let duration = audio.len() as f32 / sample_rate as f32;
 
         // Project audio
@@ -935,6 +939,7 @@ impl BatchDiscovery {
         let (audio, sample_rate) =
             AudioFrontend::load_audio(path).map_err(|e| format!("Load error: {e}"))?;
 
+        projector.validate_input_sample_rate(sample_rate)?;
         let duration = audio.len() as f32 / sample_rate as f32;
 
         // Project
