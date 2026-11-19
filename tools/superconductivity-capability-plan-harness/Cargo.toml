@@ -21,3 +21,7 @@ path = "src/main.rs"
 [[bin]]
 name = "sc_model_discrimination_audit"
 path = "src/bin/sc_model_discrimination_audit.rs"
+
+[[bin]]
+name = "sc_correlated_evidence_audit"
+path = "src/bin/sc_correlated_evidence_audit.rs"
