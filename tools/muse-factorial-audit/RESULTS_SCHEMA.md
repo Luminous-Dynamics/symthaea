@@ -48,16 +48,20 @@ without fabricating a zero.
   blocks with no input rows. It reports 81 expected cases, observed,
   not-applicable, failed and missing counts, a disposition, the ordered list of
   supplied artifact digests, and diagnostic notes.
-- effects.csv: 80 orthogonal contrasts per complete block only. A block is
-  complete only when all 81 cases have exactly one finite observed value for
-  that metric. Incomplete blocks emit no effect estimates.
+- effects.csv: 80 orthogonal contrasts per complete scalar block only. A block
+  is complete only when all 81 cases have exactly one finite observed value for
+  that metric. Identity-only metrics never produce effect rows. Incomplete
+  blocks emit no effect estimates.
 - summary.csv: cross-seed mean, sample standard deviation, minimum and maximum
   for each contrast, grouped separately by cohort, style and metric. A
   one-seed standard deviation is blank, not zero.
 - axis-invariance.csv: per style/seed/axis counts across 27 slices. Each slice
   holds the other three factors fixed and compares the full score SHA-256 at the
-  low, centre and high levels of the target axis. It reports complete,
-  identical, changed and unavailable slice counts, the declared support status,
+  low, centre and high levels of the target axis. It prefers the adapter's
+  canonical semantic digest (score metadata plus a sorted note-event multiset),
+  so harmless note-vector reordering does not count as a musical change. Older
+  synthetic inputs without that digest fall back to artifact SHA-256. It reports
+  complete, identical, changed and unavailable slice counts and the declared support status,
   and a disposition. A declared unsupported axis with 27/27 identical slices is
   negative_control_pass; any exact change is unexpected_change. A declared
   supported axis is reported as response_observed or flat_supported_axis, not
@@ -102,16 +106,20 @@ modal), not by taking an artificial average over category codes.
 
 ## Exact axis-invariance control
 
-The axis report uses the artifact digest repeated across metrics for each
-case. The importer requires those digests to agree; inconsistent hashes across
-metrics reject the input. It also requires the declared support-axis string in
+The axis report prefers a canonical semantic score digest repeated across
+metrics for each case. The importer separately requires raw artifact SHA-256
+values to agree and canonical semantic digests to agree; inconsistent hashes
+across metrics reject the input. It also requires the declared support-axis string in
 the observation notes to be consistent within each style/seed block.
 
 Each factor has 27 matched slices: all combinations of the other three factors.
-For each slice, the analyzer compares the three complete score digests across
-the target factor's low/centre/high levels. A slice is identical only when all
-three digests match byte-for-byte; otherwise it is changed. Missing artifact
-digests make the slice unavailable, never identical.
+For each slice, the analyzer compares the three canonical semantic digests
+across the target factor's low/centre/high levels. The adapter's semantic digest
+binds key/tonality, tempo, meter, total duration, and sorted note events
+including PartId, role, pitch, exact rational onset/duration, velocity, emphasis
+and section intensity. A slice is identical only when all three digests match;
+otherwise it is changed. Missing digests make the slice unavailable, never
+identical. Raw artifact digests remain in coverage for serialization provenance.
 
 This creates an exact negative-control check for styles that declare an axis
 unsupported. It does not prove that an unsupported control has no effect on
