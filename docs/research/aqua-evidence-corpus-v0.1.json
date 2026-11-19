@@ -5484,6 +5484,637 @@
           ]
         }
       ]
+    },
+    {
+      "entry_id": "clasp-south-african-showerhead-testing-2022",
+      "subject": {
+        "type": "market_sample",
+        "id": "clasp.sa.showerheads.2022.19",
+        "name": "CLASP South African Showerheads Testing Report",
+        "manufacturer": "CLASP",
+        "sku": "19 anonymized showerhead samples (A–S)",
+        "market": "South Africa; selected distributor and house-brand retail sample",
+        "revision": "October 2022 report; laboratory tests at Omega Test House, Centurion"
+      },
+      "claims": [
+        {
+          "claim_id": "clasp.sa.2022.sample-size",
+          "parameter": "sample_size",
+          "original_value": "19 showerheads tested",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 19,
+            "unit": "products"
+          },
+          "evidence_class": "independent_market_sample",
+          "result_class": "measured",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "CLASP South African ShowerHeads Testing Report; samples A–S",
+            "sample_count": 19,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "market representativeness beyond selected sales/house-brand sample",
+              "brand/model identities were anonymized"
+            ],
+            "notes": "Sample included distributor and house-brand retail selections."
+          },
+          "source": {
+            "url": "https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf",
+            "publisher": "CLASP / Herman Strauss (Jackstra Solutions); laboratory testing by Omega Test House (Pty) Ltd",
+            "source_type": "independent_market_study",
+            "published_on": "2022-10-01",
+            "accessed_on": "2026-11-19",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Independent laboratory market sample; not a census of the South African showerhead market."
+          },
+          "limitations": [
+            "Do not infer brand-level or SKU-level superiority; sample identities were anonymized.",
+            "The report itself states category sample sizes were limited and recommends larger samples for statistically significant price/category trends."
+          ]
+        },
+        {
+          "claim_id": "clasp.sa.2022.flowmeter-uncertainty",
+          "parameter": "instrument_measurement_uncertainty",
+          "original_value": "Flow meter stated uncertainty: 0.3% of reading at 95% confidence",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 0.3,
+            "unit": "%"
+          },
+          "evidence_class": "independent_market_sample",
+          "result_class": "measured",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Endress+Hauser DMA20 mass-flow meter, report apparatus section",
+            "sample_count": 19,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "calibration certificate and traceability record for the individual instrument",
+              "uncertainty budget outside the stated instrument specification"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf",
+            "publisher": "CLASP / Herman Strauss (Jackstra Solutions); laboratory testing by Omega Test House (Pty) Ltd",
+            "source_type": "independent_market_study",
+            "published_on": "2022-10-01",
+            "accessed_on": "2026-11-19",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Instrument uncertainty stated in the report; not a complete uncertainty budget for every reported result."
+          },
+          "limitations": [
+            "Do not treat 0.3% as combined measurement-system uncertainty."
+          ]
+        },
+        {
+          "claim_id": "clasp.sa.2022.pressure-transmitter-uncertainty",
+          "parameter": "instrument_measurement_uncertainty",
+          "original_value": "Pressure transmitter stated uncertainty: 2.9% of reading at 95% confidence",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 2.9,
+            "unit": "%"
+          },
+          "evidence_class": "independent_market_sample",
+          "result_class": "measured",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "WIKA A-10 pressure transmitter, report apparatus section",
+            "sample_count": 19,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "calibration certificate and traceability record for the individual instrument",
+              "uncertainty budget outside the stated instrument specification"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf",
+            "publisher": "CLASP / Herman Strauss (Jackstra Solutions); laboratory testing by Omega Test House (Pty) Ltd",
+            "source_type": "independent_market_study",
+            "published_on": "2022-10-01",
+            "accessed_on": "2026-11-19",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Instrument uncertainty stated in the report; not a complete uncertainty budget for every reported result."
+          },
+          "limitations": [
+            "Do not treat 2.9% as combined measurement-system uncertainty."
+          ]
+        },
+        {
+          "claim_id": "clasp.sa.2022.test-pressure-range",
+          "parameter": "sampled_test_pressure_range",
+          "original_value": "Flow profiles recorded across approximately 250–550 kPa; summary interpolated at 250, 300 and 500 kPa.",
+          "canonical_value": {
+            "kind": "range",
+            "minimum": 250,
+            "maximum": 550,
+            "unit": "kPa"
+          },
+          "evidence_class": "independent_market_sample",
+          "result_class": "measured",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Stabilized flow readings during a pressure ramp; summary values at 250, 300 and 500 kPa",
+            "sample_count": 19,
+            "pressure_datum": "Dynamic pressure at showerhead test supply; pressure transmitter arrangement described by the report",
+            "unknown_conditions": [
+              "raw per-sample data files",
+              "uncertainty propagation for interpolated summary values"
+            ],
+            "notes": null,
+            "pressure_range_kpa": {
+              "kind": "range",
+              "minimum": 250,
+              "maximum": 550,
+              "unit": "kPa"
+            },
+            "pressure_points_kpa": [
+              250,
+              300,
+              500
+            ]
+          },
+          "source": {
+            "url": "https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf",
+            "publisher": "CLASP / Herman Strauss (Jackstra Solutions); laboratory testing by Omega Test House (Pty) Ltd",
+            "source_type": "independent_market_study",
+            "published_on": "2022-10-01",
+            "accessed_on": "2026-11-19",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Study-specific test envelope; it is not a universal South African household pressure distribution."
+          },
+          "limitations": [
+            "Use 150 and 300 kPa as proposed local design test points only where the complete rig and comparator are rated."
+          ]
+        },
+        {
+          "claim_id": "clasp.sa.2022.pressure-compensating-flow-at-300kpa",
+          "parameter": "mean_flow_rate",
+          "original_value": "Pressure-compensating flow-profile group average: 7 L/min at 300 kPa",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 7,
+            "unit": "L/min"
+          },
+          "evidence_class": "independent_market_sample",
+          "result_class": "measured",
+          "conditions": {
+            "mode": "Pressure-compensating profile group",
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "CLASP report Table 3; interpolated summary value, rounded to nearest 1 L/min",
+            "sample_count": 19,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "raw group-level observations and group count",
+              "task comfort, shower force and standardized coverage equivalence"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf",
+            "publisher": "CLASP / Herman Strauss (Jackstra Solutions); laboratory testing by Omega Test House (Pty) Ltd",
+            "source_type": "independent_market_study",
+            "published_on": "2022-10-01",
+            "accessed_on": "2026-11-19",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Study-specific average of profiles classified as pressure compensating; not a universal product specification."
+          },
+          "limitations": [
+            "This is a flow-profile group average, not the lowest measured individual flow.",
+            "The report tested flow rates and spray patterns but did not establish completed-bathing-task superiority."
+          ]
+        },
+        {
+          "claim_id": "clasp.sa.2022.fixed-orifice-flow-at-300kpa",
+          "parameter": "mean_flow_rate",
+          "original_value": "Fixed-orifice flow-profile group average: 25 L/min at 300 kPa",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 25,
+            "unit": "L/min"
+          },
+          "evidence_class": "independent_market_sample",
+          "result_class": "measured",
+          "conditions": {
+            "mode": "Fixed-orifice profile group",
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "CLASP report Table 3; interpolated summary value, rounded to nearest 1 L/min",
+            "sample_count": 19,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "raw group-level observations and group count",
+              "task comfort, shower force and standardized coverage equivalence"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf",
+            "publisher": "CLASP / Herman Strauss (Jackstra Solutions); laboratory testing by Omega Test House (Pty) Ltd",
+            "source_type": "independent_market_study",
+            "published_on": "2022-10-01",
+            "accessed_on": "2026-11-19",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Study-specific average of profiles classified as fixed orifice; not a universal product specification."
+          },
+          "limitations": [
+            "This is a flow-profile group average, not an exact SKU result.",
+            "The report states that fixed-orifice behavior can cause poor low-pressure spray and excessive high-pressure flow."
+          ]
+        },
+        {
+          "claim_id": "clasp.sa.2022.market-water-saving-label-flow-at-300kpa",
+          "parameter": "mean_flow_rate",
+          "original_value": "Showerheads marked/marketed as water saving averaged 10.9 L/min at 300 kPa",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 10.9,
+            "unit": "L/min"
+          },
+          "evidence_class": "independent_market_sample",
+          "result_class": "measured",
+          "conditions": {
+            "mode": "Products marked as water saving by packaging/marketing",
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "CLASP report Table 3/category average, rounded to nearest 1 L/min",
+            "sample_count": 19,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "raw group count and raw values",
+              "whether marketed claim matched a defined task-quality method"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf",
+            "publisher": "CLASP / Herman Strauss (Jackstra Solutions); laboratory testing by Omega Test House (Pty) Ltd",
+            "source_type": "independent_market_study",
+            "published_on": "2022-10-01",
+            "accessed_on": "2026-11-19",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Study-specific average for a small anonymized group marketed as water saving."
+          },
+          "limitations": [
+            "This finding shows that marketing language is not evidence of low flow or task performance.",
+            "Do not generalize to all current South African products."
+          ]
+        },
+        {
+          "claim_id": "clasp.sa.2022.high-price-category-flow-at-300kpa",
+          "parameter": "mean_flow_rate",
+          "original_value": "High-price category average: 8.0 L/min at 300 kPa",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 8,
+            "unit": "L/min"
+          },
+          "evidence_class": "independent_market_sample",
+          "result_class": "measured",
+          "conditions": {
+            "mode": "High-price selected sample category",
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "CLASP report category average",
+            "sample_count": 19,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "only two high-price products in the selected 19-head sample",
+              "population representativeness"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf",
+            "publisher": "CLASP / Herman Strauss (Jackstra Solutions); laboratory testing by Omega Test House (Pty) Ltd",
+            "source_type": "independent_market_study",
+            "published_on": "2022-10-01",
+            "accessed_on": "2026-11-19",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Selected sample category average; not a statistically representative price effect."
+          },
+          "limitations": [
+            "The report explicitly notes limited category sample sizes and does not claim statistically significant price/flow correlation."
+          ]
+        },
+        {
+          "claim_id": "clasp.sa.2022.proposed-max-flow",
+          "parameter": "proposed_maximum_shower_flow",
+          "original_value": "Report recommends that a future South African showerhead standard consider a maximum of 10 L/min at 300 kPa",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 10,
+            "unit": "L/min"
+          },
+          "evidence_class": "independent_recommendation",
+          "result_class": "proposed",
+          "conditions": {
+            "mode": "Proposed national showerhead standard framework",
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "CLASP report recommendations section; not an enacted standard",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "whether government/SABS later adopted this recommendation",
+              "current legal status and exact current standard text"
+            ],
+            "notes": "The report recommends measurements at least at 300 kPa and 150 kPa."
+          },
+          "source": {
+            "url": "https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf",
+            "publisher": "CLASP / Herman Strauss (Jackstra Solutions); laboratory testing by Omega Test House (Pty) Ltd",
+            "source_type": "independent_market_study",
+            "published_on": "2022-10-01",
+            "accessed_on": "2026-11-19",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Independent research recommendation for a proposed national standard; not a current legal limit or certified criterion."
+          },
+          "limitations": [
+            "Do not describe 10 L/min as an enacted SANS limit or current statutory requirement."
+          ]
+        },
+        {
+          "claim_id": "clasp.sa.2022.proposed-preferred-wels-band",
+          "parameter": "proposed_preferred_flow_band",
+          "original_value": "Report recommends evaluating 4.5–6 L/min as the highest preferential WELS rating band, provided spray performance requirements are met",
+          "canonical_value": {
+            "kind": "range",
+            "minimum": 4.5,
+            "maximum": 6,
+            "unit": "L/min"
+          },
+          "evidence_class": "independent_recommendation",
+          "result_class": "proposed",
+          "conditions": {
+            "mode": "Proposed future South African water-efficiency labelling scheme",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "CLASP report recommendations section; flow band conditional on performance requirements",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "whether a national WELS scheme or rating band has since been adopted",
+              "final official test methods and thresholds"
+            ],
+            "notes": null
+          },
+          "source": {
+            "url": "https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf",
+            "publisher": "CLASP / Herman Strauss (Jackstra Solutions); laboratory testing by Omega Test House (Pty) Ltd",
+            "source_type": "independent_market_study",
+            "published_on": "2022-10-01",
+            "accessed_on": "2026-11-19",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Independent research recommendation; not an enacted WELS rating or certification result."
+          },
+          "limitations": [
+            "The band is explicitly conditional on acceptable spray force, spray coverage and positive user experience.",
+            "Do not present the proposal as an existing national rating."
+          ]
+        },
+        {
+          "claim_id": "clasp.sa.2022.proposed-test-pressures",
+          "parameter": "proposed_test_pressure_points",
+          "original_value": "Report recommends at least 150 and 300 kPa pressure points for a future South African showerhead standard",
+          "canonical_value": {
+            "kind": "text",
+            "text": "At least 150 kPa and 300 kPa."
+          },
+          "evidence_class": "independent_recommendation",
+          "result_class": "proposed",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "CLASP report recommendations; reference to AS 3662 / proposed SANS test framework",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "whether a current official SANS method has since incorporated these points"
+            ],
+            "notes": null,
+            "pressure_points_kpa": [
+              150,
+              300
+            ]
+          },
+          "source": {
+            "url": "https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf",
+            "publisher": "CLASP / Herman Strauss (Jackstra Solutions); laboratory testing by Omega Test House (Pty) Ltd",
+            "source_type": "independent_market_study",
+            "published_on": "2022-10-01",
+            "accessed_on": "2026-11-19",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Independent research proposal for future local test standard; not proof of the current normative procedure."
+          },
+          "limitations": [
+            "Keep separate from WaterSense 140 / 310 / 550 kPa test points.",
+            "Do not label this a current regulatory requirement."
+          ]
+        },
+        {
+          "claim_id": "clasp.sa.2022.flow-regulator-design-principle",
+          "parameter": "pressure-compensating-design-principle",
+          "original_value": "Report recommends acceptable pressure-compensating flow regulators that limit flow deviation across pressure settings",
+          "canonical_value": {
+            "kind": "text",
+            "text": "Prefer a pressure-compensating flow characteristic that maintains acceptable flow across the installation pressure envelope."
+          },
+          "evidence_class": "independent_recommendation",
+          "result_class": "proposed",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "CLASP report analysis and recommendations; comparison between fixed-orifice and pressure-compensating flow profiles",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "formal local acceptance criteria",
+              "task-quality equivalence under the full pressure envelope"
+            ],
+            "notes": null,
+            "pressure_points_kpa": [
+              150,
+              250,
+              300,
+              350,
+              500
+            ]
+          },
+          "source": {
+            "url": "https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf",
+            "publisher": "CLASP / Herman Strauss (Jackstra Solutions); laboratory testing by Omega Test House (Pty) Ltd",
+            "source_type": "independent_market_study",
+            "published_on": "2022-10-01",
+            "accessed_on": "2026-11-19",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Independent design recommendation from a limited flow-profile test; not a tested Aqua design rule."
+          },
+          "limitations": [
+            "Do not assume pressure compensation alone guarantees spray quality, comfort or hygiene."
+          ]
+        },
+        {
+          "claim_id": "wrc.2025.clasp.pressure-compensating-flow-at-300kpa",
+          "parameter": "mean_flow_rate",
+          "original_value": "WRC 2025 secondary summary reports 6.6 L/min average for pressure-compensating flow-regulator showerheads at 300 kPa.",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 6.6,
+            "unit": "L/min"
+          },
+          "evidence_class": "independent_market_sample",
+          "result_class": "measured",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Water Wheel September/October 2025 secondary summary of the October 2022 CLASP South African ShowerHeads Testing Report",
+            "sample_count": 19,
+            "pressure_datum": "Dynamic showerhead supply pressure",
+            "unknown_conditions": [
+              "secondary summary does not publish the row-level raw values",
+              "calculation/rounding basis for difference from the primary CLASP summary table"
+            ],
+            "notes": "Secondary summary of the CLASP 19-head sample. The primary CLASP PDF table rounds its pressure-compensating group average to 7 L/min."
+          },
+          "source": {
+            "url": "https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf",
+            "publisher": "Water Research Commission, The Water Wheel (September/October 2025)",
+            "source_type": "independent_market_study",
+            "published_on": null,
+            "accessed_on": "2026-11-19",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Secondary source representation of CLASP data; use alongside, not in place of, the primary CLASP PDF."
+          },
+          "limitations": [
+            "The primary CLASP PDF reports the same category as 7 L/min after rounding to the nearest 1 L/min.",
+            "Do not average the two summaries or infer a new exact mean without the raw group observations."
+          ]
+        },
+        {
+          "claim_id": "wrc.2025.clasp.fixed-orifice-flow-at-300kpa",
+          "parameter": "mean_flow_rate",
+          "original_value": "WRC 2025 secondary summary reports 24 L/min average for fixed-orifice showerheads at 300 kPa.",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 24,
+            "unit": "L/min"
+          },
+          "evidence_class": "independent_market_sample",
+          "result_class": "measured",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Water Wheel September/October 2025 secondary summary of the October 2022 CLASP South African ShowerHeads Testing Report",
+            "sample_count": 19,
+            "pressure_datum": "Dynamic showerhead supply pressure",
+            "unknown_conditions": [
+              "secondary summary does not publish the row-level raw values",
+              "calculation/rounding basis for difference from the primary CLASP summary table"
+            ],
+            "notes": "Secondary summary of the CLASP 19-head sample. The primary CLASP PDF table rounds its fixed-orifice group average to 25 L/min."
+          },
+          "source": {
+            "url": "https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf",
+            "publisher": "Water Research Commission, The Water Wheel (September/October 2025)",
+            "source_type": "independent_market_study",
+            "published_on": null,
+            "accessed_on": "2026-11-19",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Secondary source representation of CLASP data; use alongside, not in place of, the primary CLASP PDF."
+          },
+          "limitations": [
+            "The primary CLASP PDF reports the same category as 25 L/min after rounding to the nearest 1 L/min.",
+            "Do not average the two summaries or infer a new exact mean without the raw group observations."
+          ]
+        }
+      ]
     }
   ],
   "change_log": [

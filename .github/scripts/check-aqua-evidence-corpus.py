@@ -32,6 +32,7 @@ ALLOWED_SOURCE_TYPES = {
     "installation_design_reference": {"official_standard_or_programme"},
     "peer_reviewed_study_result": {"peer_reviewed_article"},
     "independent_market_sample": {"independent_market_study"},
+    "independent_recommendation": {"independent_market_study"},
 }
 
 EXPECTED_VALUES = {
@@ -56,6 +57,10 @@ EXPECTED_VALUES = {
     "floor_drain_geometry": ("text", None),
     "fuse_dependent_flow_capacity": ("text", None),
     "tile_thickness_limit": ("scalar", "mm"),
+    "proposed_maximum_shower_flow": ("scalar", "L/min"),
+    "proposed_preferred_flow_band": ("range", "L/min"),
+    "proposed_test_pressure_points": ("text", None),
+    "pressure_compensating_design_principle": ("text", None),
     "supply_pressure_range": ("range", "kPa"),
     "maximum_flow_rate": ("scalar", "L/min"),
     "flow_regulator_setting": ("scalar", "L/min"),
@@ -199,6 +204,12 @@ def semantic_errors(corpus: dict[str, Any]) -> list[str]:
             ):
                 errors.append(
                     f"{location}: independent market sample must retain measured status"
+                )
+            if claim["evidence_class"] == "independent_recommendation" and (
+                claim["result_class"] != "proposed"
+            ):
+                errors.append(
+                    f"{location}: independent recommendation must retain proposed status"
                 )
             if claim["evidence_class"] == "standard_or_programme_criterion" and (
                 claim["result_class"] not in {"declared", "derived"}

@@ -433,7 +433,8 @@
             "standard_or_programme_criterion",
             "installation_design_reference",
             "peer_reviewed_study_result",
-            "independent_market_sample"
+            "independent_market_sample",
+            "independent_recommendation"
           ]
         },
         "result_class": {
