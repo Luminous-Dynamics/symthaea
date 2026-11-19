@@ -187,7 +187,15 @@ pub fn lift_complete_task_representative_solution(
     representative_index: usize,
     budget: QualificationBudgetV1,
 ) -> Result<Vec<LiftedCandidateV1>, QuotientErrorV1> {
-    verify_complete_task_quotient(problem, metadata, action, certificate, budget)?;
+    metadata.validate()?;
+    if certificate.schema_version != 1
+        || certificate.complete_problem_contract_bytes
+            != canonical_complete_search_problem_bytes(problem, metadata)
+    {
+        return Err(QuotientErrorV1::CertificateIdentityMismatch);
+    }
+    // The core lifting routine performs the one required full certificate
+    // replay; avoid replaying the core twice under the same resource budget.
     lift_representative_solution(
         problem,
         action,
