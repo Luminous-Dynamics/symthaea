@@ -50,7 +50,7 @@ Partial WAV bytes may be retained for diagnostics, but a partial output cannot b
 ## Trust and claim boundaries
 
 - A SHA-256 value proves byte identity relative to the bytes actually hashed; it does not prove who produced them.
-- The receipt's own digest is computed over RFC 8785 JSON Canonicalization Scheme bytes after omitting `receipt_sha256`, prefixed with `luminous-dynamics-muse-render-execution-receipt-v1\\0`, then SHA-256 hashed. It seals the record but is not an identity signature.
+- The receipt's own digest is computed using the project-specific v1 canonical serialization profile: the typed schema admits strings, booleans, nulls, arrays and integers; object keys are serialized lexicographically in compact JSON; `receipt_sha256` is omitted; the domain tag `luminous-dynamics-muse-render-execution-receipt-v1` plus a NUL delimiter is prepended; then SHA-256 is applied. This is deterministic for this schema but is not claimed as full RFC 8785 JCS. It seals the record but is not an identity signature.
 - `unsigned_local` is suitable for development fixtures only. `workflow_observed` means a workflow captured the execution; it is not automatically trusted hardware attestation. `signed` requires an external key registry and signature verification.
 - A process invocation record that names an input MIDI digest and output WAV digest is only as trustworthy as the executor that observed the process boundary. Stronger claims require capture inside a controlled runner/container and attestation of runner identity.
 - A deterministic MIDI manifest is not proof of acoustic realization. Audio conformance requires an independent observer, calibrated per renderer/asset stratum, plus explicit abstention for unidentifiable voices or instruments.
