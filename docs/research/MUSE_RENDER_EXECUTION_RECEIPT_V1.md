@@ -1,6 +1,6 @@
 # MUSE Render Execution Receipt v1
 
-**Status:** Draft integration contract. No implementation, render, or conformance result is claimed by this specification.
+**Status:** Draft integration contract plus standalone Rust verifier authored; qualification pending. No real render or score-to-audio conformance result is claimed.
 **Parent:** [MUSE-RENDER-VERIFY-001 / #11389](https://github.com/Luminous-Dynamics/symthaea/issues/11389)
 
 ## Why this increment exists
@@ -21,7 +21,7 @@ One receipt describes exactly one render attempt. It joins:
 
 `source Score → authorized edit plan → candidate Score → MIDI manifest + exact MIDI bytes → renderer invocation → exact WAV bytes → independent evidence`
 
-The machine-readable shape is in [muse-render-execution-receipt-v1.schema.json](schemas/muse-render-execution-receipt-v1.schema.json). The MIDI fields intentionally follow the PartId-aware `muse-midi-performance-v1` manifest contract, including its 960 ticks-per-quarter resolution and separate score, timeline, instrument-binding, capability, manifest, and MIDI digests. The schema checks field shape and basic state constraints. A semantic verifier must additionally check digest equality and cross-artifact relationships.
+The machine-readable shape is in [muse-render-execution-receipt-v1.schema.json](schemas/muse-render-execution-receipt-v1.schema.json). The MIDI fields intentionally follow the PartId-aware muse-midi-performance-v1 manifest contract, including its 960 ticks-per-quarter resolution and separate score, timeline, instrument-binding, capability, manifest, and MIDI digests. The standalone verifier in tools/muse-render-receipt checks receipt shape, canonical seal, execution-state invariants, and cross-artifact relationships.
 
 ### Required joins
 
@@ -71,6 +71,16 @@ The first executable slice should be deliberately narrow:
 
 This is not a claim that the existing velocity edit has already been rendered or qualified. Authored, compiled, executed, and qualified states must remain distinct.
 
+## Standalone verifier
+
+The isolated Rust package at [tools/muse-render-receipt](../../tools/muse-render-receipt/README.md) is outside the root Cargo workspace. It has receipt-only and full-bundle modes, documented in its README.
+
+The full-bundle mode checks exact byte hashes for the Score, edit plan/receipt/verification report, MIDI, renderer binary/environment/configuration/asset, invocation, process streams and WAV. It deserializes the PartId-aware MIDI manifest using the exporter's field order and digest recipe; parses the actual Standard MIDI File; and compares track names, program changes, note-on and note-off event multisets against the sidecar. It also checks WAV byte length, sample rate, channel count, frame count, PCM finiteness and non-silence.
+
+The CLI returns exit code 3 for outcome_unknown; this is an unresolved execution, not a passing verification and not permission to retry under the same attempt ID. Receipt-only mode never claims bundle verification. Even a full bundle integrity pass sets acceptance_eligible=false: the verifier does not authenticate signatures, prove that an untrusted renderer consumed the named input, independently re-run the score-edit transformation, establish score-to-audio perceptual conformance, or authorize the musician's commit.
+
+The package includes known-answer unit tests for receipt tampering, cross-artifact score-digest mismatch, unresolved execution, MIDI sidecar agreement and a wrong-pitch MIDI negative control. A dedicated workflow pins Rust 1.96.0 and runs format/tests without loading the monorepo workspace. The workflow has been observed pending; no Rust compile/test pass is claimed yet. The active environment does not have cargo, rustc or rustfmt, so exact-head local qualification was not possible.
+
 ## Qualification targets (prospective)
 
 - 100% rejection of digest-link mismatches across Score, edit receipt, MIDI manifest, MIDI bytes and WAV bytes.
@@ -88,3 +98,5 @@ These are acceptance objectives, not current measurements.
 - `schemas/muse-render-execution-receipt-v1.schema.json` — JSON Schema 2020-12.
 - `fixtures/muse-render-execution-receipt-v1.completed.example.json` — synthetic shape fixture only; sentinel digests are not real artifacts.
 - `fixtures/muse-render-execution-receipt-v1.outcome-unknown.example.json` — synthetic unresolved-execution fixture only.
+- `tools/muse-render-receipt/` — isolated Rust receipt/MIDI/WAV integrity verifier and CLI.
+- `.github/workflows/muse-render-receipt.yml` — focused Rust format/test workflow.
