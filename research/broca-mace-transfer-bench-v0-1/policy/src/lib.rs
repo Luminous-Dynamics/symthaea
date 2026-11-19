@@ -53,8 +53,60 @@ impl SourceRootDigest {
         &self.0
     }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SourceRootDigestParseError {
+    InvalidLength { actual: usize },
+    InvalidHex { byte_index: usize },
+}
     pub fn is_known(self) -> bool {
         self.0 != [0; 32]
+    }
+
+    /// Parse exactly 64 hexadecimal characters. Uppercase input is accepted;
+    /// `to_hex` always emits canonical lowercase.
+    pub fn from_hex(input: &str) -> Result<Self, SourceRootDigestParseError> {
+        let bytes = input.as_bytes();
+        if bytes.len() != 64 {
+            return Err(SourceRootDigestParseError::InvalidLength {
+                actual: bytes.len(),
+            });
+        }
+
+        let mut digest = [0_u8; 32];
+        for (index, pair) in bytes.chunks_exact(2).enumerate() {
+            let high = decode_hex(pair[0]).ok_or(
+                SourceRootDigestParseError::InvalidHex {
+                    byte_index: index * 2,
+                },
+            )?;
+            let low = decode_hex(pair[1]).ok_or(
+                SourceRootDigestParseError::InvalidHex {
+                    byte_index: index * 2 + 1,
+                },
+            )?;
+            digest[index] = (high << 4) | low;
+        }
+        Ok(Self(digest))
+    }
+
+    /// Render the digest as 64 canonical lowercase hexadecimal characters.
+    pub fn to_hex(self) -> String {
+        const HEX: &[u8; 16] = b"0123456789abcdef";
+        let mut output = String::with_capacity(64);
+        for byte in self.0 {
+            output.push(HEX[usize::from(byte >> 4)] as char);
+            output.push(HEX[usize::from(byte & 0x0f)] as char);
+        }
+        output
+    }
+}
+
+fn decode_hex(value: u8) -> Option<u8> {
+    match value {
+        b'0'..=b'9' => Some(value - b'0'),
+        b'a'..=b'f' => Some(value - b'a' + 10),
+        b'A'..=b'F' => Some(value - b'A' + 10),
+        _ => None,
     }
 }
 
@@ -794,6 +846,38 @@ mod tests {
         assert!(!is_qualified(&item, Query { scope }));
     }
 
+    #[test]
+    fn source_root_digest_hex_round_trip_is_canonical() {
+        let digest = fixture_root_digest(0x12ab_34cd);
+        let encoded = digest.to_hex();
+        assert_eq!(encoded.len(), 64);
+        assert_eq!(SourceRootDigest::from_hex(&encoded), Ok(digest));
+        assert_eq!(
+            SourceRootDigest::from_hex(&encoded.to_ascii_uppercase()),
+            Ok(digest)
+        );
+        assert_eq!(digest.to_hex(), encoded);
+    }
+
+    #[test]
+    fn source_root_digest_rejects_invalid_length_and_hex() {
+        assert_eq!(
+            SourceRootDigest::from_hex("abc"),
+            Err(SourceRootDigestParseError::InvalidLength { actual: 3 })
+        );
+        let invalid = format!("{}g{}", "0".repeat(62), "0");
+        assert_eq!(
+            SourceRootDigest::from_hex(&invalid),
+            Err(SourceRootDigestParseError::InvalidHex { byte_index: 62 })
+        );
+    }
+
+    #[test]
+    fn all_zero_hex_is_unknown_not_a_qualified_root() {
+        let digest = SourceRootDigest::from_hex(&"0".repeat(64)).unwrap();
+        assert_eq!(digest, SourceRootDigest::UNKNOWN);
+        assert!(!digest.is_known());
+    }
     #[test]
     fn scope_mismatch_is_not_eligible() {
         let source_scope = Scope {
