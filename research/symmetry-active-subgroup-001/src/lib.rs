@@ -1179,6 +1179,37 @@ mod tests {
     }
 
     #[test]
+    fn subgroup_ids_do_not_collide_when_element_labels_contain_delimiters() {
+        let mut group = cyclic_group(6, "C6");
+        group.element_ids = vec![
+            "e".into(),
+            "g".into(),
+            "a".into(),
+            "a,b".into(),
+            "b".into(),
+            "g5".into(),
+        ];
+        let enumeration = enumerate_subgroups(&group, SubgroupBudgetV1::default()).unwrap();
+        let subgroup_ids = enumeration
+            .subgroups
+            .iter()
+            .map(|subgroup| subgroup.subgroup_id.as_str())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(subgroup_ids.len(), enumeration.subgroups.len());
+        let order_two = enumeration
+            .subgroups
+            .iter()
+            .find(|subgroup| subgroup.element_indices == vec![0, 3])
+            .unwrap();
+        let order_three = enumeration
+            .subgroups
+            .iter()
+            .find(|subgroup| subgroup.element_indices == vec![0, 2, 4])
+            .unwrap();
+        assert_ne!(order_two.subgroup_id, order_three.subgroup_id);
+    }
+
+    #[test]
     fn d4_membership_compiles_adaptive_and_static_policies_with_exact_replay() {
         let problem = problem(d4_group());
         let budget = SubgroupBudgetV1::default();
@@ -1311,11 +1342,20 @@ mod tests {
         assert_eq!(receipt.status, IdentificationStatusV1::ModelInconsistent);
 
         let mut wrong_context = duplicate[0].clone();
+        wrong_context.observation_id = "obs-3".into();
         wrong_context.task_contract_id = "different-contract".into();
         assert_eq!(
             replay_membership_observations(
-                &problem, &certificate, &[wrong_context], budget
+                &problem, &certificate, &[wrong_context.clone()], budget
             ),
+            Err(SubgroupErrorV1::EvidenceContextMismatch {
+                probe_id: "member-g1".into()
+            })
+        );
+        let mut batch = duplicate.clone();
+        batch.push(wrong_context);
+        assert_eq!(
+            replay_membership_observations(&problem, &certificate, &batch, budget),
             Err(SubgroupErrorV1::EvidenceContextMismatch {
                 probe_id: "member-g1".into()
             })
