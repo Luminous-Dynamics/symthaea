@@ -599,8 +599,8 @@ The C++ runner uses a default block size of 1,000 symbols (Rabbit's paper defaul
 The C++20 research frame at `research/cdl-bench/reference/typed_record_partitioned_runs_reference.cpp` prototypes a hybrid event/column layout:
 
 - A stable dictionary of entity/series keys and one state-delta/heartbeat child stream per key.
-- **Mode 0:** strict unique timestamps are restored with a deterministic k-way merge, without an order schedule.
-- **Mode 1:** nondecreasing timestamps with duplicates use tie-group key-order templates. A bounded 16-entry move-to-front dictionary reuses recurring tie orders; new orders are stored literally.
+- **Mode 0:** strictly increasing unique timestamps are restored with deterministic k-way merge; no order schedule.
+- **Mode 1:** nondecreasing timestamps with duplicates use tie-group key-order templates. A bounded 16-entry move-to-front dictionary reuses recurring tie orders; new orders are stored literally. The decoder checks per-key multiplicities for every tie group.
 - **Mode 2:** timestamp regressions use the full bit-packed key-ID schedule to restore exact arrival order.
 - The outer frame includes schema, counts, child lengths, order-mode metadata and CRC32.
 
@@ -610,7 +610,7 @@ Run from the repository root:
 bash scripts/research/cdl_partitioned_telemetry_reference.sh
 ```
 
-The partition runner compiles with `-O2 -std=c++20 -Wall -Wextra -Wconversion -Werror`, tests empty input, timestamp-merge fixtures, randomized interleavings, duplicate/out-of-order fallback and malformed frames, then compares Zstd on equally framed raw, global state-delta and partitioned representations. The latest integrated mode-1 tie-template change is authored but has not yet been compiled in the full PRN1 C++ frame.
+The partition runner compiles with `-O2 -std=c++20 -Wall -Wextra -Wconversion -Werror` and tests empty input, timestamp-merge fixtures, randomized interleavings, duplicate/out-of-order fallback and malformed frames. The latest integrated mode-1 template dictionary is authored but has **not yet been compiled** in the full PRN1 C++ frame.
 
 The tie-schedule primitive is separately reproducible:
 
