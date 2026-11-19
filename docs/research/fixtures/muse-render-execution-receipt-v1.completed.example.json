@@ -19,15 +19,24 @@
     ]
   },
   "midi": {
-    "manifest_schema": "midi-performance-manifest-v1",
+    "manifest_schema": "muse-midi-performance-v1",
     "manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
     "midi_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
     "score_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "timeline_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
     "capability_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
     "byte_length": 4096,
-    "ticks_per_quarter": 480,
-    "note_count": 128
+    "ticks_per_quarter": 960,
+    "note_count": 128,
+    "manifest_digest_schema": "muse-midi-performance-manifest-serde-json-sha256-v1",
+    "score_digest_schema": "muse-score-serde-json-sha256-v1",
+    "timeline_digest_schema": "muse-orchestration-timeline-serde-json-sha256-v1",
+    "binding_digest_schema": "muse-midi-instrument-bindings-serde-json-sha256-v1",
+    "binding_sha256": "abababababababababababababababababababababababababababababababab",
+    "capability_digest_schema": "muse-midi-instrument-capabilities-serde-json-sha256-v1",
+    "tempo_microseconds_per_quarter": 500000,
+    "meter_numerator": 4,
+    "meter_denominator": 4
   },
   "renderer": {
     "renderer_id": "fixture-only-fluidsynth",
