@@ -321,7 +321,10 @@ pub fn decompress_f64_segmented(
     if version != SEGMENTED_VERSION {
         return Err(NumericError::UnsupportedVersion(version));
     }
-    if frame[6] != 0 || frame[7] != SEGMENT_SELECTION_POLICY_BEST_OF_FOUR {
+    if frame[6] != 0 {
+        return Err(NumericError::UnsupportedFlags(frame[6]));
+    }
+    if frame[7] != SEGMENT_SELECTION_POLICY_BEST_OF_FOUR {
         return Err(NumericError::UnsupportedTransform(frame[7]));
     }
 
@@ -552,6 +555,37 @@ mod tests {
             compress_f64_segmented(&input, 0),
             Err(NumericError::InvalidSegmentSize)
         );
+    }
+
+    #[test]
+    fn segmented_frame_rejects_header_flags_and_single_bit_mutations() {
+        let input = [1.0, -0.0, f64::INFINITY, f64::from_bits(0x7ff8_0000_0000_1234)];
+        let frame = compress_f64_segmented(&input, 2).unwrap();
+
+        let mut bad_flags = frame.clone();
+        bad_flags[6] = 1;
+        assert_eq!(
+            decompress_f64_segmented(&bad_flags, input.len()),
+            Err(NumericError::UnsupportedFlags(1))
+        );
+
+        let mut bad_policy = frame.clone();
+        bad_policy[7] = 99;
+        assert_eq!(
+            decompress_f64_segmented(&bad_policy, input.len()),
+            Err(NumericError::UnsupportedTransform(99))
+        );
+
+        for index in 0..frame.len() {
+            for bit in 0..8 {
+                let mut changed = frame.clone();
+                changed[index] ^= 1 << bit;
+                assert!(
+                    decompress_f64_segmented(&changed, input.len()).is_err(),
+                    "segmented mutation at byte {index}, bit {bit} was accepted"
+                );
+            }
+        }
     }
 
     #[test]
