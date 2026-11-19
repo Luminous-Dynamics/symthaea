@@ -1,0 +1,13 @@
+[package]
+name = "symmetry-conditioned-missingness-reference"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Hard-support and interval-probability models for hypothesis-conditioned sensor dropout"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
