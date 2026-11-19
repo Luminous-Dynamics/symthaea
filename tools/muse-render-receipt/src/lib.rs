@@ -813,11 +813,10 @@ fn verify_score_edit_semantics(
     {
         return Err("independent score-edit verifier report does not match independently recomputed candidate evidence".into());
     }
-    let actual_candidate_digest = sha256_hex(&serde_json::to_vec(candidate)
-        .map_err(|e| format!("candidate Score canonical serialization failed: {e}"))?);
-    if actual_candidate_digest != candidate_score_sha256 {
-        return Err("candidate Score serialization digest mismatch".into());
-    }
+    // Exact candidate bytes are hashed by verify_bundle before this semantic
+    // comparison. Do not hash a re-serialized serde_json::Value here: that
+    // would change struct-field ordering from the producer's Score serializer.
+    let _ = candidate_score_sha256;
     Ok(())
 }
 
@@ -1109,6 +1108,55 @@ fn verify_timeline_binding_bundle(
     Ok(())
 }
 
+fn beat_to_midi_ticks(beat: EditBeat, label: &str) -> Result<u64, String> {
+    let scaled = beat.numerator.checked_mul(i128::from(MIDI_TICKS_PER_QUARTER_V1))
+        .ok_or_else(|| format!("{label} tick conversion overflow"))?;
+    if scaled % beat.denominator != 0 {
+        return Err(format!("{label} is not exactly representable at 960 PPQ"));
+    }
+    u64::try_from(scaled / beat.denominator)
+        .map_err(|_| format!("{label} exceeds MIDI tick range"))
+}
+
+fn verify_midi_manifest_matches_candidate_score(
+    manifest: &MidiPerformanceManifestV1,
+    candidate_score: &Value,
+) -> Result<(), String> {
+    let notes = candidate_score.get("notes").and_then(Value::as_array)
+        .ok_or("candidate Score notes must be an array")?;
+    if notes.len() != manifest.notes.len() {
+        return Err("MIDI note receipt count differs from candidate Score note count".into());
+    }
+    for (ordinal, (score_note, midi_note)) in notes.iter().zip(manifest.notes.iter()).enumerate() {
+        if midi_note.source_note_ordinal != ordinal {
+            return Err(format!("MIDI note receipt ordinal {} does not match Score ordinal {ordinal}", midi_note.source_note_ordinal));
+        }
+        let part_id = json_u16(score_note.get("part").ok_or("candidate note PartId missing")?, "candidate note PartId")?;
+        let pitch = score_note.get("pitch").and_then(|value| value.get("midi"))
+            .and_then(Value::as_u64).and_then(|value| u8::try_from(value).ok())
+            .ok_or_else(|| format!("candidate note {ordinal} pitch.midi must be in 0..=127"))?;
+        let onset = EditBeat::parse(score_note.get("onset").ok_or("candidate note onset missing")?,
+            "num", "den", "candidate note onset")?;
+        let duration = EditBeat::parse(score_note.get("duration").ok_or("candidate note duration missing")?,
+            "num", "den", "candidate note duration")?;
+        let end = onset.checked_add(duration, "candidate note")?;
+        let start_tick = beat_to_midi_ticks(onset, "candidate note onset")?;
+        let end_tick = beat_to_midi_ticks(end, "candidate note end")?;
+        let velocity = score_note_velocity(score_note, &format!("candidate.notes[{ordinal}]"))?;
+        if velocity <= 0.0 {
+            return Err(format!("candidate note {ordinal} has zero velocity and cannot be exported to MIDI"));
+        }
+        let expected_velocity = (f64::from(velocity) * 127.0).round().clamp(1.0, 127.0) as u8;
+        if part_id != midi_note.part_id || pitch != midi_note.pitch_midi
+            || start_tick != midi_note.start_tick || end_tick != midi_note.end_tick
+            || expected_velocity != midi_note.velocity_midi
+        {
+            return Err(format!("MIDI note receipt {ordinal} does not match candidate Score PartId/pitch/time/velocity"));
+        }
+    }
+    Ok(())
+}
+
 fn verify_midi_bundle(root: &Path, r: &ReceiptV1) -> Result<(), String> {
     let bytes = read(&root.join("midi-manifest.json"), "MIDI manifest")?;
     let m: MidiPerformanceManifestV1 = serde_json::from_slice(&bytes)
@@ -1123,6 +1171,8 @@ fn verify_midi_bundle(root: &Path, r: &ReceiptV1) -> Result<(), String> {
         || m.ticks_per_quarter != MIDI_TICKS_PER_QUARTER_V1
     { return Err("unsupported MIDI manifest/digest recipe".into()); }
     verify_timeline_binding_bundle(root, r, &m)?;
+    let candidate_score = json_file(&root.join("candidate-score.json"), "candidate Score")?;
+    verify_midi_manifest_matches_candidate_score(&m, &candidate_score)?;
     let encoded = serde_json::to_vec(&m).map_err(|e| format!("manifest serialization failed: {e}"))?;
     if domain_sha256(MIDI_MANIFEST_DIGEST_SCHEMA_V1.as_bytes(), &encoded) != r.midi.manifest_sha256 {
         return Err("MIDI manifest digest mismatch".into());
