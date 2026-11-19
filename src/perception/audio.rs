@@ -584,33 +584,100 @@ mod tests {
     }
 
     // =========================================================================
-    // ProsodyFeatures Tests
+    // Frame-aligned acoustic prosody tests
     // =========================================================================
 
+    #[cfg(feature = "voice-stt")]
+    fn sine_wave(sample_rate: u32, frequency_hz: f32, seconds: f32) -> Vec<f32> {
+        let sample_count = (sample_rate as f32 * seconds).round() as usize;
+        (0..sample_count)
+            .map(|index| {
+                let time = index as f32 / sample_rate as f32;
+                0.4 * (std::f32::consts::TAU * frequency_hz * time).sin()
+            })
+            .collect()
+    }
+
+    #[cfg(feature = "voice-stt")]
     #[test]
-    fn test_prosody_features_creation() {
-        let prosody = ProsodyFeatures {
-            avg_pitch: 150.0,
-            pitch_variance: 25.0,
-            avg_energy: 0.5,
-            speaking_rate: 4.5,
-        };
-        assert!((prosody.avg_pitch - 150.0).abs() < 0.01);
-        assert!((prosody.pitch_variance - 25.0).abs() < 0.01);
-        assert!((prosody.avg_energy - 0.5).abs() < 0.01);
-        assert!((prosody.speaking_rate - 4.5).abs() < 0.01);
+    fn prosody_extracts_frame_aligned_f0_and_preserves_source_support() {
+        let perception = AudioPerception::new(AudioPerceptionConfig::default()).unwrap();
+        let samples = sine_wave(16_000, 200.0, 1.5);
+        let prosody = perception.extract_prosody(&samples, 16_000);
+
+        assert_eq!(prosody.schema_version, ACOUSTIC_PROSODY_SCHEMA_VERSION);
+        assert_eq!(prosody.extractor_id, "symthaea-vocal-tract.lpc-autocorrelation.v1");
+        assert_eq!(prosody.source_sample_rate, 16_000);
+        assert_eq!(prosody.energy_normalization, ProsodyEnergyNormalization::UtterancePeak);
+        assert!(prosody.frames.len() > 250);
+        let mean_f0 = prosody.avg_pitch_hz.expect("voiced tone should yield F0");
+        assert!(
+            (180.0..220.0).contains(&mean_f0),
+            "estimated F0 {mean_f0} Hz should be close to 200 Hz"
+        );
+        assert!(prosody.pitch_variance_hz2.is_some());
+        assert!(prosody.speaking_rate_phonemes_per_second.is_none());
+        assert!(
+            prosody
+                .frames
+                .iter()
+                .all(|frame| frame.energy_utterance_peak_normalized <= 0.851)
+        );
+
+        for pair in prosody.frames.windows(2) {
+            assert!(pair[1].time_seconds > pair[0].time_seconds);
+            assert!(pair[1].source_start_sample > pair[0].source_start_sample);
+            assert!(pair[0].source_end_sample > pair[0].source_start_sample);
+            assert!(pair[0].f0_hz.is_some());
+        }
+    }
+
+    #[cfg(feature = "voice-stt")]
+    #[test]
+    fn prosody_marks_silence_as_unvoiced_instead_of_zero_pitch_observation() {
+        let perception = AudioPerception::new(AudioPerceptionConfig::default()).unwrap();
+        let silence = vec![0.0; 16_000];
+        let prosody = perception.extract_prosody(&silence, 16_000);
+
+        assert!(!prosody.frames.is_empty());
+        assert!(prosody.avg_pitch_hz.is_none());
+        assert!(prosody.pitch_variance_hz2.is_none());
+        assert_eq!(prosody.avg_energy_utterance_peak_normalized, Some(0.0));
+        assert!(prosody.frames.iter().all(|frame| frame.f0_hz.is_none()));
+        assert!(prosody.frames.iter().all(|frame| frame.periodicity == 0.0));
+    }
+
+    #[cfg(feature = "voice-stt")]
+    #[test]
+    fn rate_aware_pcm_entry_point_rejects_unresampled_audio() {
+        let mut perception = AudioPerception::new(AudioPerceptionConfig::default()).unwrap();
+        assert!(perception.process_samples_at_rate(&[0.0; 160], 48_000).is_err());
     }
 
     #[test]
-    fn test_prosody_features_clone() {
+    fn prosody_features_clone_preserves_optional_measurements_and_frames() {
         let prosody = ProsodyFeatures {
-            avg_pitch: 200.0,
-            pitch_variance: 30.0,
-            avg_energy: 0.7,
-            speaking_rate: 5.0,
+            schema_version: ACOUSTIC_PROSODY_SCHEMA_VERSION,
+            extractor_id: "test-extractor",
+            source_sample_rate: 16_000,
+            frame_rate_hz: 200.0,
+            energy_normalization: ProsodyEnergyNormalization::UtterancePeak,
+            frames: vec![AcousticProsodyFrameV1 {
+                frame_index: 0,
+                source_start_sample: 0,
+                source_end_sample: 400,
+                time_seconds: 0.0,
+                f0_hz: Some(200.0),
+                periodicity: 0.9,
+                energy_utterance_peak_normalized: 0.7,
+            }],
+            avg_pitch_hz: Some(200.0),
+            pitch_variance_hz2: None,
+            avg_energy_utterance_peak_normalized: Some(0.7),
+            speaking_rate_phonemes_per_second: None,
         };
         let cloned = prosody.clone();
-        assert!((prosody.avg_pitch - cloned.avg_pitch).abs() < 0.01);
+        assert_eq!(prosody, cloned);
     }
 
     // =========================================================================
