@@ -300,3 +300,10 @@ The raw-JSONL evaluator's outcome receipt now binds the exact preserved observat
 ### MACE v0.6 treatment-effect transport
 
 The policy compares `mean(A) - mean(B)` across regimes, rather than separate absolute action means. It requires target witnesses for both actions and independently qualified paired source-regime evidence, uses disjoint family/root lineage, conservatively adds measurement-error bounds, and abstains if the aggregated treatment-effect interval crosses zero. A common-mode baseline-shift fixture verifies that stable treatment effects can transfer even when both raw outcome levels move. The deterministic 0.12 margin remains a prototype constant, not a statistical confidence interval.
+
+
+### Raw-native treatment-effect transport integration (MACE v0.6)
+
+The consolidation integration suite now has a Session-A → Session-B transport control built from raw `RawInteractionV1` records. Session A is ingested at an explicit (valid_at, known_at) snapshot, grouped into action-/scope-specific evidence packs, promoted through proposal-only consolidation, and released only after an independent receipt verifier accepts the exact source bindings. Session B contributes one receipt-verified witness per action under a shifted regime with a +0.15 common-mode baseline shift. Exact-scope policy abstains; invariant transport uses the stable A-B treatment effect.
+
+The fixture verifier is synthetic. This validates crate composition and receipt/evidence interfaces, not live Mycelix cryptographic verification or physical causal inference.

@@ -381,3 +381,10 @@ For source regime `s` and target regime `t`, the deterministic worst-case check 
 The target must contain a witness for each action; every contributing source regime must contain independently qualified evidence for both actions. Root and family digests must be disjoint across source/target and across contributing source regimes. The aggregated effect is an equal-weight average of regime contrasts, avoiding raw-outcome pooling bias from unequal action counts. If its error interval crosses zero, the policy abstains.
 
 This remains a deterministic prototype: measurement bounds and root digests require independent attestation, and the fixed equivalence margin is not a learned or statistically calibrated confidence level.
+
+
+### Raw-native treatment-effect transport integration (MACE v0.6)
+
+The consolidation integration suite now has a Session-A → Session-B transport control built from raw `RawInteractionV1` records. Session A is ingested at an explicit (valid_at, known_at) snapshot, grouped into action-/scope-specific evidence packs, promoted through proposal-only consolidation, and released only after an independent receipt verifier accepts the exact source bindings. Session B contributes one receipt-verified witness per action under a shifted regime with a +0.15 common-mode baseline shift. Exact-scope policy abstains; invariant transport uses the stable A-B treatment effect.
+
+The fixture verifier is synthetic. This validates crate composition and receipt/evidence interfaces, not live Mycelix cryptographic verification or physical causal inference.

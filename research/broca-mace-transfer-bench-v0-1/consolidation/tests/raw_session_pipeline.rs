@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use broca_mace_consolidation::{
     verify_and_release_promoted_experiences, ConsolidationPolicyV1,
@@ -20,6 +20,7 @@ use broca_mace_policy::{decide, Action, Experience, Objective, Policy, Query, Re
 #[derive(Default)]
 struct FixtureVerifier {
     retracted_event_ids: BTreeSet<u32>,
+    outcome_overrides: BTreeMap<u32, f64>,
 }
 
 impl EvidenceVerifier for FixtureVerifier {
@@ -40,7 +41,7 @@ impl EvidenceVerifier for FixtureVerifier {
             valid_from_ms: raw.valid_from_ms,
             valid_until_ms: raw.valid_until_ms,
             occurred_at_ms: raw.occurred_at_ms,
-            received_at_ms: 220,
+            received_at_ms: raw.occurred_at_ms.checked_add(50)?,
             receipt_digest: "a".repeat(64),
         })
     }
@@ -110,15 +111,19 @@ impl EvidenceVerifier for FixtureVerifier {
         _observed_at_ms: i64,
         _known_at_ms: i64,
     ) -> Option<VerifiedOutcome> {
-        let observed_utility = match event_id {
-            100 => 0.91,
-            101 => 0.90,
-            102 => 0.42,
-            103 => 0.41,
-            104 => 0.40,
-            105 => 0.39,
-            _ => return None,
-        };
+        let observed_utility = self
+            .outcome_overrides
+            .get(&event_id)
+            .copied()
+            .or_else(|| match event_id {
+                100 => Some(0.91),
+                101 => Some(0.90),
+                102 => Some(0.42),
+                103 => Some(0.41),
+                104 => Some(0.40),
+                105 => Some(0.39),
+                _ => None,
+            })?;
         Some(VerifiedOutcome {
             reconciled: true,
             success: true,
@@ -217,10 +222,35 @@ fn raw_event(event_id: u32, action: Action, utility: f64) -> RawInteractionV1 {
 }
 
 fn as_known(known_at_ms: i64) -> AsKnownQuery {
+    as_known_at(180, known_at_ms)
+}
+
+fn as_known_at(valid_at_ms: i64, known_at_ms: i64) -> AsKnownQuery {
     AsKnownQuery {
-        valid_at_ms: 180,
+        valid_at_ms,
         known_at_ms,
     }
+}
+
+fn raw_event_at(
+    event_id: u32,
+    session_id: &str,
+    scope: Scope,
+    action: Action,
+    utility: f64,
+    occurred_at_ms: u64,
+) -> RawInteractionV1 {
+    let mut event = raw_event(event_id, action, utility);
+    event.session_id = session_id.to_owned();
+    event.scope = scope;
+    event.valid_from_ms = occurred_at_ms.saturating_sub(20) as i64;
+    event.valid_until_ms = Some(300);
+    event.occurred_at_ms = occurred_at_ms as i64;
+    event.prediction_registered_at_ms =
+        Some(occurred_at_ms.saturating_sub(40) as i64);
+    event.action_dispatched_at_ms = Some(occurred_at_ms as i64);
+    event.outcome_observed_at_ms = (occurred_at_ms + 20) as i64;
+    event
 }
 
 #[test]
@@ -497,5 +527,93 @@ fn promotion_receipt_cannot_be_reused_after_the_knowledge_snapshot_advances() {
         .unwrap_err(),
         broca_mace_consolidation::ReceiptUseReject::KnowledgeSnapshotMismatch
     );
+}
+
+
+#[test]
+fn raw_session_a_promoted_effect_transports_through_common_mode_shifted_session_b() {
+    let baseline = Scope {
+        regime: Regime::Baseline,
+        objective: Objective::Quality,
+    };
+    let shifted = Scope {
+        regime: Regime::Shifted,
+        objective: Objective::Quality,
+    };
+
+    let source_events = vec![
+        raw_event_at(200, "session-a", baseline, Action::A, 0.80, 170),
+        raw_event_at(201, "session-a", baseline, Action::A, 0.80, 170),
+        raw_event_at(202, "session-a", baseline, Action::A, 0.80, 170),
+        raw_event_at(203, "session-a", baseline, Action::B, 0.40, 170),
+        raw_event_at(204, "session-a", baseline, Action::B, 0.40, 170),
+        raw_event_at(205, "session-a", baseline, Action::B, 0.40, 170),
+    ];
+    let mut source_values = BTreeMap::new();
+    source_values.extend((200..=202).map(|id| (id, 0.80)));
+    source_values.extend((203..=205).map(|id| (id, 0.40)));
+    let source_verifier = FixtureVerifier {
+        outcome_overrides: source_values,
+        ..FixtureVerifier::default()
+    };
+    let source_batch =
+        ingest_batch_as_known(&source_events, as_known(250), &source_verifier)
+            .expect("Session A raw outcomes must be receipt-qualified");
+    let source_pack =
+        build_consolidation_evidence_pack(&source_batch, &[200, 201, 202, 203, 204, 205])
+            .expect("Session A evidence pack preserves source lineage");
+
+    let consolidation = ConsolidationPolicyV1::default();
+    let attestor = FixtureConsolidationVerifier {
+        verified_at_ms: None,
+    };
+    let mut promoted_memory = Vec::new();
+    for action in [Action::A, Action::B] {
+        let summary = source_pack.summarize_action_for_scope(baseline, action);
+        let ConsolidationProposalV1::ProposeProcedure(proposal) =
+            consolidation.decide_procedure_promotion(&summary)
+        else {
+            panic!("Session A action {action:?} should meet the promotion gate");
+        };
+        let receipt_proposal = ConsolidationReceiptProposalV1::from_procedure_promotion(
+            &proposal,
+            &source_pack,
+            receipt_context(action),
+        )
+        .expect("source-linked proposal must bind exact Session A receipts");
+        let (_receipt, experiences) = verify_and_release_promoted_experiences(
+            &receipt_proposal,
+            &source_pack,
+            250,
+            &attestor,
+        )
+        .expect("independent verifier must attest the exact promotion");
+        promoted_memory.extend(experiences);
+    }
+
+    // Session B has one receipt-verified witness per action. Both raw outcomes
+    // share a +0.15 baseline shift, so the A-B treatment contrast remains 0.40.
+    let target_events = vec![
+        raw_event_at(300, "session-b", shifted, Action::A, 0.95, 240),
+        raw_event_at(301, "session-b", shifted, Action::B, 0.55, 240),
+    ];
+    let target_verifier = FixtureVerifier {
+        outcome_overrides: BTreeMap::from([(300, 0.95), (301, 0.55)]),
+        ..FixtureVerifier::default()
+    };
+    let target_batch =
+        ingest_batch_as_known(&target_events, as_known_at(260, 350), &target_verifier)
+            .expect("Session B observations must pass as-known receipt checks");
+    let mut candidate_memory = promoted_memory;
+    candidate_memory.extend(target_batch.admitted().iter().map(|item| *item.experience()));
+
+    let query = Query { scope: shifted };
+    let exact = decide(Policy::CausalQualified, &candidate_memory, query);
+    let transported = decide(Policy::InvariantTransport, &candidate_memory, query);
+    assert_eq!(exact.action, None);
+    assert_eq!(transported.action, Some(Action::A));
+    assert!(transported.causal_claim.is_some());
+    assert_eq!(transported.evidence_ids.len(), 8);
+    assert!(transported.probe.is_none());
 }
 
