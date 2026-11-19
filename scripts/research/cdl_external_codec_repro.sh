@@ -99,6 +99,8 @@ fi
 
 if [[ -n "$TERSETS_DIR" ]]; then
   require_command zig
+  require_command cc
+  require_command tee
   verify_revision "$TERSETS_DIR" "$TERSETS_COMMIT" "TerseTS"
   tersets_out="$OUT_DIR/tersets"
   mkdir -p "$tersets_out"
@@ -109,11 +111,25 @@ if [[ -n "$TERSETS_DIR" ]]; then
   )
   library="$TERSETS_DIR/zig-out/lib/libtersets.so"
   [[ -f "$library" ]] || fail "TerseTS shared library missing after build: $library"
+
+  gate_source="$ROOT_DIR/scripts/research/tersets_bitwise_gate.c"
+  [[ -f "$gate_source" ]] || fail "TerseTS bitwise gate source missing: $gate_source"
+  cc -std=c11 -O2 -Wall -Wextra -Werror \
+    -I "$TERSETS_DIR/bindings/c" \
+    "$gate_source" \
+    -L "$TERSETS_DIR/zig-out/lib" \
+    -Wl,-rpath,"$TERSETS_DIR/zig-out/lib" \
+    -ltersets \
+    -o "$tersets_out/tersets_bitwise_gate"
+  "$tersets_out/tersets_bitwise_gate" | tee "$tersets_out/bitwise-gate.txt"
+
   {
     printf 'repository=cmcuza/TerseTS\n'
     printf 'commit=%s\n' "$TERSETS_COMMIT"
     printf 'zig=%s\n' "$(zig version)"
-    printf 'exact_lossless_whitelist=Uncompressed,Chimp64,Chimp128,Elf\nconditional_methods_require_bitwise_corpus_gate=RunLengthEncoding,BitPackedDeltaEncoding\n'
+    printf 'cc=%s\n' "$(cc --version | head -n 1)"
+    printf 'exact_lossless_whitelist=Uncompressed,Chimp64,Chimp128,Elf\n'
+    printf 'conditional_methods=RunLengthEncoding,BitPackedDeltaEncoding\n'
     printf 'excluded_lossy_or_unverified=Camel,BitPackedQuantization,SerfQT,BitPackedBUFF,MacaqueS,MacaqueV,SwingFilter,SlidingWindow,BottomUp,DFT,and other approximation methods pending per-method proof\n'
   } > "$tersets_out/reproduction.txt"
   sha256sum "$library" > "$tersets_out/library-sha256.txt"
@@ -130,8 +146,9 @@ Notes:
   TSFile build/dependency step and is not silently enabled here.
 - DeXOR currently documents only double support. Do not compare its results
   with non-f64 integer or bounded-error streams.
-- TerseTS is beta. Only the explicit lossless whitelist is eligible for the
-  exact-lossless leaderboard. Confirm its per-method bitwise tests before use.
+- TerseTS is beta. The C bitwise gate runs Uncompressed/Chimp64/Chimp128/Elf
+  on IEEE-754 edge patterns and signed-zero transitions. RLE and BitPackedDelta
+  are reported separately as conditional candidates, not in the strict whitelist.
 - This script records environment and data hashes, but does not adapt method
   configuration, normalize timestamps, or substitute for the CDL-Bench paired
   manifest.
