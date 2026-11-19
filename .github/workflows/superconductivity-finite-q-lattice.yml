@@ -1,0 +1,95 @@
+name: Superconductivity Finite-Q Lattice Contract
+
+on:
+  pull_request:
+    paths:
+      - "tools/superconductivity-finite-q-lattice/**"
+      - "data/schemas/superconductivity_finite_q_lattice_v0_1.schema.json"
+      - "data/research/superconductivity_finite_q_lattice_fixture_v0_1.json"
+      - "research/superconductivity/finite_q_lattice/**"
+      - ".github/workflows/superconductivity-finite-q-lattice.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: superconductivity-finite-q-lattice-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  finite-q-lattice:
+    name: Finite-Q reconstruction, gauge and momentum audits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Apply pinned Rust formatting
+        run: cargo fmt --manifest-path tools/superconductivity-finite-q-lattice/Cargo.toml --all
+
+      - name: Verify canonical Rust formatting
+        run: cargo fmt --manifest-path tools/superconductivity-finite-q-lattice/Cargo.toml --all -- --check
+
+      - name: Capture rustfmt-only patch
+        if: always()
+        run: |
+          git diff --binary -- tools/superconductivity-finite-q-lattice > "$RUNNER_TEMP/sc-rustfmt.patch"
+          git diff --stat -- tools/superconductivity-finite-q-lattice
+          sha256sum "$RUNNER_TEMP/sc-rustfmt.patch"
+
+      - name: Generate isolated dependency lockfile
+        run: cargo generate-lockfile --manifest-path tools/superconductivity-finite-q-lattice/Cargo.toml
+
+      - name: Run finite-Q reconstruction, symmetry and negative-control tests
+        run: cargo test --locked --manifest-path tools/superconductivity-finite-q-lattice/Cargo.toml --bin sc_finite_q_lattice_audit
+
+      - name: Audit synthetic commensurate finite-Q fixture
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-finite-q-lattice/Cargo.toml --bin sc_finite_q_lattice_audit -- \
+            --schema data/schemas/superconductivity_finite_q_lattice_v0_1.schema.json \
+            --fixture data/research/superconductivity_finite_q_lattice_fixture_v0_1.json \
+            --out "$RUNNER_TEMP/sc-finite-q-lattice-receipt.json"
+          cat "$RUNNER_TEMP/sc-finite-q-lattice-receipt.json"
+
+      - name: Run Clippy
+        run: cargo clippy --locked --manifest-path tools/superconductivity-finite-q-lattice/Cargo.toml --bin sc_finite_q_lattice_audit -- -D warnings
+
+      - name: Record exact-run identity
+        if: always()
+        run: |
+          {
+            echo "git_head=$(git rev-parse HEAD)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "worktree_status=$(git status --short)"
+            sha256sum data/schemas/superconductivity_finite_q_lattice_v0_1.schema.json
+            sha256sum data/research/superconductivity_finite_q_lattice_fixture_v0_1.json
+            sha256sum tools/superconductivity-finite-q-lattice/Cargo.toml
+            sha256sum tools/superconductivity-finite-q-lattice/src/main.rs
+            sha256sum "$RUNNER_TEMP/sc-rustfmt.patch"
+            if [ -f tools/superconductivity-finite-q-lattice/Cargo.lock ]; then
+              sha256sum tools/superconductivity-finite-q-lattice/Cargo.lock
+            else
+              echo "cargo_lock=not-generated"
+            fi
+          } > "$RUNNER_TEMP/sc-finite-q-lattice-environment.txt"
+
+      - name: Upload exact-run evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sc-finite-q-lattice-exact-run-evidence
+          if-no-files-found: warn
+          path: |
+            tools/superconductivity-finite-q-lattice/Cargo.lock
+            ${{ runner.temp }}/sc-finite-q-lattice-environment.txt
+            ${{ runner.temp }}/sc-finite-q-lattice-receipt.json
+            ${{ runner.temp }}/sc-rustfmt.patch
