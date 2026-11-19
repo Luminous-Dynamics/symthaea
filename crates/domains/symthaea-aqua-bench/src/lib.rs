@@ -317,9 +317,21 @@ pub fn validate_matched_comparison(
 
 /// Error returned by the composed matched-run and service-qualification gate.
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ComparisonSide {
+    Control,
+    Candidate,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QualifiedComparisonError {
     Benchmark(ContractError),
     ServiceQualification(crate::service_qualification::ServiceQualificationError),
+    SiteFit(crate::site_fit::SiteFitError),
+    SiteContextMismatch { field: &'static str },
+    SiteNotEligible {
+        side: ComparisonSide,
+        result: crate::site_fit::SiteFitResult,
+    },
 }
 
 impl Display for QualifiedComparisonError {
@@ -329,6 +341,17 @@ impl Display for QualifiedComparisonError {
             Self::ServiceQualification(error) => {
                 write!(f, "completed-service qualification failed: {error}")
             }
+            Self::SiteFit(error) => write!(f, "site-fit evidence failed: {error}"),
+            Self::SiteContextMismatch { field } => {
+                write!(f, "control/candidate site profiles differ: {field}")
+            }
+            Self::SiteNotEligible { side, result } => write!(
+                f,
+                "{side:?} installation is not eligible: {:?} ({} unresolved domain(s), {} unsatisfied domain(s))",
+                result.disposition,
+                result.indeterminate_issues.len(),
+                result.unsatisfied_domains.len()
+            ),
         }
     }
 }
@@ -344,6 +367,12 @@ impl From<ContractError> for QualifiedComparisonError {
 impl From<crate::service_qualification::ServiceQualificationError> for QualifiedComparisonError {
     fn from(error: crate::service_qualification::ServiceQualificationError) -> Self {
         Self::ServiceQualification(error)
+    }
+}
+
+impl From<crate::site_fit::SiteFitError> for QualifiedComparisonError {
+    fn from(error: crate::site_fit::SiteFitError) -> Self {
+        Self::SiteFit(error)
     }
 }
 
@@ -416,6 +445,102 @@ pub fn validate_qualified_matched_comparison(
         candidate_qualification,
     )
     .map_err(QualifiedComparisonError::from)
+}
+
+/// Result of a matched service comparison after both exact installations pass site fit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SiteQualifiedComparisonResult {
+    pub control_site_fit: crate::site_fit::SiteFitResult,
+    pub candidate_site_fit: crate::site_fit::SiteFitResult,
+    pub service_qualification: crate::service_qualification::MatchedServiceQualificationResult,
+}
+
+/// Preferred site-aware product comparison entry point.
+///
+/// Both control and candidate must be Eligible at the same surveyed site revision.
+/// Their product/architecture configurations may differ, but each site's evidence must bind
+/// to that run's exact device digest. Only then are canonical run receipts and independent
+/// completed-service decisions evaluated. This function performs no site engineering.
+pub fn validate_site_qualified_matched_comparison(
+    control: &AquaRunRecord,
+    candidate: &AquaRunRecord,
+    scope: ComparisonScope,
+    qualification_profile: &crate::service_qualification::ServiceQualificationProfile,
+    control_qualification: &crate::service_qualification::ServiceQualificationRecord,
+    candidate_qualification: &crate::service_qualification::ServiceQualificationRecord,
+    control_site_profile: &crate::site_fit::SiteFitProfile,
+    control_site_assessments: &[crate::site_fit::SiteCapabilityAssessment],
+    candidate_site_profile: &crate::site_fit::SiteFitProfile,
+    candidate_site_assessments: &[crate::site_fit::SiteCapabilityAssessment],
+) -> Result<SiteQualifiedComparisonResult, QualifiedComparisonError> {
+    if control_site_profile.site_profile_id != candidate_site_profile.site_profile_id {
+        return Err(QualifiedComparisonError::SiteContextMismatch {
+            field: "site_profile_id",
+        });
+    }
+    if control_site_profile.site_revision != candidate_site_profile.site_revision {
+        return Err(QualifiedComparisonError::SiteContextMismatch {
+            field: "site_revision",
+        });
+    }
+    if control_site_profile.site_conditions_sha256
+        != candidate_site_profile.site_conditions_sha256
+    {
+        return Err(QualifiedComparisonError::SiteContextMismatch {
+            field: "site_conditions_sha256",
+        });
+    }
+    if control_site_profile.device_configuration_sha256
+        != control.device.device_configuration_sha256
+    {
+        return Err(QualifiedComparisonError::Benchmark(
+            ContractError::ContextMismatch {
+                field: "control_site_device_configuration_sha256",
+            },
+        ));
+    }
+    if candidate_site_profile.device_configuration_sha256
+        != candidate.device.device_configuration_sha256
+    {
+        return Err(QualifiedComparisonError::Benchmark(
+            ContractError::ContextMismatch {
+                field: "candidate_site_device_configuration_sha256",
+            },
+        ));
+    }
+
+    let control_site_fit =
+        crate::site_fit::evaluate_site_fit(control_site_profile, control_site_assessments)?;
+    if control_site_fit.disposition != crate::site_fit::SiteFitDisposition::Eligible {
+        return Err(QualifiedComparisonError::SiteNotEligible {
+            side: ComparisonSide::Control,
+            result: control_site_fit,
+        });
+    }
+
+    let candidate_site_fit =
+        crate::site_fit::evaluate_site_fit(candidate_site_profile, candidate_site_assessments)?;
+    if candidate_site_fit.disposition != crate::site_fit::SiteFitDisposition::Eligible {
+        return Err(QualifiedComparisonError::SiteNotEligible {
+            side: ComparisonSide::Candidate,
+            result: candidate_site_fit,
+        });
+    }
+
+    let service_qualification = validate_qualified_matched_comparison(
+        control,
+        candidate,
+        scope,
+        qualification_profile,
+        control_qualification,
+        candidate_qualification,
+    )?;
+
+    Ok(SiteQualifiedComparisonResult {
+        control_site_fit,
+        candidate_site_fit,
+        service_qualification,
+    })
 }
 
 #[cfg(test)]
