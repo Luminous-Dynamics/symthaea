@@ -209,12 +209,21 @@ Files:
 
 The prototype builds a stable dictionary of (entity_id, series_id) keys and encodes one chronological child stream per key. Each child carries exact timestamp deltas, changed-field masks, explicit presence/null state, exact 64-bit field values and repeated-state heartbeat runs. The outer frame charges key IDs, record counts, child lengths, schema, order metadata and CRC32.
 
-It now supports two decoder-synchronous order modes:
+It now supports three decoder-synchronous order modes:
 
-1. **Timestamp merge (mode 0):** when the original global stream has strictly increasing, unique timestamps, the decoder reconstructs the original interleaving with a deterministic k-way min-heap merge of the independently decoded series streams. No order schedule is transmitted. The decoder verifies strict monotonicity in every child and across the merged output.
-2. **Explicit schedule (mode 1):** when timestamps contain duplicates or arrive out of order, the frame carries the original bit-packed key-ID schedule. The decoder replays it to restore exact record order. The fallback is tested with duplicate-timestamp and out-of-order fixtures.
+1. **Timestamp merge (mode 0):** when the original global stream has strictly increasing, unique timestamps, the decoder reconstructs original interleaving with a deterministic k-way min-heap merge of the per-series streams. No order schedule is transmitted. The decoder verifies strict monotonicity in every child and across merged output.
+2. **Tie-template schedule (mode 1):** when timestamps are nondecreasing but duplicated, the decoder identifies each equal-timestamp group from the child streams. The schedule contains only the tie-group key order. A bounded 16-entry move-to-front dictionary reuses recurring tie-order templates; a literal template is emitted when no cached order matches. Single-record timestamp groups require no schedule entries.
+3. **Full schedule (mode 2):** when timestamps regress, the frame carries the original bit-packed key-ID schedule for every record. The decoder replays it to restore exact arrival order.
 
-This is not a lossy reorder: the encoder chooses merge mode only if timestamps are globally strict and unique. Otherwise it falls back to the schedule. Both paths reconstruct the exact original records, including order.
+This is not a lossy reorder: each mode is selected only when its conditions are satisfied, and both duplicate-time and regression cases preserve the original sequence exactly. Tie templates are checked against the number of pending records per key at each timestamp; malformed templates that would consume the wrong per-key multiplicity are rejected.
+
+A separate primitive reference and runner validate the tie-template grammar:
+- `research/cdl-bench/reference/tie_group_order_template_reference.cpp`
+- `scripts/research/cdl_tie_group_order_template_reference.sh`
+
+The primitive reference compiled locally with GCC 14.2 and strict warnings (`-O2 -std=c++20 -Wall -Wextra -Wconversion -Werror`). It passed 1,000 randomized exact tie-group schedule round-trips and five malformed-input checks. For 64 repeated groups of eight keys, the template schedule used 67 bytes versus 192 bytes for fixed-width per-event IDs (65.10% reduction). For 20 alternating groups across 16 keys, the 16-entry move-to-front dictionary used 36 bytes versus 160 bytes of fixed-width IDs (77.50% reduction).
+
+**Evidence boundary:** the primitive reference tests only the tie-schedule subgrammar. The latest mode-1/mode-2 integration into `typed_record_partitioned_runs_reference.cpp` is authored and checked in, but this newest integrated C++ frame revision has not yet been compiled locally. The previous timestamp-merge/mode-2 implementation was strictly compiled and tested; do not transfer that pass claim to the latest tie-template integration.
 
 The raw and global state-delta controls use matching self-describing outer frames (magic, record count, payload length, schema and CRC32), so the Zstandard comparisons charge the basic framing on all arms.
 
