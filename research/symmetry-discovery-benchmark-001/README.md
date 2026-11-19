@@ -201,7 +201,7 @@ It validates the Draft 2020-12 manifest and then independently checks:
 - all 64 entries of the frozen D4 multiplication table;
 - exact identity, two-sided inverses, closure and associativity;
 - unordered point-set stabilizers using exact decimal-to-rational parsing;
-- polynomial invariance under each group matrix using exact rational coefficient expansion;
+- polynomial invariance under each group matrix using exact integer coefficient expansion;
 - the expected subgroup label for every frozen case.
 
 The deterministic corpus is regenerated from the manifest's D4 matrices using xorshift32 orbit seeds. Reproduce or refresh it with:
