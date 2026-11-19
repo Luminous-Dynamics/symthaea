@@ -16,7 +16,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 /// Audio frontend configuration
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AudioConfig {
     /// Sample rate (Hz)
     pub sample_rate: u32,
@@ -401,6 +401,26 @@ impl AudioProjector {
         Self::new(AudioConfig::default(), LtcConfig::default())
     }
 
+    /// Encoder configuration shared with offline training and streaming inference.
+    pub fn config(&self) -> &AudioConfig {
+        self.frontend.config()
+    }
+
+    /// Reject audio whose source sample rate does not match this projector.
+    ///
+    /// The projector does not implicitly resample. Callers must resample with
+    /// an explicit, qualified resampler before feature extraction.
+    pub fn validate_input_sample_rate(&self, observed_sample_rate: u32) -> Result<(), String> {
+        let expected_sample_rate = self.frontend.config().sample_rate;
+        if observed_sample_rate == expected_sample_rate && observed_sample_rate > 0 {
+            Ok(())
+        } else {
+            Err(format!(
+                "audio sample-rate mismatch: received {observed_sample_rate} Hz, projector requires {expected_sample_rate} Hz; resample explicitly before projection"
+            ))
+        }
+    }
+
     /// Reset projector state
     pub fn reset(&mut self) {
         self.ltc.reset();
@@ -604,7 +624,7 @@ impl AudioProjector {
     /// Uses THERMOMETER encoding: for each mel bin, include all basis vectors
     /// from level 0 up to the current level. This ensures similar mel values
     /// produce similar HVs (smooth similarity gradient).
-    fn direct_mel_hv(mel_features: &[f32], prev_features: Option<&[f32]>) -> HV16 {
+    pub(crate) fn direct_mel_hv(mel_features: &[f32], prev_features: Option<&[f32]>) -> HV16 {
         use crate::hdc::BundleAccumulator;
         let mut acc = BundleAccumulator::new();
 
@@ -968,6 +988,32 @@ mod tests {
         for filter in &filters {
             assert_eq!(filter.len(), config.n_fft / 2 + 1);
         }
+    }
+
+    #[test]
+    fn audio_projector_rejects_unresampled_source_sample_rates() {
+        let projector = AudioProjector::default_config();
+        assert!(projector.validate_input_sample_rate(16_000).is_ok());
+        assert!(projector.validate_input_sample_rate(48_000).is_err());
+        assert!(projector.validate_input_sample_rate(0).is_err());
+    }
+
+    #[test]
+    fn direct_mel_hdc_preserves_local_quantization_neighborhoods() {
+        let baseline = vec![-0.2_f32; 40];
+        let adjacent = vec![0.0_f32; 40];
+        let distant = vec![0.8_f32; 40];
+
+        let reference = AudioProjector::direct_mel_hv(&baseline, None);
+        let near = AudioProjector::direct_mel_hv(&adjacent, None);
+        let far = AudioProjector::direct_mel_hv(&distant, None);
+
+        let near_similarity = reference.similarity(&near);
+        let far_similarity = reference.similarity(&far);
+        assert!(
+            near_similarity > far_similarity,
+            "adjacent mel levels should remain closer than distant levels: near={near_similarity}, far={far_similarity}"
+        );
     }
 
     #[test]

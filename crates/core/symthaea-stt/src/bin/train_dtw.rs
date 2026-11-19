@@ -30,7 +30,7 @@ use std::path::{Path, PathBuf};
 
 use symthaea_stt::{
     AudioFrontend, AudioProjector, BootstrapConfig, CmuDictionary, DtwTrainer, HV16,
-    TextToPhonemes, TrainedPrototypes,
+    PrototypeEncoderMetadata, TextToPhonemes, TrainedPrototypes,
 };
 
 #[derive(Parser)]
@@ -194,10 +194,14 @@ fn main() {
             pb.set_position(i as u64);
 
             // Load audio
-            let (samples, _sr) = match AudioFrontend::load_audio(audio_path) {
+            let (samples, sample_rate) = match AudioFrontend::load_audio(audio_path) {
                 Ok(a) => a,
                 Err(_) => continue,
             };
+            if let Err(error) = projector.validate_input_sample_rate(sample_rate) {
+                eprintln!("Skipping {}: {}", audio_path.display(), error);
+                continue;
+            }
 
             // Project to hypervectors
             projector.reset();
@@ -257,6 +261,9 @@ fn main() {
             counts: HashMap::new(),
             config: BootstrapConfig::default(),
             version: env!("CARGO_PKG_VERSION").to_string(),
+            encoder_metadata: Some(PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(
+                projector.config().clone(),
+            )),
         };
 
         trained.enforce_separation(cli.min_separation);
@@ -276,6 +283,9 @@ fn main() {
         counts: HashMap::new(),
         config: BootstrapConfig::default(),
         version: env!("CARGO_PKG_VERSION").to_string(),
+        encoder_metadata: Some(PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(
+            projector.config().clone(),
+        )),
     };
 
     if let Err(e) = trained.save(&cli.output) {

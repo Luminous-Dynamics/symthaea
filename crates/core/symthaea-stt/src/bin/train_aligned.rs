@@ -25,8 +25,8 @@ use std::path::PathBuf;
 
 use symthaea_stt::hdc::BundleAccumulator;
 use symthaea_stt::{
-    AudioFrontend, AudioProjector, BootstrapConfig, HV16, TrainedPrototypes, id_to_audio_path,
-    load_alignments,
+    AudioFrontend, AudioProjector, BootstrapConfig, HV16, PrototypeEncoderMetadata,
+    TrainedPrototypes, id_to_audio_path, load_alignments,
 };
 
 #[derive(Parser)]
@@ -164,8 +164,21 @@ fn main() {
     };
     println!("  ✓ Loaded {} utterance alignments", alignments.len());
 
-    // Create audio projector
+    // Create audio projector.
     let mut projector = AudioProjector::default_config();
+
+    // Frame timestamps used for forced-alignment indexing must describe the
+    // actual projector cadence, not a separately configured approximation.
+    let projector_hop = projector.config().hop_duration;
+    if (cli.frame_hop - projector_hop).abs() > 1e-6 {
+        eprintln!(
+            "{} --frame-hop ({:.6}s) must match AudioProjector hop ({:.6}s); refusing to train misaligned prototypes",
+            style("ERROR:").red().bold(),
+            cli.frame_hop,
+            projector_hop
+        );
+        std::process::exit(2);
+    }
 
     // Accumulator for phoneme prototypes
     let mut accumulator = PhonemeAccumulator::new();
@@ -210,13 +223,18 @@ fn main() {
         };
 
         // Load audio
-        let (samples, _sample_rate) = match AudioFrontend::load_audio(&audio_path) {
+        let (samples, sample_rate) = match AudioFrontend::load_audio(&audio_path) {
             Ok(a) => a,
             Err(_) => {
                 skipped += 1;
                 continue;
             }
         };
+        if let Err(error) = projector.validate_input_sample_rate(sample_rate) {
+            eprintln!("Skipping {id}: {error}");
+            skipped += 1;
+            continue;
+        }
 
         // Project to hypervectors (using raw frames without temporal windowing)
         projector.reset();
@@ -306,6 +324,9 @@ fn main() {
             counts: HashMap::new(),
             config: BootstrapConfig::default(),
             version: env!("CARGO_PKG_VERSION").to_string(),
+            encoder_metadata: Some(PrototypeEncoderMetadata::direct_mel_frame_v1(
+                projector.config().clone(),
+            )),
         };
 
         trained.enforce_separation(cli.min_separation);
@@ -393,6 +414,9 @@ fn main() {
         counts: counts.iter().map(|(k, v)| (k.clone(), *v)).collect(),
         config: BootstrapConfig::default(),
         version: env!("CARGO_PKG_VERSION").to_string(),
+        encoder_metadata: Some(PrototypeEncoderMetadata::direct_mel_frame_v1(
+            projector.config().clone(),
+        )),
     };
 
     if let Err(e) = trained.save(&cli.output) {
