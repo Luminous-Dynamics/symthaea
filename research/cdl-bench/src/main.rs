@@ -34,7 +34,7 @@ fn usage() -> &'static str {
   cdl-bench telemetry [--records N] [--keys N] [--state-capacity N] [--segment-records N] [--workload sparse|bursty|idle|noisy] [--seed N]
   cdl-bench bounded [--values N] [--seed N] [--tolerance N]
 
-The E0, causal, numeric and float commands check exact round-trip integrity.
+The E0, causal, numeric, float and telemetry commands check exact round-trip integrity.
 The bounded command uses a separate per-sample error guarantee."
 }
 
