@@ -17,3 +17,7 @@ jsonschema = { version = "=0.59.0", default-features = false }
 [[bin]]
 name = "sc_capability_plan_audit"
 path = "src/main.rs"
+
+[[bin]]
+name = "sc_model_discrimination_audit"
+path = "src/bin/sc_model_discrimination_audit.rs"
