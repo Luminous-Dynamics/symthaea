@@ -31,8 +31,15 @@ The CLI hashes exact input bytes and binds the supplied source commit. The recei
 - Missing required observations or evidence return `indeterminate`.
 - Passing the contract returns `accepted_for_handoff` with `authority_granted = false`. It is not permission to actuate, transfer fluid, perform servicing, or declare a mission safe.
 
-The test-only `proximity_only` baseline accepts any case whose approach outcome is `docked`. In the frozen 20-case corpus, it falsely accepts 17 cases that the composite gate rejects or leaves indeterminate. The full gate expects 1 positive control, 15 rejections and 4 indeterminate cases, with zero expected-result mismatches. These are fixture-contract counts, not empirical probabilities.
+The test-only `proximity_only` baseline accepts any case whose approach outcome is `docked`. In the frozen 22-case corpus, it falsely accepts 20 cases that the composite gate rejects or leaves indeterminate. The full gate expects 1 positive control, 16 rejections and 5 indeterminate cases, with zero expected-result mismatches. These are fixture-contract counts, not empirical probabilities.
 
 ## Evidence ceiling
 
 A passing receipt establishes only that the evaluator applied its declared contract to the exact synthetic fixture. It does not establish real contact forces, capture reliability, docking safety, collision clearance, structural compatibility, flight autonomy, hardware qualification, fluid-transfer readiness or mission authorization.
+
+
+## Cross-service identity handoff — 19 November 2026
+
+The contact evidence now carries a required `client_id` in addition to interface ID/revision. The declared profile binds the expected client. A mismatched client rejects; a missing client identity is indeterminate. The serialized per-case result echoes client, interface/revision, frame and epoch so a downstream adapter can bind the capture result to the same servicing client and physical port used by the fluid-transfer stage.
+
+This is an identity-carrying software contract, not producer authentication or proof of a physical connection. The fixture uses synthetic identifiers.
