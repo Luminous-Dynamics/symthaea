@@ -136,7 +136,7 @@ Do not force an energy reduction target where it would trade away safety, schedu
 - [ISO 16315:2026](https://www.iso.org/standard/84203.html): AC/DC electrical propulsion and hybrid electrical systems for small craft up to 24 m LH.
 - [ISO/DIS 12217-2.2:2026](https://www.iso.org/standard/88606.html): draft stability/buoyancy assessment for sailing boats, principally 6–24 m; includes relevant habitable-multihull inversion/escape subjects; not yet final.
 - [IMO MASS Code](https://www.imo.org/en/mediacentre/pressbriefings/pages/imo-adopts-mass-code.aspx): non-mandatory code adopted May 2026, effective 1 July 2026 for SOLAS cargo ships; application to a small private liveaboard must not be presumed.
-- [ISO/AWI 25930](https://www.iso.org/standard/88606.html): use current ODD/OE standards status only after verifying the correct project page/edition; not a released requirement in this profile.
+- [ISO/AWI 25930](https://www.iso.org/standard/92074.html): approved work item, under development; its ODD/OE taxonomy is a reference, not a released requirement in this profile.
 
 ## 12. Claim ceiling
 
