@@ -1,0 +1,520 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "LUMINOUS-SYMM-ACTIVE-SUBGROUP-001",
+  "freeze_status": "oracle_fixtures_with_independent_reference_costs_not_rust_results",
+  "outcome_contract": {
+    "semantics": "A probe asks whether the declared group element preserves the complete frozen task in one frozen context.",
+    "outcome_encoding": {
+      "violated": 0,
+      "preserved": 1,
+      "unknown": "abstention; does not eliminate any candidate"
+    },
+    "hypotheses": "Only subgroups of the ambient group are admissible hypotheses.",
+    "claim_ceiling": "Subgroup identification only; downstream independent task quotient verification remains mandatory."
+  },
+  "oracle_contract": {
+    "group_identity_index": 0,
+    "group_validation": [
+      "square table",
+      "all product indices in range",
+      "Latin rows and columns",
+      "two-sided identity",
+      "two-sided inverse",
+      "associativity"
+    ],
+    "subgroup_validation": [
+      "identity membership",
+      "inverse closure",
+      "product closure"
+    ],
+    "subgroup_ordering": "ascending subgroup size then lexicographic element-index list",
+    "probe_ordering": "ascending element index, excluding the identity",
+    "planner_objective": "minimum worst-case cumulative probe cost with deterministic tie-breaks",
+    "static_objective": "exact minimum total cost set covering every distinguishable subgroup pair"
+  },
+  "groups": [
+    {
+      "group_id": "C4",
+      "notation": "cyclic C4",
+      "element_ids": [
+        "r0",
+        "r1",
+        "r2",
+        "r3"
+      ],
+      "multiplication": [
+        [
+          0,
+          1,
+          2,
+          3
+        ],
+        [
+          1,
+          2,
+          3,
+          0
+        ],
+        [
+          2,
+          3,
+          0,
+          1
+        ],
+        [
+          3,
+          0,
+          1,
+          2
+        ]
+      ],
+      "identity": 0,
+      "subgroups": [
+        [
+          0
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          1,
+          2,
+          3
+        ]
+      ],
+      "probes": [
+        {
+          "element_index": 1,
+          "cost": 1
+        },
+        {
+          "element_index": 2,
+          "cost": 1
+        },
+        {
+          "element_index": 3,
+          "cost": 1
+        }
+      ],
+      "expected": {
+        "subgroup_count": 3,
+        "full_scan_cost": 3,
+        "adaptive_worst_case_cost": 2,
+        "exact_static_basis_cost": 2,
+        "greedy_worst_case_cost": 2,
+        "adaptive_reduction_ratio": 1.5
+      }
+    },
+    {
+      "group_id": "V4",
+      "notation": "Klein four group D2",
+      "element_ids": [
+        "r0",
+        "r1",
+        "r0s",
+        "r1s"
+      ],
+      "multiplication": [
+        [
+          0,
+          1,
+          2,
+          3
+        ],
+        [
+          1,
+          0,
+          3,
+          2
+        ],
+        [
+          2,
+          3,
+          0,
+          1
+        ],
+        [
+          3,
+          2,
+          1,
+          0
+        ]
+      ],
+      "identity": 0,
+      "subgroups": [
+        [
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          1,
+          2,
+          3
+        ]
+      ],
+      "probes": [
+        {
+          "element_index": 1,
+          "cost": 1
+        },
+        {
+          "element_index": 2,
+          "cost": 1
+        },
+        {
+          "element_index": 3,
+          "cost": 1
+        }
+      ],
+      "expected": {
+        "subgroup_count": 5,
+        "full_scan_cost": 3,
+        "adaptive_worst_case_cost": 3,
+        "exact_static_basis_cost": 3,
+        "greedy_worst_case_cost": 3,
+        "adaptive_reduction_ratio": 1
+      }
+    },
+    {
+      "group_id": "S3",
+      "notation": "dihedral group D3",
+      "element_ids": [
+        "r0",
+        "r1",
+        "r2",
+        "r0s",
+        "r1s",
+        "r2s"
+      ],
+      "multiplication": [
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        [
+          1,
+          2,
+          0,
+          4,
+          5,
+          3
+        ],
+        [
+          2,
+          0,
+          1,
+          5,
+          3,
+          4
+        ],
+        [
+          3,
+          5,
+          4,
+          0,
+          2,
+          1
+        ],
+        [
+          4,
+          3,
+          5,
+          1,
+          0,
+          2
+        ],
+        [
+          5,
+          4,
+          3,
+          2,
+          1,
+          0
+        ]
+      ],
+      "identity": 0,
+      "subgroups": [
+        [
+          0
+        ],
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      ],
+      "probes": [
+        {
+          "element_index": 1,
+          "cost": 1
+        },
+        {
+          "element_index": 2,
+          "cost": 1
+        },
+        {
+          "element_index": 3,
+          "cost": 1
+        },
+        {
+          "element_index": 4,
+          "cost": 2
+        },
+        {
+          "element_index": 5,
+          "cost": 2
+        }
+      ],
+      "expected": {
+        "subgroup_count": 6,
+        "full_scan_cost": 7,
+        "adaptive_worst_case_cost": 6,
+        "exact_static_basis_cost": 6,
+        "greedy_worst_case_cost": 6,
+        "adaptive_reduction_ratio": 1.1666666666666667
+      }
+    },
+    {
+      "group_id": "D4",
+      "notation": "dihedral group D4",
+      "element_ids": [
+        "r0",
+        "r1",
+        "r2",
+        "r3",
+        "r0s",
+        "r1s",
+        "r2s",
+        "r3s"
+      ],
+      "multiplication": [
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        [
+          1,
+          2,
+          3,
+          0,
+          5,
+          6,
+          7,
+          4
+        ],
+        [
+          2,
+          3,
+          0,
+          1,
+          6,
+          7,
+          4,
+          5
+        ],
+        [
+          3,
+          0,
+          1,
+          2,
+          7,
+          4,
+          5,
+          6
+        ],
+        [
+          4,
+          7,
+          6,
+          5,
+          0,
+          3,
+          2,
+          1
+        ],
+        [
+          5,
+          4,
+          7,
+          6,
+          1,
+          0,
+          3,
+          2
+        ],
+        [
+          6,
+          5,
+          4,
+          7,
+          2,
+          1,
+          0,
+          3
+        ],
+        [
+          7,
+          6,
+          5,
+          4,
+          3,
+          2,
+          1,
+          0
+        ]
+      ],
+      "identity": 0,
+      "subgroups": [
+        [
+          0
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          1,
+          2,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          0,
+          2,
+          4,
+          6
+        ],
+        [
+          0,
+          7
+        ],
+        [
+          0,
+          2,
+          5,
+          7
+        ],
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      ],
+      "probes": [
+        {
+          "element_index": 1,
+          "cost": 1
+        },
+        {
+          "element_index": 2,
+          "cost": 1
+        },
+        {
+          "element_index": 3,
+          "cost": 1
+        },
+        {
+          "element_index": 4,
+          "cost": 2
+        },
+        {
+          "element_index": 5,
+          "cost": 2
+        },
+        {
+          "element_index": 6,
+          "cost": 2
+        },
+        {
+          "element_index": 7,
+          "cost": 2
+        }
+      ],
+      "expected": {
+        "subgroup_count": 10,
+        "full_scan_cost": 11,
+        "adaptive_worst_case_cost": 9,
+        "exact_static_basis_cost": 10,
+        "greedy_worst_case_cost": 9,
+        "adaptive_reduction_ratio": 1.2222222222222223
+      }
+    }
+  ],
+  "global_controls": {
+    "malformed_product_index": "reject",
+    "non_associative_table": "reject",
+    "work_budget_exhaustion": "fail closed without partial subgroup catalogue",
+    "incomplete_probe_family": "return unresolved subgroup-pair frontier",
+    "unknown_membership_observation": "pause and retain the current candidate set",
+    "non_subgroup_preservation_pattern": "return model inconsistency, never snap to a nearest subgroup"
+  },
+  "benchmark_status": {
+    "group_tables_and_subgroup_lists": "independently enumerated in exact integer arithmetic",
+    "cost_vectors": "frozen and identical to subgroup active Rust fixture helper",
+    "adaptive_and_static_costs": "independent reference dynamic-programming and subset-enumeration calculations",
+    "pinned_rust_reproduction": "pending exact-head workflow",
+    "external_statistical_baselines": "not included in this exact finite membership lane",
+    "results": "fixture oracle references only; no general performance claim"
+  }
+}
