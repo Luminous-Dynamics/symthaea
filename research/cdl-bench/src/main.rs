@@ -545,6 +545,26 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     let high_precision: Vec<f64> = (0..count)
         .map(|i| 1.0 + (i as f64 * 997.0) / 1_000_000_000_000.0)
         .collect();
+    let plateau_steps: Vec<f64> = (0..count)
+        .map(|i| match (i / 256) % 6 {
+            0 | 1 => 0.0,
+            2 => 12.5,
+            3 => 12.5,
+            4 => -3.25,
+            _ => -3.25,
+        })
+        .collect();
+    let telemetry_idle: Vec<f64> = (0..count)
+        .map(|i| {
+            if (i / 2048) % 3 == 0 {
+                0.0
+            } else if i % 127 == 0 {
+                (i % 11) as f64 * 0.25
+            } else {
+                42.5
+            }
+        })
+        .collect();
     let random_bytes = generate_e0(
         E0Kind::Incompressible,
         count.checked_mul(8).ok_or("float byte length overflow")?,
@@ -561,6 +581,8 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
         ("smooth-ramp", smooth),
         ("oscillating", oscillating),
         ("high-precision", high_precision),
+        ("plateau-steps", plateau_steps),
+        ("telemetry-idle-runs", telemetry_idle),
         ("random-bit-pattern", random_bits),
     ];
 
@@ -583,6 +605,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
             Float64Transform::Raw,
             Float64Transform::XorPrevious,
             Float64Transform::XorLeadingTrailing,
+            Float64Transform::RleXorPrevious,
         ] {
             for model in [ModelKind::Order0, ModelKind::Order1] {
                 let encode_started = Instant::now();
@@ -605,7 +628,8 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 let transform_name = match transform {
                     Float64Transform::Raw => "raw",
                     Float64Transform::XorPrevious => "xor_previous_varint",
-                    Float64Transform::XorLeadingTrailing => "xor_leading_trailing",
+                    Float64Transform::XorLeadingTrailing => "xor_leading_trailing_window",
+                    Float64Transform::RleXorPrevious => "rle_xor_previous",
                 };
                 println!(
                     "{name},single,{transform_name},{model_name},NA,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
@@ -633,7 +657,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 format!("{:.6}", frame.len() as f64 / raw.len() as f64)
             };
             println!(
-                "{name},segment_portfolio,best_of_six,best_of_six,{segment_size},{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
+                "{name},segment_portfolio,best_of_eight,best_of_eight,{segment_size},{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
                 raw.len(),
                 frame.len()
             );
@@ -656,7 +680,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 format!("{:.6}", online_frame.len() as f64 / raw.len() as f64)
             };
             println!(
-                "{name},online_historical_cost,past_segment_mean,best_of_six,{segment_size},{},{},{zstd},{online_ratio},{online_encode_ns},{online_decode_ns},exact",
+                "{name},online_historical_cost,past_segment_mean,best_of_eight,{segment_size},{},{},{zstd},{online_ratio},{online_encode_ns},{online_decode_ns},exact",
                 raw.len(),
                 online_frame.len()
             );
@@ -664,10 +688,10 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     }
 
     println!("# note=random-bit-pattern includes arbitrary IEEE-754 payloads, including NaNs, infinities and subnormals");
-    println!("# note=XOR-previous varint and reusable XOR-leading/trailing windows are simple reversible reference transforms, not Gorilla, Chimp or DeXOR");
-    println!("# note=segment_portfolio is an offline best-of-six per-chunk size oracle; every child header plus the outer F64S header is counted");
+    println!("# note=raw, XOR-varint, reusable XOR-window and RLE+XOR are simple reversible reference transforms, not Gorilla, Chimp, ACTF or DeXOR");
+    println!("# note=segment_portfolio is an offline best-of-eight per-chunk size oracle; every child header plus the outer F64S header is counted");
     println!("# note=segment_portfolio is not an online selector or a WZS reproduction");
-    println!("# note=online_historical_cost chooses each chunk using only prior chunks; after each chunk both sides recompute all six candidate sizes to update shared policy state");
+    println!("# note=online_historical_cost chooses each chunk using only prior chunks; after each chunk both sides recompute all eight candidate sizes to update shared policy state");
     println!("# note=online_historical_cost uses the chosen transform/model ID in the child F64C header and rejects policy-mismatched children");
     println!("# note=online_historical_cost is compute-heavy diagnostic adaptation, not a tuned practical selector");
     println!("# note=compare against DeXOR, Gorilla, Chimp, ACTF, Rabbit and Dolphin only with matching data and framing");
