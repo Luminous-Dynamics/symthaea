@@ -5,7 +5,7 @@
 **Parent:** integrated bathing service #12660  
 **Product anchor:** AQS-1 #12717  
 **Qualification contract:** #12865 / draft PR #12867  
-**Comparator evidence:** `docs/research/aqua-evidence-corpus-v0.1.json` (20 entries / 120 source-classified claims at the current research snapshot)
+**Comparator evidence:** `docs/research/aqua-evidence-corpus-v0.1.json` (21 entries / 132 source-classified claims at the current research snapshot)
 
 ## 1. The paradigm shift: choose the service architecture, not the showerhead
 
@@ -66,7 +66,37 @@ Consumer Reports' 2026 panel reports both claimed and measured model flow. Examp
 
 Aqua should capture actual instrumented values rather than treating catalogue flow as measured flow. Consumer Reports' comfort method is not interchangeable with EN 18021, UWL or WaterSense procedures.
 
-### 2.6 WaterSense numerical baseline — exceed the floor, not merely the label
+### 2.6 South African market benchmark — pressure compensation is the real gap
+
+CLASP's *South African ShowerHeads Testing Report* (October 2022; Herman Strauss / Jackstra Solutions) tested 19 anonymized showerheads selected using distributor sales data and house-brand retail selection. Omega Test House (Centurion) performed the measurements. The report says the laboratory held SANAS and ILAC accreditations for various plumbing-component methods and that tests complied with ISO/IEC 17025; it does not establish that every reported method was within a specific accredited scope. The stated instrument uncertainties were 0.3% of reading for the flow meter and 2.9% for the pressure transmitter, each at 95% confidence.
+
+The test ramp was approximately 250–550 kPa. Its summary interpolated flow at 250, 300 and 500 kPa and rounded values to the nearest 1 L/min. At 300 kPa the selected sample averages were:
+- 25 L/min for fixed-orifice flow profiles;
+- 7 L/min for pressure-compensating flow profiles;
+- 10.9 L/min for products marketed as water-saving;
+- 8.0 L/min for the high-price category.
+
+The report classified 58% of the selected showerhead profiles as fixed-orifice and 42% as pressure-compensating. It explicitly states that category sample sizes were limited and that larger samples are needed before asserting statistically significant trends by price. The identities of brands/models were obscured, so this is a local market/technology benchmark—not an exact SKU competitor list.
+
+**The actionable result is not that all South African showers use 25 L/min.** It is that fixed-orifice products can vary sharply with pressure, while pressure-compensating designs in this selected sample averaged 7 L/min at 300 kPa. Flow restriction alone is not enough: the report describes poor low-pressure spray from fixed orifices and recommends pressure-compensating flow regulation to retain acceptable flow over a wider installation envelope.
+
+### 2.7 South African recommendations are not enacted requirements
+
+The 2022 CLASP report recommended that a future national showerhead standard:
+- consider measurements at least at 150 and 300 kPa;
+- consider a maximum flow of 10 L/min at 300 kPa;
+- evaluate a highest-preference future WELS band of 4.5–6 L/min, conditional on spray-performance requirements;
+- include spray force, spray coverage and pressure-compensating flow-regulator performance.
+
+These are research recommendations in a 2022 report, not proof that a national showerhead SANS or WELS scheme has been adopted. The report's test pressures, WaterSense's 140/310/550 kPa points, and Aqua's local low-head stress tests are different methods and must remain explicitly distinct.
+
+**Aqua's local competitive target:** a 4.5–5.5 L/min operating band at the declared 300 kPa reference is plausible as a design hypothesis, but it must be coupled to (a) pressure-compensated flow over a declared site envelope, (b) category-correct spray-force and coverage tests, (c) task-completion/comfort qualification, and (d) measured flow at 150 and 300 kPa. Compete on the service vector, not the nominal flow setting.
+
+Sources:
+- CLASP report PDF (October 2022): https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf
+- CLASP report summary: https://www.clasp.ngo/research/all/south-african-shower-heads-testing-report/
+
+### 2.8 WaterSense numerical baseline — exceed the floor, not merely the label
 
 EPA's WaterSense Version 1.1 showerhead specification includes method-specific minimum-flow requirements: at 20 psi, measured flow must be at least 60% of maximum rated flow; at 45 and 80 psi, at least 75%. It also requires at least 2.0 ounces of spray force at 20 psi and defines annular-ring spray-coverage limits (combined 2- and 4-inch rings no more than 75% of collected volume; combined 2-, 4- and 6-inch rings at least 25%).
 
@@ -315,6 +345,7 @@ Aqua's competitive advantage can be the ability to select and evidence the right
 - Hansgrohe South Africa SKU 28087000: https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28087000
 - EPA WaterSense showerheads: https://www.epa.gov/watersense/showerheads
 - Consumer Reports 2026 ratings: https://www.consumerreports.org/home-garden/showerheads/c33121/
+- CLASP South African ShowerHeads Testing Report (October 2022; 19 anonymized heads): https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf
 - KOHLER Anthem EvoCycle: https://www.kohler.com/en/products/showers/anthem-evocycle
 - KOHLER K-33481 specification: https://techcomm.kohler.com/techcomm/pdf/K-33481_spec_US-CA_Kohler_en.pdf
 - Orbital Shower: https://www.orbital-systems.com/products/orbital-shower
