@@ -98,7 +98,21 @@
         "calibration": "mar-calibration-v1",
         "validation": "mar-validation-v1",
         "final_holdout": "mar-holdout-v1"
-      }
+      },
+      "hypothesis_ids": [
+        "H-normal",
+        "H-overload"
+      ],
+      "probes": [
+        {
+          "probe_id": "strain-gauge",
+          "cost": 4
+        },
+        {
+          "probe_id": "thermal-camera",
+          "cost": 2
+        }
+      ]
     },
     {
       "case_id": "MNAR-HYPOTHESIS-STATE-001",
@@ -246,7 +260,9 @@
         "calibration": "shift-calibration-site-A-v1",
         "validation": "shift-validation-site-B-v1",
         "final_holdout": "shift-holdout-site-B-v1"
-      }
+      },
+      "validity_domain_id": "site-A-load-20-80-temp-10-40",
+      "expected_relationship": "dropout_calibration_is_valid_only_in_site_A_and_must_not_transfer_to_site_B_without_recalibration"
     }
   ],
   "preregistered_targets": {
