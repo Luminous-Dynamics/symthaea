@@ -8,7 +8,7 @@ on:
       - "research/symmetry-query-semantics-001/**"
       - ".github/workflows/symmetry-quotient-reference.yml"
   push:
-    branches: [main]
+    branches: [main, research/symm-quotient-finite-group-v0-1]
     paths:
       - "research/symmetry-quotient-001/**"
       - "research/symmetry-query-semantics-001/**"
