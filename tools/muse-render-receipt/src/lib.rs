@@ -1462,8 +1462,18 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
 
-        let source_bytes = br#"{"score":"source-fixture"}"#.to_vec();
-        let candidate_bytes = br#"{"score":"candidate-fixture"}"#.to_vec();
+        let source_velocity = 0.8_f32;
+        let edited_velocity = source_velocity * 8.0_f32 / 9.0_f32;
+        let source_json = format!(
+            r#"{{"key":"C major","tempo_bpm":120.0,"meter":4,"notes":[{{"part":1,"pitch":{{"midi":60}},"onset":{{"num":0,"den":1}},"duration":{{"num":1,"den":2}},"velocity":{},"role":"Melody","emphasis":"Normal","section_intensity":1.0}}],"total_beats":{{"num":1,"den":1}}}}"#,
+            serde_json::to_string(&source_velocity).unwrap()
+        );
+        let candidate_json = format!(
+            r#"{{"key":"C major","tempo_bpm":120.0,"meter":4,"notes":[{{"part":1,"pitch":{{"midi":60}},"onset":{{"num":0,"den":1}},"duration":{{"num":1,"den":2}},"velocity":{},"role":"Melody","emphasis":"Normal","section_intensity":1.0}}],"total_beats":{{"num":1,"den":1}}}}"#,
+            serde_json::to_string(&edited_velocity).unwrap()
+        );
+        let source_bytes = source_json.into_bytes();
+        let candidate_bytes = candidate_json.into_bytes();
         std::fs::write(root.join("source-score.json"), &source_bytes).unwrap();
         std::fs::write(root.join("candidate-score.json"), &candidate_bytes).unwrap();
         let source_sha = sha256_hex(&source_bytes);
@@ -1473,20 +1483,35 @@ mod tests {
             "schema":SCORE_EDIT_SCHEMA_V1,
             "input_digest_schema":SCORE_EDIT_INPUT_DIGEST_SCHEMA_V1,
             "input_score_sha256":source_sha.clone(),
-            "operations":[{"id":"op-1"}],
-            "protected_windows":[{"id":"keep-1"}]
+            "operations":[{
+                "id":"op-1","part_id":1,
+                "start":{"numerator":0,"denominator":1},
+                "end":{"numerator":1,"denominator":1},
+                "numerator":8,"denominator":9
+            }],
+            "protected_windows":[]
         })).unwrap();
         let edit_bytes = serde_json::to_vec(&json!({
             "schema":SCORE_EDIT_SCHEMA_V1,
             "input_digest_schema":SCORE_EDIT_INPUT_DIGEST_SCHEMA_V1,
-            "input_score_sha256":source_sha,
+            "input_score_sha256":source_sha.clone(),
             "operation_ids":["op-1"],
-            "protected_window_ids":["keep-1"],
-            "changes":[]
+            "protected_window_ids":[],
+            "changes":[{
+                "operation_id":"op-1","note_index":0,"part_id":1,
+                "before":source_velocity,"after":edited_velocity
+            }]
         })).unwrap();
         let verification_bytes = serde_json::to_vec(&json!({
+            "schema":"score-edit-verification-report-v1",
             "input_score_sha256":source_sha,
-            "verified":true
+            "candidate_note_count":1,
+            "authorized_note_count":1,
+            "changed_note_count":1,
+            "preserved_note_count":0,
+            "protected_note_count":0,
+            "verified":true,
+            "issues":[]
         })).unwrap();
         std::fs::write(root.join("edit-plan.json"), &plan_bytes).unwrap();
         std::fs::write(root.join("edit-receipt.json"), &edit_bytes).unwrap();
