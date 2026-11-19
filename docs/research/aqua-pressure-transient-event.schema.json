@@ -68,59 +68,6 @@
       "type": "integer",
       "minimum": 1
     },
-    "site_profile_id": {
-      "type": "string",
-      "minLength": 1
-    },
-    "site_profile_revision": {
-      "type": "integer",
-      "minimum": 1
-    },
-    "site_conditions_sha256": {
-      "$ref": "#/$defs/sha256"
-    },
-    "observation_window": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "start",
-        "end",
-        "coverage_statement"
-      ],
-      "properties": {
-        "start": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "end": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "coverage_statement": {
-          "type": "string",
-          "minLength": 1
-        },
-        "known_gaps": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "site_survey_receipt_sha256": {
-      "$ref": "#/$defs/sha256"
-    },
-    "generator_id": {
-      "type": "string",
-      "minLength": 1
-    },
-    "generator_sha256": {
-      "$ref": "#/$defs/sha256"
-    },
-    "generator_parameters_sha256": {
-      "$ref": "#/$defs/sha256"
-    },
     "command": {
       "type": "object",
       "additionalProperties": false,
@@ -154,21 +101,29 @@
           "type": "array",
           "minItems": 2,
           "items": {
-            "type": "array",
-            "prefixItems": [
-              {
-                "type": "number",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "offset_us",
+              "value"
+            ],
+            "properties": {
+              "offset_us": {
+                "type": "integer",
                 "minimum": 0
               },
-              {
-                "type": [
-                  "number",
-                  "boolean"
+              "value": {
+                "oneOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "boolean"
+                  }
                 ]
               }
-            ],
-            "minItems": 2,
-            "maxItems": 2
+            }
           }
         },
         "waveform_sha256": {
@@ -273,6 +228,83 @@
           "$ref": "#/$defs/sha256"
         }
       }
+    },
+    "site_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "site_profile_id",
+        "site_profile_revision",
+        "site_conditions_sha256",
+        "observation_window",
+        "survey_receipt_sha256"
+      ],
+      "properties": {
+        "site_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "site_profile_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "site_conditions_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "observation_window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "start",
+            "end",
+            "coverage_statement"
+          ],
+          "properties": {
+            "start": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "end": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "coverage_statement": {
+              "type": "string",
+              "minLength": 1
+            },
+            "known_gaps": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "survey_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "synthetic_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generator_id",
+        "generator_sha256",
+        "generator_parameters_sha256"
+      ],
+      "properties": {
+        "generator_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generator_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "generator_parameters_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
     }
   },
   "allOf": [
@@ -289,45 +321,8 @@
       },
       "then": {
         "required": [
-          "site_profile_id",
-          "site_profile_revision",
-          "site_conditions_sha256",
-          "observation_window",
-          "site_survey_receipt_sha256"
-        ]
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "profile_kind": {
-            "const": "synthetic"
-          }
-        },
-        "required": [
-          "profile_kind"
-        ]
-      },
-      "then": {
-        "required": [
-          "generator_id",
-          "generator_sha256",
-          "generator_parameters_sha256"
-        ]
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "profile_kind": {
-            "const": "site_observed"
-          }
-        },
-        "required": [
-          "profile_kind"
-        ]
-      },
-      "then": {
+          "site_observation"
+        ],
         "properties": {
           "raw_artifacts": {
             "contains": {
@@ -343,6 +338,23 @@
             }
           }
         }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "profile_kind": {
+            "const": "synthetic"
+          }
+        },
+        "required": [
+          "profile_kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "synthetic_profile"
+        ]
       }
     }
   ],
