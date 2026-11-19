@@ -57,8 +57,24 @@ struct CoverageRow {
     failed: usize,
     missing: usize,
     disposition: String,
+    analysis_mode: String,
     artifact_sha256s: String,
     notes: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct AxisInvarianceRow {
+    cohort: String,
+    style: String,
+    seed: u64,
+    axis: String,
+    declared_supported: Option<bool>,
+    expected_slices: usize,
+    complete_slices: usize,
+    identical_slices: usize,
+    changed_slices: usize,
+    unavailable_slices: usize,
+    disposition: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -89,6 +105,7 @@ struct Analysis {
     coverage: Vec<CoverageRow>,
     effects: Vec<EffectRow>,
     summaries: Vec<SummaryRow>,
+    axis_invariance: Vec<AxisInvarianceRow>,
     incomplete_blocks: usize,
 }
 
@@ -253,7 +270,14 @@ fn parse_records(input: &str) -> Result<Vec<InputRecord>, String> {
         *first = first.trim_start_matches('\u{feff}').to_string();
     }
 
-    let allowed = ["case_id", "metric", "status", "value", "artifact_sha256", "note"];
+    let allowed = [
+        "case_id",
+        "metric",
+        "status",
+        "value",
+        "artifact_sha256",
+        "note",
+    ];
     let required = ["case_id", "metric", "status", "value", "artifact_sha256"];
     let mut positions = HashMap::new();
     for (index, name) in header.iter().enumerate() {
@@ -352,6 +376,133 @@ fn parse_records(input: &str) -> Result<Vec<InputRecord>, String> {
     Ok(records)
 }
 
+fn support_axes_from_note(note: &str) -> Option<String> {
+    note.split(';')
+        .find_map(|part| part.strip_prefix("support_axes="))
+        .map(str::to_string)
+}
+
+fn axis_disposition(
+    declared_supported: Option<bool>,
+    complete_slices: usize,
+    identical_slices: usize,
+    changed_slices: usize,
+    unavailable_slices: usize,
+) -> &'static str {
+    if unavailable_slices > 0 || complete_slices != 27 {
+        return "incomplete";
+    }
+    match (declared_supported, changed_slices > 0) {
+        (Some(false), false) => "negative_control_pass",
+        (Some(false), true) => "unexpected_change",
+        (Some(true), true) => "response_observed",
+        (Some(true), false) => "flat_supported_axis",
+        (None, true) => "response_unclassified",
+        (None, false) if identical_slices == 27 => "invariant_unclassified",
+        (None, false) => "mixed_unclassified",
+    }
+}
+
+fn axis_invariance_report(
+    cases: &[Case],
+    digests_by_case: &HashMap<String, String>,
+    axes_by_block: &HashMap<(String, String, u64), String>,
+) -> Vec<AxisInvarianceRow> {
+    const AXES: [&str; 4] = ["valence", "arousal", "energy", "bars"];
+    let mut blocks: BTreeMap<(String, String, u64), Vec<&Case>> = BTreeMap::new();
+    for case in cases {
+        blocks
+            .entry((
+                case.cohort.as_str().to_string(),
+                case.style.clone(),
+                case.seed,
+            ))
+            .or_default()
+            .push(case);
+    }
+
+    let mut rows = Vec::with_capacity(blocks.len() * AXES.len());
+    for ((cohort, style, seed), block_cases) in blocks {
+        let block_key = (cohort.clone(), style.clone(), seed);
+        let declared_axes = axes_by_block.get(&block_key);
+        for (axis_index, axis) in AXES.iter().enumerate() {
+            let declared_supported =
+                declared_axes.map(|axes| axes.split('|').any(|candidate| candidate == *axis));
+            let mut complete_slices = 0usize;
+            let mut identical_slices = 0usize;
+            let mut changed_slices = 0usize;
+            let mut unavailable_slices = 0usize;
+
+            for first in 0_u8..3 {
+                for second in 0_u8..3 {
+                    for third in 0_u8..3 {
+                        let mut other_levels = [first, second, third].into_iter();
+                        let mut levels = [0_u8; 4];
+                        for (index, level) in levels.iter_mut().enumerate() {
+                            if index != axis_index {
+                                *level = other_levels.next().expect("three non-target factors");
+                            }
+                        }
+
+                        let mut slice_digests = Vec::with_capacity(3);
+                        for axis_level in 0_u8..3 {
+                            levels[axis_index] = axis_level;
+                            let cell = muse_factorial_audit::Cell {
+                                valence: levels[0],
+                                arousal: levels[1],
+                                energy: levels[2],
+                                bars: levels[3],
+                            };
+                            let digest = block_cases
+                                .iter()
+                                .find(|case| case.cell == cell)
+                                .and_then(|case| digests_by_case.get(&case.case_id));
+                            slice_digests.push(digest);
+                        }
+
+                        if slice_digests.iter().all(Option::is_some) {
+                            complete_slices += 1;
+                            let first_digest = slice_digests[0].expect("slice completeness checked");
+                            if slice_digests
+                                .iter()
+                                .all(|digest| digest.is_some_and(|value| value == first_digest))
+                            {
+                                identical_slices += 1;
+                            } else {
+                                changed_slices += 1;
+                            }
+                        } else {
+                            unavailable_slices += 1;
+                        }
+                    }
+                }
+            }
+
+            let disposition = axis_disposition(
+                declared_supported,
+                complete_slices,
+                identical_slices,
+                changed_slices,
+                unavailable_slices,
+            );
+            rows.push(AxisInvarianceRow {
+                cohort: cohort.clone(),
+                style: style.clone(),
+                seed,
+                axis: (*axis).to_string(),
+                declared_supported,
+                expected_slices: 27,
+                complete_slices,
+                identical_slices,
+                changed_slices,
+                unavailable_slices,
+                disposition: disposition.to_string(),
+            });
+        }
+    }
+    rows
+}
+
 fn disposition(
     expected: usize,
     observed: usize,
@@ -398,8 +549,14 @@ fn analyze(
         validate_metric(metric)?;
     }
 
+    let case_by_id: HashMap<&str, &Case> = cases
+        .iter()
+        .map(|case| (case.case_id.as_str(), case))
+        .collect();
     let mut by_case_metric: HashMap<(String, String), &InputRecord> =
         HashMap::with_capacity(records.len());
+    let mut digests_by_case: HashMap<String, String> = HashMap::new();
+    let mut axes_by_block: HashMap<(String, String, u64), String> = HashMap::new();
     for record in records {
         if !expected_case_ids.contains(&record.case_id) {
             return Err(format!("unexpected case_id {:?}", record.case_id));
@@ -413,6 +570,45 @@ fn analyze(
                 "duplicate observation for case {:?}, metric {:?}",
                 record.case_id, record.metric
             ));
+        }
+
+        if !record.artifact_sha256.is_empty() {
+            match digests_by_case.entry(record.case_id.clone()) {
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    entry.insert(record.artifact_sha256.clone());
+                }
+                std::collections::hash_map::Entry::Occupied(entry)
+                    if entry.get() != &record.artifact_sha256 =>
+                {
+                    return Err(format!(
+                        "artifact SHA-256 mismatch across metrics for case {:?}",
+                        record.case_id
+                    ));
+                }
+                std::collections::hash_map::Entry::Occupied(_) => {}
+            }
+        }
+
+        if let Some(case) = case_by_id.get(record.case_id.as_str())
+            && let Some(axes) = support_axes_from_note(&record.note)
+        {
+            let block_key = (
+                case.cohort.as_str().to_string(),
+                case.style.clone(),
+                case.seed,
+            );
+            match axes_by_block.entry(block_key) {
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    entry.insert(axes);
+                }
+                std::collections::hash_map::Entry::Occupied(entry) if entry.get() != &axes => {
+                    return Err(format!(
+                        "declared support-axis metadata mismatch within case block {:?}",
+                        record.case_id
+                    ));
+                }
+                std::collections::hash_map::Entry::Occupied(_) => {}
+            }
         }
     }
 
@@ -490,16 +686,13 @@ fn analyze(
             }
         }
 
-        let status = disposition(
-            block_cases.len(),
-            observed,
-            not_applicable,
-            failed,
-            missing,
-        );
-        if status != "complete" {
+        let status = disposition(block_cases.len(), observed, not_applicable, failed, missing);
+        if status == "not_applicable" {
+            // Every expected case explicitly declared this metric unsupported;
+            // preserve the block in coverage without treating it as execution failure.
+        } else if status != "complete" {
             incomplete_blocks += 1;
-        } else {
+        } else if !metric.starts_with("identity_") {
             let first = block_cases[0];
             let estimates = estimate_block(
                 first.cohort,
@@ -539,6 +732,11 @@ fn analyze(
             failed,
             missing,
             disposition: status.to_string(),
+            analysis_mode: if metric.starts_with("identity_") {
+                "identity_only".to_string()
+            } else {
+                "effect_estimated".to_string()
+            },
             artifact_sha256s: artifact_sha256s.join(";"),
             notes: notes.join(" | "),
         });
@@ -566,10 +764,13 @@ fn analyze(
         }
     }
 
+    let axis_invariance = axis_invariance_report(cases, &digests_by_case, &axes_by_block);
+
     Ok(Analysis {
         coverage,
         effects,
         summaries,
+        axis_invariance,
         incomplete_blocks,
     })
 }
@@ -594,7 +795,7 @@ fn csv_record(fields: &[String]) -> String {
 
 fn coverage_csv(rows: &[CoverageRow]) -> String {
     let mut output = String::from(
-        "cohort,style,seed,metric,expected,observed,not_applicable,failed,missing,disposition,artifact_sha256s,notes\n",
+        "cohort,style,seed,metric,expected,observed,not_applicable,failed,missing,disposition,analysis_mode,artifact_sha256s,notes\n",
     );
     for row in rows {
         output.push_str(&csv_record(&[
@@ -608,6 +809,7 @@ fn coverage_csv(rows: &[CoverageRow]) -> String {
             row.failed.to_string(),
             row.missing.to_string(),
             row.disposition.clone(),
+            row.analysis_mode.clone(),
             row.artifact_sha256s.clone(),
             row.notes.clone(),
         ]));
@@ -615,9 +817,32 @@ fn coverage_csv(rows: &[CoverageRow]) -> String {
     output
 }
 
+fn axis_invariance_csv(rows: &[AxisInvarianceRow]) -> String {
+    let mut output = String::from(
+        "cohort,style,seed,axis,declared_supported,expected_slices,complete_slices,identical_slices,changed_slices,unavailable_slices,disposition\n",
+    );
+    for row in rows {
+        output.push_str(&csv_record(&[
+            row.cohort.clone(),
+            row.style.clone(),
+            row.seed.to_string(),
+            row.axis.clone(),
+            row.declared_supported
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+            row.expected_slices.to_string(),
+            row.complete_slices.to_string(),
+            row.identical_slices.to_string(),
+            row.changed_slices.to_string(),
+            row.unavailable_slices.to_string(),
+            row.disposition.clone(),
+        ]));
+    }
+    output
+}
+
 fn effects_csv(rows: &[EffectRow]) -> String {
-    let mut output =
-        String::from("cohort,style,seed,metric,term,order,estimate\n");
+    let mut output = String::from("cohort,style,seed,metric,term,order,estimate\n");
     for row in rows {
         output.push_str(&csv_record(&[
             row.cohort.clone(),
@@ -633,9 +858,8 @@ fn effects_csv(rows: &[EffectRow]) -> String {
 }
 
 fn summary_csv(rows: &[SummaryRow]) -> String {
-    let mut output = String::from(
-        "cohort,style,metric,term,order,seed_count,mean,sample_sd,minimum,maximum\n",
-    );
+    let mut output =
+        String::from("cohort,style,metric,term,order,seed_count,mean,sample_sd,minimum,maximum\n");
     for row in rows {
         output.push_str(&csv_record(&[
             row.cohort.clone(),
@@ -645,7 +869,9 @@ fn summary_csv(rows: &[SummaryRow]) -> String {
             row.order.to_string(),
             row.seed_count.to_string(),
             row.mean.to_string(),
-            row.sample_sd.map(|value| value.to_string()).unwrap_or_default(),
+            row.sample_sd
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
             row.minimum.to_string(),
             row.maximum.to_string(),
         ]));
@@ -655,9 +881,9 @@ fn summary_csv(rows: &[SummaryRow]) -> String {
 
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().skip(1).collect();
-    if args.len() != 6 {
+    if args.len() != 7 {
         return Err(
-            "usage: analyze-results <discovery|confirmation|both> <observations.csv> <metric[,metric...]> <coverage.csv> <effects.csv> <summary.csv>"
+            "usage: analyze-results <discovery|confirmation|both> <observations.csv> <metric[,metric...]> <coverage.csv> <effects.csv> <summary.csv> <axis-invariance.csv>"
                 .to_string(),
         );
     }
@@ -675,10 +901,10 @@ fn run() -> Result<(), String> {
         PathBuf::from(&args[3]),
         PathBuf::from(&args[4]),
         PathBuf::from(&args[5]),
+        PathBuf::from(&args[6]),
     ];
-    if output_paths[0] == output_paths[1]
-        || output_paths[0] == output_paths[2]
-        || output_paths[1] == output_paths[2]
+    let unique_outputs: HashSet<&PathBuf> = output_paths.iter().collect();
+    if unique_outputs.len() != output_paths.len()
         || output_paths.iter().any(|path| path == &input_path)
     {
         return Err("input and output paths must all be distinct".to_string());
@@ -699,20 +925,23 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("cannot write {}: {error}", output_paths[1].display()))?;
     fs::write(&output_paths[2], summary_csv(&analysis.summaries))
         .map_err(|error| format!("cannot write {}: {error}", output_paths[2].display()))?;
+    fs::write(&output_paths[3], axis_invariance_csv(&analysis.axis_invariance))
+        .map_err(|error| format!("cannot write {}: {error}", output_paths[3].display()))?;
 
     if analysis.incomplete_blocks > 0 {
         return Err(format!(
-            "wrote coverage/effect/summary reports, but {} of {} blocks are incomplete; only complete 81/81 observed blocks were analyzed",
+            "wrote all reports, but {} of {} blocks contain failed, missing, or mixed outcomes; only complete 81/81 observed blocks were effect-estimated",
             analysis.incomplete_blocks,
             analysis.coverage.len()
         ));
     }
 
     eprintln!(
-        "analyzed {} complete blocks; wrote {} per-seed contrast rows and {} cross-seed summary rows",
+        "audited {} expected blocks; wrote {} per-seed contrast rows, {} cross-seed summary rows, and {} axis-invariance rows",
         analysis.coverage.len(),
         analysis.effects.len(),
-        analysis.summaries.len()
+        analysis.summaries.len(),
+        analysis.axis_invariance.len()
     );
     Ok(())
 }
@@ -763,8 +992,9 @@ mod tests {
 
     #[test]
     fn parser_supports_quoted_commas_newlines_and_escaped_quotes() {
-        let parsed = parse_csv("a,b\r\n\"x,y\",\"line one\r\nline two\"\r\n\"say \"\"hi\"\"\",z\r\n")
-            .unwrap();
+        let parsed =
+            parse_csv("a,b\r\n\"x,y\",\"line one\r\nline two\"\r\n\"say \"\"hi\"\"\",z\r\n")
+                .unwrap();
         assert_eq!(parsed.len(), 3);
         assert_eq!(parsed[0], vec!["a", "b"]);
         assert_eq!(parsed[1], vec!["x,y", "line one\r\nline two"]);
@@ -810,6 +1040,39 @@ mod tests {
     }
 
     #[test]
+    fn identity_metrics_are_coverage_audited_but_never_effect_estimated() {
+        let (cases, mut records) = one_complete_block();
+        let identity_rows: Vec<InputRecord> = records
+            .iter()
+            .map(|record| {
+                let mut identity = record.clone();
+                identity.metric = "identity_fingerprint_word".to_string();
+                identity.value = Some(12_345.0);
+                identity
+            })
+            .collect();
+        records.extend(identity_rows);
+
+        let analysis = analyze(
+            &cases,
+            &["response".to_string(), "identity_fingerprint_word".to_string()],
+            &records,
+        )
+        .unwrap();
+        assert_eq!(analysis.incomplete_blocks, 0);
+        assert_eq!(analysis.coverage.len(), 2);
+        assert_eq!(analysis.effects.len(), 80);
+        assert_eq!(analysis.summaries.len(), 80);
+        let identity = analysis
+            .coverage
+            .iter()
+            .find(|row| row.metric == "identity_fingerprint_word")
+            .unwrap();
+        assert_eq!(identity.disposition, "complete");
+        assert_eq!(identity.analysis_mode, "identity_only");
+    }
+
+    #[test]
     fn not_applicable_is_not_zero_and_blocks_estimation() {
         let (cases, mut records) = one_complete_block();
         let index = records
@@ -829,6 +1092,23 @@ mod tests {
     }
 
     #[test]
+    fn fully_not_applicable_metric_is_explicit_but_not_an_execution_failure() {
+        let (cases, mut records) = one_complete_block();
+        for record in &mut records {
+            record.status = OutcomeStatus::NotApplicable;
+            record.value = None;
+            record.artifact_sha256.clear();
+            record.note = "metric not exposed by this grammar plan".to_string();
+        }
+        let analysis = analyze(&cases, &["response".to_string()], &records).unwrap();
+        assert_eq!(analysis.incomplete_blocks, 0);
+        assert_eq!(analysis.coverage[0].disposition, "not_applicable");
+        assert_eq!(analysis.coverage[0].not_applicable, 81);
+        assert!(analysis.effects.is_empty());
+        assert!(analysis.summaries.is_empty());
+    }
+
+    #[test]
     fn missing_and_failed_outcomes_remain_separate() {
         let (cases, mut records) = one_complete_block();
         records.pop();
@@ -845,7 +1125,11 @@ mod tests {
         let analysis = analyze(&cases, &["response".to_string()], &records).unwrap();
         assert_eq!(analysis.coverage[0].failed, 1);
         assert_eq!(analysis.coverage[0].missing, 0);
-        assert!(analysis.coverage[0].notes.contains("composer returned an error"));
+        assert!(
+            analysis.coverage[0]
+                .notes
+                .contains("composer returned an error")
+        );
         assert_eq!(analysis.effects.len(), 0);
     }
 
@@ -884,7 +1168,10 @@ mod tests {
             "DISCOVERY__Classical__s90210__v0a0e0b0",
             "b".repeat(64)
         );
-        assert_eq!(parse_records(&(header.to_string() + &good)).unwrap().len(), 1);
+        assert_eq!(
+            parse_records(&(header.to_string() + &good)).unwrap().len(),
+            1
+        );
 
         let bad_digest = format!(
             "{},response,observed,1.25,short,broken\n",
@@ -897,6 +1184,106 @@ mod tests {
             "DISCOVERY__Classical__s90210__v0a0e0b0"
         );
         assert!(parse_records(&(header.to_string() + &not_applicable_with_value)).is_err());
+    }
+
+    #[test]
+    fn exact_digests_confirm_supported_response_and_unsupported_invariance() {
+        let cases: Vec<Case> = generate_cases(Cohort::Discovery)
+            .into_iter()
+            .filter(|case| case.style == "Classical" && case.seed == DISCOVERY_SEEDS[0])
+            .collect();
+        let digests_by_case: HashMap<String, String> = cases
+            .iter()
+            .map(|case| {
+                (
+                    case.case_id.clone(),
+                    format!("{:064x}", case.cell.valence as u64 + 1),
+                )
+            })
+            .collect();
+        let axes_by_block = HashMap::from([(
+            (
+                "DISCOVERY".to_string(),
+                "Classical".to_string(),
+                DISCOVERY_SEEDS[0],
+            ),
+            "valence".to_string(),
+        )]);
+
+        let rows = axis_invariance_report(&cases, &digests_by_case, &axes_by_block);
+        assert_eq!(rows.len(), 4);
+        let valence = rows.iter().find(|row| row.axis == "valence").unwrap();
+        assert_eq!(valence.declared_supported, Some(true));
+        assert_eq!(valence.complete_slices, 27);
+        assert_eq!(valence.changed_slices, 27);
+        assert_eq!(valence.identical_slices, 0);
+        assert_eq!(valence.disposition, "response_observed");
+
+        let energy = rows.iter().find(|row| row.axis == "energy").unwrap();
+        assert_eq!(energy.declared_supported, Some(false));
+        assert_eq!(energy.complete_slices, 27);
+        assert_eq!(energy.changed_slices, 0);
+        assert_eq!(energy.identical_slices, 27);
+        assert_eq!(energy.disposition, "negative_control_pass");
+    }
+
+    #[test]
+    fn exact_invariance_audit_detects_unexpected_change_on_declared_dead_axis() {
+        let cases: Vec<Case> = generate_cases(Cohort::Discovery)
+            .into_iter()
+            .filter(|case| case.style == "Classical" && case.seed == DISCOVERY_SEEDS[0])
+            .collect();
+        let digests_by_case: HashMap<String, String> = cases
+            .iter()
+            .map(|case| {
+                (
+                    case.case_id.clone(),
+                    format!("{:064x}", case.cell.energy as u64 + 1),
+                )
+            })
+            .collect();
+        let axes_by_block = HashMap::from([(
+            (
+                "DISCOVERY".to_string(),
+                "Classical".to_string(),
+                DISCOVERY_SEEDS[0],
+            ),
+            "valence".to_string(),
+        )]);
+
+        let rows = axis_invariance_report(&cases, &digests_by_case, &axes_by_block);
+        let energy = rows.iter().find(|row| row.axis == "energy").unwrap();
+        assert_eq!(energy.declared_supported, Some(false));
+        assert_eq!(energy.complete_slices, 27);
+        assert_eq!(energy.changed_slices, 27);
+        assert_eq!(energy.identical_slices, 0);
+        assert_eq!(energy.disposition, "unexpected_change");
+    }
+
+    #[test]
+    fn axis_invariance_report_marks_missing_artifacts_incomplete() {
+        let cases: Vec<Case> = generate_cases(Cohort::Discovery)
+            .into_iter()
+            .filter(|case| case.style == "Classical" && case.seed == DISCOVERY_SEEDS[0])
+            .collect();
+        let mut digests_by_case: HashMap<String, String> = cases
+            .iter()
+            .map(|case| (case.case_id.clone(), "a".repeat(64)))
+            .collect();
+        digests_by_case.remove(&cases[0].case_id);
+        let axes_by_block = HashMap::from([(
+            (
+                "DISCOVERY".to_string(),
+                "Classical".to_string(),
+                DISCOVERY_SEEDS[0],
+            ),
+            "valence".to_string(),
+        )]);
+
+        let rows = axis_invariance_report(&cases, &digests_by_case, &axes_by_block);
+        let valence = rows.iter().find(|row| row.axis == "valence").unwrap();
+        assert!(valence.unavailable_slices > 0);
+        assert_eq!(valence.disposition, "incomplete");
     }
 
     #[test]
