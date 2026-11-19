@@ -465,6 +465,362 @@ fn string_array(v: &Value, field: &str, label: &str) -> Result<Vec<String>, Stri
         .ok_or_else(|| format!("{label}.{field} contains a non-string"))).collect()
 }
 
+#[derive(Debug, Clone, Copy)]
+struct EditBeat {
+    numerator: i128,
+    denominator: i128,
+}
+
+impl EditBeat {
+    fn parse(value: &Value, numerator_key: &str, denominator_key: &str, label: &str) -> Result<Self, String> {
+        let numerator = value.get(numerator_key).and_then(Value::as_i64)
+            .ok_or_else(|| format!("{label}.{numerator_key} must be a signed integer"))?;
+        let denominator = value.get(denominator_key).and_then(Value::as_i64)
+            .filter(|value| *value > 0)
+            .ok_or_else(|| format!("{label}.{denominator_key} must be a positive integer"))?;
+        if numerator < 0 || numerator > 1_000_000_000 || denominator > 1_000_000 {
+            return Err(format!("{label} rational is outside the score-edit v1 bounds"));
+        }
+        Ok(Self { numerator: i128::from(numerator), denominator: i128::from(denominator) })
+    }
+
+    fn checked_add(self, rhs: Self, label: &str) -> Result<Self, String> {
+        let left = self.numerator.checked_mul(rhs.denominator)
+            .ok_or_else(|| format!("{label} rational multiplication overflow"))?;
+        let right = rhs.numerator.checked_mul(self.denominator)
+            .ok_or_else(|| format!("{label} rational multiplication overflow"))?;
+        let numerator = left.checked_add(right)
+            .ok_or_else(|| format!("{label} rational addition overflow"))?;
+        let denominator = self.denominator.checked_mul(rhs.denominator)
+            .ok_or_else(|| format!("{label} rational denominator overflow"))?;
+        if denominator > 1_000_000 || numerator > 1_000_000_000 {
+            return Err(format!("{label} rational end exceeds score-edit v1 bounds"));
+        }
+        Ok(Self { numerator, denominator })
+    }
+
+    fn cmp(self, rhs: Self) -> std::cmp::Ordering {
+        (self.numerator * rhs.denominator).cmp(&(rhs.numerator * self.denominator))
+    }
+
+    fn intersects(self, end: Self, other_start: Self, other_end: Self) -> bool {
+        self.cmp(other_end) == std::cmp::Ordering::Less
+            && end.cmp(other_start) == std::cmp::Ordering::Greater
+    }
+
+    fn contained_by(self, end: Self, window_start: Self, window_end: Self) -> bool {
+        self.cmp(window_start) != std::cmp::Ordering::Less
+            && end.cmp(window_end) != std::cmp::Ordering::Greater
+    }
+}
+
+#[derive(Debug, Clone)]
+struct EditOperation {
+    id: String,
+    part_id: u16,
+    start: EditBeat,
+    end: EditBeat,
+    numerator: u16,
+    denominator: u16,
+}
+
+#[derive(Debug, Clone)]
+struct ProtectedEditWindow {
+    id: String,
+    part_id: u16,
+    start: EditBeat,
+    end: EditBeat,
+}
+
+fn json_u16(value: &Value, label: &str) -> Result<u16, String> {
+    let number = value.as_u64().ok_or_else(|| format!("{label} must be an unsigned integer"))?;
+    u16::try_from(number).map_err(|_| format!("{label} exceeds u16"))
+}
+
+fn remove_object_field(value: &Value, field: &str, label: &str) -> Result<Value, String> {
+    let mut object = value.as_object().cloned()
+        .ok_or_else(|| format!("{label} must be an object"))?;
+    object.remove(field);
+    Ok(Value::Object(object))
+}
+
+fn score_note_velocity(value: &Value, label: &str) -> Result<f32, String> {
+    let raw = value.get("velocity").and_then(Value::as_f64)
+        .ok_or_else(|| format!("{label}.velocity must be numeric"))?;
+    let velocity = raw as f32;
+    if !velocity.is_finite() || !(0.0..=1.0).contains(&velocity) {
+        return Err(format!("{label}.velocity must be finite and within [0, 1]"));
+    }
+    Ok(velocity)
+}
+
+fn parse_edit_operations(plan: &Value, source: &Value) -> Result<Vec<EditOperation>, String> {
+    let score_end = EditBeat::parse(
+        source.get("total_beats").ok_or("source Score total_beats missing")?,
+        "num", "den", "source.total_beats",
+    )?;
+    let values = plan.get("operations").and_then(Value::as_array)
+        .ok_or("edit plan.operations must be an array")?;
+    if values.is_empty() || values.len() > 128 {
+        return Err("score-edit v1 requires 1..=128 operations".into());
+    }
+
+    let mut operations = Vec::with_capacity(values.len());
+    let mut ids = std::collections::BTreeSet::new();
+    for value in values {
+        let id = string_field(value, "id", "edit operation")?.to_owned();
+        if id.trim().is_empty() || !ids.insert(id.clone()) {
+            return Err("edit operation IDs must be non-empty and unique".into());
+        }
+        let part_id = json_u16(value.get("part_id").ok_or("edit operation part_id missing")?, "operation.part_id")?;
+        if part_id == u16::MAX {
+            return Err("edit operation cannot target the unassigned PartId".into());
+        }
+        let numerator = json_u16(value.get("numerator").ok_or("operation numerator missing")?, "operation.numerator")?;
+        let denominator = json_u16(value.get("denominator").ok_or("operation denominator missing")?, "operation.denominator")?;
+        if numerator == 0 || denominator == 0 || numerator > 64 || denominator > 64 || numerator == denominator {
+            return Err("velocity scale must be non-identity and each component in 1..=64".into());
+        }
+        let start = EditBeat::parse(value.get("start").ok_or("operation start missing")?, "numerator", "denominator", "operation.start")?;
+        let end = EditBeat::parse(value.get("end").ok_or("operation end missing")?, "numerator", "denominator", "operation.end")?;
+        if start.cmp(end) != std::cmp::Ordering::Less || end.cmp(score_end) == std::cmp::Ordering::Greater {
+            return Err("edit operation window must be non-empty and within the source score".into());
+        }
+        operations.push(EditOperation { id, part_id, start, end, numerator, denominator });
+    }
+    for (index, left) in operations.iter().enumerate() {
+        for right in operations.iter().skip(index + 1) {
+            if left.part_id == right.part_id && left.start.intersects(left.end, right.start, right.end) {
+                return Err("overlapping velocity operations on the same PartId are forbidden".into());
+            }
+        }
+    }
+    Ok(operations)
+}
+
+fn parse_protected_windows(plan: &Value, source: &Value) -> Result<Vec<ProtectedEditWindow>, String> {
+    let score_end = EditBeat::parse(
+        source.get("total_beats").ok_or("source Score total_beats missing")?,
+        "num", "den", "source.total_beats",
+    )?;
+    let values = plan.get("protected_windows").and_then(Value::as_array)
+        .ok_or("edit plan.protected_windows must be an array")?;
+    if values.len() > 512 {
+        return Err("score-edit v1 supports at most 512 protected windows".into());
+    }
+    let notes = source.get("notes").and_then(Value::as_array).ok_or("source Score notes missing")?;
+    let known_parts: std::collections::BTreeSet<u16> = notes.iter()
+        .filter_map(|note| note.get("part").and_then(Value::as_u64))
+        .filter_map(|part| u16::try_from(part).ok())
+        .filter(|part| *part != u16::MAX)
+        .collect();
+
+    let mut windows = Vec::with_capacity(values.len());
+    let mut ids = std::collections::BTreeSet::new();
+    for value in values {
+        let id = string_field(value, "id", "protected window")?.to_owned();
+        if id.trim().is_empty() || !ids.insert(id.clone()) {
+            return Err("protected-window IDs must be non-empty and unique".into());
+        }
+        let part_id = json_u16(value.get("part_id").ok_or("protected window part_id missing")?, "protected.part_id")?;
+        if part_id == u16::MAX || !known_parts.contains(&part_id) {
+            return Err("protected window must reference an assigned source PartId".into());
+        }
+        let start = EditBeat::parse(value.get("start").ok_or("protected start missing")?, "numerator", "denominator", "protected.start")?;
+        let end = EditBeat::parse(value.get("end").ok_or("protected end missing")?, "numerator", "denominator", "protected.end")?;
+        if start.cmp(end) != std::cmp::Ordering::Less || end.cmp(score_end) == std::cmp::Ordering::Greater {
+            return Err("protected window must be non-empty and within the source score".into());
+        }
+        windows.push(ProtectedEditWindow { id, part_id, start, end });
+    }
+    Ok(windows)
+}
+
+fn parse_source_note_time(note: &Value, index: usize) -> Result<(u16, EditBeat, EditBeat), String> {
+    let label = format!("source.notes[{index}]");
+    let part_id = json_u16(note.get("part").ok_or_else(|| format!("{label}.part missing"))?, &format!("{label}.part"))?;
+    if part_id == u16::MAX {
+        return Err(format!("{label} has an unassigned PartId"));
+    }
+    let onset = EditBeat::parse(note.get("onset").ok_or_else(|| format!("{label}.onset missing"))?, "num", "den", &format!("{label}.onset"))?;
+    let duration = EditBeat::parse(note.get("duration").ok_or_else(|| format!("{label}.duration missing"))?, "num", "den", &format!("{label}.duration"))?;
+    let end = onset.checked_add(duration, &label)?;
+    Ok((part_id, onset, end))
+}
+
+fn verify_score_edit_semantics(
+    source: &Value,
+    candidate: &Value,
+    plan: &Value,
+    edit_receipt: &Value,
+    verification: &Value,
+    source_score_sha256: &str,
+    candidate_score_sha256: &str,
+) -> Result<(), String> {
+    if !valid_sha256(source_score_sha256) || !valid_sha256(candidate_score_sha256) {
+        return Err("source or candidate Score digest is invalid".into());
+    }
+    if string_field(plan, "schema", "edit plan")? != SCORE_EDIT_SCHEMA_V1
+        || string_field(plan, "input_digest_schema", "edit plan")? != SCORE_EDIT_INPUT_DIGEST_SCHEMA_V1
+        || string_field(plan, "input_score_sha256", "edit plan")? != source_score_sha256
+        || string_field(edit_receipt, "schema", "edit receipt")? != SCORE_EDIT_SCHEMA_V1
+        || string_field(edit_receipt, "input_digest_schema", "edit receipt")? != SCORE_EDIT_INPUT_DIGEST_SCHEMA_V1
+        || string_field(edit_receipt, "input_score_sha256", "edit receipt")? != source_score_sha256
+    {
+        return Err("edit plan/receipt must use the supported schema and exact source Score digest".into());
+    }
+
+    if remove_object_field(source, "notes", "source Score")?
+        != remove_object_field(candidate, "notes", "candidate Score")?
+    {
+        return Err("velocity-only edit changed Score metadata outside notes".into());
+    }
+    let source_notes = source.get("notes").and_then(Value::as_array)
+        .ok_or("source Score notes must be an array")?;
+    let candidate_notes = candidate.get("notes").and_then(Value::as_array)
+        .ok_or("candidate Score notes must be an array")?;
+    if source_notes.is_empty() || source_notes.len() != candidate_notes.len() {
+        return Err("velocity-only edit requires a non-empty, order-preserving note array".into());
+    }
+    let operations = parse_edit_operations(plan, source)?;
+    let protected = parse_protected_windows(plan, source)?;
+    let known_parts: std::collections::BTreeSet<u16> = source_notes.iter().enumerate()
+        .map(|(index, note)| parse_source_note_time(note, index).map(|x| x.0))
+        .collect::<Result<_, _>>()?;
+    if known_parts.is_empty() {
+        return Err("source Score has no assigned PartIds".into());
+    }
+    for operation in &operations {
+        if !known_parts.contains(&operation.part_id) {
+            return Err(format!("operation {} targets an unknown PartId", operation.id));
+        }
+        for window in &protected {
+            if operation.part_id == window.part_id
+                && operation.start.intersects(operation.end, window.start, window.end)
+            {
+                return Err(format!("operation {} overlaps protected window {}", operation.id, window.id));
+            }
+        }
+    }
+
+    let mut expected_changes: BTreeMap<usize, (String, u16, f32, f32)> = BTreeMap::new();
+    let mut selected_count_by_operation: BTreeMap<String, usize> = BTreeMap::new();
+    let mut protected_note_count = 0usize;
+    for (index, source_note) in source_notes.iter().enumerate() {
+        let (part_id, onset, end) = parse_source_note_time(source_note, index)?;
+        let before = score_note_velocity(source_note, &format!("source.notes[{index}]"))?;
+        let mut selected_operation: Option<&EditOperation> = None;
+        for operation in &operations {
+            if operation.part_id != part_id || !onset.intersects(end, operation.start, operation.end) {
+                continue;
+            }
+            if !onset.contained_by(end, operation.start, operation.end) {
+                return Err(format!("source note {index} crosses operation {} boundary", operation.id));
+            }
+            if selected_operation.is_some() {
+                return Err(format!("source note {index} is selected by more than one operation"));
+            }
+            selected_operation = Some(operation);
+        }
+        for window in &protected {
+            if part_id == window.part_id && onset.intersects(end, window.start, window.end) {
+                protected_note_count += 1;
+            }
+        }
+        if let Some(operation) = selected_operation {
+            *selected_count_by_operation.entry(operation.id.clone()).or_insert(0) += 1;
+            let after = before * f32::from(operation.numerator) / f32::from(operation.denominator);
+            if !after.is_finite() || !(0.0..=1.0).contains(&after) {
+                return Err(format!("operation {} creates an invalid velocity on note {index}", operation.id));
+            }
+            if after != before {
+                expected_changes.insert(index, (operation.id.clone(), part_id, before, after));
+            }
+        }
+    }
+    if selected_count_by_operation.values().sum::<usize>() == 0 {
+        return Err("edit plan selects no source notes".into());
+    }
+    for operation in &operations {
+        if selected_count_by_operation.get(&operation.id).copied().unwrap_or(0) == 0 {
+            return Err(format!("operation {} selects no source notes", operation.id));
+        }
+        if !expected_changes.values().any(|change| change.0 == operation.id) {
+            return Err(format!("operation {} produces no effective velocity change", operation.id));
+        }
+    }
+
+    let operation_ids: Vec<String> = operations.iter().map(|operation| operation.id.clone()).collect();
+    let protected_ids: Vec<String> = protected.iter().map(|window| window.id.clone()).collect();
+    if string_array(edit_receipt, "operation_ids", "edit receipt")? != operation_ids
+        || string_array(edit_receipt, "protected_window_ids", "edit receipt")? != protected_ids
+    {
+        return Err("edit receipt operation/protected IDs do not exactly match the plan order".into());
+    }
+
+    let changes = edit_receipt.get("changes").and_then(Value::as_array)
+        .ok_or("edit receipt.changes must be an array")?;
+    if changes.len() != expected_changes.len() {
+        return Err("edit receipt change count does not match source-derived authorized changes".into());
+    }
+    for (change, (index, (operation_id, part_id, before, after))) in changes.iter().zip(expected_changes.iter()) {
+        let actual_index = change.get("note_index").and_then(Value::as_u64)
+            .and_then(|value| usize::try_from(value).ok())
+            .ok_or("edit receipt change.note_index must be an integer")?;
+        let actual_part = json_u16(change.get("part_id").ok_or("edit receipt change.part_id missing")?, "change.part_id")?;
+        let actual_before = change.get("before").and_then(Value::as_f64).ok_or("edit change.before must be numeric")? as f32;
+        let actual_after = change.get("after").and_then(Value::as_f64).ok_or("edit change.after must be numeric")? as f32;
+        if actual_index != *index || string_field(change, "operation_id", "edit change")? != operation_id
+            || actual_part != *part_id || actual_before != *before || actual_after != *after
+        {
+            return Err("edit receipt contains a missing, reordered, or incorrect velocity delta".into());
+        }
+    }
+
+    let mut changed_count = 0usize;
+    let mut preserved_count = 0usize;
+    for (index, (source_note, candidate_note)) in source_notes.iter().zip(candidate_notes.iter()).enumerate() {
+        let source_non_velocity = remove_object_field(source_note, "velocity", "source note")?;
+        let candidate_non_velocity = remove_object_field(candidate_note, "velocity", "candidate note")?;
+        if source_non_velocity != candidate_non_velocity {
+            return Err(format!("candidate note {index} mutated a non-velocity field"));
+        }
+        let before = score_note_velocity(source_note, &format!("source.notes[{index}]"))?;
+        let actual_after = score_note_velocity(candidate_note, &format!("candidate.notes[{index}]"))?;
+        let expected_after = expected_changes.get(&index).map(|change| change.3).unwrap_or(before);
+        if actual_after != expected_after {
+            return Err(format!("candidate note {index} velocity does not match independently recomputed edit result"));
+        }
+        if source_note != candidate_note {
+            changed_count += 1;
+        } else {
+            preserved_count += 1;
+        }
+    }
+    if changed_count != expected_changes.len() || changed_count + preserved_count != source_notes.len() {
+        return Err("candidate change/preservation counts do not match source-derived edit".into());
+    }
+
+    if string_field(verification, "schema", "edit verification")? != "score-edit-verification-report-v1"
+        || string_field(verification, "input_score_sha256", "edit verification")? != source_score_sha256
+        || verification.get("verified").and_then(Value::as_bool) != Some(true)
+        || verification.get("candidate_note_count").and_then(Value::as_u64) != Some(candidate_notes.len() as u64)
+        || verification.get("authorized_note_count").and_then(Value::as_u64) != Some(expected_changes.len() as u64)
+        || verification.get("changed_note_count").and_then(Value::as_u64) != Some(changed_count as u64)
+        || verification.get("preserved_note_count").and_then(Value::as_u64) != Some(preserved_count as u64)
+        || verification.get("protected_note_count").and_then(Value::as_u64) != Some(protected_note_count as u64)
+        || verification.get("issues").and_then(Value::as_array).is_none_or(|issues| !issues.is_empty())
+    {
+        return Err("independent score-edit verifier report does not match independently recomputed candidate evidence".into());
+    }
+    let actual_candidate_digest = sha256_hex(&serde_json::to_vec(candidate)
+        .map_err(|e| format!("candidate Score canonical serialization failed: {e}"))?);
+    if actual_candidate_digest != candidate_score_sha256 {
+        return Err("candidate Score serialization digest mismatch".into());
+    }
+    Ok(())
+}
+
 fn verify_edit_bundle(root: &Path, r: &ReceiptV1) -> Result<(), String> {
     let pp = root.join("edit-plan.json");
     let rp = root.join("edit-receipt.json");
@@ -496,6 +852,18 @@ fn verify_edit_bundle(root: &Path, r: &ReceiptV1) -> Result<(), String> {
         || op_ids != r.edit.authorized_operation_ids
         || window_ids != string_array(&edit, "protected_window_ids", "edit receipt")?
     { return Err("operation or protected-window IDs differ across the edit transaction".into()); }
+
+    let source_score = json_file(&root.join("source-score.json"), "source Score")?;
+    let candidate_score = json_file(&root.join("candidate-score.json"), "candidate Score")?;
+    verify_score_edit_semantics(
+        &source_score,
+        &candidate_score,
+        &plan,
+        &edit,
+        &verification,
+        &r.source.source_score_sha256,
+        &r.source.candidate_score_sha256,
+    )?;
     Ok(())
 }
 
