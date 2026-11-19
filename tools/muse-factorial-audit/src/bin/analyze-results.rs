@@ -63,6 +63,21 @@ struct CoverageRow {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+struct AxisInvarianceRow {
+    cohort: String,
+    style: String,
+    seed: u64,
+    axis: String,
+    declared_supported: Option<bool>,
+    expected_slices: usize,
+    complete_slices: usize,
+    identical_slices: usize,
+    changed_slices: usize,
+    unavailable_slices: usize,
+    disposition: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 struct EffectRow {
     cohort: String,
     style: String,
@@ -90,6 +105,7 @@ struct Analysis {
     coverage: Vec<CoverageRow>,
     effects: Vec<EffectRow>,
     summaries: Vec<SummaryRow>,
+    axis_invariance: Vec<AxisInvarianceRow>,
     incomplete_blocks: usize,
 }
 
@@ -358,6 +374,133 @@ fn parse_records(input: &str) -> Result<Vec<InputRecord>, String> {
         });
     }
     Ok(records)
+}
+
+fn support_axes_from_note(note: &str) -> Option<String> {
+    note.split(';')
+        .find_map(|part| part.strip_prefix("support_axes="))
+        .map(str::to_string)
+}
+
+fn axis_disposition(
+    declared_supported: Option<bool>,
+    complete_slices: usize,
+    identical_slices: usize,
+    changed_slices: usize,
+    unavailable_slices: usize,
+) -> &'static str {
+    if unavailable_slices > 0 || complete_slices != 27 {
+        return "incomplete";
+    }
+    match (declared_supported, changed_slices > 0) {
+        (Some(false), false) => "negative_control_pass",
+        (Some(false), true) => "unexpected_change",
+        (Some(true), true) => "response_observed",
+        (Some(true), false) => "flat_supported_axis",
+        (None, true) => "response_unclassified",
+        (None, false) if identical_slices == 27 => "invariant_unclassified",
+        (None, false) => "mixed_unclassified",
+    }
+}
+
+fn axis_invariance_report(
+    cases: &[Case],
+    digests_by_case: &HashMap<String, String>,
+    axes_by_block: &HashMap<(String, String, u64), String>,
+) -> Vec<AxisInvarianceRow> {
+    const AXES: [&str; 4] = ["valence", "arousal", "energy", "bars"];
+    let mut blocks: BTreeMap<(String, String, u64), Vec<&Case>> = BTreeMap::new();
+    for case in cases {
+        blocks
+            .entry((
+                case.cohort.as_str().to_string(),
+                case.style.clone(),
+                case.seed,
+            ))
+            .or_default()
+            .push(case);
+    }
+
+    let mut rows = Vec::with_capacity(blocks.len() * AXES.len());
+    for ((cohort, style, seed), block_cases) in blocks {
+        let block_key = (cohort.clone(), style.clone(), seed);
+        let declared_axes = axes_by_block.get(&block_key);
+        for (axis_index, axis) in AXES.iter().enumerate() {
+            let declared_supported =
+                declared_axes.map(|axes| axes.split('|').any(|candidate| candidate == *axis));
+            let mut complete_slices = 0usize;
+            let mut identical_slices = 0usize;
+            let mut changed_slices = 0usize;
+            let mut unavailable_slices = 0usize;
+
+            for first in 0_u8..3 {
+                for second in 0_u8..3 {
+                    for third in 0_u8..3 {
+                        let mut other_levels = [first, second, third].into_iter();
+                        let mut levels = [0_u8; 4];
+                        for (index, level) in levels.iter_mut().enumerate() {
+                            if index != axis_index {
+                                *level = other_levels.next().expect("three non-target factors");
+                            }
+                        }
+
+                        let mut slice_digests = Vec::with_capacity(3);
+                        for axis_level in 0_u8..3 {
+                            levels[axis_index] = axis_level;
+                            let cell = muse_factorial_audit::Cell {
+                                valence: levels[0],
+                                arousal: levels[1],
+                                energy: levels[2],
+                                bars: levels[3],
+                            };
+                            let digest = block_cases
+                                .iter()
+                                .find(|case| case.cell == cell)
+                                .and_then(|case| digests_by_case.get(&case.case_id));
+                            slice_digests.push(digest);
+                        }
+
+                        if slice_digests.iter().all(Option::is_some) {
+                            complete_slices += 1;
+                            let first_digest = slice_digests[0].expect("slice completeness checked");
+                            if slice_digests
+                                .iter()
+                                .all(|digest| digest.is_some_and(|value| value == first_digest))
+                            {
+                                identical_slices += 1;
+                            } else {
+                                changed_slices += 1;
+                            }
+                        } else {
+                            unavailable_slices += 1;
+                        }
+                    }
+                }
+            }
+
+            let disposition = axis_disposition(
+                declared_supported,
+                complete_slices,
+                identical_slices,
+                changed_slices,
+                unavailable_slices,
+            );
+            rows.push(AxisInvarianceRow {
+                cohort: cohort.clone(),
+                style: style.clone(),
+                seed,
+                axis: (*axis).to_string(),
+                declared_supported,
+                expected_slices: 27,
+                complete_slices,
+                identical_slices,
+                changed_slices,
+                unavailable_slices,
+                disposition: disposition.to_string(),
+            });
+        }
+    }
+    rows
 }
 
 fn disposition(
