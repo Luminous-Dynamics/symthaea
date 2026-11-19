@@ -37,13 +37,36 @@ pub struct Scope {
     pub objective: Objective,
 }
 
+/// SHA-256 digest of a canonical upstream provenance-root identity.
+/// A digest identifies a root; it does not itself authenticate its issuer.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct SourceRootDigest([u8; 32]);
+
+impl SourceRootDigest {
+    pub const UNKNOWN: Self = Self([0; 32]);
+
+    pub const fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
+    pub const fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+
+    pub fn is_known(self) -> bool {
+        self.0 != [0; 32]
+    }
+}
+
 // Candidate-visible experience. No future labels or evaluator-only utility fields.
 #[derive(Clone, Copy, Debug)]
 pub struct Experience {
     pub event_id: u32,
     pub source_family: u16,
-    /// Claimed upstream provenance root; zero means unknown and is inadmissible.
+    /// Legacy/display identifier; never used to establish source independence.
     pub source_root_id: u32,
+    /// Verified 256-bit identity of the canonical upstream root.
+    pub source_root_digest: SourceRootDigest,
     pub scope: Scope,
     pub action: Action,
     pub observed_utility: f64,
@@ -198,7 +221,7 @@ fn scope_aware_policy(memory: &[Experience], query: Query) -> Decision {
 
 pub fn is_qualified(item: &Experience, query: Query) -> bool {
     item.scope == query.scope
-        && item.source_root_id != 0
+        && item.source_root_digest.is_known()
         && item.observed_utility.is_finite()
         && (0.0..=1.0).contains(&item.observed_utility)
         && item.measurement_error_bound.is_finite()
@@ -215,7 +238,7 @@ pub fn is_qualified(item: &Experience, query: Query) -> bool {
 #[derive(Clone, Debug, Default)]
 struct QualifiedGroup {
     source_families: BTreeSet<u16>,
-    source_roots: BTreeSet<u32>,
+    source_root_digests: BTreeSet<SourceRootDigest>,
     source_events: BTreeSet<u32>,
     sum: f64,
     error_bound_sum: f64,
@@ -229,7 +252,7 @@ impl QualifiedGroup {
             return;
         }
         self.source_families.insert(item.source_family);
-        self.source_roots.insert(item.source_root_id);
+        self.source_root_digests.insert(item.source_root_digest);
         self.sum += item.observed_utility;
         self.error_bound_sum += item.measurement_error_bound;
         self.count += 1;
@@ -237,7 +260,7 @@ impl QualifiedGroup {
     }
 
     fn independent_support(&self) -> usize {
-        self.source_roots.len()
+        self.source_root_digests.len()
     }
 
     fn mean(&self) -> f64 {
@@ -307,7 +330,7 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
 /// separately by the invariant-transport policy.
 pub fn is_transfer_qualified(item: &Experience, query: Query) -> bool {
     item.scope.objective == query.scope.objective
-        && item.source_root_id != 0
+        && item.source_root_digest.is_known()
         && item.observed_utility.is_finite()
         && (0.0..=1.0).contains(&item.observed_utility)
         && item.measurement_error_bound.is_finite()
@@ -358,7 +381,7 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
             }
 
             if !source.source_families.is_disjoint(&target.source_families)
-                || !source.source_roots.is_disjoint(&target.source_roots)
+                || !source.source_root_digests.is_disjoint(&target.source_root_digests)
             {
                 return None;
             }
@@ -378,8 +401,8 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
                 .source_families
                 .extend(source.source_families.iter().copied());
             pooled
-                .source_roots
-                .extend(source.source_roots.iter().copied());
+                .source_root_digests
+                .extend(source.source_root_digests.iter().copied());
             pooled
                 .source_events
                 .extend(source.source_events.iter().copied());
@@ -427,6 +450,12 @@ fn active_probe_policy(memory: &[Experience], query: Query) -> Decision {
 mod tests {
     use super::*;
 
+    fn fixture_root_digest(seed: u32) -> SourceRootDigest {
+        let mut bytes = [0_u8; 32];
+        bytes[..4].copy_from_slice(&seed.to_be_bytes());
+        SourceRootDigest::from_bytes(bytes)
+    }
+
     fn sample(
         id: u32,
         family: u16,
@@ -438,6 +467,7 @@ mod tests {
             event_id: id,
             source_family: family,
             source_root_id: u32::from(family),
+            source_root_digest: fixture_root_digest(u32::from(family)),
             scope,
             action,
             observed_utility: utility,
@@ -657,6 +687,8 @@ mod tests {
         let mut a2 = sample(21, 11, Action::A, 0.99, scope);
         a1.source_root_id = 700;
         a2.source_root_id = 700;
+        a1.source_root_digest = fixture_root_digest(700);
+        a2.source_root_digest = fixture_root_digest(700);
         let b1 = sample(22, 20, Action::B, 0.65, scope);
         let b2 = sample(23, 21, Action::B, 0.68, scope);
         let memory = vec![a1, a2, b1, b2];
@@ -694,6 +726,7 @@ mod tests {
         };
         let mut item = sample(30, 10, Action::A, 0.9, scope);
         item.source_root_id = 0;
+        item.source_root_digest = SourceRootDigest::UNKNOWN;
         assert!(!is_qualified(&item, Query { scope }));
     }
 
@@ -709,6 +742,8 @@ mod tests {
         ];
         memory[4].source_root_id = 10;
         memory[5].source_root_id = 20;
+        memory[4].source_root_digest = fixture_root_digest(10);
+        memory[5].source_root_digest = fixture_root_digest(20);
         let query = Query {
             scope: Scope {
                 regime: Regime::Shifted,
