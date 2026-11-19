@@ -315,3 +315,22 @@ The Rust ground-truth oracle now enforces more than the abstract multiplication 
 - Matrix multiplication and point actions use checked (i128) arithmetic and fail closed on overflow; polynomial expansion already uses checked coefficients, powers and accumulation.
 
 These gates make the oracle a verifier of both abstract group structure and its declared representation/metric—not merely a group-table parser.
+
+## Dense-coordinate representation covariance (v0.3)
+
+The D4 action oracle now includes a positive covariance control, not only the previous negative control. For a dense unimodular coordinate change \(q=Sy\), the represented action is
+
+\[
+A_y=S^{-1}A_qS,\qquad G_y=S^TG_qS.
+\]
+
+A conjugated D4 matrix will generally fail the naive Euclidean condition \(A_y^TA_y=I\), but it remains a metric isometry under the correctly transformed metric:
+
+\[
+A_y^TG_yA_y=G_y.
+\]
+
+The frozen fixture `fixtures/v0.1/dense_coordinate_representation.json` pins \(S\), its exact inverse, \(G_y\), and all eight conjugated D4 matrices. The Rust oracle verifies both-sided inverse identities, the exact congruence, every transformed metric-isometry identity, and preservation of the complete multiplication table. Reusing the identity metric is retained as a negative control.
+
+This is the finite-group analogue of the Symtropy dense-coordinate RATTLE work. It prevents a coordinate representation from being rejected merely because the chart is non-orthogonal, while also preventing abstract group closure from being mistaken for a metric-preserving physical action. It is still a mathematical representation fixture, not evidence that a particular physical system has D4 symmetry.
+
