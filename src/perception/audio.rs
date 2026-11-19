@@ -168,6 +168,13 @@ impl AudioPerception {
             if Path::new(path).exists() {
                 let prototypes = symthaea_stt::TrainedPrototypes::load(path)
                     .context("Failed to load phoneme prototypes")?;
+                let expected = symthaea_stt::PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(
+                    projector.config().clone(),
+                );
+                prototypes
+                    .validate_encoder(&expected)
+                    .map_err(anyhow::Error::msg)
+                    .context("Prototype encoder is incompatible with batch audio perception")?;
                 decoder.load_prototypes(&prototypes.as_pairs());
                 has_prototypes = true;
             }
