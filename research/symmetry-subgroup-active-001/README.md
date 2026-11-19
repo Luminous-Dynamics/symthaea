@@ -32,11 +32,18 @@ These counts are checked against independent small-group tables. The D4 fixture 
 
 The D4 adversarial control declares {e, r, s} preserving and rejects r*s. Since that set is not a subgroup, the policy must terminate with an empty compatible frontier and explicit model inconsistency.
 
-## Cost metrics
+## Frozen active-versus-static cost cases
 
-The policy receipt reports the exact adaptive worst-case query cost. The static baseline is the exhaustive minimum-cost element-probe set when its subset budget permits. Full-scan cost is the sum of all admissible probe costs. These are design metrics, not measured physical experiment throughput.
+The executable regression fixes two different scales, rather than extrapolating one toy ratio to every group:
 
-The prospective target is at least 1.5x reduction against a full all-element scan on at least one nontrivial frozen group, while retaining 100% subgroup identification and zero false identifications. No broad speedup is claimed from these fixtures alone.
+| Group | Subgroups | Full scan cost | Exact adaptive worst-case cost | Exact static basis cost | Interpretation |
+|---|---:|---:|---:|---:|---|
+| C4 | 3 | 3 | 2 | 2 | 1.5× fewer worst-case cost units than full scan |
+| D4 | 10 | 11 | 9 | 10 | 1.22× fewer worst-case cost units than full scan; adaptive beats exact static by one unit |
+
+Probe costs are fixture inputs, not measured physical acquisition costs. The values must be reproduced by the pinned Rust test suite before they are treated as qualified. The D4 case is the more demanding lattice and prevents the C4 ratio from becoming a blanket claim.
+
+The prospective target is to achieve at least 1.5× on one nontrivial frozen case, while retaining 100% subgroup identification and zero false identifications. Report the full group/order/cost table, all probes and every unresolved pair; do not optimize only the headline ratio.
 
 ## Reproduction
 
