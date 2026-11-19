@@ -5,6 +5,7 @@ use cdl_bench::{
     predictor_state_bytes, BoundedPredictor, E0Kind, ModelKind, NumericTransform,
     ScmFieldPredictor, ScmHybridPredictor, ScmIntervention, ScmLagPredictor, ScmParentPredictor,
     ScmChangePointMixturePredictor, ScmExpertMixturePredictor, ScmShuffledParentPredictor,
+    compress_f64, decompress_f64, Float64Transform,
 };
 use std::error::Error;
 use std::fs;
@@ -23,9 +24,10 @@ fn usage() -> &'static str {
   cdl-bench e0 [--bytes N] [--seed N]
   cdl-bench causal [--steps N] [--seed N]
   cdl-bench numeric [--values N] [--seed N]
+  cdl-bench float [--values N] [--seed N]
   cdl-bench bounded [--values N] [--seed N] [--tolerance N]
 
-The E0, causal and numeric commands check exact round-trip integrity.
+The E0, causal, numeric and float commands check exact round-trip integrity.
 The bounded command uses a separate per-sample error guarantee."
 }
 
@@ -507,6 +509,108 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
 }
 
 
+fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut count = 10_000usize;
+    let mut seed = 0xf64cu64;
+    let mut index = 1;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--values" => {
+                count = parse_usize(args.get(index + 1), "--values")?;
+                index += 2;
+            }
+            "--seed" => {
+                seed = parse_u64(args.get(index + 1), "--seed")?;
+                index += 2;
+            }
+            other => return Err(format!("unknown float option: {other}\n{}", usage()).into()),
+        }
+    }
+    if count > 1_000_000 {
+        return Err("float generator limit is 1,000,000 values per sequence".into());
+    }
+
+    let constant = vec![42.5f64; count];
+    let smooth: Vec<f64> = (0..count)
+        .map(|i| (i as f64 - count as f64 / 2.0) * 0.125)
+        .collect();
+    let oscillating: Vec<f64> = (0..count)
+        .map(|i| {
+            let magnitude = 100.0 + (i % 103) as f64 * 0.125;
+            if i % 2 == 0 { magnitude } else { -magnitude }
+        })
+        .collect();
+    let high_precision: Vec<f64> = (0..count)
+        .map(|i| 1.0 + (i as f64 * 997.0) / 1_000_000_000_000.0)
+        .collect();
+    let random_bytes = generate_e0(
+        E0Kind::Incompressible,
+        count.checked_mul(8).ok_or("float byte length overflow")?,
+        seed,
+    );
+    let random_bits: Vec<f64> = random_bytes
+        .chunks_exact(8)
+        .map(|chunk| u64::from_le_bytes(chunk.try_into().expect("eight-byte chunk")))
+        .map(f64::from_bits)
+        .collect();
+
+    let sources = [
+        ("constant", constant),
+        ("smooth-ramp", smooth),
+        ("oscillating", oscillating),
+        ("high-precision", high_precision),
+        ("random-bit-pattern", random_bits),
+    ];
+
+    println!("# benchmark=CDL-Bench-float64-v1");
+    println!("# values={count}");
+    println!("# seed={seed}");
+    println!("# representation=IEEE-754-binary64 exact bit preservation");
+    println!("source,transform,model,raw_bytes,frame_bytes,zstd_raw_bytes,ratio,round_trip");
+
+    for (name, values) in sources {
+        let raw_len = values.len().checked_mul(8).ok_or("float raw length overflow")?;
+        let mut raw = Vec::with_capacity(raw_len);
+        for value in &values {
+            raw.extend_from_slice(&value.to_bits().to_le_bytes());
+        }
+        let zstd = external_compressed_len("zstd", &["-q", "-c"], &raw)
+            .map_or_else(|| "NA".to_owned(), |value| value.to_string());
+
+        for transform in [Float64Transform::Raw, Float64Transform::XorPrevious] {
+            for model in [ModelKind::Order0, ModelKind::Order1] {
+                let frame = compress_f64(&values, transform, model)?;
+                let decoded = decompress_f64(&frame, values.len())?;
+                let exact = values.len() == decoded.len()
+                    && values.iter().zip(&decoded).all(|(a, b)| a.to_bits() == b.to_bits());
+                if !exact {
+                    return Err(format!("f64 bitwise round-trip failure for {name}/{transform:?}/{model:?}").into());
+                }
+                let ratio = if raw.is_empty() {
+                    "n/a".to_owned()
+                } else {
+                    format!("{:.6}", frame.len() as f64 / raw.len() as f64)
+                };
+                let model_name = if model == ModelKind::Order0 { "order0" } else { "order1" };
+                let transform_name = match transform {
+                    Float64Transform::Raw => "raw",
+                    Float64Transform::XorPrevious => "xor_previous_varint",
+                };
+                println!(
+                    "{name},{transform_name},{model_name},{},{},{zstd},{ratio},exact",
+                    raw.len(),
+                    frame.len()
+                );
+            }
+        }
+    }
+
+    println!("# note=random-bit-pattern includes arbitrary IEEE-754 payloads, including NaNs, infinities and subnormals");
+    println!("# note=XOR-previous is a simple reversible reference transform, not Gorilla, Chimp or DeXOR");
+    println!("# note=compare against DeXOR, Gorilla, Chimp, ACTF, Rabbit and Dolphin only with matching data and framing");
+    Ok(())
+}
+
 fn numeric_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     let mut count = 10_000usize;
     let mut seed = 0x16_16u64;
@@ -717,6 +821,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("e0") => e0_command(&args),
         Some("causal") => causal_command(&args),
         Some("numeric") => numeric_command(&args),
+        Some("float") => float_command(&args),
         Some("bounded") => bounded_command(&args),
         _ => Err(usage().into()),
     }
