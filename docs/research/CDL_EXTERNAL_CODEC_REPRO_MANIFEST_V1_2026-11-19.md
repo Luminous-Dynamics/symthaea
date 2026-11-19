@@ -138,7 +138,7 @@ The DeXOR CSV workflow requires Java 8 and Maven. The TerseTS workflow requires 
 
 ## 5. Current execution status
 
-The repository and artifact inspection is complete. The helper passes `bash -n` and its unset-environment dry run correctly reports both external runs as skipped; the C gate passes a strict-warning syntax-only compile against the inspected API shape. The current environment has Java 21.0.12.1 but does not have Maven, Zig or Rust/cargo. Therefore:
+The repository and artifact inspection is complete. The helper passes `bash -n` and its unset-environment dry run correctly reports both external runs as skipped; the C gate passes `cc -std=c11 -O2 -Wall -Wextra -Werror -fsyntax-only` against the inspected API header shape. The current environment has Java 21.0.12.1 but does not have Maven, Zig or Rust/cargo. Therefore:
 - DeXOR has **not** been built or run.
 - TerseTS has **not** been built or run.
 - No external codec comparison numbers are claimed.
