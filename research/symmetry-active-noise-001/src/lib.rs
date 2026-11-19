@@ -2197,11 +2197,13 @@ mod tests {
                     probe_id: "p0".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
                 NoiseProbeV1 {
                     probe_id: "p1".to_owned(),
                     cost: 2,
                     admissible: true,
+                may_abstain: false
                 },
             ],
             allowed_outcomes_by_hypothesis: vec![
@@ -2221,11 +2223,13 @@ mod tests {
                     probe_id: "p-left".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
                 NoiseProbeV1 {
                     probe_id: "p-right".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
             ],
             error_state_ids: vec!["bias-low".to_owned(), "bias-high".to_owned()],
@@ -2283,11 +2287,13 @@ mod tests {
                     probe_id: "p0".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
                 NoiseProbeV1 {
                     probe_id: "p1".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
             ],
             error_state_ids: vec!["low".to_owned(), "high".to_owned()],
@@ -2338,11 +2344,13 @@ mod tests {
                         probe_id: "p0".to_owned(),
                         cost: 1,
                         admissible: true,
+                    may_abstain: false
                     },
                     NoiseProbeV1 {
                         probe_id: "p1".to_owned(),
                         cost: 1,
                         admissible: true,
+                    may_abstain: false
                     },
                 ],
                 error_state_ids: vec!["s0".to_owned(), "s1".to_owned()],
@@ -2454,6 +2462,7 @@ mod tests {
                     probe_id: "p0".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
             ],
             error_state_ids: vec!["low".to_owned(), "high".to_owned()],
@@ -2482,11 +2491,13 @@ mod tests {
                     probe_id: "p0".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
                 NoiseProbeV1 {
                     probe_id: "p1".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
             ],
             error_state_ids: vec!["low".to_owned(), "high".to_owned()],
@@ -2523,11 +2534,13 @@ mod tests {
                     probe_id: "p0".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
                 NoiseProbeV1 {
                     probe_id: "p1".to_owned(),
                     cost: 2,
                     admissible: true,
+                may_abstain: false
                 },
             ],
             nominal_predictions_by_hypothesis: vec![
@@ -2573,11 +2586,13 @@ mod tests {
                     probe_id: "p0".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
                 NoiseProbeV1 {
                     probe_id: "p1".to_owned(),
                     cost: 2,
                     admissible: true,
+                may_abstain: false
                 },
             ],
             nominal_predictions_by_hypothesis: vec![
@@ -2627,16 +2642,19 @@ mod tests {
                     probe_id: "p-overlap".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
                 NoiseProbeV1 {
                     probe_id: "p-separate-ab".to_owned(),
                     cost: 2,
                     admissible: true,
+                may_abstain: false
                 },
                 NoiseProbeV1 {
                     probe_id: "p-separate-ac".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
             ],
             predicted_intervals_by_hypothesis: vec![
@@ -2685,16 +2703,19 @@ mod tests {
                     probe_id: "p0".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
                 NoiseProbeV1 {
                     probe_id: "p1".to_owned(),
                     cost: 2,
                     admissible: true,
+                may_abstain: false
                 },
                 NoiseProbeV1 {
                     probe_id: "p2".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
             ],
             nominal_predictions_by_hypothesis: vec![vec![0, 0, 0], vec![0, 10, 0], vec![0, 0, 20]],
@@ -2800,6 +2821,7 @@ mod tests {
                 probe_id: "p0".to_owned(),
                 cost: 1,
                 admissible: true,
+            may_abstain: false
             }],
             predicted_intervals_by_hypothesis: vec![
                 vec![FixedIntervalV1::new(0, 1).unwrap()],
@@ -2817,6 +2839,7 @@ mod tests {
                 probe_id: "p0".to_owned(),
                 cost: 1,
                 admissible: true,
+            may_abstain: false
             }],
             nominal_predictions_by_hypothesis: vec![vec![0], vec![1]],
             global_bias_interval: FixedIntervalV1::new(-100, 100).unwrap(),
@@ -2831,6 +2854,7 @@ mod tests {
         let observations = vec![NoiseObservationV1 {
             probe_id: "p0".to_owned(),
             outcomes: vec![1],
+        abstained: false
         }];
         let receipt = replay_bounded_observations(&problem, &observations).unwrap();
         assert_eq!(
@@ -2847,10 +2871,12 @@ mod tests {
             NoiseObservationV1 {
                 probe_id: "p0".to_owned(),
                 outcomes: vec![1],
+            abstained: false
             },
             NoiseObservationV1 {
                 probe_id: "p0".to_owned(),
                 outcomes: vec![0],
+            abstained: false
             },
         ];
         let receipt = replay_bounded_observations(&problem, &observations).unwrap();
@@ -2869,10 +2895,12 @@ mod tests {
             NoiseObservationV1 {
                 probe_id: "p-left".to_owned(),
                 outcomes: vec![0],
+            abstained: false
             },
             NoiseObservationV1 {
                 probe_id: "p-right".to_owned(),
                 outcomes: vec![1],
+            abstained: false
             },
         ];
         let receipt = replay_persistent_observations(&problem, &observations).unwrap();
@@ -2898,10 +2926,12 @@ mod tests {
             NoiseObservationV1 {
                 probe_id: "p-left".to_owned(),
                 outcomes: vec![0],
+            abstained: false
             },
             NoiseObservationV1 {
                 probe_id: "p-left".to_owned(),
                 outcomes: vec![0],
+            abstained: false
             },
         ];
         let receipt = replay_persistent_observations(&problem, &observations).unwrap();
@@ -2922,6 +2952,7 @@ mod tests {
         let observation = NoiseObservationV1 {
             probe_id: "p0".to_owned(),
             outcomes: vec![1],
+        abstained: false
         };
         let noise_receipt =
             replay_bounded_observations(&bounded, std::slice::from_ref(&observation)).unwrap();
@@ -2955,6 +2986,7 @@ mod tests {
         let observations = vec![NoiseObservationV1 {
             probe_id: "p0".to_owned(),
             outcomes: vec![99],
+        abstained: false
         }];
         let receipt = replay_bounded_observations(&problem, &observations).unwrap();
         assert!(receipt.final_active_hypothesis_ids.is_empty());
@@ -2971,6 +3003,7 @@ mod tests {
                 &[NoiseObservationV1 {
                     probe_id: "p1".to_owned(),
                     outcomes: vec![0]
+                abstained: false
                 }]
             ),
             Err(NoiseErrorV1::InadmissibleProbe {
@@ -2983,6 +3016,7 @@ mod tests {
                 &[NoiseObservationV1 {
                     probe_id: "missing".to_owned(),
                     outcomes: vec![0]
+                abstained: false
                 }]
             ),
             Err(NoiseErrorV1::UnknownProbe {
@@ -3010,6 +3044,7 @@ mod tests {
                 &[NoiseObservationV1 {
                     probe_id: "p-left".to_owned(),
                     outcomes: vec![]
+                abstained: false
                 }]
             ),
             Err(NoiseErrorV1::EmptyObservedOutcomeSet {
@@ -3029,11 +3064,13 @@ mod tests {
                     probe_id: "p0".to_owned(),
                     cost: 2,
                     admissible: true,
+                may_abstain: false
                 },
                 NoiseProbeV1 {
                     probe_id: "p1".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
             ],
             predicted_intervals_by_hypothesis: vec![
@@ -3072,11 +3109,13 @@ mod tests {
                     probe_id: "p0".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
                 NoiseProbeV1 {
                     probe_id: "p1".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
             ],
             nominal_predictions_by_hypothesis: vec![
@@ -3131,11 +3170,13 @@ mod tests {
                         probe_id: "p0".to_owned(),
                         cost: 1,
                         admissible: true,
+                    may_abstain: false
                     },
                     NoiseProbeV1 {
                         probe_id: "p1".to_owned(),
                         cost: 2,
                         admissible: true,
+                    may_abstain: false
                     },
                 ],
                 nominal_predictions_by_hypothesis: nominal,
@@ -3180,11 +3221,13 @@ mod tests {
                     probe_id: "p0".to_owned(),
                     cost: 2,
                     admissible: true,
+                may_abstain: false
                 },
                 NoiseProbeV1 {
                     probe_id: "p1".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
             ],
             nominal_predictions_by_hypothesis: vec![vec![0, 0], vec![0, 10]],
@@ -3213,11 +3256,13 @@ mod tests {
                     probe_id: "p0".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
                 NoiseProbeV1 {
                     probe_id: "p1".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
             ],
             predicted_intervals_by_hypothesis: vec![
@@ -3235,10 +3280,12 @@ mod tests {
             IntervalObservationV1 {
                 probe_id: "p0".to_owned(),
                 observed: FixedIntervalV1::new(8, 9).unwrap(),
+            abstained: false
             },
             IntervalObservationV1 {
                 probe_id: "p1".to_owned(),
                 observed: FixedIntervalV1::new(24, 25).unwrap(),
+            abstained: false
             },
         ];
         let receipt = replay_bounded_intervals(&problem, &observations).unwrap();
@@ -3256,6 +3303,7 @@ mod tests {
                 probe_id: "p0".to_owned(),
                 cost: 1,
                 admissible: true,
+            may_abstain: false
             }],
             predicted_intervals_by_hypothesis: vec![vec![FixedIntervalV1::new(0, 10).unwrap()]],
         };
@@ -3263,10 +3311,12 @@ mod tests {
             IntervalObservationV1 {
                 probe_id: "p0".to_owned(),
                 observed: FixedIntervalV1::new(2, 4).unwrap(),
+            abstained: false
             },
             IntervalObservationV1 {
                 probe_id: "p0".to_owned(),
                 observed: FixedIntervalV1::new(6, 7).unwrap(),
+            abstained: false
             },
         ];
         let receipt = replay_bounded_intervals(&problem, &observations).unwrap();
@@ -3286,11 +3336,13 @@ mod tests {
                     probe_id: "p0".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
                 NoiseProbeV1 {
                     probe_id: "p1".to_owned(),
                     cost: 1,
                     admissible: true,
+                may_abstain: false
                 },
             ],
             nominal_predictions_by_hypothesis: vec![vec![0, 0], vec![0, 10]],
@@ -3300,10 +3352,12 @@ mod tests {
             IntervalObservationV1 {
                 probe_id: "p0".to_owned(),
                 observed: FixedIntervalV1::point(0),
+            abstained: false
             },
             IntervalObservationV1 {
                 probe_id: "p1".to_owned(),
                 observed: FixedIntervalV1::point(10),
+            abstained: false
             },
         ];
         let receipt = replay_shared_additive_bias(&problem, &observations).unwrap();
@@ -3333,6 +3387,7 @@ mod tests {
                 probe_id: "p0".to_owned(),
                 cost: 1,
                 admissible: true,
+            may_abstain: false
             }],
             nominal_predictions_by_hypothesis: vec![vec![0]],
             global_bias_interval: FixedIntervalV1::new(-10, 10).unwrap(),
@@ -3341,10 +3396,12 @@ mod tests {
             IntervalObservationV1 {
                 probe_id: "p0".to_owned(),
                 observed: FixedIntervalV1::point(1),
+            abstained: false
             },
             IntervalObservationV1 {
                 probe_id: "p0".to_owned(),
                 observed: FixedIntervalV1::point(2),
+            abstained: false
             },
         ];
         let receipt = replay_shared_additive_bias(&problem, &observations).unwrap();
@@ -3362,6 +3419,7 @@ mod tests {
                 probe_id: "p0".to_owned(),
                 cost: 1,
                 admissible: true,
+            may_abstain: false
             }],
             nominal_predictions_by_hypothesis: vec![vec![0]],
             global_bias_interval: FixedIntervalV1::new(0, 1).unwrap(),
@@ -3388,6 +3446,7 @@ mod tests {
                 probe_id: "p0".to_owned(),
                 cost: 1,
                 admissible: true,
+            may_abstain: false
             }],
             nominal_predictions_by_hypothesis: vec![vec![1]],
             global_bias_interval: FixedIntervalV1::new(i128::MIN, i128::MAX).unwrap(),
@@ -3395,6 +3454,7 @@ mod tests {
         let observations = vec![IntervalObservationV1 {
             probe_id: "p0".to_owned(),
             observed: FixedIntervalV1::new(i128::MIN, i128::MIN).unwrap(),
+        abstained: false
         }];
         assert_eq!(
             replay_shared_additive_bias(&problem, &observations),
@@ -3412,6 +3472,7 @@ mod tests {
                 probe_id: "non-identifying-probe".to_owned(),
                 cost: 1,
                 admissible: true,
+            may_abstain: false
             }],
             predicted_intervals_by_hypothesis: vec![
                 vec![FixedIntervalV1::new(3, 7).unwrap()],
@@ -3421,6 +3482,7 @@ mod tests {
         let observations = vec![IntervalObservationV1 {
             probe_id: "non-identifying-probe".to_owned(),
             observed: FixedIntervalV1::new(4, 6).unwrap(),
+        abstained: false
         }];
         let receipt = replay_bounded_intervals(&problem, &observations).unwrap();
         assert_eq!(
@@ -3435,6 +3497,7 @@ mod tests {
         let observations = vec![NoiseObservationV1 {
             probe_id: "p0".to_owned(),
             outcomes: vec![1],
+        abstained: false
         }];
         let receipt = replay_bounded_observations(&bounded, &observations).unwrap();
         verify_bounded_noise_receipt(&bounded, &observations, &receipt).unwrap();
@@ -3457,6 +3520,7 @@ mod tests {
         let persistent_observations = vec![NoiseObservationV1 {
             probe_id: "p-left".to_owned(),
             outcomes: vec![0],
+        abstained: false
         }];
         let persistent_receipt =
             replay_persistent_observations(&persistent, &persistent_observations).unwrap();
