@@ -87,13 +87,17 @@ fn raw_bits_bytes(values: &[f64]) -> Result<Vec<u8>, NumericError> {
 
 fn encode_transform(values: &[f64], transform: Float64Transform) -> Result<Vec<u8>, NumericError> {
     let capacity = match transform {
-        Float64Transform::Raw => values.len().checked_mul(8).ok_or(NumericError::LengthOverflow)?,
-        Float64Transform::XorPrevious | Float64Transform::XorLeadingTrailing => values
+        Float64Transform::Raw => values
+            .len()
+            .checked_mul(8)
+            .ok_or(NumericError::LengthOverflow)?,
+        _ => values
             .len()
             .checked_mul(MAX_TRANSFORMED_BYTES_PER_VALUE)
             .ok_or(NumericError::LengthOverflow)?,
     };
     let mut output = Vec::with_capacity(capacity);
+
     match transform {
         Float64Transform::Raw => {
             for value in values {
@@ -115,7 +119,7 @@ fn encode_transform(values: &[f64], transform: Float64Transform) -> Result<Vec<u
                 let current = value.to_bits();
                 let residual = current ^ previous;
                 if residual == 0 {
-                    output.push(0); // zero XOR residual
+                    output.push(0);
                 } else {
                     let actual_leading = residual.leading_zeros();
                     let actual_trailing = residual.trailing_zeros();
@@ -126,10 +130,10 @@ fn encode_transform(values: &[f64], transform: Float64Transform) -> Result<Vec<u
                         .unwrap_or(false);
 
                     let (leading, trailing) = if reuse {
-                        output.push(1); // reuse prior window
-                        window.expect("reuse requires an initialized window")
+                        output.push(1);
+                        window.ok_or(NumericError::LengthMismatch)?
                     } else {
-                        output.push(2); // define a new window
+                        output.push(2);
                         let next = (actual_leading, actual_trailing);
                         output.push(next.0 as u8);
                         output.push(next.1 as u8);
@@ -144,6 +148,9 @@ fn encode_transform(values: &[f64], transform: Float64Transform) -> Result<Vec<u
                         output.push((meaningful >> (byte * 8)) as u8);
                     }
                 }
+                previous = current;
+            }
+        }
         Float64Transform::RleXorPrevious => {
             let mut previous = 0u64;
             let mut index = 0usize;
@@ -161,10 +168,8 @@ fn encode_transform(values: &[f64], transform: Float64Transform) -> Result<Vec<u
                 index = end;
             }
         }
-                previous = current;
-            }
-        }
     }
+
     Ok(output)
 }
 
@@ -175,6 +180,7 @@ fn decode_transform(
 ) -> Result<Vec<f64>, NumericError> {
     let mut values = Vec::with_capacity(count);
     let mut cursor = 0usize;
+
     match transform {
         Float64Transform::Raw => {
             let expected = count.checked_mul(8).ok_or(NumericError::LengthOverflow)?;
@@ -233,6 +239,7 @@ fn decode_transform(
                         if end > bytes.len() {
                             return Err(NumericError::TruncatedVarint);
                         }
+
                         let mut meaningful = 0u64;
                         for byte in 0..payload_bytes {
                             meaningful |= (bytes[cursor + byte] as u64) << (byte * 8);
@@ -267,10 +274,15 @@ fn decode_transform(
                     }
                     other => return Err(NumericError::UnsupportedTransform(other)),
                 };
+
                 let current = previous ^ residual;
                 values.push(f64::from_bits(current));
                 previous = current;
             }
+            if cursor != bytes.len() {
+                return Err(NumericError::LengthMismatch);
+            }
+        }
         Float64Transform::RleXorPrevious => {
             let mut previous = 0u64;
             let mut has_previous_run = false;
@@ -283,11 +295,13 @@ fn decode_transform(
                 if run_length > remaining as u64 {
                     return Err(NumericError::NumericOverflow);
                 }
+
                 let residual = read_varint_u64(bytes, &mut cursor)?;
                 let current = previous ^ residual;
                 if has_previous_run && current == previous {
                     return Err(NumericError::NonCanonicalVarint);
                 }
+
                 for _ in 0..run_length {
                     values.push(f64::from_bits(current));
                 }
@@ -298,11 +312,8 @@ fn decode_transform(
                 return Err(NumericError::LengthMismatch);
             }
         }
-            if cursor != bytes.len() {
-                return Err(NumericError::LengthMismatch);
-            }
-        }
     }
+
     Ok(values)
 }
 
