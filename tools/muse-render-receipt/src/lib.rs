@@ -10,6 +10,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::Read;
 use std::path::Path;
 
 pub const RECEIPT_SCHEMA_V1: &str = "muse-render-execution-receipt-v1";
@@ -412,7 +413,17 @@ fn read(path: &Path, label: &str) -> Result<Vec<u8>, String> {
     fs::read(path).map_err(|e| format!("could not read {label} {}: {e}", path.display()))
 }
 fn check_file(path: &Path, expected: &str, label: &str) -> Result<(), String> {
-    let actual = sha256_hex(&read(path, label)?);
+    let mut file = fs::File::open(path)
+        .map_err(|e| format!("could not open {label} {}: {e}", path.display()))?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let count = file.read(&mut buffer)
+            .map_err(|e| format!("could not hash {label} {}: {e}", path.display()))?;
+        if count == 0 { break; }
+        hasher.update(&buffer[..count]);
+    }
+    let actual = format!("{:x}", hasher.finalize());
     if actual != expected { return Err(format!("{label} SHA-256 mismatch: expected {expected}, observed {actual}")); }
     Ok(())
 }
@@ -502,11 +513,16 @@ pub fn verify_midi_event_manifest(m: &MidiPerformanceManifestV1, bytes: &[u8]) -
         let index = usize::from(n.track_index);
         let t = track_map.get(&index).ok_or("note references unknown track")?;
         if !ordinals.insert(n.source_note_ordinal) || n.start_tick >= n.end_tick
+            || n.start_tick < t.segment_start_tick || n.end_tick > t.segment_end_tick
             || n.pitch_midi > 127 || !(1..=127).contains(&n.velocity_midi)
             || n.part_id != t.part_id || n.segment_id != t.segment_id || n.instrument_id != t.instrument_id
         { return Err("invalid or inconsistent MIDI note receipt".into()); }
         inc(&mut expected_on, OnKey { track:index, channel:t.midi_channel, pitch:n.pitch_midi, velocity:n.velocity_midi, tick:n.start_tick });
         inc(&mut expected_off, OffKey { track:index, channel:t.midi_channel, pitch:n.pitch_midi, tick:n.end_tick });
+    }
+
+    if track_map.len() != m.tracks.len() || (0..m.notes.len()).any(|ordinal| !ordinals.contains(&ordinal)) {
+        return Err("MIDI manifest track or source-note ordinal coverage is incomplete".into());
     }
 
     let mut actual_on = BTreeMap::new();
@@ -598,6 +614,9 @@ fn verify_midi_bundle(root: &Path, r: &ReceiptV1) -> Result<(), String> {
 
 fn verify_wav(root: &Path, r: &ReceiptV1) -> Result<(), String> {
     let path = root.join("output.wav");
+    let expected_bytes = r.audio.byte_length.ok_or("missing WAV byte length")?;
+    let actual_bytes = fs::metadata(&path).map_err(|e| format!("could not stat WAV: {e}"))?.len() as usize;
+    if actual_bytes != expected_bytes { return Err("WAV byte length does not match receipt".into()); }
     check_file(&path, r.audio.audio_sha256.as_deref().ok_or("missing audio SHA")?, "WAV")?;
     let mut reader = hound::WavReader::open(&path).map_err(|e| format!("WAV parse failed: {e}"))?;
     let spec = reader.spec();
