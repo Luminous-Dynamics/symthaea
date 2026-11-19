@@ -5,7 +5,8 @@ use cdl_bench::{
     predictor_state_bytes, BoundedPredictor, E0Kind, ModelKind, NumericTransform,
     ScmFieldPredictor, ScmHybridPredictor, ScmIntervention, ScmLagPredictor, ScmParentPredictor,
     ScmChangePointMixturePredictor, ScmExpertMixturePredictor, ScmShuffledParentPredictor,
-    compress_f64, decompress_f64, Float64Transform,
+    compress_f64, compress_f64_segmented, decompress_f64, decompress_f64_segmented,
+    Float64Transform,
 };
 use std::error::Error;
 use std::fs;
@@ -566,7 +567,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# values={count}");
     println!("# seed={seed}");
     println!("# representation=IEEE-754-binary64 exact bit preservation");
-    println!("source,transform,model,raw_bytes,frame_bytes,zstd_raw_bytes,ratio,encode_ns,decode_ns,round_trip");
+    println!("source,mode,transform,model,segment_size,raw_bytes,frame_bytes,zstd_raw_bytes,ratio,encode_ns,decode_ns,round_trip");
 
     for (name, values) in sources {
         let raw_len = values.len().checked_mul(8).ok_or("float raw length overflow")?;
@@ -601,16 +602,42 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                     Float64Transform::XorPrevious => "xor_previous_varint",
                 };
                 println!(
-                    "{name},{transform_name},{model_name},{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
+                    "{name},single,{transform_name},{model_name},NA,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
                     raw.len(),
                     frame.len()
                 );
             }
         }
+
+        for segment_size in [64usize, 256, 1024] {
+            let encode_started = Instant::now();
+            let frame = compress_f64_segmented(&values, segment_size)?;
+            let encode_ns = encode_started.elapsed().as_nanos();
+            let decode_started = Instant::now();
+            let decoded = decompress_f64_segmented(&frame, values.len())?;
+            let decode_ns = decode_started.elapsed().as_nanos();
+            let exact = values.len() == decoded.len()
+                && values.iter().zip(&decoded).all(|(a, b)| a.to_bits() == b.to_bits());
+            if !exact {
+                return Err(format!("segmented f64 bitwise round-trip failure for {name}/{segment_size}").into());
+            }
+            let ratio = if raw.is_empty() {
+                "n/a".to_owned()
+            } else {
+                format!("{:.6}", frame.len() as f64 / raw.len() as f64)
+            };
+            println!(
+                "{name},segment_portfolio,best_of_four,best_of_four,{segment_size},{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
+                raw.len(),
+                frame.len()
+            );
+        }
     }
 
     println!("# note=random-bit-pattern includes arbitrary IEEE-754 payloads, including NaNs, infinities and subnormals");
     println!("# note=XOR-previous is a simple reversible reference transform, not Gorilla, Chimp or DeXOR");
+    println!("# note=segment_portfolio is an offline best-of-four per-chunk size oracle; every child header plus the outer F64S header is counted");
+    println!("# note=segment_portfolio is not an online selector or a WZS reproduction");
     println!("# note=compare against DeXOR, Gorilla, Chimp, ACTF, Rabbit and Dolphin only with matching data and framing");
     Ok(())
 }
