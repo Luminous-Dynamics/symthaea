@@ -174,7 +174,7 @@ fn validate_dataset(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
     }
     if measurement_timestamps
         .iter()
-        .any(|timestamp| timestamp < pre_registered_at)
+        .any(|timestamp| timestamp.as_str() < pre_registered_at)
     {
         return Err("split registration must precede every observation acquisition".to_owned());
     }
