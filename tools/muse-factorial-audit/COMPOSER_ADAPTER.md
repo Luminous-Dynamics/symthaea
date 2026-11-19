@@ -19,13 +19,27 @@ Run the composer adapter from the repository root:
 
 The cohort selector is discovery, confirmation, or both. The adapter validates
 the manifest against the exact frozen style, seed, and 3^4 cell set before
-composing anything. The final argument is a required 40-hex source commit SHA. The adapter verifies
-that it equals the checked-out HEAD, refuses a dirty worktree, checks 13 pinned
-source/lockfile blob digests, and verifies that the entire music-theory source
-tree is unchanged from the preregistered composer reference. The pinned base
-commit must exist in local Git history. The SHA is retained in every result
-row. Put generated manifests and reports outside the source checkout (for
-example under /tmp) so they do not contaminate the next run.
+composing anything. The final argument is a required 40-hex source commit SHA.
+The adapter verifies that it equals the checked-out HEAD, refuses a dirty
+worktree, checks 13 pinned source/lockfile blob digests, and verifies that the
+entire music-theory source tree is unchanged from the preregistered composer
+reference. The SHA is retained in every result row.
+
+The full-tree diff requires the pinned reference commit to exist locally. A
+shallow checkout may contain all current files but omit the historical commit
+object, causing the adapter to fail before composition. Fetch the reference
+branch history before running:
+
+    if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+      git fetch --unshallow origin muse/style-genre-profile-v1
+    else
+      git fetch origin muse/style-genre-profile-v1
+    fi
+    git cat-file -e 'bd227d416878a4373eb87a53e182e7067a2411a5^{commit}'
+
+The adapter also checks the 13 pinned file blobs, so the fetch does not replace
+the exact source checks. Put generated manifests and reports outside the source
+checkout (for example under /tmp) so they do not contaminate the next run.
 
 Analyze the resulting observations. The metric registry must be explicit:
 
