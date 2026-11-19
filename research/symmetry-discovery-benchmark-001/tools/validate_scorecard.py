@@ -181,6 +181,10 @@ def validate_scorecard(
         raise ScorecardError("resource counters must be nonnegative")
 
     for metric in scorecard["metrics"]:
+        if metric["sample_count"] > metric["observation_count"]:
+            raise ScorecardError(
+                f"metric {metric['name']} has more independent samples than raw observations"
+            )
         interval = metric.get("interval")
         if interval is not None:
             if interval["lower"] > interval["upper"]:
@@ -191,8 +195,23 @@ def validate_scorecard(
                 )
             if interval["method"] != "none" and metric["sample_count"] == 0:
                 raise ScorecardError(
-                    f"metric {metric['name']} has an interval but zero samples"
+                    f"metric {metric['name']} has an interval but zero independent samples"
                 )
+            if interval["method"] != "none":
+                if interval["resampling_unit"] != metric["sampling_unit"]:
+                    raise ScorecardError(
+                        f"metric {metric['name']} interval resampling unit does not match its declared independent unit"
+                    )
+                if interval["method"] in {"wilson", "clopper_pearson"}:
+                    if metric["observation_count"] != metric["sample_count"]:
+                        raise ScorecardError(
+                            f"metric {metric['name']} uses a binomial interval on clustered/repeated observations"
+                        )
+                if interval["method"] in {"bootstrap_percentile", "bootstrap_bca"}:
+                    if metric["sample_count"] < 2:
+                        raise ScorecardError(
+                            f"metric {metric['name']} needs at least two independent units for bootstrap intervals"
+                        )
 
 
 def self_test(manifest: dict[str, Any], manifest_bytes: bytes, protocol_bytes: bytes, schema: dict[str, Any]) -> None:
@@ -251,7 +270,21 @@ def self_test(manifest: dict[str, Any], manifest_bytes: bytes, protocol_bytes: b
             "false_elimination": False,
             "verification_status": "passed",
         }],
-        "metrics": [],
+        "metrics": [{
+            "name": "structure-level exact accuracy",
+            "unit": "proportion",
+            "value": 0.95,
+            "sample_count": 30,
+            "sampling_unit": "structure",
+            "observation_count": 240,
+            "interval": {
+                "method": "bootstrap_bca",
+                "confidence_level": 0.95,
+                "lower": 0.80,
+                "upper": 1.0,
+                "resampling_unit": "structure",
+            },
+        }],
         "verification": {
             "false_exact_promotions": 0,
             "false_eliminations": 0,
@@ -300,6 +333,14 @@ def self_test(manifest: dict[str, Any], manifest_bytes: bytes, protocol_bytes: b
     unsafe_prune = json.loads(json.dumps(scorecard))
     unsafe_prune["verification"]["unverified_hard_prune_count"] = 1
     must_reject(unsafe_prune, "unverified hard prune")
+
+    wrong_resampling_unit = json.loads(json.dumps(scorecard))
+    wrong_resampling_unit["metrics"][0]["interval"]["resampling_unit"] = "candidate"
+    must_reject(wrong_resampling_unit, "cluster bootstrap resampled at candidate instead of structure")
+
+    pseudoreplicated_binomial = json.loads(json.dumps(scorecard))
+    pseudoreplicated_binomial["metrics"][0]["interval"]["method"] = "clopper_pearson"
+    must_reject(pseudoreplicated_binomial, "binomial confidence interval on repeated observations")
 
     print(
         "SYMM_Q_SCORECARD_SELF_TEST_PASS: complete split binding, unique cases, "
