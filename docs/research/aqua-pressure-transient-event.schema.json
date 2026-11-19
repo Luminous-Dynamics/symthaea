@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/aqua-pressure-transient-event.schema.json",
+  "$id": "urn:luminous-dynamics:aqua-pressure-transient-event:0.1.0",
   "title": "Luminous Aqua pressure transient event profile",
   "description": "Provenance-bound manifest for a site-observed or explicitly synthetic supply/demand event replay. A schema-valid manifest is not metrology admission or physical qualification.",
   "type": "object",
@@ -322,6 +322,9 @@
         "channel_id": {
           "type": "string",
           "minLength": 1
+        },
+        "quality_state": {
+          "enum": ["valid", "clipped", "saturated", "out_of_range", "unknown"]
         },
         "role": {
           "enum": [
