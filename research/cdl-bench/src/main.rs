@@ -592,7 +592,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# values={count}");
     println!("# seed={seed}");
     println!("# representation=IEEE-754-binary64 exact bit preservation");
-    println!("source,mode,transform,model,segment_size,probe_interval,probe_count,extra_candidate_encodes,oracle_gap_pct,raw_bytes,frame_bytes,zstd_raw_bytes,ratio,encode_ns,decode_ns,round_trip");
+    println!("source,mode,transform,model,segment_size,probe_interval,probe_count,encoder_extra_candidate_encodes,decoder_candidate_reencodes,oracle_gap_pct,raw_bytes,frame_bytes,zstd_raw_bytes,ratio,encode_ns,decode_ns,round_trip");
 
     for (name, values) in sources {
         let raw_len = values.len().checked_mul(8).ok_or("float raw length overflow")?;
@@ -634,7 +634,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                     Float64Transform::RleXorPrevious => "rle_xor_previous",
                 };
                 println!(
-                    "{name},single,{transform_name},{model_name},NA,NA,0,0,NA,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
+                    "{name},single,{transform_name},{model_name},NA,NA,0,0,0,NA,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
                     raw.len(),
                     frame.len()
                 );
@@ -648,7 +648,9 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 (values.len() - 1) / segment_size + 1
             };
             let full_probe_count = segment_count;
-            let full_extra_candidate_encodes = full_probe_count * 7;
+            let full_encoder_extra_encodes = full_probe_count * 7;
+            let offline_decoder_reencodes = full_probe_count * 8;
+            let historical_decoder_reencodes = full_probe_count * 7;
 
             let encode_started = Instant::now();
             let frame = compress_f64_segmented(&values, segment_size)?;
@@ -667,7 +669,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 format!("{:.6}", frame.len() as f64 / raw.len() as f64)
             };
             println!(
-                "{name},segment_portfolio,best_of_eight,best_of_eight,{segment_size},1,{full_probe_count},{full_extra_candidate_encodes},0.000000,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
+                "{name},segment_portfolio,best_of_eight,best_of_eight,{segment_size},1,{full_probe_count},{full_encoder_extra_encodes},{offline_decoder_reencodes},0.000000,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
                 raw.len(),
                 frame.len()
             );
@@ -700,7 +702,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 ).into());
             }
             println!(
-                "{name},online_historical_cost,past_segment_mean,best_of_eight,{segment_size},1,{full_probe_count},{full_extra_candidate_encodes},{online_oracle_gap_pct:.6},{},{},{zstd},{online_ratio},{online_encode_ns},{online_decode_ns},exact",
+                "{name},online_historical_cost,past_segment_mean,best_of_eight,{segment_size},1,{full_probe_count},{full_encoder_extra_encodes},{historical_decoder_reencodes},{online_oracle_gap_pct:.6},{},{},{zstd},{online_ratio},{online_encode_ns},{online_decode_ns},exact",
                 raw.len(),
                 online_frame.len()
             );
@@ -744,9 +746,10 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 } else {
                     (segment_count - 1) / probe_interval + 1
                 };
-                let extra_candidate_encodes = probe_count * 7;
+                let encoder_extra_candidate_encodes = probe_count * 7;
+                let decoder_candidate_reencodes = probe_count * 7;
                 println!(
-                    "{name},budgeted_sparse_probe,historical_probe,best_of_eight,{segment_size},{probe_interval},{probe_count},{extra_candidate_encodes},{oracle_gap_pct:.6},{},{},{zstd},{budgeted_ratio},{budgeted_encode_ns},{budgeted_decode_ns},exact",
+                    "{name},budgeted_sparse_probe,historical_probe,best_of_eight,{segment_size},{probe_interval},{probe_count},{encoder_extra_candidate_encodes},{decoder_candidate_reencodes},{oracle_gap_pct:.6},{},{},{zstd},{budgeted_ratio},{budgeted_encode_ns},{budgeted_decode_ns},exact",
                     raw.len(),
                     budgeted_frame.len()
                 );
@@ -758,13 +761,14 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# note=raw, XOR-varint, reusable XOR-window and RLE+XOR are simple reversible reference transforms, not Gorilla, Chimp, ACTF or DeXOR");
     println!("# note=segment_portfolio is an offline best-of-eight per-chunk size oracle; every child header plus the outer F64S header is counted");
     println!("# note=segment_portfolio is not an online selector or a WZS reproduction");
-    println!("# note=offline and full historical policies evaluate eight candidates per segment: one chosen child plus seven additional candidate encodes per side");
+    println!("# note=offline oracle: encoder performs seven extra candidate encodes per segment; decoder re-encodes all eight candidates to verify canonical minimality");
+    println!("# note=full historical: encoder performs seven extra candidate encodes per segment; decoder recomputes seven alternatives and reuses the selected child length");
     println!("# note=online_historical_cost chooses each chunk using only prior chunks and records the same 7-per-segment compute count");
     println!("# note=online_historical_cost uses the chosen transform/model ID in the child F64C header and rejects policy-mismatched children");
     println!("# note=online_historical_cost measures seven counterfactual candidates per chunk and reuses the selected child size");
     println!("# note=budgeted_sparse_probe compares candidates only on identical scheduled probe chunks; no incumbent-only updates occur between probes");
     println!("# note=budgeted_sparse_probe intervals are powers of two from 1 through 128, recorded in the CRC-protected F64S flags byte");
-    println!("# note=budgeted_sparse_probe performs seven extra candidate encodes on each probe chunk and none between probes");
+    println!("# note=budgeted_sparse_probe performs seven extra encoder candidate encodes and seven decoder candidate recomputations on each probe chunk, and none between probes");
     println!("# note=compare against DeXOR, Gorilla, Chimp, ACTF, Rabbit and Dolphin only with matching data and framing");
     Ok(())
 }
