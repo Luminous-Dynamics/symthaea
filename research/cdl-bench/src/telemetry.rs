@@ -11,7 +11,8 @@ use std::fmt;
 
 const MAGIC: &[u8; 4] = b"TRD1";
 const VERSION: u16 = 1;
-const FIELD_COUNT: usize = 8;
+pub const TELEMETRY_FIELD_COUNT: usize = 8;
+const FIELD_COUNT: usize = TELEMETRY_FIELD_COUNT;
 const HEADER_LEN: usize = 52;
 const HEADER_BODY_LEN: usize = 48;
 const MAX_STATE_CAPACITY: u32 = 1_000_000;
@@ -58,11 +59,11 @@ impl TelemetryFieldKind {
 /// Fixed eight-lane schema for the first typed-record prototype.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TelemetrySchema {
-    pub fields: [TelemetryFieldKind; FIELD_COUNT],
+    pub fields: [TelemetryFieldKind; TELEMETRY_FIELD_COUNT],
 }
 
 impl TelemetrySchema {
-    pub const fn new(fields: [TelemetryFieldKind; FIELD_COUNT]) -> Self {
+    pub const fn new(fields: [TelemetryFieldKind; TELEMETRY_FIELD_COUNT]) -> Self {
         Self { fields }
     }
 }
@@ -76,7 +77,7 @@ pub struct TelemetryRecord {
     /// Bit i is set when field i is present. A clear bit represents null.
     pub present_mask: u8,
     /// Exact 64-bit payloads. Absent fields must contain zero.
-    pub values: [u64; FIELD_COUNT],
+    pub values: [u64; TELEMETRY_FIELD_COUNT],
 }
 
 impl TelemetryRecord {
@@ -85,7 +86,7 @@ impl TelemetryRecord {
         entity_id: u32,
         series_id: u32,
         present_mask: u8,
-        values: [u64; FIELD_COUNT],
+        values: [u64; TELEMETRY_FIELD_COUNT],
     ) -> Self {
         Self {
             timestamp,
@@ -261,16 +262,20 @@ fn changed_mask(previous: &TelemetryRecord, current: &TelemetryRecord) -> u8 {
 }
 
 fn evict_oldest(states: &mut BTreeMap<SeriesKey, StateEntry>) {
-    let victim = states
-        .iter()
-        .min_by(|(key_a, state_a), (key_b, state_b)| {
-            state_a
-                .last_seen
-                .cmp(&state_b.last_seen)
-                .then_with(|| key_a.cmp(key_b))
-        })
-        .map(|(key, _)| *key);
-    if let Some(key) = victim {
+    let mut victim: Option<(SeriesKey, u64)> = None;
+    for (key, state) in states {
+        let replace = match victim {
+            None => true,
+            Some((best_key, best_seen)) => {
+                state.last_seen < best_seen
+                    || (state.last_seen == best_seen && *key < best_key)
+            }
+        };
+        if replace {
+            victim = Some((*key, state.last_seen));
+        }
+    }
+    if let Some((key, _)) = victim {
         states.remove(&key);
     }
 }
