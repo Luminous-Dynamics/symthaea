@@ -113,7 +113,7 @@ if [[ -n "$TERSETS_DIR" ]]; then
     printf 'repository=cmcuza/TerseTS\n'
     printf 'commit=%s\n' "$TERSETS_COMMIT"
     printf 'zig=%s\n' "$(zig version)"
-    printf 'exact_lossless_whitelist=Uncompressed,RunLengthEncoding,BitPackedDeltaEncoding,Chimp64,Chimp128,Elf\n'
+    printf 'exact_lossless_whitelist=Uncompressed,Chimp64,Chimp128,Elf\nconditional_methods_require_bitwise_corpus_gate=RunLengthEncoding,BitPackedDeltaEncoding\n'
     printf 'excluded_lossy_or_unverified=Camel,BitPackedQuantization,SerfQT,BitPackedBUFF,MacaqueS,MacaqueV,SwingFilter,SlidingWindow,BottomUp,DFT,and other approximation methods pending per-method proof\n'
   } > "$tersets_out/reproduction.txt"
   sha256sum "$library" > "$tersets_out/library-sha256.txt"
