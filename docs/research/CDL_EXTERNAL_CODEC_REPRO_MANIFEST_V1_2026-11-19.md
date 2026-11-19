@@ -69,20 +69,25 @@ The pinned shell script verifies the checkout commit, Java major version, Maven 
 | Build system | Zig; native library has C API and language bindings |
 | Project warning | README explicitly labels the current version beta and not production ready |
 
-### Exact-lossless whitelist for the first comparison
+### Exact-lossless shortlist for the first comparison
 
-Source inspection shows method-specific bitwise-lossless claims/tests for the following candidates:
+Source inspection supports the following initial whitelist. Even these methods must pass CDL-Bench's own bitwise tests at the pinned revision before a result is admitted.
 
-| Method | Include in exact-lossless stratum? | Basis / caveat |
+| Method | First exact-lossless stratum? | Basis / caveat |
 |---|---:|---|
-| `Uncompressed` | Yes | Raw IEEE-754 8-byte representation |
-| `RunLengthEncoding` | Yes, after rerun | Listed under lossless compression; source invokes the lossless-method test helper |
-| `BitPackedDeltaEncoding` | Yes, after rerun | Source describes mixed-precision exact integer encoding with raw-f64 fallback |
-| `Chimp64` | Yes | Source explicitly claims bitwise lossless and tests NaN payloads, infinities, signed zero |
-| `Chimp128` | Yes | Source explicitly claims bitwise lossless and has equivalent bitwise tests |
-| `Elf` | Yes | Source explicitly claims bitwise lossless and invokes lossless-method tests |
+| `Uncompressed` | Yes | Raw IEEE-754 8-byte bit-cast representation |
+| `Chimp64` | Yes | Source explicitly claims bitwise losslessness and contains bitwise round-trip tests for NaN payloads, infinities and signed zero |
+| `Chimp128` | Yes | Source explicitly claims bitwise losslessness and contains corresponding bitwise tests |
+| `Elf` | Yes | Source explicitly claims bitwise losslessness and contains bitwise round-trip tests for NaN payloads, infinities and signed zero |
 
-Only these six methods are eligible for the first exact-lossless TerseTS result. Re-run the upstream unit tests at the pinned commit and add CDL-Bench's own bitwise round-trip corpus before comparing sizes.
+### Conditional candidates, not pre-approved
+
+| Method | Why conditional |
+|---|---|
+| `RunLengthEncoding` | Its encoder detects runs using `value == current_value`. IEEE-754 `+0.0 == -0.0` although their u64 encodings differ. A run crossing that sign change can be decoded as the first sign's bit pattern. It must be excluded from any corpus containing that adjacency unless fixed upstream or pre-screened under a narrowly declared input contract. |
+| `BitPackedDeltaEncoding` | It rejects non-finite values and values with magnitude above (10^{15}). It also classifies scaled values with numeric `==` and converts through i64, so signed-zero preservation is not established. Keep it in a restricted finite-domain experiment only after CDL-Bench bitwise validation of every sample. |
+
+A source-level test-name `testLosslessMethod` is not enough to admit a codec to the bit-exact leaderboard. In this pinned TerseTS revision, the generic helper computes an absolute difference, casts it to f32 and checks that it is zero; that is weaker than comparing all 64 bits. The stronger `expectLosslessRoundTrip` helper does compare bit-cast u64 values, and Chimp64/Chimp128/Elf include explicit tests using it. CDL-Bench must use its own u64 bit comparison for every run.
 
 ### Exclusions
 
