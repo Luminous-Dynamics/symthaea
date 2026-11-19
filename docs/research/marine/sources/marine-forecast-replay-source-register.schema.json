@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-forecast-replay-source-register:0.1.0",
+  "title": "Marine Forecast Replay Source Register",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "register_version",
+    "register_id",
+    "status",
+    "frozen_on",
+    "claim_ceiling",
+    "information_classes",
+    "source_records",
+    "frozen_replay_rules",
+    "next_deliverables"
+  ],
+  "properties": {
+    "register_version": {
+      "const": "0.1.0"
+    },
+    "register_id": {
+      "const": "MARINE-FORECAST-REPLAY-SOURCE-REGISTER-001"
+    },
+    "status": {
+      "const": "candidate_sources_not_yet_retrieved_or_qualified"
+    },
+    "frozen_on": {
+      "type": "string",
+      "format": "date"
+    },
+    "claim_ceiling": {
+      "const": "source_inventory_only"
+    },
+    "information_classes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deployable_forecast",
+        "realized_evaluator_context",
+        "in_situ_validation",
+        "commercial_route_reference"
+      ],
+      "properties": {
+        "deployable_forecast": {
+          "type": "string",
+          "minLength": 20
+        },
+        "realized_evaluator_context": {
+          "type": "string",
+          "minLength": 20
+        },
+        "in_situ_validation": {
+          "type": "string",
+          "minLength": 20
+        },
+        "commercial_route_reference": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    },
+    "source_records": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_id",
+          "provider",
+          "information_class",
+          "dataset_name",
+          "url",
+          "role",
+          "required_capture",
+          "admissibility",
+          "known_limits",
+          "rights_review"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "information_class": {
+            "enum": [
+              "deployable_forecast",
+              "realized_evaluator_context",
+              "in_situ_validation",
+              "commercial_route_reference"
+            ]
+          },
+          "dataset_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dataset_id": {
+            "type": "string"
+          },
+          "doi": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "mirror_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "temporal_coverage": {
+            "type": "string"
+          },
+          "grid": {
+            "type": "string"
+          },
+          "cadence": {
+            "type": "string"
+          },
+          "license": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "export_formats": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "GPX",
+                "KML",
+                "CSV"
+              ]
+            },
+            "uniqueItems": true
+          },
+          "required_capture": {
+            "type": "array",
+            "minItems": 5,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "admissibility": {
+            "type": "string",
+            "minLength": 20
+          },
+          "known_limits": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "rights_review": {
+            "type": "string",
+            "minLength": 10
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "information_class": {
+                  "const": "deployable_forecast"
+                }
+              },
+              "required": [
+                "information_class"
+              ]
+            },
+            "then": {
+              "required": [
+                "temporal_coverage",
+                "cadence"
+              ],
+              "properties": {
+                "required_capture": {
+                  "contains": {
+                    "const": "cycle_issue_time"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "information_class": {
+                  "const": "realized_evaluator_context"
+                }
+              },
+              "required": [
+                "information_class"
+              ]
+            },
+            "then": {
+              "properties": {
+                "admissibility": {
+                  "pattern": "Evaluator-only"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "information_class": {
+                  "const": "in_situ_validation"
+                }
+              },
+              "required": [
+                "information_class"
+              ]
+            },
+            "then": {
+              "properties": {
+                "required_capture": {
+                  "contains": {
+                    "const": "station_id"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "information_class": {
+                  "const": "commercial_route_reference"
+                }
+              },
+              "required": [
+                "information_class"
+              ]
+            },
+            "then": {
+              "required": [
+                "export_formats"
+              ],
+              "properties": {
+                "required_capture": {
+                  "contains": {
+                    "const": "subscription_or_permission_receipt"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "frozen_replay_rules": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "string",
+        "minLength": 10
+      }
+    },
+    "next_deliverables": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "string",
+        "minLength": 5
+      }
+    }
+  }
+}
