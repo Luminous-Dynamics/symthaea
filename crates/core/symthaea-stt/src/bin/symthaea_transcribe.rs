@@ -130,6 +130,12 @@ impl TranscriptionEngine {
 
     fn load_model(&mut self, path: &Path) -> std::io::Result<()> {
         let prototypes = TrainedPrototypes::load(path)?;
+        let expected = symthaea_stt::PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(
+            self.projector.config().clone(),
+        );
+        prototypes
+            .validate_encoder(&expected)
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
         self.decoder.load_prototypes(&prototypes.as_pairs());
 
         // Also load into resonator
