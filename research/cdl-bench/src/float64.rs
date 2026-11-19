@@ -215,6 +215,7 @@ fn decode_transform(
                 let residual = match marker {
                     0 => 0,
                     1 | 2 => {
+                        let previous_window = window;
                         let (leading, trailing) = if marker == 2 {
                             let leading =
                                 *bytes.get(cursor).ok_or(NumericError::TruncatedVarint)? as u32;
@@ -225,7 +226,6 @@ fn decode_transform(
                             if leading >= 64 || trailing >= 64 || leading + trailing >= 64 {
                                 return Err(NumericError::NumericOverflow);
                             }
-                            window = Some((leading, trailing));
                             (leading, trailing)
                         } else {
                             window.ok_or(NumericError::NonCanonicalVarint)?
@@ -265,6 +265,16 @@ fn decode_transform(
                             {
                                 return Err(NumericError::NonCanonicalVarint);
                             }
+                            if previous_window
+                                .map(|(old_leading, old_trailing)| {
+                                    residual.leading_zeros() >= old_leading
+                                        && residual.trailing_zeros() >= old_trailing
+                                })
+                                .unwrap_or(false)
+                            {
+                                return Err(NumericError::NonCanonicalVarint);
+                            }
+                            window = Some((leading, trailing));
                         } else if residual.leading_zeros() < leading
                             || residual.trailing_zeros() < trailing
                         {
@@ -1448,6 +1458,22 @@ mod tests {
             decompress_f64_segmented(&frame, 2),
             Err(NumericError::OutputLimitExceeded { .. })
         ));
+    }
+
+    #[test]
+    fn xor_leading_trailing_rejects_unnecessary_new_window() {
+        // The first non-zero residual defines the one-bit window at bits 12..12.
+        // The second identical residual fits the existing window and must use
+        // the reuse marker rather than defining the same window again.
+        let noncanonical = vec![0, 2, 51, 12, 1, 2, 51, 12, 1];
+        assert_eq!(
+            decode_transform(
+                &noncanonical,
+                Float64Transform::XorLeadingTrailing,
+                3
+            ),
+            Err(NumericError::NonCanonicalVarint)
+        );
     }
 
     #[test]
