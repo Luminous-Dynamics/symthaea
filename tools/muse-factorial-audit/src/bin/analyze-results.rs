@@ -376,6 +376,11 @@ fn parse_records(input: &str) -> Result<Vec<InputRecord>, String> {
     Ok(records)
 }
 
+fn semantic_digest_from_note(note: &str) -> Option<&str> {
+    note.split(';')
+        .find_map(|part| part.strip_prefix("semantic_sha256="))
+}
+
 fn support_axes_from_note(note: &str) -> Option<String> {
     note.split(';')
         .find_map(|part| part.strip_prefix("support_axes="))
@@ -556,6 +561,7 @@ fn analyze(
     let mut by_case_metric: HashMap<(String, String), &InputRecord> =
         HashMap::with_capacity(records.len());
     let mut digests_by_case: HashMap<String, String> = HashMap::new();
+    let mut semantic_digests_by_case: HashMap<String, String> = HashMap::new();
     let mut axes_by_block: HashMap<(String, String, u64), String> = HashMap::new();
     for record in records {
         if !expected_case_ids.contains(&record.case_id) {
@@ -589,6 +595,29 @@ fn analyze(
             }
         }
 
+        if let Some(semantic_digest) = semantic_digest_from_note(&record.note) {
+            if !is_sha256(semantic_digest) {
+                return Err(format!(
+                    "semantic score digest is malformed for case {:?}",
+                    record.case_id
+                ));
+            }
+            match semantic_digests_by_case.entry(record.case_id.clone()) {
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    entry.insert(semantic_digest.to_string());
+                }
+                std::collections::hash_map::Entry::Occupied(entry)
+                    if entry.get() != semantic_digest =>
+                {
+                    return Err(format!(
+                        "semantic score digest mismatch across metrics for case {:?}",
+                        record.case_id
+                    ));
+                }
+                std::collections::hash_map::Entry::Occupied(_) => {}
+            }
+        }
+
         if let Some(case) = case_by_id.get(record.case_id.as_str())
             && let Some(axes) = support_axes_from_note(&record.note)
         {
@@ -610,6 +639,14 @@ fn analyze(
                 std::collections::hash_map::Entry::Occupied(_) => {}
             }
         }
+    }
+
+    // Prefer the canonical event digest for invariance checks. Older or
+    // synthetic inputs without it fall back to the raw artifact digest.
+    for (case_id, artifact_digest) in &digests_by_case {
+        semantic_digests_by_case
+            .entry(case_id.clone())
+            .or_insert_with(|| artifact_digest.clone());
     }
 
     let mut groups: BTreeMap<(String, String, u64, String), Vec<&Case>> = BTreeMap::new();
@@ -766,7 +803,8 @@ fn analyze(
         }
     }
 
-    let axis_invariance = axis_invariance_report(cases, &digests_by_case, &axes_by_block);
+    let axis_invariance =
+        axis_invariance_report(cases, &semantic_digests_by_case, &axes_by_block);
 
     Ok(Analysis {
         coverage,
@@ -1039,6 +1077,43 @@ mod tests {
             .unwrap();
         assert!((main.estimate.estimate - 2.0).abs() < 1.0e-12);
         assert!(analysis.coverage[0].artifact_sha256s.split(';').count() == 81);
+    }
+
+    #[test]
+    fn semantic_digest_note_is_extracted_and_validated() {
+        let digest = "c".repeat(64);
+        assert_eq!(
+            semantic_digest_from_note(&format!("source_commit=abc;semantic_sha256={digest};manifest=def")),
+            Some(digest.as_str())
+        );
+        assert_eq!(semantic_digest_from_note("source_commit=abc;manifest=def"), None);
+    }
+
+    #[test]
+    fn semantic_digest_mismatch_across_metrics_rejects() {
+        let (cases, mut records) = one_complete_block();
+        let first_semantic = "c".repeat(64);
+        let second_semantic = "d".repeat(64);
+        for record in &mut records {
+            record.note = format!("semantic_sha256={first_semantic}");
+        }
+        let mut identity_rows: Vec<InputRecord> = records
+            .iter()
+            .map(|record| {
+                let mut identity = record.clone();
+                identity.metric = "identity_fingerprint_word".to_string();
+                identity.note = format!("semantic_sha256={second_semantic}");
+                identity
+            })
+            .collect();
+        identity_rows[0].note = format!("semantic_sha256={first_semantic}");
+        records.extend(identity_rows);
+        assert!(analyze(
+            &cases,
+            &["response".to_string(), "identity_fingerprint_word".to_string()],
+            &records
+        )
+        .is_err());
     }
 
     #[test]
