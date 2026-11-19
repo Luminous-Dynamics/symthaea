@@ -1,0 +1,16 @@
+[package]
+name = "symm-defect-cover-reference"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Exact one-dimensional cover verification for uniform symmetry-defect bounds"
+
+[dependencies]
+symm-error-envelope-reference = { path = "../symm-error-envelope-001" }
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]

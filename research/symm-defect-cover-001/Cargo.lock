@@ -1,0 +1,12 @@
+version = 4
+
+[[package]]
+name = "symm-defect-cover-reference"
+version = "0.1.0"
+dependencies = [
+ "symm-error-envelope-reference",
+]
+
+[[package]]
+name = "symm-error-envelope-reference"
+version = "0.1.0"
