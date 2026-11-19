@@ -206,12 +206,12 @@ pub fn evaluate_case(profile: &Profile, case: &Case) -> CaseResult {
         violates("approach_not_docked", &mut reasons);
     }
     match finite(case.approach.distance_m) {
-        Some(value) if value <= profile.max_approach_distance_m => {}
+        Some(value) if value >= 0.0 && value <= profile.max_approach_distance_m => {}
         Some(_) => violates("approach_distance", &mut reasons),
         None => missing("approach_distance", &mut reasons),
     }
     match finite(case.approach.speed_mps) {
-        Some(value) if value <= profile.max_approach_speed_mps => {}
+        Some(value) if value >= 0.0 && value <= profile.max_approach_speed_mps => {}
         Some(_) => violates("approach_speed", &mut reasons),
         None => missing("approach_speed", &mut reasons),
     }
@@ -274,7 +274,7 @@ pub fn evaluate_case(profile: &Profile, case: &Case) -> CaseResult {
     ];
     for (name, value, limit) in scalar_checks {
         match value {
-            Some(actual) if actual <= limit => {}
+            Some(actual) if actual >= 0.0 && actual <= limit => {}
             Some(_) => violates(name, &mut reasons),
             None => missing(name, &mut reasons),
         }
@@ -521,6 +521,19 @@ mod tests {
         let data = fixture();
         let case = data.cases.iter().find(|case| case.id == "CONTACT_IMPULSE_TOO_HIGH").unwrap();
         assert_eq!(evaluate_case(&data.profile, case).status, GateStatus::Rejected);
+    }
+
+    #[test]
+    fn negative_magnitude_observation_is_rejected() {
+        let data = fixture();
+        let mut case = data
+            .cases
+            .iter()
+            .find(|case| case.id == "NOMINAL_CAPTURE")
+            .unwrap()
+            .clone();
+        case.contact.position_error_m = Some(-0.001);
+        assert_eq!(evaluate_case(&data.profile, &case).status, GateStatus::Rejected);
     }
 
     #[test]
