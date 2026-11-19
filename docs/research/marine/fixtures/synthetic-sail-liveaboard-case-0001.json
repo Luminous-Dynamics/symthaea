@@ -73,7 +73,8 @@
       "disposition": "synthetic_only",
       "evidence_class": "synthetic",
       "claim_limit": "Synthetic reserve policy; not an operating limit."
-    }
+    },
+    "comfort_requirement": "hard"
   },
   "environment": {
     "decision_snapshots": [
@@ -113,7 +114,8 @@
     "family": "integrated_advisory",
     "information_policy": "as_of_decision_time",
     "compute_budget_ms": 1000,
-    "policy_revision": "0.0.1"
+    "policy_revision": "0.0.1",
+    "comfort_fallback_status": "none"
   },
   "owner_receipts": [
     {
