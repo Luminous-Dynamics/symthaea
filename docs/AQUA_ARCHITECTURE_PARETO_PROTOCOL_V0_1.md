@@ -64,9 +64,9 @@ These are manufacturer declarations/recommendations, not independent measurement
 
 ### 2.3 2026 DWHR + heat-pump coupling frontier
 
-An October 2026 *Energy and Buildings* study by Bouvenot and Beaudet considers the complete domestic-hot-water system—storage tank, heat pump and shower drain-water heat recovery—rather than evaluating the exchanger alone. It reports global DHW COP up to 6.3 experimentally and 8.0 in simulation for the paper's configurations. These are study-specific results, not transferable Aqua performance or guaranteed site values.
+An October 2026 *Energy and Buildings* study by Bouvenot and Beaudet evaluates the coupled domestic-hot-water system—storage tank, heat pump and shower drain-water heat recovery—rather than the exchanger alone. The publisher page contains an internal numerical discrepancy: its Highlights report global DHW COP up to **6.3 experimentally** and 8.0 in simulation, while its Abstract reports **6.2 experimentally** and 8.0 in simulation. The Abstract also states that DWHR increases static heat loss and reduces heat-pump COP by about 15–20%; it reports the best tested overall system performance for an unbalanced exchanger connected only to the shower mixer, while the unbalanced storage-tank connection performed significantly worse. These are study-specific configurations and results, not transferable Aqua performance.
 
-The strategic implication is to test the useful receiver-side heat and the coupled DHW system under actual usage, storage, fouling, source temperatures, parasitics and control policies. A shower DWHR plate with high standalone effectiveness does not by itself establish system savings.
+Aqua should preserve the 6.2/6.3 discrepancy in its evidence ledger until checked against the article body or author clarification. Do not use either number as a universal KPI or design target. More importantly, isolate at least three topologies in testing: mixer-only recovery, balanced preheat, and storage-tank coupling. Measure useful receiver-side heat, static loss, heat-pump COP penalty, pumping/parasitics, fouling, control behavior and completed-task energy. The topology with the highest exchanger effectiveness may not be the one with the best global DHW performance.
 
 Source: https://doi.org/10.1016/j.enbuild.2026.117761
 
@@ -279,7 +279,7 @@ Aqua's competitive advantage can be the ability to select and evidence the right
 - Orbital Shower: https://www.orbital-systems.com/products/orbital-shower
 - Orbital current installation requirements: https://support.orbital-systems.com/en/19639-installation-requirements.html
 - UK ETL 2025/26 shower update: https://etl.energysecurity.gov.uk/news-events/news/202526-annual-research-programme-updated-criteria-now-live
-- 2026 DWHR + heat-pump coupling study, *Energy and Buildings*: https://doi.org/10.1016/j.enbuild.2026.117761
+- 2026 DWHR + heat-pump coupling study, *Energy and Buildings* (including Highlights/Abstract COP discrepancy): https://doi.org/10.1016/j.enbuild.2026.117761
 - Orbital current installation requirements: https://support.orbital-systems.com/en/19639-installation-requirements.html
 - Site Fit evidence contract: #12881 / PR #12885
 - Wet-path / microbial assessment ownership: #12703
