@@ -975,11 +975,9 @@ pub fn validate_matched_event_replay(
     if control.command.unit != candidate.command.unit {
         return Err(TransientTraceError::EventReplayMismatch { field: "command.unit" });
     }
-    for role in [RawArtifactRole::EventLog] {
-        if artifact_digest(control, role) != artifact_digest(candidate, role) {
-            return Err(TransientTraceError::EventReplayMismatch { field: "event_log" });
-        }
-    }
+    // Event-log byte digests are run-specific: actual trigger times and capture metadata
+    // may differ. The matched command waveform and command samples above define the replay;
+    // each run separately retains its own event-log artifact for audit.
     if control.command.samples != candidate.command.samples {
         return Err(TransientTraceError::EventReplayMismatch { field: "command.samples" });
     }
@@ -1613,23 +1611,6 @@ mod tests {
         candidate.acquisition.channels[1].calibration_receipt_sha256 = digest('9');
 
         assert_eq!(validate_matched_event_replay(&control, &candidate), Ok(()));
-    }
-
-    #[test]
-    fn matched_replay_rejects_a_different_event_log() {
-        let control = profile();
-        let mut candidate = profile();
-        candidate.profile_id = "candidate-sag-001".to_owned();
-        candidate.raw_artifacts
-            .iter_mut()
-            .find(|artifact| artifact.role == RawArtifactRole::EventLog)
-            .unwrap()
-            .sha256 = digest('8');
-
-        assert_eq!(
-            validate_matched_event_replay(&control, &candidate),
-            Err(TransientTraceError::EventReplayMismatch { field: "event_log" })
-        );
     }
 
     #[test]
