@@ -935,6 +935,15 @@ fn verify_source_revision(source_commit: &str) -> Result<(), String> {
             "source worktree is not clean; refusing to bind measurements to commit {head}"
         ));
     }
+
+    let pinned_commit_ref = format!("{PINNED_COMPOSER_SOURCE_COMMIT}^{{commit}}");
+    git_output(&["cat-file", "-e", &pinned_commit_ref]).map_err(|_| {
+        format!(
+            "pinned composer reference commit {} is not present locally; fetch the full history of origin/muse/style-genre-profile-v1 before running the adapter",
+            PINNED_COMPOSER_SOURCE_COMMIT
+        )
+    })?;
+
     for (path, expected_blob) in PINNED_COMPOSER_BLOBS {
         let revision = format!("HEAD:{path}");
         let actual_blob = git_output(&["rev-parse", &revision])?;
