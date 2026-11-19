@@ -45,6 +45,8 @@ The command also emits two segmented rows at chunk sizes 64, 256 and 1,024:
   complete chunk, the encoder tries Raw/Order0, Raw/Order1, XOR/Order0 and
   XOR/Order1, then keeps the smallest complete F64C child frame. Every child
   header and CRC, plus the outer F64S header, counts toward the total size.
+  The decoder independently recomputes all four canonical child frames after
+  reconstruction and rejects a child that is not the exact smallest choice.
   The selector sees the current chunk before choosing and is not a streaming
   algorithm, online predictive gate, or WZS reproduction.
 - `online_historical_cost` chooses the current chunk from the average complete
