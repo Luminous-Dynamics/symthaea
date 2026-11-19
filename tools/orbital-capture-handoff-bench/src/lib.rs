@@ -39,6 +39,7 @@ pub struct ApproachRecord {
 pub struct ContactEvidence {
     pub frame_id: Option<String>,
     pub epoch_tick: Option<u64>,
+    pub client_id: Option<String>,
     pub interface_id: Option<String>,
     pub interface_revision: Option<u64>,
     pub position_error_m: Option<f64>,
@@ -74,6 +75,7 @@ pub struct Case {
 #[serde(deny_unknown_fields)]
 pub struct Profile {
     pub frame_id: String,
+    pub client_id: String,
     pub interface_id: String,
     pub interface_revision: u64,
     pub epoch_tick: u64,
@@ -115,6 +117,11 @@ pub enum GateStatus {
 pub struct CaseResult {
     pub case_id: String,
     pub case_class: String,
+    pub client_id: Option<String>,
+    pub interface_id: Option<String>,
+    pub interface_revision: Option<u64>,
+    pub frame_id: Option<String>,
+    pub epoch_tick: Option<u64>,
     pub expected: String,
     pub status: GateStatus,
     pub reason_codes: Vec<String>,
@@ -172,7 +179,10 @@ fn violates(reason: &str, reasons: &mut Vec<String>) {
 }
 
 fn check_profile(profile: &Profile) -> Result<(), String> {
-    if profile.frame_id.trim().is_empty() || profile.interface_id.trim().is_empty() {
+    if profile.frame_id.trim().is_empty()
+        || profile.client_id.trim().is_empty()
+        || profile.interface_id.trim().is_empty()
+    {
         return Err("profile_identity_empty".to_owned());
     }
     positive(profile.max_approach_distance_m, "approach_distance")?;
@@ -228,6 +238,11 @@ pub fn evaluate_case(profile: &Profile, case: &Case) -> CaseResult {
             if value.abs_diff(profile.epoch_tick) <= profile.max_epoch_skew_ticks => {}
         Some(_) => violates("stale_or_future_epoch", &mut reasons),
         None => missing("epoch_tick", &mut reasons),
+    }
+    match contact.client_id.as_deref() {
+        Some(value) if value == profile.client_id => {}
+        Some(_) => violates("client_id_mismatch", &mut reasons),
+        None => missing("client_id", &mut reasons),
     }
     match contact.interface_id.as_deref() {
         Some(value) if value == profile.interface_id => {}
@@ -351,6 +366,11 @@ pub fn evaluate_case(profile: &Profile, case: &Case) -> CaseResult {
     CaseResult {
         case_id: case.id.clone(),
         case_class: case.case_class.clone(),
+        client_id: contact.client_id.clone(),
+        interface_id: contact.interface_id.clone(),
+        interface_revision: contact.interface_revision,
+        frame_id: contact.frame_id.clone(),
+        epoch_tick: contact.epoch_tick,
         expected: case.expected.clone(),
         status,
         reason_codes: reasons,
@@ -498,7 +518,28 @@ mod tests {
         let case = data.cases.iter().find(|case| case.id == "NOMINAL_CAPTURE").unwrap();
         let result = evaluate_case(&data.profile, case);
         assert_eq!(result.status, GateStatus::AcceptedForHandoff);
+        assert_eq!(result.client_id.as_deref(), Some("serviced-client-001"));
+        assert_eq!(result.interface_id.as_deref(), Some(data.profile.interface_id.as_str()));
+        assert_eq!(result.interface_revision, Some(data.profile.interface_revision));
+        assert_eq!(result.frame_id.as_deref(), Some(data.profile.frame_id.as_str()));
+        assert_eq!(result.epoch_tick, Some(data.profile.epoch_tick));
         assert!(!result.authority_granted);
+    }
+
+    #[test]
+    fn wrong_serviced_client_identity_is_rejected() {
+        let data = fixture();
+        let mut case = data.cases.iter().find(|case| case.id == "NOMINAL_CAPTURE").unwrap().clone();
+        case.contact.client_id = Some("unrelated-client".to_owned());
+        assert_eq!(evaluate_case(&data.profile, &case).status, GateStatus::Rejected);
+    }
+
+    #[test]
+    fn missing_serviced_client_identity_is_indeterminate() {
+        let data = fixture();
+        let mut case = data.cases.iter().find(|case| case.id == "NOMINAL_CAPTURE").unwrap().clone();
+        case.contact.client_id = None;
+        assert_eq!(evaluate_case(&data.profile, &case).status, GateStatus::Indeterminate);
     }
 
     #[test]
