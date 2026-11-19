@@ -5,7 +5,8 @@ use cdl_bench::{
     predictor_state_bytes, BoundedPredictor, E0Kind, ModelKind, NumericTransform,
     ScmFieldPredictor, ScmHybridPredictor, ScmIntervention, ScmLagPredictor, ScmParentPredictor,
     ScmChangePointMixturePredictor, ScmExpertMixturePredictor, ScmShuffledParentPredictor,
-    compress_f64, compress_f64_segmented, decompress_f64, decompress_f64_segmented,
+    compress_f64, compress_f64_segmented, compress_f64_online_selector,
+    decompress_f64, decompress_f64_segmented, decompress_f64_online_selector,
     Float64Transform,
 };
 use std::error::Error;
@@ -631,6 +632,29 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 raw.len(),
                 frame.len()
             );
+
+            let encode_started = Instant::now();
+            let online_frame = compress_f64_online_selector(&values, segment_size)?;
+            let online_encode_ns = encode_started.elapsed().as_nanos();
+            let decode_started = Instant::now();
+            let online_decoded =
+                decompress_f64_online_selector(&online_frame, values.len())?;
+            let online_decode_ns = decode_started.elapsed().as_nanos();
+            let online_exact = values.len() == online_decoded.len()
+                && values.iter().zip(&online_decoded).all(|(a, b)| a.to_bits() == b.to_bits());
+            if !online_exact {
+                return Err(format!("online f64 selector round-trip failure for {name}/{segment_size}").into());
+            }
+            let online_ratio = if raw.is_empty() {
+                "n/a".to_owned()
+            } else {
+                format!("{:.6}", online_frame.len() as f64 / raw.len() as f64)
+            };
+            println!(
+                "{name},online_historical_cost,past_segment_mean,best_of_four,{segment_size},{},{},{zstd},{online_ratio},{online_encode_ns},{online_decode_ns},exact",
+                raw.len(),
+                online_frame.len()
+            );
         }
     }
 
@@ -638,6 +662,9 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# note=XOR-previous is a simple reversible reference transform, not Gorilla, Chimp or DeXOR");
     println!("# note=segment_portfolio is an offline best-of-four per-chunk size oracle; every child header plus the outer F64S header is counted");
     println!("# note=segment_portfolio is not an online selector or a WZS reproduction");
+    println!("# note=online_historical_cost chooses each chunk using only prior chunks; after each chunk both sides recompute all four candidate sizes to update shared policy state");
+    println!("# note=online_historical_cost uses the chosen transform/model ID in the child F64C header and rejects policy-mismatched children");
+    println!("# note=online_historical_cost is compute-heavy diagnostic adaptation, not a tuned practical selector");
     println!("# note=compare against DeXOR, Gorilla, Chimp, ACTF, Rabbit and Dolphin only with matching data and framing");
     Ok(())
 }
