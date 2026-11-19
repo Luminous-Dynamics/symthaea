@@ -21,7 +21,7 @@ The cohort selector is discovery, confirmation, or both. The adapter validates
 the manifest against the exact frozen style, seed, and 3^4 cell set before
 composing anything. The final argument is a required 40-hex source commit SHA.
 The adapter verifies that it equals the checked-out HEAD, refuses a dirty
-worktree, checks 13 pinned source/lockfile blob digests, and verifies that the
+worktree, checks 15 pinned source/workspace/lockfile/toolchain blob digests, and verifies that the
 entire music-theory source tree is unchanged from the preregistered composer
 reference. The SHA is retained in every result row.
 
@@ -69,7 +69,7 @@ shallow checkout, fetch the historical source branch before running:
     git cat-file -e 'bd227d416878a4373eb87a53e182e7067a2411a5^{commit}'
 
 The fetch is a prerequisite for the full-source-tree comparison; the adapter
-still checks all 13 pinned file blobs and refuses a dirty worktree.
+still checks all 15 pinned file blobs and refuses a dirty worktree.
 
 ## What is measured
 
