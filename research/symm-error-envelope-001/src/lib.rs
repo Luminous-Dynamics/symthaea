@@ -36,7 +36,11 @@ pub struct StepPremiseV1 {
     pub map_lipschitz: RationalBoundV1,
     /// Identifier for the independent derivation of the step-map Lipschitz bound.
     pub map_lipschitz_certificate_id: String,
-    /// Upper bound on the one-step equivariance defect, in state units.
+    /// Lipschitz bound for how the one-step defect changes away from the
+    /// reference orbit, in defect-units per state-unit.
+    pub defect_variation_lipschitz: RationalBoundV1,
+    pub defect_variation_certificate_id: String,
+    /// Upper bound on the one-step defect along the reference orbit, in state units.
     pub equivariance_defect_upper: u128,
     /// Identifier for the independent derivation/measurement of this defect.
     pub defect_certificate_id: String,
@@ -121,8 +125,14 @@ impl ApproximateSymmetryProblemV1 {
             if step.map_lipschitz.denominator == 0 {
                 return Err(EnvelopeErrorV1::ZeroDenominator);
             }
+            if step.defect_variation_lipschitz.denominator == 0 {
+                return Err(EnvelopeErrorV1::ZeroDenominator);
+            }
             if step.map_lipschitz_certificate_id.trim().is_empty() {
                 return Err(EnvelopeErrorV1::MissingMapLipschitzCertificate);
+            }
+            if step.defect_variation_certificate_id.trim().is_empty() {
+                return Err(EnvelopeErrorV1::MissingDefectVariationCertificate);
             }
             if step.defect_certificate_id.trim().is_empty() {
                 return Err(EnvelopeErrorV1::MissingDefectCertificate);
@@ -192,6 +202,8 @@ impl ApproximateSymmetryProblemV1 {
         for step in &self.steps {
             append_rational(&mut bytes, step.map_lipschitz);
             append_string(&mut bytes, &step.map_lipschitz_certificate_id);
+            append_rational(&mut bytes, step.defect_variation_lipschitz);
+            append_string(&mut bytes, &step.defect_variation_certificate_id);
             bytes.extend_from_slice(&step.equivariance_defect_upper.to_le_bytes());
             append_string(&mut bytes, &step.defect_certificate_id);
         }
@@ -275,11 +287,26 @@ fn checked_ceil_mul_div(
 
 fn checked_error_image(
     state_error: u128,
-    lipschitz: RationalBoundV1,
-    direct_defect: u128,
+    map_lipschitz: RationalBoundV1,
+    defect_variation_lipschitz: RationalBoundV1,
+    reference_defect: u128,
 ) -> Result<u128, EnvelopeErrorV1> {
-    checked_ceil_mul_div(state_error, lipschitz.numerator, lipschitz.denominator)?
-        .checked_add(direct_defect)
+    let propagated_map_error = checked_ceil_mul_div(
+        state_error,
+        map_lipschitz.numerator,
+        map_lipschitz.denominator,
+    )?;
+    // The one-step defect may grow with distance from the reference orbit:
+    // delta(x) <= delta(reference) + K * state_error. Rounding each term
+    // outward separately is conservative.
+    let propagated_defect_variation = checked_ceil_mul_div(
+        state_error,
+        defect_variation_lipschitz.numerator,
+        defect_variation_lipschitz.denominator,
+    )?;
+    propagated_map_error
+        .checked_add(propagated_defect_variation)
+        .and_then(|value| value.checked_add(reference_defect))
         .ok_or(EnvelopeErrorV1::ArithmeticOverflow)
 }
 
@@ -338,6 +365,7 @@ pub enum EnvelopeErrorV1 {
     ZeroDenominator,
     MissingDefectCertificate,
     MissingMapLipschitzCertificate,
+    MissingDefectVariationCertificate,
     MissingObjectiveCertificate,
     MissingConstraintCertificate,
     MissingDomainCertificate,
@@ -392,6 +420,7 @@ pub fn propagate_error_envelope(
                     let next = checked_error_image(
                         current,
                         step.map_lipschitz,
+                        step.defect_variation_lipschitz,
                         step.equivariance_defect_upper,
                     )?;
                     let time_index = step_index + 1;
@@ -437,6 +466,10 @@ pub fn propagate_error_envelope(
                 let error_upper_bound = checked_error_image(
                     final_error,
                     objective.objective_lipschitz,
+                    RationalBoundV1 {
+                        numerator: 0,
+                        denominator: 1,
+                    },
                     objective.direct_defect_upper,
                 )?;
                 let two_sided_error = error_upper_bound
@@ -455,6 +488,10 @@ pub fn propagate_error_envelope(
                 let error_upper_bound = checked_error_image(
                     final_error,
                     constraint.constraint_lipschitz,
+                    RationalBoundV1 {
+                        numerator: 0,
+                        denominator: 1,
+                    },
                     constraint.direct_defect_upper,
                 )?;
                 if constraint.nominal_slack_lower > error_upper_bound {
@@ -524,6 +561,11 @@ mod tests {
                 .map(|(index, defect)| StepPremiseV1 {
                     map_lipschitz: lipschitz,
                     map_lipschitz_certificate_id: format!("toy-lipschitz-{index}"),
+                    defect_variation_lipschitz: RationalBoundV1 {
+                        numerator: 0,
+                        denominator: 1,
+                    },
+                    defect_variation_certificate_id: format!("toy-defect-variation-{index}"),
                     equivariance_defect_upper: *defect,
                     defect_certificate_id: format!("toy-defect-{index}"),
                 })
@@ -584,6 +626,34 @@ mod tests {
                 .map(|bound| bound.error_upper_bound)
                 .collect::<Vec<_>>(),
             vec![0, 100, 100, 150, 175]
+        );
+    }
+
+    #[test]
+    fn state_dependent_defect_growth_is_added_to_the_map_error_recurrence() {
+        let mut problem = qualified_fixture(RationalBoundV1::new(1, 1).unwrap(), &[100; 3]);
+        for step in &mut problem.steps {
+            step.defect_variation_lipschitz = RationalBoundV1::new(1, 2).unwrap();
+        }
+        let receipt = propagate_error_envelope(&problem).unwrap();
+        assert_eq!(
+            receipt
+                .state_error_bounds
+                .iter()
+                .map(|bound| bound.error_upper_bound)
+                .collect::<Vec<_>>(),
+            vec![0, 100, 250, 475]
+        );
+
+        let constant_defect = qualified_fixture(RationalBoundV1::new(1, 1).unwrap(), &[100; 3]);
+        let constant_receipt = propagate_error_envelope(&constant_defect).unwrap();
+        assert_eq!(
+            constant_receipt
+                .state_error_bounds
+                .iter()
+                .map(|bound| bound.error_upper_bound)
+                .collect::<Vec<_>>(),
+            vec![0, 100, 200, 300]
         );
     }
 
