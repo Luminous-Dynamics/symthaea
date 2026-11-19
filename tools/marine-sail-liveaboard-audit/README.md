@@ -10,6 +10,7 @@ This tool does not generate routes, simulate vessel physics, calculate energy, s
 cargo test --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml
 cargo run --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml -- audit-case docs/research/marine/fixtures/synthetic-sail-liveaboard-case-0001.json
 cargo run --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml -- compare-pair baseline.json candidate.json
+cargo clippy --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml --all-targets -- -D warnings
 ```
 
 ## Dispositions
