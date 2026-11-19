@@ -857,6 +857,7 @@ pub fn verify_score_edit_candidate(
             None,
             "source total_beats is not a bounded non-negative rational",
         );
+        drop(issue);
         return ScoreEditVerificationReportV1 {
             schema: "score-edit-verification-report-v1".into(),
             input_score_sha256: expected_input_score_sha256.to_string(),
