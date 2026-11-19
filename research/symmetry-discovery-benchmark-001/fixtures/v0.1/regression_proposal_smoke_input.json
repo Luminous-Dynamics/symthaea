@@ -1,0 +1,37 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "LUMINOUS-SYMM-QUALIFIED-DISCOVERY-001",
+  "execution_id": "fixture-regression-proposal-oracle-smoke-v0.1",
+  "split": "fixture_sanity",
+  "benchmark_track": "finite_reference_group_regression_discovery",
+  "method": {
+    "name": "adversarial-proposal-smoke",
+    "version": "0.1.0",
+    "source_revision": "fixture-only",
+    "configuration_digest_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "proposals": [
+    {
+      "case_id": "D4-REGRESSION-D4-001",
+      "proposed_subgroup_ids": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
+    },
+    {
+      "case_id": "D4-REGRESSION-C4-001",
+      "proposed_subgroup_ids": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ]
+    }
+  ]
+}
