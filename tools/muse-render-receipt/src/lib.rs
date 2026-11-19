@@ -25,6 +25,12 @@ pub const MIDI_CAPABILITY_DIGEST_SCHEMA_V1: &str = "muse-midi-instrument-capabil
 pub const MIDI_TICKS_PER_QUARTER_V1: u16 = 960;
 pub const SCORE_EDIT_SCHEMA_V1: &str = "score-edit-plan-v1";
 pub const SCORE_EDIT_INPUT_DIGEST_SCHEMA_V1: &str = "muse-score-serde-json-sha256-v1";
+pub const MAX_SCORE_PARTS_V1: usize = 256;
+pub const MAX_SCORE_NOTES_V1: usize = 100_000;
+pub const MAX_TIMELINE_SEGMENTS_V1: usize = 4_096;
+pub const MAX_INSTRUMENT_PROFILES_V1: usize = 128;
+pub const MAX_INSTRUMENT_POLYPHONY_V1: u8 = 64;
+pub const MAX_MIDI_TEXT_BYTES_V1: usize = 255;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -683,7 +689,7 @@ fn verify_score_edit_semantics(
         .ok_or("source Score notes must be an array")?;
     let candidate_notes = candidate.get("notes").and_then(Value::as_array)
         .ok_or("candidate Score notes must be an array")?;
-    if source_notes.is_empty() || source_notes.len() != candidate_notes.len() {
+    if source_notes.is_empty() || source_notes.len() > MAX_SCORE_NOTES_V1 || source_notes.len() != candidate_notes.len() {
         return Err("velocity-only edit requires a non-empty, order-preserving note array".into());
     }
     let operations = parse_edit_operations(plan, source)?;
@@ -691,7 +697,7 @@ fn verify_score_edit_semantics(
     let known_parts: std::collections::BTreeSet<u16> = source_notes.iter().enumerate()
         .map(|(index, note)| parse_source_note_time(note, index).map(|x| x.0))
         .collect::<Result<_, _>>()?;
-    if known_parts.is_empty() {
+    if known_parts.is_empty() || known_parts.len() > MAX_SCORE_PARTS_V1 {
         return Err("source Score has no assigned PartIds".into());
     }
     for operation in &operations {
@@ -922,6 +928,9 @@ pub fn verify_midi_event_manifest(m: &MidiPerformanceManifestV1, bytes: &[u8]) -
         Timing::Metrical(ticks) if u32::from(ticks.as_int()) == u32::from(m.ticks_per_quarter) => {}
         _ => return Err("MIDI ticks-per-quarter mismatch".into()),
     }
+    if m.tracks.len() > MAX_TIMELINE_SEGMENTS_V1 || m.notes.len() > MAX_SCORE_NOTES_V1 {
+        return Err("MIDI manifest exceeds upstream timeline resource limits".into());
+    }
     if smf.tracks.len() != m.tracks.len() + 1 { return Err("MIDI track count mismatch".into()); }
     verify_instrument_channel_assignments(&m.tracks)?;
 
@@ -934,6 +943,11 @@ pub fn verify_midi_event_manifest(m: &MidiPerformanceManifestV1, bytes: &[u8]) -
         if index == 0 || index >= smf.tracks.len() || t.midi_channel > 15 || t.gm_program > 127
             || t.segment_start_tick >= t.segment_end_tick
             || t.track_name.trim().is_empty() || t.segment_id.trim().is_empty()
+            || t.track_name.len() > MAX_MIDI_TEXT_BYTES_V1
+            || t.segment_id.len() > MAX_MIDI_TEXT_BYTES_V1
+            || t.instrument_id.len() > MAX_MIDI_TEXT_BYTES_V1
+            || t.renderer_id.len() > MAX_MIDI_TEXT_BYTES_V1
+            || t.patch_id.len() > MAX_MIDI_TEXT_BYTES_V1
         { return Err("invalid track receipt".into()); }
         if track_map.insert(index, t).is_some() { return Err("duplicate MIDI track index".into()); }
         if !unique_track_names.insert(t.track_name.as_str()) { return Err("duplicate MIDI track name in sidecar".into()); }
@@ -1134,7 +1148,7 @@ fn verify_timeline_binding_bundle(
     )?;
     let segments = timeline.get("segments").and_then(Value::as_array)
         .ok_or("timeline.segments must be an array")?;
-    if segments.len() != manifest.tracks.len() {
+    if segments.len() > MAX_TIMELINE_SEGMENTS_V1 || segments.len() != manifest.tracks.len() {
         return Err("timeline segment count differs from MIDI track count".into());
     }
     let mut by_id = BTreeMap::new();
@@ -1180,7 +1194,8 @@ fn verify_timeline_binding_bundle(
     }
     let bindings: Vec<MidiInstrumentBindingV1> = serde_json::from_slice(&binding_bytes)
         .map_err(|e| format!("instrument bindings JSON invalid: {e}"))?;
-    if bindings.windows(2).any(|pair| pair[0].instrument_id >= pair[1].instrument_id) {
+    if bindings.len() > MAX_INSTRUMENT_PROFILES_V1
+        || bindings.windows(2).any(|pair| pair[0].instrument_id >= pair[1].instrument_id) {
         return Err("instrument bindings must be unique and sorted by instrument_id".into());
     }
     let binding_map: BTreeMap<&str, &MidiInstrumentBindingV1> =
@@ -1195,7 +1210,10 @@ fn verify_timeline_binding_bundle(
     for track in &manifest.tracks {
         let binding = binding_map.get(track.instrument_id.as_str())
             .ok_or_else(|| format!("missing binding for instrument {}", track.instrument_id))?;
-        if binding.renderer_id != track.renderer_id || binding.patch_id != track.patch_id
+        if binding.instrument_id.len() > MAX_MIDI_TEXT_BYTES_V1
+            || binding.renderer_id.len() > MAX_MIDI_TEXT_BYTES_V1
+            || binding.patch_id.len() > MAX_MIDI_TEXT_BYTES_V1
+            || binding.renderer_id != track.renderer_id || binding.patch_id != track.patch_id
             || binding.gm_program != track.gm_program
             || binding.asset_sha256.as_deref().is_some_and(|hash| !valid_sha256(hash))
             || binding.asset_sha256 != receipt.renderer.asset_sha256
@@ -1210,7 +1228,7 @@ fn verify_timeline_binding_bundle(
     }
     let capabilities: Vec<InstrumentCapabilityV1> = serde_json::from_slice(&capability_bytes)
         .map_err(|e| format!("instrument capabilities JSON invalid: {e}"))?;
-    if capabilities.len() > 128
+    if capabilities.len() > MAX_INSTRUMENT_PROFILES_V1
         || capabilities.windows(2).any(|pair| pair[0].id >= pair[1].id)
     {
         return Err("instrument capabilities must be unique, sorted by ID, and within the v1 resource limit".into());
@@ -1219,8 +1237,10 @@ fn verify_timeline_binding_bundle(
     for capability in capabilities {
         let _kind = &capability.kind;
         if capability.id.trim().is_empty()
+            || capability.id.len() > MAX_MIDI_TEXT_BYTES_V1
             || capability.sounding_range.lowest_midi > capability.sounding_range.highest_midi
-            || capability.max_polyphony == 0 || capability.max_polyphony > 64
+            || capability.sounding_range.highest_midi > 127
+            || capability.max_polyphony == 0 || capability.max_polyphony > MAX_INSTRUMENT_POLYPHONY_V1
         {
             return Err(format!("instrument capability {} has an invalid range/polyphony budget", capability.id));
         }
