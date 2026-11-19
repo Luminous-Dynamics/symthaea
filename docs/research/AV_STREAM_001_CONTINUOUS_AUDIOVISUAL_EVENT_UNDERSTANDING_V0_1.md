@@ -320,3 +320,92 @@ A negative result is a valid outcome. Keep the simplest architecture that meets 
 - Integrated benchmark issue: #12837.
 
 This document freezes an evaluation direction only. Implementation, executed benchmark results, physical measurements and independent replication remain separate evidence states.
+
+
+## 13. November 2026 research update: interaction timing and on-demand event memory
+
+Two 2026 results sharpen the benchmark and architecture priorities. They should be added as explicit evaluation arms and design references, not treated as proof that Symthaea already has the capabilities.
+
+### 13.1 DIVE: full-duplex audiovisual engagement
+
+DIVE (October 20, 2026) evaluates response decisions over continuously arriving audio/video, rather than measuring only clip QA or average response latency. It contains 525 evaluation instances drawn from 413 base scenarios, across six task dimensions:
+
+| DIVE task | Capability to qualify in Symthaea | Existing owner to compose |
+|---|---|---|
+| VTI — Video Timely Intervention | Identify an emerging visual mistake/risk and intervene inside its valid window | #3934, #12837 |
+| SPI — Speech Proactive Intervention | Detect a speech/semantic trigger and decide whether a timely interruption is warranted | #10842, #5169, #10890 |
+| CQI — Continuous Query Interaction | Retain visual state while answering successive grounded queries | #3934, #12837 |
+| ORA — Overlapping Response Adaptation | Revise or withdraw an in-progress response when new audio/video evidence arrives | #10842, #5169, #10871 |
+| AVAT — Audio-Visual Addressee Tracking | Infer whether an utterance is directed to the assistant, another person or an ambiguous group | #10842, #5169, #10840 |
+| CAT — Continuous Action Tracking | Count/track recurring actions from a persistent stream | #3934, #12837 |
+
+The DIVE paper reports a best average response-window rate of 53.77% among its evaluated systems (GPT-Realtime-2.1), 41.43% for Qwen3.5-Omni-Plus-Realtime and 40.58% for Gemini-3.1-Flash-Live. The same paper reports sub-second average response latencies for leading proprietary systems but notes that response-window compliance remains weak; for example, the best SPI result in its table is 24.8%. These are results under DIVE's specific setup, not universal vendor rankings.
+
+**Why this changes our strategy:** response latency alone is the wrong objective. The system must decide whether to speak, when to speak, when to hold, when to interrupt, and when to revise an already-started utterance. False intervention and unnecessary interruption must be scored as costs, not ignored.
+
+Add the following DIVE-compatible output contract to the evaluation adapter (not a new turn controller):
+
+- decision: speak / hold / intervene / continue / revise / withdraw;
+- triggering event reference and evidence roots;
+- target/addressee hypothesis and uncertainty;
+- valid response interval and estimated decision time;
+- current utterance revision/supersession identity;
+- observed response outcome (missed, early, on-time, late) and reason;
+- explicit no-trigger controls, with false-intervention cost.
+
+**Proposed research gates (not current results):**
+
+1. At least 70% macro response-window compliance on a frozen DIVE-like confirmatory set, with every task stratum reported. This is an ambitious target above the paper's best reported average; claim superiority only after exact protocol reproduction and paired uncertainty analysis.
+2. At least 90% precision for proactive interventions on admitted trigger events, and no more than 5% false intervention on no-trigger controls.
+3. p95 decision latency below 500 ms from the first sufficient evidence timestamp, not from packet arrival or end-of-clip.
+4. On ORA cases, correctly revise or withdraw an ongoing response when contradictory/new evidence arrives; report adaptation quality, interruption cost and revision latency separately.
+5. Maintain addressee uncertainty when the camera/microphone arrangement cannot establish who is being addressed. Do not infer identity from voice alone.
+
+DIVE paper: https://arxiv.org/abs/2610.28405
+
+### 13.2 OASIS: memory should retrieve decisive events, not more tokens
+
+OASIS (CVPR 2026) reframes long streaming-video reasoning as **temporal routing**: when the current window and summary do not decide a question, the system should infer what historical evidence would decide it and retrieve that narrow event region. It uses three temporal tiers—high-fidelity short window, medium-resolution buffer and a multi-resolution event hierarchy—with coarse reasoning first and targeted fine retrieval only when needed.
+
+In the paper's StreamingBench table, the reproduced Qwen3-VL-8B baseline scores 72.83% Real-Time All; Qwen3-VL-8B + OASIS scores 78.22%, with reported gains in anomaly-context understanding (35.74% → 49.60%) and sequential QA (43.90% → 48.40%). These are paper-specific reproduced comparisons and should not be conflated with the current official leaderboard or an independent Symthaea result.
+
+**Symthaea research hypothesis:** combine a persistent HDC/CfC event memory with evidence-indexed temporal retrieval. HDC similarity can propose candidate memories, but selection must be verified against exact source intervals, event identity, modality and clock uncertainty. Retrieval must not turn a semantically similar event into a claim that the same event occurred.
+
+Candidate memory tiers:
+
+- short: loss-accounted, high-fidelity current sensor windows;
+- medium: event summaries with exact source interval references and uncertainty;
+- long: hierarchical event/entity relations, including alternatives, contradictions and state changes;
+- query path: coarse answer from short/summary state → identify missing decisive evidence → targeted retrieval → evidence-grounded answer or abstention.
+
+A memory node is an index/summary, never a replacement for its source. Preserve immutable observation roots and event lineage; a derived summary does not become independent evidence. The evaluator must detect retrieval of a visually/audio-semantically similar but temporally or causally irrelevant event.
+
+OASIS paper: https://openaccess.thecvf.com/content/CVPR2026/papers/Liang_OASIS_On-Demand_Hierarchical_Event_Memory_for_Streaming_Video_Reasoning_CVPR_2026_paper.pdf
+
+### 13.3 Expanded benchmark matrix
+
+| Benchmark | Add to programme for | Important caveat |
+|---|---|---|
+| DIVE | Full-duplex response timing, proactive intervention, addressee tracking, overlap adaptation | Response-window quality must be separated from response latency |
+| OASIS + StreamingBench | Hierarchical event memory, retrieval precision and streaming temporal reasoning | Reproduce the exact baseline/model/frame-rate protocol |
+| DCASE 2026 Task 3 | Dense semantic acoustic imaging from low-channel spatial audio, with optional video | Four-channel evaluation input; do not claim 3D localization from mono capture |
+| DCASE 2026 Task 4 | Spatial semantic segmentation of sound scenes | Separate audio separation quality from label prediction accuracy |
+| DCASE 2026 Tasks 5–6 | Audio-dependent QA and long-audio moment retrieval | Preserve long-range audio timestamps and event localization |
+| PMLR 302 African ASR study | Data-scaling and model-selection baseline across 13 African languages and 1–400 hours | Results are language/cohort-specific; do not assume transfer to South African varieties |
+| AssemblyAI Research Rivals snapshot (2026-11-14/16) | Current production streaming ASR vendor comparison under a common corpus/scoring pipeline | Vendor-published comparison; disclose endpoint defaults and methodology; add independent South African evaluation |
+
+DCASE 2026 Task 3: https://dcase.community/challenge2026/task-semantic-acoustic-imaging-for-sound-event-localization-and-detection-from-spatial-audio-and-audiovisual-scenes
+DCASE 2026 overview: https://dcase.community/challenge2026/index
+African ASR study: https://proceedings.mlr.press/v302/nahabwe26a.html
+Streaming ASR vendor comparison: https://www.assemblyai.com/benchmarks
+
+### 13.4 Priority change
+
+The next major research increment should be **evidence-grounded event memory plus decision timing**, not a larger HDC dimension or another generic multimodal encoder. Keep model arms A1–A5 from this protocol, and add:
+
+- **A6 — OASIS-style temporal memory:** three-tier event hierarchy and query-conditioned retrieval, using the same perception backbone as its no-memory control;
+- **A7 — DIVE interaction policy:** existing full-duplex controller (#5169 / #10842) receives event hypotheses and returns a decision; do not fork or bypass its authority semantics.
+
+Required ablations: no memory; flat frame RAG; event hierarchy without semantic query refinement; semantic query refinement without evidence verification; full A6; and the same memory with HDC indexing disabled. This isolates whether HDC contributes beyond ordinary metadata/embedding retrieval.
+
+A6/A7 are benchmark and integration arms, not claims of current implementation. Their first fixtures should be deterministic paired scenarios with hidden truth, misleading context, repeated similar events, clock drift, contradictory new evidence, no-trigger controls and explicit response windows.
