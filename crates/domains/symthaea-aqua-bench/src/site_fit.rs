@@ -50,6 +50,7 @@ pub enum SiteCapabilityDomain {
     ContinuousPowerAvailability,
     DrainAndWasteGeometry,
     InstallationSpaceAndRouting,
+    OperatingEnvironmentAndFreezeProtection,
     ThermalReceiverAndHeatSinkCompatibility,
     ServiceAndMaintenanceCapacity,
     WetPathHygieneAndCleaning,
@@ -85,7 +86,9 @@ impl SiteCapabilityDomain {
             Self::ElectricalSupplyAndProtection | Self::ContinuousPowerAvailability => {
                 SiteCapabilityAuthority::IndependentElectricalAssessor
             }
-            Self::DrainAndWasteGeometry | Self::InstallationSpaceAndRouting => {
+            Self::DrainAndWasteGeometry
+            | Self::InstallationSpaceAndRouting
+            | Self::OperatingEnvironmentAndFreezeProtection => {
                 SiteCapabilityAuthority::CompetentInstallationSurveyor
             }
             Self::ServiceAndMaintenanceCapacity => {
@@ -1172,6 +1175,41 @@ mod tests {
         let result_b = evaluate_site_fit(&profile_b, &evidence_b).expect("site B");
         assert_eq!(result_a.disposition, SiteFitDisposition::Eligible);
         assert_eq!(result_b.disposition, SiteFitDisposition::Ineligible);
+    }
+
+    #[test]
+    fn operating_environment_is_not_imposed_on_every_architecture() {
+        let direct = profile(AquaArchitecture::DirectFlowPassive);
+        let recirculation = profile(AquaArchitecture::SameSessionRecirculation);
+        assert!(!direct
+            .required_domains()
+            .contains(&SiteCapabilityDomain::OperatingEnvironmentAndFreezeProtection));
+        assert!(!recirculation
+            .required_domains()
+            .contains(&SiteCapabilityDomain::OperatingEnvironmentAndFreezeProtection));
+    }
+
+    #[test]
+    fn exact_recirculation_product_can_add_ambient_and_freeze_protection() {
+        let mut orbital_profile = profile(AquaArchitecture::SameSessionRecirculation);
+        orbital_profile
+            .additional_required_domains
+            .push(SiteCapabilityDomain::OperatingEnvironmentAndFreezeProtection);
+        orbital_profile.method_bindings.push(SiteFitMethodBinding {
+            domain: SiteCapabilityDomain::OperatingEnvironmentAndFreezeProtection,
+            method_sha256: digest('3'),
+            method_conditions_sha256: digest('4'),
+        });
+
+        let result = evaluate_site_fit(
+            &orbital_profile,
+            &assessments(&orbital_profile, SiteCapabilityOutcome::Satisfied),
+        )
+        .expect("exact product ambient prerequisite");
+        assert_eq!(result.disposition, SiteFitDisposition::Eligible);
+        assert!(result.satisfied_domains.contains(
+            &SiteCapabilityDomain::OperatingEnvironmentAndFreezeProtection
+        ));
     }
 
     #[test]
