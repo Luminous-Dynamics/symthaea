@@ -146,6 +146,28 @@ These values supersede neither the earlier simple reference results nor any Rust
 
 **Evidence boundary:** this is an independent C++ algorithm reference and transform+Zstd diagnostic, not the Rust implementation, not arithmetic-coded TRD1 frame sizes, and not production telemetry or a matched ALP/Pco/Gorilla/Chimp/Rabbit/WZS comparison. The high gains are from synthetic low-update workloads; noisy data is intentionally included and still benefits in this generated workload, but that is not evidence of production distributional generalization. No throughput, peak RSS, actual BTreeMap allocation, checkpoint random-access index or full schema-registry costs were measured.
 
+## WZS-inspired LZV segmentation control (2026-11-19)
+
+A deterministic, prefix-only segmentation control is now checked in at `research/cdl-bench/reference/lzv_segmentation_reference.cpp`, with runner `scripts/research/cdl_lzv_segmentation_reference.sh`. It is deliberately labelled **WZS-inspired**, not WZS. The exposed WZS repository does not yet provide a complete executable reference.
+
+The control computes the leading-zero count of each adjacent XOR residual, then compares exact integer mean and population-variance statistics between a recent fast window (8 observations) and slow window (16 observations). It uses a latched change alarm, a minimum segment length (32), maximum length (512), and a 32-observation cooldown after a detected change. The detector uses only the observed prefix; no future values, branch labels or oracle boundary markers are supplied.
+
+Local validation used `g++ -O2 -std=c++20 -Wall -Wextra -Wconversion -Werror` and passed six tests:
+- Fixed min/max bounds and deterministic constant-stream splits.
+- Empty-stream behavior and deterministic repeatability.
+- 64 stationary-random streams of 8,192 values each: zero extra boundaries beyond required max-length splits.
+- 64 abrupt constant-to-random / random-to-constant transitions: mean detection delay 1.5 observations, maximum 2, for this particular synthetic construction.
+- Recurring stable/random/stable regimes.
+- A slow LZV drift trace, included as a diagnostic rather than a claim that the detector optimally tracks gradual changes.
+
+Representative segmentation-only output (default 32/512 bounds):
+- Constant, 2,048 values: 4 segments, exactly 512 each.
+- Stationary random, 4,096 values: 8 segments, exactly 512 each.
+- Stable/random/stable, 1,536 values: 4 segments; boundaries 0, 512, 544, 1,026, 1,536.
+- A synthetic 4,097-value slow-LZV-drift control: 17 segments, mostly maximum-sized; this shows the current detector does not create extra boundaries for that particular gradual drift.
+
+**Evidence boundary:** these are segmentation diagnostics, not compression results. No child codec was run on segments, no segment header/selector metadata was measured, and no comparison was made with full WZS. The detector's parameters were tuned on synthetic development fixtures and require blind evaluation against CUSUM, fixed windows, MDL segmentation and WZS when its full artifact becomes available. Also, zero alarms in 64 random seeds is not a production false-alarm-rate guarantee.
+
 ## Current Rust implementation status (compiler validation pending)
 
 The PR branch now contains `research/cdl-bench/src/telemetry.rs`, exported from `lib.rs`, with a `cdl-bench telemetry` synthetic command. The first frame has a fixed eight-lane schema, entity/series keys, exact u64 field payloads, explicit null/presence and changed-field masks, canonical u64 varints, deterministic bounded LRU state, segment-start checkpoints, and header/inner/raw-stream CRCs. The shared arithmetic coder is used for the transformed stream. Eight Rust tests are authored for round-trip, determinism, empty streams, truncation, single-bit mutations, resource limits, invalid field values and malformed varints.
