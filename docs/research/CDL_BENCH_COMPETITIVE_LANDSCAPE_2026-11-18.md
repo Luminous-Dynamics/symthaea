@@ -111,6 +111,31 @@ WZS (Section 1.4) already describes adaptive segmentation and online compression
 - change-point detection, context trimming, recent/global buffers and gated fallbacks must be compared as serious alternatives;
 - the potential contribution has to be a *compression-specific* result: deterministic decoder-synchronous expert updates, exact coded bits under a shared coder, no transmitted expert-choice side channel, full model/state accounting, and controlled interventional evaluation.
 
+A further compression-adaptation point is that **segmentation itself is an industry baseline**, not merely a side feature. The WZS paper's abstract reports results on 43 datasets and author-reported mean compression-ratio improvements of 36.41% over its compared lossless time-series algorithms, 13.28% over Camel, and 15.07% over general-purpose compressors, with separate latency claims. These figures are the paper's own results and must not be treated as independently reproduced here. They raise the bar materially: CDL-Bench must compare adaptive segmentation, algorithm selection and per-segment restart costs, not only a monolithic adaptive predictor.
+
+The research branch now also includes `ScmChangePointMixturePredictor` (model 8): an integer Q8 surprisal CUSUM, selective reset of fast conditional contexts, retained slow base histograms, and deterministic re-priming toward the temporal expert. It adds no transmitted reset markers. The controlled C++ detector check has passed selected stationary / step-shift / gradual-drift scenarios; SCM stream coding, Rust tests and bit savings remain unverified. See:
+- `docs/research/CDL_CHANGEPOINT_CUSUM_V1_2026-11-19.md`
+- `research/cdl-bench/reference/cusum_detector_reference.cpp`
+- issue [CDL-Bench-006 #12873](https://github.com/Luminous-Dynamics/symthaea/issues/12873)
+
+Further relevant work:
+- `A Closer Look at Adaptive Regret` (JMLR 2016) analyses fixed-share and its adaptive-regret properties; fixed-share is an established tracking baseline, not a new invention. https://www.jmlr.org/papers/volume17/13-533.html
+- `Strongly Adaptive Online Learning` develops regret guarantees over sub-intervals, motivating per-regime rather than only whole-stream performance. https://proceedings.mlr.press/v37/daniely15.pdf
+- Huang et al. (UAI/PMLR 2026) use an online martingale certificate to gate a residual Bayesian correction and fall back to a fixed forecaster when closed. https://proceedings.mlr.press/v337/huang26b.html
+- Wang et al.'s WZS (September 2026) integrates adaptive segmentation, parameter optimization and stream-aware algorithm selection across 43 datasets. https://www.sciencedirect.com/science/article/pii/S0306457326000889
+- The recent hierarchical model-level adaptation work describes frozen slow priors, fixed intermediate blending and a fast recent-buffer correction. https://www.sciencedirect.com/science/article/pii/S0893608026012578
+
+These works make the next comparison matrix explicit:
+1. static per-stream models;
+2. fixed-share mixture (model 7);
+3. surprisal-triggered fast-context reset (model 8);
+4. strongly adaptive interval/specialist experts;
+5. explicit segmentation with change-point markers included in the stream;
+6. WZS-style selector/segment strategy where reproducible;
+7. best numerical and general-purpose codecs.
+
+For the coding-specific comparison, all arms must use one shared entropy coder and the exact same source bytes. If reset boundaries are inferred from decoded history, they may require no side-channel bits but still incur compute and state costs. If a baseline transmits segment markers, those markers must be counted. Report realized coded bits, not only predictive log loss.
+
 The CDL-Bench research branch now includes `ScmExpertMixturePredictor` (fixed-share mixture of typed-field, lag and known-parent experts) and a separate reference report:
 - `docs/research/CDL_EXPERT_MIXTURE_FIXED_SHARE_V1_2026-11-18.md`
 
