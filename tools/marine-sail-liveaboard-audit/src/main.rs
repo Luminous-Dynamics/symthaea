@@ -852,6 +852,51 @@ fn audit_case(value: &Value) -> AuditReport {
     let information_policy =
         string_at(value, &["policy_arm", "information_policy"]).unwrap_or("unknown");
 
+    let comfort_requirement =
+        string_at(value, &["mission", "comfort_requirement"]).unwrap_or("unknown");
+    let comfort_fallback =
+        string_at(value, &["policy_arm", "comfort_fallback_status"]).unwrap_or("unknown");
+    match (comfort_requirement, comfort_fallback) {
+        ("hard", "none") | ("soft", "none") | ("not_applicable", "none") => {}
+        ("hard", "no_feasible_route")
+        | ("hard", "automatically_relaxed")
+        | ("hard", "operator_authorized_relaxation") => add(
+            &mut findings,
+            "HARD_COMFORT_CONSTRAINT_NOT_MET",
+            "BLOCKER",
+            "policy_arm.comfort_fallback_status",
+            "A route that does not satisfy the declared hard comfort envelope is not feasible; it cannot be promoted after automatic or operator relaxation.",
+        ),
+        ("soft", "automatically_relaxed") | ("soft", "operator_authorized_relaxation") => add(
+            &mut findings,
+            "SOFT_COMFORT_PREFERENCE_UNMET",
+            "INCOMPLETE",
+            "policy_arm.comfort_fallback_status",
+            "The soft comfort preference was relaxed; retain the result as incomplete for comfort-sensitive comparison.",
+        ),
+        ("soft", "no_feasible_route") => add(
+            &mut findings,
+            "NO_FEASIBLE_COMFORT_ROUTE",
+            "BLOCKER",
+            "policy_arm.comfort_fallback_status",
+            "No route satisfying the declared comfort preference was returned.",
+        ),
+        ("not_applicable", _) => add(
+            &mut findings,
+            "COMFORT_FALLBACK_WITHOUT_REQUIREMENT",
+            "ERROR",
+            "policy_arm.comfort_fallback_status",
+            "A comfort fallback is invalid when comfort is not an applicable mission requirement.",
+        ),
+        _ => add(
+            &mut findings,
+            "INVALID_COMFORT_POLICY",
+            "ERROR",
+            "mission.comfort_requirement",
+            "Comfort requirement or fallback status is not recognized.",
+        ),
+    }
+
     if at(value, &["policy_arm", "compute_budget_ms"])
         .and_then(Value::as_u64)
         .is_none_or(|budget| budget == 0)
@@ -1014,6 +1059,7 @@ fn compare_pair(baseline: &Value, candidate: &Value) -> Value {
         &["mission", "mission_profile_sha256"],
         &["mission", "occupants"],
         &["mission", "target_duration_h"],
+        &["mission", "comfort_requirement"],
         &["mission", "arrival_window"],
         &["mission", "route_or_waypoint_ref", "artifact_sha256"],
         &["mission", "service_level_ref", "artifact_sha256"],
@@ -1269,6 +1315,25 @@ mod tests {
         let report = audit_case(&value);
         assert_eq!(report.disposition, "INVALID");
         assert!(report.has_code("UNSUPPORTED_SCHEMA_VERSION"));
+    }
+
+    #[test]
+    fn automatic_comfort_relaxation_cannot_pass_a_hard_requirement() {
+        let mut value = fixture();
+        value["policy_arm"]["comfort_fallback_status"] = json!("automatically_relaxed");
+        let report = audit_case(&value);
+        assert_eq!(report.disposition, "BLOCKED");
+        assert!(report.has_code("HARD_COMFORT_CONSTRAINT_NOT_MET"));
+    }
+
+    #[test]
+    fn soft_comfort_relaxation_remains_incomplete() {
+        let mut value = fixture();
+        value["mission"]["comfort_requirement"] = json!("soft");
+        value["policy_arm"]["comfort_fallback_status"] = json!("automatically_relaxed");
+        let report = audit_case(&value);
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert!(report.has_code("SOFT_COMFORT_PREFERENCE_UNMET"));
     }
 
     #[test]
