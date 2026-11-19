@@ -2,7 +2,7 @@
 
 **Snapshot:** 2026-11-19  
 **Entries:** 20  
-**Claims:** 105
+**Claims:** 106
 
 > Source-classified evidence register. Manufacturer declarations, standards/programme criteria, local installation references, independent market samples and peer-reviewed results are kept distinct. Values marked unknown have not been inferred. This corpus is not a product certification or evidence of Aqua performance.
 
@@ -444,6 +444,7 @@
 | `dhwr.2026.heat-pump-cop-penalty` | heat_pump_cop_reduction | 15 % | peer_reviewed_study_result | measured | mode=Study-specific shower DWHR configuration; task=Domestic hot-water / shower service; method=Study-specific in-situ measurement and/or validated model; unknown: full rig and site conditions must be taken from the paper, not transferable to another climate, topology or exchanger; 15% is the lower endpoint of a reported 15–20% effect in some configurations, not a universal penalty. | context_only: Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee. | [Bouvenot and Beaudet, Energy and Buildings](https://doi.org/10.1016/j.enbuild.2026.117761); peer_reviewed_article; 2026-10-01 |
 | `dhwr.2026.best-coupling-topology` | preferred_dhwr_coupling_topology | Unbalanced DWHR connected to the shower mixer performed best in the tested overall system configurations. | peer_reviewed_study_result | measured | mode=Study-specific heat-pump/storage and DWHR topologies; task=Shower DHW service; method=Study-specific validated numerical/experimental model; unknown: not transferable without matched topology/system testing; The best overall system topology was not necessarily the topology with the highest component recovery efficiency. | context_only: Study-specific whole-system topology finding; not a universal ranking or Aqua result. | [Bouvenot and Beaudet, Energy and Buildings](https://doi.org/10.1016/j.enbuild.2026.117761); peer_reviewed_article; 2026-10-01 |
 | `dhwr.2026.model-validation` | model_validation_cv_rmse | 7 % | peer_reviewed_study_result | measured | mode=Study-specific shower DWHR configuration; task=Domestic hot-water / shower service; method=Study-specific in-situ measurement and/or validated model; unknown: full rig and site conditions must be taken from the paper, not transferable to another climate, topology or exchanger; Study-reported model validation result; not Aqua model accuracy. | context_only: Study-specific peer-reviewed result; not an Aqua result, certification value or universal DWHR guarantee. | [Bouvenot and Beaudet, Energy and Buildings](https://doi.org/10.1016/j.enbuild.2026.117761); peer_reviewed_article; 2026-10-01 |
+| `dhwr.2026.highlights-abstract-cop-discrepancy` | source_internal_numerical_discrepancy | Source-internal figure discrepancy: Highlights = 6.3 experimental / 8.0 simulation; Abstract = 6.2 experimental / 8.0 simulation. | peer_reviewed_study_result | measured | mode=Coupled shower DWHR + DHW storage / heat pump configurations studied in the article; task=Domestic hot-water system performance; method=Publisher landing-page Highlights and Abstract comparison; unknown: authoritative corrected numerical figure in article body / erratum, full configuration-specific COP conditions; Do not silently select 6.2 or 6.3 as a universal value; keep this difference source-scoped until the full article or authors resolve it. | context_only: The source page itself reports different experimental COP values in Highlights and Abstract. Preserve the discrepancy and do not use one figure as an Aqua design target. | [Bouvenot and Beaudet, Energy and Buildings](https://doi.org/10.1016/j.enbuild.2026.117761); peer_reviewed_article; 2026-10-01 |
 
 **Limitations — `dhwr.2026.global-cop-experimental`:**
 - Do not transfer the numerical result to an Aqua design without matched whole-system testing.
@@ -463,6 +464,11 @@
 **Limitations — `dhwr.2026.model-validation`:**
 - Do not transfer the numerical result to an Aqua design without matched whole-system testing.
 - Keep fouling, dynamic use, useful receiver-side heat, standby losses and parasitics inside the accounting boundary.
+
+**Limitations — `dhwr.2026.highlights-abstract-cop-discrepancy`:**
+- Both figures are study-specific and not transferable to an Aqua design.
+- Use the exact article body, configuration and boundary before any comparative model calibration.
+- Simulation COP of 8.0 must remain distinct from experimental results.
 
 ## EN 18021:2025 — Sanitary tapware, measurement of functional performance of taps and showers
 
