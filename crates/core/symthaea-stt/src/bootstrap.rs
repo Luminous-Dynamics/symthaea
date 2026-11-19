@@ -116,12 +116,13 @@ impl PrototypeEncoderMetadata {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&self.schema_version.to_le_bytes());
         hasher.update(self.encoder_id.as_bytes());
-        hasher.update(match self.representation {
-            PrototypeRepresentation::DirectMelFrameV1 => b"direct_mel_frame_v1",
+        let representation_id = match self.representation {
+            PrototypeRepresentation::DirectMelFrameV1 => "direct_mel_frame_v1",
             PrototypeRepresentation::DirectMelTemporalWindow7V1 => {
-                b"direct_mel_temporal_window7_v1"
+                "direct_mel_temporal_window7_v1"
             }
-        });
+        };
+        hasher.update(representation_id.as_bytes());
         hasher.update(&self.audio_config.sample_rate.to_le_bytes());
         hasher.update(&self.audio_config.frame_duration.to_bits().to_le_bytes());
         hasher.update(&self.audio_config.hop_duration.to_bits().to_le_bytes());
@@ -789,6 +790,7 @@ impl AdaptivePrototypeSet {
             counts,
             config,
             version: env!("CARGO_PKG_VERSION").to_string(),
+            encoder_metadata: None,
         }
     }
 
@@ -811,6 +813,7 @@ impl AdaptivePrototypeSet {
             counts,
             config,
             version: env!("CARGO_PKG_VERSION").to_string(),
+            encoder_metadata: None,
         }
     }
 
@@ -1163,6 +1166,7 @@ impl BootstrapPipeline {
             counts,
             config: self.config,
             version: env!("CARGO_PKG_VERSION").to_string(),
+            encoder_metadata: None,
         }
     }
 
@@ -1328,6 +1332,50 @@ mod tests {
         let protos = acc.finalize(2);
         assert!(protos.contains_key("p"));
         assert!(!protos.contains_key("b")); // Below min_instances
+    }
+
+    #[test]
+    fn prototype_encoder_metadata_is_stable_and_rejects_representation_mismatch() {
+        let config = AudioConfig::default();
+        let raw = PrototypeEncoderMetadata::direct_mel_frame_v1(config.clone());
+        let temporal =
+            PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(config.clone());
+
+        assert!(raw.validate().is_ok());
+        assert!(temporal.validate().is_ok());
+        assert_ne!(raw.fingerprint, temporal.fingerprint);
+
+        let prototypes = TrainedPrototypes::new_with_encoder(
+            BootstrapConfig::default(),
+            raw.clone(),
+        );
+        assert!(prototypes.validate_encoder(&raw).is_ok());
+        assert!(prototypes.validate_encoder(&temporal).is_err());
+    }
+
+    #[test]
+    fn legacy_prototype_artifacts_are_not_assumed_encoder_compatible() {
+        let prototypes = TrainedPrototypes::new(BootstrapConfig::default());
+        let expected =
+            PrototypeEncoderMetadata::direct_mel_frame_v1(AudioConfig::default());
+        assert!(prototypes.validate_encoder(&expected).is_err());
+
+        // Old JSON without encoder_metadata must still deserialize so it can be
+        // inspected or migrated, but strict inference validation must reject it.
+        let encoded = serde_json::to_value(&prototypes).unwrap();
+        let mut legacy = encoded;
+        legacy.as_object_mut().unwrap().remove("encoder_metadata");
+        let decoded: TrainedPrototypes = serde_json::from_value(legacy).unwrap();
+        assert!(decoded.encoder_metadata.is_none());
+        assert!(decoded.validate_encoder(&expected).is_err());
+    }
+
+    #[test]
+    fn prototype_encoder_metadata_detects_descriptor_tampering() {
+        let mut metadata =
+            PrototypeEncoderMetadata::direct_mel_frame_v1(AudioConfig::default());
+        metadata.audio_config.sample_rate = 48_000;
+        assert!(metadata.validate().is_err());
     }
 
     #[test]
