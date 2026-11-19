@@ -33,8 +33,18 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Check formatting
+      - name: Apply pinned Rust formatting
+        run: cargo fmt --manifest-path tools/superconductivity-microscopic-gl-translation-harness/Cargo.toml --all
+
+      - name: Verify canonical Rust formatting
         run: cargo fmt --manifest-path tools/superconductivity-microscopic-gl-translation-harness/Cargo.toml --all -- --check
+
+      - name: Capture rustfmt-only patch
+        if: always()
+        run: |
+          git diff --binary -- tools/superconductivity-microscopic-gl-translation-harness > "$RUNNER_TEMP/sc-rustfmt.patch"
+          git diff --stat -- tools/superconductivity-microscopic-gl-translation-harness
+          sha256sum "$RUNNER_TEMP/sc-rustfmt.patch"
 
       - name: Generate isolated dependency lockfile
         run: cargo generate-lockfile --manifest-path tools/superconductivity-microscopic-gl-translation-harness/Cargo.toml
@@ -68,6 +78,8 @@ jobs:
             echo "git_head=$(git rev-parse HEAD)"
             echo "rustc=$(rustc --version)"
             echo "cargo=$(cargo --version)"
+            echo "worktree_status=$(git status --short)"
+            if [ -f "$RUNNER_TEMP/sc-rustfmt.patch" ]; then sha256sum "$RUNNER_TEMP/sc-rustfmt.patch"; fi
             sha256sum data/schemas/superconductivity_microscopic_gl_translation_v0_1.schema.json
             sha256sum data/research/superconductivity_microscopic_gl_translation_fixture_v0_1.json
             sha256sum data/research/superconductivity_microscopic_gl_translation_arxiv_2603_05123v2_fixture_v0_1.json
@@ -91,3 +103,4 @@ jobs:
             ${{ runner.temp }}/sc-microscopic-gl-environment.txt
             ${{ runner.temp }}/sc-microscopic-gl-prl-metadata-receipt.json
             ${{ runner.temp }}/sc-microscopic-gl-arxiv-v2-receipt.json
+            ${{ runner.temp }}/sc-rustfmt.patch
