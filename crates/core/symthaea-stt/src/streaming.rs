@@ -18,6 +18,7 @@
 //! ```
 
 use crate::audio::{AudioConfig, AudioFrontend, AudioProjector};
+use crate::bootstrap::{PrototypeEncoderMetadata, TrainedPrototypes};
 use crate::hdc::HV16;
 use crate::ltc::{LtcCell, LtcConfig};
 use crate::phoneme::PhonemeResonator;
@@ -329,12 +330,28 @@ impl StreamProcessor {
         }
     }
 
-    /// Load phoneme prototypes
+    /// Load untyped phoneme vectors.
+    ///
+    /// This low-level API cannot verify encoder compatibility. Prefer
+    /// load_trained_prototypes() for persisted model artifacts.
     pub fn load_prototypes(&mut self, prototypes: &[(String, HV16)]) {
         self.resonator.clear();
         for (label, hv) in prototypes {
             self.resonator.store(label, *hv);
         }
+    }
+
+    /// Validate and load an artifact trained in the live raw-frame mel-HDC space.
+    pub fn load_trained_prototypes(
+        &mut self,
+        prototypes: &TrainedPrototypes,
+    ) -> Result<(), String> {
+        let expected = PrototypeEncoderMetadata::direct_mel_frame_v1(
+            self.frontend.config().clone(),
+        );
+        prototypes.validate_encoder(&expected)?;
+        self.load_prototypes(&prototypes.as_pairs());
+        Ok(())
     }
 
     /// Push audio samples into the processor.
