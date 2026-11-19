@@ -1,12 +1,23 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+use sha2::{Digest, Sha256};
 use symthaea_canvas::render_svg;
 use symthaea_canvas::scene_graph::NodeKind;
 use symthaea_ggl_canvas::adapt_compiled_scene;
 
 const GGL_PROGRAM: &str = include_str!("../../../domains/symthaea-canvas/tests/fixtures/ggl-program.ggl");
 const COMPILED: &str = include_str!("../../../domains/symthaea-canvas/tests/fixtures/ggl-source.json");
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut out = String::with_capacity(64);
+    for byte in digest {
+        use std::fmt::Write as _;
+        write!(&mut out, "{byte:02x}").expect("formatting into String");
+    }
+    out
+}
 
 #[test]
 fn adapts_all_supported_v01_primitives_and_renders_stable_ids() {
@@ -15,8 +26,7 @@ fn adapts_all_supported_v01_primitives_and_renders_stable_ids() {
     assert_eq!(output.manifest.units.as_deref(), Some("mm"));
     assert_eq!(output.identity_map.entries.len(), 4);
     assert_eq!(output.manifest.canvas_scene_digest, output.identity_map.canvas_scene_digest);
-    assert_eq!(output.manifest.source_sha256.len(), 64);
-    assert!(!GGL_PROGRAM.is_empty());
+    assert_eq!(output.manifest.source_sha256, sha256_hex(GGL_PROGRAM.as_bytes()));
 
     let leaves: Vec<_> = output.scene.children.iter().map(|wrapper| {
         assert!(matches!(&wrapper.kind, NodeKind::Group { id: Some(_) }));
@@ -38,6 +48,14 @@ fn adapts_all_supported_v01_primitives_and_renders_stable_ids() {
         let needle = format!(r#"id="{}""#, entry.canvas_group_id);
         assert_eq!(svg.matches(needle.as_str()).count(), 1);
     }
+}
+
+#[test]
+fn repeated_adaptation_is_deterministic() {
+    let first = adapt_compiled_scene(COMPILED, "ggl-rust-conformance").unwrap();
+    let second = adapt_compiled_scene(COMPILED, "ggl-rust-conformance").unwrap();
+    assert_eq!(first.manifest, second.manifest);
+    assert_eq!(first.identity_map, second.identity_map);
 }
 
 #[test]
