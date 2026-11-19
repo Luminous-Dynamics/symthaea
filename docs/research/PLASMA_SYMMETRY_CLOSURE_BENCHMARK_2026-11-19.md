@@ -83,7 +83,7 @@ The machine-readable source/task register is `data/research/plasma_symmetry_clos
 
 The machine-readable register now records three public artifact locators, with each dataset's license still independently audited:
 
-- **2025 Landau FNO Vlasov data:** Zenodo 10.5281/zenodo.14915239. The record lists `Linear_Landau_Damping_training_data.mat` and `Noninear_Landau_Damping_training_data.mat` (~81.9 MB total), with MD5 recorded in the JSON source manifest. The PNAS article states these are the training datasets; its article license is CC BY-NC-ND, which must not be assumed to govern the dataset.
+- **2025 Landau FNO Vlasov data:** Zenodo 10.5281/zenodo.14915239. The record lists `Linear_Landau_Damping_training_data.mat` and `Noninear_Landau_Damping_training_data.mat` (~81.9 MB total). Important admission blocker: the rendered record reports the same MD5 for both differently named files. Their bytes and SHA-256 must be checked before treating them as distinct linear and nonlinear cases. The PNAS article states these are the training datasets; its article license is CC BY-NC-ND, which must not be assumed to govern the dataset.
 - **2026 online FNO code + data:** Zenodo 10.5281/zenodo.22800112, version 1.0. The publisher confirms both code and training data are openly available. The article is CC BY 4.0; the Zenodo record's own file/license metadata still needs pinning.
 - **2026 magnetic-reconnection symmetry data:** Zenodo 10.5281/zenodo.15498576. It contains two OSIRIS input decks and a ~3.6 GB `Section2_Data.zip` archive for the closure study, with published MD5 recorded in the JSON source manifest. The Section 1 diagnostics (~500 GB) are not included. The associated APS article is CC BY 4.0; the dataset record license remains to be inspected.
 
