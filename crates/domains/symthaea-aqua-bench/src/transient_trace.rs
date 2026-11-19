@@ -13,6 +13,8 @@ use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+use serde::Deserialize;
+
 fn is_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
@@ -31,13 +33,15 @@ fn require_digest(field: &'static str, value: &str) -> Result<(), TransientTrace
     Ok(())
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ProfileKind {
     SiteObserved,
     Synthetic,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum EventFamily {
     SupplySag,
     SupplyRamp,
@@ -47,7 +51,8 @@ pub enum EventFamily {
     RapidValveEvent,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum TimestampBasis {
     Monotonic,
     UtcDisciplined,
@@ -55,31 +60,57 @@ pub enum TimestampBasis {
     OtherDeclared,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 pub enum CommandKind {
+    #[serde(rename = "upstream_pressure_command")]
     UpstreamPressure,
+    #[serde(rename = "branch_demand_command")]
     BranchDemand,
+    #[serde(rename = "valve_state_command")]
     ValveState,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum CommandValue {
-    PressureKpa(f64),
-    BranchFlowLpm(f64),
-    ValveOpen(bool),
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum CommandUnit {
+    #[serde(rename = "kPa")]
+    Kpa,
+    #[serde(rename = "L/min")]
+    LitresPerMinute,
+    #[serde(rename = "boolean")]
+    Boolean,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[serde(untagged)]
+pub enum CommandValue {
+    Numeric(f64),
+    Boolean(bool),
+}
+
+impl CommandValue {
+    fn numeric(self) -> Option<f64> {
+        match self {
+            Self::Numeric(value) => Some(value),
+            Self::Boolean(_) => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CommandSample {
     /// Microseconds from the beginning of the event capture window.
     pub offset_us: u64,
     pub value: CommandValue,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EventCommand {
+    #[serde(rename = "input_kind")]
     pub kind: CommandKind,
     pub channel_id: String,
+    pub unit: CommandUnit,
     /// Digest of the canonical command waveform and its exact units.
     pub waveform_sha256: String,
     pub samples: Vec<CommandSample>,
@@ -117,14 +148,14 @@ impl EventCommand {
             }
             previous_offset = Some(sample.offset_us);
 
-            match (&self.kind, &sample.value) {
-                (CommandKind::UpstreamPressure, CommandValue::PressureKpa(value))
-                | (CommandKind::BranchDemand, CommandValue::BranchFlowLpm(value)) => {
-                    if !value.is_finite() || *value < 0.0 {
+            match (self.kind, self.unit, sample.value) {
+                (CommandKind::UpstreamPressure, CommandUnit::Kpa, CommandValue::Numeric(value))
+                | (CommandKind::BranchDemand, CommandUnit::LitresPerMinute, CommandValue::Numeric(value)) => {
+                    if !value.is_finite() || value < 0.0 {
                         return Err(TransientTraceError::InvalidCommandValue);
                     }
                 }
-                (CommandKind::ValveState, CommandValue::ValveOpen(_)) => {}
+                (CommandKind::ValveState, CommandUnit::Boolean, CommandValue::Boolean(_)) => {}
                 _ => return Err(TransientTraceError::CommandUnitMismatch),
             }
         }
@@ -139,10 +170,10 @@ impl EventCommand {
                 .samples
                 .windows(2)
                 .any(|pair| matches!((&pair[0].value, &pair[1].value),
-                    (CommandValue::PressureKpa(before), CommandValue::PressureKpa(after)) if after < before)),
+                    (CommandValue::Numeric(before), CommandValue::Numeric(after)) if after < before)),
             (EventFamily::SupplyRamp, CommandKind::UpstreamPressure) => {
                 let values: Vec<f64> = self.samples.iter().filter_map(|sample| {
-                    if let CommandValue::PressureKpa(value) = sample.value { Some(value) } else { None }
+                    sample.value.numeric()
                 }).collect();
                 let nondecreasing = values.windows(2).all(|pair| pair[1] >= pair[0]);
                 let nonincreasing = values.windows(2).all(|pair| pair[1] <= pair[0]);
@@ -151,12 +182,12 @@ impl EventCommand {
             (EventFamily::IntermittentSupply, CommandKind::UpstreamPressure) => self
                 .samples
                 .iter()
-                .any(|sample| matches!(sample.value, CommandValue::PressureKpa(value) if value == 0.0)),
+                .any(|sample| matches!(sample.value, CommandValue::Numeric(value) if value == 0.0)),
             (EventFamily::ConcurrentDemandStep, CommandKind::BranchDemand) => self
                 .samples
                 .windows(2)
                 .any(|pair| matches!((&pair[0].value, &pair[1].value),
-                    (CommandValue::BranchFlowLpm(before), CommandValue::BranchFlowLpm(after)) if after > before)),
+                    (CommandValue::Numeric(before), CommandValue::Numeric(after)) if after > before)),
             (EventFamily::RepeatedDemandCycling, _) => transition_count >= 2,
             (EventFamily::RapidValveEvent, CommandKind::ValveState) => transition_count >= 1,
             _ => false,
@@ -168,23 +199,32 @@ impl EventCommand {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObservationWindow {
+    pub start: String,
+    pub end: String,
+    pub coverage_statement: String,
+    #[serde(default)]
+    pub known_gaps: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SiteObservationEvidence {
     pub site_profile_id: String,
     pub site_profile_revision: u32,
     pub site_conditions_sha256: String,
     pub survey_receipt_sha256: String,
-    pub observation_window_start: String,
-    pub observation_window_end: String,
-    pub coverage_statement: String,
+    pub observation_window: ObservationWindow,
 }
 
 impl SiteObservationEvidence {
     fn validate(&self) -> Result<(), TransientTraceError> {
         require_text("site_profile_id", &self.site_profile_id)?;
-        require_text("observation_window_start", &self.observation_window_start)?;
-        require_text("observation_window_end", &self.observation_window_end)?;
-        require_text("coverage_statement", &self.coverage_statement)?;
+        require_text("observation_window.start", &self.observation_window.start)?;
+        require_text("observation_window.end", &self.observation_window.end)?;
+        require_text("observation_window.coverage_statement", &self.observation_window.coverage_statement)?;
         if self.site_profile_revision == 0 {
             return Err(TransientTraceError::InvalidRevision { field: "site_profile_revision" });
         }
@@ -193,7 +233,8 @@ impl SiteObservationEvidence {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SyntheticProfileEvidence {
     pub generator_id: String,
     pub generator_sha256: String,
@@ -208,7 +249,8 @@ impl SyntheticProfileEvidence {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ChannelRole {
     UpstreamStaticPressure,
     UpstreamResidualPressure,
@@ -243,7 +285,8 @@ impl ChannelRole {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ChannelDatum {
     StaticSupply,
     UpstreamServicePoint,
@@ -257,14 +300,18 @@ pub enum ChannelDatum {
     NotApplicable,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 pub enum ChannelUnit {
+    #[serde(rename = "kPa")]
     Kpa,
+    #[serde(rename = "L/min")]
     LitresPerMinute,
+    #[serde(rename = "degC")]
     DegreesCelsius,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ChannelQuality {
     Valid,
     Clipped,
@@ -280,7 +327,8 @@ pub struct TraceSample {
     pub value: f64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TraceChannel {
     pub channel_id: String,
     pub role: ChannelRole,
@@ -290,6 +338,7 @@ pub struct TraceChannel {
     pub instrument_id: String,
     pub calibration_receipt_sha256: String,
     pub measurement_uncertainty: f64,
+    #[serde(rename = "quality_state")]
     pub quality: ChannelQuality,
     pub sample_rate_hz: f64,
     pub effective_bandwidth_hz: f64,
@@ -297,7 +346,8 @@ pub struct TraceChannel {
     pub sample_count: usize,
     pub dropped_sample_count: usize,
     pub sample_gap_report_sha256: Option<String>,
-    /// Samples are decoded from the raw artifact; the raw file remains the canonical record.
+    /// Populated by the raw-trace decoder after the manifest is read.
+    #[serde(skip)]
     pub samples: Vec<TraceSample>,
 }
 
@@ -421,7 +471,8 @@ impl TraceChannel {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AcquisitionMetadata {
     pub clock_id: String,
     pub timestamp_basis: TimestampBasis,
@@ -511,7 +562,8 @@ fn nearest_sample_distance(samples: &[TraceSample], target_us: u64) -> u64 {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum RawArtifactRole {
     UnfilteredTrace,
     EventLog,
@@ -520,7 +572,8 @@ pub enum RawArtifactRole {
     SiteObservationRecord,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RawArtifact {
     pub role: RawArtifactRole,
     pub sha256: String,
@@ -537,7 +590,8 @@ impl RawArtifact {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TransientEventProfile {
     pub schema_version: String,
     pub profile_id: String,
@@ -547,8 +601,8 @@ pub struct TransientEventProfile {
     pub task_profile_id: String,
     pub conditions_sha256: String,
     pub protocol_sha256: String,
-    /// Parsed RFC3339 event-start timestamp, normalized by the manifest decoder.
-    pub event_start_unix_ms: u64,
+    /// RFC3339 event-start timestamp, checked against the manifest schema date-time format.
+    pub event_start: String,
     pub event_duration_ms: u64,
     pub site_observation: Option<SiteObservationEvidence>,
     pub synthetic_profile: Option<SyntheticProfileEvidence>,
@@ -596,6 +650,8 @@ pub enum TransientTraceError {
     MissingSecondaryFlowChannel,
     InsufficientSpatialPressureChannels,
     EventReplayMismatch { field: &'static str },
+    ManifestDecode { message: String },
+    UnknownChannel { channel_id: String },
 }
 
 impl Display for TransientTraceError {
@@ -670,6 +726,8 @@ impl Display for TransientTraceError {
             Self::EventReplayMismatch { field } => {
                 write!(f, "matched event replays differ at: {field}")
             }
+            Self::ManifestDecode { message } => write!(f, "transient event manifest decode failed: {message}"),
+            Self::UnknownChannel { channel_id } => write!(f, "raw trace references an unknown channel: {channel_id}"),
         }
     }
 }
@@ -684,6 +742,7 @@ impl TransientEventProfile {
         }
         require_text("profile_id", &self.profile_id)?;
         require_text("task_profile_id", &self.task_profile_id)?;
+        require_text("event_start", &self.event_start)?;
         require_digest("conditions_sha256", &self.conditions_sha256)?;
         require_digest("protocol_sha256", &self.protocol_sha256)?;
         if self.profile_revision == 0 {
@@ -959,7 +1018,7 @@ mod tests {
             task_profile_id: "full-shower-v1".to_owned(),
             conditions_sha256: digest('c'),
             protocol_sha256: digest('d'),
-            event_start_unix_ms: 1_800_000_000_000,
+            event_start: "2026-11-19T00:00:00Z".to_owned(),
             event_duration_ms: 2,
             site_observation: None,
             synthetic_profile: Some(SyntheticProfileEvidence {
@@ -970,9 +1029,10 @@ mod tests {
             command: EventCommand {
                 kind: CommandKind::UpstreamPressure,
                 channel_id: "upstream-pressure-command".to_owned(),
+                unit: CommandUnit::Kpa,
                 waveform_sha256: digest('1'),
                 samples: vec![
-                    CommandSample { offset_us: 0, value: CommandValue::PressureKpa(300.0) },
+                    CommandSample { offset_us: 0, value: CommandValue::Numeric(300.0) },
                     CommandSample { offset_us: 1_000, value: CommandValue::PressureKpa(200.0) },
                     CommandSample { offset_us: 2_000, value: CommandValue::PressureKpa(300.0) },
                 ],
@@ -1023,9 +1083,12 @@ mod tests {
             site_profile_revision: 1,
             site_conditions_sha256: digest('5'),
             survey_receipt_sha256: digest('6'),
-            observation_window_start: "2026-01-01T00:00:00Z".to_owned(),
-            observation_window_end: "2026-01-01T00:10:00Z".to_owned(),
-            coverage_statement: "complete".to_owned(),
+            observation_window: ObservationWindow {
+                start: "2026-01-01T00:00:00Z".to_owned(),
+                end: "2026-01-01T00:10:00Z".to_owned(),
+                coverage_statement: "complete".to_owned(),
+                known_gaps: Vec::new(),
+            },
         });
         assert_eq!(value.validate(), Err(TransientTraceError::ContradictoryProfileProvenance));
     }
@@ -1134,7 +1197,7 @@ mod tests {
         value.event_family = EventFamily::ConcurrentDemandStep;
         value.command.kind = CommandKind::BranchDemand;
         value.command.samples.iter_mut().enumerate().for_each(|(index, sample)| {
-            sample.value = CommandValue::BranchFlowLpm(if index == 0 { 0.0 } else { 3.0 });
+            sample.value = CommandValue::Numeric(if index == 0 { 0.0 } else { 3.0 });
         });
         assert_eq!(value.validate(), Err(TransientTraceError::MissingSecondaryFlowChannel));
     }
@@ -1144,7 +1207,7 @@ mod tests {
         let mut value = profile();
         value.event_family = EventFamily::RapidValveEvent;
         value.command.kind = CommandKind::ValveState;
-        value.command.samples[0].value = CommandValue::ValveOpen(false);
+        value.command.samples[0].value = CommandValue::Boolean(false);
         value.command.samples[1].value = CommandValue::ValveOpen(true);
         value.command.samples[2].value = CommandValue::ValveOpen(false);
         assert_eq!(value.validate(), Err(TransientTraceError::InsufficientSpatialPressureChannels));
