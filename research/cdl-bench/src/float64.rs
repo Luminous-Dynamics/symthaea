@@ -325,7 +325,13 @@ mod tests {
 
     #[test]
     fn every_single_bit_mutation_is_rejected() {
-        let input = bit_fixtures()[3].clone();
+        let input = [
+            0.0,
+            -0.0,
+            f64::INFINITY,
+            f64::from_bits(0x7ff8_0000_0000_0001),
+            f64::from_bits(1),
+        ];
         let frame = compress_f64(&input, Float64Transform::XorPrevious, ModelKind::Order1).unwrap();
         for index in 0..frame.len() {
             for bit in 0..8 {
