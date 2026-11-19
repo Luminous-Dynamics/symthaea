@@ -26,6 +26,17 @@ GGL compiles into existing owner-native systems. Each existing system remains au
 | [SCI-GRAMMAR #8919](https://github.com/Luminous-Dynamics/symthaea/issues/8919) | Cross-world grammar recovery and falsification methods | Reuse equivalence classes, held-out compositions, heterogeneous controls and abstention; do not duplicate its evaluator. |
 | [Constructed glyph notation #9694](https://github.com/Luminous-Dynamics/symthaea/issues/9694) | Visual semantic notation / script design | Related but distinct: a glyph notation encodes structured meaning; GGL describes executable geometry/creative programs. |
 
+
+### Atelier adapter — bounded registration
+
+A Rust adapter in `crates/bridges/symthaea-ggl-canvas/src/atelier.rs` invokes the existing public `symthaea_atelier::generate(config, snapshot, rng)` function and returns Canvas's existing `SceneNode`. It does not implement a second generator, call the Atelier aesthetic score, or rank/select candidates.
+
+Single-family styles are registered with source-derived conservative node ceilings: LSystem 3, ParametricCurve 11, PersistenceTexture 130, ColorField 15, ReactionDiffusion 1,027, StrangeAttractor 6,002, HofstadterButterfly 1,593, PersistenceDiagram 263. `Composite` is excluded until its aggregate compute/output budget is separately qualified. The selected style's node budget is checked before generation.
+
+Further limits: viewport ≤8192 scene units, generator elements ≤5000, scene nodes ≤10000, depth ≤128, path ≤512 KiB, bounded style/resource data and finite/ranged transforms. Snapshot sanitation is checked first; if Canvas would clamp or truncate the input snapshot, the adapter rejects rather than silently changing it. The production receipt binds the explicit seed, style, request digest, generated scene digest and registered output ceiling.
+
+These are static/source-derived bounds, not runtime measurements. Rust tests are authored but still require exact-head Cargo execution.
+
 ## Stable identity without breaking Canvas
 
 Current Canvas `SceneNode` primitives do not carry semantic IDs. `NodeKind::Group` has an optional ID, while Circle/Ellipse/Line/Polygon/Rect/Path do not.
