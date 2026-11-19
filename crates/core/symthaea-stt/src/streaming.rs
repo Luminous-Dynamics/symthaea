@@ -1016,6 +1016,35 @@ mod tests {
     }
 
     #[test]
+    fn stream_processor_accepts_only_exact_raw_frame_encoder_identity() {
+        let mut processor = StreamProcessor::new(StreamConfig::default());
+        let audio_config = processor.frontend.config().clone();
+        let raw = TrainedPrototypes::new_with_encoder(
+            crate::bootstrap::BootstrapConfig::default(),
+            PrototypeEncoderMetadata::direct_mel_frame_v1(audio_config.clone()),
+        );
+        assert!(processor.load_trained_prototypes(&raw).is_ok());
+
+        let temporal = TrainedPrototypes::new_with_encoder(
+            crate::bootstrap::BootstrapConfig::default(),
+            PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(audio_config),
+        );
+        assert!(processor.load_trained_prototypes(&temporal).is_err());
+    }
+
+    #[test]
+    fn stream_processor_rejects_raw_prototypes_with_different_hop_cadence() {
+        let projector = AudioProjector::default_config();
+        let raw = TrainedPrototypes::new_with_encoder(
+            crate::bootstrap::BootstrapConfig::default(),
+            PrototypeEncoderMetadata::direct_mel_frame_v1(projector.config().clone()),
+        );
+        let mut low_latency = StreamProcessor::new(StreamConfig::low_latency());
+
+        assert!(low_latency.load_trained_prototypes(&raw).is_err());
+    }
+
+    #[test]
     fn live_stream_hvs_match_offline_training_encoder() {
         let audio = deterministic_audio_fixture();
         let mut projector = AudioProjector::default_config();
