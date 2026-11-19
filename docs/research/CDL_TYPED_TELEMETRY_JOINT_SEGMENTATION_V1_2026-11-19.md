@@ -197,30 +197,30 @@ The paper-style mapping captures the expected gain on a stable skewed distributi
 
 **Evidence boundary:** this isolates the prefix-flag mechanism only. It does not validate Rabbit's ACTF-derived branch classification, TOE bit-elision proof, full byte/bitstream framing, paper datasets, implementation, or headline compression/time gains. The same-block oracle is an offline upper bound over only two flag choices (fixed 2-bit vs dynamic 1/2/3/3), using current-block counts; it does not include payloads or side-information costs. The guarded variant is our hypothesis and has not yet been evaluated on blind or production-derived data.
 
-## Order-preserving series partitioning with an encoded interleave schedule (2026-11-19)
+## Order-preserving per-series partitioning with adaptive timestamp merge (2026-11-19)
 
-The grouped-versus-round-robin RLE ablation exposed a limitation: whole-record runs vanish when events from many series are interleaved. A new independent C++20 frame prototype now tests whether we can recover per-series locality without changing the caller-visible record order.
+The grouped-versus-round-robin RLE ablation showed that whole-record runs disappear when records from many series are interleaved. The new partitioned frame restores per-series locality without silently changing caller-visible row order.
 
 Files:
 - `research/cdl-bench/reference/typed_record_partitioned_runs_reference.cpp`
 - `scripts/research/cdl_partitioned_telemetry_reference.sh`
 
-### Format hypothesis
+### Format and order-restoration modes
 
-The prototype uses a hybrid event/column layout:
-1. Build a stable dictionary of (entity_id, series_id) keys in first-seen order.
-2. Partition records into one chronological substream per key.
-3. Encode each per-key substream with exact timestamp deltas, changed-field masks, explicit presence/null state, exact 64-bit values and repeated-state heartbeat runs.
-4. Store each substream's key, record count and byte length in the outer frame.
-5. Store a fixed-width bit-packed key-ID schedule in original arrival order (six bits per event for 64 keys).
-6. During decoding, decode each key stream, then replay the schedule to restore the exact original cross-series record ordering.
-7. Include a versioned magic, field-kind schema, record count, child lengths, order-schedule bit count and CRC32.
+The prototype builds a stable dictionary of (entity_id, series_id) keys and encodes one chronological child stream per key. Each child carries exact timestamp deltas, changed-field masks, explicit presence/null state, exact 64-bit field values and repeated-state heartbeat runs. The outer frame charges key IDs, record counts, child lengths, schema, order metadata and CRC32.
 
-Unlike sorting records and returning a reordered table, the schedule is an explicit reversible permutation. The experiment charges its bytes. The raw and global state-delta controls use equivalent outer magic/count/payload-length/CRC frames and include the same eight schema kind IDs, so the compressed-size comparison no longer omits basic framing from only one arm.
+It now supports two decoder-synchronous order modes:
+
+1. **Timestamp merge (mode 0):** when the original global stream has strictly increasing, unique timestamps, the decoder reconstructs the original interleaving with a deterministic k-way min-heap merge of the independently decoded series streams. No order schedule is transmitted. The decoder verifies strict monotonicity in every child and across the merged output.
+2. **Explicit schedule (mode 1):** when timestamps contain duplicates or arrive out of order, the frame carries the original bit-packed key-ID schedule. The decoder replays it to restore exact record order. The fallback is tested with duplicate-timestamp and out-of-order fixtures.
+
+This is not a lossy reorder: the encoder chooses merge mode only if timestamps are globally strict and unique. Otherwise it falls back to the schedule. Both paths reconstruct the exact original records, including order.
+
+The raw and global state-delta controls use matching self-describing outer frames (magic, record count, payload length, schema and CRC32), so the Zstandard comparisons charge the basic framing on all arms.
 
 ### Local strict-warning execution
 
-The checked-in C++ source was built locally with GCC 14.2 using:
+The checked-in C++ source was built with GCC 14.2:
 
 ```sh
 g++ -O2 -std=c++20 -Wall -Wextra -Wconversion -Werror \
@@ -229,34 +229,31 @@ g++ -O2 -std=c++20 -Wall -Wextra -Wconversion -Werror \
 /tmp/typed_record_partitioned_runs_reference --emit-dir /tmp/cdl-partitioned-streams
 ```
 
-Validation passed: empty stream, four deterministic 65,536-record fixtures, 100 randomized exact round-trips with interleaved keys, and three malformed-frame cases (bad magic/checksum, truncation and trailing bytes). Each decoded output was compared with the original records, including timestamps, key identity, null bitmap, and exact u64/f64 field bits.
+Validation passed:
+- Empty-stream encode/decode.
+- Four deterministic 65,536-record round-trips using timestamp-merge mode.
+- 100 randomized interleaved round-trips.
+- Duplicate-timestamp and out-of-order schedule-fallback round-trips.
+- Three malformed-frame rejections: corrupt magic/checksum, truncation and trailing bytes.
 
-Zstandard CLI 1.5.7 at level 19 was then applied to the three complete framed representations. Each compressed output was decompressed and compared byte-for-byte to its input.
+The benchmark then compressed all three complete framed representations with Zstandard CLI 1.5.7 level 19. Each compressed output decompressed byte-for-byte to its original frame.
 
-### Results: order-preserving, round-robin interleaving
-
-All fixtures contain 65,536 records across 64 interleaved series. Bytes are complete raw, global state-delta, or partitioned frames before Zstd; Zstd sizes include the Zstd frame.
+### Results: 64 round-robin series, 65,536 records
 
 | Workload | Raw frame | Global delta frame | Partitioned frame | Zstd(raw) | Zstd(global delta) | Zstd(partitioned) |
 |---|---:|---:|---:|---:|---:|---:|
-| Sparse | 5,308,448 | 648,493 | 190,030 | 223,774 | 85,931 | 61,923 |
-| Bursty | 5,308,448 | 833,813 | 369,322 | 367,607 | 224,396 | 204,994 |
-| Mostly idle | 5,308,448 | 590,677 | 57,459 | 153,209 | 5,577 | 4,846 |
-| Noisy | 5,308,448 | 3,769,213 | 3,685,415 | 2,603,680 | 2,316,397 | 2,253,017 |
+| Sparse | 5,308,448 | 648,493 | 140,879 | 223,774 | 85,931 | 61,864 |
+| Bursty | 5,308,448 | 833,813 | 320,171 | 367,607 | 224,396 | 204,921 |
+| Mostly idle | 5,308,448 | 590,677 | 8,308 | 153,209 | 5,577 | 4,784 |
+| Noisy | 5,308,448 | 3,769,213 | 3,636,264 | 2,603,680 | 2,316,397 | 2,252,910 |
 
-Relative to Zstd on the equally framed global state-delta representation, the partitioned frame plus Zstd was smaller by:
-- Sparse: 27.94%.
-- Bursty: 8.65%.
-- Mostly idle: 13.11%.
-- Noisy: 2.74%.
+Relative to Zstd on the equally framed global state-delta stream, partitioning plus Zstd was smaller by 28.01% (sparse), 8.68% (bursty), 14.22% (mostly idle) and 2.74% (noisy). Relative to Zstd on the equally framed raw representation, it was smaller by 72.35%, 44.26%, 96.88% and 13.47%, respectively.
 
-Relative to Zstd on the equally framed raw representation, it was smaller by 72.33%, 44.24%, 96.84% and 13.47%, respectively.
+The strict timestamp-merge mode reduced the uncompressed partitioned frame from 190,030 to 140,879 bytes on sparse data, 369,322 to 320,171 on bursty, 57,459 to 8,308 on mostly idle and 3,685,415 to 3,636,264 on noisy data, relative to the earlier version that carried a fixed six-bit-per-record schedule. The Zstd impact is smaller because the repeating schedule itself was highly compressible.
 
-The same synthetic data is intentionally interleaved in its original chronological order. The schedule is six bits per record (49,152 raw schedule bytes for this 64-key fixture), plus the dictionary and stream descriptors. The wins therefore are not from omitting the original order; the decoder reconstructs it exactly.
+The reproducer is `bash scripts/research/cdl_partitioned_telemetry_reference.sh`. It compiles the checked-in source with strict warnings, tests both order modes, emits the three frames, applies identical Zstd settings and verifies exact decompression.
 
-The reproducer is `bash scripts/research/cdl_partitioned_telemetry_reference.sh`. It compiles the checked-in source with strict warnings, verifies the round-trips, applies the same Zstd level to raw/global-delta/partitioned frames, and checks exact decompression.
-
-**Evidence boundary:** this is an independent C++ prototype plus Zstd, not the Rust CDL implementation, not the arithmetic-coded production frame, not a public dataset, and not a comparison with ALP/Pco/Gorilla/Chimp/ACTF/Rabbit/WZS. The benchmark uses only four deterministic synthetic workloads, eight fixed field lanes and 64 keys. It materializes and partitions the full input in memory, so it is not yet a bounded-memory streaming encoder. No throughput, peak RSS, random-access/index, checkpoint recovery, schema-name registry or production ingestion costs have been measured. The per-series streams are length-delimited, but the prototype does not yet publish a separate random-access directory. These results justify implementing and testing the representation; they do not establish a codec/SOTA win.
+**Evidence boundary:** independent C++ transform-plus-Zstd synthetic evidence, not Rust CDL, not the arithmetic-coded production frame, not public dataset results, and not a matched ALP/Pco/Gorilla/Chimp/ACTF/Rabbit/WZS comparison. The fixture has eight fixed lanes and 64 keys. The prototype materializes and partitions the full input in memory; it is not yet a bounded-memory streaming encoder. No throughput, peak RSS, direct random access, index, checkpoint recovery, schema-name registry or production ingestion costs have been measured. It still needs blind tests on production-derived telemetry, variable key counts, irregular per-series timestamps, timestamp disorder bursts, duplicate-time tie groups, and randomized arrival patterns.
 
 ## Current Rust implementation status (compiler validation pending)
 
