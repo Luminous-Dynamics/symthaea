@@ -42,6 +42,8 @@ The verifier checks:
 - the structured [render-invocation-v1 schema](../../docs/research/schemas/muse-render-invocation-v1.schema.json), including exact links to the renderer binary/environment/configuration, MIDI input digest, WAV output path, timestamps and exit code;
 - the receipt's project-specific v1 canonical serialization seal (typed integer/string/bool/null/array fields, lexicographically sorted object keys, compact JSON, receipt hash omitted, domain-separated SHA-256);
 - exact byte hashes for source/candidate scores, edit plan/receipt/report, MIDI, renderer artifacts, invocation, process streams, and WAV;
+- independent recomputation of the v1 velocity-only candidate from the exact source Score and authorized edit plan; exact comparison of the edit receipt deltas and verifier report counters/issues;
+- event-by-event candidate Score ↔ MIDI-note receipt comparison for source ordinal, PartId, pitch, exact onset/offset at 960 PPQ and the exporter's velocity quantization;
 - consistency of the score-edit input digest, operation IDs, protected-window IDs and independent verifier result;
 - consistency of the receipt with the PartId-aware MIDI manifest, including the repository's 960 ticks-per-quarter resolution;
 - exact timeline, instrument-binding and capability-manifest digests; one-to-one timeline-segment/track correspondence; and renderer/program/patch agreement;
@@ -51,7 +53,7 @@ The verifier checks:
 ## Important boundaries
 
 - A passing integrity check is not an edit-acceptance decision.
-- This tool does not independently recompute the score-edit candidate transformation. It verifies the exact edit verifier report bytes and checks their source/operation bindings. The score-edit verifier remains a separate component.
+- The standalone verifier independently re-derives the current velocity-only ScoreEditPlanV1 transformation from the source Score, checks every candidate note field and velocity, validates exact edit receipt deltas, and checks verifier report counts/issues. It does not yet independently support future ScoreEdit operation classes; unknown schema/operation classes must not be silently accepted.
 - MIDI parsing verifies the MIDI file against its own manifest. It does not prove the renderer consumed that MIDI. The invocation/executor evidence and trust boundary remain separate.
 - WAV non-silence and metadata checks do not prove score-to-audio conformance, perceptual quality, musical coherence or human preference.
 - The tool does not verify digital signatures or trusted hardware/workflow attestations. It reports the attestation class without upgrading it to trusted identity.
