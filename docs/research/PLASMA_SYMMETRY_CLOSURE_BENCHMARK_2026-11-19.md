@@ -41,7 +41,27 @@ Huang, Dong & Wang, “Machine-learning heat flux closure for multi-moment fluid
 
 This work trains a Fourier neural operator closure from Vlasov simulation data and integrates it into a multi-moment fluid model. The paper reports reproducing linear and nonlinear Landau damping evolution against Vlasov references. It is a separate electrostatic heat-flux task, not a magnetic-reconnection pressure-tensor result.
 
-Baseline reproduction must distinguish offline closure fit from online fluid-solver rollout.
+### Stronger online baseline published 2026-10-30
+
+Burles, Camporeale & Pezzi, “A neural operator closure for Landau damping in electrostatic plasma,” *Journal of Plasma Physics* 92(5), E149, published online 2026-10-30, DOI: https://doi.org/10.1017/S0022377826102517.
+
+This is the immediate online-closure competitor for the electrostatic lane:
+- FNO closure is trained online inside a differentiable fluid solver;
+- training loss is computed on closed-fluid-solver trajectories rather than individual kinetic snapshots;
+- closure is non-Markovian and consumes a trailing window of resolved-moment history;
+- the paper reports reproducing linear and nonlinear 1D electrostatic Landau damping, generalizing to unseen initial perturbation amplitudes between training values, and remaining stable in independent fluid simulations;
+- it explicitly distinguishes a-posteriori online training from a-priori pointwise regression, noting that small snapshot errors can compound and destabilize long solver rollouts.
+
+Treat these as source-reported results for that exact 1D electrostatic task, not cross-regime superiority or fusion-device evidence.
+
+Our Landau-damping tournament must therefore include:
+1. analytic Hammett–Perkins / applicable Padé references;
+2. source-pinned offline FNO baseline;
+3. source-pinned online/a-posteriori FNO with trailing memory;
+4. sparse equation-discovery closures;
+5. Symthaea candidates only when executable and matched on solver, horizon, initial conditions and budget.
+
+Baseline reproduction must distinguish offline closure fit from online fluid-solver rollout. Long-horizon stability, parameter interpolation/extrapolation and independent solver execution are first-class metrics.
 
 ### C. Sparse equation discovery for electrostatic heat flux
 
