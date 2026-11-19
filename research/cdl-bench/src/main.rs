@@ -522,6 +522,10 @@ fn f64s_candidate_trace(frame: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
     let segment_count = u32::from_le_bytes(
         frame[20..24].try_into().map_err(|_| "invalid F64S segment count")?,
     ) as usize;
+    let minimum_child_bytes = frame.len() - OUTER_HEADER_LEN;
+    if segment_count > minimum_child_bytes / CHILD_HEADER_LEN {
+        return Err("F64S segment count exceeds the available child-frame bytes".into());
+    }
     let mut cursor = OUTER_HEADER_LEN;
     let mut trace = Vec::with_capacity(segment_count);
     for _ in 0..segment_count {
@@ -1105,6 +1109,63 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("float") => float_command(&args),
         Some("bounded") => bounded_command(&args),
         _ => Err(usage().into()),
+    }
+}
+
+#[cfg(test)]
+mod candidate_trace_tests {
+    use super::*;
+
+    #[test]
+    fn candidate_trace_matches_all_three_selector_encoders() {
+        let values: Vec<f64> = (0..512)
+            .map(|index| {
+                if index % 97 < 64 {
+                    42.5
+                } else {
+                    f64::from_bits(0x3ff0_0000_0000_0000 + index as u64 * 31)
+                }
+            })
+            .collect();
+
+        let oracle = compress_f64_segmented(&values, 64).unwrap();
+        let historical = compress_f64_online_selector(&values, 64).unwrap();
+        let sparse_one = compress_f64_budgeted_selector(&values, 64, 1).unwrap();
+        let sparse_four = compress_f64_budgeted_selector(&values, 64, 4).unwrap();
+
+        let oracle_trace = f64s_candidate_trace(&oracle).unwrap();
+        let historical_trace = f64s_candidate_trace(&historical).unwrap();
+        let sparse_one_trace = f64s_candidate_trace(&sparse_one).unwrap();
+        let sparse_four_trace = f64s_candidate_trace(&sparse_four).unwrap();
+
+        assert_eq!(oracle_trace.len(), 8);
+        assert_eq!(historical_trace.len(), 8);
+        assert_eq!(sparse_one_trace.len(), 8);
+        assert_eq!(sparse_four_trace.len(), 8);
+        assert_eq!(sparse_one_trace, historical_trace);
+        assert_eq!(
+            candidate_trace_vs_oracle(&historical_trace, &oracle_trace)
+                .unwrap()
+                .1,
+            historical_trace
+                .iter()
+                .zip(&oracle_trace)
+                .filter(|(chosen, best)| chosen != best)
+                .count()
+        );
+        assert!(candidate_switch_count(&oracle_trace) <= 7);
+        assert!(candidate_switch_count(&sparse_four_trace) <= 7);
+    }
+
+    #[test]
+    fn candidate_trace_rejects_truncated_and_malformed_selector_frames() {
+        assert!(f64s_candidate_trace(&[]).is_err());
+        assert!(f64s_candidate_trace(b"F64C").is_err());
+
+        let mut impossible_count = vec![0u8; 32];
+        impossible_count[0..4].copy_from_slice(b"F64S");
+        impossible_count[20..24].copy_from_slice(&1u32.to_le_bytes());
+        assert!(f64s_candidate_trace(&impossible_count).is_err());
     }
 }
 
