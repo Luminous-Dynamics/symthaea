@@ -1,0 +1,72 @@
+name: STT stream continuity qualification
+
+on:
+  push:
+    branches:
+      - fix/voice-stt-loss-001-absolute-frame-continuity
+    paths:
+      - "crates/core/symthaea-stt/**"
+      - "src/cognitive_loop/voice_channel.rs"
+      - "src/perception/audio_stream.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/stt-stream-continuity.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "crates/core/symthaea-stt/**"
+      - "src/cognitive_loop/voice_channel.rs"
+      - "src/perception/audio_stream.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/stt-stream-continuity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stt-stream-continuity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  QUALIFIED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  exact-head-stt:
+    name: Exact-head STT continuity tests and consumer compile
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.QUALIFIED_SHA }}
+          persist-credentials: false
+
+      - name: Assert exact checkout
+        run: test "$(git rev-parse HEAD)" = "${QUALIFIED_SHA}"
+
+      - name: Install repository-pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Assert pinned toolchain
+        run: |
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+          cargo --version
+          rustfmt --version
+
+      - name: Check formatting for changed packages
+        run: cargo fmt --manifest-path Cargo.toml -p symthaea-stt -p symthaea -- --check
+
+      - name: Run STT library unit and discontinuity regression tests
+        run: cargo test --manifest-path Cargo.toml -p symthaea-stt --lib --locked
+
+      - name: Compile both live voice call sites in the application
+        run: cargo check --manifest-path Cargo.toml -p symthaea --lib --features voice-stt-live --locked
+
+      - name: Run strict STT library Clippy
+        run: cargo clippy --manifest-path Cargo.toml -p symthaea-stt --lib --locked -- -D warnings
