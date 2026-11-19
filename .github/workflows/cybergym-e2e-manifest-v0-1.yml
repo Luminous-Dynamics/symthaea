@@ -1,0 +1,94 @@
+name: CyberGym-E2E manifest contract
+
+on:
+  push:
+    branches: [research/cybergym-e2e-adapter-v0-1-2026-11-19]
+    paths:
+      - "docs/research/CYBERGYM_E2E_ADAPTER_V0_1.md"
+      - "docs/research/cybergym-e2e-adapter-v0-1/**"
+      - ".github/workflows/cybergym-e2e-manifest-v0-1.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "docs/research/CYBERGYM_E2E_ADAPTER_V0_1.md"
+      - "docs/research/cybergym-e2e-adapter-v0-1/**"
+      - ".github/workflows/cybergym-e2e-manifest-v0-1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cybergym-e2e-manifest-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  manifest-contract:
+    name: Draft 2020-12 schema and negative controls
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned schema validator
+        run: python3 -m pip install --disable-pip-version-check "jsonschema==4.26.0"
+      - name: Validate schema, planning fixture, dataset lock and negative controls
+        run: |
+          python3 - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+
+          root = Path(".")
+          base = root / "docs/research/cybergym-e2e-adapter-v0-1"
+          schema = json.loads((base / "run-manifest.schema.json").read_text())
+          example = json.loads((base / "run-manifest.planning-example.json").read_text())
+          lock = json.loads((base / "dataset-lock.json").read_text())
+
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          validator.validate(example)
+
+          assert example["manifest_state"] == "planning"
+          assert example["selection"]["task_ids"] == []
+          assert example["benchmark"]["dataset_revision"] == lock["dataset_revision"]
+          assert example["benchmark"]["source_readme_blob_sha"] == lock["benchmark_code_readme_blob_sha"]
+          assert lock["retrieval_state"] == "not-retrieved"
+          assert lock["downloaded_artifact_manifest_sha256"] is None
+          assert lock["per_artifact_digests"] == []
+          assert example["authority"]["allowed_external_targets"] == []
+          assert example["authority"]["production_credentials_present"] is False
+          assert example["execution"]["isolation"]["firewall_bypass"] is False
+
+          def expect_rejected(candidate, label):
+              errors = list(validator.iter_errors(candidate))
+              if not errors:
+                  raise AssertionError(f"negative control unexpectedly accepted: {label}")
+
+          bad = copy.deepcopy(example)
+          bad["oracle"]["ground_truth_poc_visible_to_agent"] = True
+          expect_rejected(bad, "E2E ground-truth PoC exposed")
+
+          bad = copy.deepcopy(example)
+          bad["execution"]["isolation"]["firewall_bypass"] = True
+          expect_rejected(bad, "firewall bypass enabled")
+
+          bad = copy.deepcopy(example)
+          bad["unregistered_claim"] = "not allowed"
+          expect_rejected(bad, "undeclared root property")
+
+          bad = copy.deepcopy(example)
+          bad["manifest_state"] = "frozen"
+          expect_rejected(bad, "frozen manifest without integrity-checked dataset and complete run context")
+
+          bad = copy.deepcopy(example)
+          bad["benchmark"]["dataset_revision"] = "latest"
+          expect_rejected(bad, "floating dataset revision")
+
+          patch_only = copy.deepcopy(example)
+          patch_only["benchmark"]["mode"] = "patch-only"
+          patch_only["oracle"]["ground_truth_poc_visible_to_agent"] = True
+          validator.validate(patch_only)
+
+          print("PASS: Draft 2020-12 schema, planning fixture, lock consistency, and 6 mode/safety controls")
+          print("NON-CLAIM: no benchmark data was retrieved, no agent was run, and no execution result was produced")
+          PY
