@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_model_discrimination_v0_1.schema.json",
+  "title": "Synthetic superconductivity model-discrimination planning instance",
+  "description": "Finite hypothesis set with an explicit none-of-the-above model and binary action likelihoods; synthetic contract only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "instance_id",
+    "fixture_only",
+    "models",
+    "outcome_labels",
+    "initial_capabilities",
+    "budget_units",
+    "actions",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "contract": { "const": "SC-MODEL-DISCRIMINATION-0.1" },
+    "instance_id": { "type": "string", "minLength": 1 },
+    "fixture_only": { "const": true },
+    "models": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["model_id", "prior_probability", "none_of_above"],
+        "properties": {
+          "model_id": { "type": "string", "minLength": 1 },
+          "prior_probability": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+          "none_of_above": { "type": "boolean" }
+        }
+      }
+    },
+    "outcome_labels": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "initial_capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "budget_units": { "type": "integer", "minimum": 1 },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action_id",
+          "action_type",
+          "label",
+          "cost_units",
+          "requires_capabilities",
+          "provides_capabilities",
+          "eligible",
+          "exclusion_reason",
+          "model_likelihoods"
+        ],
+        "properties": {
+          "action_id": { "type": "string", "minLength": 1 },
+          "action_type": { "enum": ["capability", "measurement", "replication", "analysis"] },
+          "label": { "type": "string", "minLength": 1 },
+          "cost_units": { "type": "integer", "minimum": 1 },
+          "requires_capabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "provides_capabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "eligible": { "type": "boolean" },
+          "exclusion_reason": { "type": "string" },
+          "model_likelihoods": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["model_id", "outcome_probabilities"],
+              "properties": {
+                "model_id": { "type": "string", "minLength": 1 },
+                "outcome_probabilities": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": { "type": "number", "minimum": 0, "maximum": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "Synthetic model-discrimination planning contract only; likelihoods are illustrative and do not describe a real specimen, authorize an experiment, or establish a pairing mechanism."
+    }
+  }
+}
