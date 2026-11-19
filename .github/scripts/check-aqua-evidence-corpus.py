@@ -36,6 +36,17 @@ ALLOWED_SOURCE_TYPES = {
 
 EXPECTED_VALUES = {
     "flow_rate": ("scalar", "L/min"),
+    "fresh_water_flow_rate": ("scalar", "L/min"),
+    "minimum_connected_showerhead_flow": ("scalar", "L/min"),
+    "water_savings_fraction": ("scalar", "%"),
+    "energy_savings_fraction": ("scalar", "%"),
+    "cleaning_water_per_cycle": ("scalar", "L"),
+    "cleaning_cycle_duration": ("scalar", "min"),
+    "deep_clean_cycle_duration": ("scalar", "min"),
+    "water_volume_per_shower": ("scalar", "L"),
+    "pressure_flow_declaration": ("text", None),
+    "inlet_supply_capacity": ("text", None),
+    "installation_requirements": ("text", None),
     "supply_pressure_range": ("range", "kPa"),
     "maximum_flow_rate": ("scalar", "L/min"),
     "flow_regulator_setting": ("scalar", "L/min"),
