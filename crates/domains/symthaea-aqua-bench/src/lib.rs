@@ -206,6 +206,8 @@ impl BenchmarkConditions {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeviceConfiguration {
     pub market_variant_id: String,
+    /// Canonical digest covering market variant, hardware, installation, cleaning and firmware.
+    pub device_configuration_sha256: String,
     pub hardware_configuration_sha256: String,
     pub installation_sha256: String,
     pub cleaning_protocol_sha256: String,
@@ -215,6 +217,10 @@ pub struct DeviceConfiguration {
 impl DeviceConfiguration {
     pub fn validate(&self) -> Result<(), ContractError> {
         require_nonempty("market_variant_id", &self.market_variant_id)?;
+        require_digest(
+            "device_configuration_sha256",
+            &self.device_configuration_sha256,
+        )?;
         require_digest(
             "hardware_configuration_sha256",
             &self.hardware_configuration_sha256,
@@ -371,6 +377,38 @@ pub fn validate_qualified_matched_comparison(
             },
         ));
     }
+    if control_qualification.run_id != control.run_id {
+        return Err(QualifiedComparisonError::Benchmark(
+            ContractError::ContextMismatch {
+                field: "control_qualification.run_id",
+            },
+        ));
+    }
+    if candidate_qualification.run_id != candidate.run_id {
+        return Err(QualifiedComparisonError::Benchmark(
+            ContractError::ContextMismatch {
+                field: "candidate_qualification.run_id",
+            },
+        ));
+    }
+    if control_qualification.device_configuration_sha256
+        != control.device.device_configuration_sha256
+    {
+        return Err(QualifiedComparisonError::Benchmark(
+            ContractError::ContextMismatch {
+                field: "control_device_configuration_sha256",
+            },
+        ));
+    }
+    if candidate_qualification.device_configuration_sha256
+        != candidate.device.device_configuration_sha256
+    {
+        return Err(QualifiedComparisonError::Benchmark(
+            ContractError::ContextMismatch {
+                field: "candidate_device_configuration_sha256",
+            },
+        ));
+    }
     crate::service_qualification::evaluate_matched_service_qualification(
         qualification_profile,
         control_qualification,
@@ -410,6 +448,7 @@ mod tests {
             },
             device: DeviceConfiguration {
                 market_variant_id: market_variant_id.to_owned(),
+                device_configuration_sha256: digest('6'),
                 hardware_configuration_sha256: digest('f'),
                 installation_sha256: digest('1'),
                 cleaning_protocol_sha256: digest(cleaning_digest),
@@ -473,6 +512,7 @@ mod tests {
 
         ServiceQualificationRecord {
             run_id: run_id.to_owned(),
+            device_configuration_sha256: digest('6'),
             profile_id: profile.profile_id.clone(),
             protocol_sha256: profile.protocol_sha256.clone(),
             conditions_sha256: profile.conditions_sha256.clone(),
@@ -491,6 +531,7 @@ mod tests {
                         outcome,
                         evidence: QualificationEvidenceRef {
                             authority: domain.expected_authority(),
+                            run_id: run_id.to_owned(),
                             issuer_principal_id: format!("issuer-{domain:?}"),
                             authority_verification_receipt_sha256: digest('e'),
                             status: crate::service_qualification::QualificationEvidenceStatus::Current,
@@ -547,6 +588,77 @@ mod tests {
         assert_eq!(
             result.disposition,
             crate::service_qualification::MatchedComparisonDisposition::CandidateQualified
+        );
+    }
+
+    #[test]
+    fn qualified_comparison_rejects_service_evidence_from_another_run() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let candidate = run("candidate-001", "aqua-test-article", '8');
+        let profile = qualification_profile(
+            crate::service_qualification::QualificationClaim::FunctionalService,
+        );
+        let control_assessment = service_qualification_record(
+            "different-control-run",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let candidate_assessment = service_qualification_record(
+            "candidate-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+
+        assert_eq!(
+            validate_qualified_matched_comparison(
+                &control,
+                &candidate,
+                ComparisonScope::WaterServiceOnly,
+                &profile,
+                &control_assessment,
+                &candidate_assessment,
+            ),
+            Err(QualifiedComparisonError::Benchmark(
+                ContractError::ContextMismatch {
+                    field: "control_qualification.run_id"
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn qualified_comparison_rejects_service_evidence_from_another_device_configuration() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let candidate = run("candidate-001", "aqua-test-article", '8');
+        let profile = qualification_profile(
+            crate::service_qualification::QualificationClaim::FunctionalService,
+        );
+        let mut control_assessment = service_qualification_record(
+            "control-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        control_assessment.device_configuration_sha256 = digest('z');
+        let candidate_assessment = service_qualification_record(
+            "candidate-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+
+        assert_eq!(
+            validate_qualified_matched_comparison(
+                &control,
+                &candidate,
+                ComparisonScope::WaterServiceOnly,
+                &profile,
+                &control_assessment,
+                &candidate_assessment,
+            ),
+            Err(QualifiedComparisonError::Benchmark(
+                ContractError::ContextMismatch {
+                    field: "control_device_configuration_sha256"
+                }
+            ))
         );
     }
 
