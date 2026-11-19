@@ -50,6 +50,27 @@ The root Cargo workspace currently needs the separate unmanifested-member
 exclusion repair before this example can be compiled through Cargo. Do not
 interpret that workspace blocker as a composer or adapter failure.
 
+## Reproducibility preflight
+
+The adapter pins the Rust compiler to 1.96.0 and records the exact
+`rustc --version` output in every observation note. A different compiler
+release is rejected rather than silently producing incomparable score bytes or
+fingerprint behavior.
+
+The source check also requires the pinned reference commit
+`bd227d416878a4373eb87a53e182e7067a2411a5` to exist in local Git history. In a
+shallow checkout, fetch the historical source branch before running:
+
+    if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+      git fetch --unshallow origin muse/style-genre-profile-v1
+    else
+      git fetch origin muse/style-genre-profile-v1
+    fi
+    git cat-file -e 'bd227d416878a4373eb87a53e182e7067a2411a5^{commit}'
+
+The fetch is a prerequisite for the full-source-tree comparison; the adapter
+still checks all 13 pinned file blobs and refuses a dirty worktree.
+
 ## What is measured
 
 The adapter materializes the registered factors exactly:
