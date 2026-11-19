@@ -27,10 +27,12 @@ dependencies.
 ## Exact IEEE-754 f64 reference track
 
 The `float` command generates constant, smooth-ramp, oscillating,
-high-precision and random-bit-pattern streams. It compares:
+high-precision, plateau-step, idle-telemetry and random-bit-pattern streams.
+It compares:
 - raw IEEE-754 binary64 bit patterns;
 - XOR with the previous u64 bit pattern, encoded as a canonical u64 varint;
 - XOR with the previous u64 bit pattern, defining and reusing a leading/trailing significant-bit window;
+- exact-bit-pattern run-length encoding followed by XOR-varint coding of each run value;
 - order-0 and order-1 byte CDF models;
 - Zstandard on the original raw little-endian bytes, when installed.
 
@@ -42,29 +44,51 @@ and subnormals.
 
 The command also emits two segmented rows at chunk sizes 64, 256 and 1,024:
 
-- `segment_portfolio` is an **offline best-of-six size oracle**. For each
+- `segment_portfolio` is an **offline best-of-eight size oracle**. For each
   complete chunk, the encoder tries Raw/Order0, Raw/Order1, XOR-varint/Order0,
-  XOR-varint/Order1, XOR-window/Order0 and XOR-window/Order1,
+  XOR-varint/Order1, XOR-window/Order0, XOR-window/Order1, RLE-XOR/Order0
+  and RLE-XOR/Order1,
   then keeps the smallest complete F64C child frame. Every child header and
   CRC, plus the outer F64S header, counts toward the total size. The decoder
-  independently recomputes all six canonical child frames after
+  independently recomputes all eight canonical child frames after
   reconstruction and rejects a child that is not the exact smallest choice.
   The selector sees the current chunk before choosing and is not a streaming
   algorithm, online predictive gate, or WZS reproduction.
 - `online_historical_cost` chooses the current chunk from the average complete
-  child-frame sizes for all six candidates measured on **previous** chunks only.
+  child-frame sizes for all eight candidates measured on **previous** chunks only.
   The first chunk uses Raw/Order0. After each chunk, both encoder and decoder
-  recompute all six candidate frame sizes from that chunk to update the same
+  recompute all eight candidate frame sizes from that chunk to update the same
   integer history.
   The selected transform/model is recorded in the child's F64C header and the
   decoder rejects a child whose IDs do not match its historical policy. There
   is no additional selector symbol or intervention information.
 
-The online policy is a compute-heavy diagnostic: it makes six candidate
+The online policy is a compute-heavy diagnostic: it makes eight candidate
 measurements per chunk on both sides. It is not yet optimized for throughput.
 Both policies use the 32-byte F64S outer header and count each F64C child
 header/CRC. They provide different reference points: an offline size oracle
 and a decoder-reproducible past-only selection policy.
+
+### Production telemetry and RLE context
+
+A SIGMOD 2026 Dynatrace study reports that application-monitoring streams can
+contain long unchanged runs that are underrepresented in academic finance and
+weather datasets. Its paper reports an RLE+XOR stack with about 23% higher
+compression ratio and 34% faster execution than standalone methods; a block
+selector reportedly comes within 2% of optimal and improves over the best
+single RLE-enhanced codec by more than 13%. These are paper-reported results,
+not CDL-Bench measurements.
+
+The new `RleXorPrevious` transform groups only exactly identical u64 IEEE-754
+bit patterns (so signed zero and NaN payload distinctions remain exact), then
+stores each run length and the XOR residual of its value against the preceding
+run value. This is a transparent comparison point, not a reproduction of the
+Dynatrace implementation. `float` now includes long plateaus and mostly-idle
+telemetry-like fixtures, alongside smooth and random patterns.
+
+Reference:
+- Urbanides, Weninger and Ertl, SIGMOD Companion 2026:
+  https://doi.org/10.1145/3788853.3803097
 
 ## Independent f64 bit-window reference
 
