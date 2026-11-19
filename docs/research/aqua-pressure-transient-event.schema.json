@@ -189,7 +189,8 @@
         "required": [
           "role",
           "sha256",
-          "byte_length"
+          "byte_length",
+          "media_type"
         ],
         "properties": {
           "role": {
@@ -209,9 +210,31 @@
             "minimum": 1
           },
           "media_type": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "role": {
+                  "const": "unfiltered_trace"
+                }
+              },
+              "required": [
+                "role"
+              ]
+            },
+            "then": {
+              "properties": {
+                "media_type": {
+                  "const": "text/csv; profile=aqua-transient-trace-v1"
+                }
+              }
+            }
+          }
+        ]
       }
     },
     "analysis": {
