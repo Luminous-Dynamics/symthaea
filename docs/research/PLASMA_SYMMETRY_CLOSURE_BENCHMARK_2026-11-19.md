@@ -77,6 +77,8 @@ This leads to a central benchmark rule:
 
 **Offline NRMSE is necessary but not sufficient. A closure that fits snapshots but destabilizes the online fluid solver fails.**
 
+The machine-readable source/task register is `data/research/plasma_symmetry_closure_sources_v0_1.json`. It preserves the magnetic-reconnection and electrostatic tasks as separate lanes, records source-reported claims and claim ceilings, and leaves data/code access and redistribution-rights states explicitly unaudited until verified. All entries retain `luminous_reproduction=false`.
+
 ## 3. Existing Luminous capability and concrete gap
 
 ### Symthaea
