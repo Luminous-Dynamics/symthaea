@@ -291,3 +291,15 @@ The critical negatives are:
 - an incomplete set of admissible membership probes, which must expose unresolved subgroup pairs.
 
 The full-task checker and its evidence references remain outside this active identification fixture. A subgroup candidate never authorizes quotient pruning; the finite quotient compiler must still independently qualify the complete task semantics.
+
+
+## Independent subgroup benchmark oracle
+
+The active-subgroup fixture now has a separate Rust 1.96 oracle under `subgroup-oracle/`. It parses the exact JSON fixture itself, validates the full multiplication tables (Latin rows/columns, identity, inverses, associativity), enumerates and canonically orders all subgroups, and recomputes:
+- full-scan cost;
+- greedy worst-case cost;
+- exact static minimum-cost basis;
+- exact adaptive minimax worst-case cost;
+- the full-scan/adaptive ratio.
+
+The oracle is code-independent from the Symthaea subgroup-active implementation. The fixture workflow runs format, locked tests and strict Clippy for this oracle. A matching fixture row is not a performance claim; it is a reproducibility check on the frozen mathematical instance and objective.
