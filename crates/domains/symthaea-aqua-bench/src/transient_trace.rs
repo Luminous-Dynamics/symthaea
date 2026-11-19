@@ -345,6 +345,7 @@ pub struct TraceChannel {
     pub unit: ChannelUnit,
     pub instrument_id: String,
     pub calibration_receipt_sha256: String,
+    pub raw_trace_sha256: String,
     pub measurement_uncertainty: f64,
     #[serde(rename = "quality_state")]
     pub quality: ChannelQuality,
@@ -370,6 +371,7 @@ impl TraceChannel {
             require_text(field, value)?;
         }
         require_digest("calibration_receipt_sha256", &self.calibration_receipt_sha256)?;
+        require_digest("raw_trace_sha256", &self.raw_trace_sha256)?;
 
         if self.quality != ChannelQuality::Valid {
             return Err(TransientTraceError::ChannelNotUsable {
@@ -641,6 +643,8 @@ pub enum TransientTraceError {
     MissingUnfilteredTrace,
     MissingEventLog,
     MissingSiteObservationArtifact,
+    MissingTraceArtifactReference { channel_id: String },
+    TraceArtifactNotFound { channel_id: String },
     DuplicateArtifactRole { role: RawArtifactRole },
     EmptyRawArtifact,
     CommandFamilyMismatch,
@@ -691,6 +695,12 @@ impl Display for TransientTraceError {
             Self::MissingEventLog => write!(f, "event log artifact is missing"),
             Self::MissingSiteObservationArtifact => {
                 write!(f, "site-observed profile lacks its source observation artifact")
+            }
+            Self::MissingTraceArtifactReference { channel_id } => {
+                write!(f, "channel {channel_id} does not identify its unfiltered raw-trace artifact")
+            }
+            Self::TraceArtifactNotFound { channel_id } => {
+                write!(f, "channel {channel_id} references a raw-trace digest absent from the manifest")
             }
             Self::DuplicateArtifactRole { role } => write!(f, "duplicate raw artifact role: {role:?}"),
             Self::EmptyRawArtifact => write!(f, "raw artifact byte length must be greater than zero"),
@@ -889,9 +899,13 @@ impl TransientEventProfile {
         // singleton references so their identity cannot be silently ambiguous.
         let mut singleton_roles = HashSet::with_capacity(self.raw_artifacts.len());
         let mut roles = HashSet::with_capacity(self.raw_artifacts.len());
+        let mut unfiltered_trace_digests = HashSet::new();
         for artifact in &self.raw_artifacts {
             artifact.validate()?;
             roles.insert(artifact.role);
+            if artifact.role == RawArtifactRole::UnfilteredTrace {
+                unfiltered_trace_digests.insert(artifact.sha256.as_str());
+            }
             if artifact.role != RawArtifactRole::UnfilteredTrace
                 && !singleton_roles.insert(artifact.role)
             {
@@ -908,6 +922,18 @@ impl TransientEventProfile {
             && !roles.contains(&RawArtifactRole::SiteObservationRecord)
         {
             return Err(TransientTraceError::MissingSiteObservationArtifact);
+        }
+        for channel in &self.acquisition.channels {
+            if !is_sha256(&channel.raw_trace_sha256) {
+                return Err(TransientTraceError::MissingTraceArtifactReference {
+                    channel_id: channel.channel_id.clone(),
+                });
+            }
+            if !unfiltered_trace_digests.contains(channel.raw_trace_sha256.as_str()) {
+                return Err(TransientTraceError::TraceArtifactNotFound {
+                    channel_id: channel.channel_id.clone(),
+                });
+            }
         }
         Ok(())
     }
@@ -945,6 +971,9 @@ pub fn validate_matched_event_replay(
     }
     if control.command.kind != candidate.command.kind {
         return Err(TransientTraceError::EventReplayMismatch { field: "command.kind" });
+    }
+    if control.command.unit != candidate.command.unit {
+        return Err(TransientTraceError::EventReplayMismatch { field: "command.unit" });
     }
     if control.command.samples != candidate.command.samples {
         return Err(TransientTraceError::EventReplayMismatch { field: "command.samples" });
@@ -990,6 +1019,8 @@ pub fn validate_matched_event_replay(
             if left.site_profile_id != right.site_profile_id
                 || left.site_profile_revision != right.site_profile_revision
                 || left.site_conditions_sha256 != right.site_conditions_sha256
+                || left.survey_receipt_sha256 != right.survey_receipt_sha256
+                || left.observation_window != right.observation_window
             {
                 return Err(TransientTraceError::EventReplayMismatch { field: "site_observation" });
             }
@@ -997,7 +1028,8 @@ pub fn validate_matched_event_replay(
         (None, None) => {
             let left = control.synthetic_profile.as_ref().expect("validated synthetic profile");
             let right = candidate.synthetic_profile.as_ref().expect("validated synthetic profile");
-            if left.generator_sha256 != right.generator_sha256
+            if left.generator_id != right.generator_id
+                || left.generator_sha256 != right.generator_sha256
                 || left.generator_parameters_sha256 != right.generator_parameters_sha256
             {
                 return Err(TransientTraceError::EventReplayMismatch { field: "synthetic_generator" });
@@ -1053,6 +1085,7 @@ mod tests {
             unit: ChannelUnit::Kpa,
             instrument_id: format!("sensor-{id}"),
             calibration_receipt_sha256: digest('a'),
+            raw_trace_sha256: digest('3'),
             measurement_uncertainty: 1.0,
             quality: ChannelQuality::Valid,
             sample_rate_hz: 1_000.0,
@@ -1074,6 +1107,7 @@ mod tests {
             unit: ChannelUnit::LitresPerMinute,
             instrument_id: "flow-meter-1".to_owned(),
             calibration_receipt_sha256: digest('b'),
+            raw_trace_sha256: digest('3'),
             measurement_uncertainty: 0.05,
             quality: ChannelQuality::Valid,
             sample_rate_hz: 1_000.0,
@@ -1152,6 +1186,7 @@ mod tests {
                 "unit": unit,
                 "instrument_id": instrument_id,
                 "calibration_receipt_sha256": digest(calibration),
+                "raw_trace_sha256": digest('3'),
                 "measurement_uncertainty": uncertainty,
                 "sample_rate_hz": 1000.0,
                 "effective_bandwidth_hz": 400.0,
