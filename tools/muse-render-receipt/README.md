@@ -40,7 +40,7 @@ The bundle directory must contain:
 
 The verifier checks:
 - the structured [render-invocation-v1 schema](../../docs/research/schemas/muse-render-invocation-v1.schema.json), including exact links to the renderer binary/environment/configuration, MIDI input digest, WAV output path, timestamps and exit code;
-- the receipt's RFC 8785-style canonical JSON seal (receipt hash omitted before hashing);
+- the receipt's project-specific v1 canonical serialization seal (typed integer/string/bool/null/array fields, lexicographically sorted object keys, compact JSON, receipt hash omitted, domain-separated SHA-256);
 - exact byte hashes for source/candidate scores, edit plan/receipt/report, MIDI, renderer artifacts, invocation, process streams, and WAV;
 - consistency of the score-edit input digest, operation IDs, protected-window IDs and independent verifier result;
 - consistency of the receipt with the PartId-aware MIDI manifest, including the repository's 960 ticks-per-quarter resolution;
