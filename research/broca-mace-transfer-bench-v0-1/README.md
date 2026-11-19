@@ -129,7 +129,7 @@ cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p 
 cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-evaluator --bin mace_generated_stress
 ```
 
-The candidate gate requires unique event IDs, at least two distinct nonzero source-family IDs and at least two distinct nonzero verified 256-bit source-root digests for each action. MACE v0.5 also requires both action alternatives to have qualified support and checks transport using worst-case effect intervals including candidate-supplied measurement bounds; the bounds remain untrusted until an ingress calibration receipt verifies them. A comparative choice also requires qualified evidence for both candidate actions; one-sided support is not treated as proof that the unsupported alternative is inferior. Different family labels cannot turn a shared upstream source into independent evidence. Root digests are supplied by the ingress verifier; the current verifier itself is still a mock. The runner reports aggregate metrics for all policies and per-family metrics for both exact-scope causal memory and invariant transport. It also reports paired utility lift versus no-memory with a deterministic **cluster-bootstrap 95% interval**, resampling world clusters rather than individual scenarios, and a Session-B / Session-C known-retraction recovery control.
+The candidate gate requires unique event IDs, at least two distinct nonzero source-family IDs and at least two distinct nonzero verified 256-bit source-root digests for each action; source-family ID zero is rejected by both exact-scope and transfer qualification. MACE v0.5 also requires both action alternatives to have qualified support and checks transport using worst-case effect intervals including candidate-supplied measurement bounds; the bounds remain untrusted until an ingress calibration receipt verifies them. A comparative choice also requires qualified evidence for both candidate actions; one-sided support is not treated as proof that the unsupported alternative is inferior. Different family labels cannot turn a shared upstream source into independent evidence. Root digests are supplied by the ingress verifier; the current verifier itself is still a mock. The runner reports aggregate metrics for all policies and per-family metrics for both exact-scope causal memory and invariant transport. It also reports paired utility lift versus no-memory with a deterministic **cluster-bootstrap 95% interval**, resampling world clusters rather than individual scenarios, and a Session-B / Session-C known-retraction recovery control.
 
 This is a generated synthetic stress distribution—not an official MemoryArena/AMA-Bench adapter, learned-policy train/test split, sealed external oracle or real-world causal discovery. Source-family IDs vary to expose correlation/identity failures, but independence is not cryptographically attested. Bootstrap intervals quantify variation over these generated clusters only; they do not establish external validity. Session-C corrections are applied as observed source-state updates before the next decision.
 
@@ -160,7 +160,7 @@ Each experience now carries a claimed absolute measurement-error bound. Invarian
 
 This is a conservative deterministic interval-containment check, not a statistical confidence interval. Error bounds are candidate-visible claims in this prototype and need sensor/protocol attestation; future work should add calibrated uncertainty models, preregistered equivalence tests and independent target-regime witnesses.
 
-## Provider-ecosystem findings (snapshot: 2026-11-18)
+## Provider-ecosystem findings (snapshot: 2026-11-19)
 
 ### OpenAI: durable memory is separate from session history
 
@@ -359,7 +359,7 @@ See [MACE AML Add/Search Adapter v0.1](../../docs/research/MACE_AML_ADD_SEARCH_A
 
 ## Current end-to-end integration inventory (2026-11-19)
 
-The MACE branch now has five Rust packages: candidate policy, synthetic evaluator, receipt-gated ingress, proposal-only consolidation and AML Add/Search contract core. The current authored regression inventory is 18 policy tests, 26 raw-JSONL evaluator tests, 36 ingress receipt/bitemporal tests, 11 provider-trace tests, 9 source-span claim tests, 7 consolidation unit tests plus the raw-session integration test, and 14 AML adapter tests. These are source counts, **not executed test results**.
+The MACE branch now has five Rust packages: candidate policy, synthetic evaluator, receipt-gated ingress, proposal-only consolidation and AML Add/Search contract core. The current authored regression inventory is 19 policy tests, 26 raw-JSONL evaluator tests, 36 ingress receipt/bitemporal tests, 11 provider-trace tests, 9 source-span claim tests, 7 consolidation unit tests plus the raw-session integration test, and 14 AML adapter tests. These are source counts, **not executed test results**.
 
 The three evidence planes remain deliberately distinct:
 - provider capture / source spans prove what bytes were captured and where a claim came from; they do not prove execution or truth;

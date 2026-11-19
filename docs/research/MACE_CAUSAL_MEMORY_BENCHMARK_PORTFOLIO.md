@@ -190,7 +190,7 @@ Each experience now carries a claimed absolute measurement-error bound. Invarian
 
 This is a conservative deterministic interval-containment check, not a statistical confidence interval. Error bounds are candidate-visible claims in this prototype and need sensor/protocol attestation; future work should add calibrated uncertainty models, preregistered equivalence tests and independent target-regime witnesses.
 
-## 8. Provider and benchmark ecosystem snapshot (2026-11-18)
+## 8. Provider and benchmark ecosystem snapshot (2026-11-19)
 
 OpenAI's Agents SDK distinguishes durable sandbox memory from conversational session history. Its documented design uses a small summary for initial context, progressive retrieval of detailed rollout summaries, and two-stage extraction/consolidation of memories. It supports separate memory layouts for different agents. Anthropic's Managed Agents describes independent session-log, harness and sandbox interfaces, and cautions that harness assumptions can become stale as models improve. Anthropic's long-running-agent pattern uses an initializer plus incremental sessions that leave durable handoff artifacts.
 
@@ -292,3 +292,7 @@ The public guide requires Add success only after persistence and immediate Searc
 Next-cycle targets: 100% smoke-contract compliance; zero cross-user leakage; zero premature Add acknowledgements; zero idempotency payload rebinding; exact parity with the frozen word counter; and at least +5 percentage points over the strongest same-track/division official baseline, with governance/safety gains measured separately.
 
 The crate is a protocol core only: it does not host endpoints, persist memory, implement embeddings/retrieval ranking, include the verified frozen word counter or perform a Full evaluation. It has 15 authored tests, not runner-verified.
+
+### Raw outcome-receipt mismatch gate (2026-11-19)
+
+The raw-JSONL evaluator's outcome receipt now binds the exact preserved observation-line SHA-256, event/action identity, observation timestamp, normalized utility value and unit. Any mismatch or replay rejects the observation before candidate memory; a receipt no longer silently repairs a conflicting source event. The evaluator has 26 authored raw-ingestion tests for payload mismatch, cross-event receipt replay, timestamp drift and unit substitution. These are authored only, not executed in the current environment. Policy qualification additionally rejects source-family ID zero, aligning direct candidate calls with ingress' unknown-family rejection.
