@@ -42,10 +42,18 @@ jobs:
           root = Path("research/symmetry-discovery-benchmark-001")
           schema = json.loads((root / "schemas/case_manifest.schema.json").read_text())
           scorecard_schema = json.loads((root / "schemas/run_scorecard.schema.json").read_text())
+          proposal_input_schema = json.loads((root / "schemas/proposal_input.schema.json").read_text())
+          proposal_receipt_schema = json.loads((root / "schemas/proposal_audit_receipt.schema.json").read_text())
           manifest = json.loads((root / "fixtures/v0.1/cases.json").read_text())
+          structural_proposal = json.loads((root / "fixtures/v0.1/proposal_smoke_input.json").read_text())
+          regression_proposal = json.loads((root / "fixtures/v0.1/regression_proposal_smoke_input.json").read_text())
           Draft202012Validator.check_schema(schema)
           Draft202012Validator(schema).validate(manifest)
           Draft202012Validator.check_schema(scorecard_schema)
+          Draft202012Validator.check_schema(proposal_input_schema)
+          Draft202012Validator(proposal_input_schema).validate(structural_proposal)
+          Draft202012Validator(proposal_input_schema).validate(regression_proposal)
+          Draft202012Validator.check_schema(proposal_receipt_schema)
           PY
       - name: Validate exact group axioms, point stabilizers and polynomial invariance
         run: python3 -I research/symmetry-discovery-benchmark-001/tools/validate_fixtures.py
@@ -74,10 +82,23 @@ jobs:
           assert sum(row["proposal_exact_match"] for row in rows) == 2
           chiral = next(row for row in rows if row["case_id"] == "C4-CHIRAL-ORBIT-001")
           assert chiral["false_exact_promotion"] is True
-          assert chiral["false_promotion_elements"] == ["fanti", "fdiag", "fx", "fy"]
+          assert sorted(chiral["false_promotion_elements"]) == ["fanti", "fdiag", "fx", "fy"]
           assert chiral["group_axioms_satisfied"] is True
           assert all(row["audit_replayed"] for row in rows)
           print("STRUCTURAL_PROPOSAL_ORACLE_SMOKE_PASS: D4/C4/C1, four exact false promotions witnessed")
+          PY
+      - name: Validate structural proposal audit receipt schema
+        run: |
+          python3 - "$RUNNER_TEMP/structural-proposal-audit.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("research/symmetry-discovery-benchmark-001")
+          schema = json.loads((root / "schemas/proposal_audit_receipt.schema.json").read_text())
+          receipt = json.load(open(sys.argv[1], encoding="utf-8"))
+          Draft202012Validator(schema).validate(receipt)
           PY
       - name: Execute regression proposal audit smoke
         run: |
@@ -96,6 +117,19 @@ jobs:
           assert all(not row["false_elimination"] for row in rows)
           assert all(row["audit_replayed"] for row in rows)
           print("REGRESSION_PROPOSAL_ORACLE_SMOKE_PASS: D4 and C4 exact subgroup proposals")
+          PY
+      - name: Validate regression proposal audit receipt schema
+        run: |
+          python3 - "$RUNNER_TEMP/regression-proposal-audit.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("research/symmetry-discovery-benchmark-001")
+          schema = json.loads((root / "schemas/proposal_audit_receipt.schema.json").read_text())
+          receipt = json.load(open(sys.argv[1], encoding="utf-8"))
+          Draft202012Validator(schema).validate(receipt)
           PY
       - name: Record oracle proposal smoke identities
         run: |
