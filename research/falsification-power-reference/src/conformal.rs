@@ -400,6 +400,44 @@ mod tests {
     }
 
     #[test]
+    fn exchangeable_observation_positions_have_mean_one_conformal_factor() {
+        let scores = [1.0_f64, 2.0, 4.0, 8.0];
+        let mut mean_e_value = 0.0;
+        for observed_index in 0..scores.len() {
+            let mut process =
+                FiniteReferenceConformalEProcess::new("exchangeable-null", 0.05).unwrap();
+            let references = scores
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| *index != observed_index)
+                .map(|(_, score)| *score)
+                .collect::<Vec<_>>();
+            process
+                .commit_score(
+                    format!("obs-{observed_index}"),
+                    "decision-v1",
+                    "score-v1",
+                    format!("batch-{observed_index}"),
+                    references.len(),
+                )
+                .unwrap();
+            let receipt = process
+                .observe(
+                    &format!("obs-{observed_index}"),
+                    "decision-v1",
+                    "score-v1",
+                    &format!("batch-{observed_index}"),
+                    scores[observed_index],
+                    &references,
+                )
+                .unwrap();
+            mean_e_value += receipt.update.log_e_increment.exp();
+        }
+        mean_e_value /= scores.len() as f64;
+        assert!((mean_e_value - 1.0).abs() <= 1.0e-12);
+    }
+
+    #[test]
     fn conformal_factor_is_invariant_to_common_positive_score_scaling() {
         let mut first =
             FiniteReferenceConformalEProcess::new("candidate-reflection", 0.05).unwrap();
@@ -595,6 +633,10 @@ mod tests {
             );
         }
         verify_conformal_transcript("candidate-hamiltonian", 0.05, &receipts).unwrap();
+        assert_eq!(
+            verify_conformal_transcript("candidate-hamiltonian", 0.10, &receipts),
+            Err(ConformalError::ReceiptCandidateMismatch)
+        );
 
         let mut forged = receipts.clone();
         forged[1].observed_score = 99.0;
