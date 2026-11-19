@@ -1,0 +1,11 @@
+[package]
+name = "cmaq-017-multistep-exploitability"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Synthetic benchmark for endogenous distribution shift and multi-step world-model exploitability"
+
+[dependencies]
+
+[workspace]
