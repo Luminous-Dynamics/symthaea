@@ -133,5 +133,31 @@
     "dataset_download": "not_performed",
     "paper_reproduction": "not_performed",
     "physical_validation": "not_performed"
+  },
+  "adaptive_reference_sampling": {
+    "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7685",
+    "objective": "minimize cost of locating closure accuracy, admissibility and epistemic envelope boundaries",
+    "acquisition_signals": [
+      "independent_closure_ensemble_disagreement",
+      "fluid_vs_kinetic_trajectory_disagreement",
+      "physical_constraint_residuals",
+      "distance_from_training_support",
+      "consequence_weighted_region"
+    ],
+    "baselines": [
+      "uniform_parameter_sweep",
+      "latin_hypercube_or_space_filling",
+      "adaptive_mesh_refinement_on_trajectory_error",
+      "maximum_predictive_uncertainty",
+      "ensemble_disagreement_only",
+      "cost_aware_expected_information_gain"
+    ],
+    "sealed_kinetic_reference_cohort": true,
+    "proposed_target": {
+      "expensive_reference_solver_call_reduction_fraction": 0.25,
+      "condition": "no degradation in sealed-cohort accuracy, physical admissibility, envelope coverage or false-safe rate",
+      "status": "aspirational_not_passed"
+    },
+    "results": null
   }
 }
