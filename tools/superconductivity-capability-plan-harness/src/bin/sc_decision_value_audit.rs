@@ -792,6 +792,66 @@ mod tests {
     }
 
     #[test]
+    fn adding_a_model_independent_constant_to_all_decision_losses_leaves_evsi_unchanged() {
+        let (schema, fixture) = inputs();
+        let baseline = audit(&schema, &fixture).unwrap();
+        let shifted = mutated_fixture(|fixture| {
+            for decision in fixture["decisions"].as_array_mut().unwrap() {
+                for row in decision["losses"].as_array_mut().unwrap() {
+                    row["loss"] = json!(row["loss"].as_f64().unwrap() + 7.5);
+                }
+            }
+        }).unwrap();
+        let baseline_plan = &baseline["decision_value_oracle"]["plan"];
+        let shifted_plan = &shifted["decision_value_oracle"]["plan"];
+        assert!((baseline_plan["expected_value_of_sample_information"].as_f64().unwrap()
+            - shifted_plan["expected_value_of_sample_information"].as_f64().unwrap()).abs() < 1.0e-10);
+        assert_eq!(baseline_plan["cost_units"], shifted_plan["cost_units"]);
+        assert_eq!(baseline_plan["ordered_action_ids"], shifted_plan["ordered_action_ids"]);
+    }
+
+    #[test]
+    fn positive_loss_scaling_scales_evsi_without_changing_the_optimal_plan() {
+        let (schema, fixture) = inputs();
+        let baseline = audit(&schema, &fixture).unwrap();
+        let scaled = mutated_fixture(|fixture| {
+            for decision in fixture["decisions"].as_array_mut().unwrap() {
+                for row in decision["losses"].as_array_mut().unwrap() {
+                    row["loss"] = json!(row["loss"].as_f64().unwrap() * 10.0);
+                }
+            }
+        }).unwrap();
+        let baseline_plan = &baseline["decision_value_oracle"]["plan"];
+        let scaled_plan = &scaled["decision_value_oracle"]["plan"];
+        assert!((10.0 * baseline_plan["expected_value_of_sample_information"].as_f64().unwrap()
+            - scaled_plan["expected_value_of_sample_information"].as_f64().unwrap()).abs() < 1.0e-9);
+        assert_eq!(baseline_plan["cost_units"], scaled_plan["cost_units"]);
+        assert_eq!(baseline_plan["ordered_action_ids"], scaled_plan["ordered_action_ids"]);
+    }
+
+    #[test]
+    fn if_every_decision_has_identical_losses_no_measurement_has_decision_value() {
+        let (schema, fixture) = inputs();
+        let result = mutated_fixture(|fixture| {
+            let losses = json!([
+                {"model_id":"uniform_electron_phonon","loss":2.0},
+                {"model_id":"multiband_electron_phonon","loss":1.0},
+                {"model_id":"finite_q_pairing","loss":4.0},
+                {"model_id":"none_of_above","loss":3.0}
+            ]);
+            for decision in fixture["decisions"].as_array_mut().unwrap() {
+                decision["losses"] = losses.clone();
+            }
+        }).unwrap();
+        let plan = &result["decision_value_oracle"]["plan"];
+        assert_eq!(plan["cost_units"], 0);
+        assert_eq!(plan["ordered_action_ids"].as_array().unwrap().len(), 0);
+        assert!(plan["expected_value_of_sample_information"].as_f64().unwrap().abs() < 1.0e-12);
+        let information_plan = &result["mutual_information_oracle"]["plan"];
+        assert!(information_plan["expected_model_information_gain_nats"].as_f64().unwrap() > 0.1);
+    }
+
+    #[test]
     fn shared_nuisance_model_is_deterministic() {
         let (schema, fixture) = inputs();
         assert_eq!(audit(&schema, &fixture).unwrap(), audit(&schema, &fixture).unwrap());
