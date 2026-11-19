@@ -1178,6 +1178,32 @@ mod tests {
     }
 
     #[test]
+    fn admits_site_observed_profile_with_survey_and_source_trace_receipts() {
+        let mut value = profile();
+        value.profile_kind = ProfileKind::SiteObserved;
+        value.synthetic_profile = None;
+        value.site_observation = Some(SiteObservationEvidence {
+            site_profile_id: "site-jhb-001".to_owned(),
+            site_profile_revision: 2,
+            site_conditions_sha256: digest('5'),
+            survey_receipt_sha256: digest('6'),
+            observation_window: ObservationWindow {
+                start: "2026-11-18T00:00:00Z".to_owned(),
+                end: "2026-11-19T00:00:00Z".to_owned(),
+                coverage_statement: "24-hour continuous site logger coverage".to_owned(),
+                known_gaps: Vec::new(),
+            },
+        });
+        value.raw_artifacts.push(RawArtifact {
+            role: RawArtifactRole::SiteObservationRecord,
+            sha256: digest('7'),
+            byte_length: 4_096,
+        });
+
+        assert_eq!(value.validate(), Ok(()));
+    }
+
+    #[test]
     fn decodes_json_manifest_and_attaches_trace_samples() {
         let digest = |character: char| character.to_string().repeat(64);
         let channel = |channel_id: &str,
