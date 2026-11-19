@@ -316,7 +316,9 @@
           "name",
           "unit",
           "value",
-          "sample_count"
+          "sample_count",
+          "sampling_unit",
+          "observation_count"
         ],
         "properties": {
           "name": {
@@ -341,7 +343,8 @@
               "method",
               "confidence_level",
               "lower",
-              "upper"
+              "upper",
+              "resampling_unit"
             ],
             "properties": {
               "method": {
@@ -364,11 +367,38 @@
               },
               "upper": {
                 "type": "number"
+              },
+              "resampling_unit": {
+                "type": "string",
+                "enum": [
+                  "structure",
+                  "trajectory",
+                  "experiment_campaign",
+                  "solver_run",
+                  "candidate",
+                  "other",
+                  "none"
+                ]
               }
             }
           },
           "notes": {
             "type": "string"
+          },
+          "sampling_unit": {
+            "type": "string",
+            "enum": [
+              "structure",
+              "trajectory",
+              "experiment_campaign",
+              "solver_run",
+              "candidate",
+              "other"
+            ]
+          },
+          "observation_count": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       }
