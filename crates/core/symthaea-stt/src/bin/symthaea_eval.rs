@@ -339,6 +339,15 @@ fn main() {
             }
         };
 
+        if let Err(error) = projector.validate_input_sample_rate(sample_rate) {
+            eprintln!(
+                "Refusing evaluation input {:?}: {}",
+                utterance.audio_path,
+                error
+            );
+            std::process::exit(1);
+        }
+
         let audio_duration = audio.len() as f32 / sample_rate as f32;
         total_audio_seconds += audio_duration;
 
