@@ -197,6 +197,25 @@ pub struct MidiPerformanceNoteReceiptV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RenderInvocationV1 {
+    pub schema: String,
+    pub renderer_id: String,
+    pub renderer_version: String,
+    pub executable_sha256: String,
+    pub environment_sha256: String,
+    pub configuration_sha256: String,
+    pub asset_sha256: Option<String>,
+    pub input_midi_path: String,
+    pub input_midi_sha256: String,
+    pub output_audio_path: String,
+    pub arguments: Vec<String>,
+    pub started_at: String,
+    pub finished_at: String,
+    pub exit_code: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BundleReportV1 {
     pub attempt_id: String,
     pub attempt_state: String,
@@ -746,6 +765,37 @@ fn verify_midi_bundle(root: &Path, r: &ReceiptV1) -> Result<(), String> {
     verify_midi_event_manifest(&m, &midi)
 }
 
+fn verify_render_invocation(root: &Path, r: &ReceiptV1) -> Result<(), String> {
+    let path = root.join("render-invocation.json");
+    let bytes = read(&path, "render invocation")?;
+    let expected_sha = r.execution.invocation_sha256.as_deref().ok_or("missing invocation SHA")?;
+    if sha256_hex(&bytes) != expected_sha {
+        return Err("render invocation SHA-256 mismatch".into());
+    }
+    let invocation: RenderInvocationV1 = serde_json::from_slice(&bytes)
+        .map_err(|e| format!("render invocation JSON invalid: {e}"))?;
+    if invocation.schema != "muse-render-invocation-v1"
+        || invocation.renderer_id != r.renderer.renderer_id
+        || invocation.renderer_version != r.renderer.renderer_version
+        || invocation.executable_sha256 != r.renderer.binary_sha256
+        || invocation.environment_sha256 != r.renderer.environment_sha256
+        || invocation.configuration_sha256 != r.renderer.configuration_sha256
+        || invocation.asset_sha256 != r.renderer.asset_sha256
+        || invocation.input_midi_path != "performance.mid"
+        || invocation.input_midi_sha256 != r.midi.midi_sha256
+        || invocation.output_audio_path != "output.wav"
+        || invocation.started_at != r.execution.started_at.as_deref().unwrap_or("")
+        || invocation.finished_at != r.execution.finished_at.as_deref().unwrap_or("")
+        || Some(invocation.exit_code) != r.execution.exit_code
+        || r.execution.input_midi_sha256.as_deref() != Some(invocation.input_midi_sha256.as_str())
+        || r.execution.output_audio_sha256.is_none()
+        || invocation.arguments.is_empty()
+    {
+        return Err("render invocation fields do not match receipt renderer, MIDI input, WAV output, and execution result".into());
+    }
+    Ok(())
+}
+
 fn verify_wav(root: &Path, r: &ReceiptV1) -> Result<(), String> {
     let path = root.join("output.wav");
     let expected_bytes = r.audio.byte_length.ok_or("missing WAV byte length")?;
@@ -809,7 +859,7 @@ pub fn verify_bundle(root: &Path, r: &ReceiptV1) -> Result<BundleReportV1, Strin
     if let Some(hash) = r.renderer.asset_sha256.as_deref() {
         check_file(&root.join("renderer-asset.bin"), hash, "renderer asset")?;
     }
-    check_file(&root.join("render-invocation.json"), r.execution.invocation_sha256.as_deref().ok_or("missing invocation SHA")?, "render invocation")?;
+    verify_render_invocation(root, r)?;
     if let Some(hash) = r.execution.stdout_sha256.as_deref() { check_file(&root.join("render.stdout"), hash, "renderer stdout")?; }
     if let Some(hash) = r.execution.stderr_sha256.as_deref() { check_file(&root.join("render.stderr"), hash, "renderer stderr")?; }
     verify_wav(root, r)?;
