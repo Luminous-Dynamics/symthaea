@@ -140,11 +140,12 @@ Do not force an energy reduction target where it would trade away safety, schedu
 - [ISO 16315:2026](https://www.iso.org/standard/84203.html): AC/DC electrical propulsion and hybrid electrical systems for small craft up to 24 m LH.
 - [ISO/DIS 12217-2.2:2026](https://www.iso.org/standard/88606.html): draft stability/buoyancy assessment for sailing boats, principally 6–24 m; includes relevant habitable-multihull inversion/escape subjects; not yet final.
 - [IMO MASS Code](https://www.imo.org/en/mediacentre/pressbriefings/pages/imo-adopts-mass-code.aspx): non-mandatory code adopted May 2026, effective 1 July 2026 for SOLAS cargo ships; application to a small private liveaboard must not be presumed.
-- [ISO/AWI 25927](https://www.iso.org/standard/92072.html): collision-avoidance scenario-generation process for MASS; approved work item under development. Useful for the scenario corpus, not an established compliance procedure.
+- [ISO/AWI 25927](https://www.iso.org/standard/92071.html): collision-avoidance scenario-generation process for MASS; approved work item under development. Useful for the scenario corpus, not an established compliance procedure.
 - [ISO/AWI 25929](https://www.iso.org/standard/92073.html): minimum safe lookout area method for MASS; approved work item under development. Useful for specifying perception/observation coverage, not evidence that a sensor suite is safe.
 - [ISO/AWI 25930](https://www.iso.org/standard/92074.html): ODD/OE taxonomy and definition format for MASS; approved work item under development. It explicitly does not define attribute test procedures or monitoring requirements.
-- [ISO/CD 25928](https://www.iso.org/committee/10281240/x/catalogue/): software functional-safety management for MASS; committee draft under development.
-- [ISO/CD 25934.2](https://www.iso.org/committee/10281240/x/catalogue/): verification procedures for autonomous navigation systems; committee draft under development.
+- [ISO/AWI 25922](https://www.iso.org/standard/92067.html): capability/responsibility allocation between a MASS and remote operators; approved work item under development.
+- [ISO/CD 25928](https://www.iso.org/standard/92072.html): software functional-safety management for MASS; committee draft under development.
+- [ISO/CD 25934.2](https://www.iso.org/standard/92078.html): guidance for developing verification procedures for autonomous navigation systems; committee draft under development.
 These projects are standards-watch inputs only. Do not treat a work item or committee draft as a published requirement or claim conformance from schema similarity.
 
 ## 12. Industry comparison: what is already commercially available
