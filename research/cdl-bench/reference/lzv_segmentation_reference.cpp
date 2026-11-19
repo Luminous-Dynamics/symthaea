@@ -171,12 +171,14 @@ void test_stationary_random() {
     config.mean_shift = 12U;
     config.variance_shift = 512U;
     config.max_segment = 256U;
-    const auto values = random_stream(4096U, 0x12345678ULL);
-    const auto boundaries = segment_lzv(values, config);
-    check_boundaries(boundaries, values.size(), config, "stationary random");
-    const std::size_t expected_segments = (values.size() + config.max_segment - 1U) / config.max_segment;
-    require(boundaries.size() - 1U <= expected_segments + 2U,
-            "stationary random stream over-segmented");
+    for (std::uint64_t seed = 0U; seed < 64U; ++seed) {
+        const auto values = random_stream(4096U, 0x12345678ULL + seed);
+        const auto boundaries = segment_lzv(values, config);
+        check_boundaries(boundaries, values.size(), config, "stationary random");
+        const std::size_t expected_segments = (values.size() + config.max_segment - 1U) / config.max_segment;
+        require(boundaries.size() - 1U <= expected_segments + 2U,
+                "stationary random stream over-segmented");
+    }
 }
 void test_deterministic_and_empty() {
     Config config{};
