@@ -96,13 +96,14 @@ No nameplate PV capacity is credited as delivered energy. No absent energy chann
 11. Water, food, waste or critical consumables become limiting before energy.
 12. Sail/steering sensor or actuator fault, failed transition, or reef/furl capability withdrawal.
 13. Traffic, visibility or weather pushes a candidate outside its ODD.
+17. A commercial or research router returns a route only after automatically relaxing a declared hard comfort limit; preserve it as BLOCKED for that hard-comfort mission rather than counting it as compliant.
 14. Common-cause failure affects purportedly redundant generation/sensing/communications.
 15. Configuration change or evidence revocation invalidates only dependent capabilities.
 16. No policy meets all gates: return no feasible mission plan, with reasons.
 
 ## 8. Metrics
 
-**Hard gates:** false-feasible plan count; essential-service floor breaches; ODD/COLREG/authority gate failures; unknown or stale inputs treated as valid; future-information leakage; accounting incompleteness; unauthorized commands (must remain zero).
+**Hard gates:** false-feasible plan count; essential-service floor breaches; ODD/COLREG/authority gate failures; unknown or stale inputs treated as valid; future-information leakage; accounting incompleteness; unauthorized commands (must remain zero); route results automatically relaxed beyond declared hard comfort limits (must remain zero).
 
 **Sailing and service:** distance, passage time, arrival-window success, VMG, manoeuvre count, signed transition losses, motor-assist hours, delivered occupied berth-days, service availability, comfort, workload and maintenance burden.
 
@@ -152,12 +153,12 @@ These projects are standards-watch inputs only. Do not treat a work item or comm
 
 The comparison must recognize capabilities that already exist in commercial sailing systems:
 
-- [PredictWind Sail Routing](https://help.predictwind.com/en/articles/2884532-how-to-use-weather-routing-for-sailboats-on-the-forecast-website) offers fastest-time and comfort routing, sail polars, forecast-driven routes and motion metrics (RMS roll, vertical acceleration and slamming). Its guidance says route quality depends on the boat polar and forecast accuracy, and recommends rerouting as forecasts update.
+- [PredictWind Sail Routing](https://help.predictwind.com/en/articles/2884532-how-to-use-weather-routing-for-sailboats-on-the-forecast-website) offers fastest-time and comfort routing, sail polars, forecast-driven routes and motion metrics (RMS roll, vertical acceleration and slamming). Its published guidance says that when no route meets the selected comfort limits, the product automatically reruns without those limits so the user still receives a route. Our benchmark must preserve the returned route's actual constraint status: an automatically relaxed route cannot be counted as satisfying a hard comfort requirement.
 - [PredictWind AI Polars](https://www.predictwind.com/features/ai-polars) uses connected vessel data to adapt polars to a boat and sailing style, including wave conditions and separate night behaviour. This means learning personalized performance polars is not, by itself, a differentiator.
 - [Raymarine wind-vane / steer-to-wind modes](https://docs.raymarine.com/81406/en-US/latest/AutopilotWindVaneMode-6A57E8F8.html) include apparent-wind, true-wind and polar-target wind-angle steering. This means holding a wind angle or following a polar target is a baseline capability, not a novel autonomy claim.
 - [Garmin SmartDrive (announced 1 September 2026)](https://www.garmin.com/en-US/newsroom/press-release/marine/garmin-launches-innovative-smartdrive-autopilot-for-sailboats-and-catamarans/) extends the installed autopilot ecosystem with a brushless linear actuator, integrated ECU and rudder feedback for sailboats/catamarans up to 45 ft and declared displacement limits. This is hardware/control-system evidence, not proof of autonomous mission planning.
 
-**What would actually differentiate this programme:** not steering accuracy, a learned polar, or another weather route. It is a reproducible, owner-independent evaluation of route choices against complete onboard service delivery and multidimensional resource autonomy, with temporal evidence admissibility, fault/revocation propagation, per-configuration capability scope, and blind forecast-regret evaluation. Commercial products may already optimize comfort, route time and boat-specific polars; our benchmark must compare those outputs fairly rather than dismiss them.
+**What would actually differentiate this programme:** not steering accuracy, a learned polar, or another weather route. It is a reproducible, owner-independent evaluation of route choices against complete onboard service delivery and multidimensional resource autonomy, with temporal evidence admissibility, fault/revocation propagation, per-configuration capability scope, comfort-constraint non-relaxation accounting, and blind forecast-regret evaluation. Commercial products may already optimize comfort, route time and boat-specific polars; our benchmark must compare those outputs fairly rather than dismiss them.
 
 ## 13. Claim ceiling
 
