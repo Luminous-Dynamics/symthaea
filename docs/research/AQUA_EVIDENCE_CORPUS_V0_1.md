@@ -2,7 +2,7 @@
 
 **Snapshot:** 2026-11-19  
 **Entries:** 20  
-**Claims:** 100
+**Claims:** 101
 
 > Source-classified evidence register. Manufacturer declarations, standards/programme criteria, local installation references, independent market samples and peer-reviewed results are kept distinct. Values marked unknown have not been inferred. This corpus is not a product certification or evidence of Aqua performance.
 
@@ -598,6 +598,7 @@
 | `kohler.k33481.cycle.deep-clean-duration` | deep_clean_cycle_duration | 15 min | manufacturer_declaration | declared | mode=Deep Clean; duration=15 min; task=Periodic system cleaning; method=Manufacturer product-page description; unknown: water and energy consumed, consumables or service labour, independent endpoint method; Manufacturer recommendation is monthly. | context_only: Manufacturer-declared maintenance schedule; full resource and service burden must be measured. | [KOHLER manufacturer product page](https://www.kohler.com/en/products/showers/anthem-evocycle); manufacturer_product_page; date not stated |
 | `kohler.k33481.cycle.same-session-boundary` | recirculation_scope | Same-session recirculation only while Cycle Mode is active; no storage for later users or connection to other household plumbing. | manufacturer_declaration | declared | mode=Cycle Mode; task=One active shower session; method=Manufacturer product-page description; unknown: independent validation of water quality, biofilm and aerosol exposure outcomes, cleaning coverage of all wetted surfaces; Manufacturer describes a washable reusable fine-mesh filter and continuous 0.5 US gal/min fresh-water refresh. | context_only: Manufacturer-described process boundary; not evidence of microbiological safety or hygiene efficacy. | [KOHLER manufacturer product page](https://www.kohler.com/en/products/showers/anthem-evocycle); manufacturer_product_page; date not stated |
 | `kohler.k33481.minimum-outlet-flow` | minimum_connected_showerhead_flow | 3.4 L/min | manufacturer_declaration | derived | mode=Compatible connected showerhead / handspray; method=K-33481 technical specification; unknown: performance below the listed minimum, task performance at each outlet flow; Manufacturer compatibility statement; converted from 0.9 US gal/min. | context_only: Manufacturer compatibility floor, not an independently tested service-quality threshold. | [KOHLER K-33481 technical specification](https://techcomm.kohler.com/techcomm/pdf/K-33481_spec_US-CA_Kohler_en.pdf); manufacturer_datasheet; 2026-04-15 |
+| `kohler.k33481.cycle.water-savings-after-rapid-clean` | water_savings_fraction | 77 % | manufacturer_declaration | derived | mode=Cycle Mode with 2.5 US gal/min outlet plus one Rapid Clean after the shower; duration=10 min; task=Manufacturer's 10-minute example with one recommended after-session Rapid Clean; method=Arithmetic derived from KOHLER's published 25 US gal conventional example, 5 US gal Cycle Mode example and 0.75 US gal Rapid Clean water; unknown: monthly Deep Clean water and energy use, actual startup, purge, reject water and measured usage, independent task-quality equivalence, site-specific actual consumption; This is not an independently measured result. It includes the stated Rapid Clean water only; monthly Deep Clean and other unreported flows are excluded. | context_only: Transparent arithmetic on manufacturer-published figures to illustrate the effect of the recommended per-shower cleaning cycle; not a matched or independent result. | [KOHLER manufacturer product page](https://www.kohler.com/en/products/showers/anthem-evocycle); manufacturer_product_page; date not stated |
 
 **Limitations — `kohler.k33481.cycle.fresh-water-feed`:**
 - Do not equate fresh-water feed with the total shower stream.
@@ -623,6 +624,11 @@
 
 **Limitations — `kohler.k33481.minimum-outlet-flow`:**
 - Do not interpret as the fresh-water input rate in Cycle Mode.
+
+**Limitations — `kohler.k33481.cycle.water-savings-after-rapid-clean`:**
+- Do not present 77% as a measured or fully all-in lifecycle saving.
+- Monthly Deep Clean water/energy, startup, purge, standby, consumables and maintenance remain unquantified.
+- The 80% headline claim is for Cycle Mode use; this adjusted illustration adds only the stated Rapid Clean water.
 
 ## Orbital Shower recirculating shower system
 
