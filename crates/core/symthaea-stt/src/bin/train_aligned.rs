@@ -223,13 +223,18 @@ fn main() {
         };
 
         // Load audio
-        let (samples, _sample_rate) = match AudioFrontend::load_audio(&audio_path) {
+        let (samples, sample_rate) = match AudioFrontend::load_audio(&audio_path) {
             Ok(a) => a,
             Err(_) => {
                 skipped += 1;
                 continue;
             }
         };
+        if let Err(error) = projector.validate_input_sample_rate(sample_rate) {
+            eprintln!("Skipping {id}: {error}");
+            skipped += 1;
+            continue;
+        }
 
         // Project to hypervectors (using raw frames without temporal windowing)
         projector.reset();
