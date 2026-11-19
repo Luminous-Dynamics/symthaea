@@ -2254,6 +2254,57 @@ mod tests {
     }
 
     #[test]
+    fn exhaustive_two_state_binary_tables_match_unknown_state_collision_oracle() {
+        for encoded in 0_u32..256 {
+            let mut predictions = vec![vec![vec![0_u32; 2]; 2]; 2];
+            for hypothesis in 0..2 {
+                for probe in 0..2 {
+                    for state in 0..2 {
+                        let bit = hypothesis * 4 + probe * 2 + state;
+                        predictions[hypothesis][probe][state] = (encoded >> bit) & 1;
+                    }
+                }
+            }
+            let problem = PersistentNoiseProblemV1 {
+                problem_id: format!("exhaustive-cross-state-{encoded}"),
+                hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned()],
+                probes: vec![
+                    NoiseProbeV1 {
+                        probe_id: "p0".to_owned(),
+                        cost: 1,
+                        admissible: true,
+                    },
+                    NoiseProbeV1 {
+                        probe_id: "p1".to_owned(),
+                        cost: 1,
+                        admissible: true,
+                    },
+                ],
+                error_state_ids: vec!["s0".to_owned(), "s1".to_owned()],
+                predicted_outcomes_by_hypothesis: predictions,
+            };
+
+            let report =
+                persistent_pair_identifiability_under_unknown_state(&problem, 0, 1).unwrap();
+            let mut brute_force_collision = false;
+            for state_a in 0..2 {
+                for state_b in 0..2 {
+                    let identical = (0..2).all(|probe| {
+                        problem.predicted_outcomes_by_hypothesis[0][probe][state_a]
+                            == problem.predicted_outcomes_by_hypothesis[1][probe][state_b]
+                    });
+                    brute_force_collision |= identical;
+                }
+            }
+            assert_eq!(
+                report.indistinguishable_under_unknown_state,
+                brute_force_collision,
+                "cross-state mismatch for encoded prediction table {encoded}"
+            );
+        }
+    }
+
+    #[test]
     fn persistent_identifiability_uses_the_same_global_error_state_on_both_sides() {
         let problem = persistent_fixture();
         let report = persistent_pair_identifiability(&problem, 0, 1).unwrap();
@@ -2993,6 +3044,64 @@ mod tests {
             nonconstant.separating_probe_ids[0],
             nonconstant.separating_probe_ids[1]
         );
+    }
+
+    #[test]
+    fn exhaustive_small_numeric_tables_match_unknown_bias_collision_oracle() {
+        for encoded in 0_u32..81 {
+            let mut value = encoded;
+            let mut nominal = vec![vec![0_i128; 2]; 2];
+            for hypothesis in 0..2 {
+                for probe in 0..2 {
+                    nominal[hypothesis][probe] = i128::from(value % 3);
+                    value /= 3;
+                }
+            }
+            let problem = SharedAdditiveBiasProblemV1 {
+                problem_id: format!("exhaustive-unknown-bias-{encoded}"),
+                quantity_unit_id: "integer-unit".to_owned(),
+                hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned()],
+                probes: vec![
+                    NoiseProbeV1 {
+                        probe_id: "p0".to_owned(),
+                        cost: 1,
+                        admissible: true,
+                    },
+                    NoiseProbeV1 {
+                        probe_id: "p1".to_owned(),
+                        cost: 2,
+                        admissible: true,
+                    },
+                ],
+                nominal_predictions_by_hypothesis: nominal,
+                global_bias_interval: FixedIntervalV1::new(-1, 1).unwrap(),
+            };
+
+            let report =
+                shared_bias_pair_identifiability_under_unknown_bias(&problem, 0, 1).unwrap();
+            let mut brute_force_collision = false;
+            for bias_a in -1_i128..=1 {
+                for bias_b in -1_i128..=1 {
+                    let identical = (0..2).all(|probe| {
+                        problem.nominal_predictions_by_hypothesis[0][probe] + bias_a
+                            == problem.nominal_predictions_by_hypothesis[1][probe] + bias_b
+                    });
+                    brute_force_collision |= identical;
+                }
+            }
+            assert_eq!(
+                report.indistinguishable_under_unknown_bias,
+                brute_force_collision,
+                "cross-bias mismatch for encoded prediction table {encoded}"
+            );
+            if brute_force_collision {
+                assert!(report.separating_probe_ids.is_empty());
+                assert!(report.collision.is_some());
+            } else {
+                assert!(!report.separating_probe_ids.is_empty());
+                assert!(report.collision.is_none());
+            }
+        }
     }
 
     #[test]
