@@ -166,7 +166,8 @@
         "policy_id",
         "family",
         "information_policy",
-        "compute_budget_ms"
+        "compute_budget_ms",
+        "comfort_fallback_status"
       ],
       "properties": {
         "policy_id": {
@@ -205,6 +206,19 @@
           "items": {
             "type": "string"
           }
+        },
+        "comfort_fallback_status": {
+          "type": "string",
+          "enum": [
+            "none",
+            "no_feasible_route",
+            "automatically_relaxed",
+            "operator_authorized_relaxation"
+          ]
+        },
+        "comfort_fallback_evidence_id": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "allOf": [
@@ -352,7 +366,8 @@
         "arrival_window",
         "route_or_waypoint_ref",
         "service_level_ref",
-        "reserve_policy_ref"
+        "reserve_policy_ref",
+        "comfort_requirement"
       ],
       "properties": {
         "mission_identity": {
@@ -386,6 +401,14 @@
           "items": {
             "type": "string"
           }
+        },
+        "comfort_requirement": {
+          "type": "string",
+          "enum": [
+            "hard",
+            "soft",
+            "not_applicable"
+          ]
         }
       }
     },
