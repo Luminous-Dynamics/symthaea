@@ -30,7 +30,14 @@ fn sha256(bytes: &[u8]) -> String {
 }
 
 fn valid_iso_date(value: &str) -> bool {
-    if value.len() != 10 || value.as_bytes()[4] != b'-' || value.as_bytes()[7] != b'-' {
+    let bytes = value.as_bytes();
+    if bytes.len() != 10
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || !bytes[..4].iter().all(u8::is_ascii_digit)
+        || !bytes[5..7].iter().all(u8::is_ascii_digit)
+        || !bytes[8..].iter().all(u8::is_ascii_digit)
+    {
         return false;
     }
     let Ok(year) = value[0..4].parse::<u32>() else { return false; };
@@ -397,12 +404,6 @@ mod tests {
 
     #[test]
     fn positive_record_without_observed_tc_cannot_receive_conditional_tc_prediction() {
-        assert!(mutated_fixture(|fixture| {
-            fixture["records"][0]["observed_tc_k"] = Value::Null;
-        }).is_err() || mutated_fixture(|fixture| {
-            fixture["records"][0]["observed_tc_k"] = Value::Null;
-            fixture["predictions"][0]["conditional_tc_pred_k"] = json!(6.0);
-        }).is_ok());
         assert!(mutated_fixture(|fixture| {
             fixture["records"][0]["observed_tc_k"] = Value::Null;
             fixture["predictions"][0]["conditional_tc_pred_k"] = json!(6.0);
