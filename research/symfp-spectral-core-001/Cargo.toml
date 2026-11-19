@@ -1,0 +1,17 @@
+[package]
+name = "symfp-spectral-core-reference"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Formula-level SymFP reproduction kernel with crystallographic rank templates and spectral leakage"
+
+[lib]
+path = "src/lib.rs"
+
+[[example]]
+name = "rank_template_probe"
+path = "examples/rank_template_probe.rs"
+
+[workspace]
