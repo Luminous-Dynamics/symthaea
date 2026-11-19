@@ -58,4 +58,4 @@ The verifier checks:
 - `outcome_unknown` is returned as unresolved (exit code 3), never as a successful render and never as permission to retry under the same attempt ID.
 - Hashes prove byte identity only. They do not establish rights, authorship or publication permission.
 
-No Rust compile/test or real render result is claimed until the standalone workflow runs on the exact head.
+The direct dependency versions are exact-pinned to the versions in the current root lockfile. A standalone package Cargo.lock has not yet been generated because no Cargo toolchain is available in the authoring environment; therefore the transitive dependency graph is not yet claimed fully frozen. No Rust compile/test or real render result is claimed until the standalone workflow runs on the exact head.
