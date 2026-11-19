@@ -54,21 +54,36 @@ References:
 
 **CDL-Bench consequence:** Pco is a mandatory numerical-data baseline for typed numeric streams. Preserve per-channel separation and test wrappers for timestamps, missingness, units and random access. Do not flatten a multivariate stream in a way that destroys the per-column structure Pco expects.
 
+### 1.3.1 ALP is now an ecosystem baseline, not just an academic codec
+
+ALP was introduced at SIGMOD 2024 and is now included in Parquet format 2.14.0 (2026-09) and Apache Arrow Rust 60.0.0 (2026-09-29). Arrow Rust 60.0.0 explicitly announces a Parquet ALP encoder/decoder. Apache's overview says ALP targets decimal-like binary32/binary64 values, can achieve compression ratios similar to Zstandard, and offers much faster decoding and random access; it also cautions that ALP is unsuitable for wide exponent ranges and high-significance data such as vector embeddings.
+
+The Apache ALP benchmark repository provides a reproducible 30-dataset CWI floating-point corpus and scripts comparing ALP with PLAIN+Zstd and BYTE_STREAM_SPLIT+Zstd. These sources make ALP a practical reproducibility path, not just a paper citation.
+
+References:
+- Parquet format 2.14.0 and ALP: https://parquet.apache.org/blog/2026/09/22/alp-adaptive-lossless-floating-point-encoding-in-apache-parquet/
+- Arrow Rust 60.0.0: https://arrow.apache.org/blog/2026/09/29/arrow-rs-60.0.0/
+- ALP benchmark: https://github.com/alamb/alp_benchmark
+- ALP encoding specification: https://github.com/apache/parquet-format/blob/master/Encodings.md
+
+**CDL-Bench consequence:** pin the ALP benchmark repository commit and download hashes; run the supplied CWI corpus and the same normalized typed columns used by CDL-Bench. Compare complete Parquet file size, page/index/exception metadata, compression/decompression speed and single-value random access, not only the ALP value payload.
+
 ### 1.4 Wave Zero Streaming — non-stationary streaming adaptation
 
-Wang et al., *Waved Zero Streaming: A Time Series Compression Framework with Adaptive Segmentation Optimization* (Information Processing & Management, September 2026), describes a lossless streaming framework for non-stationary time series. Its indexed abstract and methodology describe:
-- adaptive segmentation based on local fluctuation / leading-zero-variance behaviour;
-- local parameter optimization;
-- dynamic selection among compression algorithms for streams;
-- evaluation across 43 heterogeneous datasets.
+Wang et al., *Waved Zero Streaming: A Time Series Compression Framework with Adaptive Segmentation Optimization* (Information Processing & Management, September 2026; DOI 10.1016/j.ipm.2026.104697), is now one of the most important competitive references for this programme. Its abstract reports evaluation across 43 datasets and claims:
+- 36.41% average compression-ratio improvement over leading lossless time-series codecs including Camel, Chimp and ACTF (53.08% peak);
+- 13.28% improvement over Camel;
+- 15.07% improvement over general-purpose compressors;
+- two-orders-of-magnitude lower computational latency than the compared general-purpose methods;
+- 16.45% speed advantage over comparable floating-point streaming baselines.
 
-The source currently available for this research pass exposes the abstract and section summaries, not a fully inspectable result table. No numerical performance claim is adopted here.
+These are paper-reported abstract results, not independently reproduced CDL-Bench measurements. The methodology combines adaptive segmentation, a heuristic genetic optimizer for local compression parameters, and real-time algorithm selection. The full article/result tables and executable reproduction path were not inspected in this research pass.
 
 References:
 - https://www.sciencedirect.com/science/article/pii/S0306457326000889
-- https://eurekamag.com/research/104/828/104828221.php
+- https://doi.org/10.1016/j.ipm.2026.104697
 
-**CDL-Bench consequence:** add non-stationary regime-change and streaming tests. WZS should be a reproduction target when its implementation and exact configuration are available.
+**CDL-Bench consequence:** WZS is a mandatory comparison target, not merely optional related work. First seek an official implementation/configuration and reproduce its declared datasets. If code is not available, reproduce its disclosed algorithmic components as a separately labelled WZS-inspired control; never equate that control with the paper's method or results. Include the same non-stationary regime-change suite and measure segmentation overhead, adaptation delay, false switches and online compute.
 
 ### 1.5 Sprintz, Gorilla and Chimp — edge and time-series baselines
 
