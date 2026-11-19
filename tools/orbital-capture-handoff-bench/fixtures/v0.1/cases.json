@@ -9,222 +9,792 @@
     "interface_revision": 3,
     "epoch_tick": 1000,
     "max_epoch_skew_ticks": 0,
-    "max_approach_distance_m": 2.0,
-    "max_approach_speed_mps": 0.10,
+    "max_approach_distance_m": 2,
+    "max_approach_speed_mps": 0.1,
     "max_contact_position_error_m": 0.01,
     "max_contact_speed_mps": 0.03,
     "max_relative_angular_rate_rad_s": 0.005,
-    "max_contact_impulse_ns": 2.0,
+    "max_contact_impulse_ns": 2,
     "max_end_effector_error_m": 0.005,
     "min_collision_clearance_m": 0.02,
-    "max_joint_abs_rad": 2.90,
-    "max_bus_angular_rate_rad_s": 0.02
+    "max_joint_abs_rad": 2.9,
+    "max_bus_angular_rate_rad_s": 0.02,
+    "max_attitude_error_rad": 0.02,
+    "min_joint_limit_margin_rad": 0.05
   },
   "cases": [
     {
       "id": "NOMINAL_CAPTURE",
       "class": "positive_control",
       "expected": "accepted_for_handoff",
-      "approach": {"outcome":"docked","distance_m":0.8,"speed_mps":0.02},
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
       "contact": {
-        "frame_id":"TARGET-LVLH-001","epoch_tick":1000,
-        "interface_id":"COOPERATIVE-CAPTURE-PORT-A","interface_revision":3,
-        "position_error_m":0.003,"relative_speed_mps":0.015,
-        "relative_angular_rate_rad_s":0.001,"contact_impulse_ns":0.4,
-        "end_effector_error_m":0.002,"collision_clearance_m":0.06,
-        "joint_angles_rad":[0.2,-0.4,0.7,0.1,-0.3,0.2,0.1],
-        "bus_angular_velocity_rad_s":[0.001,-0.001,0.002],
-        "latch_state":"engaged","retention_state":"passed",
-        "approach_receipt":"synthetic:approach-001",
-        "contact_receipt":"synthetic:contact-001",
-        "arm_receipt":"synthetic:arm-001",
-        "latch_receipt":"synthetic:latch-001",
-        "retention_receipt":"synthetic:retention-001"
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3,
+        "position_error_m": 0.003,
+        "relative_speed_mps": 0.015,
+        "relative_angular_rate_rad_s": 0.001,
+        "contact_impulse_ns": 0.4,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.06,
+        "joint_angles_rad": [
+          0.2,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.001,
+          -0.001,
+          0.002
+        ],
+        "latch_state": "engaged",
+        "retention_state": "passed",
+        "approach_receipt": "synthetic:approach-001",
+        "contact_receipt": "synthetic:contact-001",
+        "arm_receipt": "synthetic:arm-001",
+        "latch_receipt": "synthetic:latch-001",
+        "retention_receipt": "synthetic:retention-001",
+        "attitude_error_rad": 0.005
       }
     },
     {
       "id": "APPROACH_ABORTED",
       "class": "negative_control",
       "expected": "rejected",
-      "approach": {"outcome":"aborted","distance_m":0.8,"speed_mps":0.02},
-      "contact": {"frame_id":"TARGET-LVLH-001","epoch_tick":1000,"interface_id":"COOPERATIVE-CAPTURE-PORT-A","interface_revision":3}
+      "approach": {
+        "outcome": "aborted",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
+      "contact": {
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3
+      }
     },
     {
       "id": "RELATIVE_SPEED_TOO_HIGH",
       "class": "negative_control",
       "expected": "rejected",
-      "approach": {"outcome":"docked","distance_m":0.8,"speed_mps":0.02},
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
       "contact": {
-        "frame_id":"TARGET-LVLH-001","epoch_tick":1000,"interface_id":"COOPERATIVE-CAPTURE-PORT-A","interface_revision":3,
-        "position_error_m":0.003,"relative_speed_mps":0.08,"relative_angular_rate_rad_s":0.001,"contact_impulse_ns":0.4,
-        "end_effector_error_m":0.002,"collision_clearance_m":0.06,"joint_angles_rad":[0.2,-0.4,0.7,0.1,-0.3,0.2,0.1],
-        "bus_angular_velocity_rad_s":[0.001,-0.001,0.002],"latch_state":"engaged","retention_state":"passed",
-        "approach_receipt":"synthetic:a","contact_receipt":"synthetic:c","arm_receipt":"synthetic:arm","latch_receipt":"synthetic:l","retention_receipt":"synthetic:r"
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3,
+        "position_error_m": 0.003,
+        "relative_speed_mps": 0.08,
+        "relative_angular_rate_rad_s": 0.001,
+        "contact_impulse_ns": 0.4,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.06,
+        "joint_angles_rad": [
+          0.2,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.001,
+          -0.001,
+          0.002
+        ],
+        "latch_state": "engaged",
+        "retention_state": "passed",
+        "approach_receipt": "synthetic:a",
+        "contact_receipt": "synthetic:c",
+        "arm_receipt": "synthetic:arm",
+        "latch_receipt": "synthetic:l",
+        "retention_receipt": "synthetic:r",
+        "attitude_error_rad": 0.005
       }
     },
     {
       "id": "ANGULAR_RATE_TOO_HIGH",
       "class": "negative_control",
       "expected": "rejected",
-      "approach": {"outcome":"docked","distance_m":0.8,"speed_mps":0.02},
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
       "contact": {
-        "frame_id":"TARGET-LVLH-001","epoch_tick":1000,"interface_id":"COOPERATIVE-CAPTURE-PORT-A","interface_revision":3,
-        "position_error_m":0.003,"relative_speed_mps":0.015,"relative_angular_rate_rad_s":0.02,"contact_impulse_ns":0.4,
-        "end_effector_error_m":0.002,"collision_clearance_m":0.06,"joint_angles_rad":[0.2,-0.4,0.7,0.1,-0.3,0.2,0.1],
-        "bus_angular_velocity_rad_s":[0.001,-0.001,0.002],"latch_state":"engaged","retention_state":"passed",
-        "approach_receipt":"synthetic:a","contact_receipt":"synthetic:c","arm_receipt":"synthetic:arm","latch_receipt":"synthetic:l","retention_receipt":"synthetic:r"
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3,
+        "position_error_m": 0.003,
+        "relative_speed_mps": 0.015,
+        "relative_angular_rate_rad_s": 0.02,
+        "contact_impulse_ns": 0.4,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.06,
+        "joint_angles_rad": [
+          0.2,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.001,
+          -0.001,
+          0.002
+        ],
+        "latch_state": "engaged",
+        "retention_state": "passed",
+        "approach_receipt": "synthetic:a",
+        "contact_receipt": "synthetic:c",
+        "arm_receipt": "synthetic:arm",
+        "latch_receipt": "synthetic:l",
+        "retention_receipt": "synthetic:r",
+        "attitude_error_rad": 0.005
       }
     },
     {
       "id": "INTERFACE_REVISION_MISMATCH",
       "class": "negative_control",
       "expected": "rejected",
-      "approach": {"outcome":"docked","distance_m":0.8,"speed_mps":0.02},
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
       "contact": {
-        "frame_id":"TARGET-LVLH-001","epoch_tick":1000,"interface_id":"COOPERATIVE-CAPTURE-PORT-A","interface_revision":2,
-        "position_error_m":0.003,"relative_speed_mps":0.015,"relative_angular_rate_rad_s":0.001,"contact_impulse_ns":0.4,
-        "end_effector_error_m":0.002,"collision_clearance_m":0.06,"joint_angles_rad":[0.2,-0.4,0.7,0.1,-0.3,0.2,0.1],
-        "bus_angular_velocity_rad_s":[0.001,-0.001,0.002],"latch_state":"engaged","retention_state":"passed",
-        "approach_receipt":"synthetic:a","contact_receipt":"synthetic:c","arm_receipt":"synthetic:arm","latch_receipt":"synthetic:l","retention_receipt":"synthetic:r"
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 2,
+        "position_error_m": 0.003,
+        "relative_speed_mps": 0.015,
+        "relative_angular_rate_rad_s": 0.001,
+        "contact_impulse_ns": 0.4,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.06,
+        "joint_angles_rad": [
+          0.2,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.001,
+          -0.001,
+          0.002
+        ],
+        "latch_state": "engaged",
+        "retention_state": "passed",
+        "approach_receipt": "synthetic:a",
+        "contact_receipt": "synthetic:c",
+        "arm_receipt": "synthetic:arm",
+        "latch_receipt": "synthetic:l",
+        "retention_receipt": "synthetic:r",
+        "attitude_error_rad": 0.005
       }
     },
     {
       "id": "FRAME_NOT_OBSERVED",
       "class": "negative_control",
       "expected": "indeterminate",
-      "approach": {"outcome":"docked","distance_m":0.8,"speed_mps":0.02},
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
       "contact": {
-        "epoch_tick":1000,"interface_id":"COOPERATIVE-CAPTURE-PORT-A","interface_revision":3,
-        "position_error_m":0.003,"relative_speed_mps":0.015,"relative_angular_rate_rad_s":0.001,"contact_impulse_ns":0.4,
-        "end_effector_error_m":0.002,"collision_clearance_m":0.06,"joint_angles_rad":[0.2,-0.4,0.7,0.1,-0.3,0.2,0.1],
-        "bus_angular_velocity_rad_s":[0.001,-0.001,0.002],"latch_state":"engaged","retention_state":"passed",
-        "approach_receipt":"synthetic:a","contact_receipt":"synthetic:c","arm_receipt":"synthetic:arm","latch_receipt":"synthetic:l","retention_receipt":"synthetic:r"
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3,
+        "position_error_m": 0.003,
+        "relative_speed_mps": 0.015,
+        "relative_angular_rate_rad_s": 0.001,
+        "contact_impulse_ns": 0.4,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.06,
+        "joint_angles_rad": [
+          0.2,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.001,
+          -0.001,
+          0.002
+        ],
+        "latch_state": "engaged",
+        "retention_state": "passed",
+        "approach_receipt": "synthetic:a",
+        "contact_receipt": "synthetic:c",
+        "arm_receipt": "synthetic:arm",
+        "latch_receipt": "synthetic:l",
+        "retention_receipt": "synthetic:r",
+        "attitude_error_rad": 0.005
       }
     },
     {
       "id": "CONTACT_IMPULSE_TOO_HIGH",
       "class": "negative_control",
       "expected": "rejected",
-      "approach": {"outcome":"docked","distance_m":0.8,"speed_mps":0.02},
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
       "contact": {
-        "frame_id":"TARGET-LVLH-001","epoch_tick":1000,"interface_id":"COOPERATIVE-CAPTURE-PORT-A","interface_revision":3,
-        "position_error_m":0.003,"relative_speed_mps":0.015,"relative_angular_rate_rad_s":0.001,"contact_impulse_ns":3.5,
-        "end_effector_error_m":0.002,"collision_clearance_m":0.06,"joint_angles_rad":[0.2,-0.4,0.7,0.1,-0.3,0.2,0.1],
-        "bus_angular_velocity_rad_s":[0.001,-0.001,0.002],"latch_state":"engaged","retention_state":"passed",
-        "approach_receipt":"synthetic:a","contact_receipt":"synthetic:c","arm_receipt":"synthetic:arm","latch_receipt":"synthetic:l","retention_receipt":"synthetic:r"
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3,
+        "position_error_m": 0.003,
+        "relative_speed_mps": 0.015,
+        "relative_angular_rate_rad_s": 0.001,
+        "contact_impulse_ns": 3.5,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.06,
+        "joint_angles_rad": [
+          0.2,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.001,
+          -0.001,
+          0.002
+        ],
+        "latch_state": "engaged",
+        "retention_state": "passed",
+        "approach_receipt": "synthetic:a",
+        "contact_receipt": "synthetic:c",
+        "arm_receipt": "synthetic:arm",
+        "latch_receipt": "synthetic:l",
+        "retention_receipt": "synthetic:r",
+        "attitude_error_rad": 0.005
       }
     },
     {
       "id": "ARM_CLEARANCE_VIOLATION",
       "class": "negative_control",
       "expected": "rejected",
-      "approach": {"outcome":"docked","distance_m":0.8,"speed_mps":0.02},
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
       "contact": {
-        "frame_id":"TARGET-LVLH-001","epoch_tick":1000,"interface_id":"COOPERATIVE-CAPTURE-PORT-A","interface_revision":3,
-        "position_error_m":0.003,"relative_speed_mps":0.015,"relative_angular_rate_rad_s":0.001,"contact_impulse_ns":0.4,
-        "end_effector_error_m":0.002,"collision_clearance_m":0.005,"joint_angles_rad":[0.2,-0.4,0.7,0.1,-0.3,0.2,0.1],
-        "bus_angular_velocity_rad_s":[0.001,-0.001,0.002],"latch_state":"engaged","retention_state":"passed",
-        "approach_receipt":"synthetic:a","contact_receipt":"synthetic:c","arm_receipt":"synthetic:arm","latch_receipt":"synthetic:l","retention_receipt":"synthetic:r"
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3,
+        "position_error_m": 0.003,
+        "relative_speed_mps": 0.015,
+        "relative_angular_rate_rad_s": 0.001,
+        "contact_impulse_ns": 0.4,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.005,
+        "joint_angles_rad": [
+          0.2,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.001,
+          -0.001,
+          0.002
+        ],
+        "latch_state": "engaged",
+        "retention_state": "passed",
+        "approach_receipt": "synthetic:a",
+        "contact_receipt": "synthetic:c",
+        "arm_receipt": "synthetic:arm",
+        "latch_receipt": "synthetic:l",
+        "retention_receipt": "synthetic:r",
+        "attitude_error_rad": 0.005
       }
     },
     {
       "id": "JOINT_LIMIT_MARGIN_VIOLATION",
       "class": "negative_control",
       "expected": "rejected",
-      "approach": {"outcome":"docked","distance_m":0.8,"speed_mps":0.02},
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
       "contact": {
-        "frame_id":"TARGET-LVLH-001","epoch_tick":1000,"interface_id":"COOPERATIVE-CAPTURE-PORT-A","interface_revision":3,
-        "position_error_m":0.003,"relative_speed_mps":0.015,"relative_angular_rate_rad_s":0.001,"contact_impulse_ns":0.4,
-        "end_effector_error_m":0.002,"collision_clearance_m":0.06,"joint_angles_rad":[2.89,-0.4,0.7,0.1,-0.3,0.2,0.1],
-        "bus_angular_velocity_rad_s":[0.001,-0.001,0.002],"latch_state":"engaged","retention_state":"passed",
-        "approach_receipt":"synthetic:a","contact_receipt":"synthetic:c","arm_receipt":"synthetic:arm","latch_receipt":"synthetic:l","retention_receipt":"synthetic:r"
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3,
+        "position_error_m": 0.003,
+        "relative_speed_mps": 0.015,
+        "relative_angular_rate_rad_s": 0.001,
+        "contact_impulse_ns": 0.4,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.06,
+        "joint_angles_rad": [
+          2.89,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.001,
+          -0.001,
+          0.002
+        ],
+        "latch_state": "engaged",
+        "retention_state": "passed",
+        "approach_receipt": "synthetic:a",
+        "contact_receipt": "synthetic:c",
+        "arm_receipt": "synthetic:arm",
+        "latch_receipt": "synthetic:l",
+        "retention_receipt": "synthetic:r",
+        "attitude_error_rad": 0.005
       }
     },
     {
       "id": "BUS_RATE_LIMIT_VIOLATION",
       "class": "negative_control",
       "expected": "rejected",
-      "approach": {"outcome":"docked","distance_m":0.8,"speed_mps":0.02},
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
       "contact": {
-        "frame_id":"TARGET-LVLH-001","epoch_tick":1000,"interface_id":"COOPERATIVE-CAPTURE-PORT-A","interface_revision":3,
-        "position_error_m":0.003,"relative_speed_mps":0.015,"relative_angular_rate_rad_s":0.001,"contact_impulse_ns":0.4,
-        "end_effector_error_m":0.002,"collision_clearance_m":0.06,"joint_angles_rad":[0.2,-0.4,0.7,0.1,-0.3,0.2,0.1],
-        "bus_angular_velocity_rad_s":[0.05,-0.001,0.002],"latch_state":"engaged","retention_state":"passed",
-        "approach_receipt":"synthetic:a","contact_receipt":"synthetic:c","arm_receipt":"synthetic:arm","latch_receipt":"synthetic:l","retention_receipt":"synthetic:r"
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3,
+        "position_error_m": 0.003,
+        "relative_speed_mps": 0.015,
+        "relative_angular_rate_rad_s": 0.001,
+        "contact_impulse_ns": 0.4,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.06,
+        "joint_angles_rad": [
+          0.2,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.05,
+          -0.001,
+          0.002
+        ],
+        "latch_state": "engaged",
+        "retention_state": "passed",
+        "approach_receipt": "synthetic:a",
+        "contact_receipt": "synthetic:c",
+        "arm_receipt": "synthetic:arm",
+        "latch_receipt": "synthetic:l",
+        "retention_receipt": "synthetic:r",
+        "attitude_error_rad": 0.005
       }
     },
     {
       "id": "LATCH_NOT_ENGAGED",
       "class": "negative_control",
       "expected": "rejected",
-      "approach": {"outcome":"docked","distance_m":0.8,"speed_mps":0.02},
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
       "contact": {
-        "frame_id":"TARGET-LVLH-001","epoch_tick":1000,"interface_id":"COOPERATIVE-CAPTURE-PORT-A","interface_revision":3,
-        "position_error_m":0.003,"relative_speed_mps":0.015,"relative_angular_rate_rad_s":0.001,"contact_impulse_ns":0.4,
-        "end_effector_error_m":0.002,"collision_clearance_m":0.06,"joint_angles_rad":[0.2,-0.4,0.7,0.1,-0.3,0.2,0.1],
-        "bus_angular_velocity_rad_s":[0.001,-0.001,0.002],"latch_state":"not_engaged","retention_state":"passed",
-        "approach_receipt":"synthetic:a","contact_receipt":"synthetic:c","arm_receipt":"synthetic:arm","latch_receipt":"synthetic:l","retention_receipt":"synthetic:r"
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3,
+        "position_error_m": 0.003,
+        "relative_speed_mps": 0.015,
+        "relative_angular_rate_rad_s": 0.001,
+        "contact_impulse_ns": 0.4,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.06,
+        "joint_angles_rad": [
+          0.2,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.001,
+          -0.001,
+          0.002
+        ],
+        "latch_state": "not_engaged",
+        "retention_state": "passed",
+        "approach_receipt": "synthetic:a",
+        "contact_receipt": "synthetic:c",
+        "arm_receipt": "synthetic:arm",
+        "latch_receipt": "synthetic:l",
+        "retention_receipt": "synthetic:r",
+        "attitude_error_rad": 0.005
       }
     },
     {
       "id": "RETENTION_NOT_RUN",
       "class": "negative_control",
       "expected": "indeterminate",
-      "approach": {"outcome":"docked","distance_m":0.8,"speed_mps":0.02},
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
       "contact": {
-        "frame_id":"TARGET-LVLH-001","epoch_tick":1000,"interface_id":"COOPERATIVE-CAPTURE-PORT-A","interface_revision":3,
-        "position_error_m":0.003,"relative_speed_mps":0.015,"relative_angular_rate_rad_s":0.001,"contact_impulse_ns":0.4,
-        "end_effector_error_m":0.002,"collision_clearance_m":0.06,"joint_angles_rad":[0.2,-0.4,0.7,0.1,-0.3,0.2,0.1],
-        "bus_angular_velocity_rad_s":[0.001,-0.001,0.002],"latch_state":"engaged","retention_state":"not_run",
-        "approach_receipt":"synthetic:a","contact_receipt":"synthetic:c","arm_receipt":"synthetic:arm","latch_receipt":"synthetic:l"
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3,
+        "position_error_m": 0.003,
+        "relative_speed_mps": 0.015,
+        "relative_angular_rate_rad_s": 0.001,
+        "contact_impulse_ns": 0.4,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.06,
+        "joint_angles_rad": [
+          0.2,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.001,
+          -0.001,
+          0.002
+        ],
+        "latch_state": "engaged",
+        "retention_state": "not_run",
+        "approach_receipt": "synthetic:a",
+        "contact_receipt": "synthetic:c",
+        "arm_receipt": "synthetic:arm",
+        "latch_receipt": "synthetic:l",
+        "attitude_error_rad": 0.005
       }
     },
     {
       "id": "MISSING_CONTACT_EVIDENCE",
       "class": "negative_control",
       "expected": "indeterminate",
-      "approach": {"outcome":"docked","distance_m":0.8,"speed_mps":0.02},
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
       "contact": {
-        "frame_id":"TARGET-LVLH-001","epoch_tick":1000,"interface_id":"COOPERATIVE-CAPTURE-PORT-A","interface_revision":3,
-        "position_error_m":0.003,"relative_speed_mps":0.015,"relative_angular_rate_rad_s":0.001,"contact_impulse_ns":0.4,
-        "end_effector_error_m":0.002,"collision_clearance_m":0.06,"joint_angles_rad":[0.2,-0.4,0.7,0.1,-0.3,0.2,0.1],
-        "bus_angular_velocity_rad_s":[0.001,-0.001,0.002],"latch_state":"engaged","retention_state":"passed",
-        "approach_receipt":"synthetic:a","arm_receipt":"synthetic:arm","latch_receipt":"synthetic:l","retention_receipt":"synthetic:r"
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3,
+        "position_error_m": 0.003,
+        "relative_speed_mps": 0.015,
+        "relative_angular_rate_rad_s": 0.001,
+        "contact_impulse_ns": 0.4,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.06,
+        "joint_angles_rad": [
+          0.2,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.001,
+          -0.001,
+          0.002
+        ],
+        "latch_state": "engaged",
+        "retention_state": "passed",
+        "approach_receipt": "synthetic:a",
+        "arm_receipt": "synthetic:arm",
+        "latch_receipt": "synthetic:l",
+        "retention_receipt": "synthetic:r",
+        "attitude_error_rad": 0.005
       }
     },
     {
       "id": "STALE_EPOCH",
       "class": "negative_control",
       "expected": "rejected",
-      "approach": {"outcome":"docked","distance_m":0.8,"speed_mps":0.02},
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
       "contact": {
-        "frame_id":"TARGET-LVLH-001","epoch_tick":900,"interface_id":"COOPERATIVE-CAPTURE-PORT-A","interface_revision":3,
-        "position_error_m":0.003,"relative_speed_mps":0.015,"relative_angular_rate_rad_s":0.001,"contact_impulse_ns":0.4,
-        "end_effector_error_m":0.002,"collision_clearance_m":0.06,"joint_angles_rad":[0.2,-0.4,0.7,0.1,-0.3,0.2,0.1],
-        "bus_angular_velocity_rad_s":[0.001,-0.001,0.002],"latch_state":"engaged","retention_state":"passed",
-        "approach_receipt":"synthetic:a","contact_receipt":"synthetic:c","arm_receipt":"synthetic:arm","latch_receipt":"synthetic:l","retention_receipt":"synthetic:r"
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 900,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3,
+        "position_error_m": 0.003,
+        "relative_speed_mps": 0.015,
+        "relative_angular_rate_rad_s": 0.001,
+        "contact_impulse_ns": 0.4,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.06,
+        "joint_angles_rad": [
+          0.2,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.001,
+          -0.001,
+          0.002
+        ],
+        "latch_state": "engaged",
+        "retention_state": "passed",
+        "approach_receipt": "synthetic:a",
+        "contact_receipt": "synthetic:c",
+        "arm_receipt": "synthetic:arm",
+        "latch_receipt": "synthetic:l",
+        "retention_receipt": "synthetic:r",
+        "attitude_error_rad": 0.005
       }
     },
     {
       "id": "APPROACH_ONLY_NOT_CAPTURE",
       "class": "negative_control",
       "expected": "indeterminate",
-      "approach": {"outcome":"docked","distance_m":0.8,"speed_mps":0.02},
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
       "contact": {
-        "approach_receipt":"synthetic:approach-only"
+        "approach_receipt": "synthetic:approach-only"
       }
     },
     {
       "id": "APPROACH_DISTANCE_TOO_HIGH",
       "class": "negative_control",
       "expected": "rejected",
-      "approach": {"outcome":"docked","distance_m":5.0,"speed_mps":0.02},
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 5,
+        "speed_mps": 0.02
+      },
       "contact": {
-        "frame_id":"TARGET-LVLH-001","epoch_tick":1000,"interface_id":"COOPERATIVE-CAPTURE-PORT-A","interface_revision":3,
-        "position_error_m":0.003,"relative_speed_mps":0.015,"relative_angular_rate_rad_s":0.001,"contact_impulse_ns":0.4,
-        "end_effector_error_m":0.002,"collision_clearance_m":0.06,"joint_angles_rad":[0.2,-0.4,0.7,0.1,-0.3,0.2,0.1],
-        "bus_angular_velocity_rad_s":[0.001,-0.001,0.002],"latch_state":"engaged","retention_state":"passed",
-        "approach_receipt":"synthetic:a","contact_receipt":"synthetic:c","arm_receipt":"synthetic:arm","latch_receipt":"synthetic:l","retention_receipt":"synthetic:r"
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3,
+        "position_error_m": 0.003,
+        "relative_speed_mps": 0.015,
+        "relative_angular_rate_rad_s": 0.001,
+        "contact_impulse_ns": 0.4,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.06,
+        "joint_angles_rad": [
+          0.2,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.001,
+          -0.001,
+          0.002
+        ],
+        "latch_state": "engaged",
+        "retention_state": "passed",
+        "approach_receipt": "synthetic:a",
+        "contact_receipt": "synthetic:c",
+        "arm_receipt": "synthetic:arm",
+        "latch_receipt": "synthetic:l",
+        "retention_receipt": "synthetic:r",
+        "attitude_error_rad": 0.005
+      }
+    },
+    {
+      "id": "ATTITUDE_MISALIGNMENT",
+      "class": "negative_control",
+      "expected": "rejected",
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
+      "contact": {
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3,
+        "position_error_m": 0.003,
+        "attitude_error_rad": 0.05,
+        "relative_speed_mps": 0.015,
+        "relative_angular_rate_rad_s": 0.001,
+        "contact_impulse_ns": 0.4,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.06,
+        "joint_angles_rad": [
+          0.2,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.001,
+          -0.001,
+          0.002
+        ],
+        "latch_state": "engaged",
+        "retention_state": "passed",
+        "approach_receipt": "synthetic:a",
+        "contact_receipt": "synthetic:c",
+        "arm_receipt": "synthetic:arm",
+        "latch_receipt": "synthetic:l",
+        "retention_receipt": "synthetic:r"
+      }
+    },
+    {
+      "id": "RETENTION_FAILED",
+      "class": "negative_control",
+      "expected": "rejected",
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
+      "contact": {
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3,
+        "position_error_m": 0.003,
+        "attitude_error_rad": 0.005,
+        "relative_speed_mps": 0.015,
+        "relative_angular_rate_rad_s": 0.001,
+        "contact_impulse_ns": 0.4,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.06,
+        "joint_angles_rad": [
+          0.2,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.001,
+          -0.001,
+          0.002
+        ],
+        "latch_state": "engaged",
+        "retention_state": "failed",
+        "approach_receipt": "synthetic:a",
+        "contact_receipt": "synthetic:c",
+        "arm_receipt": "synthetic:arm",
+        "latch_receipt": "synthetic:l",
+        "retention_receipt": "synthetic:r"
+      }
+    },
+    {
+      "id": "CONTACT_POSITION_ERROR_TOO_HIGH",
+      "class": "negative_control",
+      "expected": "rejected",
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
+      "contact": {
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3,
+        "position_error_m": 0.03,
+        "attitude_error_rad": 0.005,
+        "relative_speed_mps": 0.015,
+        "relative_angular_rate_rad_s": 0.001,
+        "contact_impulse_ns": 0.4,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.06,
+        "joint_angles_rad": [
+          0.2,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.001,
+          -0.001,
+          0.002
+        ],
+        "latch_state": "engaged",
+        "retention_state": "passed",
+        "approach_receipt": "synthetic:a",
+        "contact_receipt": "synthetic:c",
+        "arm_receipt": "synthetic:arm",
+        "latch_receipt": "synthetic:l",
+        "retention_receipt": "synthetic:r"
       }
     }
   ]
