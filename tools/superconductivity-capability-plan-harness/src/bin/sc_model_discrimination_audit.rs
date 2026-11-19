@@ -366,7 +366,7 @@ impl Instance {
         if !information.is_finite() || information < -1.0e-9 {
             return Err("computed model information gain is invalid".to_owned());
         }
-        Ok(information.max(0.0).min(self.prior_entropy_nats()))
+        Ok(information.clamp(0.0, self.prior_entropy_nats()))
     }
 
     fn plan_from_indices(&self, indices: &[usize]) -> Result<Option<Plan>, String> {
