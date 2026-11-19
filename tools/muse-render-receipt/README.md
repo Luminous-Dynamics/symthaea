@@ -34,11 +34,12 @@ The bundle directory must contain:
 | `renderer-environment.json` | Exact pinned environment/closure manifest |
 | `renderer-config.json` | Exact renderer configuration bytes |
 | `renderer-asset.bin` | Exact SoundFont/asset bytes when the receipt names an asset digest |
-| `render-invocation.json` | Canonical invocation record |
+| `render-invocation.json` | Structured invocation record validated against renderer identity, binary/environment/configuration hashes, MIDI input, WAV output, timing and exit code |
 | `render.stdout`, `render.stderr` | Captured process streams when their hashes are present |
 | `output.wav` | Exact rendered WAV bytes |
 
 The verifier checks:
+- the structured [render-invocation-v1 schema](../../docs/research/schemas/muse-render-invocation-v1.schema.json), including exact links to the renderer binary/environment/configuration, MIDI input digest, WAV output path, timestamps and exit code;
 - the receipt's RFC 8785-style canonical JSON seal (receipt hash omitted before hashing);
 - exact byte hashes for source/candidate scores, edit plan/receipt/report, MIDI, renderer artifacts, invocation, process streams, and WAV;
 - consistency of the score-edit input digest, operation IDs, protected-window IDs and independent verifier result;
