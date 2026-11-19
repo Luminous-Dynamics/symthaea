@@ -105,6 +105,12 @@ pub struct QuotientCertificateV1 {
     pub group_id: String,
     pub group_order: usize,
     pub candidate_count: usize,
+    /// Exact versioned canonical encoding of every task-semantic input.
+    /// This is a replay identity, not a cryptographic digest.
+    pub problem_contract_bytes: Vec<u8>,
+    /// Exact versioned canonical encoding of the complete finite action.
+    pub action_contract_bytes: Vec<u8>,
+    pub qualification_budget: QualificationBudgetV1,
     pub pruning_authority: PruningAuthorityV1,
     pub orbits: Vec<OrbitV1>,
     pub evidence: CertificateEvidenceV1,
@@ -341,6 +347,65 @@ struct ValidatedActionV1 {
 fn nonempty(value: &str) -> bool {
     !value.trim().is_empty()
 }
+
+fn append_contract_field(target: &mut Vec<u8>, value: &[u8]) {
+    target.extend_from_slice(&(value.len() as u64).to_le_bytes());
+    target.extend_from_slice(value);
+}
+
+fn append_contract_string(target: &mut Vec<u8>, value: &str) {
+    append_contract_field(target, value.as_bytes());
+}
+
+/// Canonical versioned byte encoding for the complete discrete task contract.
+/// Field order, integer width, boolean representation and string framing are
+/// fixed; it intentionally does not claim to be a cryptographic hash.
+pub fn canonical_search_problem_bytes(problem: &SearchProblemV1) -> Vec<u8> {
+    let mut bytes = b"luminous.symmetry_quotient.search_problem.v1\0".to_vec();
+    append_contract_string(&mut bytes, &problem.problem_id);
+    bytes.extend_from_slice(&(problem.candidate_ids.len() as u64).to_le_bytes());
+    for candidate_id in &problem.candidate_ids {
+        append_contract_string(&mut bytes, candidate_id);
+    }
+    bytes.extend_from_slice(&(problem.semantics.len() as u64).to_le_bytes());
+    for semantics in &problem.semantics {
+        bytes.push(u8::from(semantics.in_search_domain));
+        bytes.push(u8::from(semantics.admissible));
+        bytes.push(u8::from(semantics.feasible));
+        bytes.extend_from_slice(&semantics.objective_cost.to_le_bytes());
+        bytes.extend_from_slice(&(semantics.constraint_signature.len() as u64).to_le_bytes());
+        for constraint in &semantics.constraint_signature {
+            bytes.extend_from_slice(&constraint.to_le_bytes());
+        }
+        append_contract_string(&mut bytes, &semantics.boundary_condition_id);
+        append_contract_string(&mut bytes, &semantics.output_equivalence_id);
+    }
+    bytes
+}
+
+/// Canonical versioned byte encoding for the complete finite group action.
+pub fn canonical_finite_action_bytes(action: &FiniteActionV1) -> Vec<u8> {
+    let mut bytes = b"luminous.symmetry_quotient.finite_action.v1\0".to_vec();
+    append_contract_string(&mut bytes, &action.action_id);
+    append_contract_string(&mut bytes, &action.group.group_id);
+    bytes.extend_from_slice(&(action.group.identity as u64).to_le_bytes());
+    bytes.extend_from_slice(&(action.group.multiplication.len() as u64).to_le_bytes());
+    for row in &action.group.multiplication {
+        bytes.extend_from_slice(&(row.len() as u64).to_le_bytes());
+        for product in row {
+            bytes.extend_from_slice(&(*product as u64).to_le_bytes());
+        }
+    }
+    bytes.extend_from_slice(&(action.permutations.len() as u64).to_le_bytes());
+    for permutation in &action.permutations {
+        bytes.extend_from_slice(&(permutation.len() as u64).to_le_bytes());
+        for image in permutation {
+            bytes.extend_from_slice(&(*image as u64).to_le_bytes());
+        }
+    }
+    bytes
+}
+
 
 fn ceil_log2(value: usize) -> usize {
     if value <= 1 {
@@ -738,6 +803,9 @@ pub fn compile_quotient(
         group_id: action.group.group_id.clone(),
         group_order,
         candidate_count,
+        problem_contract_bytes: canonical_search_problem_bytes(problem),
+        action_contract_bytes: canonical_finite_action_bytes(action),
+        qualification_budget: budget,
         pruning_authority: PruningAuthorityV1::ExactFiniteGroupAndExactTaskSemanticPreservation,
         orbits,
         evidence: CertificateEvidenceV1 {
@@ -773,6 +841,9 @@ pub fn verify_certificate(
         || certificate.group_id != action.group.group_id
         || certificate.group_order != group_order
         || certificate.candidate_count != candidate_count
+        || certificate.problem_contract_bytes != canonical_search_problem_bytes(problem)
+        || certificate.action_contract_bytes != canonical_finite_action_bytes(action)
+        || certificate.qualification_budget != budget
     {
         return Err(QuotientErrorV1::CertificateIdentityMismatch);
     }
@@ -2286,6 +2357,53 @@ mod tests {
         assert_eq!(
             validate_action(&action, 4, QualificationBudgetV1::default()),
             Err(QuotientErrorV1::ActionLawViolation)
+        );
+    }
+
+    #[test]
+    fn certificate_binds_complete_task_action_and_budget_contracts() {
+        let (problem, action, certificate) = authorized_fixture();
+        verify_certificate(
+            &problem,
+            &action,
+            &certificate,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+
+        // A uniform mutation can leave every orbit's pairwise task semantics
+        // invariant. It must still not reuse a certificate for another task.
+        let mut uniformly_changed_problem = problem.clone();
+        for semantics in &mut uniformly_changed_problem.semantics {
+            semantics.objective_cost += 7;
+            semantics.boundary_condition_id = "new-but-uniform-boundary".to_owned();
+            semantics.constraint_signature.push(99);
+        }
+        assert!(check_task_invariance(&uniformly_changed_problem, &action).is_ok());
+        assert_eq!(
+            verify_certificate(
+                &uniformly_changed_problem,
+                &action,
+                &certificate,
+                QualificationBudgetV1::default(),
+            ),
+            Err(QuotientErrorV1::CertificateIdentityMismatch)
+        );
+
+        let changed_budget = QualificationBudgetV1 {
+            maximum_work_units: QualificationBudgetV1::default().maximum_work_units + 1,
+            ..QualificationBudgetV1::default()
+        };
+        assert_eq!(
+            verify_certificate(&problem, &action, &certificate, changed_budget),
+            Err(QuotientErrorV1::CertificateIdentityMismatch)
+        );
+
+        let mut changed_action = action.clone();
+        changed_action.permutations.swap(0, 1);
+        assert_eq!(
+            verify_certificate(&problem, &changed_action, &certificate, QualificationBudgetV1::default()),
+            Err(QuotientErrorV1::CertificateIdentityMismatch)
         );
     }
 
