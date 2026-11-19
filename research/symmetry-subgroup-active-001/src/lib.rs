@@ -989,9 +989,9 @@ mod tests {
         let (eb, ab, sb) = budgets();
         let SubgroupPolicyOutcomeV1::Identifiable(cert) = compile_subgroup_policy(&p, eb, ab, sb).unwrap()
         else { panic!("D4 probe family is complete"); };
-        let PlanDispositionV1::Probe { probe_index, .. } = cert.adaptive_policy.root.disposition
+        let PlanDispositionV1::Probe { probe_index, .. } = &cert.adaptive_policy.root.disposition
         else { panic!("policy root must be a membership query"); };
-        let probe = &p.probes[probe_index];
+        let probe = &p.probes[*probe_index];
         let record = MembershipObservationV1 {
             probe_id: probe.probe_id.clone(),
             evidence: MembershipEvidenceV1::Unknown {
@@ -1069,9 +1069,9 @@ mod tests {
         let (eb, ab, sb) = budgets();
         let SubgroupPolicyOutcomeV1::Identifiable(cert) = compile_subgroup_policy(&p, eb, ab, sb).unwrap()
         else { panic!("complete D4 probe family is required"); };
-        let PlanDispositionV1::Probe { probe_index, .. } = cert.adaptive_policy.root.disposition
+        let PlanDispositionV1::Probe { probe_index, .. } = &cert.adaptive_policy.root.disposition
         else { panic!("policy root must be a probe"); };
-        let probe = &p.probes[probe_index];
+        let probe = &p.probes[*probe_index];
         let bad = MembershipObservationV1 {
             probe_id: probe.probe_id.clone(),
             evidence: MembershipEvidenceV1::Preserved {
