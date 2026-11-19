@@ -78,7 +78,9 @@ The command also emits three segmented-policy families at chunk sizes 64, 256 an
   the offline best-of-eight oracle.
 
 The CLI CSV separates encoder and decoder work with
-`encoder_extra_candidate_encodes` and `decoder_candidate_reencodes`:
+`encoder_extra_candidate_encodes` and `decoder_candidate_reencodes`, and also
+reports `candidate_switches` plus `oracle_candidate_mismatch_segments` for
+segmented policies:
 - Single-transform rows: 0 / 0.
 - Offline best-of-eight: 7 extra encoder encodes per segment (eight candidates
   are tried; one is selected), and 8 decoder candidate re-encodes per segment
@@ -89,8 +91,10 @@ The CLI CSV separates encoder and decoder work with
 - Sparse historical: 7 extra encodes per side on each scheduled probe and 0
   between probes.
 
-The CSV also includes `oracle_gap_pct`, `probe_interval` and
-`probe_count`. Offline and full-historical rows are recorded as probing every
+The CSV also includes `oracle_gap_pct`, `probe_interval`, `probe_count`,
+`candidate_switches` and `oracle_candidate_mismatch_segments`. A candidate
+mismatch is a different transform/model ID from the per-chunk offline choice;
+it is a selection-behaviour diagnostic, not a byte-regret metric. Offline and full-historical rows are recorded as probing every
 segment; sparse rows count only the scheduled common probes. Every online
 frame is checked to be no smaller than the offline best-of-eight frame for the
 same source and fixed chunking. For K=1, sparse-probe child frames must match
