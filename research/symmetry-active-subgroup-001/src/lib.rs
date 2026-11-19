@@ -534,6 +534,83 @@ pub enum AdaptivePolicyV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubgroupCostComparisonV1 {
+    pub full_scan_cost: u64,
+    pub static_basis_cost: u64,
+    pub adaptive_worst_case_cost: Option<u64>,
+    /// Sum of per-hypothesis path costs under a uniform subgroup prior.
+    pub uniform_prior_cost_sum: u64,
+    pub uniform_prior_hypothesis_count: usize,
+}
+
+fn policy_path_cost(
+    problem: &ActiveExperimentProblemV1,
+    policy: &ActiveExperimentCertificateV1,
+    hypothesis_index: usize,
+) -> Result<u64, SubgroupErrorV1> {
+    let mut node = &policy.root;
+    let mut cost = 0_u64;
+    loop {
+        match &node.disposition {
+            PlanDispositionV1::Identified { hypothesis_index: identified, .. } => {
+                if *identified != hypothesis_index {
+                    return Err(SubgroupErrorV1::ReceiptMismatch);
+                }
+                return Ok(cost);
+            }
+            PlanDispositionV1::Probe { probe_index, probe_cost, branches, .. } => {
+                let outcome = problem
+                    .probes
+                    .get(*probe_index)
+                    .and_then(|probe| probe.outcomes.get(hypothesis_index))
+                    .ok_or(SubgroupErrorV1::ReceiptMismatch)?;
+                let branch = branches
+                    .iter()
+                    .find(|branch| branch.outcome == *outcome)
+                    .ok_or(SubgroupErrorV1::ReceiptMismatch)?;
+                cost = cost.checked_add(*probe_cost).ok_or(
+                    SubgroupErrorV1::Planner(ExperimentErrorV1::CostOverflow),
+                )?;
+                node = &branch.child;
+            }
+        }
+    }
+}
+
+fn build_cost_comparison(
+    problem: &SubgroupIdentificationProblemV1,
+    active_problem: &ActiveExperimentProblemV1,
+    adaptive_policy: &AdaptivePolicyV1,
+    static_probe_certificate: &ExactStaticProbeCertificateV1,
+) -> Result<SubgroupCostComparisonV1, SubgroupErrorV1> {
+    let full_scan_cost = problem
+        .probes
+        .iter()
+        .filter(|probe| probe.admissible)
+        .try_fold(0_u64, |total, probe| total.checked_add(probe.cost))
+        .ok_or(SubgroupErrorV1::Planner(ExperimentErrorV1::CostOverflow))?;
+    let mut uniform_prior_cost_sum = 0_u64;
+    let adaptive_worst_case_cost = match adaptive_policy {
+        AdaptivePolicyV1::Complete(policy) => {
+            for hypothesis_index in 0..active_problem.hypotheses.len() {
+                uniform_prior_cost_sum = uniform_prior_cost_sum
+                    .checked_add(policy_path_cost(active_problem, policy, hypothesis_index)?)
+                    .ok_or(SubgroupErrorV1::Planner(ExperimentErrorV1::CostOverflow))?;
+            }
+            Some(policy.root_worst_case_cost)
+        }
+        AdaptivePolicyV1::Incomplete { .. } => None,
+    };
+    Ok(SubgroupCostComparisonV1 {
+        full_scan_cost,
+        static_basis_cost: static_probe_certificate.selected_cost,
+        adaptive_worst_case_cost,
+        uniform_prior_cost_sum,
+        uniform_prior_hypothesis_count: active_problem.hypotheses.len(),
+    })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubgroupIdentificationCertificateV1 {
     pub schema_version: u32,
     pub problem_id: String,
@@ -542,6 +619,7 @@ pub struct SubgroupIdentificationCertificateV1 {
     pub active_problem: ActiveExperimentProblemV1,
     pub adaptive_policy: AdaptivePolicyV1,
     pub static_probe_certificate: ExactStaticProbeCertificateV1,
+    pub cost_comparison: SubgroupCostComparisonV1,
     pub subgroup_count: usize,
     pub policy_authorizes_subgroup_claim_only: bool,
     pub pruning_authorized: bool,
@@ -588,6 +666,12 @@ pub fn compile_subgroup_identification(
         },
         Err(error) => return Err(SubgroupErrorV1::Planner(error)),
     };
+    let cost_comparison = build_cost_comparison(
+        problem,
+        &active_problem,
+        &adaptive_policy,
+        &static_probe_certificate,
+    )?;
 
     Ok(SubgroupIdentificationCertificateV1 {
         schema_version: 1,
@@ -598,6 +682,7 @@ pub fn compile_subgroup_identification(
         active_problem,
         adaptive_policy,
         static_probe_certificate,
+        cost_comparison,
         policy_authorizes_subgroup_claim_only: true,
         pruning_authorized: false,
     })
@@ -1001,13 +1086,22 @@ mod tests {
 
     fn probes_for_group(group: &FiniteGroupTableV1, cost: u64) -> Vec<MembershipProbeV1> {
         (0..group.element_ids.len())
-            .map(|index| MembershipProbeV1 {
-                probe_id: format!("member-{}", group.element_ids[index]),
-                group_element_index: index,
-                task_contract_id: "task-contract-sha256:fixture".to_owned(),
-                checker_id: "finite-membership-checker-v1".to_owned(),
-                cost,
-                admissible: true,
+            .filter(|index| *index != group.identity_index)
+            .map(|index| {
+                let probe_cost = if group.group_id == "D4" {
+                    // r, r2, r3, s, rs, r2s, r3s: total full-scan cost 11.
+                    [1_u64, 1, 1, 2, 2, 2, 3][index - 1]
+                } else {
+                    cost
+                };
+                MembershipProbeV1 {
+                    probe_id: format!("member-{}", group.element_ids[index]),
+                    group_element_index: index,
+                    task_contract_id: "task-contract-sha256:fixture".to_owned(),
+                    checker_id: "finite-membership-checker-v1".to_owned(),
+                    cost: probe_cost,
+                    admissible: true,
+                }
             })
             .collect()
     }
@@ -1039,6 +1133,21 @@ mod tests {
                 group.element_ids.len()
             );
         }
+    }
+
+    #[test]
+    fn c4_and_d4_cost_targets_match_exact_adaptive_and_static_oracles() {
+        let c4_problem = problem(cyclic_group(4, "C4"));
+        let c4 = compile_subgroup_identification(&c4_problem, SubgroupBudgetV1::default()).unwrap();
+        assert_eq!(c4.cost_comparison.full_scan_cost, 3);
+        assert_eq!(c4.cost_comparison.adaptive_worst_case_cost, Some(2));
+
+        let d4_problem = problem(d4_group());
+        let d4 = compile_subgroup_identification(&d4_problem, SubgroupBudgetV1::default()).unwrap();
+        assert_eq!(d4.cost_comparison.full_scan_cost, 11);
+        assert_eq!(d4.cost_comparison.adaptive_worst_case_cost, Some(9));
+        assert_eq!(d4.cost_comparison.static_basis_cost, 10);
+        assert_eq!(d4.cost_comparison.uniform_prior_hypothesis_count, 10);
     }
 
     #[test]
