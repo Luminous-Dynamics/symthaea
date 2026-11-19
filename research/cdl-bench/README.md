@@ -30,7 +30,7 @@ The `float` command generates constant, smooth-ramp, oscillating,
 high-precision and random-bit-pattern streams. It compares:
 - raw IEEE-754 binary64 bit patterns;
 - XOR with the previous u64 bit pattern, encoded as a canonical u64 varint;
-- XOR with the previous u64 bit pattern, storing leading/trailing zero spans and only the meaningful middle bits;
+- XOR with the previous u64 bit pattern, defining and reusing a leading/trailing significant-bit window;
 - order-0 and order-1 byte CDF models;
 - Zstandard on the original raw little-endian bytes, when installed.
 
@@ -44,7 +44,7 @@ The command also emits two segmented rows at chunk sizes 64, 256 and 1,024:
 
 - `segment_portfolio` is an **offline best-of-six size oracle**. For each
   complete chunk, the encoder tries Raw/Order0, Raw/Order1, XOR-varint/Order0,
-  XOR-varint/Order1, XOR-leading-trailing/Order0 and XOR-leading-trailing/Order1,
+  XOR-varint/Order1, XOR-window/Order0 and XOR-window/Order1,
   then keeps the smallest complete F64C child frame. Every child header and
   CRC, plus the outer F64S header, counts toward the total size. The decoder
   independently recomputes all six canonical child frames after
@@ -66,8 +66,9 @@ Both policies use the 32-byte F64S outer header and count each F64C child
 header/CRC. They provide different reference points: an offline size oracle
 and a decoder-reproducible past-only selection policy.
 
-Neither the single-stream XOR transform nor this segment-local oracle is
-Gorilla, Chimp, ACTF, DeXOR, Rabbit or Dolphin. These are transparent
+The XOR-leading/trailing window is a small Gorilla-style reference transform,
+not a Gorilla/Chimp implementation. Neither the single-stream XOR transforms
+nor these segment selectors implement ACTF, DeXOR, Rabbit or Dolphin. These are transparent
 correctness baselines and a harness for those specialized comparators.
 
 ## Independent fixed-share reference simulation
