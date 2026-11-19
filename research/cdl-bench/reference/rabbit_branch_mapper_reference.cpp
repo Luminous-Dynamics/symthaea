@@ -184,7 +184,9 @@ std::vector<std::uint8_t> decode_flags(const Encoded& encoded, std::size_t count
 
 std::size_t fixed_two_bit_cost(const std::vector<std::uint8_t>& branches) { return branches.size() * 2U; }
 
-std::size_t same_block_oracle_cost(const std::vector<std::uint8_t>& branches, std::size_t block_size) {
+std::size_t same_block_candidate_oracle_cost(const std::vector<std::uint8_t>& branches, std::size_t block_size) {
+    // Offline upper-bound comparator over fixed-2 and dynamic {1,2,3,3},
+    // with the true current-block histogram available.
     std::size_t total = 0U;
     for (std::size_t start = 0U; start < branches.size(); start += block_size) {
         const std::size_t end = std::min(branches.size(), start + block_size);
@@ -192,8 +194,11 @@ std::size_t same_block_oracle_cost(const std::vector<std::uint8_t>& branches, st
         for (std::size_t index = start; index < end; ++index) ++counts.at(branches[index]);
         const Mapping ranked = rank_by_previous_counts(counts);
         const std::array<std::size_t, kBranches> lengths = {1U, 2U, 3U, 3U};
+        std::size_t dynamic_cost = 0U;
         for (std::size_t index = start; index < end; ++index)
-            total += lengths[rank_of(ranked, branches[index])];
+            dynamic_cost += lengths[rank_of(ranked, branches[index])];
+        const std::size_t fixed_cost = 2U * (end - start);
+        total += std::min(dynamic_cost, fixed_cost);
     }
     return total;
 }
@@ -308,7 +313,7 @@ void report(const std::string& name, const std::vector<std::uint8_t>& branches,
     const auto rabbit = encode_flags(branches, block, Policy::RabbitPreviousBlock);
     const auto guarded = encode_flags(branches, block, Policy::GuardedPreviousBlock);
     const std::size_t fixed = fixed_two_bit_cost(branches);
-    const std::size_t oracle = same_block_oracle_cost(branches, block);
+    const std::size_t oracle = same_block_candidate_oracle_cost(branches, block);
     require(decode_flags(rabbit, branches.size(), block, Policy::RabbitPreviousBlock) == branches,
             name + " Rabbit mapper decode mismatch");
     require(decode_flags(guarded, branches.size(), block, Policy::GuardedPreviousBlock) == branches,
@@ -321,7 +326,7 @@ void report(const std::string& name, const std::vector<std::uint8_t>& branches,
               << ",fixed2_bits=" << fixed
               << ",rabbit_predictive_bits=" << rabbit.bit_count
               << ",guarded_bits=" << guarded.bit_count
-              << ",same_block_oracle_bits=" << oracle
+              << ",same_block_candidate_oracle_bits=" << oracle
               << ",rabbit_vs_fixed_pct=" << pct(rabbit.bit_count, fixed)
               << ",guarded_vs_rabbit_pct=" << pct(guarded.bit_count, rabbit.bit_count)
               << '\\n';
