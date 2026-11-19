@@ -1,0 +1,395 @@
+{
+  "protocol_id": "MUSE-HUMAN-CONTROL-001",
+  "version": "1.0.0-draft",
+  "status": "draft_not_preregistered_not_executed",
+  "created_on": "2026-11-19",
+  "purpose": "Qualify whether symbolic and audio edits are perceptible, instruction-aligned, musically coherent, preservation-safe, and agency-preserving.",
+  "evidence_boundary": {
+    "symbolic_metrics": "Structural and causal diagnostics; not direct judgments of musical value.",
+    "score_digest_invariance": "Exact serialized-score identity only; not rendered-audio or listener invariance.",
+    "human_ratings": "Participant judgments under a defined task and cohort; not universal truths about music.",
+    "aggregate_preference": "Secondary outcome; never a substitute for target attainment or protected-content preservation."
+  },
+  "research_basis": {
+    "paper": "Evaluating the Evaluation of Music Generation Models with Generative Psychometrics",
+    "arxiv": "2611.21809",
+    "publication_date": "2026-11-16",
+    "extracted_items": 284,
+    "unique_items_after_pruning": 57,
+    "source_papers": 150,
+    "candidate_dimensions": [
+      "rhythm",
+      "melody",
+      "audio",
+      "composition",
+      "structure",
+      "lyrics"
+    ],
+    "limitation": "The dimensions were derived from semantic relations among questionnaire items and expert interpretation, not from a new participant-response dataset. Empirical psychometric validation is required before treating them as a validated scale."
+  },
+  "candidate_general_dimensions": [
+    {
+      "id": "rhythm",
+      "construct": "Perceived rhythmic stability, groove, and temporal flow.",
+      "candidate_items": [
+        {
+          "id": "rhythm_stability",
+          "prompt": "How stable and coherent is the rhythmic timing?",
+          "applies_to": [
+            "rhythm_edits",
+            "tempo_edits",
+            "groove_edits",
+            "live_interaction"
+          ]
+        },
+        {
+          "id": "rhythm_fit",
+          "prompt": "How well do the rhythmic parts fit together?",
+          "applies_to": [
+            "multi_part",
+            "arrangement",
+            "live_interaction"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "melody",
+      "construct": "Perceived melodic coherence, phrasing, and development.",
+      "candidate_items": [
+        {
+          "id": "melody_coherence",
+          "prompt": "How coherent is the melodic line in this context?",
+          "applies_to": [
+            "melody_edits",
+            "composition",
+            "arrangement"
+          ]
+        },
+        {
+          "id": "melody_development",
+          "prompt": "How well does the melody develop or vary without losing its identity?",
+          "applies_to": [
+            "theme_variation",
+            "composition",
+            "long_form"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "audio",
+      "construct": "Perceived sound quality, rendering clarity, and production artifacts.",
+      "applies_to": [
+        "rendered_audio_only"
+      ],
+      "candidate_items": [
+        {
+          "id": "audio_quality",
+          "prompt": "How clear and listenable is the rendered audio?",
+          "applies_to": [
+            "rendered_audio_only"
+          ]
+        },
+        {
+          "id": "audio_artifacts",
+          "prompt": "To what extent do audible artifacts or unwanted sounds interfere with the result?",
+          "applies_to": [
+            "rendered_audio_only"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "composition",
+      "construct": "Perceived overall coherence and listener liking; retain them as separate questions.",
+      "candidate_items": [
+        {
+          "id": "composition_coherence",
+          "prompt": "How coherent does the whole musical result feel?",
+          "applies_to": [
+            "composition",
+            "arrangement",
+            "editing"
+          ]
+        },
+        {
+          "id": "composition_liking",
+          "prompt": "How much do you like this result?",
+          "applies_to": [
+            "all_audio_trials"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "structure",
+      "construct": "Perceived phrase, section, and long-term organization.",
+      "candidate_items": [
+        {
+          "id": "structure_flow",
+          "prompt": "How naturally do the sections and phrases flow into one another?",
+          "applies_to": [
+            "long_form",
+            "form_edits",
+            "composition"
+          ]
+        },
+        {
+          "id": "structure_arc",
+          "prompt": "How clear is the overall musical arc?",
+          "applies_to": [
+            "long_form",
+            "composition"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lyrics",
+      "construct": "Perceived intelligibility and semantic compatibility of lyrics.",
+      "applies_to": [
+        "vocal_or_lyric_trials_only"
+      ],
+      "candidate_items": [
+        {
+          "id": "lyrics_intelligibility",
+          "prompt": "How intelligible are the lyrics?",
+          "applies_to": [
+            "vocal_or_lyric_trials_only"
+          ]
+        },
+        {
+          "id": "lyrics_compatibility",
+          "prompt": "How well do the lyrics fit the requested meaning or topic?",
+          "applies_to": [
+            "vocal_or_lyric_trials_only"
+          ]
+        }
+      ]
+    }
+  ],
+  "task_specific_dimensions": [
+    {
+      "id": "target_attainment",
+      "primary": true,
+      "prompt": "Did the result make the requested musical change in the intended direction?",
+      "response_type": "ordinal_5",
+      "notes": "Score target attainment separately from overall liking."
+    },
+    {
+      "id": "change_detectability",
+      "primary": true,
+      "prompt": "Which candidate better expresses the requested change?",
+      "response_type": "forced_choice_with_tie",
+      "notes": "Randomize candidate order; include no-op and sham controls."
+    },
+    {
+      "id": "protected_content_preservation",
+      "primary": true,
+      "prompt": "Was the specified material that should remain unchanged preserved?",
+      "response_type": "ordinal_5",
+      "notes": "Pair with exact symbolic mutation controls and rendered-audio controls where applicable."
+    },
+    {
+      "id": "instruction_compatibility",
+      "primary": true,
+      "prompt": "How closely does the result follow the written instruction?",
+      "response_type": "ordinal_5"
+    },
+    {
+      "id": "contextual_coherence",
+      "primary": true,
+      "prompt": "Does the change fit musically with the surrounding material?",
+      "response_type": "ordinal_5"
+    },
+    {
+      "id": "agency_and_reversibility",
+      "primary": true,
+      "prompt": "Did you retain meaningful control to accept, reject, revise, branch, or undo the proposed change?",
+      "response_type": "ordinal_5",
+      "applies_to": [
+        "interactive_collaboration_trials"
+      ]
+    },
+    {
+      "id": "authorship_and_attribution",
+      "primary": true,
+      "prompt": "Is it clear which musical contributions came from you and which came from the system?",
+      "response_type": "ordinal_5",
+      "applies_to": [
+        "interactive_collaboration_trials"
+      ]
+    },
+    {
+      "id": "confidence",
+      "primary": false,
+      "prompt": "How confident are you in your previous judgment?",
+      "response_type": "numeric_0_100",
+      "notes": "Confidence is linked to a specific correctness/detection judgment, not an isolated confidence score."
+    }
+  ],
+  "response_scales": {
+    "ordinal_5": {
+      "values": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "anchors": {
+        "1": "not at all",
+        "2": "slightly",
+        "3": "moderately",
+        "4": "mostly",
+        "5": "completely"
+      },
+      "instruction": "Show the anchor labels on every study form; do not silently convert ordinal responses into interval measurements."
+    },
+    "forced_choice_with_tie": {
+      "values": [
+        "candidate_A",
+        "candidate_B",
+        "no_clear_difference"
+      ],
+      "instruction": "Randomize A/B presentation order and retain tie responses."
+    },
+    "numeric_0_100": {
+      "min": 0,
+      "max": 100,
+      "anchors": {
+        "0": "not confident",
+        "100": "fully confident"
+      }
+    }
+  },
+  "trial_design": {
+    "unit": "one source material + one instruction + one candidate set + one participant response",
+    "randomization": [
+      "Randomize candidate order and trial order.",
+      "Counterbalance condition order in within-participant designs.",
+      "Use incomplete-block assignment to manage fatigue.",
+      "Hide model names, control condition, and source/target labels from participants."
+    ],
+    "matched_conditions": [
+      "intended_valid_change",
+      "sham_or_no_op",
+      "wrong_direction",
+      "wrong_axis",
+      "protected_region_mutation",
+      "yoked_candidate_from_another_task",
+      "valid_alternative_realization"
+    ],
+    "controls": [
+      "Match source, instruction, duration, rendering chain, loudness normalization, candidate count, and inference budget.",
+      "For audio, retain renderer version, sample rate, audio digest, and loudness-normalization receipt.",
+      "For symbolic-only tasks, do not ask audio-quality or timbre questions.",
+      "For vocal tasks, activate lyric questions only when lyrics are present and relevant.",
+      "Never treat a synthetic target or exact waveform match as the sole definition of musical correctness."
+    ],
+    "duration_and_fatigue": "Pilot stimulus length and trial count; define stopping/rest rules before confirmatory recruitment.",
+    "stimulus_rights": "Every source, target, render, and annotation asset must pass a separate rights/consent review before materialization or participant exposure."
+  },
+  "cohorts": [
+    {
+      "id": "musicians",
+      "description": "Performers, composers, arrangers, or trained musicians.",
+      "report_separately": true
+    },
+    {
+      "id": "general_listeners",
+      "description": "Listeners without formal music training.",
+      "report_separately": true
+    },
+    {
+      "id": "tradition_practitioners",
+      "description": "Musicians or practitioners with relevant lived and practice-based knowledge of the tradition under evaluation.",
+      "report_separately": true,
+      "rule": "A global panel cannot stand in for tradition-specific review."
+    },
+    {
+      "id": "production_practitioners",
+      "description": "Audio engineers, producers, and performance-technology practitioners where rendering or production is part of the task.",
+      "report_separately": true
+    }
+  ],
+  "primary_outcomes": [
+    "target_attainment",
+    "change_detectability",
+    "protected_content_preservation",
+    "instruction_compatibility",
+    "contextual_coherence"
+  ],
+  "secondary_outcomes": [
+    "rhythm",
+    "melody",
+    "audio",
+    "composition",
+    "structure",
+    "lyrics",
+    "composition_liking",
+    "confidence",
+    "agency_and_reversibility",
+    "authorship_and_attribution"
+  ],
+  "analysis_plan": {
+    "pilot_first": true,
+    "sample_size_rule": "Estimate task difficulty, participant variance, item variance, and clustering in a pilot. Determine confirmatory sample size and power before recruitment. Do not claim that the pilot is a powered confirmatory result.",
+    "models": [
+      "Use mixed-effects or hierarchical ordinal models for ordinal outcomes.",
+      "Include participant, task, source lineage, and relevant style/tradition strata as grouping or fixed-effect terms according to the preregistered estimand.",
+      "Use paired estimates for randomized A/B choices and report ties.",
+      "Report participant-clustered and source-lineage-clustered uncertainty where appropriate."
+    ],
+    "reliability": [
+      "Test-retest stability for a planned subset.",
+      "Inter-rater agreement by task and participant cohort.",
+      "Item-level distributions and floor/ceiling effects.",
+      "Empirical validation of factor structure; do not assume six dimensions from embedding clustering."
+    ],
+    "reporting": [
+      "Publish exact questionnaire items and translations.",
+      "Publish randomization seed, stimulus manifests, analysis version, and exclusion rules.",
+      "Report missing responses, abstentions, participant exclusions, and adverse/null outcomes.",
+      "Separate confirmatory primary outcomes from exploratory dimensions.",
+      "Never publish only a global composite when task- or cohort-level results materially differ."
+    ]
+  },
+  "prospective_targets": {
+    "status": "targets_not_results",
+    "clear_control_discrimination": ">= 90% correct discrimination between unambiguous valid-change and sham/no-op conditions on held-out tasks.",
+    "wrong_direction_detection": ">= 95% on tasks with objectively defined direction.",
+    "protected_mutation_detection": ">= 95% on the deterministic listening panel, paired with symbolic preservation controls.",
+    "valid_alternative_acceptance": ">= 90% acceptance of independently adjudicated valid alternatives.",
+    "confidence_calibration": "Confidence must predict correctness; publish calibration curves and proper scoring rules.",
+    "veto_expiry": "0 accepted actions after deterministic veto or expiry controls.",
+    "caveat": "Refine thresholds and power during the pilot; these are not current results."
+  },
+  "exclusions": [
+    "No universal beauty, creativity, consciousness, or musicality score.",
+    "No model-generated judge may replace relevant human participants.",
+    "No cultural authenticity claim from a demographic label or one global average.",
+    "No raw-generation preference score as a proxy for editing correctness.",
+    "No score digest or symbolic invariant is treated as rendered-audio or perceptual evidence."
+  ],
+  "provenance_fields": [
+    "protocol_id",
+    "protocol_version",
+    "trial_id",
+    "participant_pseudonymous_id",
+    "participant_cohort",
+    "self_described_expertise_and_relevant_tradition_if_voluntarily_supplied",
+    "source_lineage_id",
+    "instruction_id_and_digest",
+    "candidate_ids_and_digests",
+    "renderer_version_and_audio_digest_if_applicable",
+    "randomization_seed",
+    "questionnaire_item_version",
+    "response_scale_version",
+    "response",
+    "confidence_response_if_applicable",
+    "timestamp_and_task_order",
+    "exclusion_or_withdrawal_disposition"
+  ]
+}
