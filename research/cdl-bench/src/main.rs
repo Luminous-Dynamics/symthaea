@@ -4,7 +4,7 @@ use cdl_bench::{
     e3_mechanism_splits, generate_e0, generate_fsm, generate_scm, generate_scm_with_config,
     predictor_state_bytes, BoundedPredictor, E0Kind, ModelKind, NumericTransform,
     ScmFieldPredictor, ScmHybridPredictor, ScmIntervention, ScmLagPredictor, ScmParentPredictor,
-    ScmExpertMixturePredictor, ScmShuffledParentPredictor,
+    ScmChangePointMixturePredictor, ScmExpertMixturePredictor, ScmShuffledParentPredictor,
 };
 use std::error::Error;
 use std::fs;
@@ -259,7 +259,7 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# benchmark=CDL-Bench-E1-E3-structure-aware-v2");
     println!("# steps={steps}");
     println!("# seed={seed}");
-    println!("source,raw_bytes,cdl_order0_frame,cdl_order1_frame,field_frame,lag_frame,parent_oracle_frame,hybrid_frame,shuffled_parent_frame,online_mixture_frame,zstd,round_trip");
+    println!("source,raw_bytes,cdl_order0_frame,cdl_order1_frame,field_frame,lag_frame,parent_oracle_frame,hybrid_frame,shuffled_parent_frame,online_mixture_frame,change_point_frame,zstd,round_trip");
 
     let fsm = generate_fsm(steps, 8, 4, seed)?;
     let scm_observational = generate_scm(steps, seed, None)?;
@@ -323,8 +323,14 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
             shuffled_parent_bytes,
             mixture_bytes,
             mixture_weights,
+            change_point_bytes,
+            change_point_weights,
+            change_point_alarms,
         ) = if name == "fsm-observations" {
             (
+                "NA".to_owned(),
+                "NA".to_owned(),
+                "NA".to_owned(),
                 "NA".to_owned(),
                 "NA".to_owned(),
                 "NA".to_owned(),
@@ -394,6 +400,32 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
             {
                 return Err(format!("expert-mixture round-trip failure for {name}").into());
             }
+            let mut change_point_encoder = ScmChangePointMixturePredictor::new();
+            let change_point_frame =
+                compress_with_predictor(source, &mut change_point_encoder)?;
+            let mut change_point_decoder = ScmChangePointMixturePredictor::new();
+            if decompress_with_predictor(
+                &change_point_frame,
+                source.len(),
+                &mut change_point_decoder,
+            )?.as_slice() != source
+            {
+                return Err(format!("change-point mixture round-trip failure for {name}").into());
+            }
+            if change_point_encoder.expert_weights()
+                != change_point_decoder.expert_weights()
+                || change_point_encoder.alarm_count() != change_point_decoder.alarm_count()
+            {
+                return Err(format!("change-point mixture state divergence for {name}").into());
+            }
+            let change_point_weight_report = format!(
+                "{}:{}:{}",
+                change_point_encoder.expert_weights()[0],
+                change_point_encoder.expert_weights()[1],
+                change_point_encoder.expert_weights()[2]
+            );
+            let change_point_alarm_report = change_point_encoder.alarm_count().to_string();
+
             let final_weights = mixture_encoder.expert_weights();
             if final_weights != mixture_decoder.expert_weights() {
                 return Err(format!("expert-mixture state divergence for {name}").into());
@@ -422,18 +454,23 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 shuffled_parent_frame.len().to_string(),
                 mixture_frame.len().to_string(),
                 mixture_weight_report,
+                change_point_frame.len().to_string(),
+                change_point_weight_report,
+                change_point_alarm_report,
             )
         };
 
         let zstd = external_compressed_len("zstd", &["-q", "-c"], source)
             .map_or_else(|| "NA".to_owned(), |value| value.to_string());
         println!(
-            "{name},{},{},{},{field_bytes},{lag_bytes},{parent_oracle_bytes},{hybrid_bytes},{shuffled_parent_bytes},{mixture_bytes},{zstd},exact",
+            "{name},{},{},{},{field_bytes},{lag_bytes},{parent_oracle_bytes},{hybrid_bytes},{shuffled_parent_bytes},{mixture_bytes},{change_point_bytes},{zstd},exact",
             source.len(),
             frame0.len(),
             frame1.len()
         );
         println!("# final_expert_weights_{name}={mixture_weights}");
+        println!("# change_point_expert_weights_{name}={change_point_weights}");
+        println!("# change_point_alarm_count_{name}={change_point_alarms}");
     }
 
     // The latent states are evaluator-only ground truth; print only counts here.
@@ -452,6 +489,7 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# scm_shuffled_parent_predictor_state_bytes={}", ScmShuffledParentPredictor::state_bytes());
     println!("# scm_parent_oracle_predictor_state_bytes={}", ScmParentPredictor::state_bytes());
     println!("# scm_expert_mixture_predictor_state_bytes={}", ScmExpertMixturePredictor::state_bytes());
+    println!("# scm_change_point_mixture_predictor_state_bytes={}", ScmChangePointMixturePredictor::state_bytes());
     println!("# note=field_frame conditions on typed variable/byte-lane identity only");
     println!("# note=lag_frame conditions on the previous timestep's full i16 value for the same variable, without graph structure");
     println!("# note=parent_oracle_frame additionally receives the known SCM graph and conditions on same-step parent i16 values");
@@ -460,6 +498,8 @@ fn causal_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# note=parent_oracle is an oracle-topology control, not learned causal discovery or transfer");
     println!("# note=shuffled_parent_frame uses the same context arity with deliberately misassigned downstream parents as a topology negative control");
     println!("# note=online_mixture_frame combines typed-field, temporal-lag, and known-parent expert CDFs with decoder-synchronous Bayesian integer weights");
+    println!("# note=change_point_frame adds an integer surprisal-CUSUM detector, retaining base histograms while resetting specialist contexts on alarm");
+    println!("# note=change-point alarms are derived from decoded-prefix likelihoods; no intervention labels or reset markers are transmitted");
     println!("# note=final expert weights are printed for the encoder-side diagnostic; decoder weights are independently reconstructed from the same decoded prefix");
     println!("# note=per-stream frame sizes exclude predictor executable/code and inline state; report these separately for end-to-end accounting");
     println!("# note=these are deterministic generator and codec smoke measurements, not predictive transfer results");
