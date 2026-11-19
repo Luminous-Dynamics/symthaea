@@ -240,9 +240,43 @@ fn receipt_digest(value: &Value) -> Result<String, String> {
     Ok(domain_sha256(RECEIPT_DIGEST_DOMAIN_V1, &canonical_receipt_bytes(&unsealed)?))
 }
 
+fn require_fields(value: &Value, fields: &[&str], label: &str) -> Result<(), String> {
+    let object = value.as_object().ok_or_else(|| format!("{label} must be an object"))?;
+    for field in fields {
+        if !object.contains_key(*field) {
+            return Err(format!("{label} is missing required field {field}"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_receipt_shape(value: &Value) -> Result<(), String> {
+    require_fields(value, &["schema","attempt_id","attempt_state","source","edit","midi","renderer","execution","audio","verification","attestation","digest_recipe","receipt_sha256"], "receipt")?;
+    let source = &value["source"];
+    require_fields(source, &["source_score_sha256","candidate_score_sha256","score_digest_schema"], "source")?;
+    let edit = &value["edit"];
+    require_fields(edit, &["plan_sha256","edit_receipt_sha256","verifier_id","verifier_version","verification_receipt_sha256","verdict","authorized_operation_ids"], "edit")?;
+    let midi = &value["midi"];
+    require_fields(midi, &["manifest_schema","manifest_digest_schema","manifest_sha256","score_digest_schema","score_sha256","timeline_digest_schema","timeline_sha256","binding_digest_schema","binding_sha256","capability_digest_schema","capability_sha256","midi_sha256","byte_length","ticks_per_quarter","tempo_microseconds_per_quarter","meter_numerator","meter_denominator","note_count"], "midi")?;
+    let renderer = &value["renderer"];
+    require_fields(renderer, &["renderer_id","renderer_version","binary_sha256","environment_sha256","configuration_sha256","asset_sha256","fallback_used","fallback_reason"], "renderer")?;
+    let execution = &value["execution"];
+    require_fields(execution, &["state","executor_id","input_midi_sha256","output_audio_sha256","exit_code","started_at","finished_at","stdout_sha256","stderr_sha256","invocation_sha256"], "execution")?;
+    let audio = &value["audio"];
+    require_fields(audio, &["disposition","container","audio_sha256","byte_length","sample_rate_hz","channels","frames"], "audio")?;
+    let verification = &value["verification"];
+    require_fields(verification, &["midi_score_conformance","rendered_score_conformance","protected_audio_preservation","human_evaluation"], "verification")?;
+    for name in ["midi_score_conformance","rendered_score_conformance","protected_audio_preservation","human_evaluation"] {
+        require_fields(&verification[name], &["verdict","verifier_id","verifier_version","receipt_sha256","reason"], name)?;
+    }
+    require_fields(&value["attestation"], &["kind","identity","key_id","signature"], "attestation")?;
+    Ok(())
+}
+
 pub fn verify_receipt_bytes(bytes: &[u8]) -> Result<ReceiptV1, String> {
     let value: Value = serde_json::from_slice(bytes)
         .map_err(|e| format!("invalid receipt JSON: {e}"))?;
+    validate_receipt_shape(&value)?;
     let receipt: ReceiptV1 = serde_json::from_value(value.clone())
         .map_err(|e| format!("receipt shape invalid: {e}"))?;
     validate_receipt(&receipt)?;
@@ -519,6 +553,11 @@ pub fn verify_midi_event_manifest(m: &MidiPerformanceManifestV1, bytes: &[u8]) -
     if actual_names.get(&0).map(String::as_str) != Some("Muse Tempo and Meter")
         || actual_names.len() != smf.tracks.len()
     { return Err("tempo/part track names missing or incomplete".into()); }
+    for index in 1..smf.tracks.len() {
+        if !track_map.contains_key(&index) {
+            return Err(format!("MIDI manifest is missing track index {index}"));
+        }
+    }
     for (index, name) in expected_names {
         if actual_names.get(&index).map(String::as_str) != Some(name) { return Err(format!("track {index} name mismatch")); }
     }
