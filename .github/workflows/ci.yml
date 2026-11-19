@@ -9,6 +9,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
   workflow_dispatch:
   schedule:
     # Weekly psych-bench regression run: Sundays at 04:00 UTC
@@ -1738,3 +1739,33 @@ jobs:
           sudo mv gitleaks /usr/local/bin/
       - name: Run gitleaks
         run: gitleaks detect --source . --config .gitleaks.toml --verbose --exit-code 1
+
+  falsification-power-reference:
+    name: Falsification Power and Sequential E-Process Reference
+    runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check research crate formatting
+        run: cargo fmt --manifest-path research/falsification-power-reference/Cargo.toml -- --check
+
+      - name: Test research crate
+        run: cargo test --locked --manifest-path research/falsification-power-reference/Cargo.toml --all-targets
+
+      - name: Calibrate predictable sequential null and post-hoc leakage control
+        run: cargo run --locked --manifest-path research/falsification-power-reference/Cargo.toml --example sequential_null_calibration
+
+      - name: Strict Clippy for research crate
+        run: cargo clippy --locked --manifest-path research/falsification-power-reference/Cargo.toml --all-targets -- -D warnings
+
