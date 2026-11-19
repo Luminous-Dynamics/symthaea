@@ -19,6 +19,18 @@ An empty surviving set is reported as model inconsistency, not as proof that no 
 
 A deterministic problem from the exact active-experiment crate can be lifted into singleton allowed-outcome sets. Its survivor set must match deterministic observation replay exactly. The bridge is tested on a frozen fixture.
 
+## Bounded-outcome adaptive minimax planner
+
+The new `robust_planner` module composes the bounded categorical outcome model with an exact adaptive policy search. At every decision node, every outcome allowed by any active hypothesis receives a branch, and the child retains exactly the hypotheses whose allowed set contains that outcome. The planner optimizes worst-case surviving hypotheses, then worst-case cumulative probe cost, with deterministic tie-breaking.
+
+- A probe is used at most once; repeated readings of one probe are not treated as fresh independent trials.
+- Depth, total-cost and search-node budgets are explicit.
+- Node-budget exhaustion returns an error and no partial qualified policy.
+- The receipt binds the canonical uncertainty model and solver budget; verification receives the expected budget independently and recomputes the complete tree.
+- The zero-noise singleton adapter is tested against the deterministic active-experiment planner on the same frozen problem.
+
+This is an exact finite set-valued minimax reference. It is not a probabilistic posterior policy, POMDP solver, or replacement for general noisy ODT/ASRN. Its purpose is to give the symmetry programme a transparent robust baseline between deterministic planning and more general stochastic acquisition.
+
 ## Identifiability frontier and adversarial controls
 
 Before a policy is selected, pairwise reports determine whether the complete admissible probe family can separate each candidate pair. Bounded categorical pairs return disjoint-outcome probes or explicit ambiguity. Shared-persistent pairs return one cheapest probe witness per global state or an identical-signature collision. This is a full-family identifiability diagnostic, not a guarantee that one fixed probe separates every candidate.
