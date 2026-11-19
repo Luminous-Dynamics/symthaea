@@ -209,6 +209,7 @@ pub struct RenderInvocationV1 {
     pub input_midi_path: String,
     pub input_midi_sha256: String,
     pub output_audio_path: String,
+    pub output_audio_sha256: String,
     pub arguments: Vec<String>,
     pub started_at: String,
     pub finished_at: String,
@@ -784,6 +785,8 @@ fn verify_render_invocation(root: &Path, r: &ReceiptV1) -> Result<(), String> {
         || invocation.input_midi_path != "performance.mid"
         || invocation.input_midi_sha256 != r.midi.midi_sha256
         || invocation.output_audio_path != "output.wav"
+        || invocation.output_audio_sha256 != r.audio.audio_sha256.as_deref().unwrap_or("")
+        || invocation.output_audio_sha256 != r.execution.output_audio_sha256.as_deref().unwrap_or("")
         || invocation.started_at != r.execution.started_at.as_deref().unwrap_or("")
         || invocation.finished_at != r.execution.finished_at.as_deref().unwrap_or("")
         || Some(invocation.exit_code) != r.execution.exit_code
@@ -1104,7 +1107,7 @@ mod tests {
         std::fs::write(root.join("renderer-binary"), &renderer_binary).unwrap();
         std::fs::write(root.join("renderer-environment.json"), &renderer_environment).unwrap();
         std::fs::write(root.join("renderer-config.json"), &renderer_config).unwrap();
-        let invocation = serde_json::to_vec(&json!({
+        let invocation_template = |output_sha: &str| serde_json::to_vec(&json!({
             "schema":"muse-render-invocation-v1",
             "renderer_id":"test-renderer",
             "renderer_version":"1",
@@ -1115,13 +1118,12 @@ mod tests {
             "input_midi_path":"performance.mid",
             "input_midi_sha256":midi_sha.clone(),
             "output_audio_path":"output.wav",
+            "output_audio_sha256":output_sha,
             "arguments":["--input","performance.mid","--output","output.wav"],
             "started_at":"2026-11-19T10:00:00Z",
             "finished_at":"2026-11-19T10:00:01Z",
             "exit_code":0
         })).unwrap();
-        std::fs::write(root.join("render-invocation.json"), &invocation).unwrap();
-
         let wav_path = root.join("output.wav");
         let spec = hound::WavSpec {
             channels:2, sample_rate:44100, bits_per_sample:16,
@@ -1134,6 +1136,8 @@ mod tests {
         writer.finalize().unwrap();
         let wav_bytes = std::fs::read(&wav_path).unwrap();
         let wav_sha = sha256_hex(&wav_bytes);
+        let invocation = invocation_template(&wav_sha);
+        std::fs::write(root.join("render-invocation.json"), &invocation).unwrap();
 
         let d = |c: char| std::iter::repeat(c).take(64).collect::<String>();
         let mut receipt = ReceiptV1 {
