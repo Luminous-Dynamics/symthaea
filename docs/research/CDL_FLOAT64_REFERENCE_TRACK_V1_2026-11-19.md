@@ -1,15 +1,15 @@
 # CDL-Bench exact IEEE-754 f64 reference track v1
 
 **Date:** 2026-11-19  
-**Status:** Rust reference source, four reversible transforms, eight-candidate segment selectors and authored tests committed; independent transform-logic translations exercised; Rust compilation and arithmetic-coded size results pending.
+**Status:** Rust reference source, four reversible transforms, three eight-candidate segment policies and authored tests committed; independent C++/Python transform checks exercised; Rust compilation and arithmetic-coded size results pending.
 
 ## Why this track exists
 
 The SCM/i16 lane does not represent the dominant specialized lossless floating-point time-series competition. By 2026, several purpose-built codecs target bit patterns, decimal prefixes, oscillation, branch flags and segment-local encoding choices. A credible SOTA comparison needs a typed IEEE-754 track; it must not infer that success on synthetic SCM i16 streams transfers to f64 sensor streams.
 
 The branch adds correctness references and selector baselines, not a competitive codec:
-- `research/cdl-bench/src/float64.rs`: typed `F64C` frame with raw bits, XOR-previous u64 varints, reusable XOR-leading/trailing windows, and exact-bit-pattern RLE+XOR run coding; `F64S` segment container with offline best-of-eight and decoder-synchronous historical-cost policies; inner CDL arithmetic coding, CRC-32 checksums and output limits.
-- `research/cdl-bench/src/main.rs`: `float --values N --seed N` experiment command comparing single-stream, offline segment-portfolio and online historical-cost rows across plateau/idle regimes as well as smooth, oscillating and random streams.
+- `research/cdl-bench/src/float64.rs`: typed `F64C` frame with raw bits, XOR-previous u64 varints, reusable XOR-leading/trailing windows, and exact-bit-pattern RLE+XOR run coding; `F64S` segment container with offline best-of-eight, full historical-cost and sparse-probe decoder-synchronous policies; inner CDL arithmetic coding, CRC-32 checksums and output limits.
+- `research/cdl-bench/src/main.rs`: `float --values N --seed N` experiment command comparing single-stream, offline segment-portfolio, full historical-cost and sparse-probe policies across plateau/idle regimes as well as smooth, oscillating and random streams; it records oracle gap and probe compute.
 - `research/cdl-bench/src/lib.rs`: public exports.
 - `research/cdl-bench/reference/float64_window_reference.cpp`: independent C++20 bit-window transform reference.
 - `research/cdl-bench/reference/float64_rle_xor_reference.cpp`: independent C++20 RLE+XOR reference and malformed-input checks.
@@ -86,9 +86,23 @@ The new `compress_f64_online_selector` / `decompress_f64_online_selector` pair u
 - after each chunk, both encoder and decoder recompute all eight complete candidate sizes from that chunk and update the same integer totals;
 - the child F64C header exposes the selected transform/model IDs; the decoder independently computes the expected candidate and rejects a child whose IDs violate the historical policy.
 
-This transmits no additional selector symbols. The selected transform/model IDs already live in the child header and are counted as part of the F64C frame. The policy is decoder-synchronous and uses only prior chunks to select the current chunk, but it is **compute-heavy**: both sides perform eight candidate encodings after every chunk to update historical cost. It is a diagnostic online baseline, not yet a practical throughput-optimized selector. The policy is not a learned causal mechanism, and it should be compared against simpler features, fixed share, and WZS-style selectors.
+This transmits no additional selector symbols. The selected transform/model IDs already live in the child header and are counted as part of the F64C frame. The policy is decoder-synchronous and uses only prior chunks to select the current chunk. Both sides measure the seven alternatives after encoding/decoding the selected candidate and reuse the selected child's actual frame length, avoiding one redundant re-encode. It remains a diagnostic online baseline, not yet a practical throughput-optimized selector. The policy is not a learned causal mechanism, and it should be compared against simpler features, fixed-share and WZS-style selectors.
 
-The float CLI evaluates both policies at chunk sizes 64, 256 and 1,024. It reports size ratio and encode/decode nanoseconds for each complete outer frame. Rust tests are authored for exact bitwise reconstruction, policy mismatch rejection, corruption/truncation, zero chunk size and output limits; they have not run.
+### Policy 3: sparse-probe historical-cost selection
+
+The new `compress_f64_budgeted_selector` / `decompress_f64_budgeted_selector` pair keeps the same past-only eight-candidate policy but measures alternatives only on scheduled probe chunks:
+- The first chunk is always a probe.
+- Subsequent probes occur every (K) chunks, where (K\in\{1,2,4,8,16,32,64,128\}).
+- The F64S flags byte stores `log2(K)`; the header CRC protects it. The decoder derives the same schedule.
+- On a probe, both sides measure all eight candidate child sizes. The chosen child length is reused, so only seven additional candidate encodings are required.
+- Between probes, the incumbent candidate is used but **no candidate cost statistics are updated**. This keeps every candidate mean based on the same probe chunk sample set. Adding incumbent-only observations would create selection-biased means because the candidates would be measured on different time regimes.
+- The decoder still derives the candidate choice from prior probe data and rejects a child whose transform/model IDs differ from the expected policy. No per-segment selection symbols are emitted.
+
+For (S) chunks, probes are (lceil S/K\rceil), and extra candidate encodes per side are (7\lceil S/K\rceil). Average additional candidate encodes per chunk are approximately (7/K): 7.0 at (K=1), 1.75 at (K=4), 0.4375 at (K=16), and 0.1094 at (K=64). The selected transform is still encoded once per chunk. Larger (K) reduces compute but increases adaptation staleness and potential regret.
+
+The CLI evaluates offline oracle, full historical and sparse-probe policies at chunk sizes 64/256/1024. Sparse rows report (K), probe count, seven extra candidate encodes per probe, complete frame ratio, encode/decode nanoseconds and percentage size gap to the offline oracle. An invariant checks that no online policy produces a smaller complete frame than the per-chunk offline best-of-eight oracle. At (K=1), sparse-probe child frames must equal the full historical selector's child frames; only the outer F64S policy ID/header CRC differ.
+
+These are authored Rust tests, not compiled Rust results. The tests cover bitwise round-trip for all supported probe intervals, K=1 equivalence, invalid interval rejection, policy mismatch, header CRC and offline-oracle dominance. No actual Rust frame size, throughput or energy result is claimed.
 
 ## Independent transform-logic check
 
@@ -269,7 +283,7 @@ For each:
 - per-dataset and geometric-mean results, with paired bootstrap intervals;
 - explicit negative-control results where XOR/temporal locality should not help.
 
-A future superiority claim should require at least 5% lower end-to-end bytes than the strongest reproduced matched baseline on a preregistered stream family, with exact reconstruction and a paired 95% confidence interval excluding zero. No broad SOTA claim should be made from the synthetic fixtures alone.
+A future superiority claim should require at least 5% lower end-to-end bytes than the strongest reproduced matched baseline on a preregistered stream family, with exact reconstruction and a paired 95% confidence interval excluding zero. For an adaptive selector, also require a pre-registered compute budget and report selector regret versus the offline oracle; a size win obtained by unbounded candidate re-encoding is not a practical SOTA result. No broad SOTA claim should be made from the synthetic fixtures alone.
 
 ## Immediate next actions
 
