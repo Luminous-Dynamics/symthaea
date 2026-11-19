@@ -26,6 +26,9 @@ The bundle directory must contain:
 | `edit-receipt.json` | Exact serialized ScoreEditReceiptV1 |
 | `edit-verification.json` | Independent candidate-verification report |
 | `midi-manifest.json` | Part-aware MIDI performance manifest |
+| `orchestration-timeline.json` | Exact source-Score-bound timeline whose segments must explain each MIDI track |
+| `instrument-bindings.json` | Canonical, instrument-ID-sorted renderer/program/patch bindings |
+| `instrument-capabilities.json` | Canonical, instrument-ID-sorted capability profiles used by the MIDI realization |
 | `performance.mid` | Exact Standard MIDI File bytes |
 | `renderer-binary` | Exact renderer executable bytes |
 | `renderer-environment.json` | Exact pinned environment/closure manifest |
@@ -40,6 +43,7 @@ The verifier checks:
 - exact byte hashes for source/candidate scores, edit plan/receipt/report, MIDI, renderer artifacts, invocation, process streams, and WAV;
 - consistency of the score-edit input digest, operation IDs, protected-window IDs and independent verifier result;
 - consistency of the receipt with the PartId-aware MIDI manifest, including the repository's 960 ticks-per-quarter resolution;
+- exact timeline, instrument-binding and capability-manifest digests; one-to-one timeline-segment/track correspondence; and renderer/program/patch agreement;
 - MIDI track/part/program/note event correspondence by parsing the actual SMF bytes, not by trusting manifest summaries;
 - WAV parseability, declared sample format, frame count, finite samples, non-silence, and exact output-byte digest.
 
