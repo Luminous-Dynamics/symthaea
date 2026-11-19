@@ -516,10 +516,14 @@ DEXOR_DIR=/path/to/DeXOR TERSETS_DIR=/path/to/TerseTS \
 ```
 
 It verifies revisions, builds, records environment/data hashes and explicitly
-skips any external repository not supplied. DeXOR requires Java 8 and Maven;
-TerseTS requires Zig. Neither external codec has been built or run in the
-current environment. TerseTS is beta, and lossy/bit-nonexact methods are
-excluded from the exact-lossless comparison.
+skips any external repository not supplied. For TerseTS it also compiles and
+runs `scripts/research/tersets_bitwise_gate.c` against the pinned native C API:
+Uncompressed/Chimp64/Chimp128/Elf must preserve every u64 bit on edge and
+signed-zero fixtures; RLE and BitPackedDelta are reported separately as
+conditional candidates. DeXOR requires Java 8 and Maven; TerseTS requires Zig
+and a C compiler. Neither external codec has been built or run in the current
+environment. TerseTS is beta, and lossy/bit-nonexact methods are excluded from
+the exact-lossless comparison.
 
 ## Plugging in a custom predictor
 
