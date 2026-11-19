@@ -846,6 +846,59 @@ mod tests {
         assert_eq!(buffer.read_frame(4, 4), None);
     }
 
+
+    #[test]
+    fn ring_buffer_absolute_reads_match_reference_across_chunk_shapes() {
+        // Deterministic reference-model stress test: vary capacities, empty
+        // writes, partial writes, exact-capacity writes, and multi-capacity
+        // overruns. Every readable absolute interval must match the retained
+        // source samples exactly; every unavailable interval must return None.
+        for capacity in 1usize..=8 {
+            let mut buffer = AudioRingBuffer::new(capacity);
+            let mut reference = VecDeque::<f32>::new();
+            let mut total_written = 0u64;
+
+            for round in 0usize..48 {
+                let chunk_len = (round * 11 + capacity * 7) % (capacity * 3 + 2);
+                let samples: Vec<f32> = (0..chunk_len)
+                    .map(|offset| (total_written + offset as u64) as f32)
+                    .collect();
+                buffer.write(&samples).unwrap();
+                total_written += chunk_len as u64;
+
+                for sample in samples {
+                    if reference.len() == capacity {
+                        reference.pop_front();
+                    }
+                    reference.push_back(sample);
+                }
+
+                let retained: Vec<f32> = reference.iter().copied().collect();
+                let expected_base = total_written - retained.len() as u64;
+                assert_eq!(buffer.base_sample_pos(), expected_base);
+                assert_eq!(buffer.total_written(), total_written);
+                assert_eq!(buffer.available(), retained.len());
+
+                for start in expected_base.saturating_sub(1)..=total_written {
+                    for length in 0..=capacity + 1 {
+                        let end = start + length as u64;
+                        let expected = if start >= expected_base && end <= total_written {
+                            let relative_start = (start - expected_base) as usize;
+                            Some(retained[relative_start..relative_start + length].to_vec())
+                        } else {
+                            None
+                        };
+                        assert_eq!(
+                            buffer.read_frame(start, length),
+                            expected,
+                            "capacity={capacity}, round={round}, start={start}, length={length}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     fn small_stream_config() -> StreamConfig {
         StreamConfig {
             sample_rate: 1_000,
