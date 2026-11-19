@@ -1,0 +1,12 @@
+version = 4
+
+[[package]]
+name = "symmetry-query-semantics-reference"
+version = "0.1.0"
+dependencies = [
+ "symmetry-quotient-reference",
+]
+
+[[package]]
+name = "symmetry-quotient-reference"
+version = "0.1.0"
