@@ -1065,6 +1065,32 @@ pub struct PersistentStateWitnessV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersistentUnknownStateWitnessV1 {
+    pub error_state_a_id: String,
+    pub error_state_b_id: String,
+    pub probe_id: String,
+    pub outcome_a: u32,
+    pub outcome_b: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersistentUnknownStateCollisionV1 {
+    pub error_state_a_id: String,
+    pub error_state_b_id: String,
+    /// Identical complete signature over all admissible probes.
+    pub common_signature: Vec<(String, u32)>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersistentUnknownStateIdentifiabilityV1 {
+    pub hypothesis_a: String,
+    pub hypothesis_b: String,
+    pub separating_state_pair_witnesses: Vec<PersistentUnknownStateWitnessV1>,
+    pub unresolved_state_pair_collisions: Vec<PersistentUnknownStateCollisionV1>,
+    pub indistinguishable_under_unknown_state: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PersistentStateCollisionV1 {
     pub error_state_id: String,
     /// Complete identical signature over every admissible probe.
@@ -1154,6 +1180,72 @@ pub fn bounded_pair_identifiability(
 /// on both sides: the environment cannot change merely because the candidate
 /// hypothesis changed. For each state, the cheapest admissible probe with
 /// unequal predictions is retained as a replayable witness.
+/// Robust pairwise identifiability when the persistent nuisance state is
+/// unobserved. Unlike the same-state conditional check below, this compares
+/// every possible nuisance state for hypothesis A with every possible state
+/// for hypothesis B. If any cross-state pair has the same complete signature,
+/// the two hypotheses are observationally confounded without state calibration.
+pub fn persistent_pair_identifiability_under_unknown_state(
+    problem: &PersistentNoiseProblemV1,
+    hypothesis_a: usize,
+    hypothesis_b: usize,
+) -> Result<PersistentUnknownStateIdentifiabilityV1, NoiseErrorV1> {
+    problem.validate()?;
+    validate_hypothesis_pair(problem.hypothesis_ids.len(), hypothesis_a, hypothesis_b)?;
+
+    let mut separating_state_pair_witnesses = Vec::new();
+    let mut unresolved_state_pair_collisions = Vec::new();
+
+    for (state_a_index, state_a_id) in problem.error_state_ids.iter().enumerate() {
+        for (state_b_index, state_b_id) in problem.error_state_ids.iter().enumerate() {
+            let mut separating: Vec<(&NoiseProbeV1, u32, u32)> = Vec::new();
+            let mut common_signature = Vec::new();
+
+            for (probe_index, probe) in problem.probes.iter().enumerate() {
+                if !probe.admissible {
+                    continue;
+                }
+                let outcome_a = problem.predicted_outcomes_by_hypothesis[hypothesis_a]
+                    [probe_index][state_a_index];
+                let outcome_b = problem.predicted_outcomes_by_hypothesis[hypothesis_b]
+                    [probe_index][state_b_index];
+                common_signature.push((probe.probe_id.clone(), outcome_a));
+                if outcome_a != outcome_b {
+                    separating.push((probe, outcome_a, outcome_b));
+                }
+            }
+
+            separating.sort_by(|left, right| {
+                (left.0.cost, left.0.probe_id.as_str())
+                    .cmp(&(right.0.cost, right.0.probe_id.as_str()))
+            });
+            if let Some((probe, outcome_a, outcome_b)) = separating.first() {
+                separating_state_pair_witnesses.push(PersistentUnknownStateWitnessV1 {
+                    error_state_a_id: state_a_id.clone(),
+                    error_state_b_id: state_b_id.clone(),
+                    probe_id: probe.probe_id.clone(),
+                    outcome_a: *outcome_a,
+                    outcome_b: *outcome_b,
+                });
+            } else {
+                unresolved_state_pair_collisions.push(PersistentUnknownStateCollisionV1 {
+                    error_state_a_id: state_a_id.clone(),
+                    error_state_b_id: state_b_id.clone(),
+                    common_signature,
+                });
+            }
+        }
+    }
+
+    Ok(PersistentUnknownStateIdentifiabilityV1 {
+        hypothesis_a: problem.hypothesis_ids[hypothesis_a].clone(),
+        hypothesis_b: problem.hypothesis_ids[hypothesis_b].clone(),
+        separating_state_pair_witnesses,
+        indistinguishable_under_unknown_state: !unresolved_state_pair_collisions.is_empty(),
+        unresolved_state_pair_collisions,
+    })
+}
+
 pub fn persistent_pair_identifiability(
     problem: &PersistentNoiseProblemV1,
     hypothesis_a: usize,
@@ -1208,6 +1300,26 @@ pub fn persistent_pair_identifiability(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedBiasCrossStateCollisionV1 {
+    pub bias_a: i128,
+    pub bias_b: i128,
+    pub common_signature: Vec<(String, i128)>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedBiasCrossStateIdentifiabilityV1 {
+    pub hypothesis_a: String,
+    pub hypothesis_b: String,
+    /// One probe if every nominal offset is outside the bias-difference
+    /// envelope; two probes if their nominal offsets differ.
+    pub separating_probe_ids: Vec<String>,
+    /// Present when different permissible campaign-bias values make the
+    /// complete prediction signatures identical.
+    pub collision: Option<SharedBiasCrossStateCollisionV1>,
+    pub indistinguishable_under_unknown_bias: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NumericPairIdentifiabilityV1 {
     pub hypothesis_a: String,
     pub hypothesis_b: String,
@@ -1256,9 +1368,158 @@ pub fn bounded_interval_pair_identifiability(
     })
 }
 
-/// Under one shared additive bias, the same nuisance value shifts both
-/// hypotheses equally. Therefore a probe with unequal nominal predictions
-/// separates the pair independently of the allowed common bias interval.
+/// Robust pairwise identifiability when each candidate may explain the
+/// campaign using any value in the same declared *unknown* bias interval.
+/// The candidate-specific nuisance values may differ: the model only asserts
+/// that each is campaign-persistent, not that its value has been calibrated.
+pub fn shared_bias_pair_identifiability_under_unknown_bias(
+    problem: &SharedAdditiveBiasProblemV1,
+    hypothesis_a: usize,
+    hypothesis_b: usize,
+) -> Result<SharedBiasCrossStateIdentifiabilityV1, NoiseErrorV1> {
+    problem.validate()?;
+    validate_hypothesis_pair(problem.hypothesis_ids.len(), hypothesis_a, hypothesis_b)?;
+
+    let mut differences: Vec<(&NoiseProbeV1, i128)> = Vec::new();
+    for (probe_index, probe) in problem.probes.iter().enumerate() {
+        if !probe.admissible {
+            continue;
+        }
+        let difference = problem.nominal_predictions_by_hypothesis[hypothesis_a][probe_index]
+            .checked_sub(problem.nominal_predictions_by_hypothesis[hypothesis_b][probe_index])
+            .ok_or(NoiseErrorV1::IntervalArithmeticOverflow)?;
+        differences.push((probe, difference));
+    }
+    differences.sort_by(|left, right| {
+        (left.0.cost, left.0.probe_id.as_str())
+            .cmp(&(right.0.cost, right.0.probe_id.as_str()))
+    });
+
+    let bias = problem.global_bias_interval;
+    let minimum_bias_difference = bias
+        .lower
+        .checked_sub(bias.upper)
+        .ok_or(NoiseErrorV1::IntervalArithmeticOverflow)?;
+    let maximum_bias_difference = bias
+        .upper
+        .checked_sub(bias.lower)
+        .ok_or(NoiseErrorV1::IntervalArithmeticOverflow)?;
+
+    // A cross-hypothesis collision exists exactly when one constant
+    // difference d = bias_b - bias_a can cancel every nominal difference.
+    let constant_difference = differences
+        .first()
+        .map(|(_, difference)| *difference)
+        .filter(|first| differences.iter().all(|(_, value)| value == first));
+
+    let collision = if let Some(difference) = constant_difference {
+        if (minimum_bias_difference..=maximum_bias_difference).contains(&difference) {
+            let (bias_a, bias_b) = if difference >= 0 {
+                (
+                    bias.lower,
+                    bias.lower
+                        .checked_add(difference)
+                        .ok_or(NoiseErrorV1::IntervalArithmeticOverflow)?,
+                )
+            } else {
+                (
+                    bias.lower
+                        .checked_sub(difference)
+                        .ok_or(NoiseErrorV1::IntervalArithmeticOverflow)?,
+                    bias.lower,
+                )
+            };
+            let mut common_signature = Vec::with_capacity(differences.len());
+            for (probe_index, probe) in problem.probes.iter().enumerate() {
+                if !probe.admissible {
+                    continue;
+                }
+                let prediction_a = problem.nominal_predictions_by_hypothesis[hypothesis_a]
+                    [probe_index]
+                    .checked_add(bias_a)
+                    .ok_or(NoiseErrorV1::IntervalArithmeticOverflow)?;
+                let prediction_b = problem.nominal_predictions_by_hypothesis[hypothesis_b]
+                    [probe_index]
+                    .checked_add(bias_b)
+                    .ok_or(NoiseErrorV1::IntervalArithmeticOverflow)?;
+                if prediction_a != prediction_b {
+                    return Err(NoiseErrorV1::InvalidDeterministicInput);
+                }
+                common_signature.push((probe.probe_id.clone(), prediction_a));
+            }
+            Some(SharedBiasCrossStateCollisionV1 {
+                bias_a,
+                bias_b,
+                common_signature,
+            })
+        } else {
+            None
+        }
+    } else if differences.is_empty() {
+        Some(SharedBiasCrossStateCollisionV1 {
+            bias_a: bias.lower,
+            bias_b: bias.lower,
+            common_signature: Vec::new(),
+        })
+    } else {
+        None
+    };
+
+    let separating_probe_ids = if collision.is_some() {
+        Vec::new()
+    } else if let Some((probe, _)) = differences.first() {
+        // If all probe offsets are the same but outside the possible
+        // bias-difference envelope, one probe is sufficient.
+        if differences
+            .iter()
+            .all(|(_, difference)| *difference == differences[0].1)
+        {
+            vec![probe.probe_id.clone()]
+        } else {
+            let mut witness_pair = None;
+            for left_index in 0..differences.len() {
+                for right_index in (left_index + 1)..differences.len() {
+                    if differences[left_index].1 != differences[right_index].1 {
+                        let left = differences[left_index].0;
+                        let right = differences[right_index].0;
+                        let candidate = (
+                            left.cost
+                                .checked_add(right.cost)
+                                .ok_or(NoiseErrorV1::IntervalArithmeticOverflow)?,
+                            left.probe_id.as_str(),
+                            right.probe_id.as_str(),
+                            left.probe_id.clone(),
+                            right.probe_id.clone(),
+                        );
+                        if witness_pair.as_ref().is_none_or(|current| {
+                            (&candidate.0, candidate.1, candidate.2)
+                                < (&current.0, current.1, current.2)
+                        }) {
+                            witness_pair = Some(candidate);
+                        }
+                    }
+                }
+            }
+            witness_pair
+                .map(|candidate| vec![candidate.3, candidate.4])
+                .unwrap_or_default()
+        }
+    } else {
+        Vec::new()
+    };
+
+    Ok(SharedBiasCrossStateIdentifiabilityV1 {
+        hypothesis_a: problem.hypothesis_ids[hypothesis_a].clone(),
+        hypothesis_b: problem.hypothesis_ids[hypothesis_b].clone(),
+        separating_probe_ids,
+        indistinguishable_under_unknown_bias: collision.is_some(),
+        collision,
+    })
+}
+
+/// Conditional identifiability when the *same fixed bias value* is held
+/// common across both competing hypotheses. For unobserved candidate-specific
+/// nuisance values, use shared_bias_pair_identifiability_under_unknown_bias.
 pub fn shared_bias_pair_identifiability(
     problem: &SharedAdditiveBiasProblemV1,
     hypothesis_a: usize,
@@ -1761,6 +2022,51 @@ mod tests {
         assert_eq!(
             indistinguishable.overlapping_probe_ids,
             vec!["p0".to_owned(), "p1".to_owned()]
+        );
+    }
+
+    #[test]
+    fn unknown_persistent_state_detects_cross_state_signature_collisions() {
+        let problem = PersistentNoiseProblemV1 {
+            problem_id: "cross-state-collision-v1".to_owned(),
+            hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned()],
+            probes: vec![
+                NoiseProbeV1 {
+                    probe_id: "p0".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p1".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+            ],
+            error_state_ids: vec!["low".to_owned(), "high".to_owned()],
+            predicted_outcomes_by_hypothesis: vec![
+                vec![vec![0, 1], vec![0, 1]],
+                vec![vec![1, 0], vec![1, 0]],
+            ],
+        };
+
+        // Conditional on the same state index, every comparison is separated.
+        let same_state = persistent_pair_identifiability(&problem, 0, 1).unwrap();
+        assert!(!same_state.indistinguishable_under_available_probes);
+
+        // But H-A/low and H-B/high both produce [0, 0], and H-A/high and
+        // H-B/low both produce [1, 1]. Without state calibration the hypotheses
+        // are not robustly identifiable from this probe family.
+        let unknown_state =
+            persistent_pair_identifiability_under_unknown_state(&problem, 0, 1).unwrap();
+        assert!(unknown_state.indistinguishable_under_unknown_state);
+        assert_eq!(unknown_state.unresolved_state_pair_collisions.len(), 2);
+        assert_eq!(
+            unknown_state.unresolved_state_pair_collisions[0].common_signature,
+            vec![("p0".to_owned(), 0), ("p1".to_owned(), 0)]
+        );
+        assert_eq!(
+            unknown_state.unresolved_state_pair_collisions[1].common_signature,
+            vec![("p0".to_owned(), 1), ("p1".to_owned(), 1)]
         );
     }
 
@@ -2282,6 +2588,56 @@ mod tests {
         let ambiguous = bounded_interval_pair_identifiability(&problem, 0, 2).unwrap();
         assert!(ambiguous.indistinguishable_under_available_probes);
         assert!(ambiguous.separating_probe_ids.is_empty());
+    }
+
+    #[test]
+    fn unknown_campaign_bias_detects_cross_bias_signature_collisions() {
+        let problem = SharedAdditiveBiasProblemV1 {
+            problem_id: "cross-bias-collision-v1".to_owned(),
+            quantity_unit_id: "millimetre-integer".to_owned(),
+            hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned(), "H-C".to_owned()],
+            probes: vec![
+                NoiseProbeV1 {
+                    probe_id: "p0".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p1".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+            ],
+            nominal_predictions_by_hypothesis: vec![
+                vec![0, 10],
+                vec![3, 13],
+                vec![3, 14],
+            ],
+            global_bias_interval: FixedIntervalV1::new(-5, 5).unwrap(),
+        };
+
+        let same_bias = shared_bias_pair_identifiability(&problem, 0, 1).unwrap();
+        assert!(!same_bias.indistinguishable_under_available_probes);
+        let unknown_bias =
+            shared_bias_pair_identifiability_under_unknown_bias(&problem, 0, 1).unwrap();
+        assert!(unknown_bias.indistinguishable_under_unknown_bias);
+        let collision = unknown_bias.collision.unwrap();
+        assert_eq!((collision.bias_a, collision.bias_b), (-2, -5));
+        assert_eq!(
+            collision.common_signature,
+            vec![("p0".to_owned(), -2), ("p1".to_owned(), 8)]
+        );
+
+        // A non-constant nominal offset cannot be canceled by one campaign-wide
+        // bias pair, even though either individual probe can be matched.
+        let nonconstant =
+            shared_bias_pair_identifiability_under_unknown_bias(&problem, 0, 2).unwrap();
+        assert!(!nonconstant.indistinguishable_under_unknown_bias);
+        assert_eq!(nonconstant.separating_probe_ids.len(), 2);
+        assert_ne!(
+            nonconstant.separating_probe_ids[0],
+            nonconstant.separating_probe_ids[1]
+        );
     }
 
     #[test]
