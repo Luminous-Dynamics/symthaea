@@ -227,8 +227,12 @@ impl AudioPerception {
         let start = std::time::Instant::now();
 
         // Load audio
-        let (samples, _sample_rate) =
+        let (samples, sample_rate) =
             symthaea_stt::AudioFrontend::load_wav(path).context("Failed to load audio file")?;
+        self.projector
+            .validate_input_sample_rate(sample_rate)
+            .map_err(anyhow::Error::msg)
+            .context("Audio sample rate does not match the perception encoder")?;
 
         // Project through the encoder space associated with the loaded model.
         let hvs = self.project_audio(&samples);
