@@ -822,7 +822,12 @@ fn csv_row(fields: &[String]) -> String {
     line
 }
 
-fn failed_measurements(case_id: &str, error: &str, note: &str) -> Vec<Measurement> {
+fn failed_measurements(
+    case_id: &str,
+    error: &str,
+    note: &str,
+    rustc_version: &str,
+) -> Vec<Measurement> {
     METRICS
         .iter()
         .map(|metric| Measurement {
@@ -831,7 +836,7 @@ fn failed_measurements(case_id: &str, error: &str, note: &str) -> Vec<Measuremen
             status: "failed",
             value: None,
             artifact_sha256: String::new(),
-            note: format!("{note};composer_failure={error}"),
+            note: format!("{note};rustc_version={rustc_version};composer_failure={error}"),
         })
         .collect()
 }
@@ -891,6 +896,7 @@ fn measurements_for_case(
                 &case.case_id,
                 &error,
                 &format!("source_commit={source_commit};manifest_sha256={manifest_sha256}"),
+                rustc_version,
             ),
             None,
         ),
@@ -899,6 +905,7 @@ fn measurements_for_case(
                 &case.case_id,
                 "composer_panicked",
                 &format!("source_commit={source_commit};manifest_sha256={manifest_sha256}"),
+                rustc_version,
             ),
             None,
         ),
@@ -1063,11 +1070,8 @@ fn run() -> Result<(), String> {
                 failed_measurements(
                     &case.case_id,
                     "centre_reference_unavailable",
-                    &format!(
-                        "source_commit={};manifest_sha256={manifest_sha256}",
-                        args[3]
-                    ) + &format!(";rustc_version={rustc_version}"),
-
+                    &format!("source_commit={};manifest_sha256={manifest_sha256}", args[3]),
+                    &rustc_version,
                 ),
                 None,
             )
