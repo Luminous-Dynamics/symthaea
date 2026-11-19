@@ -479,7 +479,7 @@
       }
     },
     "digest_recipe": {
-      "const": "muse-render-execution-receipt-jcs-sha256-v1"
+      "const": "muse-render-execution-receipt-sorted-json-sha256-v1"
     },
     "receipt_sha256": {
       "$ref": "#/$defs/sha256"
