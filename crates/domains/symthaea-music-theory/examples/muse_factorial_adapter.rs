@@ -20,14 +20,14 @@ use serde_json::to_vec;
 use sha2::{Digest, Sha256};
 use symthaea_music_theory::score_validation::is_universal_invariant;
 use symthaea_music_theory::{
-    MusicalIntent, PitchClass, Score, ScoreValidationConfig, Style, ValidationSeverity,
-    compose_with_grammar_plan, validate_score, VoiceRole,
+    Emphasis, GrammarPlanEvidence, MusicalIntent, PitchClass, Score, ScoreValidationConfig,
+    Style, Tonality, ValidationSeverity, VoiceRole, compose_with_grammar_plan, validate_score,
 };
 
 const HEADER: &str =
     "case_id,cohort,style,seed,valence_code,arousal_code,energy_code,bars_code";
 
-const METRICS: [&str; 28] = [
+const METRICS: [&str; 52] = [
     "score_note_count",
     "score_total_beats",
     "score_total_seconds",
@@ -56,6 +56,30 @@ const METRICS: [&str; 28] = [
     "score_voice_role_entropy_bits",
     "score_duration_variety_count",
     "score_section_intensity_stddev",
+    "score_meter_beats",
+    "score_distinct_midi_pitches",
+    "score_key_tonic_pc",
+    "score_key_tonality_code",
+    "score_emphasis_normal_count",
+    "score_emphasis_climax_count",
+    "score_emphasis_cadential_count",
+    "score_emphasis_phrase_start_count",
+    "score_form_section_count",
+    "score_plan_requested_bars",
+    "score_plan_realized_bars",
+    "score_fingerprint_form_distance",
+    "score_fingerprint_harmony_distance",
+    "score_fingerprint_orchestration_distance",
+    "score_fingerprint_rhythm_distance",
+    "score_fingerprint_contour_distance",
+    "score_fingerprint_tempo_meter_distance",
+    "score_fingerprint_pitch_class_distance",
+    "score_fingerprint_interval_distance",
+    "score_fingerprint_chord_quality_distance",
+    "score_fingerprint_cadence_distance",
+    "score_fingerprint_motif_distance",
+    "score_exact_fingerprint_high32",
+    "score_exact_fingerprint_low32",
 ];
 
 const CONFIRMATION_STYLES: [&str; 6] = [
@@ -203,11 +227,18 @@ struct Measurement {
     note: String,
 }
 
+#[derive(Debug, Clone)]
+struct ReferenceArtifact {
+    structural_fingerprint: [f64; symthaea_music_theory::fingerprint::STRUCT_DIMS],
+    exact_fingerprint: u64,
+}
+
 #[derive(Debug)]
 struct ComposedArtifact {
     metrics: Vec<(&'static str, Option<f64>)>,
     artifact_sha256: String,
     note: String,
+    reference: Option<ReferenceArtifact>,
 }
 
 fn style_name(style: Style) -> String {
@@ -375,6 +406,39 @@ fn parse_manifest(input: &str, expected: &[CaseRow]) -> Result<Vec<CaseRow>, Str
     Ok(expected.to_vec())
 }
 
+fn centre_cell() -> Cell {
+    Cell {
+        valence: 1,
+        arousal: 1,
+        energy: 1,
+        bars: 1,
+    }
+}
+
+fn centre_first_cases(cases: &[CaseRow]) -> Result<Vec<CaseRow>, String> {
+    if cases.is_empty() || cases.len() % 81 != 0 {
+        return Err(format!(
+            "case list must contain complete 81-case blocks, found {} rows",
+            cases.len()
+        ));
+    }
+    let mut ordered = Vec::with_capacity(cases.len());
+    for (block_index, block) in cases.chunks_exact(81).enumerate() {
+        let Some(centre_index) = block.iter().position(|case| case.cell == centre_cell()) else {
+            return Err(format!("block {block_index} has no centre reference condition"));
+        };
+        ordered.push(block[centre_index].clone());
+        ordered.extend(
+            block
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| *index != centre_index)
+                .map(|(_, case)| case.clone()),
+        );
+    }
+    Ok(ordered)
+}
+
 fn factor_value(code: u8, levels: [f32; 3]) -> f32 {
     levels[code as usize]
 }
@@ -422,6 +486,7 @@ fn compose_case(
     case: &CaseRow,
     source_commit: &str,
     manifest_sha256: &str,
+    reference: Option<&ReferenceArtifact>,
 ) -> Result<ComposedArtifact, String> {
     let spec = case.style.spec();
     spec.validate()
@@ -435,6 +500,10 @@ fn compose_case(
         seed: case.seed,
         tonic: PitchClass::C,
     };
+    let is_centre = case.cell == centre_cell();
+    if is_centre != reference.is_none() {
+        return Err("centre-reference execution ordering contract was violated".to_string());
+    }
 
     let realization =
         compose_with_grammar_plan(case.style.grammar_profile(), &intent, &spec);
@@ -444,6 +513,17 @@ fn compose_case(
     let artifact_bytes = to_vec(&score)
         .map_err(|error| format!("cannot serialize symbolic score: {error}"))?;
     let artifact_sha256 = sha256_hex(&artifact_bytes);
+    let current_fingerprint =
+        symthaea_music_theory::fingerprint::structural_fingerprint(&score, &realization.form);
+    let current_exact_fingerprint =
+        symthaea_music_theory::fingerprint::exact_fingerprint(&score);
+    let layer_distances = match reference {
+        Some(reference) => symthaea_music_theory::fingerprint::layer_dists(
+            &current_fingerprint,
+            &reference.structural_fingerprint,
+        ),
+        None => [0.0; symthaea_music_theory::fingerprint::LAYERS.len()],
+    };
 
     let note_count = score.notes.len();
     let pitches: Vec<f64> = score
@@ -516,8 +596,10 @@ fn compose_case(
     };
 
     let mut pitch_class_counts = [0usize; 12];
+    let mut distinct_midi_pitches = HashSet::new();
     for note in &score.notes {
         pitch_class_counts[(note.pitch.midi() % 12) as usize] += 1;
+        distinct_midi_pitches.insert(note.pitch.midi());
     }
     let pitch_class_diversity = pitch_class_counts.iter().filter(|count| **count > 0).count();
     let pitch_class_entropy = categorical_entropy_bits(&pitch_class_counts, note_count);
@@ -569,14 +651,23 @@ fn compose_case(
     };
 
     let mut role_counts = [0usize; 4];
+    let mut emphasis_counts = [0usize; 4];
     for note in &score.notes {
-        let index = match note.role {
+        let role_index = match note.role {
             VoiceRole::Melody => 0,
             VoiceRole::Harmony => 1,
             VoiceRole::Bass => 2,
             VoiceRole::CounterMelody => 3,
         };
-        role_counts[index] += 1;
+        role_counts[role_index] += 1;
+
+        let emphasis_index = match note.emphasis {
+            Emphasis::Normal => 0,
+            Emphasis::Climax => 1,
+            Emphasis::Cadential => 2,
+            Emphasis::PhraseStart => 3,
+        };
+        emphasis_counts[emphasis_index] += 1;
     }
     let role_entropy = categorical_entropy_bits(&role_counts, note_count);
 
@@ -586,8 +677,38 @@ fn compose_case(
         let distinct: HashSet<u64> = durations.iter().map(|duration| duration.to_bits()).collect();
         Some(distinct.len() as f64)
     };
-
     let intensity_stddev = population_stddev(&intensities);
+    let tonality_code = match score.key.tonality {
+        Tonality::Major => 0.0,
+        Tonality::Minor => 1.0,
+        Tonality::Modal(_) => 2.0,
+    };
+
+    let (plan_kind, plan_requested_bars, plan_realized_bars) = match &realization.plan {
+        GrammarPlanEvidence::CallResponse(plan) => (
+            "call_response",
+            Some(plan.requested_bars as f64),
+            Some(plan.realized_bars as f64),
+        ),
+        GrammarPlanEvidence::JazzChorus(plan) => (
+            "jazz_chorus",
+            Some(plan.requested_bars as f64),
+            Some(plan.realized_bars as f64),
+        ),
+        GrammarPlanEvidence::PeriodSentence(_) => ("period_sentence", None, None),
+        GrammarPlanEvidence::Contrapuntal(_) => ("contrapuntal", None, None),
+        GrammarPlanEvidence::GrooveCycle(_) => ("groove_cycle", None, None),
+        GrammarPlanEvidence::AdditiveProcess(_) => ("additive_process", None, None),
+        GrammarPlanEvidence::ModalArc(_) => ("modal_arc", None, None),
+        GrammarPlanEvidence::Compatibility { .. } => ("compatibility", None, None),
+    };
+    let form_section_count = realization
+        .form
+        .as_ref()
+        .map(|form| form.sections.len() as f64);
+
+    let exact_high = ((current_exact_fingerprint >> 32) as u32) as f64;
+    let exact_low = (current_exact_fingerprint as u32) as f64;
 
     let metrics = vec![
         ("score_note_count", Some(note_count as f64)),
@@ -627,22 +748,54 @@ fn compose_case(
         ("score_voice_role_entropy_bits", role_entropy),
         ("score_duration_variety_count", duration_variety_count),
         ("score_section_intensity_stddev", intensity_stddev),
+        ("score_meter_beats", Some(f64::from(score.meter))),
+        ("score_distinct_midi_pitches", Some(distinct_midi_pitches.len() as f64)),
+        ("score_key_tonic_pc", Some(f64::from(score.key.tonic.value()))),
+        ("score_key_tonality_code", Some(tonality_code)),
+        ("score_emphasis_normal_count", Some(emphasis_counts[0] as f64)),
+        ("score_emphasis_climax_count", Some(emphasis_counts[1] as f64)),
+        ("score_emphasis_cadential_count", Some(emphasis_counts[2] as f64)),
+        ("score_emphasis_phrase_start_count", Some(emphasis_counts[3] as f64)),
+        ("score_form_section_count", form_section_count),
+        ("score_plan_requested_bars", plan_requested_bars),
+        ("score_plan_realized_bars", plan_realized_bars),
+        ("score_fingerprint_form_distance", Some(layer_distances[0])),
+        ("score_fingerprint_harmony_distance", Some(layer_distances[1])),
+        ("score_fingerprint_orchestration_distance", Some(layer_distances[2])),
+        ("score_fingerprint_rhythm_distance", Some(layer_distances[3])),
+        ("score_fingerprint_contour_distance", Some(layer_distances[4])),
+        ("score_fingerprint_tempo_meter_distance", Some(layer_distances[5])),
+        ("score_fingerprint_pitch_class_distance", Some(layer_distances[6])),
+        ("score_fingerprint_interval_distance", Some(layer_distances[7])),
+        ("score_fingerprint_chord_quality_distance", Some(layer_distances[8])),
+        ("score_fingerprint_cadence_distance", Some(layer_distances[9])),
+        ("score_fingerprint_motif_distance", Some(layer_distances[10])),
+        ("score_exact_fingerprint_high32", Some(exact_high)),
+        ("score_exact_fingerprint_low32", Some(exact_low)),
     ];
 
     let note = format!(
-        "source_commit={source_commit};composer_reference_commit={};manifest_sha256={manifest_sha256};engine_version={};grammar_family={:?};support_axes={};universal_fatal={universal_fatal_count};style_fatal={};warnings={warning_count};validation_valid={}",
+        "source_commit={source_commit};composer_reference_commit={};manifest_sha256={manifest_sha256};engine_version={};grammar_family={:?};support_axes={};tonality={:?};plan_kind={plan_kind};universal_fatal={universal_fatal_count};style_fatal={};warnings={warning_count};validation_valid={};exact_fingerprint={current_exact_fingerprint:016x};reference_exact_fingerprint={:016x}",
         PINNED_COMPOSER_SOURCE_COMMIT,
         symthaea_music_theory::MUSIC_THEORY_ENGINE_VERSION,
         case.style.grammar_family(),
         case.style.supported_intent_axes().join("|"),
+        score.key.tonality,
         all_fatal_count.saturating_sub(universal_fatal_count),
-        validation.valid
+        validation.valid,
+        reference
+            .map(|reference| reference.exact_fingerprint)
+            .unwrap_or(current_exact_fingerprint)
     );
 
     Ok(ComposedArtifact {
         metrics,
         artifact_sha256,
         note,
+        reference: is_centre.then_some(ReferenceArtifact {
+            structural_fingerprint: current_fingerprint,
+            exact_fingerprint: current_exact_fingerprint,
+        }),
     })
 }
 
