@@ -251,6 +251,43 @@ std::vector<Record> fixture(const std::string& workload,std::uint64_t seed) {
     }
     return records;
 }
+
+std::vector<Record> fixture_interleaved(const std::string& workload,std::uint64_t seed) {
+    constexpr std::uint32_t keys=64U,steps=1024U;
+    std::mt19937_64 rng(seed);
+    std::array<Record,keys> states{};
+    std::vector<Record> records;
+    records.reserve(static_cast<std::size_t>(keys)*steps);
+    for (std::uint32_t key=0U;key<keys;++key) {
+        auto& current=states[key];
+        current.entity=key/16U;
+        current.series=key%16U;
+        current.present=0xffU;
+        for (std::size_t field=0U;field<kFields;++field) current.values[field]=field_value(field,rng());
+    }
+    for (std::uint32_t step=0U;step<steps;++step) {
+        for (std::uint32_t key=0U;key<keys;++key) {
+            auto& current=states[key];
+            current.timestamp=(static_cast<std::uint64_t>(step)*keys+key)*1000U;
+            for (std::size_t field=0U;field<kFields;++field) {
+                const std::uint64_t random=rng(); bool update=false;
+                if (step>0U) {
+                    if (workload=="sparse") update=random%1000U<15U;
+                    else if (workload=="idle") update=random%10000U<2U;
+                    else if (workload=="bursty") update=(step%256U<24U)?random%100U<65U:random%1000U<5U;
+                    else if (workload=="noisy") update=true;
+                }
+                if (update) {
+                    const auto bit=static_cast<std::uint8_t>(1U<<field);
+                    if (std::rotl(random,11)%2048U==0U) current.present=static_cast<std::uint8_t>(current.present^bit);
+                    current.values[field]=(current.present&bit)==0U?0U:field_value(field,rng());
+                }
+            }
+            records.push_back(current);
+        }
+    }
+    return records;
+}
 std::vector<std::uint8_t> raw_bytes(const std::vector<Record>& records) {
     std::vector<std::uint8_t> out; out.reserve(8U+records.size()*81U);
     out.insert(out.end(),{2U,2U,3U,4U,1U,0U,5U,2U});
@@ -265,9 +302,13 @@ void write_file(const std::filesystem::path& path,const std::vector<std::uint8_t
 void require(bool condition,const std::string& message) { if(!condition) throw std::runtime_error(message); }
 void test_fixtures() {
     for (const std::string name:{"sparse","bursty","noisy","idle"}) {
-        const auto records=fixture(name,0x9911U); const auto encoded=encode_record_runs(records);
-        std::vector<Record> decoded; require(decode_record_runs(encoded,records.size(),decoded),name+" decode failed");
-        require(decoded==records,name+" bitwise record mismatch");
+        for (const bool interleaved:{false,true}) {
+            const auto records=interleaved?fixture_interleaved(name,0x9911U):fixture(name,0x9911U);
+            const auto encoded=encode_record_runs(records);
+            std::vector<Record> decoded;
+            require(decode_record_runs(encoded,records.size(),decoded),name+" decode failed");
+            require(decoded==records,name+" bitwise record mismatch");
+        }
     }
 }
 void test_random_roundtrips() {
@@ -299,11 +340,21 @@ void test_malformed() {
 void emit(const std::filesystem::path& directory) {
     std::filesystem::create_directories(directory);
     for(const std::string name:{"sparse","bursty","noisy","idle"}) {
-        const auto records=fixture(name,0x7e1e0001U); const auto raw=raw_bytes(records);
-        const auto delta=encode_state_delta(records); const auto runs=encode_record_runs(records);
-        std::vector<Record> decoded; require(decode_record_runs(runs,records.size(),decoded),name+" round-trip failed"); require(decoded==records,name+" mismatch");
-        write_file(directory/(name+"_raw.bin"),raw); write_file(directory/(name+"_state_delta.bin"),delta); write_file(directory/(name+"_state_delta_record_runs.bin"),runs);
-        std::cout<<name<<": records="<<records.size()<<" raw_bytes="<<raw.size()<<" state_delta_bytes="<<delta.size()<<" record_run_bytes="<<runs.size()<<"\n";
+        for(const bool interleaved:{false,true}) {
+            const std::string label=name+(interleaved?"_interleaved":"_grouped");
+            const auto records=interleaved?fixture_interleaved(name,0x7e1e0001U):fixture(name,0x7e1e0001U);
+            const auto raw=raw_bytes(records);
+            const auto delta=encode_state_delta(records);
+            const auto runs=encode_record_runs(records);
+            std::vector<Record> decoded;
+            require(decode_record_runs(runs,records.size(),decoded),label+" round-trip failed");
+            require(decoded==records,label+" mismatch");
+            write_file(directory/(label+"_raw.bin"),raw);
+            write_file(directory/(label+"_state_delta.bin"),delta);
+            write_file(directory/(label+"_state_delta_record_runs.bin"),runs);
+            std::cout<<label<<": records="<<records.size()<<" raw_bytes="<<raw.size()
+                     <<" state_delta_bytes="<<delta.size()<<" record_run_bytes="<<runs.size()<<"\n";
+        }
     }
 }
 }
