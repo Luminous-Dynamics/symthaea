@@ -66,6 +66,7 @@ jobs:
             and .report.summary.indeterminate == 5
             and .report.summary.proximity_only_false_accepts == 20
             and .report.summary.expected_result_mismatches == 0
+            and (.report.cases | any(.case_id == "NOMINAL_CAPTURE" and .status == "accepted_for_handoff" and .client_id == "serviced-client-001" and .interface_id == "COOPERATIVE-CAPTURE-PORT-A" and .interface_revision == 3 and .frame_id == "TARGET-LVLH-001" and .epoch_tick == 1000))
             and (.report.cases | all(.authority_granted == false))
           ' orbital-capture-handoff-receipt.json
 
