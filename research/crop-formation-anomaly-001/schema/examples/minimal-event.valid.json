@@ -1,0 +1,193 @@
+{
+  "schema_version": "0.1.0",
+  "event_id": "CFE-synthetic-fixture-001",
+  "record_status": "draft",
+  "discovery": {
+    "first_reported_at": null,
+    "last_reported_at": null,
+    "alleged_formation_interval": null,
+    "temporal_precision": "unknown"
+  },
+  "crop": {
+    "species_state": "unknown",
+    "species": null,
+    "cultivar": null,
+    "phenological_stage": null
+  },
+  "source_assertions": [
+    {
+      "assertion_id": "CFA-synthetic-source-001",
+      "source_name": "CROP-INTEL synthetic schema fixture",
+      "author_or_reporter": null,
+      "source_url": "https://example.org/crop-intel/synthetic-fixture",
+      "original_record_id": null,
+      "retrieved_at": null,
+      "assertion_type": "other",
+      "record_state": "asserted",
+      "asserted_value": "synthetic fixture only; not a reported formation",
+      "source_wording": null,
+      "reviewer_assessment": null
+    }
+  ],
+  "notes": "Machine-readable schema example only. This record does not describe a real crop formation.",
+  "crop_flow_samples": [
+    {
+      "sample_id": "CFS-synthetic-001",
+      "parent_specimen_id": null,
+      "position": {
+        "x": 0,
+        "y": 0,
+        "coordinate_space": "field_local",
+        "unit": "m",
+        "coordinate_reference_system": "synthetic-local-x-east-y-north",
+        "position_uncertainty_m": 0
+      },
+      "direction_rad": 0,
+      "direction_reference": "field_x_counterclockwise",
+      "bend_magnitude": 0.25,
+      "bend_unit": "rad",
+      "weight": 1,
+      "weight_basis": "equal synthetic measurement weight",
+      "method": "synthetic known-answer crop-flow fixture",
+      "instrument_or_calibration": "none; generated synthetic observation",
+      "observed_at": null,
+      "observer_blinding_id": null,
+      "raw_measurement_url": null
+    }
+  ],
+  "stem_pose_3d_samples": [
+    {
+      "sample_id": "SPS3D-synthetic-001",
+      "parent_specimen_id": null,
+      "base_position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "axis_vector": {
+        "x": 0.2,
+        "y": 0,
+        "z": 0.98
+      },
+      "coordinate_frame": "synthetic-local-x-east-y-north-z-up",
+      "position_unit": "m",
+      "axis_direction_convention": "base_to_tip",
+      "bend_magnitude": 0.12,
+      "bend_unit": "rad",
+      "weight": 1,
+      "weight_basis": "equal synthetic measurement weight",
+      "method": "synthetic known-answer 3D stem-axis fixture",
+      "instrument_or_calibration": "none; generated synthetic observation",
+      "observed_at": null,
+      "observer_blinding_id": null,
+      "raw_measurement_url": null
+    }
+  ],
+  "stem_mechanical_samples": [
+    {
+      "sample_id": "SMS-synthetic-001",
+      "parent_specimen_id": "SPEC-synthetic-beam-001",
+      "test_type": "three_point_bending",
+      "protocol_id": "synthetic-three-point-bend-v1",
+      "support_span_m": 0.1,
+      "cantilever_length_m": null,
+      "loading_rate_m_s": 0.001,
+      "force_displacement_curve": [
+        {
+          "force_n": 0,
+          "displacement_m": 0,
+          "time_s": 0
+        },
+        {
+          "force_n": 5,
+          "displacement_m": 0.005,
+          "time_s": 5
+        },
+        {
+          "force_n": 10,
+          "displacement_m": 0.01,
+          "time_s": 10
+        }
+      ],
+      "derived_flexural_rigidity_nm2": 0.020833333333333332,
+      "derived_peak_moment_nm": 0.25,
+      "moisture_mass_fraction": null,
+      "moisture_method": null,
+      "temperature_c": null,
+      "sheath_state": "not_applicable",
+      "failure_mode": "none",
+      "loading_axis_reference": "synthetic transverse axis perpendicular to specimen longitudinal axis",
+      "method": "synthetic known-answer three-point bend example; idealized linear force-displacement segment",
+      "instrument_or_calibration": "none; generated synthetic observation",
+      "observed_at": null,
+      "observer_blinding_id": null,
+      "raw_measurement_url": null,
+      "cross_section": {
+        "geometry_model": "elliptical_annulus",
+        "outer_semi_axis_x_m": 0.004,
+        "outer_semi_axis_y_m": 0.003,
+        "inner_semi_axis_x_m": 0.002,
+        "inner_semi_axis_y_m": 0.001,
+        "orientation_rad": 0,
+        "measurement_method": "synthetic known-answer caliper measurements",
+        "section_location": "mid-internode"
+      }
+    }
+  ],
+  "root_anchorage_samples": [
+    {
+      "sample_id": "RAS-synthetic-001",
+      "parent_specimen_id": "SPEC-synthetic-beam-001",
+      "protocol_id": "synthetic-root-support-calibration-v1",
+      "coordinate_frame": "synthetic-local-x-east-y-north-z-up",
+      "loading_direction": "transverse +x",
+      "force_translation_curve": [
+        {
+          "force_n": 0,
+          "translation_m": 0,
+          "time_s": 0
+        },
+        {
+          "force_n": 10,
+          "translation_m": 0.01,
+          "time_s": 10
+        },
+        {
+          "force_n": 20,
+          "translation_m": 0.02,
+          "time_s": 20
+        }
+      ],
+      "moment_rotation_curve": [
+        {
+          "moment_nm": 0,
+          "rotation_rad": 0,
+          "time_s": 0
+        },
+        {
+          "moment_nm": 1,
+          "rotation_rad": 0.05,
+          "time_s": 10
+        },
+        {
+          "moment_nm": 2,
+          "rotation_rad": 0.1,
+          "time_s": 20
+        }
+      ],
+      "derived_translational_stiffness_n_per_m": 1000,
+      "derived_rotational_stiffness_nm_per_rad": 20,
+      "root_plate_major_axis_m": 0.08,
+      "root_plate_minor_axis_m": 0.06,
+      "soil_water_mass_fraction": 0.2,
+      "soil_bulk_density_kg_m3": 1200,
+      "failure_mode": "none",
+      "failure_moment_nm": null,
+      "method": "synthetic known-answer linear root-support spring fixture; no physical specimen",
+      "instrument_or_calibration": "none; generated synthetic observation",
+      "observed_at": null,
+      "observer_blinding_id": null,
+      "raw_measurement_url": null
+    }
+  ]
+}
