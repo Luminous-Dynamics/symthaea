@@ -566,6 +566,14 @@ fn audit_and_plan(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, St
             "exclusion_reason": action.exclusion_reason
         })).collect();
 
+    let oracle_minus_greedy =
+        (oracle.information_gain_nats - greedy.information_gain_nats).max(0.0);
+    let greedy_fraction_of_oracle = if oracle.information_gain_nats > 1.0e-12 {
+        greedy.information_gain_nats / oracle.information_gain_nats
+    } else {
+        1.0
+    };
+
     Ok(json!({
         "status": "synthetic_contract_pass",
         "contract": "SC-CORRELATED-EVIDENCE-AUDIT-0.1",
@@ -606,6 +614,11 @@ fn audit_and_plan(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, St
             "factorized_marginal_approximation_nats": independent_information,
             "factorized_minus_shared_nats": factorization_delta,
             "shared_nuisance_model_materially_changes_information": factorization_delta.abs() > 1.0e-3
+        },
+        "comparison": {
+            "oracle_information_gain_minus_myopic_nats": oracle_minus_greedy,
+            "myopic_fraction_of_oracle_information_gain": greedy_fraction_of_oracle,
+            "capability_gating_gap_detected": oracle_minus_greedy > 1.0e-9
         },
         "claim_ceiling": "Synthetic shared-nuisance planning contract only; calibration states and likelihoods are illustrative, not fitted to a real specimen or physical instrument."
     }))
