@@ -4036,6 +4036,65 @@
               "Rounded to one decimal L/min."
             ]
           }
+        },
+        {
+          "claim_id": "kohler.k33481.cycle.water-savings-after-rapid-clean",
+          "parameter": "water_savings_fraction",
+          "original_value": "Derived rapid-clean-adjusted illustration: (25 US gal baseline − (5 US gal Cycle Mode fresh water + 0.75 US gal Rapid Clean water)) / 25 US gal = 77%",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 77,
+            "unit": "%"
+          },
+          "evidence_class": "manufacturer_declaration",
+          "result_class": "derived",
+          "conditions": {
+            "mode": "Cycle Mode with 2.5 US gal/min outlet plus one Rapid Clean after the shower",
+            "pressure_kpa": null,
+            "temperature_c": null,
+            "duration_min": 10,
+            "task": "Manufacturer's 10-minute example with one recommended after-session Rapid Clean",
+            "method": "Arithmetic derived from KOHLER's published 25 US gal conventional example, 5 US gal Cycle Mode example and 0.75 US gal Rapid Clean water",
+            "sample_count": null,
+            "pressure_datum": null,
+            "unknown_conditions": [
+              "monthly Deep Clean water and energy use",
+              "actual startup, purge, reject water and measured usage",
+              "independent task-quality equivalence",
+              "site-specific actual consumption"
+            ],
+            "notes": "This is not an independently measured result. It includes the stated Rapid Clean water only; monthly Deep Clean and other unreported flows are excluded."
+          },
+          "source": {
+            "url": "https://www.kohler.com/en/products/showers/anthem-evocycle",
+            "publisher": "KOHLER manufacturer product page",
+            "source_type": "manufacturer_product_page",
+            "published_on": null,
+            "accessed_on": "2026-11-19",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Transparent arithmetic on manufacturer-published figures to illustrate the effect of the recommended per-shower cleaning cycle; not a matched or independent result."
+          },
+          "limitations": [
+            "Do not present 77% as a measured or fully all-in lifecycle saving.",
+            "Monthly Deep Clean water/energy, startup, purge, standby, consumables and maintenance remain unquantified.",
+            "The 80% headline claim is for Cycle Mode use; this adjusted illustration adds only the stated Rapid Clean water."
+          ],
+          "derivation": {
+            "formula": "1 − ((5 US gal Cycle Mode water + 0.75 US gal Rapid Clean water) / 25 US gal conventional water) = 0.77",
+            "inputs": [
+              "25 US gal conventional shower water over 10 minutes",
+              "5 US gal Cycle Mode fresh water over 10 minutes",
+              "0.75 US gal Rapid Clean water per shower"
+            ],
+            "assumptions": [
+              "One recommended Rapid Clean is counted after this shower.",
+              "Monthly Deep Clean and all other unreported water streams are excluded.",
+              "Manufacturer example volumes are used without independent measurement."
+            ]
+          }
         }
       ]
     },
