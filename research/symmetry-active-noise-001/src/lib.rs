@@ -1783,6 +1783,66 @@ pub fn design_persistent_noise_probe_set(
     )
 }
 
+/// Greedy non-adaptive probe design when the persistent categorical
+/// nuisance state is unobserved. Each (hypothesis pair, state-A, state-B)
+/// combination is a separate obligation. This is stronger than
+/// `design_persistent_noise_probe_set`, which assumes the same indexed state
+/// is known/common across both candidates.
+pub fn design_persistent_noise_probe_set_under_unknown_state(
+    problem: &PersistentNoiseProblemV1,
+) -> Result<ProbeDesignReceiptV1, NoiseErrorV1> {
+    problem.validate()?;
+    let mut required = Vec::new();
+    let mut unresolved = Vec::new();
+    let mut coverage = vec![BTreeSet::new(); problem.probes.len()];
+
+    for hypothesis_a in 0..problem.hypothesis_ids.len() {
+        for hypothesis_b in (hypothesis_a + 1)..problem.hypothesis_ids.len() {
+            for (state_a_index, state_a_id) in problem.error_state_ids.iter().enumerate() {
+                for (state_b_index, state_b_id) in problem.error_state_ids.iter().enumerate() {
+                    let obligation = pair_obligation(
+                        &problem.hypothesis_ids,
+                        hypothesis_a,
+                        hypothesis_b,
+                        Some(format!("{state_a_id}::{state_b_id}")),
+                    );
+                    let separating_probes: Vec<usize> = problem
+                        .probes
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, probe)| probe.admissible)
+                        .filter_map(|(probe_index, _)| {
+                            let outcome_a = problem.predicted_outcomes_by_hypothesis
+                                [hypothesis_a][probe_index][state_a_index];
+                            let outcome_b = problem.predicted_outcomes_by_hypothesis
+                                [hypothesis_b][probe_index][state_b_index];
+                            (outcome_a != outcome_b).then_some(probe_index)
+                        })
+                        .collect();
+                    if separating_probes.is_empty() {
+                        unresolved.push(obligation);
+                    } else {
+                        let obligation_index = required.len();
+                        required.push(obligation);
+                        for probe_index in separating_probes {
+                            coverage[probe_index].insert(obligation_index);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    greedy_probe_cover(
+        &problem.problem_id,
+        problem.canonical_bytes(),
+        &problem.probes,
+        required,
+        unresolved,
+        coverage,
+    )
+}
+
 /// Greedy minimum-cost non-adaptive diagnostic design for bounded numeric
 /// intervals. Disjoint predicted intervals are robust pair-separation witnesses.
 pub fn design_bounded_interval_probe_set(
@@ -1885,8 +1945,115 @@ pub fn design_shared_bias_probe_set(
     )
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedBiasProbeWitnessV1 {
+    pub hypothesis_a: String,
+    pub hypothesis_b: String,
+    pub witness_probe_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedBiasProbeDesignReceiptV1 {
+    pub schema_version: u32,
+    pub problem_id: String,
+    pub problem_contract_bytes: Vec<u8>,
+    pub selected_probe_ids: Vec<String>,
+    pub selected_cost: u64,
+    pub covered_pair_witnesses: Vec<SharedBiasProbeWitnessV1>,
+    pub unresolved_pairs: Vec<ProbeDesignObligationV1>,
+    /// This construction unions each pair's cheapest witness; it is not a
+    /// globally optimal weighted set-cover solution.
+    pub optimality_certified: bool,
+    pub complete_pairwise_separation: bool,
+}
+
 /// Replay the deterministic greedy set-cover implementation and reject any
 /// modified or forged receipt. This verifies reproducibility, not optimality.
+/// Construct a non-adaptive probe set robust to an unknown campaign-wide
+/// additive bias. Every candidate pair must be separated even when the two
+/// hypotheses are allowed to use different values from the same bounded bias
+/// interval. A witness can be one probe (constant offset outside the bias
+/// difference range) or two probes (non-constant nominal offset).
+///
+/// This deterministic construction unions the cheapest witness set per pair.
+/// It is a valid upper-bound design, not a globally optimal minimum-cost set.
+pub fn design_shared_bias_probe_set_under_unknown_bias(
+    problem: &SharedAdditiveBiasProblemV1,
+) -> Result<SharedBiasProbeDesignReceiptV1, NoiseErrorV1> {
+    problem.validate()?;
+    let mut selected = BTreeSet::new();
+    let mut covered_pair_witnesses = Vec::new();
+    let mut unresolved_pairs = Vec::new();
+
+    for hypothesis_a in 0..problem.hypothesis_ids.len() {
+        for hypothesis_b in (hypothesis_a + 1)..problem.hypothesis_ids.len() {
+            let report = shared_bias_pair_identifiability_under_unknown_bias(
+                problem,
+                hypothesis_a,
+                hypothesis_b,
+            )?;
+            if report.indistinguishable_under_unknown_bias {
+                unresolved_pairs.push(pair_obligation(
+                    &problem.hypothesis_ids,
+                    hypothesis_a,
+                    hypothesis_b,
+                    None,
+                ));
+                continue;
+            }
+
+            if report.separating_probe_ids.is_empty() {
+                return Err(NoiseErrorV1::InvalidDeterministicInput);
+            }
+            for probe_id in &report.separating_probe_ids {
+                if !problem.probes.iter().any(|probe| probe.probe_id == *probe_id && probe.admissible) {
+                    return Err(NoiseErrorV1::InvalidDeterministicInput);
+                }
+                selected.insert(probe_id.clone());
+            }
+            covered_pair_witnesses.push(SharedBiasProbeWitnessV1 {
+                hypothesis_a: problem.hypothesis_ids[hypothesis_a].clone(),
+                hypothesis_b: problem.hypothesis_ids[hypothesis_b].clone(),
+                witness_probe_ids: report.separating_probe_ids,
+            });
+        }
+    }
+
+    let selected_probe_ids: Vec<String> = selected.into_iter().collect();
+    let selected_cost = selected_probe_ids.iter().try_fold(0_u64, |sum, probe_id| {
+        let probe = problem
+            .probes
+            .iter()
+            .find(|probe| probe.probe_id == *probe_id)
+            .ok_or(NoiseErrorV1::InvalidDeterministicInput)?;
+        sum.checked_add(probe.cost)
+            .ok_or(NoiseErrorV1::IntervalArithmeticOverflow)
+    })?;
+
+    Ok(SharedBiasProbeDesignReceiptV1 {
+        schema_version: 1,
+        problem_id: problem.problem_id.clone(),
+        problem_contract_bytes: problem.canonical_bytes(),
+        selected_probe_ids,
+        selected_cost,
+        covered_pair_witnesses,
+        complete_pairwise_separation: unresolved_pairs.is_empty(),
+        unresolved_pairs,
+        optimality_certified: false,
+    })
+}
+
+pub fn verify_shared_bias_probe_design_under_unknown_bias(
+    problem: &SharedAdditiveBiasProblemV1,
+    receipt: &SharedBiasProbeDesignReceiptV1,
+) -> Result<(), NoiseErrorV1> {
+    let replayed = design_shared_bias_probe_set_under_unknown_bias(problem)?;
+    if *receipt != replayed {
+        return Err(NoiseErrorV1::ReceiptMismatch);
+    }
+    Ok(())
+}
+
 pub fn verify_bounded_noise_probe_design_receipt(
     problem: &BoundedNoiseProblemV1,
     receipt: &ProbeDesignReceiptV1,
@@ -2142,6 +2309,96 @@ mod tests {
                 .required_obligations
                 .iter()
                 .all(|obligation| obligation.error_state_id.is_some())
+        );
+    }
+
+    #[test]
+    fn unknown_state_persistent_probe_design_covers_cross_state_obligations() {
+        let problem = PersistentNoiseProblemV1 {
+            problem_id: "unknown-state-design-v1".to_owned(),
+            hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned()],
+            probes: vec![
+                NoiseProbeV1 {
+                    probe_id: "p0".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p1".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+            ],
+            error_state_ids: vec!["low".to_owned(), "high".to_owned()],
+            predicted_outcomes_by_hypothesis: vec![
+                vec![vec![0, 1], vec![0, 1]],
+                vec![vec![1, 0], vec![1, 0]],
+            ],
+        };
+        let conditional = design_persistent_noise_probe_set(&problem).unwrap();
+        assert!(conditional.complete_pairwise_separation);
+
+        let robust = design_persistent_noise_probe_set_under_unknown_state(&problem).unwrap();
+        assert!(!robust.complete_pairwise_separation);
+        assert_eq!(robust.unresolved_obligations.len(), 2);
+        assert_eq!(
+            robust.unresolved_obligations[0].error_state_id.as_deref(),
+            Some("low::high")
+        );
+        assert_eq!(
+            robust.unresolved_obligations[1].error_state_id.as_deref(),
+            Some("high::low")
+        );
+        assert!(robust.optimality_certified == false);
+    }
+
+    #[test]
+    fn unknown_bias_probe_design_carries_pair_witnesses_and_unresolved_frontier() {
+        let problem = SharedAdditiveBiasProblemV1 {
+            problem_id: "unknown-bias-probe-design-v1".to_owned(),
+            quantity_unit_id: "millimetre-integer".to_owned(),
+            hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned(), "H-C".to_owned()],
+            probes: vec![
+                NoiseProbeV1 {
+                    probe_id: "p0".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p1".to_owned(),
+                    cost: 2,
+                    admissible: true,
+                },
+            ],
+            nominal_predictions_by_hypothesis: vec![
+                vec![0, 10],
+                vec![3, 13],
+                vec![3, 14],
+            ],
+            global_bias_interval: FixedIntervalV1::new(-5, 5).unwrap(),
+        };
+        let receipt = design_shared_bias_probe_set_under_unknown_bias(&problem).unwrap();
+        assert_eq!(receipt.unresolved_pairs.len(), 1);
+        assert_eq!(
+            (receipt.unresolved_pairs[0].hypothesis_a.as_str(),
+             receipt.unresolved_pairs[0].hypothesis_b.as_str()),
+            ("H-A", "H-B")
+        );
+        assert_eq!(receipt.covered_pair_witnesses.len(), 2);
+        let h_a_h_c = receipt.covered_pair_witnesses.iter()
+            .find(|witness| witness.hypothesis_a == "H-A" && witness.hypothesis_b == "H-C")
+            .unwrap();
+        assert_eq!(h_a_h_c.witness_probe_ids.len(), 2);
+        assert_eq!(receipt.selected_probe_ids, vec!["p0", "p1"]);
+        assert!(!receipt.complete_pairwise_separation);
+        assert!(!receipt.optimality_certified);
+        verify_shared_bias_probe_design_under_unknown_bias(&problem, &receipt).unwrap();
+
+        let mut forged = receipt.clone();
+        forged.selected_cost += 1;
+        assert_eq!(
+            verify_shared_bias_probe_design_under_unknown_bias(&problem, &forged),
+            Err(NoiseErrorV1::ReceiptMismatch)
         );
     }
 
