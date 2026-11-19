@@ -174,8 +174,12 @@ fn valid_kind(kind: &NodeKind) -> bool {
         }
         NodeKind::UseFilter { filter_id } => filter_id.len() <= MAX_SCENE_TEXT_BYTES,
         NodeKind::Path { d } => {
+            // Check the byte cap before allocating the lowercase scan buffer.
+            if d.len() > MAX_PATH_BYTES {
+                return false;
+            }
             let lower = d.to_ascii_lowercase();
-            d.len() <= MAX_PATH_BYTES && !lower.contains("nan") && !lower.contains("inf")
+            !lower.contains("nan") && !lower.contains("inf")
         }
     }
 }
@@ -299,8 +303,12 @@ pub fn generate_atelier_production(
 
     // Do not silently accept a snapshot that Canvas would need to clamp or
     // truncate. The caller must repair and resubmit the actual source state.
-    let (_, sanitization) = snapshot.sanitize_with_limits(SnapshotLimits::default());
-    if sanitization.changed() {
+    let (sanitized, sanitization) = snapshot.sanitize_with_limits(SnapshotLimits::default());
+    // SnapshotSanitization is an audit summary, not a complete equality proof:
+    // for example, the current Canvas sanitizer clamps cantor_last_depth but
+    // does not increment a dedicated counter. Compare the full serialized
+    // value as well so no silent normalization crosses this adapter boundary.
+    if sanitization.changed() || digest_json(snapshot)? != digest_json(&sanitized)? {
         return Err(AdapterError(
             "Atelier snapshot requires sanitization; repair it before production".into(),
         ));
