@@ -1423,7 +1423,7 @@ mod tests {
         );
 
         let mut bad_child_choice = frame.clone();
-        bad_child_choice[SEGMENTED_HEADER_LEN + 6] = 1; // expect Raw/Order0 on the first segment.
+        bad_child_choice[SEGMENTED_HEADER_LEN + 7] = 1; // claim Raw/Order1 instead of Raw/Order0.
         assert_eq!(
             decompress_f64_budgeted_selector(&bad_child_choice, input.len()),
             Err(NumericError::SegmentPolicyMismatch {
