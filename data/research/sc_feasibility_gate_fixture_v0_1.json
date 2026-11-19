@@ -1,0 +1,166 @@
+{
+  "contract": "SC-FEASIBILITY-GATE-0.1",
+  "fixture_only": true,
+  "instance_id": "synthetic-tristate-feasibility-conditional-tc-v0",
+  "records": [
+    {
+      "record_id": "synthetic-record-001",
+      "material_id": "synthetic-material-a",
+      "family_id": "synthetic-family-a",
+      "source_id": "synthetic-source-a",
+      "publication_date": "2026-01-15",
+      "label_state": "observed_superconducting",
+      "condition_context": {
+        "pressure_gpa": 0,
+        "measurement_temperature_range_k": [1.8, 20],
+        "sample_form": "bulk_crystal",
+        "measurement_method": "transport+magnetization+specific_heat",
+        "transition_criterion": "bulk_thermodynamic",
+        "evidence_scope": "targeted_experiment",
+        "scope_description": "Synthetic fixture: multiple independent bulk-sensitive measurements on one specimen"
+      },
+      "observed_tc_k": 6.4
+    },
+    {
+      "record_id": "synthetic-record-002",
+      "material_id": "synthetic-material-b",
+      "family_id": "synthetic-family-a",
+      "source_id": "synthetic-source-b",
+      "publication_date": "2026-02-10",
+      "label_state": "observed_non_superconducting_under_conditions",
+      "condition_context": {
+        "pressure_gpa": 0,
+        "measurement_temperature_range_k": [1.8, 50],
+        "sample_form": "bulk_crystal",
+        "measurement_method": "transport+magnetization",
+        "transition_criterion": "none",
+        "evidence_scope": "targeted_experiment",
+        "scope_description": "Synthetic fixture: no transition detected within the stated temperature/pressure/sample scope"
+      },
+      "observed_tc_k": null
+    },
+    {
+      "record_id": "synthetic-record-003",
+      "material_id": "synthetic-material-c",
+      "family_id": "synthetic-family-b",
+      "source_id": "synthetic-source-c",
+      "publication_date": "2026-03-01",
+      "label_state": "unknown_or_not_reported",
+      "condition_context": {
+        "pressure_gpa": null,
+        "measurement_temperature_range_k": [0, 300],
+        "sample_form": "unknown",
+        "measurement_method": "not reported",
+        "transition_criterion": "unknown",
+        "evidence_scope": "unknown_or_not_reported",
+        "scope_description": "Synthetic fixture: database absence is not evidence of non-superconductivity"
+      },
+      "observed_tc_k": null
+    },
+    {
+      "record_id": "synthetic-record-004",
+      "material_id": "synthetic-material-d",
+      "family_id": "synthetic-family-c",
+      "source_id": "synthetic-source-d",
+      "publication_date": "2026-04-12",
+      "label_state": "observed_superconducting",
+      "condition_context": {
+        "pressure_gpa": 18,
+        "measurement_temperature_range_k": [2, 120],
+        "sample_form": "bulk_crystal",
+        "measurement_method": "transport+diamagnetism+specific_heat",
+        "transition_criterion": "bulk_thermodynamic",
+        "evidence_scope": "targeted_experiment",
+        "scope_description": "Synthetic fixture: pressure-tagged bulk transition; operating pressure remains part of the material state"
+      },
+      "observed_tc_k": 21
+    },
+    {
+      "record_id": "synthetic-record-005",
+      "material_id": "synthetic-material-e",
+      "family_id": "synthetic-family-c",
+      "source_id": "synthetic-source-e",
+      "publication_date": "2026-05-05",
+      "label_state": "observed_non_superconducting_under_conditions",
+      "condition_context": {
+        "pressure_gpa": 0,
+        "measurement_temperature_range_k": [1.6, 100],
+        "sample_form": "thin_film",
+        "measurement_method": "transport+magnetization",
+        "transition_criterion": "none",
+        "evidence_scope": "targeted_literature_review",
+        "scope_description": "Synthetic fixture: condition-specific targeted review with a stated detection range"
+      },
+      "observed_tc_k": null
+    },
+    {
+      "record_id": "synthetic-record-006",
+      "material_id": "synthetic-material-f",
+      "family_id": "synthetic-family-d",
+      "source_id": "synthetic-source-f",
+      "publication_date": "2026-06-20",
+      "label_state": "unknown_or_not_reported",
+      "condition_context": {
+        "pressure_gpa": null,
+        "measurement_temperature_range_k": [0, 300],
+        "sample_form": "unknown",
+        "measurement_method": "not reported",
+        "transition_criterion": "unknown",
+        "evidence_scope": "unknown_or_not_reported",
+        "scope_description": "Synthetic fixture: no condition-qualified observation is available"
+      },
+      "observed_tc_k": null
+    }
+  ],
+  "predictions": [
+    {
+      "record_id": "synthetic-record-001",
+      "feasibility_abstained": false,
+      "p_superconducting": 0.82,
+      "conditional_tc_pred_k": 6.1,
+      "tc_lower_k": 5.8,
+      "tc_upper_k": 6.5
+    },
+    {
+      "record_id": "synthetic-record-002",
+      "feasibility_abstained": false,
+      "p_superconducting": 0.18,
+      "conditional_tc_pred_k": null,
+      "tc_lower_k": null,
+      "tc_upper_k": null
+    },
+    {
+      "record_id": "synthetic-record-003",
+      "feasibility_abstained": true,
+      "p_superconducting": null,
+      "conditional_tc_pred_k": null,
+      "tc_lower_k": null,
+      "tc_upper_k": null
+    },
+    {
+      "record_id": "synthetic-record-004",
+      "feasibility_abstained": false,
+      "p_superconducting": 0.74,
+      "conditional_tc_pred_k": 20.3,
+      "tc_lower_k": 18.5,
+      "tc_upper_k": 22.2
+    },
+    {
+      "record_id": "synthetic-record-005",
+      "feasibility_abstained": false,
+      "p_superconducting": 0.22,
+      "conditional_tc_pred_k": null,
+      "tc_lower_k": null,
+      "tc_upper_k": null
+    },
+    {
+      "record_id": "synthetic-record-006",
+      "feasibility_abstained": true,
+      "p_superconducting": null,
+      "conditional_tc_pred_k": null,
+      "tc_lower_k": null,
+      "tc_upper_k": null
+    }
+  ],
+  "claim_ceiling": "Synthetic feasibility-gate contract only; no external data, superconducting material, Tc, or model performance is established."
+}
