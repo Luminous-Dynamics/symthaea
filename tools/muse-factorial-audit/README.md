@@ -96,3 +96,13 @@ not-applicable 81-row block is an explicit disposition, not a failed run.
 The fourth output compares exact score digests across all 27 matched slices for
 each of the four control axes. It checks declared unsupported axes as exact
 negative controls and distinguishes flat supported axes from measured response.
+
+## Composer execution adapter
+
+The source-pinned symbolic composer example validates the complete frozen case
+manifest, composes the exact 3^4 matrix, hashes each serialized score, emits 54
+scalar/identity channels, and computes eleven structural-layer distances from
+each style/seed centre-case reference. See [COMPOSER_ADAPTER.md](COMPOSER_ADAPTER.md)
+for commands and evidence limits. The adapter cannot compile through Cargo until
+the root workspace missing-manifest exclusions in PR #12843 are repaired. No
+composer execution result is claimed.
