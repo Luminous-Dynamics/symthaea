@@ -17,26 +17,55 @@
     "solver": "energy-conserving semi-implicit PIC (ECsim)",
     "run_A": {
       "role": "high_particle_count_test",
-      "grid": [2048, 2048],
+      "grid": [
+        2048,
+        2048
+      ],
       "particles_per_cell": 5000
     },
     "runs_B": {
-      "grid_before_downsample": [2048, 2048],
-      "grid_after_downsample": [512, 512],
+      "grid_before_downsample": [
+        2048,
+        2048
+      ],
+      "grid_after_downsample": [
+        512,
+        512
+      ],
       "particles_per_cell": 256,
       "filter": "4x4 boxcar"
     },
     "source_split": {
-      "train": ["B3", "B4", "B5", "B6"],
-      "validation": ["B2"],
-      "test": ["B1"],
-      "high_fidelity_test": ["A"]
+      "train": [
+        "B3",
+        "B4",
+        "B5",
+        "B6"
+      ],
+      "validation": [
+        "B2"
+      ],
+      "test": [
+        "B1"
+      ],
+      "high_fidelity_test": [
+        "A"
+      ]
     }
   },
   "reported_baseline_ranges": {
-    "fcnn_diagonal_pressure_r2_approx": [0.80, 0.82],
-    "fcnn_off_diagonal_pressure_r2_approx": [0.37, 0.41],
-    "fcnn_heat_flux_r2_approx": [0.20, 0.30],
+    "fcnn_diagonal_pressure_r2_approx": [
+      0.8,
+      0.82
+    ],
+    "fcnn_off_diagonal_pressure_r2_approx": [
+      0.37,
+      0.41
+    ],
+    "fcnn_heat_flux_r2_approx": [
+      0.2,
+      0.3
+    ],
     "status": "paper_reported_not_independently_reproduced"
   },
   "reproduction_blockers": [
@@ -52,10 +81,42 @@
     "license": "MIT",
     "license_evidence": "https://github.com/georgemilosh/closure/blob/826a6ef687a899f9c5aa4cf2436262862feae84c/LICENSE",
     "verified_feature_sets_in_harris_scripts": {
-      "default": ["rho_e","Bx","By","Bz","Vx_e","Vy_e","Vz_e","Ex","Ey","Ez"],
-      "noE": ["rho_e","Bx","By","Bz","Vx_e","Vy_e","Vz_e"],
-      "noJ": ["rho_e","Bx","By","Bz","Ex","Ey","Ez"],
-      "noJnoE": ["rho_e","Bx","By","Bz"]
+      "default": [
+        "rho_e",
+        "Bx",
+        "By",
+        "Bz",
+        "Vx_e",
+        "Vy_e",
+        "Vz_e",
+        "Ex",
+        "Ey",
+        "Ez"
+      ],
+      "noE": [
+        "rho_e",
+        "Bx",
+        "By",
+        "Bz",
+        "Vx_e",
+        "Vy_e",
+        "Vz_e"
+      ],
+      "noJ": [
+        "rho_e",
+        "Bx",
+        "By",
+        "Bz",
+        "Ex",
+        "Ey",
+        "Ez"
+      ],
+      "noJnoE": [
+        "rho_e",
+        "Bx",
+        "By",
+        "Bz"
+      ]
     },
     "configuration_caveat": "Harris Le2GEM15ppc scaffolding and Optuna files are not established as the exact magnetosheath paper configuration"
   },
@@ -72,6 +133,9 @@
   ],
   "required_metrics": [
     "componentwise_R2_MAE_RMSE_bias",
+    "solver_matched_discrete_divergence_of_pressure_tensor_componentwise_MAE_RMSE_relative_L2",
+    "pressure_force_error_under_solver_stencil_and_boundaries",
+    "global_pressure_divergence_flux_balance_residual",
     "off_diagonal_Pxy_Pxz_Pyz",
     "pressure_symmetry_residual",
     "pressure_psd_minimum_eigenvalue",
@@ -86,7 +150,7 @@
     "cost_per_stable_qualified_domain_time"
   ],
   "prospective_targets": {
-    "off_diagonal_component_r2_each": 0.60,
+    "off_diagonal_component_r2_each": 0.6,
     "must_preserve_source_diagonal_pressure_quality": true,
     "must_preserve_pressure_symmetry_and_psd": true,
     "status": "aspirational_not_passed"
@@ -96,5 +160,11 @@
     "paper_reproduction": "not_performed",
     "training": "not_performed",
     "physical_validation": "not_performed"
+  },
+  "operator_reference": {
+    "symtropy_issue": "https://github.com/Luminous-Dynamics/symtropy/issues/6274",
+    "symtropy_pr": "https://github.com/Luminous-Dynamics/symtropy/pull/6243",
+    "status": "synthetic_periodic_shared_face_reference_only_not_ecsim_equivalent",
+    "requirement": "future_ECsim_adapter_must_pin_actual_stencil_grid_staggering_halos_and_boundaries"
   }
 }
