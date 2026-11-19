@@ -173,12 +173,6 @@ fn is_hex_digest(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
-fn position_is_before(slot: &StageStamp, query: &QueryStamp) -> bool {
-    slot.step_index < query.step_index
-        || (slot.step_index == query.step_index
-            && slot.evaluation_order < query.evaluation_order)
-}
-
 fn validate_slot_shape(slot: &StageStamp, index: usize, issues: &mut Vec<BufferIssue>) {
     if !non_empty(&slot.sample_id) {
         push_unique(issues, BufferIssue::EmptySampleId(index));
@@ -541,7 +535,7 @@ mod tests {
     fn accepted_state_only_rejects_provisional_slots() {
         let report = validate_buffer(
             &query(2, "stage-2", RationalAbscissa::ONE),
-            &vec![accepted(6), provisional(7, 1, "stage-1", RationalAbscissa::ZERO)],
+            &[accepted(6), provisional(7, 1, "stage-1", RationalAbscissa::ZERO)],
             contract(BufferPolicy::AcceptedStateOnly),
         );
         assert_eq!(report.disposition, BufferDisposition::Invalid);
@@ -554,7 +548,7 @@ mod tests {
     fn stage_explicit_rejects_future_abscissa_without_tableau_dependency() {
         let report = validate_buffer(
             &query(3, "stage-3", RationalAbscissa { numerator: 1, denominator: 2 }),
-            &vec![provisional(7, 2, "stage-2", RationalAbscissa::ONE)],
+            &[provisional(7, 2, "stage-2", RationalAbscissa::ONE)],
             contract(BufferPolicy::StageExplicit),
         );
         assert_eq!(report.disposition, BufferDisposition::Invalid);
@@ -569,7 +563,7 @@ mod tests {
         q.allowed_prior_stage_ids = vec!["stage-2".into()];
         let report = validate_buffer(
             &q,
-            &vec![
+            &[
                 provisional(7, 1, "stage-1", RationalAbscissa::ZERO),
                 provisional(7, 2, "stage-2", RationalAbscissa::ONE),
             ],
@@ -583,7 +577,7 @@ mod tests {
     fn future_computation_order_is_rejected_even_when_abscissa_is_earlier() {
         let report = validate_buffer(
             &query(2, "stage-2", RationalAbscissa::ONE),
-            &vec![provisional(7, 3, "stage-3", RationalAbscissa::ZERO)],
+            &[provisional(7, 3, "stage-3", RationalAbscissa::ZERO)],
             contract(BufferPolicy::PaperExact),
         );
         assert_eq!(report.disposition, BufferDisposition::Invalid);
@@ -596,7 +590,7 @@ mod tests {
     fn future_step_is_rejected() {
         let report = validate_buffer(
             &query(1, "stage-1", RationalAbscissa::ZERO),
-            &vec![provisional(8, 1, "stage-1", RationalAbscissa::ZERO)],
+            &[provisional(8, 1, "stage-1", RationalAbscissa::ZERO)],
             contract(BufferPolicy::PaperExact),
         );
         assert_eq!(report.disposition, BufferDisposition::Invalid);
@@ -659,7 +653,7 @@ mod tests {
     fn unsorted_input_window_is_rejected_not_silently_reordered() {
         let report = validate_buffer(
             &query(3, "stage-3", RationalAbscissa { numerator: 1, denominator: 2 }),
-            &vec![
+            &[
                 provisional(7, 2, "stage-2", RationalAbscissa::ONE),
                 provisional(7, 1, "stage-1", RationalAbscissa::ZERO),
             ],
