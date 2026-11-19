@@ -63,20 +63,20 @@ jobs:
         run: cargo test -p symthaea-music-theory --example muse_factorial_adapter
 
       - name: Execute optional frozen composer sweep
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.cohort != 'none' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.cohort != 'none' }}
         shell: bash
         run: |
           set -euo pipefail
-          cohort="${{ inputs.cohort }}"
+          cohort="${{ github.event.inputs.cohort }}"
           cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin emit-cases -- "$cohort" > /tmp/muse-cases.csv
           cargo run -p symthaea-music-theory --example muse_factorial_adapter -- "$cohort" /tmp/muse-cases.csv /tmp/muse-observations.csv "$GITHUB_SHA"
           cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin analyze-results -- "$cohort" /tmp/muse-observations.csv "$MUSE_METRICS" /tmp/muse-coverage.csv /tmp/muse-effects.csv /tmp/muse-summary.csv /tmp/muse-axis-invariance.csv
 
       - name: Upload frozen sweep evidence
-        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.cohort != 'none' }}
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && github.event.inputs.cohort != 'none' }}
         uses: actions/upload-artifact@v4
         with:
-          name: muse-factorial-${{ inputs.cohort }}-${{ github.sha }}
+          name: muse-factorial-${{ github.event.inputs.cohort }}-${{ github.sha }}
           path: |
             /tmp/muse-cases.csv
             /tmp/muse-observations.csv
