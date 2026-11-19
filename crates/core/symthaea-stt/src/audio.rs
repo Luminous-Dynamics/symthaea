@@ -16,7 +16,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 /// Audio frontend configuration
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AudioConfig {
     /// Sample rate (Hz)
     pub sample_rate: u32,
@@ -399,6 +399,11 @@ impl AudioProjector {
     /// Create with default configuration
     pub fn default_config() -> Self {
         Self::new(AudioConfig::default(), LtcConfig::default())
+    }
+
+    /// Encoder configuration shared with offline training and streaming inference.
+    pub fn config(&self) -> &AudioConfig {
+        self.frontend.config()
     }
 
     /// Reset projector state
