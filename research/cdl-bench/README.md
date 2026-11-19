@@ -580,6 +580,20 @@ cargo run --release -- segment --values 4096 --workload stationary-random --seed
 
 Supported fixtures are `constant`, `stationary-random`, `stable-random` and `stable-random-stable`. The command prints the config, segment lengths, detected LZV boundaries and forced maximum-length boundaries. This measures segmentation only; it does not yet encode each selected segment or establish a compression gain.
 
+## Rabbit-derived branch-mapping diagnostic
+
+The isolated flag-mapping reference is in `research/cdl-bench/reference/rabbit_branch_mapper_reference.cpp` with runner `scripts/research/cdl_rabbit_branch_mapper_reference.sh`.
+
+This diagnostic models four abstract branch IDs and the paper-described prefix codes `0`, `10`, `110`, `111`, ranked using previous-block branch counts. It does not implement ACTF branch classification/payloads, XOR residual coding or TOE, and must not be called a full Rabbit reproduction. A guarded previous-block policy is included as an experimental CDL extension; it falls back to fixed two-bit flags when the predicted distribution is not sufficiently skewed or stable.
+
+Run from the repository root:
+
+```sh
+bash scripts/research/cdl_rabbit_branch_mapper_reference.sh
+```
+
+The C++ runner uses a default block size of 1,000 symbols (Rabbit's paper default), checks exact flag round-trips including 100 randomized streams, and reports flag-only bits against fixed two-bit flags and an offline same-block fixed-or-dynamic oracle. These are synthetic flag costs only, not end-to-end Rabbit/ACTF or CDL compression results. See the research note for the ablation numbers and limitations.
+
 ## Plugging in a custom predictor
 
 The library exposes:
