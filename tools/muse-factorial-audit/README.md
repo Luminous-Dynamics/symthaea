@@ -96,7 +96,7 @@ Missing, failed, and not-applicable values are never imputed as zero.
 
 The source-pinned symbolic composer adapter is now authored. It validates the
 complete frozen case manifest, invokes each style's canonical grammar-plan
-composition path, hashes each serialized score, and emits 18 symbolic metrics.
+composition path, hashes each serialized score, and emits 28 symbolic metrics.
 See [COMPOSER_ADAPTER.md](COMPOSER_ADAPTER.md) for the exact run commands,
 metric registry, evidence boundary, and workspace prerequisite.
 
