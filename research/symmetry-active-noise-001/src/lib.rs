@@ -13,6 +13,9 @@ use std::fmt;
 
 use symmetry_active_experiment_reference::ActiveExperimentProblemV1;
 
+/// Exact bounded-outcome adaptive minimax policies and replay verification.
+pub mod robust_planner;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NoiseProbeV1 {
     pub probe_id: String,
