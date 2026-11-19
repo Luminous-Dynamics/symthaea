@@ -27,7 +27,7 @@ use symthaea_music_theory::{
 const HEADER: &str =
     "case_id,cohort,style,seed,valence_code,arousal_code,energy_code,bars_code";
 
-const METRICS: [&str; 52] = [
+const METRICS: [&str; 54] = [
     "score_note_count",
     "score_total_beats",
     "score_total_seconds",
@@ -56,10 +56,12 @@ const METRICS: [&str; 52] = [
     "score_voice_role_entropy_bits",
     "score_duration_variety_count",
     "score_section_intensity_stddev",
-    "score_meter_beats",
+    "identity_score_meter_beats",
     "score_distinct_midi_pitches",
-    "score_key_tonic_pc",
-    "score_key_tonality_code",
+    "identity_score_key_tonic_pc",
+    "score_key_major_indicator",
+    "score_key_minor_indicator",
+    "score_key_modal_indicator",
     "score_emphasis_normal_count",
     "score_emphasis_climax_count",
     "score_emphasis_cadential_count",
@@ -78,8 +80,8 @@ const METRICS: [&str; 52] = [
     "score_fingerprint_chord_quality_distance",
     "score_fingerprint_cadence_distance",
     "score_fingerprint_motif_distance",
-    "score_exact_fingerprint_high32",
-    "score_exact_fingerprint_low32",
+    "identity_exact_fingerprint_high32",
+    "identity_exact_fingerprint_low32",
 ];
 
 const CONFIRMATION_STYLES: [&str; 6] = [
@@ -678,11 +680,9 @@ fn compose_case(
         Some(distinct.len() as f64)
     };
     let intensity_stddev = population_stddev(&intensities);
-    let tonality_code = match score.key.tonality {
-        Tonality::Major => 0.0,
-        Tonality::Minor => 1.0,
-        Tonality::Modal(_) => 2.0,
-    };
+    let is_major = matches!(score.key.tonality, Tonality::Major);
+    let is_minor = matches!(score.key.tonality, Tonality::Minor);
+    let is_modal = matches!(score.key.tonality, Tonality::Modal(_));
 
     let (plan_kind, plan_requested_bars, plan_realized_bars) = match &realization.plan {
         GrammarPlanEvidence::CallResponse(plan) => (
@@ -748,10 +748,12 @@ fn compose_case(
         ("score_voice_role_entropy_bits", role_entropy),
         ("score_duration_variety_count", duration_variety_count),
         ("score_section_intensity_stddev", intensity_stddev),
-        ("score_meter_beats", Some(f64::from(score.meter))),
+        ("identity_score_meter_beats", Some(f64::from(score.meter))),
         ("score_distinct_midi_pitches", Some(distinct_midi_pitches.len() as f64)),
-        ("score_key_tonic_pc", Some(f64::from(score.key.tonic.value()))),
-        ("score_key_tonality_code", Some(tonality_code)),
+        ("identity_score_key_tonic_pc", Some(f64::from(score.key.tonic.value()))),
+        ("score_key_major_indicator", Some(if is_major { 1.0 } else { 0.0 })),
+        ("score_key_minor_indicator", Some(if is_minor { 1.0 } else { 0.0 })),
+        ("score_key_modal_indicator", Some(if is_modal { 1.0 } else { 0.0 })),
         ("score_emphasis_normal_count", Some(emphasis_counts[0] as f64)),
         ("score_emphasis_climax_count", Some(emphasis_counts[1] as f64)),
         ("score_emphasis_cadential_count", Some(emphasis_counts[2] as f64)),
@@ -770,8 +772,8 @@ fn compose_case(
         ("score_fingerprint_chord_quality_distance", Some(layer_distances[8])),
         ("score_fingerprint_cadence_distance", Some(layer_distances[9])),
         ("score_fingerprint_motif_distance", Some(layer_distances[10])),
-        ("score_exact_fingerprint_high32", Some(exact_high)),
-        ("score_exact_fingerprint_low32", Some(exact_low)),
+        ("identity_exact_fingerprint_high32", Some(exact_high)),
+        ("identity_exact_fingerprint_low32", Some(exact_low)),
     ];
 
     let note = format!(
@@ -1163,7 +1165,7 @@ mod tests {
 
     #[test]
     fn metric_registry_is_unique_and_matches_the_contract() {
-        assert_eq!(METRICS.len(), 52);
+        assert_eq!(METRICS.len(), 54);
         let unique: HashSet<&str> = METRICS.iter().copied().collect();
         assert_eq!(unique.len(), METRICS.len());
     }
