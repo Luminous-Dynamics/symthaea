@@ -588,6 +588,119 @@ pub fn verify_midi_event_manifest(m: &MidiPerformanceManifestV1, bytes: &[u8]) -
     Ok(())
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MidiInstrumentBindingV1 {
+    instrument_id: String,
+    renderer_id: String,
+    patch_id: String,
+    gm_program: u8,
+    asset_sha256: Option<String>,
+}
+
+fn rational_beat_to_ticks(value: &Value) -> Result<u64, String> {
+    let numerator = value.get("numerator").and_then(Value::as_u64)
+        .ok_or("timeline beat numerator must be a non-negative integer")?;
+    let denominator = value.get("denominator").and_then(Value::as_u64)
+        .filter(|value| *value > 0)
+        .ok_or("timeline beat denominator must be a positive integer")?;
+    let scaled = u128::from(numerator) * u128::from(MIDI_TICKS_PER_QUARTER_V1);
+    if scaled % u128::from(denominator) != 0 {
+        return Err("timeline beat is not exactly representable at 960 PPQ".into());
+    }
+    u64::try_from(scaled / u128::from(denominator))
+        .map_err(|_| "timeline beat exceeds MIDI tick range".into())
+}
+
+fn verify_timeline_binding_bundle(
+    root: &Path,
+    receipt: &ReceiptV1,
+    manifest: &MidiPerformanceManifestV1,
+) -> Result<(), String> {
+    let timeline_bytes = read(&root.join("orchestration-timeline.json"), "orchestration timeline")?;
+    if domain_sha256(MIDI_TIMELINE_DIGEST_SCHEMA_V1.as_bytes(), &timeline_bytes) != receipt.midi.timeline_sha256 {
+        return Err("orchestration timeline digest mismatch".into());
+    }
+    let timeline: Value = serde_json::from_slice(&timeline_bytes)
+        .map_err(|e| format!("orchestration timeline JSON invalid: {e}"))?;
+    if string_field(&timeline, "schema", "timeline")? != "orchestration-timeline-v1"
+        || string_field(&timeline, "score_digest_schema", "timeline")? != MIDI_SCORE_DIGEST_SCHEMA_V1
+        || string_field(&timeline, "score_sha256", "timeline")? != receipt.source.candidate_score_sha256
+    {
+        return Err("orchestration timeline schema/source Score binding mismatch".into());
+    }
+    let segments = timeline.get("segments").and_then(Value::as_array)
+        .ok_or("timeline.segments must be an array")?;
+    if segments.len() != manifest.tracks.len() {
+        return Err("timeline segment count differs from MIDI track count".into());
+    }
+    let mut by_id = BTreeMap::new();
+    for segment in segments {
+        let id = string_field(segment, "id", "timeline segment")?.to_owned();
+        if by_id.insert(id, segment).is_some() {
+            return Err("timeline contains duplicate segment IDs".into());
+        }
+    }
+    for track in &manifest.tracks {
+        let segment = by_id.get(&track.segment_id)
+            .ok_or_else(|| format!("MIDI track references missing timeline segment {}", track.segment_id))?;
+        let part_id = segment.get("part_id").and_then(Value::as_u64)
+            .ok_or("timeline segment part_id must be an integer")?;
+        let instrument_id = string_field(segment, "instrument_id", "timeline segment")?;
+        let start = rational_beat_to_ticks(segment.get("start").ok_or("timeline segment start missing")?)?;
+        let end = rational_beat_to_ticks(segment.get("end").ok_or("timeline segment end missing")?)?;
+        if part_id != u64::from(track.part_id) || instrument_id != track.instrument_id
+            || start != track.segment_start_tick || end != track.segment_end_tick || start >= end
+        {
+            return Err(format!("timeline segment {} does not explain its MIDI track", track.segment_id));
+        }
+    }
+
+    let binding_bytes = read(&root.join("instrument-bindings.json"), "instrument bindings")?;
+    if domain_sha256(MIDI_BINDING_DIGEST_SCHEMA_V1.as_bytes(), &binding_bytes) != receipt.midi.binding_sha256 {
+        return Err("instrument-binding digest mismatch".into());
+    }
+    let bindings: Vec<MidiInstrumentBindingV1> = serde_json::from_slice(&binding_bytes)
+        .map_err(|e| format!("instrument bindings JSON invalid: {e}"))?;
+    if bindings.windows(2).any(|pair| pair[0].instrument_id >= pair[1].instrument_id) {
+        return Err("instrument bindings must be unique and sorted by instrument_id".into());
+    }
+    let binding_map: BTreeMap<&str, &MidiInstrumentBindingV1> =
+        bindings.iter().map(|binding| (binding.instrument_id.as_str(), binding)).collect();
+    for track in &manifest.tracks {
+        let binding = binding_map.get(track.instrument_id.as_str())
+            .ok_or_else(|| format!("missing binding for instrument {}", track.instrument_id))?;
+        if binding.renderer_id != track.renderer_id || binding.patch_id != track.patch_id
+            || binding.gm_program != track.gm_program
+            || binding.asset_sha256.as_deref().is_some_and(|hash| !valid_sha256(hash))
+        {
+            return Err(format!("instrument binding does not match MIDI track {}", track.track_index));
+        }
+    }
+
+    let capability_bytes = read(&root.join("instrument-capabilities.json"), "instrument capabilities")?;
+    if domain_sha256(MIDI_CAPABILITY_DIGEST_SCHEMA_V1.as_bytes(), &capability_bytes) != receipt.midi.capability_sha256 {
+        return Err("instrument-capability digest mismatch".into());
+    }
+    let capabilities: Value = serde_json::from_slice(&capability_bytes)
+        .map_err(|e| format!("instrument capabilities JSON invalid: {e}"))?;
+    let capability_array = capabilities.as_array()
+        .ok_or("instrument capabilities must be a JSON array")?;
+    let mut capability_ids = Vec::new();
+    for capability in capability_array {
+        capability_ids.push(string_field(capability, "id", "instrument capability")?.to_owned());
+    }
+    if capability_ids.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err("instrument capabilities must be unique and sorted by ID".into());
+    }
+    for track in &manifest.tracks {
+        if capability_ids.binary_search(&track.instrument_id).is_err() {
+            return Err(format!("missing capability profile for instrument {}", track.instrument_id));
+        }
+    }
+    Ok(())
+}
+
 fn verify_midi_bundle(root: &Path, r: &ReceiptV1) -> Result<(), String> {
     let bytes = read(&root.join("midi-manifest.json"), "MIDI manifest")?;
     let m: MidiPerformanceManifestV1 = serde_json::from_slice(&bytes)
@@ -601,6 +714,7 @@ fn verify_midi_bundle(root: &Path, r: &ReceiptV1) -> Result<(), String> {
         || m.capability_digest_schema != MIDI_CAPABILITY_DIGEST_SCHEMA_V1
         || m.ticks_per_quarter != MIDI_TICKS_PER_QUARTER_V1
     { return Err("unsupported MIDI manifest/digest recipe".into()); }
+    verify_timeline_binding_bundle(root, r, &m)?;
     let encoded = serde_json::to_vec(&m).map_err(|e| format!("manifest serialization failed: {e}"))?;
     if domain_sha256(MIDI_MANIFEST_DIGEST_SCHEMA_V1.as_bytes(), &encoded) != r.midi.manifest_sha256 {
         return Err("MIDI manifest digest mismatch".into());
