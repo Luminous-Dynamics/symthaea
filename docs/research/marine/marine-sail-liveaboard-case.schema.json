@@ -470,7 +470,11 @@
               "service_continuity",
               "habitat_metabolism",
               "hydrodynamic_validation",
-              "physical_campaign"
+              "physical_campaign",
+              "spatial_metocean_context",
+              "spatial_test_site_context",
+              "component_product_lifecycle",
+              "maritime_cross_stack_golden_trace"
             ]
           },
           "reference": {
