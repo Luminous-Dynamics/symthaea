@@ -290,4 +290,13 @@ fn atelier_production_rejects_unbounded_or_unregistered_requests() {
         ..CognitiveSnapshot::dormant()
     };
     assert!(generate_atelier_production(&request, &oversized_snapshot).is_err());
+
+    // Canvas currently clamps cantor_last_depth without recording it in
+    // SnapshotSanitization.changed(); the adapter's full-value comparison
+    // must still reject the hidden normalization.
+    let silently_clamped_snapshot = CognitiveSnapshot {
+        cantor_last_depth: 9,
+        ..CognitiveSnapshot::dormant()
+    };
+    assert!(generate_atelier_production(&request, &silently_clamped_snapshot).is_err());
 }
