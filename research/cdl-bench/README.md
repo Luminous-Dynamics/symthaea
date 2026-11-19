@@ -43,7 +43,7 @@ does not perform floating-point subtraction or normalization. Tests compare
 `to_bits()` for each sample, including NaN payloads, infinities, signed zero
 and subnormals.
 
-The command also emits two segmented rows at chunk sizes 64, 256 and 1,024:
+The command also emits three segmented-policy families at chunk sizes 64, 256 and 1,024:
 
 - `segment_portfolio` is an **offline best-of-eight size oracle**. For each
   complete chunk, the encoder tries Raw/Order0, Raw/Order1, XOR-varint/Order0,
