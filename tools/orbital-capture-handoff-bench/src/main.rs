@@ -6,14 +6,17 @@ use std::process::ExitCode;
 
 fn run() -> Result<(), String> {
     let mut args = env::args().skip(1);
-    let fixture_path = args
-        .next()
-        .ok_or_else(|| "usage: orbital-capture-handoff-bench <fixture.json> --source-commit <40-hex-sha>".to_owned())?;
+    let fixture_path = args.next().ok_or_else(|| {
+        "usage: orbital-capture-handoff-bench <fixture.json> --source-commit <40-hex-sha>"
+            .to_owned()
+    })?;
     let flag = args.next().ok_or_else(|| "missing --source-commit".to_owned())?;
     if flag != "--source-commit" {
         return Err("expected --source-commit".to_owned());
     }
-    let source_commit = args.next().ok_or_else(|| "missing source commit value".to_owned())?;
+    let source_commit = args
+        .next()
+        .ok_or_else(|| "missing source commit value".to_owned())?;
     if args.next().is_some() {
         return Err("unexpected trailing arguments".to_owned());
     }
@@ -31,7 +34,7 @@ fn run() -> Result<(), String> {
         "validator_version": env!("CARGO_PKG_VERSION"),
         "source_commit": source_commit,
         "fixture_sha256": sha256_hex(&bytes),
-        "result": report.result,
+        "result": report.result.clone(),
         "report": report
     });
     println!(
