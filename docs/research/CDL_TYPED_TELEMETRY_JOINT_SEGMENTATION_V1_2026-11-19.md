@@ -212,18 +212,18 @@ The prototype builds a stable dictionary of (entity_id, series_id) keys and enco
 It now supports three decoder-synchronous order modes:
 
 1. **Timestamp merge (mode 0):** when the original global stream has strictly increasing, unique timestamps, the decoder reconstructs original interleaving with a deterministic k-way min-heap merge of the per-series streams. No order schedule is transmitted. The decoder verifies strict monotonicity in every child and across merged output.
-2. **Tie-template schedule (mode 1):** when timestamps are nondecreasing but duplicated, the decoder identifies each equal-timestamp group from the child streams. The schedule contains only the tie-group key order. A bounded 16-entry move-to-front dictionary reuses recurring tie-order templates; a literal template is emitted when no cached order matches. Single-record timestamp groups require no schedule entries.
+2. **Tie-template schedule (mode 1):** when timestamps are nondecreasing but duplicated, the decoder identifies each equal-timestamp group from the child streams. The schedule contains only the tie-group key order. A bounded 16-entry move-to-front dictionary reuses recurring key-order templates; a literal template is emitted on a miss. Single-record timestamp groups require no schedule entries.
 3. **Full schedule (mode 2):** when timestamps regress, the frame carries the original bit-packed key-ID schedule for every record. The decoder replays it to restore exact arrival order.
 
-This is not a lossy reorder: each mode is selected only when its conditions are satisfied, and both duplicate-time and regression cases preserve the original sequence exactly. Tie templates are checked against the number of pending records per key at each timestamp; malformed templates that would consume the wrong per-key multiplicity are rejected.
+This is not a lossy reorder: each mode is selected only when its conditions are satisfied, and duplicate-time and regression cases preserve the original sequence. Tie templates are verified against actual per-key pending-record counts for each timestamp; malformed templates that would consume the wrong multiplicity are rejected.
 
-A separate primitive reference and runner validate the tie-template grammar:
+A separate schedule-primitive reference and runner validate the move-to-front grammar:
 - `research/cdl-bench/reference/tie_group_order_template_reference.cpp`
 - `scripts/research/cdl_tie_group_order_template_reference.sh`
 
-The primitive reference compiled locally with GCC 14.2 and strict warnings (`-O2 -std=c++20 -Wall -Wextra -Wconversion -Werror`). It passed 1,000 randomized exact tie-group schedule round-trips and five malformed-input checks. For 64 repeated groups of eight keys, the template schedule used 67 bytes versus 192 bytes for fixed-width per-event IDs (65.10% reduction). For 20 alternating groups across 16 keys, the 16-entry move-to-front dictionary used 36 bytes versus 160 bytes of fixed-width IDs (77.50% reduction).
+The primitive reference compiled locally with GCC 14.2 and strict warnings (`-O2 -std=c++20 -Wall -Wextra -Wconversion -Werror`). It passed 1,000 randomized exact tie-group schedule round-trips and five malformed-input checks. For 64 repeated groups of eight keys, the template schedule used 67 bytes versus 192 bytes for fixed-width per-event IDs (65.10% reduction). For 20 alternating groups across 16 keys, the 16-entry dictionary used 36 bytes versus 160 bytes for fixed-width IDs (77.50% reduction).
 
-**Evidence boundary:** the primitive reference tests only the tie-schedule subgrammar. The latest mode-1/mode-2 integration into `typed_record_partitioned_runs_reference.cpp` is authored and checked in, but this newest integrated C++ frame revision has not yet been compiled locally. The previous timestamp-merge/mode-2 implementation was strictly compiled and tested; do not transfer that pass claim to the latest tie-template integration.
+**Evidence boundary:** the primitive reference tests only the tie-schedule subgrammar. The latest mode-1/mode-2 integration into `typed_record_partitioned_runs_reference.cpp` is authored and checked in, but this newest integrated C++ frame revision has not yet been compiled locally. The previous timestamp-merge/full-schedule revision was strictly compiled and tested; do not transfer that pass claim to the latest tie-template integration.
 
 The raw and global state-delta controls use matching self-describing outer frames (magic, record count, payload length, schema and CRC32), so the Zstandard comparisons charge the basic framing on all arms.
 
