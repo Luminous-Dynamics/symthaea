@@ -68,6 +68,10 @@ metric is not a successful zero response. Duplicate case/metric rows, unexpected
 case IDs, undeclared metrics, malformed digests, non-finite values, and malformed
 CSV reject the input.
 
+The coverage report's analysis_mode is identity_only for identity-prefixed metrics,
+effect_estimated for complete scalar blocks, and not_estimated when a scalar
+block is not fully observed (including a uniformly not_applicable block).
+
 The report contains descriptive orthogonal coefficients and seed dispersion. It
 does not produce p-values, confidence intervals, musical-quality judgments,
 listener preference, or a causal claim beyond the registered deterministic
@@ -83,7 +87,8 @@ observed rows to receive a complete coverage disposition. They produce no rows
 in `effects.csv` or `summary.csv`. Use this mode for exact fingerprints,
 category identifiers, or other values whose numeric encoding is not a
 meaningful interval scale. The coverage report records `analysis_mode=identity_only`;
-ordinary scalar channels use `effect_estimated`.
+complete scalar channels use `effect_estimated`; scalar blocks that are not
+eligible for contrasts use `not_estimated`.
 
 Examples from the composer adapter are:
 - `identity_score_meter_beats`
