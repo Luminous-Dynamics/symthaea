@@ -387,9 +387,702 @@ fn normal_quantile(probability: f64) -> f64 {
         / ((((D[0] * q + D[1]) * q + D[2]) * q + D[3]) * q + 1.0)
 }
 
+/// Errors for sequential likelihood-ratio evidence updates.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SequentialError {
+    EmptyIdentifier,
+    InvalidAlpha,
+    InvalidSigma,
+    NonFiniteDiscrepancy,
+    NonFiniteObservation,
+    PredictionAlreadyPending,
+    NoPredictionPending,
+    ObservationIdentityMismatch,
+    DuplicateObservationId,
+    NumericalOverflow,
+    EmptyMixture,
+    DuplicateAlternativeId(String),
+    InvalidMixtureWeight(String),
+    MixtureWeightsNotNormalizable,
+    MixturePredictionCountMismatch,
+    MissingMixturePrediction(String),
+    DuplicateMixturePrediction(String),
+}
+
+impl fmt::Display for SequentialError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl Error for SequentialError {}
+
+#[derive(Debug, Clone, PartialEq)]
+struct PendingGaussianPrediction {
+    observation_id: String,
+    decision_digest: String,
+    expected_discrepancy: f64,
+    sigma: f64,
+}
+
+/// One sequential update. The running maximum, not the current e-value,
+/// determines the anytime p-value and is never reset by adverse evidence.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SequentialUpdate {
+    pub observations: u64,
+    pub log_e_value: f64,
+    pub running_max_log_e_value: f64,
+    pub anytime_p_value: f64,
+    pub crossed_alpha: bool,
+}
+
+/// Predict-before-observe Gaussian likelihood-ratio e-process for one
+/// evaluator-declared alternative to a simple conditional Gaussian null.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PredictableGaussianEProcess {
+    alternative_id: String,
+    alpha: f64,
+    pending: Option<PendingGaussianPrediction>,
+    consumed_observation_ids: BTreeSet<String>,
+    observations: u64,
+    log_e_value: f64,
+    running_max_log_e_value: f64,
+}
+
+impl PredictableGaussianEProcess {
+    pub fn new(alternative_id: impl Into<String>, alpha: f64) -> Result<Self, SequentialError> {
+        let alternative_id = alternative_id.into();
+        validate_sequential_identifier(&alternative_id)?;
+        validate_sequential_alpha(alpha)?;
+        Ok(Self {
+            alternative_id,
+            alpha,
+            pending: None,
+            consumed_observation_ids: BTreeSet::new(),
+            observations: 0,
+            log_e_value: 0.0,
+            running_max_log_e_value: 0.0,
+        })
+    }
+
+    pub fn alternative_id(&self) -> &str {
+        &self.alternative_id
+    }
+
+    pub fn observations(&self) -> u64 {
+        self.observations
+    }
+
+    pub fn log_e_value(&self) -> f64 {
+        self.log_e_value
+    }
+
+    pub fn running_max_log_e_value(&self) -> f64 {
+        self.running_max_log_e_value
+    }
+
+    pub fn commit_prediction(
+        &mut self,
+        observation_id: impl Into<String>,
+        decision_digest: impl Into<String>,
+        expected_discrepancy: f64,
+        sigma: f64,
+    ) -> Result<(), SequentialError> {
+        if self.pending.is_some() {
+            return Err(SequentialError::PredictionAlreadyPending);
+        }
+        let observation_id = observation_id.into();
+        let decision_digest = decision_digest.into();
+        validate_sequential_identifier(&observation_id)?;
+        validate_sequential_identifier(&decision_digest)?;
+        if self.consumed_observation_ids.contains(&observation_id) {
+            return Err(SequentialError::DuplicateObservationId);
+        }
+        if !expected_discrepancy.is_finite() {
+            return Err(SequentialError::NonFiniteDiscrepancy);
+        }
+        validate_sequential_sigma(sigma)?;
+
+        self.pending = Some(PendingGaussianPrediction {
+            observation_id,
+            decision_digest,
+            expected_discrepancy,
+            sigma,
+        });
+        Ok(())
+    }
+
+    pub fn observe(
+        &mut self,
+        observation_id: &str,
+        decision_digest: &str,
+        observed_residual: f64,
+    ) -> Result<SequentialUpdate, SequentialError> {
+        let pending = self
+            .pending
+            .as_ref()
+            .ok_or(SequentialError::NoPredictionPending)?;
+        if pending.observation_id != observation_id || pending.decision_digest != decision_digest {
+            return Err(SequentialError::ObservationIdentityMismatch);
+        }
+        if !observed_residual.is_finite() {
+            return Err(SequentialError::NonFiniteObservation);
+        }
+        if self.consumed_observation_ids.contains(observation_id) {
+            return Err(SequentialError::DuplicateObservationId);
+        }
+
+        let increment = gaussian_log_likelihood_ratio(
+            pending.expected_discrepancy,
+            observed_residual,
+            pending.sigma,
+        )?;
+        let next_log_e_value = self.log_e_value + increment;
+        if !next_log_e_value.is_finite() {
+            return Err(SequentialError::NumericalOverflow);
+        }
+        let next_running_max = self.running_max_log_e_value.max(next_log_e_value);
+        let next_observations = self
+            .observations
+            .checked_add(1)
+            .ok_or(SequentialError::NumericalOverflow)?;
+
+        self.log_e_value = next_log_e_value;
+        self.running_max_log_e_value = next_running_max;
+        self.observations = next_observations;
+        self.consumed_observation_ids.insert(observation_id.to_owned());
+        self.pending = None;
+
+        Ok(self.snapshot())
+    }
+
+    pub fn snapshot(&self) -> SequentialUpdate {
+        SequentialUpdate {
+            observations: self.observations,
+            log_e_value: self.log_e_value,
+            running_max_log_e_value: self.running_max_log_e_value,
+            anytime_p_value: anytime_p_value(self.running_max_log_e_value),
+            crossed_alpha: self.running_max_log_e_value >= -self.alpha.ln(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MixtureAlternative {
+    pub id: String,
+    pub weight: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MixtureDiscrepancy {
+    pub alternative_id: String,
+    pub expected_discrepancy: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct PendingMixturePrediction {
+    observation_id: String,
+    decision_digest: String,
+    sigma: f64,
+    expected_discrepancies: Vec<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MixtureSequentialUpdate {
+    pub observations: u64,
+    pub component_log_e_values: Vec<(String, f64)>,
+    pub log_e_value: f64,
+    pub running_max_log_e_value: f64,
+    pub anytime_p_value: f64,
+    pub crossed_alpha: bool,
+}
+
+/// Fixed, predeclared mixture over alternatives. Weights are normalized once
+/// at construction and cannot be changed after outcomes become observable.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PredictableGaussianMixture {
+    alternatives: Vec<MixtureAlternative>,
+    alpha: f64,
+    pending: Option<PendingMixturePrediction>,
+    consumed_observation_ids: BTreeSet<String>,
+    observations: u64,
+    component_log_e_values: Vec<f64>,
+    log_e_value: f64,
+    running_max_log_e_value: f64,
+}
+
+impl PredictableGaussianMixture {
+    pub fn new(
+        alternatives: Vec<MixtureAlternative>,
+        alpha: f64,
+    ) -> Result<Self, SequentialError> {
+        validate_sequential_alpha(alpha)?;
+        if alternatives.is_empty() {
+            return Err(SequentialError::EmptyMixture);
+        }
+
+        let mut seen = BTreeSet::new();
+        let mut total_weight = 0.0_f64;
+        for alternative in &alternatives {
+            validate_sequential_identifier(&alternative.id)?;
+            if !seen.insert(alternative.id.clone()) {
+                return Err(SequentialError::DuplicateAlternativeId(
+                    alternative.id.clone(),
+                ));
+            }
+            if !alternative.weight.is_finite() || alternative.weight <= 0.0 {
+                return Err(SequentialError::InvalidMixtureWeight(
+                    alternative.id.clone(),
+                ));
+            }
+            total_weight += alternative.weight;
+            if !total_weight.is_finite() {
+                return Err(SequentialError::MixtureWeightsNotNormalizable);
+            }
+        }
+        if total_weight <= 0.0 {
+            return Err(SequentialError::MixtureWeightsNotNormalizable);
+        }
+
+        let mut normalized = alternatives
+            .into_iter()
+            .map(|alternative| MixtureAlternative {
+                id: alternative.id,
+                weight: alternative.weight / total_weight,
+            })
+            .collect::<Vec<_>>();
+        normalized.sort_by(|left, right| left.id.cmp(&right.id));
+
+        // Make the stored binary64 weights sum to one in the same order used
+        // by the audit API. The final weight absorbs normalization round-off.
+        if normalized.len() > 1 {
+            let prefix_sum = normalized[..normalized.len() - 1]
+                .iter()
+                .map(|alternative| alternative.weight)
+                .sum::<f64>();
+            let last = normalized.last_mut().expect("non-empty mixture");
+            last.weight = 1.0 - prefix_sum;
+            if !last.weight.is_finite() || last.weight <= 0.0 {
+                return Err(SequentialError::MixtureWeightsNotNormalizable);
+            }
+        } else {
+            normalized[0].weight = 1.0;
+        }
+
+        let component_count = normalized.len();
+        Ok(Self {
+            alternatives: normalized,
+            alpha,
+            pending: None,
+            consumed_observation_ids: BTreeSet::new(),
+            observations: 0,
+            component_log_e_values: vec![0.0; component_count],
+            log_e_value: 0.0,
+            running_max_log_e_value: 0.0,
+        })
+    }
+
+    pub fn alternatives(&self) -> &[MixtureAlternative] {
+        &self.alternatives
+    }
+
+    pub fn observations(&self) -> u64 {
+        self.observations
+    }
+
+    pub fn commit_prediction(
+        &mut self,
+        observation_id: impl Into<String>,
+        decision_digest: impl Into<String>,
+        sigma: f64,
+        predictions: &[MixtureDiscrepancy],
+    ) -> Result<(), SequentialError> {
+        if self.pending.is_some() {
+            return Err(SequentialError::PredictionAlreadyPending);
+        }
+        let observation_id = observation_id.into();
+        let decision_digest = decision_digest.into();
+        validate_sequential_identifier(&observation_id)?;
+        validate_sequential_identifier(&decision_digest)?;
+        if self.consumed_observation_ids.contains(&observation_id) {
+            return Err(SequentialError::DuplicateObservationId);
+        }
+        validate_sequential_sigma(sigma)?;
+        if predictions.len() != self.alternatives.len() {
+            return Err(SequentialError::MixturePredictionCountMismatch);
+        }
+
+        let mut by_id = std::collections::BTreeMap::new();
+        for prediction in predictions {
+            validate_sequential_identifier(&prediction.alternative_id)?;
+            if !prediction.expected_discrepancy.is_finite() {
+                return Err(SequentialError::NonFiniteDiscrepancy);
+            }
+            if by_id
+                .insert(
+                    prediction.alternative_id.clone(),
+                    prediction.expected_discrepancy,
+                )
+                .is_some()
+            {
+                return Err(SequentialError::DuplicateMixturePrediction(
+                    prediction.alternative_id.clone(),
+                ));
+            }
+        }
+        let mut expected_discrepancies = Vec::with_capacity(self.alternatives.len());
+        for alternative in &self.alternatives {
+            let discrepancy = by_id
+                .remove(&alternative.id)
+                .ok_or_else(|| {
+                    SequentialError::MissingMixturePrediction(alternative.id.clone())
+                })?;
+            expected_discrepancies.push(discrepancy);
+        }
+        if !by_id.is_empty() {
+            return Err(SequentialError::MixturePredictionCountMismatch);
+        }
+
+        self.pending = Some(PendingMixturePrediction {
+            observation_id,
+            decision_digest,
+            sigma,
+            expected_discrepancies,
+        });
+        Ok(())
+    }
+
+    pub fn observe(
+        &mut self,
+        observation_id: &str,
+        decision_digest: &str,
+        observed_residual: f64,
+    ) -> Result<MixtureSequentialUpdate, SequentialError> {
+        let pending = self
+            .pending
+            .as_ref()
+            .ok_or(SequentialError::NoPredictionPending)?;
+        if pending.observation_id != observation_id || pending.decision_digest != decision_digest {
+            return Err(SequentialError::ObservationIdentityMismatch);
+        }
+        if !observed_residual.is_finite() {
+            return Err(SequentialError::NonFiniteObservation);
+        }
+        if self.consumed_observation_ids.contains(observation_id) {
+            return Err(SequentialError::DuplicateObservationId);
+        }
+
+        let mut next_components = Vec::with_capacity(self.alternatives.len());
+        for (index, alternative) in self.alternatives.iter().enumerate() {
+            let increment = gaussian_log_likelihood_ratio(
+                pending.expected_discrepancies[index],
+                observed_residual,
+                pending.sigma,
+            )?;
+            let next = self.component_log_e_values[index] + increment;
+            if !next.is_finite() {
+                return Err(SequentialError::NumericalOverflow);
+            }
+            next_components.push(next);
+            let _ = alternative;
+        }
+
+        let next_mixture_log_e = mixture_log_e_value(&self.alternatives, &next_components)?;
+        let next_running_max = self.running_max_log_e_value.max(next_mixture_log_e);
+        let next_observations = self
+            .observations
+            .checked_add(1)
+            .ok_or(SequentialError::NumericalOverflow)?;
+
+        self.component_log_e_values = next_components;
+        self.log_e_value = next_mixture_log_e;
+        self.running_max_log_e_value = next_running_max;
+        self.observations = next_observations;
+        self.consumed_observation_ids.insert(observation_id.to_owned());
+        self.pending = None;
+
+        Ok(self.snapshot())
+    }
+
+    pub fn snapshot(&self) -> MixtureSequentialUpdate {
+        MixtureSequentialUpdate {
+            observations: self.observations,
+            component_log_e_values: self
+                .alternatives
+                .iter()
+                .zip(self.component_log_e_values.iter())
+                .map(|(alternative, log_e)| (alternative.id.clone(), *log_e))
+                .collect(),
+            log_e_value: self.log_e_value,
+            running_max_log_e_value: self.running_max_log_e_value,
+            anytime_p_value: anytime_p_value(self.running_max_log_e_value),
+            crossed_alpha: self.running_max_log_e_value >= -self.alpha.ln(),
+        }
+    }
+}
+
+fn validate_sequential_identifier(value: &str) -> Result<(), SequentialError> {
+    if value.trim().is_empty() {
+        Err(SequentialError::EmptyIdentifier)
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_sequential_alpha(alpha: f64) -> Result<(), SequentialError> {
+    if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
+        Err(SequentialError::InvalidAlpha)
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_sequential_sigma(sigma: f64) -> Result<(), SequentialError> {
+    if !sigma.is_finite() || sigma <= 0.0 {
+        Err(SequentialError::InvalidSigma)
+    } else {
+        Ok(())
+    }
+}
+
+fn gaussian_log_likelihood_ratio(
+    expected_discrepancy: f64,
+    observed_residual: f64,
+    sigma: f64,
+) -> Result<f64, SequentialError> {
+    let variance = sigma * sigma;
+    let product = expected_discrepancy * observed_residual;
+    let squared_discrepancy = expected_discrepancy * expected_discrepancy;
+    if !variance.is_finite()
+        || variance <= 0.0
+        || !product.is_finite()
+        || !squared_discrepancy.is_finite()
+    {
+        return Err(SequentialError::NumericalOverflow);
+    }
+    let increment = product / variance - squared_discrepancy / (2.0 * variance);
+    if !increment.is_finite() {
+        return Err(SequentialError::NumericalOverflow);
+    }
+    Ok(increment)
+}
+
+fn mixture_log_e_value(
+    alternatives: &[MixtureAlternative],
+    component_log_e_values: &[f64],
+) -> Result<f64, SequentialError> {
+    if alternatives.len() != component_log_e_values.len() || alternatives.is_empty() {
+        return Err(SequentialError::MixturePredictionCountMismatch);
+    }
+    let terms = alternatives
+        .iter()
+        .zip(component_log_e_values.iter())
+        .map(|(alternative, component)| alternative.weight.ln() + component)
+        .collect::<Vec<_>>();
+    let maximum = terms
+        .iter()
+        .copied()
+        .fold(f64::NEG_INFINITY, f64::max);
+    if !maximum.is_finite() {
+        return Err(SequentialError::NumericalOverflow);
+    }
+    let scaled_sum = terms
+        .iter()
+        .map(|term| (*term - maximum).exp())
+        .sum::<f64>();
+    let value = maximum + scaled_sum.ln();
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(SequentialError::NumericalOverflow)
+    }
+}
+
+fn anytime_p_value(running_max_log_e_value: f64) -> f64 {
+    if running_max_log_e_value <= 0.0 {
+        return 1.0;
+    }
+    (-running_max_log_e_value)
+        .exp()
+        .max(f64::MIN_POSITIVE)
+        .min(1.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sequential_gaussian_log_likelihood_ratio_matches_known_answer() {
+        let mut process = PredictableGaussianEProcess::new("reflection-break-a", 0.05).unwrap();
+        process
+            .commit_prediction("obs-1", "decision-1", 2.0, 2.0)
+            .unwrap();
+        let update = process.observe("obs-1", "decision-1", 1.5).unwrap();
+        assert!((update.log_e_value - 0.25).abs() < 1.0e-12);
+        assert_eq!(update.running_max_log_e_value, 0.25);
+        assert!(!update.crossed_alpha);
+    }
+
+    #[test]
+    fn sequential_process_requires_predict_before_matching_observation() {
+        let mut process = PredictableGaussianEProcess::new("rotation-break", 0.05).unwrap();
+        assert_eq!(
+            process.observe("obs-1", "decision-1", 0.2),
+            Err(SequentialError::NoPredictionPending)
+        );
+        process
+            .commit_prediction("obs-1", "decision-1", 0.3, 0.1)
+            .unwrap();
+        assert_eq!(
+            process.observe("wrong-obs", "decision-1", 0.2),
+            Err(SequentialError::ObservationIdentityMismatch)
+        );
+        assert_eq!(process.observations(), 0);
+        assert_eq!(process.log_e_value(), 0.0);
+        assert!(process.pending.is_some());
+    }
+
+    #[test]
+    fn running_maximum_preserves_earlier_boundary_crossing() {
+        let mut process = PredictableGaussianEProcess::new("mirror-break", 0.05).unwrap();
+        process
+            .commit_prediction("obs-1", "decision-1", 1.0, 1.0)
+            .unwrap();
+        let first = process.observe("obs-1", "decision-1", 8.0).unwrap();
+        assert!(first.crossed_alpha);
+        let max_before = first.running_max_log_e_value;
+
+        process
+            .commit_prediction("obs-2", "decision-2", 1.0, 1.0)
+            .unwrap();
+        let second = process.observe("obs-2", "decision-2", -8.0).unwrap();
+        assert!(second.log_e_value < first.log_e_value);
+        assert_eq!(second.running_max_log_e_value, max_before);
+        assert_eq!(second.anytime_p_value, first.anytime_p_value);
+        assert!(second.crossed_alpha);
+    }
+
+    #[test]
+    fn invalid_sequential_update_does_not_consume_pending_prediction() {
+        let mut process = PredictableGaussianEProcess::new("translation-break", 0.05).unwrap();
+        process
+            .commit_prediction("obs-1", "decision-1", f64::MAX, f64::MIN_POSITIVE)
+            .unwrap();
+        assert_eq!(
+            process.observe("obs-1", "decision-1", f64::MAX),
+            Err(SequentialError::NumericalOverflow)
+        );
+        assert_eq!(process.observations(), 0);
+        assert!(process.pending.is_some());
+        assert!(process.consumed_observation_ids.is_empty());
+    }
+
+    #[test]
+    fn sequential_process_rejects_duplicate_observation_ids() {
+        let mut process = PredictableGaussianEProcess::new("glide-break", 0.05).unwrap();
+        process
+            .commit_prediction("obs-1", "decision-1", 0.1, 1.0)
+            .unwrap();
+        process.observe("obs-1", "decision-1", 0.0).unwrap();
+        assert_eq!(
+            process.commit_prediction("obs-1", "decision-2", 0.1, 1.0),
+            Err(SequentialError::DuplicateObservationId)
+        );
+    }
+
+    #[test]
+    fn fixed_mixture_normalizes_weights_and_matches_component_sum() {
+        let mut mixture = PredictableGaussianMixture::new(
+            vec![
+                MixtureAlternative { id: "break-x".to_owned(), weight: 2.0 },
+                MixtureAlternative { id: "break-y".to_owned(), weight: 1.0 },
+            ],
+            0.05,
+        )
+        .unwrap();
+        let weights = mixture.alternatives().iter().map(|item| item.weight).sum::<f64>();
+        assert!((weights - 1.0).abs() < 1.0e-15);
+
+        let predictions = [
+            MixtureDiscrepancy { alternative_id: "break-y".to_owned(), expected_discrepancy: 0.3 },
+            MixtureDiscrepancy { alternative_id: "break-x".to_owned(), expected_discrepancy: 0.1 },
+        ];
+        mixture
+            .commit_prediction("obs-1", "decision-1", 0.2, &predictions)
+            .unwrap();
+        let update = mixture.observe("obs-1", "decision-1", 0.25).unwrap();
+
+        let direct = mixture
+            .alternatives()
+            .iter()
+            .map(|alternative| {
+                let component = update
+                    .component_log_e_values
+                    .iter()
+                    .find(|(id, _)| id == &alternative.id)
+                    .unwrap()
+                    .1;
+                alternative.weight * component.exp()
+            })
+            .sum::<f64>()
+            .ln();
+        assert!((update.log_e_value - direct).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn fixed_mixture_rejects_missing_duplicate_and_nonfinite_predictions() {
+        let mut mixture = PredictableGaussianMixture::new(
+            vec![
+                MixtureAlternative { id: "break-a".to_owned(), weight: 0.5 },
+                MixtureAlternative { id: "break-b".to_owned(), weight: 0.5 },
+            ],
+            0.05,
+        )
+        .unwrap();
+        assert_eq!(
+            mixture.commit_prediction("obs-1", "decision-1", 1.0, &[
+                MixtureDiscrepancy { alternative_id: "break-a".to_owned(), expected_discrepancy: 0.2 }
+            ]),
+            Err(SequentialError::MixturePredictionCountMismatch)
+        );
+        assert!(mixture.pending.is_none());
+        assert_eq!(
+            mixture.commit_prediction("obs-1", "decision-1", 1.0, &[
+                MixtureDiscrepancy { alternative_id: "break-a".to_owned(), expected_discrepancy: 0.2 },
+                MixtureDiscrepancy { alternative_id: "break-a".to_owned(), expected_discrepancy: 0.3 }
+            ]),
+            Err(SequentialError::DuplicateMixturePrediction("break-a".to_owned()))
+        );
+        assert!(mixture.pending.is_none());
+        assert_eq!(
+            mixture.commit_prediction("obs-1", "decision-1", 1.0, &[
+                MixtureDiscrepancy { alternative_id: "break-a".to_owned(), expected_discrepancy: 0.2 },
+                MixtureDiscrepancy { alternative_id: "break-b".to_owned(), expected_discrepancy: f64::NAN }
+            ]),
+            Err(SequentialError::NonFiniteDiscrepancy)
+        );
+        assert!(mixture.pending.is_none());
+    }
+
+    #[test]
+    fn fixed_mixture_is_order_independent_and_rejects_posthoc_identity_change() {
+        let alternatives = vec![
+            MixtureAlternative { id: "break-b".to_owned(), weight: 0.4 },
+            MixtureAlternative { id: "break-a".to_owned(), weight: 0.6 },
+        ];
+        let mut mixture = PredictableGaussianMixture::new(alternatives, 0.05).unwrap();
+        assert_eq!(mixture.alternatives()[0].id, "break-a");
+        assert_eq!(mixture.alternatives()[1].id, "break-b");
+        assert_eq!(
+            mixture.commit_prediction("obs-1", "decision-1", 1.0, &[
+                MixtureDiscrepancy { alternative_id: "break-a".to_owned(), expected_discrepancy: 0.2 },
+                MixtureDiscrepancy { alternative_id: "unregistered".to_owned(), expected_discrepancy: 0.3 }
+            ]),
+            Err(SequentialError::MissingMixturePrediction("break-b".to_owned()))
+        );
+        assert!(mixture.pending.is_none());
+    }
 
     #[test]
     fn nominal_null_power_matches_alpha() {
