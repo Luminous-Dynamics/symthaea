@@ -238,7 +238,7 @@ fn validate(corpus: &Value) -> Result<Value, Vec<String>> {
             "compare_pair_count": command_counts.get("compare_pair").copied().unwrap_or(0),
             "required_threat_classes_covered": REQUIRED_THREATS.len(),
             "claim_ceiling": "test_vector_contract_only",
-            "execution_note": "Shape and coverage verified; scenario outcomes are not yet executed by this command."
+            "execution_note": "Shape and coverage checked before every mutation vector is replayed against the shared audit engine."
         }))
     } else {
         Err(errors)
