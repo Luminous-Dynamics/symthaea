@@ -927,6 +927,7 @@ pub fn verify_midi_event_manifest(m: &MidiPerformanceManifestV1, bytes: &[u8]) -
 
     let mut track_map = BTreeMap::new();
     let mut expected_names = BTreeMap::new();
+    let mut unique_track_names = std::collections::BTreeSet::new();
     let mut expected_programs = BTreeMap::new();
     for t in &m.tracks {
         let index = usize::from(t.track_index);
@@ -935,6 +936,7 @@ pub fn verify_midi_event_manifest(m: &MidiPerformanceManifestV1, bytes: &[u8]) -
             || t.track_name.trim().is_empty() || t.segment_id.trim().is_empty()
         { return Err("invalid track receipt".into()); }
         if track_map.insert(index, t).is_some() { return Err("duplicate MIDI track index".into()); }
+        if !unique_track_names.insert(t.track_name.as_str()) { return Err("duplicate MIDI track name in sidecar".into()); }
         expected_names.insert(index, t.track_name.as_str());
         inc(&mut expected_programs, ProgramKey {
             track: index, channel: t.midi_channel, program: t.gm_program, tick: t.segment_start_tick,
@@ -1644,7 +1646,7 @@ mod tests {
     }
     #[test]
     fn instrument_instances_must_have_distinct_stable_channels() {
-        let mut tracks = manifest().tracks;
+        let tracks = manifest().tracks;
         let mut second = tracks[0].clone();
         second.track_index = 2;
         second.segment_id = "seg-b".into();
@@ -1667,7 +1669,6 @@ mod tests {
             repeated.track_name = "Part 1 seg-b inst-a".into();
             repeated
         }]).is_ok());
-        tracks.clear();
     }
 
     #[test]
