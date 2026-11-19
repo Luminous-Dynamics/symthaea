@@ -112,10 +112,10 @@ fn run(input_path: &str) -> Result<Value, String> {
         let false_promotion = !audit.false_promotion_elements.is_empty();
         let false_elimination = !audit.missed_symmetry_elements.is_empty();
 
-        exact_matches += usize::from(exact_match);
-        false_promotions += usize::from(false_promotion);
-        missed_symmetries += usize::from(false_elimination);
-        invalid_group_proposals += usize::from(!audit.group_axioms_satisfied);
+        exact_matches += if exact_match { 1 } else { 0 };
+        false_promotions += if false_promotion { 1 } else { 0 };
+        missed_symmetries += if false_elimination { 1 } else { 0 };
+        invalid_group_proposals += if audit.group_axioms_satisfied { 0 } else { 1 };
 
         case_results.push(json!({
             "case_id": case_id,
@@ -135,7 +135,8 @@ fn run(input_path: &str) -> Result<Value, String> {
         }));
     }
 
-    let completed = seen.len() == expected_ids.len() && seen == expected_ids.iter().cloned().collect();
+    let expected_set: BTreeSet<String> = expected_ids.iter().cloned().collect();
+    let completed = seen.len() == expected_ids.len() && seen == expected_set;
     Ok(json!({
         "schema_version": "0.1.0",
         "benchmark_id": "LUMINOUS-SYMM-QUALIFIED-DISCOVERY-001",
