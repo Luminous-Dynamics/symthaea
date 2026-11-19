@@ -830,7 +830,8 @@ mod tests {
     fn capability_action_cannot_smuggle_in_an_observation_model() {
         assert!(
             mutated_fixture(|fixture| {
-                fixture["actions"][0]["model_likelihoods"] = fixture["actions"][2]["model_likelihoods"].clone();
+                let measurement_likelihoods = fixture["actions"][2]["model_likelihoods"].clone();
+                fixture["actions"][0]["model_likelihoods"] = measurement_likelihoods;
             })
             .is_err()
         );
