@@ -61,6 +61,7 @@ The module assigns expected owners. This is an evidence-routing contract, not a 
 | Backflow and cross-connection protection | Competent plumbing assessor |
 | Service and maintenance capacity | Independent serviceability assessor |
 | Wet-path hygiene and cleaning | Independent hygiene/exposure assessor under #12703 |
+| Building water-age / stagnation management (added for declared high-risk / low-use sites) | Independent hygiene/exposure assessor under #12703 |
 | Product-specific network/site infrastructure | Independent site infrastructure assessor |
 
 Each owner remains responsible for the measurand, sampling/measurement method, validity interval, uncertainty, acceptance envelope and actual Satisfied / Unsatisfied / Indeterminate decision. Aqua only checks evidence identity, scope, completeness, authority mapping and decision state.
