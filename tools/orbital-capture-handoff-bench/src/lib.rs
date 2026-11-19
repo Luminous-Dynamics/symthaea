@@ -495,12 +495,12 @@ mod tests {
     fn complete_capture_fixture_matches_all_expected_results() {
         let report = evaluate(&fixture()).expect("fixture should validate");
         assert_eq!(report.result, "pass");
-        assert_eq!(report.summary.case_count, 19);
+        assert_eq!(report.summary.case_count, 22);
         assert_eq!(report.summary.accepted_for_handoff, 1);
-        assert_eq!(report.summary.rejected, 14);
-        assert_eq!(report.summary.indeterminate, 4);
+        assert_eq!(report.summary.rejected, 16);
+        assert_eq!(report.summary.indeterminate, 5);
         assert_eq!(report.summary.expected_result_mismatches, 0);
-        assert_eq!(report.summary.proximity_only_false_accepts, 17);
+        assert_eq!(report.summary.proximity_only_false_accepts, 20);
         assert!(report.cases.iter().all(|case| !case.authority_granted));
     }
 
