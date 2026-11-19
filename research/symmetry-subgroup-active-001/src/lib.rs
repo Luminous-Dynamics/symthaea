@@ -222,11 +222,19 @@ fn validate_group(
     let n2 = n.checked_mul(n).ok_or(SubgroupErrorV1::ArithmeticOverflow)?;
     let n3 = n2.checked_mul(n).ok_or(SubgroupErrorV1::ArithmeticOverflow)?;
     let masks = 1_u64.checked_shl(order as u32).ok_or(SubgroupErrorV1::ArithmeticOverflow)?;
-    let closure_bound = masks.checked_mul(n2).ok_or(SubgroupErrorV1::ArithmeticOverflow)?;
-    let required = n3
-        .checked_add(n2.checked_mul(2).ok_or(SubgroupErrorV1::ArithmeticOverflow)?)
+    // Each subset checks at most n inverse memberships and n² products.
+    let per_subset_bound = n2.checked_add(n).ok_or(SubgroupErrorV1::ArithmeticOverflow)?;
+    let closure_bound = masks
+        .checked_mul(per_subset_bound)
+        .ok_or(SubgroupErrorV1::ArithmeticOverflow)?;
+    // Group admission includes n³ associativity checks, 2n² Latin checks,
+    // 2n identity checks, and at most n² inverse-search checks.
+    let group_bound = n3
+        .checked_add(n2.checked_mul(3).ok_or(SubgroupErrorV1::ArithmeticOverflow)?)
         .and_then(|v| v.checked_add(n.checked_mul(2)?))
-        .and_then(|v| v.checked_add(closure_bound))
+        .ok_or(SubgroupErrorV1::ArithmeticOverflow)?;
+    let required = group_bound
+        .checked_add(closure_bound)
         .ok_or(SubgroupErrorV1::ArithmeticOverflow)?;
     if required > budget.maximum_work_units {
         return Err(SubgroupErrorV1::WorkBudgetExceeded {
@@ -917,7 +925,9 @@ mod tests {
             (dihedral_group(3, "S3"), 6),
             (dihedral_group(4, "D4"), 10),
         ] {
-            let catalogue = enumerate_subgroups(&group, SubgroupEnumerationBudgetV1::default()).unwrap();
+            let budget = SubgroupEnumerationBudgetV1::default();
+            let catalogue = enumerate_subgroups(&group, budget).unwrap();
+            assert!(catalogue.work_units <= budget.maximum_work_units);
             assert_eq!(catalogue.subgroups.len(), expected, "{}", group.group_id);
             for subgroup in &catalogue.subgroups {
                 assert!(subgroup.element_indices.contains(&group.identity));
