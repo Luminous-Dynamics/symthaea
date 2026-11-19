@@ -1,0 +1,88 @@
+name: Muse Composer Adapter Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'scripts/check-workspace-targets.sh'
+      - 'crates/domains/symthaea-music-theory/**'
+      - 'tools/muse-factorial-audit/**'
+      - '.github/workflows/muse-composer-adapter.yml'
+  workflow_dispatch:
+    inputs:
+      cohort:
+        description: 'Optional frozen composer sweep (none runs tests only)'
+        required: true
+        type: choice
+        default: none
+        options:
+          - none
+          - discovery
+          - confirmation
+          - both
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-composer-adapter-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      MUSE_METRICS: >-
+        score_note_count,score_total_beats,score_total_seconds,score_tempo_bpm,score_notes_per_beat,score_mean_pitch_midi,score_pitch_span_semitones,score_pitch_stddev_midi,score_mean_velocity,score_velocity_stddev,score_mean_section_intensity,score_mean_note_duration_beats,score_assigned_part_fraction,score_universal_fatal_count,score_style_fatal_count,score_warning_count,score_universal_valid,score_full_validation_valid,score_pitch_class_diversity,score_pitch_class_entropy_bits,score_melody_mean_interval_semitones,score_melody_step_fraction,score_melody_leap_fraction,score_onset_ioi_stddev_beats,score_offbeat_onset_fraction,score_voice_role_entropy_bits,score_duration_variety_count,score_section_intensity_stddev,identity_score_meter_beats,score_distinct_midi_pitches,identity_score_key_tonic_pc,score_key_major_indicator,score_key_minor_indicator,score_key_modal_indicator,score_emphasis_normal_count,score_emphasis_climax_count,score_emphasis_cadential_count,score_emphasis_phrase_start_count,score_form_section_count,score_plan_requested_bars,score_plan_realized_bars,score_fingerprint_form_distance,score_fingerprint_harmony_distance,score_fingerprint_orchestration_distance,score_fingerprint_rhythm_distance,score_fingerprint_contour_distance,score_fingerprint_tempo_meter_distance,score_fingerprint_pitch_class_distance,score_fingerprint_interval_distance,score_fingerprint_chord_quality_distance,score_fingerprint_cadence_distance,score_fingerprint_motif_distance,identity_exact_fingerprint_high32,identity_exact_fingerprint_low32
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Validate workspace target declarations
+        run: bash scripts/check-workspace-targets.sh
+
+      - name: Format-check adapter source
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-music-theory/examples/muse_factorial_adapter.rs
+
+      - name: Test standalone factorial harness and analyzer
+        run: cargo test --manifest-path tools/muse-factorial-audit/Cargo.toml
+
+      - name: Test symbolic music-theory library
+        run: cargo test -p symthaea-music-theory --lib
+
+      - name: Compile and test composer adapter
+        run: cargo test -p symthaea-music-theory --example muse_factorial_adapter
+
+      - name: Execute optional frozen composer sweep
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.cohort != 'none' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cohort="${{ inputs.cohort }}"
+          cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin emit-cases -- "$cohort" > /tmp/muse-cases.csv
+          cargo run -p symthaea-music-theory --example muse_factorial_adapter -- "$cohort" /tmp/muse-cases.csv /tmp/muse-observations.csv "$GITHUB_SHA"
+          cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin analyze-results -- "$cohort" /tmp/muse-observations.csv "$MUSE_METRICS" /tmp/muse-coverage.csv /tmp/muse-effects.csv /tmp/muse-summary.csv /tmp/muse-axis-invariance.csv
+
+      - name: Upload frozen sweep evidence
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.cohort != 'none' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: muse-factorial-${{ inputs.cohort }}-${{ github.sha }}
+          path: |
+            /tmp/muse-cases.csv
+            /tmp/muse-observations.csv
+            /tmp/muse-coverage.csv
+            /tmp/muse-effects.csv
+            /tmp/muse-summary.csv
+            /tmp/muse-axis-invariance.csv
+          if-no-files-found: ignore
+          retention-days: 30
