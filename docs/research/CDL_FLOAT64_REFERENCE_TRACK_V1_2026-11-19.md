@@ -122,8 +122,7 @@ g++ -O2 -std=c++20 -Wall -Wextra -Wconversion -Werror \
 /tmp/float64_window_reference
 ```
 
-It exercised 57,105 bit patterns across five fixture classes and rejected
-seven malformed marker/span/payload cases. Exact output:
+It exercised 57,105 bit patterns across five fixture classes. The updated reference now rejects eight malformed marker/span/payload cases, adding a noncanonical repeated new-window marker when the previous window can still encode the residual. Exact output:
 
 | Fixture | Samples | XOR-varint bytes | Reusable XOR-window bytes | Change |
 |---|---:|---:|---:|---:|
