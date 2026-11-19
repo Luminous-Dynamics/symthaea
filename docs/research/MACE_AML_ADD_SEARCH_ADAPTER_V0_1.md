@@ -76,7 +76,7 @@ These are programme goals, not achieved results. Recalculate absolute thresholds
 
 ## Implementation boundary
 
-The workspace contains broca-aml-adapter with 15 authored unit tests. Implemented: typed contract core, injected-counter Textual chunking, SHA-256 Add identity/idempotency helper, Add echo/persistence-gate validation, track-aware Search validation, Top-K/result-order checks and multimodal data-URI/media validation.
+The workspace contains broca-aml-adapter with 14 authored unit tests. Implemented: typed contract core, injected-counter Textual chunking, SHA-256 Add identity/idempotency helper, Add echo/persistence-gate validation, track-aware Search validation, Top-K/result-order checks and multimodal data-URI/media validation.
 
 Not implemented: HTTP service, authentication middleware, persistent store, atomic database idempotency, embeddings/retrieval/ranking, verified official word counter, live smoke/full evaluation, Cycle 2 submission, or end-to-end wiring from #12731 consolidation receipts into AML Add/Search.
 

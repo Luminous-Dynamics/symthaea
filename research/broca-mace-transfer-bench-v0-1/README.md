@@ -12,7 +12,7 @@ This v0.1 slice isolates one narrow bridge: **qualified transition evidence → 
 
 ## Run
 
-The research workspace contains four separately scoped packages: oracle-blind policy, synthetic evaluator, receipt-gated ingress, and proposal-only consolidation.
+The research workspace contains five separately scoped packages: oracle-blind policy, synthetic evaluator, receipt-gated ingress, proposal-only consolidation, and the provider-neutral AML Add/Search contract core.
 
 ```bash
 cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-evaluator
@@ -21,6 +21,7 @@ cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p
 cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-ingress
 cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-consolidation
 cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-consolidation --test raw_session_pipeline
+cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-aml-adapter
 ```
 
 No external service, GPU, database or model API is required. The current verifier used by tests is synthetic, not a production Mycelix adapter.
@@ -355,3 +356,15 @@ See [MACE Provider-Native Trace Integrity and Outcome Grounding Benchmark v0.1](
 ## AML Add/Search adapter
 
 See [MACE AML Add/Search Adapter v0.1](../../docs/research/MACE_AML_ADD_SEARCH_ADAPTER_V0_1.md) for the public protocol, Luminous memory projection and next-cycle qualification targets. The workspace includes a separate broca-aml-adapter Rust contract core with 15 authored tests. It is not a hosted service and has not been runner-verified.
+
+## Current end-to-end integration inventory (2026-11-19)
+
+The MACE branch now has five Rust packages: candidate policy, synthetic evaluator, receipt-gated ingress, proposal-only consolidation and AML Add/Search contract core. The current authored regression inventory is 18 policy tests, 26 raw-JSONL evaluator tests, 36 ingress receipt/bitemporal tests, 11 provider-trace tests, 9 source-span claim tests, 7 consolidation unit tests plus the raw-session integration test, and 14 AML adapter tests. These are source counts, **not executed test results**.
+
+The three evidence planes remain deliberately distinct:
+- provider capture / source spans prove what bytes were captured and where a claim came from; they do not prove execution or truth;
+- Symtropy execution and outcome receipts bind the proposed/dispatched action to the observed world event;
+- Mycelix lineage, calibration, trust policy, lifecycle and bitemporal receipts govern source identity and whether the evidence was known/valid at the queried snapshot;
+- Symthaea consolidation emits a proposal; an independent consolidation receipt verifier must attest the exact decision/input/output before the candidate can consume the promoted procedure.
+
+The older raw-JSONL evaluator now fails closed when the outcome receipt does not bind the exact preserved observation line, observed-at time, utility value and unit. The receipt registry remains a synthetic injected verifier seam. The canonical ingress/consolidation cross-crate path is stronger, but the raw-JSONL evaluator still uses a parallel test-only receipt schema; unifying it with the existing evidence receipt bundle and consolidation receipt types is the next integration task.
