@@ -1,18 +1,18 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Swarm Delegation Proof — Test 4.
+//! Swarm Cognitive Influence smoke test.
 //!
-//! Validates the swarm consciousness delegation mechanism end-to-end
-//! through the public CognitiveLoopService API. The detailed delegation
-//! logic is unit-tested in swarm_consciousness.rs (private module).
+//! Confirms that the cognitive loop and swarm subsystem can cycle. This is a
+//! wiring smoke test, not proof of collective behavior or effect authorization.
+//! The focused collective-signal calculations are unit-tested in swarm_consciousness.rs.
 
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
 #[test]
-fn proof4_cognitive_loop_swarm_integration() {
+fn swarm_subsystem_runs_without_authority_claims() {
     println!();
     println!("┌──────────────────────────────────────────────────────────┐");
-    println!("│  SWARM DELEGATION PROOF — Cognitive Loop Integration     │");
+    println!("│  SWARM COGNITIVE INFLUENCE — Cognitive Loop Integration  │");
     println!("└──────────────────────────────────────────────────────────┘");
     println!();
 
@@ -40,14 +40,10 @@ fn proof4_cognitive_loop_swarm_integration() {
     }
     println!("  5 cognitive cycles executed: ✓");
     println!();
-    println!("  Note: Detailed SwarmConsciousness delegation logic is");
-    println!("  validated by 5 unit tests in swarm_consciousness.rs:");
-    println!("    - test_no_coalitions");
-    println!("    - test_conscious_collective_delegates_authority");
-    println!("    - test_not_in_coalition_no_delegation");
-    println!("    - test_high_individual_phi_not_downgraded");
-    println!("    - test_multiple_coalitions_picks_strongest");
+    println!("  Focused collective-signal unit tests live in");
+    println!("  src/cognitive_loop/managers/swarm_consciousness.rs.");
+    println!("  This smoke test does not establish effect authorization.");
     println!();
-    println!("  INTEGRATION VALIDATED: Swarm subsystem runs in cognitive loop.");
+    println!("  SMOKE CHECK: Swarm subsystem runs in cognitive loop.");
     println!();
 }
