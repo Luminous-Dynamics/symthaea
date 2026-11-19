@@ -8,11 +8,15 @@ An approximate symmetry is not an equivalence relation. It cannot be substituted
 
 Every step-map Lipschitz bound and one-step defect bound carries its own non-empty certificate identifier. Objective/constraint Lipschitz and direct-defect premises have separate identifiers as well. The receipt binds these IDs together with all numeric assumptions; it does not verify the cited external certificates.
 
-The reference propagates the recurrence
+The reference propagates the constant/time-varying recurrence
 
-`e_{k+1} ≤ L_k e_k + δ_k`
+`e_{k+1} ≤ ceil(L_k e_k) + δ_k`
 
-using nonnegative fixed-point integer bounds, rational Lipschitz constants, checked multiplication/addition, and outward ceiling division. Defect bounds may vary per step.
+and the state-dependent defect recurrence
+
+`e_{k+1} ≤ ceil(L_k e_k) + ceil(K_k e_k) + δ_k`,
+
+where `K_k` bounds how the one-step equivariance defect grows with distance from the reference orbit. The separate ceiling operations are conservative. All values are nonnegative fixed-point integers with rational Lipschitz constants, checked multiplication/addition and outward rounding. Every step has separate non-empty certificate identifiers for the map Lipschitz bound, defect-variation Lipschitz bound and reference-orbit defect bound.
 
 ## Domain guard
 
@@ -41,7 +45,7 @@ If the domain guard stops early, objective and constraint assessments are not ma
 The reference includes:
 - contractive (L<1), neutral (L=1), and expansive (L>1) exact integer recurrence oracles;
 - horizons 1, 2, 4, 8, 16, 32 and 64;
-- zero, constant and step-varying defect envelopes;
+- zero, constant, step-varying and state-dependent defect envelopes;
 - initial and later domain-boundary crossings;
 - strict objective-gap and constraint-slack thresholds;
 - missing/contradicted domain evidence;
