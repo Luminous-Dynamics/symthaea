@@ -11,7 +11,7 @@ The stabilizer of a task under a valid group action is a subgroup. Therefore a m
 ## V0 implementation
 
 - Validate group identity, inverses, multiplication outputs, associativity and element IDs.
-- Exhaustively enumerate all subsets containing the identity and retain only those closed under inverses and multiplication.
+- Exhaustively enumerate all subsets containing the identity and retain only those closed under inverses and multiplication; order the resulting lattice by subgroup size then lexicographic element-index list.
 - Bound group order to 16, subgroup hypotheses to 16, membership probes to 64, and enumeration/planning work by explicit budgets.
 - Convert element-membership predictions to 0 = violated and 1 = preserved outcomes and reuse the exact adaptive minimax planner.
 - Also compute the exact minimum-cost static probe basis.
