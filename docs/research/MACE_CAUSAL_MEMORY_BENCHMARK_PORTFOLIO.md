@@ -279,3 +279,16 @@ The provider capture envelope accepts an optional thread_id (or stream_id). Sequ
 ## Provider trace qualification benchmark
 
 See [MACE Provider-Native Trace Integrity and Outcome Grounding Benchmark v0.1](MACE_PROVIDER_TRACE_INTEGRITY_BENCHMARK_V0_1.md). It defines separate tracks for provider trace fidelity, outcome grounding, source/measurement/causal qualification, consolidation lifecycle, cross-session transfer, and cross-provider harness robustness. It deliberately scores these axes separately from memory recall and official leaderboard accuracy.
+
+
+## 10. Official Add/Search benchmark adapter
+
+The MACE workspace now includes a separate broca-aml-adapter Rust crate. It encodes the AML Add/Search boundary: ordered Add messages, strict user_id isolation, source-session grouping through session_id, exact response echoes, Add idempotency, Textual chunking through an injected frozen word counter, track-aware Search validation, formal Top K 100, rank-preserving results and multimodal media validation.
+
+The public guide requires Add success only after persistence and immediate Search visibility; retries reuse the same request_id and identical payload; Textual chunks at 20 messages or 2,000 frozen-adapter-counted words; user_id is the sole retrieval-isolation key; and Multimodal uses inline Base64 Data URIs with 10 MiB per image, 30 MiB per Add request and 30 MiB per Search response. Evaluation data is job-only and must be deleted within 30 days after run completion.
+
+**Cycle 2 snapshot, November 19, 2026:** the official page still labels results expected November 19; materials closed October 31 and Full evaluation closed November 4. No Cycle 2 rank is asserted. Cycle 1 historical Textual references are MemoraX v0.5 58.02 overall (commercial) and an open-method textual reference of 45.06 overall. These are not Cycle 2 results and are not directly comparable to MACE synthetic scores.
+
+Next-cycle targets: 100% smoke-contract compliance; zero cross-user leakage; zero premature Add acknowledgements; zero idempotency payload rebinding; exact parity with the frozen word counter; and at least +5 percentage points over the strongest same-track/division official baseline, with governance/safety gains measured separately.
+
+The crate is a protocol core only: it does not host endpoints, persist memory, implement embeddings/retrieval ranking, include the verified frozen word counter or perform a Full evaluation. It has 15 authored tests, not runner-verified.

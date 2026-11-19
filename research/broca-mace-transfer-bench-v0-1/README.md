@@ -348,3 +348,8 @@ See [MACE Provider-Native Trace Integrity and Outcome Grounding Benchmark v0.1](
 The ingress crate now includes a source-span validator for extractor-generated claims. Each proposal binds the original capture digest, provider event/thread identity, native event ID, JSON Pointer, UTF-8 byte range, exact span digest, assertion digest and extractor configuration. Validation returns an explicitly untrusted claim with the exact source text. It cannot become a candidate Experience, execution authority or world-outcome receipt; independent grounding and Mycelix/Symtropy receipts remain mandatory.
 
 See [MACE Provider-Native Trace Integrity and Outcome Grounding Benchmark v0.1](../../docs/research/MACE_PROVIDER_TRACE_INTEGRITY_BENCHMARK_V0_1.md). This is an authored implementation and test tranche, not runner-verified.
+
+
+## AML Add/Search adapter
+
+See [MACE AML Add/Search Adapter v0.1](../../docs/research/MACE_AML_ADD_SEARCH_ADAPTER_V0_1.md) for the public protocol, Luminous memory projection and next-cycle qualification targets. The workspace includes a separate broca-aml-adapter Rust contract core with 15 authored tests. It is not a hosted service and has not been runner-verified.
