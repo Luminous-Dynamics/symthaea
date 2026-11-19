@@ -553,6 +553,15 @@ mod tests {
     }
 
     #[test]
+    fn hand_calculated_plus_minus_q_fixture_energy_is_reproduced() {
+        let model = model_from(&inputs().1);
+        let energy = model.energy().unwrap();
+        assert!((energy.local - (-0.1472)).abs() < 1.0e-12);
+        assert!((energy.gradient - 0.32).abs() < 1.0e-12);
+        assert!((energy.total - 0.1728).abs() < 1.0e-12);
+    }
+
+    #[test]
     fn common_local_gauge_transform_preserves_free_energy() {
         let model = model_from(&inputs().1);
         let chi: Vec<f64> = (0..model.length)
