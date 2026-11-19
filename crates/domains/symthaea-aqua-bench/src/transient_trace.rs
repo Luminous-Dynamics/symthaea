@@ -1108,6 +1108,118 @@ mod tests {
     }
 
     #[test]
+    fn decodes_json_manifest_and_attaches_trace_samples() {
+        let digest = |character: char| character.to_string().repeat(64);
+        let channel = |channel_id: &str,
+                       role: &str,
+                       location: &str,
+                       datum: &str,
+                       unit: &str,
+                       instrument_id: &str,
+                       calibration: char,
+                       uncertainty: f64| {
+            serde_json::json!({
+                "channel_id": channel_id,
+                "quality_state": "valid",
+                "role": role,
+                "location": location,
+                "datum": datum,
+                "unit": unit,
+                "instrument_id": instrument_id,
+                "calibration_receipt_sha256": digest(calibration),
+                "measurement_uncertainty": uncertainty,
+                "sample_rate_hz": 1000.0,
+                "effective_bandwidth_hz": 400.0,
+                "anti_alias_filter_id": "aa-filter-v1",
+                "sample_count": 3,
+                "dropped_sample_count": 0
+            })
+        };
+        let manifest = serde_json::json!({
+            "schema_version": "0.1.0",
+            "profile_id": "synthetic-sag-json-001",
+            "profile_revision": 1,
+            "profile_kind": "synthetic",
+            "event_family": "supply_sag",
+            "task_profile_id": "full-shower-v1",
+            "conditions_sha256": digest('c'),
+            "protocol_sha256": digest('d'),
+            "event_start": "2026-11-19T00:00:00Z",
+            "event_duration_ms": 2,
+            "synthetic_profile": {
+                "generator_id": "event-generator-v1",
+                "generator_sha256": digest('e'),
+                "generator_parameters_sha256": digest('f')
+            },
+            "command": {
+                "input_kind": "upstream_pressure_command",
+                "channel_id": "upstream-pressure-command",
+                "unit": "kPa",
+                "waveform_sha256": digest('1'),
+                "samples": [
+                    {"offset_us": 0, "value": 300.0},
+                    {"offset_us": 1000, "value": 200.0},
+                    {"offset_us": 2000, "value": 300.0}
+                ]
+            },
+            "acquisition": {
+                "clock_id": "ptp-clock-1",
+                "timestamp_basis": "ptp",
+                "clock_sync_uncertainty_us": 2.0,
+                "maximum_clock_sync_uncertainty_us": 5.0,
+                "maximum_channel_alignment_skew_us": 0,
+                "clock_sync_receipt_sha256": digest('2'),
+                "channels": [
+                    channel("terminal-pressure", "terminal_dynamic_pressure", "terminal-outlet",
+                        "terminal_fitting_inlet", "kPa", "pressure-1", 'a', 1.0),
+                    channel("primary-flow", "primary_flow", "shower-outlet",
+                        "not_applicable", "L/min", "flow-1", 'b', 0.05)
+                ]
+            },
+            "raw_artifacts": [
+                {"role": "unfiltered_trace", "sha256": digest('3'), "byte_length": 10000},
+                {"role": "event_log", "sha256": digest('4'), "byte_length": 1024}
+            ]
+        });
+
+        let mut decoded = TransientEventProfile::from_json_manifest(&manifest.to_string())
+            .expect("valid manifest decodes");
+        decoded
+            .attach_channel_samples("terminal-pressure", samples(250.0))
+            .expect("pressure samples attach to declared channel");
+        decoded
+            .attach_channel_samples("primary-flow", samples(5.0))
+            .expect("flow samples attach to declared channel");
+
+        assert_eq!(decoded.validate(), Ok(()));
+    }
+
+    #[test]
+    fn strict_json_decoder_rejects_unknown_manifest_fields() {
+        let mut manifest = serde_json::json!({
+            "schema_version": "0.1.0",
+            "profile_id": "strict-test",
+            "profile_revision": 1
+        });
+        manifest["unexpected_authority_override"] = serde_json::json!(true);
+        assert!(matches!(
+            TransientEventProfile::from_json_manifest(&manifest.to_string()),
+            Err(TransientTraceError::ManifestDecode { .. })
+        ));
+    }
+
+    #[test]
+    fn raw_trace_decoder_cannot_attach_samples_to_unknown_channel() {
+        let mut value = profile();
+        assert_eq!(
+            value.attach_channel_samples("not-a-channel", samples(1.0)),
+            Err(TransientTraceError::UnknownChannel {
+                channel_id: "not-a-channel".to_owned()
+            })
+        );
+    }
+
+    #[test]
     fn accepts_complete_synthetic_supply_sag_profile() {
         assert_eq!(profile().validate(), Ok(()));
     }
