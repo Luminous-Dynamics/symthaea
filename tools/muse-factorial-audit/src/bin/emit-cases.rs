@@ -29,7 +29,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         )
     })?;
     if args.next().is_some() {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "unexpected extra arguments").into());
+        return Err(
+            io::Error::new(io::ErrorKind::InvalidInput, "unexpected extra arguments").into(),
+        );
     }
 
     let cohorts: Vec<Cohort> = match cohort_arg.as_str() {

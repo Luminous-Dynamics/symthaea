@@ -72,18 +72,8 @@ pub const CONFIRMATION_STYLES: [&str; 6] = [
 pub const DISCOVERY_SEEDS: [u64; 4] = [90_210, 130_363, 222_731, 918_273];
 
 pub const CONFIRMATION_SEEDS: [u64; 12] = [
-    1_000_003,
-    1_000_033,
-    1_000_037,
-    1_000_039,
-    1_000_081,
-    1_000_099,
-    1_000_117,
-    1_000_121,
-    1_000_133,
-    1_000_151,
-    1_000_159,
-    1_000_171,
+    1_000_003, 1_000_033, 1_000_037, 1_000_039, 1_000_081, 1_000_099, 1_000_117, 1_000_121,
+    1_000_133, 1_000_151, 1_000_159, 1_000_171,
 ];
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -303,13 +293,7 @@ impl ContrastTerm {
     pub fn id(&self) -> String {
         self.components
             .iter()
-            .map(|component| {
-                format!(
-                    "{}_{}",
-                    component.factor.as_str(),
-                    component.kind.as_str()
-                )
-            })
+            .map(|component| format!("{}_{}", component.factor.as_str(), component.kind.as_str()))
             .collect::<Vec<_>>()
             .join("__")
     }
@@ -317,11 +301,7 @@ impl ContrastTerm {
     fn weight(&self, cell: Cell) -> f64 {
         self.components
             .iter()
-            .map(|component| {
-                component
-                    .kind
-                    .coefficient(cell.level(component.factor))
-            })
+            .map(|component| component.kind.coefficient(cell.level(component.factor)))
             .product()
     }
 }
@@ -529,7 +509,9 @@ pub fn summarize_seed_effects(
         }
         let observed: HashSet<&str> = block.iter().map(|item| item.term.as_str()).collect();
         if observed.len() != block.len()
-            || expected_terms.iter().any(|(term, _)| !observed.contains(term.as_str()))
+            || expected_terms
+                .iter()
+                .any(|(term, _)| !observed.contains(term.as_str()))
         {
             return Err(AuditError::InconsistentContrastSet);
         }
@@ -592,14 +574,27 @@ pub enum AuditError {
     UnexpectedCase(String),
     MutatedCase(String),
     MissingCase(String),
-    WrongCaseCount { expected: usize, actual: usize },
-    UnexpectedBlock { cohort: Cohort, style: String, seed: u64 },
-    WrongObservationCount { expected: usize, actual: usize },
+    WrongCaseCount {
+        expected: usize,
+        actual: usize,
+    },
+    UnexpectedBlock {
+        cohort: Cohort,
+        style: String,
+        seed: u64,
+    },
+    WrongObservationCount {
+        expected: usize,
+        actual: usize,
+    },
     MixedBlock,
     OutOfRangeCell,
     NonFiniteValue(String),
     DuplicateCell(Cell),
-    IncompleteBlock { expected: usize, actual: usize },
+    IncompleteBlock {
+        expected: usize,
+        actual: usize,
+    },
     DegenerateContrast(String),
     NoSeedBlocks,
     DuplicateContrast(String),
@@ -668,7 +663,11 @@ mod tests {
     fn style_inventory_matches_source_derived_style_count() {
         assert_eq!(DISCOVERY_STYLES.len(), 29);
         assert_eq!(CONFIRMATION_STYLES.len(), 6);
-        assert!(CONFIRMATION_STYLES.iter().all(|style| DISCOVERY_STYLES.contains(style)));
+        assert!(
+            CONFIRMATION_STYLES
+                .iter()
+                .all(|style| DISCOVERY_STYLES.contains(style))
+        );
     }
 
     #[test]
@@ -702,33 +701,45 @@ mod tests {
     fn complete_design_has_eight_main_and_twenty_four_pairwise_terms() {
         let terms = contrast_terms();
         assert_eq!(terms.len(), CONTRASTS_PER_BLOCK);
-        assert_eq!(terms.iter().filter(|term| term.components.len() == 1).count(), 8);
-        assert_eq!(terms.iter().filter(|term| term.components.len() == 2).count(), 24);
         assert_eq!(
-            terms.iter().filter(|term| term.components.len() >= 3).count(),
+            terms
+                .iter()
+                .filter(|term| term.components.len() == 1)
+                .count(),
+            8
+        );
+        assert_eq!(
+            terms
+                .iter()
+                .filter(|term| term.components.len() == 2)
+                .count(),
+            24
+        );
+        assert_eq!(
+            terms
+                .iter()
+                .filter(|term| term.components.len() >= 3)
+                .count(),
             HIGHER_ORDER_DIAGNOSTICS_PER_BLOCK
         );
         assert_eq!(PRIMARY_CONTRASTS_PER_BLOCK, 32);
-        assert!(terms.iter().all(|term| (1..=4).contains(&term.components.len())));
+        assert!(
+            terms
+                .iter()
+                .all(|term| (1..=4).contains(&term.components.len()))
+        );
     }
 
     #[test]
     fn orthogonal_contrasts_recover_known_main_and_interaction_effects() {
-        let observations = observations_for(
-            Cohort::Discovery,
-            "Classical",
-            DISCOVERY_SEEDS[0],
-            |cell| {
+        let observations =
+            observations_for(Cohort::Discovery, "Classical", DISCOVERY_SEEDS[0], |cell| {
                 let linear = [-1.0, 0.0, 1.0];
                 let quadratic = [1.0, -2.0, 1.0];
-                7.0
-                    + 2.0 * linear[cell.valence as usize]
+                7.0 + 2.0 * linear[cell.valence as usize]
                     + 3.0 * quadratic[cell.arousal as usize]
-                    + 4.0
-                        * linear[cell.valence as usize]
-                        * quadratic[cell.energy as usize]
-            },
-        );
+                    + 4.0 * linear[cell.valence as usize] * quadratic[cell.energy as usize]
+            });
         let estimates = estimate_block(
             Cohort::Discovery,
             "Classical",
@@ -741,24 +752,14 @@ mod tests {
         assert!((find(&estimates, "valence_linear").estimate - 2.0).abs() < 1.0e-12);
         assert!((find(&estimates, "arousal_quadratic").estimate - 3.0).abs() < 1.0e-12);
         assert!(
-            (find(
-                &estimates,
-                "valence_linear__energy_quadratic"
-            )
-            .estimate
-                - 4.0)
-                .abs()
-                < 1.0e-12
+            (find(&estimates, "valence_linear__energy_quadratic").estimate - 4.0).abs() < 1.0e-12
         );
     }
 
     #[test]
     fn higher_order_terms_are_recovered_but_labelled_diagnostic() {
-        let observations = observations_for(
-            Cohort::Discovery,
-            "Classical",
-            DISCOVERY_SEEDS[0],
-            |cell| {
+        let observations =
+            observations_for(Cohort::Discovery, "Classical", DISCOVERY_SEEDS[0], |cell| {
                 let linear = [-1.0, 0.0, 1.0];
                 let quadratic = [1.0, -2.0, 1.0];
                 5.0 * linear[cell.valence as usize]
@@ -769,8 +770,7 @@ mod tests {
                         * linear[cell.arousal as usize]
                         * quadratic[cell.energy as usize]
                         * linear[cell.bars as usize]
-            },
-        );
+            });
         let estimates = estimate_block(
             Cohort::Discovery,
             "Classical",
@@ -795,12 +795,8 @@ mod tests {
 
     #[test]
     fn incomplete_duplicate_and_nonfinite_observation_blocks_fail_closed() {
-        let mut observations = observations_for(
-            Cohort::Discovery,
-            "Classical",
-            DISCOVERY_SEEDS[0],
-            |_| 1.0,
-        );
+        let mut observations =
+            observations_for(Cohort::Discovery, "Classical", DISCOVERY_SEEDS[0], |_| 1.0);
         observations.pop();
         assert!(matches!(
             estimate_block(
@@ -813,12 +809,8 @@ mod tests {
             Err(AuditError::WrongObservationCount { .. })
         ));
 
-        let mut observations = observations_for(
-            Cohort::Discovery,
-            "Classical",
-            DISCOVERY_SEEDS[0],
-            |_| 1.0,
-        );
+        let mut observations =
+            observations_for(Cohort::Discovery, "Classical", DISCOVERY_SEEDS[0], |_| 1.0);
         observations[0].cell = observations[1].cell;
         observations[0].case_id = observations[1].case_id.clone();
         assert!(matches!(
@@ -832,12 +824,8 @@ mod tests {
             Err(AuditError::DuplicateCell(_))
         ));
 
-        let mut observations = observations_for(
-            Cohort::Discovery,
-            "Classical",
-            DISCOVERY_SEEDS[0],
-            |_| 1.0,
-        );
+        let mut observations =
+            observations_for(Cohort::Discovery, "Classical", DISCOVERY_SEEDS[0], |_| 1.0);
         observations[0].value = f64::NAN;
         assert!(matches!(
             estimate_block(
@@ -853,18 +841,12 @@ mod tests {
 
     #[test]
     fn seed_aggregation_reports_dispersion_not_p_values() {
-        let first = observations_for(
-            Cohort::Discovery,
-            "Classical",
-            DISCOVERY_SEEDS[0],
-            |cell| [-1.0, 0.0, 1.0][cell.valence as usize],
-        );
-        let second = observations_for(
-            Cohort::Discovery,
-            "Classical",
-            DISCOVERY_SEEDS[1],
-            |cell| 3.0 * [-1.0, 0.0, 1.0][cell.valence as usize],
-        );
+        let first = observations_for(Cohort::Discovery, "Classical", DISCOVERY_SEEDS[0], |cell| {
+            [-1.0, 0.0, 1.0][cell.valence as usize]
+        });
+        let second = observations_for(Cohort::Discovery, "Classical", DISCOVERY_SEEDS[1], |cell| {
+            3.0 * [-1.0, 0.0, 1.0][cell.valence as usize]
+        });
         let first_effects = estimate_block(
             Cohort::Discovery,
             "Classical",
@@ -893,15 +875,11 @@ mod tests {
 
     #[test]
     fn estimates_are_bit_stable_under_input_row_reordering() {
-        let observations = observations_for(
-            Cohort::Discovery,
-            "Classical",
-            DISCOVERY_SEEDS[0],
-            |cell| {
+        let observations =
+            observations_for(Cohort::Discovery, "Classical", DISCOVERY_SEEDS[0], |cell| {
                 1.25 * [-1.0, 0.0, 1.0][cell.valence as usize]
                     + 0.75 * [1.0, -2.0, 1.0][cell.energy as usize]
-            },
-        );
+            });
         let forward = estimate_block(
             Cohort::Discovery,
             "Classical",
@@ -925,12 +903,8 @@ mod tests {
 
     #[test]
     fn metric_names_reject_unstable_delimiters() {
-        let observations = observations_for(
-            Cohort::Discovery,
-            "Classical",
-            DISCOVERY_SEEDS[0],
-            |_| 1.0,
-        );
+        let observations =
+            observations_for(Cohort::Discovery, "Classical", DISCOVERY_SEEDS[0], |_| 1.0);
         assert!(matches!(
             estimate_block(
                 Cohort::Discovery,
@@ -954,10 +928,7 @@ mod tests {
         assert!(Cell::all().contains(&centre));
         assert_eq!(
             case_id(Cohort::Discovery, "Classical", DISCOVERY_SEEDS[0], centre),
-            format!(
-                "DISCOVERY__Classical__s{}__v1a1e1b1",
-                DISCOVERY_SEEDS[0]
-            )
+            format!("DISCOVERY__Classical__s{}__v1a1e1b1", DISCOVERY_SEEDS[0])
         );
     }
 }
