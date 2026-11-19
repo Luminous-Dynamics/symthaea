@@ -1,0 +1,16 @@
+[package]
+name = "symmetry-subgroup-active-reference"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Exact active identification of task-preserving finite subgroups"
+
+[dependencies]
+symmetry-active-experiment-reference = { path = "../symmetry-active-experiment-001" }
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
