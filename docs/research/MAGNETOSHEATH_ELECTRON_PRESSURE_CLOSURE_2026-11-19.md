@@ -129,6 +129,8 @@ Hold out entire initializations and parameter regimes. Vary beta_i, beta_e, fluc
 
 **Tensor prediction:** per-component R², MAE, RMSE, normalized error and bias; off-diagonal channels reported individually; spatial correlation and scale-dependent error.
 
+**Solver-operator impact:** compare the discrete div(P) vector using the exact solver stencil, staggering, halo and boundary semantics; report componentwise MAE/RMSE/relative-L2, error spectra, current-sheet/separatrix stratification and conservation residual. A synthetic shared-face periodic reference operator exists in Symtropy [#6274 / PR #6243](https://github.com/Luminous-Dynamics/symtropy/pull/6243), but it is not an ECsim stencil substitute.
+
 **Physical admissibility:** symmetry residual; PSD/minimum eigenvalue; trace, determinant, anisotropy and agyrotropy; pressure-dilation and pressure-strain error.
 
 **Energy/turbulence:** scale-filtered Π:D spectrum; conditional structure statistics; energy-channel balance residual using the exact ECsim convention.
