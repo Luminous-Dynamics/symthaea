@@ -305,10 +305,6 @@ pub fn verify_receipt_bytes(bytes: &[u8]) -> Result<ReceiptV1, String> {
     let receipt: ReceiptV1 = serde_json::from_value(value.clone())
         .map_err(|e| format!("receipt shape invalid: {e}"))?;
     validate_receipt(&receipt)?;
-    let actual = receipt_digest(&value)?;
-    if actual != receipt.receipt_sha256 {
-        return Err(format!("receipt seal mismatch: recorded {}, recomputed {actual}", receipt.receipt_sha256));
-    }
     Ok(receipt)
 }
 
@@ -318,6 +314,12 @@ pub fn validate_receipt(r: &ReceiptV1) -> Result<(), String> {
     }
     if r.attempt_id.trim().is_empty() || !valid_sha256(&r.receipt_sha256) {
         return Err("attempt ID or receipt digest is invalid".into());
+    }
+    let value = serde_json::to_value(r)
+        .map_err(|error| format!("receipt canonical serialization failed: {error}"))?;
+    let actual = receipt_digest(&value)?;
+    if actual != r.receipt_sha256 {
+        return Err(format!("receipt seal mismatch: recorded {}, recomputed {actual}", r.receipt_sha256));
     }
     let required = [
         r.source.source_score_sha256.as_str(), r.source.candidate_score_sha256.as_str(),
@@ -1504,6 +1506,15 @@ mod tests {
         changed["attempt_id"] = Value::String("tampered".into());
         assert!(verify_receipt_bytes(&serde_json::to_vec(&changed).unwrap()).unwrap_err().contains("seal mismatch"));
     }
+    #[test]
+    fn public_library_validation_rejects_stale_receipt_seals() {
+        let bytes = sample_receipt();
+        let mut receipt = verify_receipt_bytes(&bytes).unwrap();
+        receipt.attempt_id = "tampered-after-parse".into();
+        assert!(validate_receipt(&receipt).unwrap_err().contains("seal mismatch"));
+        assert!(verify_bundle(Path::new("missing-bundle"), &receipt).unwrap_err().contains("seal mismatch"));
+    }
+
     #[test]
     fn candidate_score_and_midi_score_must_match() {
         let mut value: Value = serde_json::from_slice(&sample_receipt()).unwrap();
