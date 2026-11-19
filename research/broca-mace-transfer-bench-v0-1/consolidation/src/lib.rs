@@ -7,7 +7,12 @@
 //! durable memory, erase data, grant authority, or replace Mycelix lifecycle
 //! and privacy governance. The thresholds are prototype policy constants.
 
-use broca_mace_ingress::ActionConsolidationEvidenceSummaryV1;
+use broca_mace_ingress::{
+    ActionConsolidationEvidenceSummaryV1, AsKnownQuery, ConsolidationEvidencePackV1,
+    ConsolidationPackReject, ConsolidationSourceBindingV1, SourceTrustStatus,
+};
+use broca_mace_policy::{Action, Experience, Scope};
+use sha2::{Digest, Sha256};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HoldReason {
@@ -45,6 +50,378 @@ pub struct ProcedurePromotionProposalV1 {
 }
 
 /// A proposal is not a consolidation transaction or authority grant.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ConsolidationDispositionV1 {
+    PromoteToProcedure,
+    PromoteToRule,
+    RetainRaw,
+    CompressWithSourceLinks,
+    Quarantine,
+    Supersede,
+    ForgetFromActiveIndex,
+    EraseForPrivacy,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ReversibilityClassV1 {
+    ReversibleWithSourceLinks,
+    IrreversiblePrivacyErase,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConsolidationReceiptContextV1 {
+    pub consolidation_run_id: String,
+    pub principal_id: String,
+    pub capability_receipt_digest: String,
+    pub policy_digest: String,
+    pub destination_abstraction_id: String,
+    pub output_artifact_digest: String,
+    pub retention_policy_id: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConsolidationReceiptProposalV1 {
+    pub schema_version: u16,
+    pub disposition: ConsolidationDispositionV1,
+    pub action: Action,
+    pub target_scope: Scope,
+    pub as_known: AsKnownQuery,
+    pub policy_revision: String,
+    pub policy_digest: String,
+    pub principal_id: String,
+    pub capability_receipt_digest: String,
+    pub consolidation_run_id: String,
+    pub input_episode_set_digest: String,
+    pub destination_abstraction_id: String,
+    pub output_artifact_digest: String,
+    pub retention_policy_id: String,
+    pub reversibility: ReversibilityClassV1,
+    pub source_bindings: Vec<ConsolidationSourceBindingV1>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ReceiptProposalReject {
+    NotProcedurePromotion,
+    KnowledgeSnapshotMismatch,
+    InvalidPolicyDigest,
+    InvalidCapabilityReceiptDigest,
+    InvalidOutputArtifactDigest,
+    MissingReceiptContext,
+    EvidencePackRejected(ConsolidationPackReject),
+    SourceActionOrScopeMismatch,
+    InsufficientQualifiedSources,
+    MeasurementBoundExceedsProposal,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifiedConsolidationReceiptV1 {
+    pub proposal_digest: String,
+    pub verification_receipt_digest: String,
+    pub verifier_id: String,
+    pub verifier_role: String,
+    pub verified_at_ms: i64,
+    pub authority_scope: Scope,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ReceiptUseReject {
+    NotProcedurePromotion,
+    ProposalDigestMismatch,
+    MalformedVerificationReceipt,
+    WrongAuthorityScope,
+    ReceiptNotKnownAtTransfer,
+    KnowledgeSnapshotMismatch,
+    SourceBindingsChanged,
+}
+
+/// Implementations must verify an independently issued receipt over the exact
+/// proposal digest, issuer, authority scope and revocation/validity status.
+pub trait ConsolidationReceiptVerifierV1 {
+    fn verify(
+        &self,
+        proposal: &ConsolidationReceiptProposalV1,
+    ) -> Option<VerifiedConsolidationReceiptV1>;
+}
+
+fn is_lower_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn scope_code(scope: Scope) -> &'static str {
+    match (scope.regime, scope.objective) {
+        (
+            broca_mace_policy::Regime::Baseline,
+            broca_mace_policy::Objective::Quality,
+        ) => "baseline:quality",
+        (
+            broca_mace_policy::Regime::Baseline,
+            broca_mace_policy::Objective::Cost,
+        ) => "baseline:cost",
+        (
+            broca_mace_policy::Regime::Baseline,
+            broca_mace_policy::Objective::Speed,
+        ) => "baseline:speed",
+        (
+            broca_mace_policy::Regime::Shifted,
+            broca_mace_policy::Objective::Quality,
+        ) => "shifted:quality",
+        (
+            broca_mace_policy::Regime::Shifted,
+            broca_mace_policy::Objective::Cost,
+        ) => "shifted:cost",
+        (
+            broca_mace_policy::Regime::Shifted,
+            broca_mace_policy::Objective::Speed,
+        ) => "shifted:speed",
+    }
+}
+
+fn source_trust_code(status: SourceTrustStatus) -> &'static str {
+    match status {
+        SourceTrustStatus::TrustedForScope => "trusted_for_scope",
+        SourceTrustStatus::Untrusted => "untrusted",
+        SourceTrustStatus::Unknown => "unknown",
+    }
+}
+
+fn digest_fields(domain: &[u8], fields: &[String]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(domain);
+    for field in fields {
+        hasher.update((field.len() as u64).to_be_bytes());
+        hasher.update(field.as_bytes());
+    }
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn binding_fields(binding: &ConsolidationSourceBindingV1) -> Vec<String> {
+    let receipt = &binding.receipts;
+    vec![
+        binding.event_id.to_string(),
+        binding.action.name().to_owned(),
+        scope_code(binding.scope).to_owned(),
+        binding.measurement_error_bound_bits.to_string(),
+        receipt.raw_event_digest.clone(),
+        receipt.raw_event_receipt_digest.clone(),
+        receipt.session_id.clone(),
+        receipt.task_id.clone(),
+        receipt.canonical_event_hash.clone(),
+        receipt.authority_receipt_digest.clone(),
+        receipt.event_occurred_at_ms.to_string(),
+        receipt.authority_received_at_ms.to_string(),
+        receipt.lineage_digest.clone(),
+        receipt.source_family.to_string(),
+        receipt.source_root_id.to_string(),
+        receipt.source_root_digest.to_hex(),
+        receipt.source_acquisition_mode.clone(),
+        receipt.upstream_source_id.clone(),
+        receipt.source_artifact_digest.clone(),
+        receipt.transformation_digest.clone(),
+        receipt.source_issuer_id.clone(),
+        source_trust_code(receipt.source_trust_status).to_owned(),
+        receipt.source_trust_policy_digest.clone(),
+        receipt.calibration_digest.clone(),
+        receipt.measurement_unit.clone(),
+        receipt.measurement_instrument_id.clone(),
+        receipt.calibration_method_id.clone(),
+        receipt.calibration_revision.clone(),
+        receipt.causal_assessment_digest.clone(),
+        receipt.outcome_success.to_string(),
+        receipt.outcome_observed_utility_bits.to_string(),
+        receipt.outcome_utility_unit.clone(),
+        receipt.outcome_digest.clone(),
+    ]
+}
+
+impl ConsolidationReceiptProposalV1 {
+    pub fn from_procedure_promotion(
+        proposal: &ProcedurePromotionProposalV1,
+        pack: &ConsolidationEvidencePackV1,
+        context: ConsolidationReceiptContextV1,
+    ) -> Result<Self, ReceiptProposalReject> {
+        if pack.as_known() != proposal.as_known {
+            return Err(ReceiptProposalReject::KnowledgeSnapshotMismatch);
+        }
+        if !is_lower_sha256(&context.policy_digest) {
+            return Err(ReceiptProposalReject::InvalidPolicyDigest);
+        }
+        if !is_lower_sha256(&context.capability_receipt_digest) {
+            return Err(ReceiptProposalReject::InvalidCapabilityReceiptDigest);
+        }
+        if !is_lower_sha256(&context.output_artifact_digest) {
+            return Err(ReceiptProposalReject::InvalidOutputArtifactDigest);
+        }
+        if context.consolidation_run_id.is_empty()
+            || context.principal_id.is_empty()
+            || context.destination_abstraction_id.is_empty()
+            || context.retention_policy_id.is_empty()
+        {
+            return Err(ReceiptProposalReject::MissingReceiptContext);
+        }
+
+        let source_bindings = pack
+            .source_bindings_for_event_ids(&proposal.evidence_event_ids)
+            .map_err(ReceiptProposalReject::EvidencePackRejected)?;
+        if source_bindings.len() < proposal.minimum_qualified_success_events {
+            return Err(ReceiptProposalReject::InsufficientQualifiedSources);
+        }
+        let mut families = std::collections::BTreeSet::new();
+        let mut roots = std::collections::BTreeSet::new();
+        for binding in &source_bindings {
+            if binding.action != proposal.action || binding.scope != proposal.target_scope {
+                return Err(ReceiptProposalReject::SourceActionOrScopeMismatch);
+            }
+            let error_bound = f64::from_bits(binding.measurement_error_bound_bits);
+            if !error_bound.is_finite()
+                || !(0.0..=proposal.maximum_measurement_error_bound)
+                    .contains(&error_bound)
+            {
+                return Err(ReceiptProposalReject::MeasurementBoundExceedsProposal);
+            }
+            families.insert(binding.receipts.source_family);
+            roots.insert(binding.receipts.source_root_digest);
+        }
+        if families.len() < proposal.minimum_independent_source_families
+            || roots.len() < proposal.minimum_independent_source_roots
+        {
+            return Err(ReceiptProposalReject::InsufficientQualifiedSources);
+        }
+
+        let mut input_fields = Vec::new();
+        for binding in &source_bindings {
+            input_fields.extend(binding_fields(binding));
+        }
+        let input_episode_set_digest =
+            digest_fields(b"mycelix:mace:episode-set:v1\0", &input_fields);
+
+        Ok(Self {
+            schema_version: 1,
+            disposition: ConsolidationDispositionV1::PromoteToProcedure,
+            action: proposal.action,
+            target_scope: proposal.target_scope,
+            as_known: proposal.as_known,
+            policy_revision: proposal.policy_revision.to_owned(),
+            policy_digest: context.policy_digest,
+            principal_id: context.principal_id,
+            capability_receipt_digest: context.capability_receipt_digest,
+            consolidation_run_id: context.consolidation_run_id,
+            input_episode_set_digest,
+            destination_abstraction_id: context.destination_abstraction_id,
+            output_artifact_digest: context.output_artifact_digest,
+            retention_policy_id: context.retention_policy_id,
+            reversibility: ReversibilityClassV1::ReversibleWithSourceLinks,
+            source_bindings,
+        })
+    }
+
+    /// Canonical digest over decision context, output identity and every
+    /// receipt-bound source revision. String fields are length-prefixed.
+    pub fn canonical_digest(&self) -> String {
+        let mut fields = vec![
+            self.schema_version.to_string(),
+            match self.disposition {
+                ConsolidationDispositionV1::PromoteToProcedure => "promote_to_procedure",
+                ConsolidationDispositionV1::PromoteToRule => "promote_to_rule",
+                ConsolidationDispositionV1::RetainRaw => "retain_raw",
+                ConsolidationDispositionV1::CompressWithSourceLinks => "compress_with_source_links",
+                ConsolidationDispositionV1::Quarantine => "quarantine",
+                ConsolidationDispositionV1::Supersede => "supersede",
+                ConsolidationDispositionV1::ForgetFromActiveIndex => "forget_from_active_index",
+                ConsolidationDispositionV1::EraseForPrivacy => "erase_for_privacy",
+            }
+            .to_owned(),
+            self.action.name().to_owned(),
+            scope_code(self.target_scope).to_owned(),
+            self.as_known.valid_at_ms.to_string(),
+            self.as_known.known_at_ms.to_string(),
+            self.policy_revision.clone(),
+            self.policy_digest.clone(),
+            self.principal_id.clone(),
+            self.capability_receipt_digest.clone(),
+            self.consolidation_run_id.clone(),
+            self.input_episode_set_digest.clone(),
+            self.destination_abstraction_id.clone(),
+            self.output_artifact_digest.clone(),
+            self.retention_policy_id.clone(),
+            match self.reversibility {
+                ReversibilityClassV1::ReversibleWithSourceLinks => "reversible_with_source_links",
+                ReversibilityClassV1::IrreversiblePrivacyErase => "irreversible_privacy_erase",
+            }
+            .to_owned(),
+            self.source_bindings.len().to_string(),
+        ];
+        for binding in &self.source_bindings {
+            fields.extend(binding_fields(binding));
+        }
+        digest_fields(b"mycelix:mace:consolidation-decision:v1\0", &fields)
+    }
+}
+
+pub fn verify_and_release_promoted_experiences(
+    proposal: &ConsolidationReceiptProposalV1,
+    pack: &ConsolidationEvidencePackV1,
+    transfer_known_at_ms: i64,
+    verifier: &impl ConsolidationReceiptVerifierV1,
+) -> Result<(VerifiedConsolidationReceiptV1, Vec<Experience>), ReceiptUseReject> {
+    if proposal.disposition != ConsolidationDispositionV1::PromoteToProcedure {
+        return Err(ReceiptUseReject::NotProcedurePromotion);
+    }
+    if pack.as_known() != proposal.as_known {
+        return Err(ReceiptUseReject::KnowledgeSnapshotMismatch);
+    }
+
+    let verified = verifier
+        .verify(proposal)
+        .ok_or(ReceiptUseReject::MalformedVerificationReceipt)?;
+    if verified.proposal_digest != proposal.canonical_digest() {
+        return Err(ReceiptUseReject::ProposalDigestMismatch);
+    }
+    if !is_lower_sha256(&verified.verification_receipt_digest)
+        || verified.verifier_id.is_empty()
+        || verified.verifier_role.is_empty()
+    {
+        return Err(ReceiptUseReject::MalformedVerificationReceipt);
+    }
+    if verified.authority_scope != proposal.target_scope {
+        return Err(ReceiptUseReject::WrongAuthorityScope);
+    }
+    if verified.verified_at_ms < proposal.as_known.known_at_ms
+        || verified.verified_at_ms > transfer_known_at_ms
+    {
+        return Err(ReceiptUseReject::ReceiptNotKnownAtTransfer);
+    }
+
+    let event_ids: Vec<u32> = proposal
+        .source_bindings
+        .iter()
+        .map(|binding| binding.event_id)
+        .collect();
+    let current_bindings = pack
+        .source_bindings_for_event_ids(&event_ids)
+        .map_err(|_| ReceiptUseReject::SourceBindingsChanged)?;
+    if current_bindings != proposal.source_bindings {
+        return Err(ReceiptUseReject::SourceBindingsChanged);
+    }
+
+    let experiences = pack
+        .events()
+        .iter()
+        .filter(|event| event_ids.contains(&event.event_id()))
+        .map(|event| event.experience())
+        .collect();
+    if experiences.len() != event_ids.len() {
+        return Err(ReceiptUseReject::SourceBindingsChanged);
+    }
+    Ok((verified, experiences))
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum ConsolidationProposalV1 {
     ProposeProcedure(ProcedurePromotionProposalV1),

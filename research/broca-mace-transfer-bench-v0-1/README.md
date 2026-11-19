@@ -291,3 +291,11 @@ SHA-256(
 `canonical_upstream_identity` should identify the upstream dataset/series or primary source lineage, not a particular publisher's copy, acquisition artifact or transformation. Multiple publishers reusing one BIS/IMF series therefore share one root; separately sourced series with the same legacy numeric ID remain distinct when their verified canonical roots differ. Release/revision identity, exact artifact digest, acquisition mode and transformation digest remain separate receipt fields.
 
 The digest is only a stable identity. Trust still requires independent verification of the lineage receipt's issuer, signature, source policy revision, scope, validity, revocation status and canonical payload binding. The all-zero digest is unknown and fails closed. The current MACE `EvidenceVerifier` implementations remain fixtures/mocks; no production Mycelix cryptographic verifier is claimed.
+
+### Receipt-bound consolidation bridge (MACE v0.8)
+
+The consolidation package now turns a governed procedure-promotion proposal into a canonical `ConsolidationReceiptProposalV1`. It binds the bitemporal snapshot, action/scope, policy digest and revision, principal/capability receipt, consolidation run, input episode-set digest, destination artifact identity/digest, retention policy, reversibility class, and the complete receipt bundles for every selected source event.
+
+A separate `ConsolidationReceiptVerifierV1` interface must attest the exact canonical proposal digest before `verify_and_release_promoted_experiences` releases only the selected source-backed experiences to Session B. It rejects altered source revisions, changed output/policy identity, wrong authority scope, mismatched evidence-pack snapshots, and receipts not yet known at transfer time. Session C repeats the proposal/verification process over the surviving as-known evidence after retraction.
+
+The integration test uses a fixture verifier only. It is not a live Mycelix signature verifier, production authority service, durable memory write, or proof of physical privacy erasure. The existing raw-JSONL evaluator registry remains a separate test seam and still needs to consume this exact proposal/receipt schema.

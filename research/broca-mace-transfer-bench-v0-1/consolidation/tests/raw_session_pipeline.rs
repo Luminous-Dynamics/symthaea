@@ -4,7 +4,10 @@
 use std::collections::BTreeSet;
 
 use broca_mace_consolidation::{
-    ConsolidationPolicyV1, ConsolidationProposalV1, HoldReason,
+    verify_and_release_promoted_experiences, ConsolidationPolicyV1,
+    ConsolidationProposalV1, ConsolidationReceiptContextV1,
+    ConsolidationReceiptProposalV1, ConsolidationReceiptVerifierV1,
+    HoldReason, VerifiedConsolidationReceiptV1,
 };
 use broca_mace_ingress::{
     build_consolidation_evidence_pack, ingest_as_known, ingest_batch_as_known, AsKnownQuery,
@@ -138,6 +141,44 @@ impl EvidenceVerifier for FixtureVerifier {
     }
 }
 
+struct FixtureConsolidationVerifier {
+    verified_at_ms: Option<i64>,
+}
+
+impl ConsolidationReceiptVerifierV1 for FixtureConsolidationVerifier {
+    fn verify(
+        &self,
+        proposal: &ConsolidationReceiptProposalV1,
+    ) -> Option<VerifiedConsolidationReceiptV1> {
+        Some(VerifiedConsolidationReceiptV1 {
+            proposal_digest: proposal.canonical_digest(),
+            verification_receipt_digest: "d".repeat(64),
+            verifier_id: "did:key:fixture-independent-verifier".into(),
+            verifier_role: "independent_test_verifier".into(),
+            verified_at_ms: self
+                .verified_at_ms
+                .unwrap_or(proposal.as_known.known_at_ms + 1),
+            authority_scope: proposal.target_scope,
+        })
+    }
+}
+
+fn receipt_context(action: Action) -> ConsolidationReceiptContextV1 {
+    ConsolidationReceiptContextV1 {
+        consolidation_run_id: format!("session-a-consolidation-{}", action.name()),
+        principal_id: "did:key:fixture-consolidation-principal".into(),
+        capability_receipt_digest: "a".repeat(64),
+        policy_digest: "9".repeat(64),
+        destination_abstraction_id: format!("procedure:quality:{}", action.name()),
+        output_artifact_digest: if action == Action::A {
+            "b".repeat(64)
+        } else {
+            "c".repeat(64)
+        },
+        retention_policy_id: "retention:source-linked:v1".into(),
+    }
+}
+
 fn fixture_root_digest(seed: u32) -> broca_mace_policy::SourceRootDigest {
     let mut bytes = [0_u8; 32];
     bytes[..4].copy_from_slice(&seed.to_be_bytes());
@@ -219,12 +260,43 @@ fn raw_session_a_governed_proposal_session_b_decision_session_c_retraction() {
                 && proposal.independent_source_root_count == 3
     ));
 
-    // Session B consumes the pack projection, not the original raw/admitted batch.
-    let memory_b: Vec<Experience> = pack_a
-        .events()
-        .iter()
-        .map(|event| event.experience())
-        .collect();
+    let ConsolidationProposalV1::ProposeProcedure(proposal_a) = proposal_a else {
+        panic!("A-side promotion proposal required");
+    };
+    let ConsolidationProposalV1::ProposeProcedure(proposal_b) = proposal_b else {
+        panic!("B-side promotion proposal required");
+    };
+    let receipt_proposal_a = ConsolidationReceiptProposalV1::from_procedure_promotion(
+        &proposal_a,
+        &pack_a,
+        receipt_context(Action::A),
+    )
+    .expect("A proposal must bind exact source revisions");
+    let receipt_proposal_b = ConsolidationReceiptProposalV1::from_procedure_promotion(
+        &proposal_b,
+        &pack_a,
+        receipt_context(Action::B),
+    )
+    .expect("B proposal must bind exact source revisions");
+
+    let attestor = FixtureConsolidationVerifier {
+        verified_at_ms: None,
+    };
+    let (_receipt_a, mut memory_b) = verify_and_release_promoted_experiences(
+        &receipt_proposal_a,
+        &pack_a,
+        260,
+        &attestor,
+    )
+    .expect("independent verifier must attest A-side proposal");
+    let (_receipt_b, memory_b_side) = verify_and_release_promoted_experiences(
+        &receipt_proposal_b,
+        &pack_a,
+        260,
+        &attestor,
+    )
+    .expect("independent verifier must attest B-side proposal");
+    memory_b.extend(memory_b_side);
     let query_b = Query {
         scope: target_scope(),
     };
@@ -261,13 +333,127 @@ fn raw_session_a_governed_proposal_session_b_decision_session_c_retraction() {
         ConsolidationProposalV1::ProposeProcedure(_)
     ));
 
-    let memory_c: Vec<Experience> = pack_c
-        .events()
-        .iter()
-        .map(|event| event.experience())
-        .collect();
+    let ConsolidationProposalV1::ProposeProcedure(proposal_b_c) =
+        consolidation.decide_procedure_promotion(&support_b_c)
+    else {
+        panic!("surviving B-side evidence must propose promotion");
+    };
+    let receipt_proposal_b_c = ConsolidationReceiptProposalV1::from_procedure_promotion(
+        &proposal_b_c,
+        &pack_c,
+        receipt_context(Action::B),
+    )
+    .expect("Session C proposal must bind surviving source revisions");
+    let (_receipt_c, memory_c) = verify_and_release_promoted_experiences(
+        &receipt_proposal_b_c,
+        &pack_c,
+        280,
+        &FixtureConsolidationVerifier {
+            verified_at_ms: None,
+        },
+    )
+    .expect("independent verifier must attest Session C proposal");
     assert_eq!(decide(Policy::CausalQualified, &memory_c, query_b).action, None);
     assert!(decide(Policy::ActiveProbe, &memory_c, query_b)
         .probe
         .is_some());
 }
+
+#[test]
+fn consolidation_receipt_rejects_source_substitution_and_late_attestation() {
+    let raw_events = vec![
+        raw_event(100, Action::A, 0.91),
+        raw_event(101, Action::A, 0.90),
+        raw_event(102, Action::A, 0.89),
+    ];
+    let batch = ingest_batch_as_known(
+        &raw_events,
+        as_known(250),
+        &FixtureVerifier::default(),
+    )
+    .unwrap();
+    let pack = build_consolidation_evidence_pack(&batch, &[100, 101, 102]).unwrap();
+    let evidence = pack.summarize_action_for_scope(target_scope(), Action::A);
+    let ConsolidationProposalV1::ProposeProcedure(procedure) =
+        ConsolidationPolicyV1::default().decide_procedure_promotion(&evidence)
+    else {
+        panic!("evidence should propose promotion");
+    };
+    let proposal = ConsolidationReceiptProposalV1::from_procedure_promotion(
+        &procedure,
+        &pack,
+        receipt_context(Action::A),
+    )
+    .unwrap();
+    let verifier = FixtureConsolidationVerifier {
+        verified_at_ms: None,
+    };
+    let (verified, _) =
+        verify_and_release_promoted_experiences(&proposal, &pack, 260, &verifier).unwrap();
+
+    let mut substituted = proposal.clone();
+    substituted.source_bindings[0].receipts.source_artifact_digest = "f".repeat(64);
+    assert_eq!(
+        verify_and_release_promoted_experiences(
+            &substituted,
+            &pack,
+            260,
+            &verifier,
+        )
+        .unwrap_err(),
+        broca_mace_consolidation::ReceiptUseReject::SourceBindingsChanged
+    );
+
+    let late_verifier = FixtureConsolidationVerifier {
+        verified_at_ms: Some(280),
+    };
+    assert_eq!(
+        verify_and_release_promoted_experiences(
+            &proposal,
+            &pack,
+            270,
+            &late_verifier,
+        )
+        .unwrap_err(),
+        broca_mace_consolidation::ReceiptUseReject::ReceiptNotKnownAtTransfer
+    );
+    assert_eq!(verified.proposal_digest, proposal.canonical_digest());
+}
+
+#[test]
+fn consolidation_proposal_digest_binds_output_and_policy_identity() {
+    let raw_events = vec![
+        raw_event(100, Action::A, 0.91),
+        raw_event(101, Action::A, 0.90),
+        raw_event(102, Action::A, 0.89),
+    ];
+    let batch = ingest_batch_as_known(
+        &raw_events,
+        as_known(250),
+        &FixtureVerifier::default(),
+    )
+    .unwrap();
+    let pack = build_consolidation_evidence_pack(&batch, &[100, 101, 102]).unwrap();
+    let evidence = pack.summarize_action_for_scope(target_scope(), Action::A);
+    let ConsolidationProposalV1::ProposeProcedure(procedure) =
+        ConsolidationPolicyV1::default().decide_procedure_promotion(&evidence)
+    else {
+        panic!("evidence should propose promotion");
+    };
+    let original = ConsolidationReceiptProposalV1::from_procedure_promotion(
+        &procedure,
+        &pack,
+        receipt_context(Action::A),
+    )
+    .unwrap();
+    let mut changed = receipt_context(Action::A);
+    changed.output_artifact_digest = "e".repeat(64);
+    let changed = ConsolidationReceiptProposalV1::from_procedure_promotion(
+        &procedure,
+        &pack,
+        changed,
+    )
+    .unwrap();
+    assert_ne!(original.canonical_digest(), changed.canonical_digest());
+}
+
