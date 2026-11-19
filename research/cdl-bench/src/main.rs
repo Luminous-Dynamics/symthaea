@@ -579,7 +579,11 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
         let zstd = external_compressed_len("zstd", &["-q", "-c"], &raw)
             .map_or_else(|| "NA".to_owned(), |value| value.to_string());
 
-        for transform in [Float64Transform::Raw, Float64Transform::XorPrevious] {
+        for transform in [
+            Float64Transform::Raw,
+            Float64Transform::XorPrevious,
+            Float64Transform::XorLeadingTrailing,
+        ] {
             for model in [ModelKind::Order0, ModelKind::Order1] {
                 let encode_started = Instant::now();
                 let frame = compress_f64(&values, transform, model)?;
@@ -601,6 +605,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 let transform_name = match transform {
                     Float64Transform::Raw => "raw",
                     Float64Transform::XorPrevious => "xor_previous_varint",
+                    Float64Transform::XorLeadingTrailing => "xor_leading_trailing",
                 };
                 println!(
                     "{name},single,{transform_name},{model_name},NA,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
@@ -628,7 +633,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 format!("{:.6}", frame.len() as f64 / raw.len() as f64)
             };
             println!(
-                "{name},segment_portfolio,best_of_four,best_of_four,{segment_size},{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
+                "{name},segment_portfolio,best_of_six,best_of_six,{segment_size},{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
                 raw.len(),
                 frame.len()
             );
@@ -651,7 +656,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 format!("{:.6}", online_frame.len() as f64 / raw.len() as f64)
             };
             println!(
-                "{name},online_historical_cost,past_segment_mean,best_of_four,{segment_size},{},{},{zstd},{online_ratio},{online_encode_ns},{online_decode_ns},exact",
+                "{name},online_historical_cost,past_segment_mean,best_of_six,{segment_size},{},{},{zstd},{online_ratio},{online_encode_ns},{online_decode_ns},exact",
                 raw.len(),
                 online_frame.len()
             );
@@ -659,10 +664,10 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     }
 
     println!("# note=random-bit-pattern includes arbitrary IEEE-754 payloads, including NaNs, infinities and subnormals");
-    println!("# note=XOR-previous is a simple reversible reference transform, not Gorilla, Chimp or DeXOR");
-    println!("# note=segment_portfolio is an offline best-of-four per-chunk size oracle; every child header plus the outer F64S header is counted");
+    println!("# note=XOR-previous varint and XOR-leading/trailing-zero packing are simple reversible reference transforms, not Gorilla, Chimp or DeXOR");
+    println!("# note=segment_portfolio is an offline best-of-six per-chunk size oracle; every child header plus the outer F64S header is counted");
     println!("# note=segment_portfolio is not an online selector or a WZS reproduction");
-    println!("# note=online_historical_cost chooses each chunk using only prior chunks; after each chunk both sides recompute all four candidate sizes to update shared policy state");
+    println!("# note=online_historical_cost chooses each chunk using only prior chunks; after each chunk both sides recompute all six candidate sizes to update shared policy state");
     println!("# note=online_historical_cost uses the chosen transform/model ID in the child F64C header and rejects policy-mismatched children");
     println!("# note=online_historical_cost is compute-heavy diagnostic adaptation, not a tuned practical selector");
     println!("# note=compare against DeXOR, Gorilla, Chimp, ACTF, Rabbit and Dolphin only with matching data and framing");
