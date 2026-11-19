@@ -26,12 +26,12 @@ The CLI hashes exact input bytes and binds the supplied source commit. The recei
 ## Gate semantics
 
 - A relative-motion `Docked` result is only an approach result.
-- Capture acceptance additionally requires frame/epoch and interface identity, contact pose/speed/angular-rate/impulse limits, arm endpoint error and clearance, joint-limit margin, bus-rate envelope, latch engagement, a retention witness, and named evidence references.
+- Capture acceptance additionally requires frame/epoch and interface identity, contact position and attitude error, relative speed/angular-rate/impulse limits, arm endpoint error and clearance, a declared joint-limit margin, bus-rate envelope, latch engagement, a retention witness, and named evidence references.
 - Known hard violations return `rejected`.
 - Missing required observations or evidence return `indeterminate`.
 - Passing the contract returns `accepted_for_handoff` with `authority_granted = false`. It is not permission to actuate, transfer fluid, perform servicing, or declare a mission safe.
 
-The test-only baseline called `proximity_only` accepts any case whose approach outcome is `docked`. The reference gate must demonstrate why that baseline false-accepts cases with invalid/missing capture evidence.
+The test-only `proximity_only` baseline accepts any case whose approach outcome is `docked`. In the frozen 19-case corpus, it falsely accepts 17 cases that the composite gate rejects or leaves indeterminate. The full gate expects 1 positive control, 14 rejections and 4 indeterminate cases, with zero expected-result mismatches. These are fixture-contract counts, not empirical probabilities.
 
 ## Evidence ceiling
 
