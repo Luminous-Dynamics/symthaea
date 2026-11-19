@@ -90,3 +90,37 @@ The deterministic harness simulates 10,000 independent null paths with 50 looks 
 An intentionally invalid negative control chooses its discrepancy after observing the current residual. It should cross frequently, demonstrating that the local commit/observe API cannot prevent a caller from leaking the outcome through an out-of-band path.
 
 The harness is a deterministic software regression and a useful calibration warning light. It does not prove the martingale theorem, establish type-I error for real sensors or physical trajectories, or qualify persistent/correlated noise. The valid processes rely on the correctly specified simple conditional Gaussian null with predictable (d_t) and known (sigma_t). A real research campaign still needs independent null calibration, sealed alternatives, full action logs, and multiplicity control across candidate transformations and probe families.
+
+
+## Finite-reference conformal e-process for simulator nulls
+
+The crate also contains a separate finite-reference conformal process in `conformal`:
+
+[
+e_t = (K_t+1) \frac{S_t(Y_t)}{S_t(Y_t)+\sum_{j=1}^{K_t} S_t(\widetilde{Y}_{t,j})}.
+]
+
+Here (S_t) is a positive score selected using only information available before the current observation, and the (widetilde{Y}_{t,j}) are fresh conditional draws from the candidate null simulator. Under the null, the observed value and the reference draws must be conditionally exchangeable. Then the normalized observed score has conditional expectation (1/(K_t+1)), so the factor has conditional mean one. Multiplying these factors gives an e-process.
+
+The implementation:
+- commits candidate, observation, decision, score-profile and reference-batch identities before consuming the score values;
+- rejects reused observation/reference-batch IDs, score/profile mismatches, invalid scores and reference-count mismatches;
+- evaluates the ratio in log space;
+- retains raw score inputs in a versioned receipt and independently replays the complete transcript.
+
+This is a **finite-reference conformal e-process core**, inspired by the construction in SLICE. It is not a full SLICE reproduction: it does not train a neural ratio estimator, invert a continuous parameter-indexed family into confidence sequences, implement certified continuous-parameter outer approximations, or address every nuisance-parameter construction in the paper. It also cannot prove that the caller generated fresh independent simulations or applied the same score implementation to all (K+1) samples; the caller must preserve those execution records independently. Score quality affects power and detection delay, not validity under the stated exchangeability assumptions.
+
+For symmetry testing, one candidate transformation defines the null simulator for paired residuals or another declared symmetry diagnostic. A conformal e-process can falsify that candidate under the simulator's conditional observation model. Non-rejection remains unresolved; it is not an exact symmetry proof, physical qualification, or permission to prune. Testing many candidate transformations requires a declared family-wise or simultaneous-confidence-set construction; this single-candidate class does not silently provide multiplicity control.
+
+### Current sequential-inference comparators
+
+- **Fixed-horizon terminal test:** the matched Neyman–Pearson or application-specific test at a frozen horizon.
+- **Induced anytime-valid terminal test:** Koning & van Meer show an arbitrary valid terminal test can be sequentialized while matching its terminal-horizon decision, so an e-process is not the only anytime-valid route.
+- **Gaussian LR e-process:** direct likelihood-ratio reference, with a transparent conditional Gaussian assumption.
+- **Finite-reference conformal e-process:** simulator-backed candidate nulls without tractable likelihoods; reference simulator calls are part of the acquisition cost.
+- **Faithful SLICE implementation:** neural ratio score, fresh null references, candidate-grid inversion and any continuous-grid certification required by the evaluated setting. This remains a future baseline, not an implemented feature here.
+- **Invalid post-hoc leakage:** explicit negative control showing that selecting a discrepancy after observing the current outcome destroys the predictable-betting argument.
+
+### Expanded calibration output
+
+The deterministic calibration example now evaluates three valid null procedures (single Gaussian, fixed Gaussian mixture, and finite-reference conformal) plus the invalid post-hoc leakage control. It reports empirical ever-crossing rates and Wilson 95% intervals for 10,000 seeded paths with 50 looks. The conformal lane uses five fresh standard-normal reference draws per look and a positive history-adaptive score. It is a reproducible regression diagnostic, not a scientific type-I calibration for real systems.
