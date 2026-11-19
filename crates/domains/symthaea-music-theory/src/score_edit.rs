@@ -568,6 +568,23 @@ pub fn apply_score_edit_plan(
                 None,
                 "operation selects no fully contained source notes",
             );
+        } else {
+            let has_effective_change = note_indices.iter().any(|&index| {
+                let note = &source.notes[index];
+                let scaled = note.velocity * f32::from(operation.numerator)
+                    / f32::from(operation.denominator);
+                scaled != note.velocity
+            });
+            if !has_effective_change {
+                push_issue(
+                    &mut issues,
+                    ScoreEditIssueCodeV1::NoOpVelocityScale,
+                    Some(&operation.id),
+                    Some(operation.part_id),
+                    None,
+                    "selected notes would retain identical velocities; a no-op receipt is forbidden",
+                );
+            }
         }
         prepared.push(PreparedOperation {
             operation,
@@ -677,14 +694,16 @@ pub fn apply_score_edit_plan(
             let before = note.velocity;
             let after = before * f32::from(item.operation.numerator)
                 / f32::from(item.operation.denominator);
-            note.velocity = after;
-            changes.push(ScoreNoteVelocityChangeV1 {
-                operation_id: item.operation.id.clone(),
-                note_index: index,
-                part_id: item.operation.part_id,
-                before,
-                after,
-            });
+            if after != before {
+                note.velocity = after;
+                changes.push(ScoreNoteVelocityChangeV1 {
+                    operation_id: item.operation.id.clone(),
+                    note_index: index,
+                    part_id: item.operation.part_id,
+                    before,
+                    after,
+                });
+            }
         }
     }
     changes.sort_by_key(|change| change.note_index);
@@ -1026,6 +1045,19 @@ pub fn verify_score_edit_candidate(
             None,
             "plan selects no source notes",
         );
+    }
+    for (operation, _, _) in &operation_windows {
+        if !expected_changes
+            .values()
+            .any(|(operation_id, _, _, _)| operation_id == &operation.id)
+        {
+            issue(
+                ScoreEditVerificationIssueCodeV1::InvalidOperationScope,
+                Some(&operation.id),
+                None,
+                "operation produced no effective velocity change",
+            );
+        }
     }
 
     let mut receipt_changes: BTreeMap<usize, &ScoreNoteVelocityChangeV1> = BTreeMap::new();
