@@ -32,9 +32,11 @@ Analyze the resulting observations. The metric registry must be explicit:
     METRICS='score_note_count,score_total_beats,score_total_seconds,score_tempo_bpm,score_notes_per_beat,score_mean_pitch_midi,score_pitch_span_semitones,score_pitch_stddev_midi,score_mean_velocity,score_velocity_stddev,score_mean_section_intensity,score_mean_note_duration_beats,score_assigned_part_fraction,score_universal_fatal_count,score_style_fatal_count,score_warning_count,score_universal_valid,score_full_validation_valid,score_pitch_class_diversity,score_pitch_class_entropy_bits,score_melody_mean_interval_semitones,score_melody_step_fraction,score_melody_leap_fraction,score_onset_ioi_stddev_beats,score_offbeat_onset_fraction,score_voice_role_entropy_bits,score_duration_variety_count,score_section_intensity_stddev,identity_score_meter_beats,score_distinct_midi_pitches,identity_score_key_tonic_pc,score_key_major_indicator,score_key_minor_indicator,score_key_modal_indicator,score_emphasis_normal_count,score_emphasis_climax_count,score_emphasis_cadential_count,score_emphasis_phrase_start_count,score_form_section_count,score_plan_requested_bars,score_plan_realized_bars,score_fingerprint_form_distance,score_fingerprint_harmony_distance,score_fingerprint_orchestration_distance,score_fingerprint_rhythm_distance,score_fingerprint_contour_distance,score_fingerprint_tempo_meter_distance,score_fingerprint_pitch_class_distance,score_fingerprint_interval_distance,score_fingerprint_chord_quality_distance,score_fingerprint_cadence_distance,score_fingerprint_motif_distance,identity_exact_fingerprint_high32,identity_exact_fingerprint_low32'
     cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin analyze-results -- discovery /tmp/muse-observations.csv "$METRICS" coverage.csv effects.csv summary.csv axis-invariance.csv
 
-The root Cargo workspace currently needs the separate unmanifested-member
-exclusion repair before this example can be compiled through Cargo. Do not
-interpret that workspace blocker as a composer or adapter failure.
+This adapter branch carries the narrow unmanifested-member exclusions and
+matching workspace-target ratchet from PR #12843 so a real package build can be
+attempted here. The independent workspace-repair PR remains open for its own
+review/landing path; this branch does not claim that the shared main workspace
+has been repaired.
 
 ## What is measured
 
@@ -50,8 +52,10 @@ The adapter materializes the registered factors exactly:
 Every composition routes through the style's canonical
 compose_with_grammar_plan entry point and its frozen grammar profile/spec.
 
-For each symbolic score, it serializes the score with serde_json, computes a
-SHA-256 digest over those exact bytes, and emits 54 scalar/identity metrics:
+For each symbolic score, it serializes the score with serde_json and computes an
+artifact SHA-256 over those exact bytes. It also computes a canonical semantic
+SHA-256 over score metadata and a sorted event multiset. It emits 54
+scalar/identity metrics:
 
 1. note count
 2. actual score length in beats
@@ -131,7 +135,13 @@ notes belong to one part.
   version, grammar family, declared supported axes, and validator counts.
 - Output rows follow canonical manifest order and fixed metric order.
 
-The adapter's CSV is an execution receipt, not an authenticity certificate. Every row carries both an artifact SHA-256 over the exact serde_json bytes and a canonical semantic SHA-256. The latter sorts event tuples and binds key, tempo, meter, total duration, PartId, role, pitch, exact rational onset/duration, velocity, emphasis and section intensity; harmless note-vector reordering therefore does not alter the semantic digest.
+The adapter's CSV is an execution receipt, not an authenticity certificate. Its
+raw artifact digest binds exact serde_json bytes. Its canonical semantic digest
+binds key/tonality, tempo, meter, total duration, PartId, role, pitch, exact
+rational onset/duration, velocity, emphasis, and section intensity; sorting makes
+it insensitive to harmless note-vector reordering. The axis-invariance report
+uses the canonical digest, while raw artifact SHA-256 remains available for
+reproducible serialization evidence. Every row carries both an artifact SHA-256 over the exact serde_json bytes and a canonical semantic SHA-256. The latter sorts event tuples and binds key, tempo, meter, total duration, PartId, role, pitch, exact rational onset/duration, velocity, emphasis and section intensity; harmless note-vector reordering therefore does not alter the semantic digest.
 It hashes the serialized symbolic score and binds its source commit and input
 manifest digest as note fields. It does not render audio, hash rendered audio,
 measure listener preference, certify legal rights, or establish that the
