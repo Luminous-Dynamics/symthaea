@@ -1,0 +1,118 @@
+{
+  "record_contract": "SC-QXY-SOURCE-RECORD-0.1",
+  "record_id": "ponticelli-2026-quantum-vs-thermal-qxy",
+  "record_status": "source_reconstructed_from_open_arxiv_preprint; publication_identity_crosschecked",
+  "source": {
+    "title": "Quantum versus thermal fluctuations in phase transitions of two-dimensional superconductors",
+    "authors": [
+      "Andrea Ponticelli",
+      "Francesco Giuseppe Capone",
+      "Vittorio Cataudella",
+      "Giulio De Filippis",
+      "Antonio De Candia",
+      "Carmine Antonio Perroni"
+    ],
+    "journal": "Physical Review B",
+    "volume": 114,
+    "article_number": "134503",
+    "publication_date": "2026-09-03",
+    "doi": "10.1103/jbz7-l9h4",
+    "published_url": "https://doi.org/10.1103/jbz7-l9h4",
+    "preprint_id": "arXiv:2512.20476",
+    "preprint_date": "2025-12-23",
+    "preprint_url": "https://arxiv.org/abs/2512.20476"
+  },
+  "model": {
+    "model_id": "2d-quantum-xy-phase-representation-ponticelli-2026",
+    "lattice": "LxL square lattice",
+    "hamiltonian": "H = -t * sum_<ij> cos(phi_i - phi_j) + (U/2) * sum_i (-i d/dphi_i)^2",
+    "josephson_energy": "t",
+    "on_site_interaction": "U",
+    "parameter_ratio": "U/t",
+    "conventions": {
+      "hbar": 1,
+      "boltzmann_constant": 1,
+      "cooper_pair_charge_2e": 1,
+      "energy_reference": "t"
+    },
+    "path_integral_mapping": {
+      "action": "S = -sum_(tau,<ij>) K_s cos(phi_i(tau)-phi_j(tau)) - sum_(tau,i) K_tau cos(phi_i(tau)-phi_i(tau+Delta_tau))",
+      "spatial_coupling": "K_s = t * Delta_tau",
+      "imaginary_time_coupling": "K_tau = 1 / (U * Delta_tau)",
+      "imaginary_time_slices": "N_tau = beta / Delta_tau",
+      "boundary_condition": "periodic in imaginary time",
+      "mapping": "2D quantum rotor -> anisotropic 3D classical phase action"
+    }
+  },
+  "numerical_method": {
+    "method": "path-integral quantum Monte Carlo",
+    "updates": [
+      "Wolff embedded-cluster updates",
+      "Metropolis updates"
+    ],
+    "source_notes": [
+      "The authors state Metropolis moves help avoid slowing down near criticality where Wolff clusters become comparable to the system size.",
+      "Spatial and imaginary-time couplings are anisotropic at finite Delta_tau.",
+      "N_tau must be increased and Delta_tau extrapolated; small imaginary-time discretisation can systematically underestimate stiffness."
+    ]
+  },
+  "reported_results": {
+    "finite_temperature_transition": "BKT for U < U_c",
+    "bkt_finite_size_criterion": "Upsilon_L(U,T_c(L)) = 2*T_c(L)/(t*pi)",
+    "bkt_size_scaling": "T_c(L) = T_c(infinity) + a_T / ln(b_T*L)^2",
+    "quantum_critical_point": {
+      "Uc_over_t": 5.72,
+      "uncertainty": 0.01,
+      "method": "linear extrapolation of finite-Delta_tau critical interactions to Delta_tau -> 0",
+      "finite_delta_tau_example": {
+        "delta_tau": 0.0066666666667,
+        "Uc_over_t": 5.63,
+        "uncertainty": 0.02
+      }
+    },
+    "universality": {
+      "class": "3D XY",
+      "dynamic_exponent_z": 1,
+      "correlation_length_exponent_nu": 0.671,
+      "scaling": "Upsilon = L^(-z) f((U-U_c)*L^(1/nu))",
+      "critical_size_relation": "Upsilon * L is size-independent at U_c when z=1"
+    },
+    "examples": {
+      "stiffness": {
+        "L": 48,
+        "U_over_t": 4,
+        "imaginary_time_slices": 1000
+      },
+      "low_temperature_scaling": {
+        "temperature_over_t": 0.05,
+        "imaginary_time_slices": 5000
+      },
+      "conductivity": {
+        "L": 48,
+        "imaginary_time_slices": 1000,
+        "U_over_t": 4,
+        "temperatures_over_t": [
+          0.3,
+          0.72
+        ]
+      }
+    },
+    "regimes": [
+      "For U < U_c, finite-temperature BKT behavior remains and the transition temperature decreases with U.",
+      "For U > U_c, the paper reports finite resistance at all studied nonzero temperatures and a metallic-to-insulating crossover.",
+      "The total vortex density grows with U and remains finite at low temperature in the studied quantum regime; the reported total vortex count does not separate bound vortex-antivortex pairs from free vortices."
+    ]
+  },
+  "transport": {
+    "current_correlation": "F(tau) = < I(tau) I(0) >",
+    "conductivity_decomposition": "Re sigma(omega,T) = D(T) delta(omega) + sigma_reg(omega,T)",
+    "kernel": "F(tau) = (1/pi) * integral_0^infinity d omega sigma_reg(omega) * omega*cosh(omega*(beta-2*tau)/2)/sinh(omega*beta/2)",
+    "continuation_method": "Constrained Lorentzian plus symmetrized Gaussian in the normal phase; symmetrized Gaussian in the superconducting phase",
+    "limitations": [
+      "Analytic continuation is ill-conditioned because current-current data contain Monte Carlo statistical noise.",
+      "The source explicitly reports that finite-size effects prevent physically reliable continuation near the critical temperature.",
+      "The assumed continuation basis is a source-specific ansatz and is not a uniquely determined spectrum."
+    ]
+  },
+  "claim_ceiling": "Literature source record only. These are paper-reported model and numerical results; Symthaea has not independently reproduced the QMC calculations or measured a material."
+}

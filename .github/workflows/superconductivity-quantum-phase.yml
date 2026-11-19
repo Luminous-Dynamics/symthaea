@@ -1,0 +1,113 @@
+name: Superconductivity Quantum Phase Contract
+
+on:
+  pull_request:
+    paths:
+      - "tools/superconductivity-quantum-phase-harness/**"
+      - "data/schemas/superconductivity_quantum_phase_instance_v0_1.schema.json"
+      - "data/research/superconductivity_quantum_phase_fixture_v0_1.json"
+      - "data/research/superconductivity_quantum_phase_QXY_smoke_fixture_v0_1.json"
+      - "data/research/superconductivity_quantum_phase_ponticelli_2026_U4_T03_input_fixture_v0_1.json"
+      - "data/research/superconductivity_quantum_phase_ponticelli_2026_source_record_v0_1.json"
+      - "research/superconductivity/quantum_phase/**"
+      - ".github/workflows/superconductivity-quantum-phase.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: superconductivity-quantum-phase-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  quantum-phase-contract:
+    name: Quantum-phase model input and negative controls
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path tools/superconductivity-quantum-phase-harness/Cargo.toml --all -- --check
+
+      - name: Generate isolated dependency lockfile
+        run: cargo generate-lockfile --manifest-path tools/superconductivity-quantum-phase-harness/Cargo.toml
+
+      - name: Test quantum-phase input contract and negative controls
+        run: cargo test --locked --manifest-path tools/superconductivity-quantum-phase-harness/Cargo.toml --bin sc_quantum_phase_audit
+
+      - name: Run synthetic quantum-phase input audit
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-quantum-phase-harness/Cargo.toml --bin sc_quantum_phase_audit -- \
+            --schema data/schemas/superconductivity_quantum_phase_instance_v0_1.schema.json \
+            --fixture data/research/superconductivity_quantum_phase_fixture_v0_1.json \
+            --out "$RUNNER_TEMP/sc-quantum-phase-input-receipt.json"
+          cat "$RUNNER_TEMP/sc-quantum-phase-input-receipt.json"
+
+      - name: Run source-aligned Ponticelli QXY input audit
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-quantum-phase-harness/Cargo.toml --bin sc_quantum_phase_audit -- \
+            --schema data/schemas/superconductivity_quantum_phase_instance_v0_1.schema.json \
+            --fixture data/research/superconductivity_quantum_phase_ponticelli_2026_U4_T03_input_fixture_v0_1.json \
+            --out "$RUNNER_TEMP/sc-quantum-phase-ponticelli-input-receipt.json"
+          cat "$RUNNER_TEMP/sc-quantum-phase-ponticelli-input-receipt.json"
+
+      - name: Test anisotropic QXY path-integral solver and negative controls
+        run: cargo test --locked --manifest-path tools/superconductivity-quantum-phase-harness/Cargo.toml --bin sc_qxy_phase_pimc
+
+      - name: Run small synthetic QXY path-integral smoke
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-quantum-phase-harness/Cargo.toml --bin sc_qxy_phase_pimc -- \
+            --schema data/schemas/superconductivity_quantum_phase_instance_v0_1.schema.json \
+            --fixture data/research/superconductivity_quantum_phase_QXY_smoke_fixture_v0_1.json \
+            --warmup-sweeps 1 --measurement-sweeps 2 --replicates 2 \
+            --out "$RUNNER_TEMP/sc-qxy-pimc-smoke-receipt.json"
+          cat "$RUNNER_TEMP/sc-qxy-pimc-smoke-receipt.json"
+
+      - name: Run Clippy
+        run: |
+          cargo clippy --locked --manifest-path tools/superconductivity-quantum-phase-harness/Cargo.toml --bin sc_quantum_phase_audit -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-quantum-phase-harness/Cargo.toml --bin sc_qxy_phase_pimc -- -D warnings
+
+      - name: Record exact-run identity
+        if: always()
+        run: |
+          {
+            echo "git_head=$(git rev-parse HEAD)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            sha256sum data/schemas/superconductivity_quantum_phase_instance_v0_1.schema.json
+            sha256sum data/research/superconductivity_quantum_phase_fixture_v0_1.json
+            sha256sum data/research/superconductivity_quantum_phase_QXY_smoke_fixture_v0_1.json
+            sha256sum data/research/superconductivity_quantum_phase_ponticelli_2026_U4_T03_input_fixture_v0_1.json
+            sha256sum data/research/superconductivity_quantum_phase_ponticelli_2026_source_record_v0_1.json
+            sha256sum tools/superconductivity-quantum-phase-harness/Cargo.toml
+            sha256sum tools/superconductivity-quantum-phase-harness/src/main.rs
+            sha256sum tools/superconductivity-quantum-phase-harness/src/bin/qxy_phase_pimc.rs
+            if [ -f tools/superconductivity-quantum-phase-harness/Cargo.lock ]; then
+              sha256sum tools/superconductivity-quantum-phase-harness/Cargo.lock
+            else
+              echo "cargo_lock=not-generated"
+            fi
+          } > "$RUNNER_TEMP/sc-quantum-phase-environment.txt"
+
+      - name: Upload exact-run receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sc-quantum-phase-exact-run-evidence
+          if-no-files-found: warn
+          path: |
+            tools/superconductivity-quantum-phase-harness/Cargo.lock
+            ${{ runner.temp }}/sc-quantum-phase-environment.txt
+            ${{ runner.temp }}/sc-quantum-phase-input-receipt.json
+            ${{ runner.temp }}/sc-quantum-phase-ponticelli-input-receipt.json
+            ${{ runner.temp }}/sc-qxy-pimc-smoke-receipt.json

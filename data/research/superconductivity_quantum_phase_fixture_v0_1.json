@@ -1,0 +1,167 @@
+{
+  "contract": "SC-QUANTUM-PHASE-0.1",
+  "instance_id": "synthetic-quantum-rotor-ring-4-v0",
+  "fixture_only": true,
+  "model": {
+    "kind": "compact_quantum_rotor",
+    "equation_id": "generic-charging-plus-josephson-rotor-v0.1",
+    "hbar_convention": "hbar_equals_1",
+    "kB_convention": "kB_equals_1",
+    "energy_unit": "coupling_energy_units",
+    "temperature_unit": "coupling_energy_units",
+    "charge_convention": "integer_cooper_pair_number",
+    "phase_compactification": "2pi",
+    "source_model_id": null,
+    "notes": "Synthetic four-site ring to exercise the input contract only. U_ij and E_J values are arbitrary dimensionless fixture values and are not fitted to a material or to Ponticelli et al.",
+    "pair_charge_convention": "2e_equals_1"
+  },
+  "graph": {
+    "spatial_dimension": 1,
+    "embedding": "physical_coordinates",
+    "topology_family": "periodic_ring",
+    "box_lengths": [
+      4
+    ],
+    "periodic_axes": [
+      0
+    ],
+    "nodes": [
+      {
+        "node_id": "n0",
+        "position": [
+          0
+        ]
+      },
+      {
+        "node_id": "n1",
+        "position": [
+          1
+        ]
+      },
+      {
+        "node_id": "n2",
+        "position": [
+          2
+        ]
+      },
+      {
+        "node_id": "n3",
+        "position": [
+          3
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "e0",
+        "source": "n0",
+        "target": "n1",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0
+        ]
+      },
+      {
+        "edge_id": "e1",
+        "source": "n1",
+        "target": "n2",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0
+        ]
+      },
+      {
+        "edge_id": "e2",
+        "source": "n2",
+        "target": "n3",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          0
+        ]
+      },
+      {
+        "edge_id": "e3",
+        "source": "n3",
+        "target": "n0",
+        "josephson_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "periodic_image_shift": [
+          1
+        ]
+      }
+    ]
+  },
+  "charging": {
+    "matrix_kind": "diagonal_positive",
+    "energy_unit": "coupling_energy_units",
+    "matrix_u_ij": [
+      [
+        2,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        2,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        2,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        2
+      ]
+    ],
+    "offset_charges": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "simulation": {
+    "algorithm": "path_integral_quantum_monte_carlo",
+    "temperature": 0.5,
+    "temperature_unit": "coupling_energy_units",
+    "imaginary_time_slices": 16,
+    "random_seed": 17,
+    "representation": "phase_path_integral",
+    "imaginary_time_step": 0.125,
+    "charge_basis_cutoff": {
+      "mode": "not_applicable",
+      "max_abs_charge_state": null
+    }
+  },
+  "bath": {
+    "mode": "none",
+    "coupling_operator": "none",
+    "coupling_strength": 0,
+    "low_frequency_exponent": null,
+    "cutoff_energy": null,
+    "spectral_density": []
+  },
+  "external_flux": {
+    "mode": "zero",
+    "total_flux_quanta": 0
+  },
+  "source_references": [
+    "https://doi.org/10.1103/jbz7-l9h4",
+    "https://doi.org/10.1103/PhysRevB.37.3283"
+  ],
+  "claim_ceiling": "Model input only; not a solved quantum state, measured Tc, conductivity result, or experimental material observation."
+}
