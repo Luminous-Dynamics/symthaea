@@ -19,7 +19,7 @@ dependencies.
 - E3 public development fixtures with held-out combinations assembled from individually seen mechanism components; metadata is not serialized into learner-visible streams. These fixed tuples are visible in source and are not a blind test split.
 - CLI file encode/decode and an E0 length comparison against installed
   Zstandard, Brotli, XZ and gzip commands.
-- Exact IEEE-754 f64 raw/XOR-previous framing, bit-preserving test fixtures, and a fixed-chunk best-of-four segment-local portfolio baseline.
+- Exact IEEE-754 f64 raw/XOR-previous framing, bit-preserving test fixtures, a fixed-chunk best-of-four size oracle, and a decoder-synchronous historical-cost online selector.
 - SCM-specific typed-field, temporal-lag, oracle-parent, hybrid and
   shuffled-parent byte predictors, plus fixed-share and CUSUM change-point
   mixtures, all using the same arithmetic coder and exact decoder path.
@@ -39,19 +39,27 @@ does not perform floating-point subtraction or normalization. Tests compare
 `to_bits()` for each sample, including NaN payloads, infinities, signed zero
 and subnormals.
 
-The command also emits a `segment_portfolio` row at chunk sizes 64, 256 and
-1,024. The F64S outer frame contains a fixed policy ID, count, chunk size,
-segment count and CRC-protected header. For every chunk, the encoder tries
-Raw/Order0, Raw/Order1, XOR/Order0 and XOR/Order1 and retains the smallest
-complete F64C child frame. Every child header and CRC, plus the outer F64S
-header, is counted in the result. The decoder reads the fixed segment lengths
-and the chosen child-frame metadata; no per-segment selector symbols are sent.
+The command also emits two segmented rows at chunk sizes 64, 256 and 1,024:
 
-This is an **offline best-of-four size oracle**: it has the entire chunk
-available while choosing the smallest candidate. It is not a streaming
-algorithm, an online predictive gate, or a WZS reproduction. Its purpose is
-to establish the upper bound available from simple fixed-chunk transform/model
-selection before implementing a causal or learned online selector.
+- `segment_portfolio` is an **offline best-of-four size oracle**. For each
+  complete chunk, the encoder tries Raw/Order0, Raw/Order1, XOR/Order0 and
+  XOR/Order1, then keeps the smallest complete F64C child frame. Every child
+  header and CRC, plus the outer F64S header, counts toward the total size.
+  The selector sees the current chunk before choosing and is not a streaming
+  algorithm, online predictive gate, or WZS reproduction.
+- `online_historical_cost` chooses the current chunk from the average complete
+  child-frame sizes measured on **previous** chunks only. The first chunk uses
+  Raw/Order0. After each chunk, both encoder and decoder recompute all four
+  candidate frame sizes from that chunk to update the same integer history.
+  The selected transform/model is recorded in the child's F64C header and the
+  decoder rejects a child whose IDs do not match its historical policy. There
+  is no additional selector symbol or intervention information.
+
+The online policy is a compute-heavy diagnostic: it makes four candidate
+measurements per chunk on both sides. It is not yet optimized for throughput.
+Both policies use the 32-byte F64S outer header and count each F64C child
+header/CRC. They provide different reference points: an offline size oracle
+and a decoder-reproducible past-only selection policy.
 
 Neither the single-stream XOR transform nor this segment-local oracle is
 Gorilla, Chimp, ACTF, DeXOR, Rabbit or Dolphin. These are transparent
