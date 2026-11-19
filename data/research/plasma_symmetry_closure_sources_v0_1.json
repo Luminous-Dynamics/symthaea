@@ -137,7 +137,7 @@
       "reported_findings": [
         "The authors report a learned heat-flux closure that reproduces linear and nonlinear Landau-damping evolution against their Vlasov references."
       ],
-      "metric_policy": "The publisher states that the linear and nonlinear Vlasov training datasets are deposited on Zenodo (DOI 10.5281/zenodo.14915239). Zenodo record lists two MAT files (~81.9 MB total). Pin exact record version, file checksums and dataset license; article license does not establish dataset license.",
+      "metric_policy": "The publisher states the linear and nonlinear Vlasov training datasets are deposited on Zenodo (DOI 10.5281/zenodo.14915239). The record lists two MAT files but its rendered metadata reports the same MD5 for both. Verify the raw record metadata and downloaded file bytes/SHA-256 before treating them as distinct linear and nonlinear cases. Pin exact record version and dataset license; article license does not establish dataset license.",
       "data_access_state": "OPEN_ZENODO_DATASET_10_5281_ZENODO_14915239",
       "code_access_state": "TRAINING_DATA_AVAILABLE; TRAINING_CODE_NOT_YET_AUDITED",
       "redistribution_rights_state": "ARTICLE_CC_BY_NC_ND_4_0; DATASET_LICENSE_PENDING_ZENODO_RECORD_AUDIT",
@@ -163,7 +163,11 @@
           "size_bytes_approx": 41000000,
           "md5": "6370e709ce0a825148917fabc8638a2a"
         }
-      ]
+      ],
+      "artifact_manifest_warnings": [
+        "The Zenodo record's rendered file inventory reports the same MD5 (6370e709ce0a825148917fabc8638a2a) for both Linear_Landau_Damping_training_data.mat and Noninear_Landau_Damping_training_data.mat. Do not assume these are distinct contents or proceed with a two-case reproduction until the raw record metadata and downloaded file bytes are checked. Verify both file SHA-256 hashes, byte sizes, MAT structure and case metadata."
+      ],
+      "artifact_integrity_state": "BLOCKED_PENDING_DOWNLOAD_AND_SHA256_VERIFICATION"
     },
     {
       "source_id": "ingelsten_sparse_heatflux_2025",
