@@ -6,6 +6,8 @@ on:
       - "tools/sc-discovery-ood-benchmark-auditor/**"
       - "data/schemas/sc_discovery_benchmark_v0_1.schema.json"
       - "data/research/sc_discovery_benchmark_fixture_v0_1.json"
+      - "data/schemas/sc_feasibility_gate_v0_1.schema.json"
+      - "data/research/sc_feasibility_gate_fixture_v0_1.json"
       - "research/superconductivity/discovery_ood_benchmark/**"
       - ".github/workflows/sc-discovery-ood-benchmark.yml"
   workflow_dispatch:
@@ -32,14 +34,24 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Check formatting
+      - name: Apply pinned Rust formatting
+        run: cargo fmt --manifest-path tools/sc-discovery-ood-benchmark-auditor/Cargo.toml --all
+
+      - name: Verify canonical Rust formatting
         run: cargo fmt --manifest-path tools/sc-discovery-ood-benchmark-auditor/Cargo.toml --all -- --check
+
+      - name: Capture rustfmt-only patch
+        if: always()
+        run: |
+          git diff --binary -- tools/sc-discovery-ood-benchmark-auditor > "$RUNNER_TEMP/sc-ood-rustfmt.patch"
+          git diff --stat -- tools/sc-discovery-ood-benchmark-auditor
+          sha256sum "$RUNNER_TEMP/sc-ood-rustfmt.patch"
 
       - name: Generate isolated dependency lockfile
         run: cargo generate-lockfile --manifest-path tools/sc-discovery-ood-benchmark-auditor/Cargo.toml
 
-      - name: Run split leakage negative controls
-        run: cargo test --locked --manifest-path tools/sc-discovery-ood-benchmark-auditor/Cargo.toml --bin sc_discovery_ood_audit
+      - name: Run OOD and feasibility-gate negative controls
+        run: cargo test --locked --manifest-path tools/sc-discovery-ood-benchmark-auditor/Cargo.toml --bins
 
       - name: Audit synthetic fixture
         run: |
@@ -49,8 +61,16 @@ jobs:
             --out "$RUNNER_TEMP/sc-discovery-ood-receipt.json"
           cat "$RUNNER_TEMP/sc-discovery-ood-receipt.json"
 
+      - name: Audit synthetic tri-state feasibility gate
+        run: |
+          cargo run --locked --manifest-path tools/sc-discovery-ood-benchmark-auditor/Cargo.toml --bin sc_feasibility_gate_audit -- \
+            --schema data/schemas/sc_feasibility_gate_v0_1.schema.json \
+            --fixture data/research/sc_feasibility_gate_fixture_v0_1.json \
+            --out "$RUNNER_TEMP/sc-feasibility-gate-receipt.json"
+          cat "$RUNNER_TEMP/sc-feasibility-gate-receipt.json"
+
       - name: Run Clippy
-        run: cargo clippy --locked --manifest-path tools/sc-discovery-ood-benchmark-auditor/Cargo.toml --bin sc_discovery_ood_audit -- -D warnings
+        run: cargo clippy --locked --manifest-path tools/sc-discovery-ood-benchmark-auditor/Cargo.toml --bins -- -D warnings
 
       - name: Record exact-run identity
         if: always()
@@ -63,6 +83,10 @@ jobs:
             sha256sum data/research/sc_discovery_benchmark_fixture_v0_1.json
             sha256sum tools/sc-discovery-ood-benchmark-auditor/Cargo.toml
             sha256sum tools/sc-discovery-ood-benchmark-auditor/src/main.rs
+            sha256sum tools/sc-discovery-ood-benchmark-auditor/src/bin/sc_feasibility_gate_audit.rs
+            sha256sum data/schemas/sc_feasibility_gate_v0_1.schema.json
+            sha256sum data/research/sc_feasibility_gate_fixture_v0_1.json
+            if [ -f "$RUNNER_TEMP/sc-ood-rustfmt.patch" ]; then sha256sum "$RUNNER_TEMP/sc-ood-rustfmt.patch"; fi
             if [ -f tools/sc-discovery-ood-benchmark-auditor/Cargo.lock ]; then
               sha256sum tools/sc-discovery-ood-benchmark-auditor/Cargo.lock
             else
@@ -80,3 +104,5 @@ jobs:
             tools/sc-discovery-ood-benchmark-auditor/Cargo.lock
             ${{ runner.temp }}/sc-discovery-ood-environment.txt
             ${{ runner.temp }}/sc-discovery-ood-receipt.json
+            ${{ runner.temp }}/sc-feasibility-gate-receipt.json
+            ${{ runner.temp }}/sc-ood-rustfmt.patch
