@@ -548,6 +548,35 @@ mod tests {
     }
 
     #[test]
+    fn rejects_different_canonical_condition_bundles() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.conditions.conditions_bundle_sha256 = digest('9');
+        assert_eq!(
+            validate_matched_comparison(
+                &control,
+                &candidate,
+                ComparisonScope::WaterServiceOnly
+            ),
+            Err(ContractError::ContextMismatch {
+                field: "conditions_bundle_sha256"
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_device_configuration_bundle_digest() {
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.device.device_configuration_sha256 = "not-a-digest".to_owned();
+        assert_eq!(
+            candidate.validate(ComparisonScope::WaterServiceOnly),
+            Err(ContractError::InvalidDigest {
+                field: "device_configuration_sha256"
+            })
+        );
+    }
+
+    #[test]
     fn allows_matched_task_conditions_with_different_device_and_cleaning_profiles() {
         let control = run("control-001", "incumbent-shower", '7');
         let candidate = run("candidate-001", "aqua-test-article", '8');
