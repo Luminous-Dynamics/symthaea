@@ -285,6 +285,8 @@ impl ServiceQualificationProfile {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QualificationEvidenceRef {
     pub authority: QualificationAuthority,
+    /// Exact Aqua run identity to which this assessment was issued.
+    pub run_id: String,
     /// Stable principal identity returned by the canonical authority registry.
     pub issuer_principal_id: String,
     /// Receipt from the canonical owner that it authenticated and checked this evidence.
@@ -302,7 +304,12 @@ impl QualificationEvidenceRef {
         &self,
         domain: QualificationDomain,
         profile: &ServiceQualificationProfile,
+        expected_run_id: &str,
     ) -> Result<(), ServiceQualificationError> {
+        require_text("assessment.run_id", &self.run_id)?;
+        if self.run_id != expected_run_id {
+            return Err(ServiceQualificationError::EvidenceRunMismatch { domain });
+        }
         require_text("assessment.issuer_principal_id", &self.issuer_principal_id)?;
         require_digest(
             "assessment.authority_verification_receipt_sha256",
@@ -369,6 +376,8 @@ pub struct DomainAssessment {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServiceQualificationRecord {
     pub run_id: String,
+    /// Canonical digest of market variant, hardware, installation, cleaning protocol and firmware.
+    pub device_configuration_sha256: String,
     pub profile_id: String,
     pub protocol_sha256: String,
     pub conditions_sha256: String,
@@ -394,6 +403,7 @@ pub enum ServiceQualificationError {
         domain: QualificationDomain,
         status: QualificationEvidenceStatus,
     },
+    EvidenceRunMismatch { domain: QualificationDomain },
     WrongAuthority {
         domain: QualificationDomain,
         expected: QualificationAuthority,
@@ -446,6 +456,9 @@ impl Display for ServiceQualificationError {
             Self::EvidenceNotCurrent { domain, status } => {
                 write!(f, "evidence for {domain:?} is not current: {status:?}")
             }
+            Self::EvidenceRunMismatch { domain } => {
+                write!(f, "evidence for {domain:?} is bound to a different run")
+            }
             Self::WrongAuthority {
                 domain,
                 expected,
@@ -480,6 +493,10 @@ impl ServiceQualificationRecord {
         profile.validate()?;
         require_text("run_id", &self.run_id)?;
         require_text("record.profile_id", &self.profile_id)?;
+        require_digest(
+            "record.device_configuration_sha256",
+            &self.device_configuration_sha256,
+        )?;
         require_digest("record.protocol_sha256", &self.protocol_sha256)?;
         require_digest("record.conditions_sha256", &self.conditions_sha256)?;
 
@@ -512,7 +529,9 @@ impl ServiceQualificationRecord {
                     record_id: assessment.evidence.record_id.clone(),
                 });
             }
-            assessment.evidence.validate(assessment.domain, profile)?;
+            assessment
+                .evidence
+                .validate(assessment.domain, profile, &self.run_id)?;
         }
 
         for domain in required {
@@ -666,6 +685,7 @@ mod tests {
     }
 
     fn assessment(
+        run_id: &str,
         domain: QualificationDomain,
         outcome: AssessmentOutcome,
         profile: &ServiceQualificationProfile,
@@ -675,6 +695,7 @@ mod tests {
             outcome,
             evidence: QualificationEvidenceRef {
                 authority: domain.expected_authority(),
+                run_id: run_id.to_owned(),
                 issuer_principal_id: format!("issuer-{domain:?}"),
                 authority_verification_receipt_sha256: digest('f'),
                 status: QualificationEvidenceStatus::Current,
@@ -702,6 +723,7 @@ mod tests {
     ) -> ServiceQualificationRecord {
         ServiceQualificationRecord {
             run_id: run_id.to_owned(),
+            device_configuration_sha256: digest('6'),
             profile_id: profile.profile_id.clone(),
             protocol_sha256: profile.protocol_sha256.clone(),
             conditions_sha256: profile.conditions_sha256.clone(),
@@ -709,9 +731,22 @@ mod tests {
                 .claim
                 .required_domains()
                 .iter()
-                .map(|domain| assessment(*domain, outcome, profile))
+                .map(|domain| assessment(run_id, *domain, outcome, profile))
                 .collect(),
         }
+    }
+
+    #[test]
+    fn evidence_must_be_bound_to_the_exact_run_id() {
+        let profile = profile(QualificationClaim::FunctionalService);
+        let mut record = record("candidate-01", &profile, AssessmentOutcome::Pass);
+        record.assessments[0].evidence.run_id = "other-run".to_owned();
+        assert_eq!(
+            record.validate(&profile),
+            Err(ServiceQualificationError::EvidenceRunMismatch {
+                domain: QualificationDomain::MeasurementValidity
+            })
+        );
     }
 
     #[test]
