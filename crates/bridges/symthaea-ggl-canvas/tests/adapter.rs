@@ -41,6 +41,14 @@ fn adapts_supported_primitives_and_renders_stable_ids() {
         "serde-json-compact-struct-order-v1"
     );
 
+    let canvas_ids: std::collections::BTreeSet<_> = output
+        .identity_map
+        .entries
+        .iter()
+        .map(|entry| entry.canvas_group_id.as_str())
+        .collect();
+    assert_eq!(canvas_ids.len(), output.identity_map.entries.len());
+
     let leaves: Vec<_> = output
         .scene
         .children
@@ -52,12 +60,32 @@ fn adapts_supported_primitives_and_renders_stable_ids() {
         })
         .collect();
 
-    assert!(matches!(&leaves[0].kind, NodeKind::Circle { .. }));
-    assert!(matches!(&leaves[1].kind, NodeKind::Line { .. }));
-    assert!(matches!(
-        &leaves[2].kind,
-        NodeKind::Polygon { closed: true, .. }
-    ));
+    match &leaves[0].kind {
+        NodeKind::Circle { cx, cy, r } => {
+            assert!((*cx - 1.0).abs() < 1.0e-6);
+            assert!((*cy + 2.0).abs() < 1.0e-6, "GGL y-up must map to Canvas y-down");
+            assert!((*r - 4.75).abs() < 1.0e-6);
+        }
+        other => panic!("circle mapping mismatch: {other:?}"),
+    }
+    match &leaves[1].kind {
+        NodeKind::Line { x1, y1, x2, y2 } => {
+            assert!((*x1 + 2.0).abs() < 1.0e-6);
+            assert!((*y1 + 1.25).abs() < 1.0e-6);
+            assert!((*x2 - 5.5).abs() < 1.0e-6);
+            assert!((*y2 - 4.0).abs() < 1.0e-6);
+        }
+        other => panic!("segment mapping mismatch: {other:?}"),
+    }
+    match &leaves[2].kind {
+        NodeKind::Polygon { points, closed } => {
+            assert!(*closed);
+            assert_eq!(points.len(), 3);
+            assert!((points[0].0 - 3.9344428).abs() < 1.0e-5);
+            assert!((points[0].1 + 2.623735).abs() < 1.0e-5);
+        }
+        other => panic!("polygon mapping mismatch: {other:?}"),
+    }
     match &leaves[3].kind {
         NodeKind::Path { d } => {
             assert!(d.contains(" A 3.000000000000 3.000000000000 0 0 0"));
@@ -129,6 +157,17 @@ fn requires_consistent_counts_and_well_formed_units() {
     let mut oversized_units: serde_json::Value = serde_json::from_str(COMPILED).unwrap();
     oversized_units["units"] = "m".repeat(65).into();
     assert!(adapt_compiled_scene(&oversized_units.to_string(), "fixture").is_err());
+}
+
+#[test]
+fn supports_full_circle_arcs_as_two_svg_arc_segments() {
+    let mut full_circle: serde_json::Value = serde_json::from_str(COMPILED).unwrap();
+    full_circle["primitives"][3]["sweep_rad"] = std::f64::consts::TAU.into();
+    let output = adapt_compiled_scene(&full_circle.to_string(), "fixture").unwrap();
+    match &output.scene.children[3].children[0].kind {
+        NodeKind::Path { d } => assert_eq!(d.matches(" A ").count(), 2),
+        other => panic!("full circular arc must remain a path: {other:?}"),
+    }
 }
 
 #[test]
