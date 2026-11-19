@@ -61,10 +61,14 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         if record_map.insert(id, record).is_some() {
             return Err(format!("duplicate record_id {id}"));
         }
+        // The identity includes the complete condition context: one material
+        // can legitimately have multiple pressure/temperature/sample observations
+        // in a single paper and those must not be collapsed into one label.
         let identity = [
             required_text(record, "material_id")?,
             required_text(record, "source_id")?,
             required_text(record, "publication_date")?,
+            record["condition_context"].to_string(),
         ].join("|");
         if !material_sources.insert(identity) {
             return Err(format!("duplicate material/source/date evidence identity at {id}"));
