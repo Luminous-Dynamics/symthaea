@@ -162,6 +162,8 @@
     "Reconstruct and verify the BEE-NET row-label versus Alexandria-ID join; assert train/validation/test disjointness.",
     "Acquire the missing selected database and released checkpoints through permitted channels; do not infer access rights from repository visibility.",
     "Reproduce published in-distribution metrics before running new family/prototype/source/pressure holdouts.",
-    "Report alpha2F spectral and derived Tc metrics separately from experimentally measured properties."
+    "Report alpha2F spectral and derived Tc metrics separately from experimentally measured properties.",
+    "Qualify the August 2026 Geisler et al. clean-limit Eliashberg Hc/Hc1/Hc2 database as a separate calculated-first-principles baseline; pin its supporting information, source artifacts, method settings and exact row count before attempting replay.",
+    "Keep high-field clean-limit calculations separate from measured AutoSuperCon/NIMS values; join only on verified material state, sample form, pressure, temperature, orientation and measurement criterion."
   ]
 }
