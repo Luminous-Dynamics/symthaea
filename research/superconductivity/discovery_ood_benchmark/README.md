@@ -189,3 +189,12 @@ Wang et al. (npj Computational Materials, 20 May 2026; https://www.nature.com/ar
 The 2026 critical examination of materials active-learning workflows (https://pubs.rsc.org/en/content/articlehtml/2026/dd/d6dd00081a) highlights that hidden workflow choices and implicit assumptions can influence reported performance. Therefore freeze acquisition policies, candidate pools, costs, preprocessing, splits and stop criteria before comparing methods. Report the full discovery trajectory and experimental burden, not only the final best candidate.
 
 A relevant system-level design reference is Lee et al., *Toward self-driving laboratory 2.0 for chemistry and materials discovery* (Materials Horizons, 4 March 2026; https://doi.org/10.1039/D5MH01984B), which emphasizes interoperability, collaboration, generalization, orchestration, safety and creativity. These are architectural requirements, not superconductivity discovery metrics.
+
+### Negative-evidence sensitivity requirement
+
+The v0.2 fixture and auditor now require a negative observation to carry:
+- applied field and field orientation (explicitly unknown where unavailable);
+- a minimum detectable transition-temperature floor;
+- a description of the detection limit and measurement scope.
+
+The detection floor must lie inside the stated measurement-temperature range. Thus "no transition detected down to 1.8 K" cannot be generalized to "not superconducting below 1.8 K," nor can missing database coverage be used as a negative label. Positive and unknown records may leave this floor unasserted. This is still a synthetic schema contract; real sensitivity values need to be extracted and reviewed from the source experiment.
