@@ -28,7 +28,7 @@ dependencies.
 
 The `float` command generates constant, smooth-ramp, oscillating,
 high-precision, plateau-step, idle-telemetry, signed-zero-switch, NaN-payload
-and random-bit-pattern streams.
+and random-bit-pattern streams, plus a deliberately misaligned alternating regime workload (1,537-sample repeated-value and random-bit-pattern blocks).
 It compares:
 - raw IEEE-754 binary64 bit patterns;
 - XOR with the previous u64 bit pattern, encoded as a canonical u64 varint;
