@@ -545,6 +545,14 @@ The experimental `telemetry` module adds a typed multi-field record frame:
 - Header CRC, inner-frame CRC and canonical uncompressed-stream CRC; the inner payload uses the shared arithmetic coder.
 - Decoder caps both record count and state capacity before allocation. Boolean/U32 field kinds are range-checked, absent field payloads must be zero, and varints/update masks are canonical.
 
+From `research/cdl-bench`:
+
+```sh
+cargo run --release -- telemetry --records 65536 --keys 64 --state-capacity 64 --segment-records 4096 --workload sparse --seed 2111830017
+```
+
+Supported synthetic workloads are `sparse`, `bursty`, `idle`, and `noisy`. The CSV reports complete CDL telemetry-frame bytes against Zstandard on the same canonical raw typed-record serialization, plus encode/decode nanoseconds and a lower-bound state-payload estimate. The CLI path performs exact decode equality checks. This is a synthetic development diagnostic; use pinned production-derived data and matched ALP/Pco/Gorilla/Chimp/ACTF/Rabbit baselines before drawing compression claims.
+
 The public API is:
 - `TelemetryFieldKind`, `TelemetrySchema`, `TelemetryRecord`, `TelemetryStream`.
 - `compress_telemetry_records(records, schema, state_capacity, segment_records, model)`.
