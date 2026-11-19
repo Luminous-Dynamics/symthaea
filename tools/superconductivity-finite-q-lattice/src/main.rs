@@ -92,9 +92,6 @@ fn finite_number(value: &Value, context: &str) -> Result<f64, String> {
     Ok(number)
 }
 
-fn close_enough(left: f64, right: f64, tolerance: f64) -> bool {
-    (left - right).abs() <= tolerance * left.abs().max(right.abs()).max(1.0)
-}
 
 impl Model {
     fn from_bytes(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Self, String> {
