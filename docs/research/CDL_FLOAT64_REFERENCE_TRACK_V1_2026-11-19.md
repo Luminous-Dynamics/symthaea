@@ -8,7 +8,7 @@
 The SCM/i16 lane does not represent the dominant specialized lossless floating-point time-series competition. By 2026, several purpose-built codecs target bit patterns, decimal prefixes, oscillation, branch flags and segment-local encoding choices. A credible SOTA comparison needs a typed IEEE-754 track; it must not infer that success on synthetic SCM i16 streams transfers to f64 sensor streams.
 
 The branch adds a small correctness reference, not a competitive codec:
-- `research/cdl-bench/src/float64.rs`: typed `F64C` frame with raw bits or XOR-previous u64 varints; `F64S` segment container with policy IDs for offline best-of-four and decoder-synchronous historical-cost selection; inner CDL arithmetic coding, CRC-32 checksums and output limits.
+- `research/cdl-bench/src/float64.rs`: typed `F64C` frame with raw bits or XOR-previous u64 varints; `F64S` segment container with policy IDs for offline best-of-six and decoder-synchronous historical-cost selection; inner CDL arithmetic coding, CRC-32 checksums and output limits.
 - `research/cdl-bench/src/main.rs`: `float --values N --seed N` experiment command comparing single-stream, offline segment-portfolio, and online historical-cost rows with frame size and encode/decode timings.
 - `research/cdl-bench/src/lib.rs`: public exports.
 - `research/cdl-bench/README.md`: usage and limits.
