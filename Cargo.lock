@@ -18153,6 +18153,14 @@ dependencies = [
 [[package]]
 name = "symthaea-aqua-bench"
 version = "0.1.0"
+dependencies = [
+ "chrono",
+ "csv",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2",
+]
 
 [[package]]
 name = "symthaea-art-eye"

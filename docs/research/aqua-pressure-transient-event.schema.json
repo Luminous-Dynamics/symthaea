@@ -1,0 +1,522 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:aqua-pressure-transient-event:0.1.0",
+  "title": "Luminous Aqua pressure transient event profile",
+  "description": "Provenance-bound manifest for a site-observed or explicitly synthetic supply/demand event replay. A schema-valid manifest is not metrology admission or physical qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile_id",
+    "profile_revision",
+    "profile_kind",
+    "event_family",
+    "task_profile_id",
+    "conditions_sha256",
+    "protocol_sha256",
+    "event_start",
+    "event_duration_ms",
+    "command",
+    "acquisition",
+    "raw_artifacts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9][a-z0-9._-]+$"
+    },
+    "profile_revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "profile_kind": {
+      "enum": [
+        "site_observed",
+        "synthetic"
+      ]
+    },
+    "event_family": {
+      "enum": [
+        "supply_sag",
+        "supply_ramp",
+        "concurrent_demand_step",
+        "intermittent_supply",
+        "repeated_demand_cycling",
+        "rapid_valve_event"
+      ]
+    },
+    "task_profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "conditions_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "protocol_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "event_start": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "event_duration_ms": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_kind",
+        "channel_id",
+        "unit",
+        "samples",
+        "waveform_sha256"
+      ],
+      "properties": {
+        "input_kind": {
+          "enum": [
+            "upstream_pressure_command",
+            "branch_demand_command",
+            "valve_state_command"
+          ]
+        },
+        "channel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "enum": [
+            "kPa",
+            "L/min",
+            "boolean"
+          ]
+        },
+        "samples": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "offset_us",
+              "value"
+            ],
+            "properties": {
+              "offset_us": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "value": {
+                "oneOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "boolean"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "waveform_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "acquisition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clock_id",
+        "timestamp_basis",
+        "clock_sync_uncertainty_us",
+        "clock_sync_receipt_sha256",
+        "channels",
+        "maximum_clock_sync_uncertainty_us",
+        "maximum_channel_alignment_skew_us"
+      ],
+      "properties": {
+        "clock_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timestamp_basis": {
+          "enum": [
+            "monotonic",
+            "utc_disciplined",
+            "ptp",
+            "other_declared"
+          ]
+        },
+        "clock_sync_uncertainty_us": {
+          "type": "number",
+          "minimum": 0
+        },
+        "clock_sync_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "channels": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/channel"
+          }
+        },
+        "maximum_clock_sync_uncertainty_us": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_channel_alignment_skew_us": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "raw_artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "sha256",
+          "byte_length",
+          "media_type"
+        ],
+        "properties": {
+          "role": {
+            "enum": [
+              "unfiltered_trace",
+              "event_log",
+              "calibration_bundle",
+              "clock_sync_receipt",
+              "site_observation_record"
+            ]
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "byte_length": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "media_type": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "role": {
+                  "const": "unfiltered_trace"
+                }
+              },
+              "required": [
+                "role"
+              ]
+            },
+            "then": {
+              "properties": {
+                "media_type": {
+                  "const": "text/csv; profile=aqua-transient-trace-v1"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "analysis_code_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "filter_definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "exclusion_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "site_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "site_profile_id",
+        "site_profile_revision",
+        "site_conditions_sha256",
+        "observation_window",
+        "survey_receipt_sha256"
+      ],
+      "properties": {
+        "site_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "site_profile_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "site_conditions_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "observation_window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "start",
+            "end",
+            "coverage_statement"
+          ],
+          "properties": {
+            "start": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "end": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "coverage_statement": {
+              "type": "string",
+              "minLength": 1
+            },
+            "known_gaps": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "survey_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "synthetic_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generator_id",
+        "generator_sha256",
+        "generator_parameters_sha256"
+      ],
+      "properties": {
+        "generator_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generator_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "generator_parameters_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "profile_kind": {
+            "const": "site_observed"
+          }
+        },
+        "required": [
+          "profile_kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "site_observation"
+        ],
+        "properties": {
+          "raw_artifacts": {
+            "contains": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "const": "site_observation_record"
+                }
+              },
+              "required": [
+                "role"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "profile_kind": {
+            "const": "synthetic"
+          }
+        },
+        "required": [
+          "profile_kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "synthetic_profile"
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel_id",
+        "quality_state",
+        "role",
+        "location",
+        "datum",
+        "unit",
+        "instrument_id",
+        "calibration_receipt_sha256",
+        "measurement_uncertainty",
+        "sample_rate_hz",
+        "effective_bandwidth_hz",
+        "anti_alias_filter_id",
+        "sample_count",
+        "dropped_sample_count",
+        "raw_trace_sha256"
+      ],
+      "properties": {
+        "channel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quality_state": {
+          "enum": [
+            "valid",
+            "clipped",
+            "saturated",
+            "out_of_range",
+            "unknown"
+          ]
+        },
+        "role": {
+          "enum": [
+            "upstream_static_pressure",
+            "upstream_residual_pressure",
+            "terminal_dynamic_pressure",
+            "point_of_discharge_pressure",
+            "hot_inlet_pressure",
+            "cold_inlet_pressure",
+            "faceplate_center_pressure",
+            "branch_pressure",
+            "primary_flow",
+            "secondary_branch_flow",
+            "outlet_temperature"
+          ]
+        },
+        "location": {
+          "type": "string",
+          "minLength": 1
+        },
+        "datum": {
+          "enum": [
+            "static_supply",
+            "upstream_service_point",
+            "terminal_fitting_inlet",
+            "point_of_discharge",
+            "hot_mixer_inlet",
+            "cold_mixer_inlet",
+            "faceplate_center",
+            "branch_point",
+            "fixture_outlet",
+            "not_applicable"
+          ]
+        },
+        "unit": {
+          "enum": [
+            "kPa",
+            "L/min",
+            "degC"
+          ]
+        },
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "measurement_uncertainty": {
+          "type": "number",
+          "minimum": 0
+        },
+        "sample_rate_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "effective_bandwidth_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "anti_alias_filter_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "dropped_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sample_gap_report_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "raw_trace_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "dropped_sample_count": {
+                "minimum": 1
+              }
+            },
+            "required": [
+              "dropped_sample_count"
+            ]
+          },
+          "then": {
+            "required": [
+              "sample_gap_report_sha256"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
