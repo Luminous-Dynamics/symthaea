@@ -197,6 +197,67 @@ The paper-style mapping captures the expected gain on a stable skewed distributi
 
 **Evidence boundary:** this isolates the prefix-flag mechanism only. It does not validate Rabbit's ACTF-derived branch classification, TOE bit-elision proof, full byte/bitstream framing, paper datasets, implementation, or headline compression/time gains. The same-block oracle is an offline upper bound over only two flag choices (fixed 2-bit vs dynamic 1/2/3/3), using current-block counts; it does not include payloads or side-information costs. The guarded variant is our hypothesis and has not yet been evaluated on blind or production-derived data.
 
+## Order-preserving series partitioning with an encoded interleave schedule (2026-11-19)
+
+The grouped-versus-round-robin RLE ablation exposed a limitation: whole-record runs vanish when events from many series are interleaved. A new independent C++20 frame prototype now tests whether we can recover per-series locality without changing the caller-visible record order.
+
+Files:
+- `research/cdl-bench/reference/typed_record_partitioned_runs_reference.cpp`
+- `scripts/research/cdl_partitioned_telemetry_reference.sh`
+
+### Format hypothesis
+
+The prototype uses a hybrid event/column layout:
+1. Build a stable dictionary of (entity_id, series_id) keys in first-seen order.
+2. Partition records into one chronological substream per key.
+3. Encode each per-key substream with exact timestamp deltas, changed-field masks, explicit presence/null state, exact 64-bit values and repeated-state heartbeat runs.
+4. Store each substream's key, record count and byte length in the outer frame.
+5. Store a fixed-width bit-packed key-ID schedule in original arrival order (six bits per event for 64 keys).
+6. During decoding, decode each key stream, then replay the schedule to restore the exact original cross-series record ordering.
+7. Include a versioned magic, field-kind schema, record count, child lengths, order-schedule bit count and CRC32.
+
+Unlike sorting records and returning a reordered table, the schedule is an explicit reversible permutation. The experiment charges its bytes. The raw and global state-delta controls use equivalent outer magic/count/payload-length/CRC frames and include the same eight schema kind IDs, so the compressed-size comparison no longer omits basic framing from only one arm.
+
+### Local strict-warning execution
+
+The checked-in C++ source was built locally with GCC 14.2 using:
+
+```sh
+g++ -O2 -std=c++20 -Wall -Wextra -Wconversion -Werror \
+  research/cdl-bench/reference/typed_record_partitioned_runs_reference.cpp \
+  -o /tmp/typed_record_partitioned_runs_reference
+/tmp/typed_record_partitioned_runs_reference --emit-dir /tmp/cdl-partitioned-streams
+```
+
+Validation passed: empty stream, four deterministic 65,536-record fixtures, 100 randomized exact round-trips with interleaved keys, and three malformed-frame cases (bad magic/checksum, truncation and trailing bytes). Each decoded output was compared with the original records, including timestamps, key identity, null bitmap, and exact u64/f64 field bits.
+
+Zstandard CLI 1.5.7 at level 19 was then applied to the three complete framed representations. Each compressed output was decompressed and compared byte-for-byte to its input.
+
+### Results: order-preserving, round-robin interleaving
+
+All fixtures contain 65,536 records across 64 interleaved series. Bytes are complete raw, global state-delta, or partitioned frames before Zstd; Zstd sizes include the Zstd frame.
+
+| Workload | Raw frame | Global delta frame | Partitioned frame | Zstd(raw) | Zstd(global delta) | Zstd(partitioned) |
+|---|---:|---:|---:|---:|---:|---:|
+| Sparse | 5,308,448 | 648,493 | 190,030 | 223,774 | 85,931 | 61,923 |
+| Bursty | 5,308,448 | 833,813 | 369,322 | 367,607 | 224,396 | 204,994 |
+| Mostly idle | 5,308,448 | 590,677 | 57,459 | 153,209 | 5,577 | 4,846 |
+| Noisy | 5,308,448 | 3,769,213 | 3,685,415 | 2,603,680 | 2,316,397 | 2,253,017 |
+
+Relative to Zstd on the equally framed global state-delta representation, the partitioned frame plus Zstd was smaller by:
+- Sparse: 27.94%.
+- Bursty: 8.65%.
+- Mostly idle: 13.11%.
+- Noisy: 2.74%.
+
+Relative to Zstd on the equally framed raw representation, it was smaller by 72.33%, 44.24%, 96.84% and 13.47%, respectively.
+
+The same synthetic data is intentionally interleaved in its original chronological order. The schedule is six bits per record (49,152 raw schedule bytes for this 64-key fixture), plus the dictionary and stream descriptors. The wins therefore are not from omitting the original order; the decoder reconstructs it exactly.
+
+The reproducer is `bash scripts/research/cdl_partitioned_telemetry_reference.sh`. It compiles the checked-in source with strict warnings, verifies the round-trips, applies the same Zstd level to raw/global-delta/partitioned frames, and checks exact decompression.
+
+**Evidence boundary:** this is an independent C++ prototype plus Zstd, not the Rust CDL implementation, not the arithmetic-coded production frame, not a public dataset, and not a comparison with ALP/Pco/Gorilla/Chimp/ACTF/Rabbit/WZS. The benchmark uses only four deterministic synthetic workloads, eight fixed field lanes and 64 keys. It materializes and partitions the full input in memory, so it is not yet a bounded-memory streaming encoder. No throughput, peak RSS, random-access/index, checkpoint recovery, schema-name registry or production ingestion costs have been measured. The per-series streams are length-delimited, but the prototype does not yet publish a separate random-access directory. These results justify implementing and testing the representation; they do not establish a codec/SOTA win.
+
 ## Current Rust implementation status (compiler validation pending)
 
 The PR branch now contains `research/cdl-bench/src/telemetry.rs`, exported from `lib.rs`, with a `cdl-bench telemetry` synthetic command. The first frame has a fixed eight-lane schema, entity/series keys, exact u64 field payloads, explicit null/presence and changed-field masks, canonical u64 varints, deterministic bounded LRU state, segment-start checkpoints, and header/inner/raw-stream CRCs. The shared arithmetic coder is used for the transformed stream. Eight Rust tests are authored for round-trip, determinism, empty streams, truncation, single-bit mutations, resource limits, invalid field values and malformed varints.
