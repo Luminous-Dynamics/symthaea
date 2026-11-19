@@ -45,19 +45,60 @@ jobs:
           proposal_input_schema = json.loads((root / "schemas/proposal_input.schema.json").read_text())
           proposal_receipt_schema = json.loads((root / "schemas/proposal_audit_receipt.schema.json").read_text())
           dense_representation_schema = json.loads((root / "schemas/dense_coordinate_representation.schema.json").read_text())
+          missingness_schema = json.loads((root / "schemas/missingness_case_manifest.schema.json").read_text())
           manifest = json.loads((root / "fixtures/v0.1/cases.json").read_text())
           dense_representation = json.loads((root / "fixtures/v0.1/dense_coordinate_representation.json").read_text())
+          missingness_manifest = json.loads((root / "fixtures/missingness/v0.1/dropout_cases.json").read_text())
           structural_proposal = json.loads((root / "fixtures/v0.1/proposal_smoke_input.json").read_text())
           regression_proposal = json.loads((root / "fixtures/v0.1/regression_proposal_smoke_input.json").read_text())
           Draft202012Validator.check_schema(schema)
           Draft202012Validator(schema).validate(manifest)
           Draft202012Validator.check_schema(dense_representation_schema)
           Draft202012Validator(dense_representation_schema).validate(dense_representation)
+          Draft202012Validator.check_schema(missingness_schema)
+          Draft202012Validator(missingness_schema).validate(missingness_manifest)
           Draft202012Validator.check_schema(scorecard_schema)
           Draft202012Validator.check_schema(proposal_input_schema)
           Draft202012Validator(proposal_input_schema).validate(structural_proposal)
           Draft202012Validator(proposal_input_schema).validate(regression_proposal)
           Draft202012Validator.check_schema(proposal_receipt_schema)
+          PY
+      - name: Validate MCAR, MAR, MNAR, hard-support and shift controls
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("research/symmetry-discovery-benchmark-001")
+          cases = json.loads((root / "fixtures/missingness/v0.1/dropout_cases.json").read_text())["cases"]
+          by_id = {case["case_id"]: case for case in cases}
+          assert len(cases) == 5 and len(by_id) == 5
+
+          mcar = by_id["MCAR-EQUAL-DROPOUT-001"]
+          assert mcar["dropout_probability_intervals_ppm_by_hypothesis"][0] == mcar["dropout_probability_intervals_ppm_by_hypothesis"][1]
+
+          mar = by_id["MAR-LOAD-STRATA-001"]
+          assert mar["observed_context_variable"] == "load_band"
+          assert {row["stratum_id"] for row in mar["context_strata"]} == {"low-load", "high-load"}
+
+          mnar = by_id["MNAR-HYPOTHESIS-STATE-001"]
+          assert mnar["dropout_probability_intervals_ppm_by_hypothesis"][0] != mnar["dropout_probability_intervals_ppm_by_hypothesis"][1]
+
+          hard = by_id["HARD-SUPPORT-INTERLOCK-001"]
+          domain = hard["validity_domain_id"]
+          assert hard["abstention_possible_by_hypothesis"][0][0] is False
+          justification = hard["impossibility_justifications_by_hypothesis"][0][0]
+          assert justification["evidence_id"] and justification["validity_domain_id"] == domain
+
+          shifted = by_id["MNAR-CALIBRATION-SHIFT-001"]
+          assert shifted["calibration_domain_id"] != shifted["evaluation_domain_id"]
+          assert shifted["evaluation_dropout_intervals_available"] is False
+          assert "do_not_use" in shifted["expected_policy"]
+
+          for case in cases:
+              split_ids = case["split_ids"]
+              assert len(set(split_ids.values())) == 3
+          print("MISSINGNESS_FIXTURE_SEMANTICS_PASS: MCAR/MAR/MNAR/hard-support/shift controls")
           PY
       - name: Validate exact group axioms, point stabilizers and polynomial invariance
         run: python3 -I research/symmetry-discovery-benchmark-001/tools/validate_fixtures.py
