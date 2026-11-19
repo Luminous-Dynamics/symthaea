@@ -18,13 +18,13 @@ The exact discrete task contract records domain membership, admissibility, feasi
 
 ## Certificate replay
 
-The certificate includes problem/action/group identities, group order, candidate count, deterministic orbit representatives, every orbit member, forward and inverse group-element witnesses, and recomputed check counts.
+The certificate includes problem/action/group identities, group order, candidate count, deterministic orbit representatives, every orbit member, forward and inverse group-element witnesses, and recomputed check counts. It also carries versioned canonical bytes for the complete task contract and complete finite action, plus the exact qualification budget used to compile it.
 
-The verifier does not trust the certificate's counts, orbit listing, or stabilizers. It revalidates the group and action, checks every forward and inverse witness, checks exact task-semantic equality, verifies that each orbit is complete under every group element, reconstructs each stabilizer from the action, checks subgroup closure, verifies |G| = |orbit| × |stabilizer|, and requires a disjoint cover of the original candidate universe.
+The verifier does not trust the certificate's counts, orbit listing, stabilizers, or declared identities. It reconstructs canonical task/action bytes, checks the exact budget, revalidates the group and action, checks every forward and inverse witness, checks exact task-semantic equality, verifies that each orbit is complete under every group element, reconstructs each stabilizer from the action, checks subgroup closure, verifies |G| = |orbit| × |stabilizer|, and requires a disjoint cover of the original candidate universe. A uniformly mutated but still symmetric task is rejected as a different problem; a different valid action is rejected as a different action.
 
 The lift operation first replays the certificate, then maps a selected representative to every original candidate in its orbit. In this finite-indexed v0.1 reference, lifting returns candidate identities and transformation witnesses; it is not a continuous-state lifting mechanism.
 
-This version does not use a cryptographic digest. The verifier receives the exact original task and action records. A later version should bind canonical serialized inputs with cryptographic digests and independently replayable proof artifacts.
+The canonical byte encodings are deterministic replay identities, not cryptographic hashes or signatures. External benchmark harnesses should hash these bytes (and the source/checker revision) when publishing a scorecard. This reference verifier compares the exact byte encodings directly, so it does not rely on a caller-supplied digest. Formal proof artifacts and content-addressed multi-party receipts remain future work.
 
 ## Reproduction
 
