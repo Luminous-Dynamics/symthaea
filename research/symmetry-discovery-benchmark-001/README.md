@@ -249,3 +249,24 @@ This corpus split validates bookkeeping and leakage resistance; it does not itse
 ## Exact fixture oracle status (2026-11-18)
 
 The single manifest-driven Rust oracle is under `oracle/`; there is no parallel reference crate. It loads the checked-in JSON manifest and tests D4 closure/inverses, exact point-set stabilizers, polynomial invariance and arithmetic overflow. The fixture/schema validation step passed on the earlier benchmark workflow head. The Rust formatter diff from that run was applied to the consolidated oracle. A fresh exact-head run is required to qualify the current branch. **No external baseline has yet been run and these fixtures are not benchmark results.**
+
+
+## Exact proposal-audit adapter (v0.2)
+
+The independent Rust oracle now exposes a manifest-bound proposal API and a small CLI:
+
+    cargo run --locked --manifest-path research/symmetry-discovery-benchmark-001/oracle/Cargo.toml --bin audit_proposals -- research/symmetry-discovery-benchmark-001/fixtures/v0.1/proposal_smoke_input.json
+
+A method submits only the proposed ambient-group element IDs. It cannot provide its own exact label, false-positive count or witness. The oracle independently:
+- resolves the frozen case identity and split/track;
+- recomputes the exact stabilizer from the point-set or polynomial contract;
+- tests whether the proposal itself is a subgroup (identity, inverses and closure);
+- classifies true-positive, false-promotion, missed-symmetry and true-negative elements;
+- returns exact moved-point or coefficient-mismatch witnesses;
+- replays the full audit before serializing the receipt.
+
+The smoke inputs are deliberately split by task: structural point-set stabilizers and finite-reference-group polynomial invariance.
+
+The structural negative control proposes D4 for the chiral C4 orbit. D4 is a mathematically valid subgroup of the ambient D4 group, but four proposed reflections do not stabilize the object. The expected result is therefore `group_axioms_satisfied=true` **and** four `false_promotion_elements`, each accompanied by a moved-point counterexample. This is the central adversarial distinction: group validity is not object invariance.
+
+The exact-head workflow runs both smoke lanes and asserts the expected element-level outcome. These are oracle/adapter conformance checks, not external learner benchmark results. The Rust polynomial parser caps total degree at 32 and term count at 256, rejects duplicate/zero terms and fractional coefficients, and uses checked integer expansion to bound work and avoid lossy parsing.
