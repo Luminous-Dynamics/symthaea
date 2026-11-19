@@ -19,7 +19,7 @@ dependencies.
 - E3 public development fixtures with held-out combinations assembled from individually seen mechanism components; metadata is not serialized into learner-visible streams. These fixed tuples are visible in source and are not a blind test split.
 - CLI file encode/decode and an E0 length comparison against installed
   Zstandard, Brotli, XZ and gzip commands.
-- Exact IEEE-754 f64 raw/XOR-varint/reusable XOR-window framing, bit-preserving test fixtures, a fixed-chunk best-of-six size oracle, and a decoder-synchronous historical-cost online selector.
+- Exact IEEE-754 f64 raw/XOR-varint/reusable XOR-window/RLE+XOR framing, bit-preserving test fixtures, a fixed-chunk best-of-eight size oracle, and decoder-synchronous full/sparse historical-cost selectors.
 - SCM-specific typed-field, temporal-lag, oracle-parent, hybrid and
   shuffled-parent byte predictors, plus fixed-share and CUSUM change-point
   mixtures, all using the same arithmetic coder and exact decoder path.
