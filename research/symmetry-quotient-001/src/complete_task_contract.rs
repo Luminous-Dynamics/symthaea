@@ -52,10 +52,14 @@ pub struct SearchProblemMetadataV1 {
     pub resource_budget_policy_id: String,
     pub termination_policy_id: String,
     pub randomness_policy_id: String,
+    pub intervention_family_id: String,
+    pub measurement_model_id: String,
+    pub noise_model_id: String,
+    pub context_selection_policy_id: String,
 }
 
 impl SearchProblemMetadataV1 {
-    pub const FIELD_COUNT: usize = 17;
+    pub const FIELD_COUNT: usize = 21;
 
     fn fields(&self) -> [&str; Self::FIELD_COUNT] {
         [
@@ -76,6 +80,10 @@ impl SearchProblemMetadataV1 {
             &self.resource_budget_policy_id,
             &self.termination_policy_id,
             &self.randomness_policy_id,
+            &self.intervention_family_id,
+            &self.measurement_model_id,
+            &self.noise_model_id,
+            &self.context_selection_policy_id,
         ]
     }
 
@@ -231,6 +239,10 @@ mod tests {
             resource_budget_policy_id: "qualification-budget-v1".to_owned(),
             termination_policy_id: "complete-enumeration-v1".to_owned(),
             randomness_policy_id: "not-applicable".to_owned(),
+            intervention_family_id: "not-applicable".to_owned(),
+            measurement_model_id: "exact-finite-candidate-observation-v1".to_owned(),
+            noise_model_id: "zero-noise-exact-outcomes-v1".to_owned(),
+            context_selection_policy_id: "single-declared-context-v1".to_owned(),
         }
     }
 
@@ -314,13 +326,16 @@ mod tests {
             panic!("fixture must authorize");
         };
 
-        for mutate in 0..4 {
+        for mutate in 0..7 {
             let mut changed = original.clone();
             match mutate {
                 0 => changed.dataset_revision = "dataset-revision-2".to_owned(),
                 1 => changed.evaluator_revision = "evaluator-revision-2".to_owned(),
                 2 => changed.solver_profile_id = "solver-profile-2".to_owned(),
-                _ => changed.unit_system_id = "metres-instead-of-dimensionless".to_owned(),
+                3 => changed.unit_system_id = "metres-instead-of-dimensionless".to_owned(),
+                4 => changed.intervention_family_id = "intervention-family-2".to_owned(),
+                5 => changed.measurement_model_id = "measurement-model-2".to_owned(),
+                _ => changed.noise_model_id = "noise-model-2".to_owned(),
             }
             assert_eq!(
                 verify_complete_task_quotient(
