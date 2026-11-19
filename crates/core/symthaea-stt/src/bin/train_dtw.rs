@@ -194,10 +194,14 @@ fn main() {
             pb.set_position(i as u64);
 
             // Load audio
-            let (samples, _sr) = match AudioFrontend::load_audio(audio_path) {
+            let (samples, sample_rate) = match AudioFrontend::load_audio(audio_path) {
                 Ok(a) => a,
                 Err(_) => continue,
             };
+            if let Err(error) = projector.validate_input_sample_rate(sample_rate) {
+                eprintln!("Skipping {}: {}", audio_path.display(), error);
+                continue;
+            }
 
             // Project to hypervectors
             projector.reset();
