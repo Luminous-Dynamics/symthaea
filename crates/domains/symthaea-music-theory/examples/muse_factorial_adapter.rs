@@ -24,6 +24,8 @@ use symthaea_music_theory::{
     Style, Tonality, ValidationSeverity, VoiceRole, compose_with_grammar_plan, validate_score,
 };
 
+const PINNED_RUSTC_RELEASE: &str = "1.96.0";
+
 const HEADER: &str =
     "case_id,cohort,style,seed,valence_code,arousal_code,energy_code,bars_code";
 
@@ -488,6 +490,7 @@ fn compose_case(
     case: &CaseRow,
     source_commit: &str,
     manifest_sha256: &str,
+    rustc_version: &str,
     reference: Option<&ReferenceArtifact>,
 ) -> Result<ComposedArtifact, String> {
     let spec = case.style.spec();
@@ -777,7 +780,7 @@ fn compose_case(
     ];
 
     let note = format!(
-        "source_commit={source_commit};composer_reference_commit={};manifest_sha256={manifest_sha256};engine_version={};grammar_family={:?};support_axes={};tonality={:?};plan_kind={plan_kind};universal_fatal={universal_fatal_count};style_fatal={};warnings={warning_count};validation_valid={};exact_fingerprint={current_exact_fingerprint:016x};reference_exact_fingerprint={:016x}",
+        "source_commit={source_commit};composer_reference_commit={};manifest_sha256={manifest_sha256};rustc_version={rustc_version};engine_version={};grammar_family={:?};support_axes={};tonality={:?};plan_kind={plan_kind};universal_fatal={universal_fatal_count};style_fatal={};warnings={warning_count};validation_valid={};exact_fingerprint={current_exact_fingerprint:016x};reference_exact_fingerprint={:016x}",
         PINNED_COMPOSER_SOURCE_COMMIT,
         symthaea_music_theory::MUSIC_THEORY_ENGINE_VERSION,
         case.style.grammar_family(),
@@ -837,10 +840,11 @@ fn measurements_for_case(
     case: &CaseRow,
     source_commit: &str,
     manifest_sha256: &str,
+    rustc_version: &str,
     reference: Option<&ReferenceArtifact>,
 ) -> (Vec<Measurement>, Option<ReferenceArtifact>) {
     let composed = catch_unwind(AssertUnwindSafe(|| {
-        compose_case(case, source_commit, manifest_sha256, reference)
+        compose_case(case, source_commit, manifest_sha256, rustc_version, reference)
     }));
 
     match composed {
@@ -922,6 +926,34 @@ fn git_output(args: &[&str]) -> Result<String, String> {
         .map_err(|error| format!("git {:?} output is not UTF-8: {error}", args))
 }
 
+fn rustc_version() -> Result<String, String> {
+    let output = Command::new("rustc")
+        .arg("--version")
+        .output()
+        .map_err(|error| format!("cannot execute rustc --version: {error}"))?;
+    if !output.status.success() {
+        return Err(format!("rustc --version failed with status {}", output.status));
+    }
+    String::from_utf8(output.stdout)
+        .map(|value| value.trim().to_string())
+        .map_err(|error| format!("rustc --version output is not UTF-8: {error}"))
+}
+
+fn is_pinned_rustc_version(version: &str) -> bool {
+    version == "rustc 1.96.0" || version.starts_with("rustc 1.96.0 (")
+}
+
+fn verify_rustc_version() -> Result<String, String> {
+    let version = rustc_version()?;
+    if !is_pinned_rustc_version(&version) {
+        return Err(format!(
+            "factorial measurements require rustc {}; found {version}",
+            PINNED_RUSTC_RELEASE
+        ));
+    }
+    Ok(version)
+}
+
 fn verify_source_revision(source_commit: &str) -> Result<(), String> {
     let head = git_output(&["rev-parse", "HEAD"])?;
     if head != source_commit {
@@ -991,6 +1023,7 @@ fn run() -> Result<(), String> {
         return Err("source commit must be exactly 40 hexadecimal characters".to_string());
     }
     verify_source_revision(&args[3])?;
+    let rustc_version = verify_rustc_version()?;
 
     let manifest_bytes = fs::read(manifest_path)
         .map_err(|error| format!("cannot read {}: {error}", manifest_path.display()))?;
@@ -1024,7 +1057,7 @@ fn run() -> Result<(), String> {
             reference_by_block.get(&key)
         };
         let (measurements, reference_artifact) = if is_centre || reference.is_some() {
-            measurements_for_case(case, &args[3], &manifest_sha256, reference)
+            measurements_for_case(case, &args[3], &manifest_sha256, &rustc_version, reference)
         } else {
             (
                 failed_measurements(
@@ -1033,7 +1066,8 @@ fn run() -> Result<(), String> {
                     &format!(
                         "source_commit={};manifest_sha256={manifest_sha256}",
                         args[3]
-                    ),
+                    ) + &format!(";rustc_version={rustc_version}"),
+
                 ),
                 None,
             )
@@ -1085,14 +1119,15 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("cannot flush observations: {error}"))?;
 
     eprintln!(
-        "case_count={}, metric_count={}, observed_rows={}, not_applicable_rows={}, failed_cases={}, source_commit={}, manifest_sha256={}",
+        "case_count={}, metric_count={}, observed_rows={}, not_applicable_rows={}, failed_cases={}, source_commit={}, manifest_sha256={}, rustc_version={}",
         cases.len(),
         METRICS.len(),
         observed_rows,
         not_applicable_rows,
         failed_cases,
         args[3],
-        manifest_sha256
+        manifest_sha256,
+        rustc_version
     );
 
     if failed_cases > 0 {
@@ -1187,6 +1222,14 @@ mod tests {
             assert!(!path.is_empty());
             assert!(is_commit_sha(blob));
         }
+    }
+
+    #[test]
+    fn rustc_release_gate_accepts_only_the_pinned_compiler() {
+        assert!(is_pinned_rustc_version("rustc 1.96.0"));
+        assert!(is_pinned_rustc_version("rustc 1.96.0 (abc123 2026-01-01)"));
+        assert!(!is_pinned_rustc_version("rustc 1.96.1 (abc123 2026-01-01)"));
+        assert!(!is_pinned_rustc_version("rustc 1.96.00 (abc123 2026-01-01)"));
     }
 
     #[test]
