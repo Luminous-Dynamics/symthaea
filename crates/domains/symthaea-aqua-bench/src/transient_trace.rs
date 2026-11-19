@@ -294,9 +294,6 @@ impl ChannelRole {
         )
     }
 
-    fn is_flow(self) -> bool {
-        matches!(self, Self::PrimaryFlow | Self::SecondaryBranchFlow)
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -367,6 +364,11 @@ pub struct TraceChannel {
 }
 
 impl TraceChannel {
+    /// Read-only decoded samples. Samples can only enter through the verified raw CSV path.
+    pub fn samples(&self) -> &[TraceSample] {
+        &self.samples
+    }
+
     fn validate(&self, duration_us: u64) -> Result<(), TransientTraceError> {
         for (field, value) in [
             ("channel_id", self.channel_id.as_str()),
@@ -661,6 +663,7 @@ pub enum TransientTraceError {
     MissingTraceArtifactReference { channel_id: String },
     TraceArtifactNotFound { channel_id: String },
     DuplicateArtifactRole { role: RawArtifactRole },
+    DuplicateRawTraceArtifactDigest { sha256: String },
     EmptyRawArtifact,
     MissingRawArtifactMediaType,
     RawArtifactMediaTypeMismatch,
@@ -724,6 +727,7 @@ impl Display for TransientTraceError {
                 write!(f, "channel {channel_id} references a raw-trace digest absent from the manifest")
             }
             Self::DuplicateArtifactRole { role } => write!(f, "duplicate raw artifact role: {role:?}"),
+            Self::DuplicateRawTraceArtifactDigest { sha256 } => write!(f, "duplicate unfiltered trace artifact digest: {sha256}"),
             Self::EmptyRawArtifact => write!(f, "raw artifact byte length must be greater than zero"),
             Self::MissingRawArtifactMediaType => write!(f, "raw artifact media type is missing"),
             Self::RawArtifactMediaTypeMismatch => write!(f, "unfiltered trace artifact does not use the canonical Aqua CSV media type"),
@@ -1050,7 +1054,12 @@ impl TransientEventProfile {
             artifact.validate()?;
             roles.insert(artifact.role);
             if artifact.role == RawArtifactRole::UnfilteredTrace {
-                unfiltered_trace_digests.insert(artifact.sha256.as_str());
+                let normalized_digest = artifact.sha256.to_ascii_lowercase();
+                if !unfiltered_trace_digests.insert(normalized_digest) {
+                    return Err(TransientTraceError::DuplicateRawTraceArtifactDigest {
+                        sha256: artifact.sha256.clone(),
+                    });
+                }
             }
             if artifact.role != RawArtifactRole::UnfilteredTrace
                 && !singleton_roles.insert(artifact.role)
