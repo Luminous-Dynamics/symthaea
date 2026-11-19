@@ -134,6 +134,28 @@ Run each lane separately. Within a lane, freeze source data, split identities, p
 6. Symmetry-aware architecture or regularization baseline, where exact code/checkpoint/license permit.
 7. Symthaea candidate, only when an executable model exists and is evaluated under the same budget.
 
+### Memory-architecture tournament
+
+The 2026 online FNO closure uses an explicit trailing window of resolved-moment history. Symthaea's CfC/LTC architecture suggests a different, testable hypothesis: a continuous-time latent state may compress the relevant unresolved-history memory while accepting irregular observation intervals.
+
+Compare under the same physical input history, elapsed-time horizon, data budget and compute budget:
+- instantaneous Markovian closure;
+- explicit trailing-window FNO;
+- another matched sequence/state-space baseline where available;
+- CfC/LTC latent-memory closure candidate;
+- hybrid explicit short window plus continuous-time latent state.
+
+Measure:
+- online rollout error and stability, not only one-step loss;
+- error versus history-window length / latent-state size;
+- sensitivity to irregular sampling, dropped intervals and asynchronous channels;
+- hidden-state reset, warm-start and cross-trajectory contamination;
+- memory and runtime scaling;
+- extrapolation to unseen oscillation periods and initial perturbation amplitudes;
+- whether the latent memory captures physically meaningful lags or merely memorizes the training trajectories.
+
+The hypothesis is that continuous-time latent memory may be more data-efficient and robust to irregular cadence than a fixed history window. It is not an assumed advantage: the FNO is a strong published comparator and all methods must use matched evidence and evaluation boundaries.
+
 ### Data splits
 
 - Source-snapshot holdout: augmented copies of one source sample must stay in one split.
