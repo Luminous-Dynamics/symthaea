@@ -249,6 +249,243 @@ const SEGMENTED_VERSION: u16 = 1;
 const SEGMENTED_HEADER_LEN: usize = 32;
 const SEGMENT_SELECTION_POLICY_BEST_OF_FOUR: u8 = 1;
 
+const SEGMENT_SELECTION_POLICY_HISTORICAL_COST: u8 = 2;
+const SEGMENT_CANDIDATES: usize = 4;
+
+fn encode_segment_candidate(
+    values: &[f64],
+    candidate: u8,
+) -> Result<Vec<u8>, NumericError> {
+    let (transform, model) = match candidate {
+        0 => (Float64Transform::Raw, ModelKind::Order0),
+        1 => (Float64Transform::Raw, ModelKind::Order1),
+        2 => (Float64Transform::XorPrevious, ModelKind::Order0),
+        3 => (Float64Transform::XorPrevious, ModelKind::Order1),
+        _ => return Err(NumericError::UnsupportedTransform(candidate)),
+    };
+    compress_f64(values, transform, model)
+}
+
+fn segment_candidate_from_child_header(child: &[u8]) -> Result<u8, NumericError> {
+    if child.len() < HEADER_LEN || &child[0..4] != MAGIC {
+        return Err(NumericError::BadMagic);
+    }
+    let transform = child[6];
+    let model = child[7];
+    match (transform, model) {
+        (0, 0) => Ok(0),
+        (0, 1) => Ok(1),
+        (1, 0) => Ok(2),
+        (1, 1) => Ok(3),
+        _ => Err(NumericError::UnsupportedTransform(transform)),
+    }
+}
+
+#[derive(Default)]
+struct HistoricalSegmentCosts {
+    totals: [u64; SEGMENT_CANDIDATES],
+    segments: u64,
+}
+
+impl HistoricalSegmentCosts {
+    fn choose(&self) -> u8 {
+        if self.segments == 0 {
+            return 0;
+        }
+        let mut best = 0usize;
+        for candidate in 1..SEGMENT_CANDIDATES {
+            let candidate_average = self.totals[candidate] / self.segments;
+            let best_average = self.totals[best] / self.segments;
+            if candidate_average < best_average {
+                best = candidate;
+            }
+        }
+        best as u8
+    }
+
+    fn observe(&mut self, values: &[f64]) -> Result<(), NumericError> {
+        for candidate in 0..SEGMENT_CANDIDATES {
+            let frame = encode_segment_candidate(values, candidate as u8)?;
+            self.totals[candidate] = self.totals[candidate]
+                .checked_add(frame.len() as u64)
+                .ok_or(NumericError::LengthOverflow)?;
+        }
+        self.segments = self.segments
+            .checked_add(1)
+            .ok_or(NumericError::LengthOverflow)?;
+        Ok(())
+    }
+}
+
+/// Encode fixed-size f64 chunks using a deterministic historical-cost policy.
+///
+/// The first chunk uses Raw/Order0 (candidate 0). Before each later chunk, the
+/// selector chooses the candidate with the lowest *mean complete child-frame
+/// size on previously decoded chunks*. It never uses the current chunk to
+/// choose its encoding. After encoding a chunk, all four candidate sizes are
+/// measured to update the policy state for the next chunk.
+///
+/// The decoder repeats those four measurements from the reconstructed chunk,
+/// derives the same next policy state, and rejects a child whose transform/model
+/// ID does not match the policy's expected choice. The selected child header
+/// already carries the transform/model ID; no additional selector message is
+/// sent. This is an online policy with high diagnostic compute cost, not an
+/// optimized implementation.
+pub fn compress_f64_online_selector(
+    values: &[f64],
+    segment_size: usize,
+) -> Result<Vec<u8>, NumericError> {
+    if segment_size == 0 {
+        return Err(NumericError::InvalidSegmentSize);
+    }
+    let segment_count = if values.is_empty() {
+        0
+    } else {
+        (values.len() - 1) / segment_size + 1
+    };
+    let segment_size_u32 =
+        u32::try_from(segment_size).map_err(|_| NumericError::LengthOverflow)?;
+    let segment_count_u32 =
+        u32::try_from(segment_count).map_err(|_| NumericError::LengthOverflow)?;
+    let count = u64::try_from(values.len()).map_err(|_| NumericError::LengthOverflow)?;
+    let raw = raw_bits_bytes(values)?;
+
+    let mut frame = Vec::new();
+    frame.extend_from_slice(SEGMENTED_MAGIC);
+    frame.extend_from_slice(&SEGMENTED_VERSION.to_le_bytes());
+    frame.push(0);
+    frame.push(SEGMENT_SELECTION_POLICY_HISTORICAL_COST);
+    frame.extend_from_slice(&count.to_le_bytes());
+    frame.extend_from_slice(&segment_size_u32.to_le_bytes());
+    frame.extend_from_slice(&segment_count_u32.to_le_bytes());
+    frame.extend_from_slice(&crc32(&raw).to_le_bytes());
+    let header_crc = crc32(&frame);
+    frame.extend_from_slice(&header_crc.to_le_bytes());
+    debug_assert_eq!(frame.len(), SEGMENTED_HEADER_LEN);
+
+    let mut history = HistoricalSegmentCosts::default();
+    for segment in values.chunks(segment_size) {
+        let selected = history.choose();
+        let child = encode_segment_candidate(segment, selected)?;
+        frame.extend_from_slice(&child);
+        history.observe(segment)?;
+    }
+    Ok(frame)
+}
+
+/// Decode the F64S historical-cost online selector frame. It reproduces the
+/// policy from prior decoded chunks and rejects a child with an unexpected
+/// transform/model ID before decoding its payload.
+pub fn decompress_f64_online_selector(
+    frame: &[u8],
+    max_values: usize,
+) -> Result<Vec<f64>, NumericError> {
+    if frame.len() < SEGMENTED_HEADER_LEN {
+        return Err(NumericError::TruncatedHeader);
+    }
+    if &frame[0..4] != SEGMENTED_MAGIC {
+        return Err(NumericError::BadMagic);
+    }
+    let version = u16::from_le_bytes([frame[4], frame[5]]);
+    if version != SEGMENTED_VERSION {
+        return Err(NumericError::UnsupportedVersion(version));
+    }
+    if frame[6] != 0 {
+        return Err(NumericError::UnsupportedFlags(frame[6]));
+    }
+    if frame[7] != SEGMENT_SELECTION_POLICY_HISTORICAL_COST {
+        return Err(NumericError::UnsupportedTransform(frame[7]));
+    }
+
+    let count = u64::from_le_bytes(
+        frame[8..16].try_into().map_err(|_| NumericError::LengthMismatch)?,
+    );
+    let segment_size = u32::from_le_bytes(
+        frame[16..20].try_into().map_err(|_| NumericError::LengthMismatch)?,
+    ) as usize;
+    let segment_count = u32::from_le_bytes(
+        frame[20..24].try_into().map_err(|_| NumericError::LengthMismatch)?,
+    ) as usize;
+    let raw_crc = u32::from_le_bytes(
+        frame[24..28].try_into().map_err(|_| NumericError::LengthMismatch)?,
+    );
+    let header_crc = u32::from_le_bytes(
+        frame[28..32].try_into().map_err(|_| NumericError::LengthMismatch)?,
+    );
+
+    if count > max_values as u64 {
+        return Err(NumericError::OutputLimitExceeded {
+            declared: count,
+            limit: max_values,
+        });
+    }
+    if segment_size == 0 {
+        return Err(NumericError::InvalidSegmentSize);
+    }
+    if crc32(&frame[..28]) != header_crc {
+        return Err(NumericError::ChecksumMismatch);
+    }
+
+    let count = usize::try_from(count).map_err(|_| NumericError::LengthOverflow)?;
+    let expected_segments = if count == 0 { 0 } else { (count - 1) / segment_size + 1 };
+    if segment_count != expected_segments {
+        return Err(NumericError::LengthMismatch);
+    }
+
+    let mut output = Vec::with_capacity(count);
+    let mut cursor = SEGMENTED_HEADER_LEN;
+    let mut history = HistoricalSegmentCosts::default();
+
+    for segment_index in 0..segment_count {
+        let header_end = cursor.checked_add(HEADER_LEN).ok_or(NumericError::LengthOverflow)?;
+        if header_end > frame.len() {
+            return Err(NumericError::TruncatedHeader);
+        }
+        let inner_len = u64::from_le_bytes(
+            frame[cursor + 16..cursor + 24]
+                .try_into().map_err(|_| NumericError::LengthMismatch)?,
+        );
+        let inner_len = usize::try_from(inner_len).map_err(|_| NumericError::LengthOverflow)?;
+        let child_len = HEADER_LEN.checked_add(inner_len).ok_or(NumericError::LengthOverflow)?;
+        let child_end = cursor.checked_add(child_len).ok_or(NumericError::LengthOverflow)?;
+        if child_end > frame.len() {
+            return Err(NumericError::LengthMismatch);
+        }
+
+        let expected_candidate = history.choose();
+        let child = &frame[cursor..child_end];
+        let actual_candidate = segment_candidate_from_child_header(child)?;
+        if actual_candidate != expected_candidate {
+            return Err(NumericError::SegmentPolicyMismatch {
+                expected: expected_candidate,
+                actual: actual_candidate,
+            });
+        }
+
+        let expected_values = if segment_index + 1 == segment_count {
+            count - output.len()
+        } else {
+            segment_size
+        };
+        let decoded = decompress_f64(child, expected_values)?;
+        if decoded.len() != expected_values {
+            return Err(NumericError::LengthMismatch);
+        }
+        history.observe(&decoded)?;
+        output.extend_from_slice(&decoded);
+        cursor = child_end;
+    }
+
+    if cursor != frame.len() || output.len() != count {
+        return Err(NumericError::LengthMismatch);
+    }
+    if crc32(&raw_bits_bytes(&output)?) != raw_crc {
+        return Err(NumericError::ChecksumMismatch);
+    }
+    Ok(output)
+}
+
+
 /// Encode fixed-size f64 chunks by selecting the smallest complete subframe
 /// among Raw/XorPrevious x Order0/Order1. Every selected F64C frame (including
 /// its own header and CRCs) is retained in the output, so selection overhead is
@@ -586,6 +823,46 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn historical_cost_selector_round_trips_and_uses_past_segments_only() {
+        for input in bit_fixtures() {
+            for segment_size in [1, 64, 256, 1024] {
+                let frame = compress_f64_online_selector(&input, segment_size).unwrap();
+                let decoded = decompress_f64_online_selector(&frame, input.len()).unwrap();
+                assert_same_bits(&decoded, &input);
+            }
+        }
+    }
+
+    #[test]
+    fn historical_cost_selector_rejects_wrong_child_choice() {
+        let values = [0.0f64];
+        let wrong_child =
+            compress_f64(&values, Float64Transform::XorPrevious, ModelKind::Order1).unwrap();
+        let raw = raw_bits_bytes(&values).unwrap();
+
+        let mut malicious = Vec::new();
+        malicious.extend_from_slice(SEGMENTED_MAGIC);
+        malicious.extend_from_slice(&SEGMENTED_VERSION.to_le_bytes());
+        malicious.push(0);
+        malicious.push(SEGMENT_SELECTION_POLICY_HISTORICAL_COST);
+        malicious.extend_from_slice(&(1u64).to_le_bytes());
+        malicious.extend_from_slice(&(1u32).to_le_bytes());
+        malicious.extend_from_slice(&(1u32).to_le_bytes());
+        malicious.extend_from_slice(&crc32(&raw).to_le_bytes());
+        let header_crc = crc32(&malicious);
+        malicious.extend_from_slice(&header_crc.to_le_bytes());
+        malicious.extend_from_slice(&wrong_child);
+
+        assert_eq!(
+            decompress_f64_online_selector(&malicious, 1),
+            Err(NumericError::SegmentPolicyMismatch {
+                expected: 0,
+                actual: 3
+            })
+        );
     }
 
     #[test]
