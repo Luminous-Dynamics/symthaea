@@ -1355,11 +1355,16 @@ mod tests {
     fn budgeted_selector_round_trips_for_sparse_probe_intervals() {
         for input in bit_fixtures() {
             for segment_size in [64, 256, 1024] {
+                let oracle = compress_f64_segmented(&input, segment_size).unwrap();
+                let full = compress_f64_online_selector(&input, segment_size).unwrap();
+                assert!(full.len() >= oracle.len());
+
                 for probe_interval in [1, 2, 4, 16, 64, 128] {
                     let frame =
                         compress_f64_budgeted_selector(&input, segment_size, probe_interval)
                             .unwrap();
                     assert_eq!(frame[6], probe_interval.trailing_zeros() as u8);
+                    assert!(frame.len() >= oracle.len());
                     let decoded =
                         decompress_f64_budgeted_selector(&frame, input.len()).unwrap();
                     assert_same_bits(&decoded, &input);
@@ -1415,6 +1420,16 @@ mod tests {
         assert_eq!(
             decompress_f64_budgeted_selector(&bad_interval, input.len()),
             Err(NumericError::InvalidProbeInterval)
+        );
+
+        let mut bad_child_choice = frame.clone();
+        bad_child_choice[SEGMENTED_HEADER_LEN + 6] = 1; // expect Raw/Order0 on the first segment.
+        assert_eq!(
+            decompress_f64_budgeted_selector(&bad_child_choice, input.len()),
+            Err(NumericError::SegmentPolicyMismatch {
+                expected: 0,
+                actual: 1
+            })
         );
 
         let mut bad_crc = frame;
