@@ -6,11 +6,13 @@
 
 ## Purpose
 
-These vectors define the minimum negative-control suite for a future event-manifest parser and trace-admission implementation. They deliberately separate JSON Schema validity from metrology admission, method comparability, task qualification and physical safety.
+These vectors define the minimum structural and negative-control suite for the event-manifest parser and trace-admission implementation. They deliberately separate JSON Schema validity from metrology admission, method comparability, task qualification and physical safety.
 
 A schema-valid manifest is only structurally well-formed. It is not proof that a sensor is calibrated, a pressure trace is physically plausible, the apparatus is rated, the event was faithfully replayed or a bathing task succeeded.
 
 ## Vector catalogue
+
+The current catalogue contains two positive structural fixtures and 30 negative/adversarial cases. Cases are proposed conformance expectations, not executed validator or physical-rig tests.
 
 | ID | Mutation / scenario | Expected gate | Required disposition |
 |---|---|---|---|
@@ -76,4 +78,6 @@ The Rust module `symthaea_aqua_bench::transient_trace` now has strict JSON decod
 | PT-NEG-028 | A matched event replay uses a different anti-alias filter, sampling rate, uncertainty contract or channel map | Matched replay | Reject comparison |
 | PT-NEG-029 | RFC3339 event or observation-window timestamp is invalid, or observation window end precedes start | Timestamp validation | Reject |
 
-The executable module currently contains 30 authored Rust tests. None is represented as executed until the exact-head Cargo test workflow completes with a successful conclusion.
+The executable module currently contains 32 authored Rust tests. None is represented as executed until the exact-head Cargo test workflow completes with a successful conclusion.
+
+| PT-NEG-030 | A channel references a raw-trace SHA-256 that is missing from the manifest's unfiltered-trace artifacts | Trace provenance admission | Reject; do not attach samples from an undeclared raw artifact |
