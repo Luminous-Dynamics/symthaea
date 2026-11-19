@@ -1072,7 +1072,7 @@ impl IntertwinedModel {
             let stiffness_matrix = &self.gradient_by_axis[edge.axis];
             for (first, row) in stiffness_matrix.iter().enumerate() {
                 for (second, coefficient) in row.iter().enumerate() {
-                    gradient += coefficient
+                    gradient += *coefficient
                         * differences[first].conj_product_real(differences[second]);
                 }
             }
