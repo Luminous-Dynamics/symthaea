@@ -57,17 +57,38 @@ The command also emits two segmented rows at chunk sizes 64, 256 and 1,024:
 - `online_historical_cost` chooses the current chunk from the average complete
   child-frame sizes for all eight candidates measured on **previous** chunks only.
   The first chunk uses Raw/Order0. After each chunk, both encoder and decoder
-  recompute all eight candidate frame sizes from that chunk to update the same
-  integer history.
+  measure the seven alternatives and reuse the selected child's actual frame
+  length to update the same integer history.
   The selected transform/model is recorded in the child's F64C header and the
   decoder rejects a child whose IDs do not match its historical policy. There
   is no additional selector symbol or intervention information.
+- `budgeted_sparse_probe` uses the same historical policy, but only probes all
+  eight candidates on the first chunk and then every (K)-th chunk. Supported
+  (K) values are powers of two from 1 through 128 and the interval is recorded
+  in the CRC-protected F64S header. Between probes, both sides retain the same
+  candidate-cost history and encode only the incumbent. The decoder derives
+  the same probe schedule and rejects a child whose selected candidate differs
+  from its history-derived choice.
+  Importantly, **only common probe chunks update cross-candidate means**.
+  We do not add extra measurements for just the incumbent between probes,
+  which would compare candidate means on different, selection-biased sample
+  sets. The CLI reports (K), number of probes, seven extra candidate encodes
+  per probe, complete frame ratio and percentage size gap to the offline
+  best-of-eight oracle.
 
-The online policy is a compute-heavy diagnostic: it makes eight candidate
-measurements per chunk on both sides. It is not yet optimized for throughput.
-Both policies use the 32-byte F64S outer header and count each F64C child
-header/CRC. They provide different reference points: an offline size oracle
-and a decoder-reproducible past-only selection policy.
+For a stream with (S) segments and probe interval (K), the number of probes
+is (lceil S/K ceil), and the extra candidate encodes per side are
+(7\lceil S/K \rceil). Amortized extra candidate encodes per segment are
+approximately (7/K): 7.0 at (K=1), 1.75 at (K=4), 0.4375 at (K=16),
+and 0.1094 at (K=64). The selected candidate is encoded once on every
+segment. The decoder performs corresponding candidate recomputations on probe
+segments to preserve deterministic policy state.
+
+The online policies offer different points on the size/compute frontier:
+full historical measurement gives more frequent feedback, while sparse probes
+reduce selector work but increase adaptation staleness. Neither is yet a
+throughput-optimized production selector. All policies use the 32-byte F64S
+outer header and count every F64C child header/CRC.
 
 ### Production telemetry and RLE context
 
