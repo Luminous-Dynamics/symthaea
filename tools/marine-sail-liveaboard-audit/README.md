@@ -29,7 +29,7 @@ Pair comparison returns `INCOMPARABLE` when mission/configuration/service/foreca
 - Realized environment is kept outside deployable decision input.
 - Every case includes the complete liveaboard resource-dimension roster.
 - Every required owner role and hard gate is explicit.
-- Unknown, partial, expired, revoked and synthetic evidence cannot be promoted into a non-synthetic comparison.
+- Unknown, partial, expired, revoked and synthetic evidence cannot be promoted into a non-synthetic comparison. A route that automatically relaxes a hard comfort requirement is BLOCKED; a relaxed soft preference remains INCOMPLETE.
 - Failed or unresolved hard gates cannot be compensated by energy or cost improvements.
 - Matching is by exact identifiers/digests and service/mission fields, not inferred rescaling.
 
