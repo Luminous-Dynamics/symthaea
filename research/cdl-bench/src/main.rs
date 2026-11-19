@@ -566,7 +566,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# values={count}");
     println!("# seed={seed}");
     println!("# representation=IEEE-754-binary64 exact bit preservation");
-    println!("source,transform,model,raw_bytes,frame_bytes,zstd_raw_bytes,ratio,round_trip");
+    println!("source,transform,model,raw_bytes,frame_bytes,zstd_raw_bytes,ratio,encode_ns,decode_ns,round_trip");
 
     for (name, values) in sources {
         let raw_len = values.len().checked_mul(8).ok_or("float raw length overflow")?;
@@ -579,8 +579,12 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
 
         for transform in [Float64Transform::Raw, Float64Transform::XorPrevious] {
             for model in [ModelKind::Order0, ModelKind::Order1] {
+                let encode_started = Instant::now();
                 let frame = compress_f64(&values, transform, model)?;
+                let encode_ns = encode_started.elapsed().as_nanos();
+                let decode_started = Instant::now();
                 let decoded = decompress_f64(&frame, values.len())?;
+                let decode_ns = decode_started.elapsed().as_nanos();
                 let exact = values.len() == decoded.len()
                     && values.iter().zip(&decoded).all(|(a, b)| a.to_bits() == b.to_bits());
                 if !exact {
@@ -597,7 +601,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                     Float64Transform::XorPrevious => "xor_previous_varint",
                 };
                 println!(
-                    "{name},{transform_name},{model_name},{},{},{zstd},{ratio},exact",
+                    "{name},{transform_name},{model_name},{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
                     raw.len(),
                     frame.len()
                 );
