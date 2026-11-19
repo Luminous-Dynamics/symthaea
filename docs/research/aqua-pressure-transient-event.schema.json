@@ -380,7 +380,8 @@
         "effective_bandwidth_hz",
         "anti_alias_filter_id",
         "sample_count",
-        "dropped_sample_count"
+        "dropped_sample_count",
+        "raw_trace_sha256"
       ],
       "properties": {
         "channel_id": {
@@ -468,6 +469,9 @@
           "minimum": 0
         },
         "sample_gap_report_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "raw_trace_sha256": {
           "$ref": "#/$defs/sha256"
         }
       },
