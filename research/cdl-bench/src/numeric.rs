@@ -63,6 +63,7 @@ pub enum NumericError {
     UnsupportedFlags(u8),
     SegmentPolicyMismatch { expected: u8, actual: u8 },
     InvalidProbeInterval,
+    UnsupportedPolicy(u8),
 }
 
 impl fmt::Display for NumericError {
@@ -81,13 +82,14 @@ impl fmt::Display for NumericError {
             }
             Self::ChecksumMismatch => write!(f, "typed numerical frame checksum mismatch"),
             Self::TruncatedVarint => write!(f, "truncated unsigned varint"),
-            Self::VarintOverflow => write!(f, "unsigned varint exceeds u32"),
+            Self::VarintOverflow => write!(f, "unsigned varint exceeds u64"),
             Self::NonCanonicalVarint => write!(f, "non-canonical overlong unsigned varint"),
-            Self::NumericOverflow => write!(f, "decoded value is outside the i16 range"),
+            Self::NumericOverflow => write!(f, "decoded numeric value exceeds the supported range"),
             Self::InvalidSegmentSize => write!(f, "segment size must be positive"),
             Self::UnsupportedFlags(v) => write!(f, "unsupported numeric frame flags {v}"),
             Self::SegmentPolicyMismatch { expected, actual } => write!(f, "segment policy mismatch: expected candidate {expected}, got {actual}"),
             Self::InvalidProbeInterval => write!(f, "probe interval must be a power of two from 1 through 128"),
+            Self::UnsupportedPolicy(v) => write!(f, "unsupported F64S segment policy id {v}"),
         }
     }
 }
