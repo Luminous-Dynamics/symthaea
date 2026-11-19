@@ -257,15 +257,6 @@ def main():
     if len(split_ids) != len(set(split_ids)):
         fail("discovery/calibration/final holdout split IDs must be distinct")
 
-    split = fixture["split_contract"]
-    split_ids = [
-        split["discovery_split_id"],
-        split["calibration_split_id"],
-        split["final_holdout_split_id"],
-    ]
-    if len(split_ids) != len(set(split_ids)):
-        fail("discovery/calibration/final holdout split IDs must be distinct")
-
     expected_split_counts = {
         "fixture_sanity": 5,
         "discovery": 300,
