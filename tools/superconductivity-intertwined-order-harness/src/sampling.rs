@@ -3,6 +3,9 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use serde_json::{Value, json};
 
+type HelicityTensor = Vec<Vec<f64>>;
+type JackknifeHelicityResult = (HelicityTensor, Option<HelicityTensor>, Option<f64>);
+
 #[derive(Clone, Copy, Default)]
 pub(super) struct SamplingOverrides {
     pub warmup_sweeps: Option<usize>,
@@ -354,7 +357,7 @@ fn block_jackknife_helicity(
     current_series: &[Vec<f64>],
     diamagnetic_series: &[Vec<Vec<f64>>],
     temperature: f64,
-) -> Result<(Vec<Vec<f64>>, Option<Vec<Vec<f64>>>, Option<f64>), String> {
+) -> Result<JackknifeHelicityResult, String> {
     let point_estimate =
         helicity_tensor_from_samples(current_series, diamagnetic_series, temperature, None)?;
     let sample_count = current_series[0].len();
@@ -533,11 +536,10 @@ fn run_chain(
             phase_lock_series[term].push(relative_cosines[term]);
             phase_lock_sine_series[term].push(relative_sines[term]);
         }
-        for axis in 0..dimension {
-            current_series[axis].push(twist.current[axis]);
-            for other_axis in 0..dimension {
-                diamagnetic_series[axis][other_axis]
-                    .push(twist.diamagnetic[axis][other_axis]);
+        for (axis, current) in current_series.iter_mut().enumerate() {
+            current.push(twist.current[axis]);
+            for (other_axis, series) in diamagnetic_series[axis].iter_mut().enumerate() {
+                series.push(twist.diamagnetic[axis][other_axis]);
             }
         }
 
