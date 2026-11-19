@@ -311,6 +311,28 @@ impl Oracle {
             if declared.len() != case.target_subgroup_ids.len() || !subgroups.contains(&declared) {
                 return Err(format!("{} declares a non-subgroup target", case.case_id));
             }
+            let expected_label = match declared.len() {
+                1 => "C1".to_owned(),
+                3 => "C3".to_owned(),
+                6 => "S3".to_owned(),
+                2 => format!(
+                    "C2_{}",
+                    declared
+                        .iter()
+                        .find(|element_id| *element_id != &self.manifest.action.identity_element_id)
+                        .ok_or_else(|| format!("{} order-two subgroup lacks generator", case.case_id))?
+                ),
+                _ => return Err(format!("{} has unsupported S3 subgroup order", case.case_id)),
+            };
+            if case.expected_subgroup_label != expected_label {
+                return Err(format!(
+                    "{} label {} does not match exact subgroup {}",
+                    case.case_id, case.expected_subgroup_label, expected_label
+                ));
+            }
+            if case.split != "fixture_sanity" {
+                return Err(format!("{} must remain isolated as fixture_sanity", case.case_id));
+            }
             let orbit = self.orbit(&declared);
             let fixture_orbit: BTreeSet<[i64; 3]> = case.point_orbit.iter().copied().collect();
             if orbit != fixture_orbit || fixture_orbit.len() != case.point_orbit.len() {
@@ -424,6 +446,28 @@ mod tests {
             let orbit = oracle.orbit(&subgroup);
             assert_eq!(oracle.stabilizer(&orbit), subgroup);
         }
+    }
+
+    #[test]
+    fn all_six_subgroup_labels_are_exact_and_nonduplicated() {
+        let oracle = oracle();
+        let labels = oracle
+            .manifest
+            .cases
+            .iter()
+            .map(|case| case.expected_subgroup_label.clone())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            labels,
+            BTreeSet::from([
+                "C1".to_owned(),
+                "C2_s12".to_owned(),
+                "C2_s01".to_owned(),
+                "C2_s02".to_owned(),
+                "C3".to_owned(),
+                "S3".to_owned(),
+            ])
+        );
     }
 
     #[test]
