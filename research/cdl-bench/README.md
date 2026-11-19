@@ -488,6 +488,30 @@ adapter and held-out calibration protocol in
 The codebook/readout, calibration parameters and decoder costs still count
 toward model accounting.
 
+## External codec reproduction
+
+A pinned, method-aware reproduction setup is documented in
+`docs/research/CDL_EXTERNAL_CODEC_REPRO_MANIFEST_V1_2026-11-19.md`.
+It records the inspected DeXOR commit and 22-file `Overall` corpus, the
+TerseTS commit and exact-lossless whitelist, upstream build constraints, and
+the distinction between paper-reported results and actually reproduced
+numbers.
+
+The helper script is
+`scripts/research/cdl_external_codec_repro.sh`. With pre-existing checkout
+directories at the pinned commits, run:
+
+```sh
+DEXOR_DIR=/path/to/DeXOR TERSETS_DIR=/path/to/TerseTS \
+  bash scripts/research/cdl_external_codec_repro.sh
+```
+
+It verifies revisions, builds, records environment/data hashes and explicitly
+skips any external repository not supplied. DeXOR requires Java 8 and Maven;
+TerseTS requires Zig. Neither external codec has been built or run in the
+current environment. TerseTS is beta, and lossy/bit-nonexact methods are
+excluded from the exact-lossless comparison.
+
 ## Plugging in a custom predictor
 
 The library exposes:
