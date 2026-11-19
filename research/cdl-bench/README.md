@@ -572,6 +572,14 @@ This is a **WZS-inspired control**, not the authors' WZS implementation. The ind
 
 The Rust module has authored tests for constant streams, stationary random streams, abrupt/recurring shifts, empty/singleton inputs, determinism and invalid configurations. They have not been compiler-run here because the Rust toolchain is unavailable.
 
+From the standalone crate, the synthetic boundary report can be generated with:
+
+```sh
+cargo run --release -- segment --values 4096 --workload stationary-random --seed 2748 --min-segment 32 --max-segment 512
+```
+
+Supported fixtures are `constant`, `stationary-random`, `stable-random` and `stable-random-stable`. The command prints the config, segment lengths, detected LZV boundaries and forced maximum-length boundaries. This measures segmentation only; it does not yet encode each selected segment or establish a compression gain.
+
 ## Plugging in a custom predictor
 
 The library exposes:
