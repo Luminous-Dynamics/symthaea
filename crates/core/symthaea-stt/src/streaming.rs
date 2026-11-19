@@ -905,8 +905,8 @@ mod tests {
             // exercises a physically plausible frontend, not a 1 kHz test-only
             // configuration whose mel filterbank exceeds Nyquist.
             sample_rate: 16_000,
-            frame_duration: 0.01,
-            hop_duration: 0.01,
+            frame_duration: 0.025,
+            hop_duration: 0.010,
             buffer_duration: 0.1,
             n_mels: 40,
             min_frames: 1,
@@ -940,16 +940,17 @@ mod tests {
     fn overrun_emits_exact_gap_and_starts_a_new_segment() {
         let mut processor = StreamProcessor::new(small_stream_config());
 
-        // Consume three 10 ms frames (480 samples), then block the consumer
-        // while 4,000 new samples arrive into the 1,600-sample buffer.
-        let initial: Vec<f32> = (0..480)
+        // Consume three 25 ms windows at a 10 ms hop. Their starts are
+        // 0, 160 and 320; after the third window the consumer cursor is 480.
+        // Then block it while 4,000 samples arrive into the 1,600-sample buffer.
+        let initial: Vec<f32> = (0..720)
             .map(|value| (value as f32 * 0.001).sin())
             .collect();
         processor.push_audio(&initial).unwrap();
         let first = processor.process();
         assert_eq!(first.len(), 3);
         assert_eq!(first[0].source_start_sample, 0);
-        assert_eq!(first[2].source_end_sample, 480);
+        assert_eq!(first[2].source_end_sample, 720);
         assert_eq!(processor.frame_count(), 3);
 
         let overrun: Vec<f32> = (0..4_000)
@@ -963,17 +964,17 @@ mod tests {
             .expect("overrun must be observable");
         assert_eq!(gap.segment_index, 1);
         assert_eq!(gap.lost_start_sample, 480);
-        assert_eq!(gap.lost_end_sample, 2_880);
-        assert_eq!(gap.lost_samples(), 2_400);
-        assert_eq!(processor.dropped_sample_count(), 2_400);
-        assert_eq!(processor.skipped_frame_count(), 15);
+        assert_eq!(gap.lost_end_sample, 3_120);
+        assert_eq!(gap.lost_samples(), 2_640);
+        assert_eq!(processor.dropped_sample_count(), 2_640);
+        assert_eq!(processor.skipped_frame_count(), 17);
         assert_eq!(processor.segment_index(), 1);
 
         assert!(!resumed.is_empty());
-        assert_eq!(resumed[0].source_start_sample, 2_880);
+        assert_eq!(resumed[0].source_start_sample, 3_120);
         assert_eq!(resumed[0].segment_index, 1);
         assert_eq!(resumed[0].frame_idx, 3, "frame IDs remain monotonic");
-        assert!(resumed.iter().all(|frame| frame.source_start_sample >= 2_880));
+        assert!(resumed.iter().all(|frame| frame.source_start_sample >= 3_120));
         assert!(resumed.iter().all(|frame| frame.segment_index == 1));
         assert!(resumed.windows(2).all(|pair| {
             pair[0].source_start_sample < pair[1].source_start_sample
@@ -984,7 +985,7 @@ mod tests {
     #[test]
     fn reset_starts_a_new_origin_and_clears_gap_counters() {
         let mut processor = StreamProcessor::new(small_stream_config());
-        let initial: Vec<f32> = (0..480)
+        let initial: Vec<f32> = (0..720)
             .map(|value| (value as f32 * 0.001).sin())
             .collect();
         let overrun: Vec<f32> = (0..4_000)
@@ -1003,7 +1004,7 @@ mod tests {
         assert_eq!(processor.skipped_frame_count(), 0);
         assert!(processor.take_discontinuity().is_none());
 
-        let fresh: Vec<f32> = (0..320)
+        let fresh: Vec<f32> = (0..800)
             .map(|value| (value as f32 * 0.002).sin())
             .collect();
         processor.push_audio(&fresh).unwrap();
