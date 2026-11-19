@@ -227,6 +227,7 @@ fn atelier_production_is_seeded_bounded_and_canvas_owned() {
         serde_json::to_vec(&second.scene).unwrap()
     );
     assert!(first.receipt.generated_scene_nodes < request.max_scene_nodes);
+    assert_eq!(first.receipt.registered_max_output_nodes, 3);
     assert_eq!(first.receipt.seed, request.seed);
     assert_eq!(first.receipt.style, request.style);
 
@@ -278,7 +279,11 @@ fn atelier_production_rejects_unbounded_or_unregistered_requests() {
 
     request.style = AtelierStyle::Composite;
     assert!(generate_atelier_production(&request, &snapshot).is_err());
+    request.style = AtelierStyle::ReactionDiffusion;
+    request.max_scene_nodes = 1_026;
+    assert!(generate_atelier_production(&request, &snapshot).is_err());
     request.style = AtelierStyle::LSystem;
+    request.max_scene_nodes = 2_000;
 
     let oversized_snapshot = CognitiveSnapshot {
         thought_vector: vec![0.0; 300],
