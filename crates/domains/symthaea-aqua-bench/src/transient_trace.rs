@@ -1,7 +1,7 @@
 //! Provenance-bound admission for Luminous Aqua pressure-transient event traces.
 //!
-//! This module consumes an already decoded event manifest and channel samples. It does not
-//! parse JSON, authenticate external issuers, calibrate sensors, authorize a pressure rig,
+//! This module strictly decodes a JSON event manifest and then admits decoded channel samples.
+//! It does not authenticate external issuers, calibrate sensors, authorize a pressure rig,
 //! calculate hydraulic states, or qualify bathing-task performance. Those remain with the
 //! schema/decoder, Mycelix metrology, competent apparatus authority, Symtropy and independent
 //! task/laboratory assessors respectively.
@@ -13,6 +13,7 @@ use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+use chrono::DateTime;
 use serde::Deserialize;
 
 fn is_sha256(value: &str) -> bool {
@@ -225,6 +226,13 @@ impl SiteObservationEvidence {
         require_text("observation_window.start", &self.observation_window.start)?;
         require_text("observation_window.end", &self.observation_window.end)?;
         require_text("observation_window.coverage_statement", &self.observation_window.coverage_statement)?;
+        let start = DateTime::parse_from_rfc3339(&self.observation_window.start)
+            .map_err(|_| TransientTraceError::InvalidTimestamp { field: "observation_window.start" })?;
+        let end = DateTime::parse_from_rfc3339(&self.observation_window.end)
+            .map_err(|_| TransientTraceError::InvalidTimestamp { field: "observation_window.end" })?;
+        if end <= start {
+            return Err(TransientTraceError::InvalidTimestamp { field: "observation_window.end" });
+        }
         if self.site_profile_revision == 0 {
             return Err(TransientTraceError::InvalidRevision { field: "site_profile_revision" });
         }
@@ -590,6 +598,14 @@ impl RawArtifact {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AnalysisMetadata {
+    pub analysis_code_sha256: Option<String>,
+    pub filter_definition_sha256: Option<String>,
+    pub exclusion_manifest_sha256: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TransientEventProfile {
@@ -609,6 +625,7 @@ pub struct TransientEventProfile {
     pub command: EventCommand,
     pub acquisition: AcquisitionMetadata,
     pub raw_artifacts: Vec<RawArtifact>,
+    pub analysis: Option<AnalysisMetadata>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -651,6 +668,7 @@ pub enum TransientTraceError {
     InsufficientSpatialPressureChannels,
     EventReplayMismatch { field: &'static str },
     ManifestDecode { message: String },
+    InvalidTimestamp { field: &'static str },
     UnknownChannel { channel_id: String },
 }
 
@@ -727,6 +745,7 @@ impl Display for TransientTraceError {
                 write!(f, "matched event replays differ at: {field}")
             }
             Self::ManifestDecode { message } => write!(f, "transient event manifest decode failed: {message}"),
+            Self::InvalidTimestamp { field } => write!(f, "invalid or reversed RFC3339 timestamp: {field}"),
             Self::UnknownChannel { channel_id } => write!(f, "raw trace references an unknown channel: {channel_id}"),
         }
     }
@@ -735,6 +754,38 @@ impl Display for TransientTraceError {
 impl Error for TransientTraceError {}
 
 impl TransientEventProfile {
+    /// Strictly decode a versioned JSON manifest. Raw channel samples are attached separately
+    /// from the referenced unfiltered trace artifact before full admission.
+    pub fn from_json_manifest(json: &str) -> Result<Self, TransientTraceError> {
+        serde_json::from_str(json)
+            .map_err(|error| TransientTraceError::ManifestDecode {
+                message: error.to_string(),
+            })
+    }
+
+    /// Attach decoded samples to the exact manifest channel named by the raw-trace decoder.
+    pub fn attach_channel_samples(
+        &mut self,
+        channel_id: &str,
+        samples: Vec<TraceSample>,
+    ) -> Result<(), TransientTraceError> {
+        let channel = self
+            .acquisition
+            .channels
+            .iter_mut()
+            .find(|channel| channel.channel_id == channel_id)
+            .ok_or_else(|| TransientTraceError::UnknownChannel {
+                channel_id: channel_id.to_owned(),
+            })?;
+        channel.samples = samples;
+        if channel.sample_count != channel.samples.len() {
+            return Err(TransientTraceError::SampleCountMismatch {
+                channel_id: channel.channel_id.clone(),
+            });
+        }
+        Ok(())
+    }
+
     pub fn validate(&self) -> Result<(), TransientTraceError> {
         require_text("schema_version", &self.schema_version)?;
         if self.schema_version != "0.1.0" {
@@ -743,6 +794,8 @@ impl TransientEventProfile {
         require_text("profile_id", &self.profile_id)?;
         require_text("task_profile_id", &self.task_profile_id)?;
         require_text("event_start", &self.event_start)?;
+        DateTime::parse_from_rfc3339(&self.event_start)
+            .map_err(|_| TransientTraceError::InvalidTimestamp { field: "event_start" })?;
         require_digest("conditions_sha256", &self.conditions_sha256)?;
         require_digest("protocol_sha256", &self.protocol_sha256)?;
         if self.profile_revision == 0 {
@@ -1033,8 +1086,8 @@ mod tests {
                 waveform_sha256: digest('1'),
                 samples: vec![
                     CommandSample { offset_us: 0, value: CommandValue::Numeric(300.0) },
-                    CommandSample { offset_us: 1_000, value: CommandValue::PressureKpa(200.0) },
-                    CommandSample { offset_us: 2_000, value: CommandValue::PressureKpa(300.0) },
+                    CommandSample { offset_us: 1_000, value: CommandValue::Numeric(200.0) },
+                    CommandSample { offset_us: 2_000, value: CommandValue::Numeric(300.0) },
                 ],
             },
             acquisition: AcquisitionMetadata {
@@ -1050,6 +1103,7 @@ mod tests {
                 RawArtifact { role: RawArtifactRole::UnfilteredTrace, sha256: digest('3'), byte_length: 10_000 },
                 RawArtifact { role: RawArtifactRole::EventLog, sha256: digest('4'), byte_length: 1_024 },
             ],
+            analysis: None,
         }
     }
 
