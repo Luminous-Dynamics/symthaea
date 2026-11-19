@@ -9,6 +9,8 @@ use cdl_bench::{
     compress_f64_budgeted_selector,
     decompress_f64, decompress_f64_segmented, decompress_f64_online_selector,
     decompress_f64_budgeted_selector,
+    compress_telemetry_records, decompress_telemetry_records,
+    TelemetryFieldKind, TelemetryRecord, TelemetrySchema,
     Float64Transform,
 };
 use std::error::Error;
@@ -29,6 +31,7 @@ fn usage() -> &'static str {
   cdl-bench causal [--steps N] [--seed N]
   cdl-bench numeric [--values N] [--seed N]
   cdl-bench float [--values N] [--seed N]
+  cdl-bench telemetry [--records N] [--keys N] [--state-capacity N] [--segment-records N] [--workload sparse|bursty|idle|noisy] [--seed N]
   cdl-bench bounded [--values N] [--seed N] [--tolerance N]
 
 The E0, causal, numeric and float commands check exact round-trip integrity.
@@ -988,6 +991,251 @@ fn numeric_command(args: &[String]) -> Result<(), Box<dyn Error>> {
 }
 
 
+fn telemetry_command(args: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut count = 65_536usize;
+    let mut key_count = 64usize;
+    let mut state_capacity = 64usize;
+    let mut segment_records = 4_096usize;
+    let mut workload = "sparse".to_owned();
+    let mut seed = 0x7e1e_0001_u64;
+    let mut index = 1;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--records" => {
+                count = parse_usize(args.get(index + 1), "--records")?;
+                index += 2;
+            }
+            "--keys" => {
+                key_count = parse_usize(args.get(index + 1), "--keys")?;
+                index += 2;
+            }
+            "--state-capacity" => {
+                state_capacity = parse_usize(args.get(index + 1), "--state-capacity")?;
+                index += 2;
+            }
+            "--segment-records" => {
+                segment_records = parse_usize(args.get(index + 1), "--segment-records")?;
+                index += 2;
+            }
+            "--workload" => {
+                workload = args.get(index + 1).ok_or("missing value after --workload")?.clone();
+                index += 2;
+            }
+            "--seed" => {
+                seed = parse_u64(args.get(index + 1), "--seed")?;
+                index += 2;
+            }
+            other => return Err(format!("unknown telemetry option: {other}\n{}", usage()).into()),
+        }
+    }
+    if count > 1_000_000 {
+        return Err("telemetry generator limit is 1,000,000 records".into());
+    }
+    if key_count == 0 || key_count > 65_536 {
+        return Err("telemetry --keys must be in 1..=65536".into());
+    }
+    if state_capacity == 0 || state_capacity > 1_000_000 {
+        return Err("telemetry --state-capacity must be in 1..=1000000".into());
+    }
+    if segment_records == 0 || segment_records > 1_000_000 {
+        return Err("telemetry --segment-records must be in 1..=1000000".into());
+    }
+    if !["sparse", "bursty", "idle", "noisy"].contains(&workload.as_str()) {
+        return Err("telemetry --workload must be sparse, bursty, idle or noisy".into());
+    }
+
+    fn next_random(state: &mut u64) -> u64 {
+        *state = state.wrapping_add(0x9e37_79b9_7f4a_7c15);
+        let mut value = *state;
+        value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        value ^ (value >> 31)
+    }
+
+    fn field_value(field: usize, random: u64) -> u64 {
+        match field {
+            0 => ((random % 100_000) as f64 / 1000.0).to_bits(),
+            1 => ((random % 10_000_000) as f64 / 100.0).to_bits(),
+            2 => random % 4096,
+            3 => random & 1,
+            4 => random as i64 as u64,
+            5 => random,
+            6 => random.rotate_left(17),
+            _ => ((random % 1_000_000) as f64 / 10_000.0).to_bits(),
+        }
+    }
+
+    let schema = TelemetrySchema::new([
+        TelemetryFieldKind::F64Bits,
+        TelemetryFieldKind::F64Bits,
+        TelemetryFieldKind::U32,
+        TelemetryFieldKind::Boolean,
+        TelemetryFieldKind::I64,
+        TelemetryFieldKind::U64,
+        TelemetryFieldKind::Opaque64,
+        TelemetryFieldKind::F64Bits,
+    ]);
+    let mut rng = seed;
+    let mut per_key = vec![None::<(u8, [u64; 8])>; key_count];
+    let mut records = Vec::with_capacity(count);
+
+    for row in 0..count {
+        let key = row % key_count;
+        let step = row / key_count;
+        let (mut present_mask, mut values) = match per_key[key] {
+            Some((mask, current)) => (mask, current),
+            None => {
+                let mut initial = [0u64; 8];
+                for field in 0..8 {
+                    initial[field] = field_value(field, next_random(&mut rng));
+                }
+                (u8::MAX, initial)
+            }
+        };
+
+        let first_observation = per_key[key].is_none();
+        for field in 0..8 {
+            let random = next_random(&mut rng);
+            let update = if first_observation {
+                true
+            } else {
+                match workload.as_str() {
+                    "sparse" => random % 1000 < 15,
+                    "idle" => random % 10_000 < 2,
+                    "bursty" => {
+                        if step % 256 < 24 {
+                            random % 100 < 65
+                        } else {
+                            random % 1000 < 5
+                        }
+                    }
+                    "noisy" => true,
+                    _ => false,
+                }
+            };
+            if update {
+                let bit = 1u8 << field;
+                if random.rotate_left(11) % 2048 == 0 {
+                    present_mask ^= bit;
+                }
+                if present_mask & bit == 0 {
+                    values[field] = 0;
+                } else {
+                    values[field] = field_value(field, next_random(&mut rng));
+                }
+            }
+        }
+
+        let entity_id = (key / 16) as u32;
+        let series_id = (key % 16) as u32;
+        let timestamp = (row as u64).saturating_mul(1000);
+        records.push(TelemetryRecord::new(
+            timestamp,
+            entity_id,
+            series_id,
+            present_mask,
+            values,
+        ));
+        per_key[key] = Some((present_mask, values));
+    }
+
+    // The canonical uncompressed baseline includes the schema type IDs and all
+    // fixed-width record fields, including zeroed slots for absent fields.
+    let mut raw = Vec::with_capacity(8usize.saturating_add(count.saturating_mul(81)));
+    raw.extend_from_slice(&[
+        TelemetryFieldKind::F64Bits as u8,
+        TelemetryFieldKind::F64Bits as u8,
+        TelemetryFieldKind::U32 as u8,
+        TelemetryFieldKind::Boolean as u8,
+        TelemetryFieldKind::I64 as u8,
+        TelemetryFieldKind::U64 as u8,
+        TelemetryFieldKind::Opaque64 as u8,
+        TelemetryFieldKind::F64Bits as u8,
+    ]);
+    for record in &records {
+        raw.extend_from_slice(&record.timestamp.to_le_bytes());
+        raw.extend_from_slice(&record.entity_id.to_le_bytes());
+        raw.extend_from_slice(&record.series_id.to_le_bytes());
+        raw.push(record.present_mask);
+        for value in record.values {
+            raw.extend_from_slice(&value.to_le_bytes());
+        }
+    }
+    let zstd_bytes = external_compressed_len("zstd", &["-q", "-c"], &raw)
+        .map_or_else(|| "NA".to_owned(), |bytes| bytes.to_string());
+
+    println!("# benchmark=CDL-Bench-typed-telemetry-v1");
+    println!("# records={count}");
+    println!("# keys={key_count}");
+    println!("# state_capacity={state_capacity}");
+    println!("# segment_records={segment_records}");
+    println!("# workload={workload}");
+    println!("# seed={seed}");
+    report_external_versions();
+    println!("model,raw_bytes,cdl_frame_bytes,zstd_raw_bytes,frame_vs_zstd_pct,ratio,encode_ns,decode_ns,state_record_payload_bytes,round_trip");
+
+    for model in [ModelKind::Order0, ModelKind::Order1] {
+        let encode_started = Instant::now();
+        let frame = compress_telemetry_records(
+            &records,
+            schema,
+            u32::try_from(state_capacity)?,
+            u32::try_from(segment_records)?,
+            model,
+        )?;
+        let encode_ns = encode_started.elapsed().as_nanos();
+
+        let decode_started = Instant::now();
+        let decoded = decompress_telemetry_records(
+            &frame,
+            count,
+            state_capacity,
+        )?;
+        let decode_ns = decode_started.elapsed().as_nanos();
+
+        if decoded.records != records
+            || decoded.schema != schema
+            || decoded.state_capacity as usize != state_capacity
+            || decoded.segment_records as usize != segment_records
+        {
+            return Err(format!("typed telemetry round-trip failure for {model:?}").into());
+        }
+
+        let ratio = if raw.is_empty() {
+            "n/a".to_owned()
+        } else {
+            format!("{:.6}", frame.len() as f64 / raw.len() as f64)
+        };
+        let zstd_delta = zstd_bytes
+            .parse::<usize>()
+            .ok()
+            .map(|zstd| (frame.len() as f64 / zstd as f64 - 1.0) * 100.0);
+        let zstd_delta = zstd_delta
+            .map(|value| format!("{value:.6}"))
+            .unwrap_or_else(|| "NA".to_owned());
+        let state_payload_bytes = state_capacity
+            .saturating_mul(std::mem::size_of::<TelemetryRecord>());
+        println!(
+            "{},{},{},{},{},{},{},{},{},exact",
+            if model == ModelKind::Order0 { "order0" } else { "order1" },
+            raw.len(),
+            frame.len(),
+            zstd_bytes,
+            zstd_delta,
+            ratio,
+            encode_ns,
+            decode_ns,
+            state_payload_bytes
+        );
+    }
+
+    println!("# note=raw baseline includes eight field-kind bytes and complete fixed-width record values");
+    println!("# note=Zstandard compresses raw typed records; CDL compresses changed-field state-delta symbols with the shared arithmetic coder");
+    println!("# note=state_record_payload_bytes is a lower bound for record payload slots, not full BTreeMap/RSS accounting");
+    println!("# note=segment_records resets the encoder/decoder state table but this monolithic frame has no random-access index");
+    Ok(())
+}
+
 fn bounded_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     let mut count = 10_000usize;
     let mut seed = 0xB0_0D_16u64;
@@ -1107,6 +1355,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("causal") => causal_command(&args),
         Some("numeric") => numeric_command(&args),
         Some("float") => float_command(&args),
+        Some("telemetry") => telemetry_command(&args),
         Some("bounded") => bounded_command(&args),
         _ => Err(usage().into()),
     }
