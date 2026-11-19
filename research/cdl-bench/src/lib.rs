@@ -16,7 +16,7 @@ pub mod numeric;
 pub use numeric::{compress_i16, decompress_i16, NumericError, NumericTransform};
 
 pub use causal::{e3_mechanism_splits, generate_fsm, generate_scm, generate_scm_with_config, FsmTrace, GeneratorError, ScmIntervention, ScmMechanismConfig, ScmResponse, ScmTrace};
-pub use scm_predictor::{ScmExpertMixturePredictor, ScmFieldPredictor, ScmHybridPredictor, ScmLagPredictor, ScmParentPredictor, ScmShuffledParentPredictor};
+pub use scm_predictor::{ScmChangePointMixturePredictor, ScmExpertMixturePredictor, ScmFieldPredictor, ScmHybridPredictor, ScmLagPredictor, ScmParentPredictor, ScmShuffledParentPredictor};
 
 use std::fmt;
 
