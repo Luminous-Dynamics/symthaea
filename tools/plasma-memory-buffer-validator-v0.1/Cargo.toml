@@ -1,0 +1,13 @@
+[workspace]
+resolver = "3"
+
+[package]
+name = "symthaea-plasma-memory-buffer-validator"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Causal and stage-aware validation for online plasma-closure history buffers"
+
+[lib]
+path = "src/lib.rs"
