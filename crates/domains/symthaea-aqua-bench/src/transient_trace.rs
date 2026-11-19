@@ -812,8 +812,10 @@ impl TransientEventProfile {
     /// A digest and byte length are checked before any samples are attached.
     pub fn attach_unfiltered_trace_csv(
         &mut self,
+        declared_sha256: &str,
         bytes: &[u8],
     ) -> Result<(), TransientTraceError> {
+        require_digest("declared_sha256", declared_sha256)?;
         let actual_length = u64::try_from(bytes.len())
             .map_err(|_| TransientTraceError::RawArtifactLengthMismatch)?;
         let actual_digest = hex::encode(Sha256::digest(bytes));
@@ -822,12 +824,15 @@ impl TransientEventProfile {
             .iter()
             .find(|artifact| {
                 artifact.role == RawArtifactRole::UnfilteredTrace
-                    && artifact.sha256.eq_ignore_ascii_case(&actual_digest)
+                    && artifact.sha256.eq_ignore_ascii_case(declared_sha256)
             })
             .ok_or(TransientTraceError::RawArtifactBytesNotDeclared)?;
 
         if artifact.byte_length != actual_length {
             return Err(TransientTraceError::RawArtifactLengthMismatch);
+        }
+        if !actual_digest.eq_ignore_ascii_case(declared_sha256) {
+            return Err(TransientTraceError::RawArtifactDigestMismatch);
         }
         if artifact.media_type.as_deref() != Some(TRANSIENT_TRACE_CSV_MEDIA_TYPE) {
             return Err(TransientTraceError::RawArtifactMediaTypeMismatch);
@@ -899,7 +904,7 @@ impl TransientEventProfile {
                 .ok_or_else(|| TransientTraceError::UnknownChannel {
                     channel_id: channel_id.clone(),
                 })?;
-            if !channel.raw_trace_sha256.eq_ignore_ascii_case(&actual_digest) {
+            if !channel.raw_trace_sha256.eq_ignore_ascii_case(declared_sha256) {
                 return Err(TransientTraceError::TraceArtifactNotFound { channel_id });
             }
             samples_by_channel
@@ -911,7 +916,7 @@ impl TransientEventProfile {
         // Validate every affected channel before mutating any channel.
         let mut pending = Vec::new();
         for channel in self.acquisition.channels.iter().filter(|channel| {
-            channel.raw_trace_sha256.eq_ignore_ascii_case(&actual_digest)
+            channel.raw_trace_sha256.eq_ignore_ascii_case(declared_sha256)
         }) {
             if !channel.samples.is_empty() {
                 return Err(TransientTraceError::ChannelSamplesAlreadyAttached {
@@ -1446,7 +1451,7 @@ mod tests {
         let mut decoded = TransientEventProfile::from_json_manifest(&manifest.to_string())
             .expect("valid manifest decodes");
         decoded
-            .attach_unfiltered_trace_csv(trace_bytes)
+            .attach_unfiltered_trace_csv(&trace_sha256, trace_bytes)
             .expect("raw CSV bytes verify and samples attach to declared channels");
 
         assert_eq!(decoded.validate(), Ok(()));
@@ -1485,8 +1490,83 @@ mod tests {
         artifact.byte_length += 1;
 
         assert_eq!(
-            value.attach_unfiltered_trace_csv(trace),
+            value.attach_unfiltered_trace_csv(&trace_sha256, trace),
             Err(TransientTraceError::RawArtifactLengthMismatch)
+        );
+        assert!(value.acquisition.channels.iter().all(|channel| channel.samples.is_empty()));
+    }
+
+    #[test]
+    fn rejects_raw_trace_digest_mismatch_before_parsing_samples() {
+        let mut value = profile();
+        let trace = b"offset_us,channel_id,value\n0,terminal-pressure,250\n1000,terminal-pressure,250\n2000,terminal-pressure,250\n0,primary-flow,5\n1000,primary-flow,5\n2000,primary-flow,5\n";
+        let declared = digest('8');
+        let artifact = value
+            .raw_artifacts
+            .iter_mut()
+            .find(|artifact| artifact.role == RawArtifactRole::UnfilteredTrace)
+            .unwrap();
+        artifact.sha256 = declared.clone();
+        artifact.byte_length = trace.len() as u64;
+        for channel in &mut value.acquisition.channels {
+            channel.raw_trace_sha256 = declared.clone();
+            channel.samples.clear();
+        }
+
+        assert_eq!(
+            value.attach_unfiltered_trace_csv(&declared, trace),
+            Err(TransientTraceError::RawArtifactDigestMismatch)
+        );
+        assert!(value.acquisition.channels.iter().all(|channel| channel.samples.is_empty()));
+    }
+
+    #[test]
+    fn rejects_raw_trace_csv_with_noncanonical_header() {
+        let mut value = profile();
+        let trace = b"time_us,channel_id,value\n0,terminal-pressure,250\n1000,terminal-pressure,250\n";
+        let declared = hex::encode(Sha256::digest(trace));
+        let artifact = value
+            .raw_artifacts
+            .iter_mut()
+            .find(|artifact| artifact.role == RawArtifactRole::UnfilteredTrace)
+            .unwrap();
+        artifact.sha256 = declared.clone();
+        artifact.byte_length = trace.len() as u64;
+        for channel in &mut value.acquisition.channels {
+            channel.raw_trace_sha256 = declared.clone();
+            channel.samples.clear();
+        }
+
+        assert!(matches!(
+            value.attach_unfiltered_trace_csv(&declared, trace),
+            Err(TransientTraceError::RawTraceCsvDecode { .. })
+        ));
+        assert!(value.acquisition.channels.iter().all(|channel| channel.samples.is_empty()));
+    }
+
+    #[test]
+    fn rejects_wrong_declared_sample_count_without_partial_attachment() {
+        let mut value = profile();
+        let trace = b"offset_us,channel_id,value\n0,terminal-pressure,250\n1000,terminal-pressure,250\n2000,terminal-pressure,250\n0,primary-flow,5\n1000,primary-flow,5\n2000,primary-flow,5\n";
+        let declared = hex::encode(Sha256::digest(trace));
+        let artifact = value
+            .raw_artifacts
+            .iter_mut()
+            .find(|artifact| artifact.role == RawArtifactRole::UnfilteredTrace)
+            .unwrap();
+        artifact.sha256 = declared.clone();
+        artifact.byte_length = trace.len() as u64;
+        for channel in &mut value.acquisition.channels {
+            channel.raw_trace_sha256 = declared.clone();
+            channel.samples.clear();
+        }
+        value.acquisition.channels[0].sample_count = 4;
+
+        assert_eq!(
+            value.attach_unfiltered_trace_csv(&declared, trace),
+            Err(TransientTraceError::SampleCountMismatch {
+                channel_id: "terminal-pressure".to_owned()
+            })
         );
         assert!(value.acquisition.channels.iter().all(|channel| channel.samples.is_empty()));
     }
