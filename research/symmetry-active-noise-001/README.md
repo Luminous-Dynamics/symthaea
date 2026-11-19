@@ -161,3 +161,21 @@ A late adversarial review separated two previously easy-to-confuse semantics:
 - **Unobserved candidate-specific nuisance state:** each candidate may explain the history using a different allowed latent state or bias value. The new `persistent_pair_identifiability_under_unknown_state` compares every state-A/state-B pair and emits complete-signature collision witnesses. Its probe designer expands each cross-state pair to a separate coverage obligation. The numeric `shared_bias_pair_identifiability_under_unknown_bias` checks whether one constant bias difference can cancel every nominal prediction difference; if not, it provides one- or two-probe witnesses. Its probe designer unions a witness bundle for every resolvable pair and is explicitly **not globally optimal**.
 
 The difference is observable in the cross-state negative controls: two hypotheses can be separable under the same state index but still produce identical full records under different allowed state indices. A planner must not claim robust identification until the nuisance-state calibration assumption is explicit and qualified.
+
+
+## Explicit probe abstention (v0.2 evidence semantics)
+
+Every probe contract now includes `may_abstain`, and that policy bit is bound into the canonical model bytes. Categorical and fixed-point observations include an explicit `abstained` discriminator.
+
+The current semantics are intentionally conservative and hypothesis-independent:
+
+- An abstained categorical observation must carry an empty outcome set.
+- An abstained numeric observation contributes no interval constraint; its numeric payload is ignored by replay.
+- An abstention leaves the current active-hypothesis set, compatible persistent-state set, feasible shared-bias interval, and accumulated per-probe interval unchanged.
+- Repeated abstentions do not create independent evidence and cannot manufacture a contradictory interval.
+- An abstention is rejected unless that probe declared `may_abstain=true`.
+- A probe that may abstain is not accepted as a guaranteed pair-separation or static diagnostic witness.
+
+The bounded-outcome adaptive planner represents abstention as its own `RobustPolicyOutcomeV1::Abstained` branch. Its child retains the entire active hypothesis mask. The minimax objective compares the cost and worst-case survivors with stopping immediately; a probe whose worst case cannot improve the frontier is not selected merely because some non-abstaining branches happen to be informative.
+
+**Claim boundary:** this is a conservative, probe-level missingness model. It does not claim that real sensors are missing-at-random or that missingness is always scientifically uninformative. If a sensor's dropout probability or admissibility is hypothesis-dependent, the dropout event may carry evidence; that requires a separately calibrated, hypothesis-conditioned missingness model and its own negative controls. It is not inferred from the current boolean flag.
