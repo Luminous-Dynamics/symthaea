@@ -2400,9 +2400,15 @@ mod tests {
         );
 
         let mut changed_action = action.clone();
-        changed_action.permutations.swap(0, 1);
+        changed_action.permutations[1] = vec![2, 3, 0, 1];
+        assert!(validate_action(&changed_action, 4, QualificationBudgetV1::default()).is_ok());
         assert_eq!(
-            verify_certificate(&problem, &changed_action, &certificate, QualificationBudgetV1::default()),
+            verify_certificate(
+                &problem,
+                &changed_action,
+                &certificate,
+                QualificationBudgetV1::default(),
+            ),
             Err(QuotientErrorV1::CertificateIdentityMismatch)
         );
     }
