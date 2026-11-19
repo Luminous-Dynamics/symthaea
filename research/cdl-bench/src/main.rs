@@ -11,6 +11,7 @@ use cdl_bench::{
     decompress_f64_budgeted_selector,
     compress_telemetry_records, decompress_telemetry_records,
     TelemetryFieldKind, TelemetryRecord, TelemetrySchema,
+    segment_lzv, LzvConfig,
     Float64Transform,
 };
 use std::error::Error;
@@ -32,6 +33,7 @@ fn usage() -> &'static str {
   cdl-bench numeric [--values N] [--seed N]
   cdl-bench float [--values N] [--seed N]
   cdl-bench telemetry [--records N] [--keys N] [--state-capacity N] [--segment-records N] [--workload sparse|bursty|idle|noisy] [--seed N]
+  cdl-bench segment [--values N] [--workload constant|stationary-random|stable-random|stable-random-stable] [--seed N] [--min-segment N] [--max-segment N]
   cdl-bench bounded [--values N] [--seed N] [--tolerance N]
 
 The E0, causal, numeric, float and telemetry commands check exact round-trip integrity.
@@ -1236,6 +1238,137 @@ fn telemetry_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn segment_command(args: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut count = 4096usize;
+    let mut seed = 0xabc_u64;
+    let mut workload = "stationary-random".to_owned();
+    let mut config = LzvConfig::default();
+    let mut index = 1usize;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--values" => {
+                count = parse_usize(args.get(index + 1), "--values")?;
+                index += 2;
+            }
+            "--seed" => {
+                seed = parse_u64(args.get(index + 1), "--seed")?;
+                index += 2;
+            }
+            "--workload" => {
+                workload = args.get(index + 1).ok_or("missing value after --workload")?.clone();
+                index += 2;
+            }
+            "--min-segment" => {
+                config.min_segment = parse_usize(args.get(index + 1), "--min-segment")?;
+                index += 2;
+            }
+            "--max-segment" => {
+                config.max_segment = parse_usize(args.get(index + 1), "--max-segment")?;
+                index += 2;
+            }
+            other => return Err(format!("unknown segment option: {other}\n{}", usage()).into()),
+        }
+    }
+    if count > 10_000_000 {
+        return Err("segment generator limit is 10,000,000 values".into());
+    }
+    if ![
+        "constant",
+        "stationary-random",
+        "stable-random",
+        "stable-random-stable",
+    ]
+    .contains(&workload.as_str())
+    {
+        return Err("segment workload must be constant, stationary-random, stable-random or stable-random-stable".into());
+    }
+
+    fn next_random(state: &mut u64) -> u64 {
+        *state ^= *state >> 12;
+        *state ^= *state << 25;
+        *state ^= *state >> 27;
+        state.wrapping_mul(0x2545_f491_4f6c_dd1d)
+    }
+
+    let mut values = Vec::with_capacity(count);
+    match workload.as_str() {
+        "constant" => values.resize(count, 0x3ff0_0000_0000_0000),
+        "stationary-random" => {
+            let mut rng = seed;
+            values.extend((0..count).map(|_| next_random(&mut rng)));
+        }
+        "stable-random" => {
+            let stable = count / 2;
+            values.resize(stable, 0x3ff0_0000_0000_0000);
+            let mut rng = seed;
+            values.extend((stable..count).map(|_| next_random(&mut rng)));
+        }
+        "stable-random-stable" => {
+            let first = count / 3;
+            let middle = count / 3;
+            values.resize(first, 0u64);
+            let mut rng = seed;
+            values.extend((0..middle).map(|_| next_random(&mut rng)));
+            values.resize(count, 0u64);
+        }
+        _ => unreachable!(),
+    }
+
+    let boundaries = segment_lzv(&values, config)?;
+    let segments = boundaries.len().saturating_sub(1);
+    let mut min_length = usize::MAX;
+    let mut max_length = 0usize;
+    let mut total_length = 0usize;
+    let mut lzv_boundaries = 0usize;
+    let mut forced_boundaries = 0usize;
+    for pair in boundaries.windows(2) {
+        let length = pair[1] - pair[0];
+        min_length = min_length.min(length);
+        max_length = max_length.max(length);
+        total_length = total_length.saturating_add(length);
+        if pair[1] != count {
+            if length == config.max_segment {
+                forced_boundaries += 1;
+            } else {
+                lzv_boundaries += 1;
+            }
+        }
+    }
+
+    println!("# benchmark=CDL-Bench-LZV-segmentation-v1");
+    println!("# values={count}");
+    println!("# seed={seed}");
+    println!("# workload={workload}");
+    println!("# fast_window={}", config.fast_window);
+    println!("# slow_window={}", config.slow_window);
+    println!("# min_segment={}", config.min_segment);
+    println!("# max_segment={}", config.max_segment);
+    println!("# cooldown={}", config.cooldown);
+    println!("# mean_shift={}", config.mean_shift);
+    println!("# variance_shift={}", config.variance_shift);
+    println!("# segments={segments}");
+    println!("# lzv_boundaries={lzv_boundaries}");
+    println!("# forced_max_boundaries={forced_boundaries}");
+    println!("# min_observed_segment={}", if segments == 0 { 0 } else { min_length });
+    println!("# max_observed_segment={max_length}");
+    println!("# mean_observed_segment={:.3}", if segments == 0 { 0.0 } else { total_length as f64 / segments as f64 });
+    println!("segment_index,start,end,length,end_reason");
+    for (segment_index, pair) in boundaries.windows(2).enumerate() {
+        let length = pair[1] - pair[0];
+        let reason = if pair[1] == count {
+            "final"
+        } else if length == config.max_segment {
+            "forced_max"
+        } else {
+            "lzv_shift"
+        };
+        println!("{segment_index},{},{},{length},{reason}", pair[0], pair[1]);
+    }
+    println!("# note=segmentation diagnostic only; no compression-ratio result is measured");
+    println!("# note=WZS-inspired control, not a WZS reproduction");
+    Ok(())
+}
+
 fn bounded_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     let mut count = 10_000usize;
     let mut seed = 0xB0_0D_16u64;
@@ -1356,6 +1489,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("numeric") => numeric_command(&args),
         Some("float") => float_command(&args),
         Some("telemetry") => telemetry_command(&args),
+        Some("segment") => segment_command(&args),
         Some("bounded") => bounded_command(&args),
         _ => Err(usage().into()),
     }
