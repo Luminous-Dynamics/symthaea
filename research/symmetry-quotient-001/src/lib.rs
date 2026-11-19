@@ -2041,6 +2041,35 @@ mod tests {
             ),
             Err(QuotientErrorV1::EnvironmentCertificateMismatch)
         );
+
+        // The same abstract action under a different action identity is a
+        // different admitted representation contract.
+        let mut relabelled_action = action.clone();
+        relabelled_action.action_id = "D4-same-maps-new-action-identity".to_owned();
+        assert!(validate_action(
+            &relabelled_action,
+            problem.candidate_ids.len(),
+            budget
+        )
+        .is_ok());
+        assert_eq!(
+            verify_multi_environment_quotient(
+                &problem,
+                &relabelled_action,
+                &common,
+                budget
+            ),
+            Err(QuotientErrorV1::EnvironmentCertificateMismatch)
+        );
+        assert_eq!(
+            verify_contextual_multi_environment_quotient(
+                &problem,
+                &relabelled_action,
+                &contextual,
+                budget
+            ),
+            Err(QuotientErrorV1::EnvironmentCertificateMismatch)
+        );
     }
 
     #[test]
