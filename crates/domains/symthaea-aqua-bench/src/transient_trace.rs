@@ -1289,6 +1289,18 @@ mod tests {
     }
 
     #[test]
+    fn rejects_channel_trace_digest_absent_from_raw_artifact_manifest() {
+        let mut value = profile();
+        value.acquisition.channels[0].raw_trace_sha256 = digest('9');
+        assert_eq!(
+            value.validate(),
+            Err(TransientTraceError::TraceArtifactNotFound {
+                channel_id: "terminal-pressure".to_owned()
+            })
+        );
+    }
+
+    #[test]
     fn raw_trace_decoder_cannot_attach_samples_to_unknown_channel() {
         let mut value = profile();
         assert_eq!(
