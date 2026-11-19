@@ -194,8 +194,8 @@ void test_malformed_and_count_validation() {
     require(!decode({1U}, {2U}, {{1U,1U}}, 2U, decoded), "truncated literal accepted");
     require(!decode({0U}, {2U}, {{1U,1U}}, 2U, decoded), "reuse without template accepted");
     require(!decode({1U,0x7fU}, {2U}, {{1U,1U}}, 2U, decoded), "nonzero padding accepted");
-    const std::vector<std::uint8_t> valid = {1U,0x18U}; // two 2-bit IDs: 0, 3
-    require(!decode(valid, {2U}, {{1U,1U,0U,0U}}, 4U, decoded), "invalid key multiplicity accepted");
+    const std::vector<std::uint8_t> valid = {1U,0x10U}; // literal IDs are 0, 1; expected multiset is 0, 2
+    require(!decode(valid, {2U}, {{1U,0U,1U,0U}}, 4U, decoded), "invalid key multiplicity accepted");
 }
 }
 int main() {
