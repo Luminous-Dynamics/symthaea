@@ -148,3 +148,38 @@ The first executable version assumes known likelihood tables, independent outcom
 Next qualification steps are likelihood calibration on held-out synthetic cases, proper scoring rules (Brier/log score), selective-risk and abstention metrics, robust planning under likelihood misspecification, and replay against specimen-linked historical campaigns only after the underlying evidence and rights are admitted. Report parameter precision, model discrimination, cost and qualified-answer probability as a Pareto surface rather than hiding them in one scalar.
 
 No physical experiment is authorized or performed by this contract. The existing v0.1 target-variance planner remains a separate objective and benchmark.
+
+## v0.3 research track: correlated evidence and shared calibration nuisance
+
+The new `SC-CORRELATED-EVIDENCE-0.1` contract addresses a major failure mode in the v0.2 model-discrimination planner: two measurement outcomes may share a calibration drift, specimen inhomogeneity, batch effect or other common-cause state. Multiplying independently nuisance-marginalized likelihoods can misstate their joint evidential value.
+
+The Rust binary `sc_correlated_evidence_audit` implements a finite, exact synthetic model:
+- a shared latent nuisance state is drawn once for the selected observation set;
+- observations are conditionally independent only after conditioning on both the physical-model hypothesis and that shared state;
+- the oracle marginalizes the shared state *after* multiplying the conditional likelihoods;
+- a factorized comparator independently marginalizes the nuisance for each action, deliberately showing the approximation that must not be mistaken for shared-state inference;
+- the exact feasible-plan search preserves capability dependencies and non-compensable eligibility;
+- a reference measurement can carry zero standalone information about mechanism identity while adding information jointly by identifying shared calibration drift.
+
+### Synthetic fixture result (illustrative likelihoods only)
+
+The fixture contains two calibration states (nominal and shared positive drift), four competing hypotheses including `none_of_above`, and seven actions. The exact budget-9 oracle selects both thermodynamic repeats, the shared-drift reference, field-angle (H_{c2}), and stiffness-tensor observations, together with the two capability-qualification actions. Its exact expected model information is approximately **0.424973 nats**. The myopic feasible policy cannot unlock either capability chain and stops with only the immediately available field-angle and stiffness observations.
+
+The reference probe alone has **zero** model information because its outcome distribution is identical under every hypothesis. Jointly with a thermodynamic observation it increases model information from approximately 0.070706 to 0.097327 nats by revealing the nuisance state. The independent-per-action nuisance approximation gives a different value from the shared-state calculation on repeated observations (difference exceeds 0.01 nats for the duplicated thermodynamic pair).
+
+These are algebraic results from a synthetic fixture, not calibrated physical likelihoods or measured properties.
+
+### Formal model and limitations
+
+For model (M), one shared nuisance state (C), selected observations (Y_1,\ldots,Y_k), and conditional likelihoods:
+
+[
+p(y_1,\ldots,y_k\mid M)=
+\sum_c p(c)\prod_{i=1}^{k}p(y_i\mid M,c).
+]
+
+The information objective is (I(M;Y_1,\ldots,Y_k\mid D)), evaluated by exact binary-outcome enumeration. The incorrect factorized approximation instead uses (prod_i \sum_c p(c)p(y_i\mid M,c)), which implicitly redraws the same calibration state independently for each action.
+
+The fixture assumes one discrete nuisance state shared by all selected observations and conditional independence given that state and the model. It does not yet model multiple nuisance groups, continuous random effects, partially shared specimen/batch factors, unknown nuisance priors, posterior likelihood uncertainty, adaptive sequential decision trees, or causal dependence among measurement outcomes. Those are the next research requirements before any historical or physical campaign use.
+
+The workflow now tests and lints all three planning binaries and produces a separate correlated-evidence receipt with exact input hashes. No physical experiment is authorized or performed.
