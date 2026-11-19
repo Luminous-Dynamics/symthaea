@@ -21,11 +21,16 @@ pub struct NoiseProbeV1 {
     pub probe_id: String,
     pub cost: u64,
     pub admissible: bool,
+    /// True when this measurement may produce no usable observation.
+    pub may_abstain: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NoiseObservationV1 {
     pub probe_id: String,
+    /// True when the probe produced no usable observation. This must be an
+    /// empty outcome set and is never evidence against a hypothesis.
+    pub abstained: bool,
     /// Finite set of outcomes consistent with the measurement record.
     pub outcomes: Vec<u32>,
 }
@@ -98,6 +103,10 @@ pub enum NoiseErrorV1 {
         probe_id: String,
     },
     DuplicateObservedOutcome {
+        probe_id: String,
+    },
+    InvalidAbstentionObservation,
+    UnexpectedAbstention {
         probe_id: String,
     },
     ReceiptMismatch,
@@ -183,6 +192,13 @@ fn validate_identifiers(
 }
 
 fn validate_observation_set(observation: &NoiseObservationV1) -> Result<(), NoiseErrorV1> {
+    if observation.abstained {
+        return if observation.outcomes.is_empty() {
+            Ok(())
+        } else {
+            Err(NoiseErrorV1::InvalidAbstentionObservation)
+        };
+    }
     if observation.outcomes.is_empty() {
         return Err(NoiseErrorV1::EmptyObservedOutcomeSet {
             probe_id: observation.probe_id.clone(),
@@ -232,7 +248,7 @@ impl BoundedNoiseProblemV1 {
 
     /// Canonical versioned bytes; this is not a cryptographic digest/signature.
     pub fn canonical_bytes(&self) -> Vec<u8> {
-        let mut bytes = b"luminous.symm_active_noise.bounded.v1\0".to_vec();
+        let mut bytes = b"luminous.symm_active_noise.bounded.v2\0".to_vec();
         append_string(&mut bytes, &self.problem_id);
         bytes.extend_from_slice(&(self.hypothesis_ids.len() as u64).to_le_bytes());
         for hypothesis_id in &self.hypothesis_ids {
@@ -243,6 +259,7 @@ impl BoundedNoiseProblemV1 {
             append_string(&mut bytes, &probe.probe_id);
             bytes.extend_from_slice(&probe.cost.to_le_bytes());
             bytes.push(u8::from(probe.admissible));
+            bytes.push(u8::from(probe.may_abstain));
         }
         for by_probe in &self.allowed_outcomes_by_hypothesis {
             for allowed in by_probe {
@@ -274,6 +291,7 @@ impl BoundedNoiseProblemV1 {
                     probe_id: probe.probe_id.clone(),
                     cost: probe.cost,
                     admissible: probe.admissible,
+                    may_abstain: false,
                 })
                 .collect(),
             allowed_outcomes_by_hypothesis: (0..problem.hypotheses.len())
@@ -333,7 +351,7 @@ impl PersistentNoiseProblemV1 {
 
     /// Canonical versioned bytes; the shared error-state axis is explicit.
     pub fn canonical_bytes(&self) -> Vec<u8> {
-        let mut bytes = b"luminous.symm_active_noise.persistent.v1\0".to_vec();
+        let mut bytes = b"luminous.symm_active_noise.persistent.v2\0".to_vec();
         append_string(&mut bytes, &self.problem_id);
         bytes.extend_from_slice(&(self.hypothesis_ids.len() as u64).to_le_bytes());
         for hypothesis_id in &self.hypothesis_ids {
@@ -344,6 +362,7 @@ impl PersistentNoiseProblemV1 {
             append_string(&mut bytes, &probe.probe_id);
             bytes.extend_from_slice(&probe.cost.to_le_bytes());
             bytes.push(u8::from(probe.admissible));
+            bytes.push(u8::from(probe.may_abstain));
         }
         bytes.extend_from_slice(&(self.error_state_ids.len() as u64).to_le_bytes());
         for error_state_id in &self.error_state_ids {
@@ -381,6 +400,7 @@ fn observation_bytes(observations: &[NoiseObservationV1]) -> Vec<u8> {
     bytes.extend_from_slice(&(observations.len() as u64).to_le_bytes());
     for observation in observations {
         append_string(&mut bytes, &observation.probe_id);
+        bytes.push(u8::from(observation.abstained));
         append_outcomes(&mut bytes, &observation.outcomes);
     }
     bytes
@@ -444,11 +464,21 @@ pub fn replay_bounded_observations(
     for (observation_index, observation) in observations.iter().enumerate() {
         validate_observation_set(observation)?;
         let probe_index = resolve_probe(&problem.probes, &observation.probe_id)?;
-        let incoming: BTreeSet<u32> = observation.outcomes.iter().copied().collect();
-        if let Some(existing) = observed_by_probe.get_mut(&probe_index) {
-            existing.retain(|value| incoming.contains(value));
+        if observation.abstained {
+            if !problem.probes[probe_index].may_abstain {
+                return Err(NoiseErrorV1::UnexpectedAbstention {
+                    probe_id: observation.probe_id.clone(),
+                });
+            }
+            // Missingness adds no information and must not intersect with
+            // a prior valid reading of the same probe.
         } else {
-            observed_by_probe.insert(probe_index, incoming);
+            let incoming: BTreeSet<u32> = observation.outcomes.iter().copied().collect();
+            if let Some(existing) = observed_by_probe.get_mut(&probe_index) {
+                existing.retain(|value| incoming.contains(value));
+            } else {
+                observed_by_probe.insert(probe_index, incoming);
+            }
         }
         snapshots.push(bounded_snapshot(
             problem,
@@ -562,15 +592,24 @@ pub fn replay_persistent_observations(
     for (observation_index, observation) in observations.iter().enumerate() {
         validate_observation_set(observation)?;
         let probe_index = resolve_probe(&problem.probes, &observation.probe_id)?;
-        let observed: BTreeSet<u32> = observation.outcomes.iter().copied().collect();
-        for (hypothesis_index, by_probe) in
-            problem.predicted_outcomes_by_hypothesis.iter().enumerate()
-        {
-            for (state_index, compatible) in
-                compatible_states[hypothesis_index].iter_mut().enumerate()
+        if observation.abstained {
+            if !problem.probes[probe_index].may_abstain {
+                return Err(NoiseErrorV1::UnexpectedAbstention {
+                    probe_id: observation.probe_id.clone(),
+                });
+            }
+            // The latent persistent state is unchanged by a missing reading.
+        } else {
+            let observed: BTreeSet<u32> = observation.outcomes.iter().copied().collect();
+            for (hypothesis_index, by_probe) in
+                problem.predicted_outcomes_by_hypothesis.iter().enumerate()
             {
-                if *compatible && !observed.contains(&by_probe[probe_index][state_index]) {
-                    *compatible = false;
+                for (state_index, compatible) in
+                    compatible_states[hypothesis_index].iter_mut().enumerate()
+                {
+                    if *compatible && !observed.contains(&by_probe[probe_index][state_index]) {
+                        *compatible = false;
+                    }
                 }
             }
         }
@@ -667,6 +706,8 @@ fn append_interval(target: &mut Vec<u8>, interval: FixedIntervalV1) {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IntervalObservationV1 {
     pub probe_id: String,
+    /// True when the probe produced no usable numeric interval.
+    pub abstained: bool,
     pub observed: FixedIntervalV1,
 }
 
@@ -721,6 +762,7 @@ impl BoundedIntervalProblemV1 {
             append_string(&mut bytes, &probe.probe_id);
             bytes.extend_from_slice(&probe.cost.to_le_bytes());
             bytes.push(u8::from(probe.admissible));
+            bytes.push(u8::from(probe.may_abstain));
         }
         for by_probe in &self.predicted_intervals_by_hypothesis {
             for interval in by_probe {
@@ -753,6 +795,7 @@ fn interval_observation_bytes(observations: &[IntervalObservationV1]) -> Vec<u8>
     bytes.extend_from_slice(&(observations.len() as u64).to_le_bytes());
     for observation in observations {
         append_string(&mut bytes, &observation.probe_id);
+        bytes.push(u8::from(observation.abstained));
         append_interval(&mut bytes, observation.observed);
     }
     bytes
@@ -797,22 +840,30 @@ pub fn replay_bounded_intervals(
     snapshots.push(bounded_interval_snapshot(problem, &observed_by_probe, 0));
 
     for (observation_index, observation) in observations.iter().enumerate() {
-        if observation.observed.lower > observation.observed.upper {
-            return Err(NoiseErrorV1::InvalidInterval);
-        }
         let probe_index = resolve_probe(&problem.probes, &observation.probe_id)?;
-        if model_consistent {
-            if let Some(existing) = observed_by_probe.get(&probe_index).copied() {
-                if let Some(intersection) = existing.intersection(observation.observed) {
-                    observed_by_probe.insert(probe_index, intersection);
+        if observation.abstained {
+            if !problem.probes[probe_index].may_abstain {
+                return Err(NoiseErrorV1::UnexpectedAbstention {
+                    probe_id: observation.probe_id.clone(),
+                });
+            }
+        } else {
+            if observation.observed.lower > observation.observed.upper {
+                return Err(NoiseErrorV1::InvalidInterval);
+            }
+            if model_consistent {
+                if let Some(existing) = observed_by_probe.get(&probe_index).copied() {
+                    if let Some(intersection) = existing.intersection(observation.observed) {
+                        observed_by_probe.insert(probe_index, intersection);
+                    } else {
+                        // Once repeated readings have an empty intersection, a
+                        // later reading cannot repair the campaign's evidence.
+                        model_consistent = false;
+                        observed_by_probe.remove(&probe_index);
+                    }
                 } else {
-                    // Once repeated readings have an empty intersection, a
-                    // later reading cannot repair the campaign's evidence.
-                    model_consistent = false;
-                    observed_by_probe.remove(&probe_index);
+                    observed_by_probe.insert(probe_index, observation.observed);
                 }
-            } else {
-                observed_by_probe.insert(probe_index, observation.observed);
             }
         }
         if model_consistent {
@@ -913,6 +964,7 @@ impl SharedAdditiveBiasProblemV1 {
             append_string(&mut bytes, &probe.probe_id);
             bytes.extend_from_slice(&probe.cost.to_le_bytes());
             bytes.push(u8::from(probe.admissible));
+            bytes.push(u8::from(probe.may_abstain));
         }
         append_interval(&mut bytes, self.global_bias_interval);
         for by_probe in &self.nominal_predictions_by_hypothesis {
@@ -994,18 +1046,28 @@ pub fn replay_shared_additive_bias(
     ));
 
     for (observation_index, observation) in observations.iter().enumerate() {
-        if observation.observed.lower > observation.observed.upper {
-            return Err(NoiseErrorV1::InvalidInterval);
-        }
         let probe_index = resolve_probe(&problem.probes, &observation.probe_id)?;
-        for (hypothesis_index, feasible_bias) in feasible_bias_by_hypothesis.iter_mut().enumerate()
-        {
-            let Some(current) = *feasible_bias else {
-                continue;
-            };
-            let nominal = problem.nominal_predictions_by_hypothesis[hypothesis_index][probe_index];
-            let allowed_bias = observation.observed.checked_subtract(nominal)?;
-            *feasible_bias = current.intersection(allowed_bias);
+        if observation.abstained {
+            if !problem.probes[probe_index].may_abstain {
+                return Err(NoiseErrorV1::UnexpectedAbstention {
+                    probe_id: observation.probe_id.clone(),
+                });
+            }
+        } else {
+            if observation.observed.lower > observation.observed.upper {
+                return Err(NoiseErrorV1::InvalidInterval);
+            }
+            for (hypothesis_index, feasible_bias) in
+                feasible_bias_by_hypothesis.iter_mut().enumerate()
+            {
+                let Some(current) = *feasible_bias else {
+                    continue;
+                };
+                let nominal =
+                    problem.nominal_predictions_by_hypothesis[hypothesis_index][probe_index];
+                let allowed_bias = observation.observed.checked_subtract(nominal)?;
+                *feasible_bias = current.intersection(allowed_bias);
+            }
         }
         snapshots.push(shared_bias_snapshot(
             problem,
@@ -1144,7 +1206,7 @@ pub fn bounded_pair_identifiability(
     let mut separating: Vec<&NoiseProbeV1> = Vec::new();
 
     for (probe_index, probe) in problem.probes.iter().enumerate() {
-        if !probe.admissible {
+        if !probe.admissible || probe.may_abstain {
             continue;
         }
         let allowed_a: BTreeSet<u32> = problem.allowed_outcomes_by_hypothesis[hypothesis_a]
@@ -1344,7 +1406,7 @@ pub fn bounded_interval_pair_identifiability(
     let mut separating = Vec::new();
     let mut overlapping_probe_ids = Vec::new();
     for (probe_index, probe) in problem.probes.iter().enumerate() {
-        if !probe.admissible {
+        if !probe.admissible || probe.may_abstain {
             continue;
         }
         let interval_a = problem.predicted_intervals_by_hypothesis[hypothesis_a][probe_index];
@@ -1385,7 +1447,7 @@ pub fn shared_bias_pair_identifiability_under_unknown_bias(
 
     let mut differences: Vec<(&NoiseProbeV1, i128)> = Vec::new();
     for (probe_index, probe) in problem.probes.iter().enumerate() {
-        if !probe.admissible {
+        if !probe.admissible || probe.may_abstain {
             continue;
         }
         let difference = problem.nominal_predictions_by_hypothesis[hypothesis_a][probe_index]
@@ -1534,7 +1596,7 @@ pub fn shared_bias_pair_identifiability(
     let mut separating = Vec::new();
     let mut overlapping_probe_ids = Vec::new();
     for (probe_index, probe) in problem.probes.iter().enumerate() {
-        if !probe.admissible {
+        if !probe.admissible || probe.may_abstain {
             continue;
         }
         let prediction_a = problem.nominal_predictions_by_hypothesis[hypothesis_a][probe_index];
@@ -1759,7 +1821,7 @@ pub fn design_persistent_noise_probe_set(
                     .probes
                     .iter()
                     .enumerate()
-                    .filter(|(_, probe)| probe.admissible)
+                    .filter(|(_, probe)| probe.admissible && !probe.may_abstain)
                     .filter_map(|(probe_index, _)| {
                         let outcome_a = problem.predicted_outcomes_by_hypothesis[hypothesis_a]
                             [probe_index][state_index];
@@ -1818,7 +1880,7 @@ pub fn design_persistent_noise_probe_set_under_unknown_state(
                         .probes
                         .iter()
                         .enumerate()
-                        .filter(|(_, probe)| probe.admissible)
+                        .filter(|(_, probe)| probe.admissible && !probe.may_abstain)
                         .filter_map(|(probe_index, _)| {
                             let outcome_a = problem.predicted_outcomes_by_hypothesis
                                 [hypothesis_a][probe_index][state_a_index];
@@ -1869,7 +1931,7 @@ pub fn design_bounded_interval_probe_set(
                 .probes
                 .iter()
                 .enumerate()
-                .filter(|(_, probe)| probe.admissible)
+                .filter(|(_, probe)| probe.admissible && !probe.may_abstain)
                 .filter_map(|(probe_index, _)| {
                     let interval_a =
                         problem.predicted_intervals_by_hypothesis[hypothesis_a][probe_index];
@@ -1922,7 +1984,7 @@ pub fn design_shared_bias_probe_set(
                 .probes
                 .iter()
                 .enumerate()
-                .filter(|(_, probe)| probe.admissible)
+                .filter(|(_, probe)| probe.admissible && !probe.may_abstain)
                 .filter_map(|(probe_index, _)| {
                     let prediction_a =
                         problem.nominal_predictions_by_hypothesis[hypothesis_a][probe_index];
