@@ -574,7 +574,7 @@ pub(super) fn run(
 
 #[cfg(test)]
 mod tests {
-    use super::{GlModel, SamplingOverrides, run};
+    use super::{GlModel, SamplingOverrides, population_variance, run};
     use serde_json::{Value, json};
     use std::fs;
     use std::path::PathBuf;
