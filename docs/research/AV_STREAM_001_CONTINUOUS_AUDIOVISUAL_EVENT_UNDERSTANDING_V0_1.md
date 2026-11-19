@@ -409,3 +409,40 @@ The next major research increment should be **evidence-grounded event memory plu
 Required ablations: no memory; flat frame RAG; event hierarchy without semantic query refinement; semantic query refinement without evidence verification; full A6; and the same memory with HDC indexing disabled. This isolates whether HDC contributes beyond ordinary metadata/embedding retrieval.
 
 A6/A7 are benchmark and integration arms, not claims of current implementation. Their first fixtures should be deterministic paired scenarios with hidden truth, misleading context, repeated similar events, clock drift, contradictory new evidence, no-trigger controls and explicit response windows.
+
+
+## 14. Existing memory and interaction owners — no parallel subsystem
+
+The A6/A7 arms are benchmark compositions. They do not authorize a second episodic database, bitemporal ledger, retrieval engine, proof selector or turn controller.
+
+| Capability needed by A6/A7 | Existing owner | AV-STREAM integration boundary |
+|---|---|---|
+| Visual persistent belief and visual episodic memory | #3934 (VIS-004/VIS-007) | Consume object/event/scene hypotheses with visual provenance; do not create another vision memory store |
+| HDC/dense/hybrid representation comparison | #8152 | Add an HDC-index-disabled control and keep downstream task/memory logic frozen |
+| Temporal retrieval with query-anchor preservation | #10644 | Provide query obligations, exact temporal spans and retrieval trace; no free-form rewrite that drops entities/numbers/negation/time anchors |
+| Valid-time / known-at history | #9075 | A6 queries carry both valid_at and known_at; late corrections must not leak into historical as-known answers |
+| Proof-aware minimal sufficient context | #9177 | Retrieve the least-cost complete evidence packet or return Unknown/BudgetInsufficient; never claim a truncated packet is sufficient |
+| Cross-clock mapping | #621 | Keep audio sample coordinates and camera PTS incomparable until a qualified uncertain transform exists |
+| Dependence-aware multimodal fusion | #633 | Preserve modality-specific likelihood/evidence; no confidence laundering or double-counting shared capture roots |
+| Full-duplex floor/STOP/yield semantics | #5169 | DIVE-style decisions route through the existing controller and retain latching STOP/yield behavior |
+| Shared HDC-CfC dialogue research | #10842 | Evaluate shared latent contribution against modular L0; it does not supersede controller authority |
+
+### Evidence packet for temporal memory
+
+An A6 retrieval response should contain:
+- original question and immutable query digest;
+- preserved anchors and explicit temporal obligations;
+- valid_at and known_at query coordinates;
+- exact event/revision IDs, source observation roots and half-open source intervals;
+- source modality, clock domain, transform/calibration version and uncertainty;
+- relation to the claim (supports / contradicts / context-only / excluded);
+- why candidate memories were selected or rejected;
+- proof completeness and budget status;
+- derived-summary identity and lineage (never promoted to an independent observation);
+- verifier result or an explicit abstention state.
+
+For audiovisual events, the packet must not imply simultaneity from similar numeric timestamps alone. An unknown clock relation remains unknown, and a source gap remains a gap.
+
+### DIVE decision packet
+
+An A7 request to the existing turn controller should include only qualified event hypotheses and source evidence plus a proposed interaction decision. The controller remains responsible for latching stop/yield, active floor, interrupted-turn identity and renderer stop acknowledgement. Report event-to-controller delay and controller-to-output acknowledgement separately; an early model prediction is not a completed intervention.
