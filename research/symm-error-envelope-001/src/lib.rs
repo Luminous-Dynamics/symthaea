@@ -34,6 +34,8 @@ impl RationalBoundV1 {
 pub struct StepPremiseV1 {
     /// Lipschitz upper bound for the discrete step map on the certified domain.
     pub map_lipschitz: RationalBoundV1,
+    /// Identifier for the independent derivation of the step-map Lipschitz bound.
+    pub map_lipschitz_certificate_id: String,
     /// Upper bound on the one-step equivariance defect, in state units.
     pub equivariance_defect_upper: u128,
     /// Identifier for the independent derivation/measurement of this defect.
@@ -64,8 +66,10 @@ pub struct ObjectiveComparisonV1 {
     pub nominal_gap_lower: u128,
     /// Lipschitz bound from state error to objective error.
     pub objective_lipschitz: RationalBoundV1,
+    pub objective_lipschitz_certificate_id: String,
     /// Direct objective equivariance/measurement error, in objective units.
     pub direct_defect_upper: u128,
+    pub direct_defect_certificate_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -75,8 +79,10 @@ pub struct ConstraintMarginV1 {
     pub nominal_slack_lower: u128,
     /// Lipschitz bound from state error to constraint residual error.
     pub constraint_lipschitz: RationalBoundV1,
+    pub constraint_lipschitz_certificate_id: String,
     /// Direct constraint equivariance/measurement error, in constraint units.
     pub direct_defect_upper: u128,
+    pub direct_defect_certificate_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -115,6 +121,9 @@ impl ApproximateSymmetryProblemV1 {
             if step.map_lipschitz.denominator == 0 {
                 return Err(EnvelopeErrorV1::ZeroDenominator);
             }
+            if step.map_lipschitz_certificate_id.trim().is_empty() {
+                return Err(EnvelopeErrorV1::MissingMapLipschitzCertificate);
+            }
             if step.defect_certificate_id.trim().is_empty() {
                 return Err(EnvelopeErrorV1::MissingDefectCertificate);
             }
@@ -148,6 +157,11 @@ impl ApproximateSymmetryProblemV1 {
             if objective.objective_lipschitz.denominator == 0 {
                 return Err(EnvelopeErrorV1::ZeroDenominator);
             }
+            if objective.objective_lipschitz_certificate_id.trim().is_empty()
+                || objective.direct_defect_certificate_id.trim().is_empty()
+            {
+                return Err(EnvelopeErrorV1::MissingObjectiveCertificate);
+            }
         }
         if let Some(constraint) = &self.constraint {
             if constraint.constraint_unit_id.trim().is_empty() {
@@ -155,6 +169,11 @@ impl ApproximateSymmetryProblemV1 {
             }
             if constraint.constraint_lipschitz.denominator == 0 {
                 return Err(EnvelopeErrorV1::ZeroDenominator);
+            }
+            if constraint.constraint_lipschitz_certificate_id.trim().is_empty()
+                || constraint.direct_defect_certificate_id.trim().is_empty()
+            {
+                return Err(EnvelopeErrorV1::MissingConstraintCertificate);
             }
         }
         Ok(())
@@ -172,6 +191,7 @@ impl ApproximateSymmetryProblemV1 {
         bytes.extend_from_slice(&(self.steps.len() as u64).to_le_bytes());
         for step in &self.steps {
             append_rational(&mut bytes, step.map_lipschitz);
+            append_string(&mut bytes, &step.map_lipschitz_certificate_id);
             bytes.extend_from_slice(&step.equivariance_defect_upper.to_le_bytes());
             append_string(&mut bytes, &step.defect_certificate_id);
         }
@@ -199,7 +219,9 @@ impl ApproximateSymmetryProblemV1 {
                 append_string(&mut bytes, &objective.objective_unit_id);
                 bytes.extend_from_slice(&objective.nominal_gap_lower.to_le_bytes());
                 append_rational(&mut bytes, objective.objective_lipschitz);
+                append_string(&mut bytes, &objective.objective_lipschitz_certificate_id);
                 bytes.extend_from_slice(&objective.direct_defect_upper.to_le_bytes());
+                append_string(&mut bytes, &objective.direct_defect_certificate_id);
             }
             None => bytes.push(0),
         }
@@ -209,7 +231,9 @@ impl ApproximateSymmetryProblemV1 {
                 append_string(&mut bytes, &constraint.constraint_unit_id);
                 bytes.extend_from_slice(&constraint.nominal_slack_lower.to_le_bytes());
                 append_rational(&mut bytes, constraint.constraint_lipschitz);
+                append_string(&mut bytes, &constraint.constraint_lipschitz_certificate_id);
                 bytes.extend_from_slice(&constraint.direct_defect_upper.to_le_bytes());
+                append_string(&mut bytes, &constraint.direct_defect_certificate_id);
             }
             None => bytes.push(0),
         }
@@ -313,6 +337,9 @@ pub enum EnvelopeErrorV1 {
     HorizonTooLarge,
     ZeroDenominator,
     MissingDefectCertificate,
+    MissingMapLipschitzCertificate,
+    MissingObjectiveCertificate,
+    MissingConstraintCertificate,
     MissingDomainCertificate,
     MissingContradictionEvidence,
     BoundaryMarginCountMismatch { expected: usize, actual: usize },
@@ -395,7 +422,7 @@ pub fn propagate_error_envelope(
 
     let propagated_steps = state_error_bounds.len().saturating_sub(1);
     let complete_horizon = matches!(
-        status,
+        &status,
         EnvelopeStatusV1::CertifiedWithinTolerance
             | EnvelopeStatusV1::CertifiedBoundAboveTolerance
     );
@@ -496,6 +523,7 @@ mod tests {
                 .enumerate()
                 .map(|(index, defect)| StepPremiseV1 {
                     map_lipschitz: lipschitz,
+                    map_lipschitz_certificate_id: format!("toy-lipschitz-{index}"),
                     equivariance_defect_upper: *defect,
                     defect_certificate_id: format!("toy-defect-{index}"),
                 })
@@ -637,13 +665,17 @@ mod tests {
             objective_unit_id: "micro-objective-unit-v1".to_owned(),
             nominal_gap_lower: 411,
             objective_lipschitz: RationalBoundV1::new(2, 1).unwrap(),
+            objective_lipschitz_certificate_id: "objective-lipschitz-certificate".to_owned(),
             direct_defect_upper: 5,
+            direct_defect_certificate_id: "objective-defect-certificate".to_owned(),
         });
         problem.constraint = Some(ConstraintMarginV1 {
             constraint_unit_id: "micro-constraint-unit-v1".to_owned(),
             nominal_slack_lower: 305,
             constraint_lipschitz: RationalBoundV1::new(3, 1).unwrap(),
+            constraint_lipschitz_certificate_id: "constraint-lipschitz-certificate".to_owned(),
             direct_defect_upper: 4,
+            direct_defect_certificate_id: "constraint-defect-certificate".to_owned(),
         });
         let receipt = propagate_error_envelope(&problem).unwrap();
         assert_eq!(
