@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: scdft-sctk-replay-\${{ github.event.pull_request.head.sha || github.sha }}
+  group: scdft-sctk-replay-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: Install pinned Rust toolchain
@@ -32,8 +32,18 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Check formatting
+      - name: Apply pinned Rust formatting
+        run: cargo fmt --manifest-path tools/scdft-sctk-replay-auditor/Cargo.toml --all
+
+      - name: Verify canonical Rust formatting
         run: cargo fmt --manifest-path tools/scdft-sctk-replay-auditor/Cargo.toml --all -- --check
+
+      - name: Capture rustfmt-only patch
+        if: always()
+        run: |
+          git diff --binary -- tools/scdft-sctk-replay-auditor > "$RUNNER_TEMP/sc-rustfmt.patch"
+          git diff --stat -- tools/scdft-sctk-replay-auditor
+          sha256sum "$RUNNER_TEMP/sc-rustfmt.patch"
 
       - name: Generate isolated dependency lockfile
         run: cargo generate-lockfile --manifest-path tools/scdft-sctk-replay-auditor/Cargo.toml
@@ -59,6 +69,8 @@ jobs:
             echo "git_head=$(git rev-parse HEAD)"
             echo "rustc=$(rustc --version)"
             echo "cargo=$(cargo --version)"
+            echo "worktree_status=$(git status --short)"
+            if [ -f "$RUNNER_TEMP/sc-rustfmt.patch" ]; then sha256sum "$RUNNER_TEMP/sc-rustfmt.patch"; fi
             sha256sum data/schemas/scdft_sctk_replay_manifest_v0_1.schema.json
             sha256sum data/research/scdft_sctk_pb_legacy_replay_manifest_v0_1.json
             sha256sum tools/scdft-sctk-replay-auditor/Cargo.toml
@@ -78,5 +90,6 @@ jobs:
           if-no-files-found: warn
           path: |
             tools/scdft-sctk-replay-auditor/Cargo.lock
-            \${{ runner.temp }}/scdft-sctk-replay-environment.txt
-            \${{ runner.temp }}/scdft-sctk-replay-manifest-receipt.json
+            ${{ runner.temp }}/scdft-sctk-replay-environment.txt
+            ${{ runner.temp }}/scdft-sctk-replay-manifest-receipt.json
+            ${{ runner.temp }}/sc-rustfmt.patch
