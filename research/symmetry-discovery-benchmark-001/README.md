@@ -173,9 +173,11 @@ For mechanics, align masses, constraints, constitutive/contact models, integrato
 
 `schemas/run_scorecard.schema.json` defines the required record for every external comparator execution. It pins the protocol, case manifest, inputs, split and method configuration by SHA-256; records the baseline code revision and hardware/software environment; stores per-case outputs including abstentions, failures and out-of-domain cases; and requires explicit false-promotion, false-elimination, lift and verification accounting.
 
-Sampled metrics must include their interval method, confidence level and sample count. Physical performance reports should include wall time, peak memory, energy when measured, and certificate/verifier overhead. The denominator rule includes all in-scope cases, including abstentions and failures. An unverified hard-prune count is structurally fixed at zero.
+Every metric must declare its independent `sampling_unit`, `sample_count` (the number of independent units), `observation_count` (raw observations), and—when an interval is reported—its `resampling_unit`. The validator requires the resampling unit to match the declared independent unit. Wilson and Clopper–Pearson binomial intervals are rejected when raw observations outnumber independent units; clustered/repeated measurements must be reduced to unit-level outcomes or use an explicitly matching cluster bootstrap. Bootstrap intervals require at least two independent units. This prevents hundreds of points from one structure or frames from one trajectory being presented as hundreds of independent trials.
 
-The fixture workflow validates this schema itself. It does not fabricate a scorecard or claim that any external baseline has run.
+Physical performance reports should include wall time, peak memory, energy when measured, and certificate/verifier overhead. The denominator rule includes all in-scope cases, including abstentions and failures. An unverified hard-prune count is structurally fixed at zero.
+
+The fixture workflow validates this schema itself. The scorecard self-test accepts a structure-clustered bootstrap with 30 independent structures and 240 raw point observations, then rejects both a mismatched resampling unit and a binomial interval applied to those 240 correlated observations. It does not fabricate a benchmark result or claim that any external baseline has run.
 
 
 
