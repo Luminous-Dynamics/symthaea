@@ -1044,10 +1044,14 @@ fn evaluate_model(
         progress.set_position(i as u64);
 
         // Load and process audio
-        let (audio, _sample_rate) = match AudioFrontend::load_audio(audio_path) {
+        let (audio, sample_rate) = match AudioFrontend::load_audio(audio_path) {
             Ok(result) => result,
             Err(_) => continue,
         };
+        if let Err(error) = projector.validate_input_sample_rate(sample_rate) {
+            eprintln!("Skipping {}: {}", audio_path.display(), error);
+            continue;
+        }
 
         projector.reset();
         let hvs = projector.project(&audio);
