@@ -750,7 +750,7 @@ impl BoundedIntervalProblemV1 {
     }
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
-        let mut bytes = b"luminous.symm_active_noise.bounded_intervals.v1\\0".to_vec();
+        let mut bytes = b"luminous.symm_active_noise.bounded_intervals.v2\\0".to_vec();
         append_string(&mut bytes, &self.problem_id);
         append_string(&mut bytes, &self.quantity_unit_id);
         bytes.extend_from_slice(&(self.hypothesis_ids.len() as u64).to_le_bytes());
@@ -952,7 +952,7 @@ impl SharedAdditiveBiasProblemV1 {
     }
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
-        let mut bytes = b"luminous.symm_active_noise.shared_additive_bias.v1\\0".to_vec();
+        let mut bytes = b"luminous.symm_active_noise.shared_additive_bias.v2\\0".to_vec();
         append_string(&mut bytes, &self.problem_id);
         append_string(&mut bytes, &self.quantity_unit_id);
         bytes.extend_from_slice(&(self.hypothesis_ids.len() as u64).to_le_bytes());
@@ -1267,7 +1267,7 @@ pub fn persistent_pair_identifiability_under_unknown_state(
             let mut common_signature = Vec::new();
 
             for (probe_index, probe) in problem.probes.iter().enumerate() {
-                if !probe.admissible {
+                if !probe.admissible || probe.may_abstain {
                     continue;
                 }
                 let outcome_a = problem.predicted_outcomes_by_hypothesis[hypothesis_a]
@@ -1325,7 +1325,7 @@ pub fn persistent_pair_identifiability(
         let mut distinguishing: Vec<(&NoiseProbeV1, u32, u32)> = Vec::new();
         let mut common_signature = Vec::new();
         for (probe_index, probe) in problem.probes.iter().enumerate() {
-            if !probe.admissible {
+            if !probe.admissible || probe.may_abstain {
                 continue;
             }
             let outcome_a =
@@ -1496,7 +1496,7 @@ pub fn shared_bias_pair_identifiability_under_unknown_bias(
             };
             let mut common_signature = Vec::with_capacity(differences.len());
             for (probe_index, probe) in problem.probes.iter().enumerate() {
-                if !probe.admissible {
+                if !probe.admissible || probe.may_abstain {
                     continue;
                 }
                 let prediction_a = problem.nominal_predictions_by_hypothesis[hypothesis_a]
@@ -1680,7 +1680,7 @@ fn greedy_probe_cover(
     while !remaining.is_empty() {
         let mut best: Option<(usize, usize)> = None;
         for (probe_index, probe) in probes.iter().enumerate() {
-            if !probe.admissible || selected_probe_indices.contains(&probe_index) {
+            if !probe.admissible || probe.may_abstain || selected_probe_indices.contains(&probe_index) {
                 continue;
             }
             let newly_covered = coverage_by_probe[probe_index]
@@ -1757,7 +1757,7 @@ pub fn design_bounded_noise_probe_set(
                 pair_obligation(&problem.hypothesis_ids, hypothesis_a, hypothesis_b, None);
             let mut separating_probes = Vec::new();
             for (probe_index, probe) in problem.probes.iter().enumerate() {
-                if !probe.admissible {
+                if !probe.admissible || probe.may_abstain {
                     continue;
                 }
                 let allowed_a: BTreeSet<u32> = problem.allowed_outcomes_by_hypothesis[hypothesis_a]
