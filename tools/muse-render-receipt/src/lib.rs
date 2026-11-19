@@ -200,6 +200,7 @@ pub struct MidiPerformanceNoteReceiptV1 {
 #[serde(deny_unknown_fields)]
 pub struct RenderInvocationV1 {
     pub schema: String,
+    pub attempt_id: String,
     pub renderer_id: String,
     pub renderer_version: String,
     pub executable_sha256: String,
@@ -779,6 +780,7 @@ fn verify_render_invocation(root: &Path, r: &ReceiptV1) -> Result<(), String> {
     let invocation: RenderInvocationV1 = serde_json::from_slice(&bytes)
         .map_err(|e| format!("render invocation JSON invalid: {e}"))?;
     if invocation.schema != "muse-render-invocation-v1"
+        || invocation.attempt_id != r.attempt_id
         || invocation.renderer_id != r.renderer.renderer_id
         || invocation.renderer_version != r.renderer.renderer_version
         || invocation.executable_sha256 != r.renderer.binary_sha256
@@ -1112,6 +1114,7 @@ mod tests {
         std::fs::write(root.join("renderer-config.json"), &renderer_config).unwrap();
         let invocation_template = |output_sha: &str| serde_json::to_vec(&json!({
             "schema":"muse-render-invocation-v1",
+            "attempt_id":"synthetic-bundle.1",
             "renderer_id":"test-renderer",
             "renderer_version":"1",
             "executable_sha256":sha256_hex(&renderer_binary),
