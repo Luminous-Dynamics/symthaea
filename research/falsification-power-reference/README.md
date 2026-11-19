@@ -49,7 +49,7 @@ No external Rust crates are required.
 
 ## Known-answer controls
 
-The 11-test suite includes:
+The focused Rust suite includes 20 unit tests covering:
 - null power equals nominal alpha;
 - the 5% one-sided normal critical value;
 - an external normal-tail known answer (three observations, delta=0.24, sigma=0.15, alpha=0.05);
@@ -75,3 +75,18 @@ A fixed mixture over registered break alternatives can then accumulate evidence 
 This does not automatically test a whole group: required generators/elements and probe strata must be declared, and the campaign must control multiplicity across candidate actions and probe families. A successful statistical test is still only a proposal/falsification result; it does not replace exact group closure, Lie-algebra, complete-task or physical step-map qualification, and it never authorizes quotient pruning.
 
 The implementation uses binary64 arithmetic and is a research reference, not a formally verified floating-point e-process certificate. Conditional-model assumptions, numerical error, null calibration and actual adaptive action logs require independent review. Persistent or correlated nuisance effects are not covered merely because the caller uses a mixture; use the explicit persistent-noise model or a separately justified conditional law.
+
+
+## Sequential null calibration harness
+
+Run:
+
+    cargo run --locked --manifest-path research/falsification-power-reference/Cargo.toml --example sequential_null_calibration
+
+The deterministic harness simulates 10,000 independent null paths with 50 looks each. Both valid policies choose their discrepancy using only the previous residual and commit it before sampling the current observation. The known standard deviation changes according to a fixed action-dependent schedule. It reports the empirical probability of ever crossing the 5% boundary and 95% Wilson intervals for:
+- one predictable alternative;
+- a fixed two-alternative mixture.
+
+An intentionally invalid negative control chooses its discrepancy after observing the current residual. It should cross frequently, demonstrating that the local commit/observe API cannot prevent a caller from leaking the outcome through an out-of-band path.
+
+The harness is a deterministic software regression and a useful calibration warning light. It does not prove the martingale theorem, establish type-I error for real sensors or physical trajectories, or qualify persistent/correlated noise. The valid processes rely on the correctly specified simple conditional Gaussian null with predictable (d_t) and known (sigma_t). A real research campaign still needs independent null calibration, sealed alternatives, full action logs, and multiplicity control across candidate transformations and probe families.
