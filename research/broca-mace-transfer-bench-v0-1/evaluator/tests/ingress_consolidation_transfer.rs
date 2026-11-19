@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use broca_mace_consolidation::{
     verify_and_release_promoted_experiences, ConsolidationPolicyV1,
-    ConsolidationProposalV1, ConsolidationReceiptContextV1,
+    ConsolidationProposalV1, ConsolidationReceiptContextV1, HoldReason,
     ConsolidationReceiptProposalV1, ConsolidationReceiptVerifierV1,
     VerifiedConsolidationReceiptV1, ReceiptUseReject,
 };
@@ -324,6 +324,17 @@ fn raw_session_to_governed_consolidation_to_mace_decision_then_correction() {
     let pack_c = build_consolidation_evidence_pack(&batch_c, &[3, 4, 5, 6])
         .expect("corrected pack must bind only non-retracted observations");
     assert_eq!(pack_c.events().len(), 4);
+
+    let corrected_a_promotion = ConsolidationPolicyV1::default()
+        .decide_procedure_promotion(
+            &pack_c.summarize_action_for_scope(scope(), Action::A),
+        );
+    assert_eq!(
+        corrected_a_promotion,
+        ConsolidationProposalV1::RetainProvisional(
+            HoldReason::InsufficientQualifiedEvents
+        )
+    );
 
     let _verified_action_b = propose_and_release(Action::B, &pack_a);
     assert_eq!(
