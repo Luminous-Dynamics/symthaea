@@ -68,6 +68,67 @@ References:
 
 **CDL-Bench consequence:** pin the ALP benchmark repository commit and download hashes; run the supplied CWI corpus and the same normalized typed columns used by CDL-Bench. Compare complete Parquet file size, page/index/exception metadata, compression/decompression speed and single-value random access, not only the ALP value payload.
 
+### 1.3.2 tparquet — mandatory mixed-column storage baseline (Pco + Zstd + Parquet)
+
+A stronger industry comparator has been verified in the public [aperiodic-io/tparquet](https://github.com/aperiodic-io/tparquet) repository. It keeps standard Parquet file structure (schema, row groups, statistics, page indexes and bloom filters) and selects PCODEC/Pco or Zstandard per column. It is not merely another scalar time-series codec: its advantage comes from specializing numeric columns while retaining general-purpose compression for strings and flags.
+
+The ALP-inclusive benchmark report is pinned to:
+- Benchmark/result source commit: `d1a40f6fa5508c99ee95e9609f3c38b111e21cf6`.
+- Underlying benchmark-code/report run: `0f2845d4e8edf08bd59ee4d4e24f1495f8279041`.
+- Last measured run: 2026-11-07; 31 datasets; 151,499,256 rows; four providers (Aperiodic, Tardis.dev, Crypto Lake, NYSE); 1.2 GB downloaded; 4-vCPU cloud VM; Python 3.14.6 / PyArrow 26.0.1.
+- The run uses tparquet's Rust/Parquet 60.1 stack and `pco = 1.0.4` in the pinned workspace manifest.
+
+Reported complete Parquet sizes:
+| Dataset class | Rows | Zstd 9 | Tuned Zstd 9 | Tuned + ALP | tparquet Pco/Zstd |
+|---|---:|---:|---:|---:|---:|
+| Trades | 138.9M | 737.0 MB | 520.0 MB | 480.6 MB | 362.2 MB |
+| Quotes L1 | 6.8M | 80.6 MB | 63.3 MB | 63.3 MB | 51.0 MB |
+| Order book L2 | 5.5M | 126.4 MB | 109.2 MB | 95.7 MB | 58.6 MB |
+| All 31 datasets | 151.5M | 957.1 MB | 700.7 MB | 649.5 MB | 478.6 MB |
+
+Across all 31 datasets, tparquet reports 0.50× default Zstd 9, 0.68× tuned Zstd 9, and 0.74× tuned+ALP total file size. Its selector chose PCODEC for 478 of 480 numeric columns, retaining Zstd for strings/flags. It reports 100% bit-exact round-trip. Reported all-data throughput was 102 MB/s write and 924 MB/s read, compared with 97/916 for default Zstd, 141/1,129 for tuned Zstd, and 169/1,231 for ALP. These measurements are the project's reported results, not independently reproduced CDL-Bench runs. The report also documents trade-offs: wide L2 order books compress well but write/read more slowly than ALP; small metric aggregates are much less compressible.
+
+This changes the novelty boundary. **Per-column Pco/Zstd selection is already an industry-reported solution.** CDL cannot claim a breakthrough merely by selecting numeric codecs per field. The differentiated experiment must test whether per-series state deltas, heartbeat runs, key-local streams, order restoration, schema-aware event coding and bounded-memory checkpoints add value *on top of* this strong Parquet/Pco/ALP/Zstd portfolio.
+
+Fair reproduction route:
+```sh
+git clone https://github.com/aperiodic-io/tparquet.git
+cd tparquet
+git checkout d1a40f6fa5508c99ee95a3e1cd9ca54e1c66ef63c
+make bench
+```
+The command downloads about 1.2 GB of public sample/preview data. Freeze the data manifest and environment, then compare the same normalized source records in (a) complete tparquet Parquet files, (b) Parquet tuned Zstd/ALP, (c) CDL frames and (d) state-delta/partitioned transforms plus a general-purpose backend. Do not compare only PCODEC payload bytes against an entire CDL file. Preserve row groups, statistics, page indexes, dictionaries, null levels, footer and schema metadata on all storage-container arms.
+
+Reference:
+- https://github.com/aperiodic-io/tparquet
+- Pinned ALP-inclusive benchmark/results commit: https://github.com/aperiodic-io/tparquet/commit/d1a40f6fa5508c99ee95e9609f3c38b111e21cf6
+- Benchmark report at that commit: https://github.com/aperiodic-io/tparquet/blob/d1a40f6fa5508c99ee95e9609f3c38b111e21cf6/bench/RESULTS.md
+
+### 1.3.3 OpenTelemetry Arrow / OTAP — columnar transport and multivariate telemetry baseline
+
+The OpenTelemetry Arrow proposal (OTEP-0156) is a distinct but highly relevant systems baseline. It represents metrics, logs and traces as Apache Arrow columnar batches over an Arrow IPC/gRPC transport. The proposal specifically identifies multivariate metrics sharing attributes and timestamps as poorly compressed in row-oriented OTLP, and argues that a related columnar representation can exploit cross-field redundancy.
+
+The OTEP reports:
+- Univariate metrics: 2–2.5× better bandwidth reduction than OTLP+Zstd in Phase 1, while conversion overhead made end-to-end speed 1.5–2× slower; Phase 2 (removing conversion) was estimated at 3.1–11.2× faster.
+- Multivariate metrics: 3–7× better bandwidth reduction; Phase 1 end-to-end speed similar to the univariate case.
+- Logs: 1.6–2× better bandwidth reduction; Phase 1 2–3.5× slower, Phase 2 estimated 2.3–4.86× faster.
+- Traces: 1.7–2.8× better bandwidth reduction; Phase 1 1.5–2.1× slower, Phase 2 estimated 3.37–6.16× faster.
+
+These are proposal/benchmark claims, not CDL measurements. The key conceptual implication is that **shared timestamp + shared dimensions + correlated metric values** should be represented together, rather than treated as unrelated scalar columns. The OTEP also explicitly says small batches remain better served by row-oriented OTLP; columnar batching is a large-batch optimization.
+
+The original F5 adapter README describes an experimental reference implementation; it says Phase 1 uses an edge collector that converts between OTLP and Arrow, while direct end-to-end Phase 2 is intended to avoid conversion. The newer [OpenTelemetry Arrow Dataflow Engine](https://github.com/open-telemetry/otel-arrow) is labelled incubating/experimental, keeps OTAP columnar across hops, speaks OTLP for interoperability, and has evolving APIs/configuration. Its published benchmark suite covers 100k records/sec single-core standard load, filter/backpressure, batch sizes 10–8192, saturation, 1/2/4/8/16-core scaling (target >0.90 linear efficiency), pass-through and idle memory. These are transport/dataflow metrics, not file-compression leaderboard scores.
+
+CDL comparison lanes should therefore separate:
+1. **Storage:** complete Parquet/tparquet vs CDL archive bytes, random access and scan throughput.
+2. **Transport:** OTLP+Zstd vs OTAP/Arrow+Zstd vs CDL event transport, measuring bytes on wire, conversion cost, CPU/core, memory, batching, backpressure and tail latency.
+3. **Multivariate event compression:** same-time related fields, entity/resource attributes and schema dictionaries; count timestamp/attribute repetition once, but preserve exact semantics.
+
+References:
+- OTEP-0156: https://github.com/open-telemetry/opentelemetry-specification/blob/main/oteps/0156-columnar-encoding.md
+- OpenTelemetry Arrow Dataflow Engine: https://github.com/open-telemetry/otel-arrow
+- DFE benchmark suite: https://github.com/open-telemetry/otel-arrow/blob/main/docs/benchmarks.md
+- Original F5 OTel Arrow adapter/reference: https://github.com/f5/otel-arrow-adapter
+
 ### 1.4 Wave Zero Streaming — non-stationary streaming adaptation
 
 Wang et al., *Waved Zero Streaming: A Time Series Compression Framework with Adaptive Segmentation Optimization* (Information Processing & Management, September 2026; DOI 10.1016/j.ipm.2026.104697), is now one of the most important competitive references for this programme. Its abstract reports evaluation across 43 datasets and claims:
