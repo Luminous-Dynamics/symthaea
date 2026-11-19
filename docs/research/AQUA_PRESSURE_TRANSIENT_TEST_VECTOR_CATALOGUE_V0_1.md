@@ -58,3 +58,22 @@ A schema-valid manifest is only structurally well-formed. It is not proof that a
 ## Claim ceiling
 
 This catalogue is a proposed software/experiment conformance plan. It contains no measured pressure traces, no validated event generator, no physical test result, no task-completion result, no local pressure profile, and no product safety, compliance or superiority claim.
+
+
+## Additional executable-contract vectors
+
+The Rust module `symthaea_aqua_bench::transient_trace` now has strict JSON decoding and a separate raw-sample attachment boundary. These additional cases should be preserved in schema and module conformance work:
+
+| ID | Mutation / scenario | Expected gate | Required disposition |
+|---|---|---|---|
+| PT-NEG-021 | JSON manifest contains an unknown top-level or nested field | Strict Serde decoder | Reject |
+| PT-NEG-022 | Command kind, unit and sample value disagree (e.g. pressure command expressed as L/min or valve state expressed as a number) | Manifest / command validation | Reject |
+| PT-NEG-023 | Event is labelled `supply_sag` but the command waveform has no pressure decrease | Event-shape validation | Reject |
+| PT-NEG-024 | Event is labelled `intermittent_supply` but contains no zero-supply interval | Event-shape validation | Reject |
+| PT-NEG-025 | Event is labelled `rapid_valve_event` but the valve command never changes state | Event-shape validation | Reject |
+| PT-NEG-026 | Rapid valve test observes pressure only at the activated outlet and omits an adjacent plumbing location | Spatial acquisition contract | Reject; require two distinct pressure locations |
+| PT-NEG-027 | The raw-trace decoder attaches samples to an undeclared channel ID | Trace attachment | Reject |
+| PT-NEG-028 | A matched event replay uses a different anti-alias filter, sampling rate, uncertainty contract or channel map | Matched replay | Reject comparison |
+| PT-NEG-029 | RFC3339 event or observation-window timestamp is invalid, or observation window end precedes start | Timestamp validation | Reject |
+
+The executable module currently contains 30 authored Rust tests. None is represented as executed until the exact-head Cargo test workflow completes with a successful conclusion.
