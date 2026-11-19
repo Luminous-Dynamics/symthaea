@@ -72,7 +72,7 @@ const DISCOVERY_SEEDS: [u64; 4] = [90_210, 130_363, 222_731, 918_273];
 const PINNED_COMPOSER_SOURCE_COMMIT: &str =
     "bd227d416878a4373eb87a53e182e7067a2411a5";
 
-const PINNED_COMPOSER_BLOBS: [(&str, &str); 7] = [
+const PINNED_COMPOSER_BLOBS: [(&str, &str); 13] = [
     (
         "crates/domains/symthaea-music-theory/src/style.rs",
         "81192045a724823b47107702185b814cb9921cbf",
@@ -100,6 +100,27 @@ const PINNED_COMPOSER_BLOBS: [(&str, &str); 7] = [
     (
         "crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs",
         "bf51ab11df3c1ca2c4ca28b894e8597eaef490e3",
+    ),
+    ("Cargo.lock", "53f6c6da5ff9c253682fa331264897472f2fa2c3"),
+    (
+        "crates/domains/symthaea-music-theory/src/lib.rs",
+        "ecfc73d187418cac7168794ea20e07dd70fc6cf4",
+    ),
+    (
+        "crates/domains/symthaea-music-theory/src/score_validation.rs",
+        "2f139e2c1f67e67603b2391149007cf1385f4c36",
+    ),
+    (
+        "crates/domains/symthaea-music-theory/src/motif.rs",
+        "c69edee65b92374c7517b453edf9a34121214a71",
+    ),
+    (
+        "crates/domains/symthaea-music-theory/src/rhythm.rs",
+        "444f70eec498a79e77c5cf041cde45458eda2bc6",
+    ),
+    (
+        "crates/domains/symthaea-music-theory/Cargo.toml",
+        "2b2ce7caed933be6837ca50f2f34ddd254de224a",
     ),
 ];
 
@@ -757,6 +778,22 @@ fn verify_source_revision(source_commit: &str) -> Result<(), String> {
             ));
         }
     }
+
+    // Pin the complete composer source subtree, not just the hand-selected
+    // interface files above. This prevents an unreviewed transitive module
+    // change (e.g. fugue/process/modal realization) from riding along.
+    git_output(&[
+        "diff",
+        "--quiet",
+        PINNED_COMPOSER_SOURCE_COMMIT,
+        "HEAD",
+        "--",
+        "crates/domains/symthaea-music-theory/src",
+    ])
+    .map_err(|_| {
+        "symbolic music-theory source tree differs from the frozen composer source commit"
+            .to_string()
+    })?;
     Ok(())
 }
 
@@ -915,7 +952,7 @@ mod tests {
 
     #[test]
     fn pinned_composer_manifest_has_seven_valid_blob_pins() {
-        assert_eq!(PINNED_COMPOSER_BLOBS.len(), 7);
+        assert_eq!(PINNED_COMPOSER_BLOBS.len(), 13);
         assert!(is_commit_sha(PINNED_COMPOSER_SOURCE_COMMIT));
         for (path, blob) in PINNED_COMPOSER_BLOBS {
             assert!(!path.is_empty());
