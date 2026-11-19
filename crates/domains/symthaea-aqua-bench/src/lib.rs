@@ -444,11 +444,20 @@ pub struct SiteQualifiedMatchedComparisonResult {
 }
 
 impl SiteQualifiedMatchedComparisonResult {
-    pub fn is_ready_for_service_comparison(&self) -> bool {
+    /// True only when both exact device configurations are eligible at the same surveyed site.
+    /// This does not imply that either completed service has passed functional qualification.
+    pub fn both_architectures_site_eligible(&self) -> bool {
         self.control_site_fit.disposition == crate::site_fit::SiteFitDisposition::Eligible
-            && self.candidate_site_fit.disposition
-                == crate::site_fit::SiteFitDisposition::Eligible
-            && self.matched_service_qualification.is_some()
+            && self.candidate_site_fit.disposition == crate::site_fit::SiteFitDisposition::Eligible
+    }
+
+    /// True only when the independent matched service decision qualifies the candidate
+    /// against a qualified control. Site eligibility by itself never satisfies this method.
+    pub fn candidate_service_qualified(&self) -> bool {
+        self.matched_service_qualification.as_ref().is_some_and(|result| {
+            result.disposition
+                == crate::service_qualification::MatchedComparisonDisposition::CandidateQualified
+        })
     }
 }
 
@@ -770,7 +779,8 @@ mod tests {
             &candidate_site, &candidate_site_evidence,
             &qualification, &control_qualification, &candidate_qualification,
         ).expect("site-qualified comparison");
-        assert!(result.is_ready_for_service_comparison());
+        assert!(result.both_architectures_site_eligible());
+        assert!(result.candidate_service_qualified());
         assert_eq!(
             result.matched_service_qualification.expect("service result").disposition,
             crate::service_qualification::MatchedComparisonDisposition::CandidateQualified
@@ -799,7 +809,35 @@ mod tests {
         ).expect("site ineligibility is a decision");
         assert_eq!(result.candidate_site_fit.disposition,crate::site_fit::SiteFitDisposition::Ineligible);
         assert!(result.matched_service_qualification.is_none());
-        assert!(!result.is_ready_for_service_comparison());
+        assert!(!result.both_architectures_site_eligible());
+        assert!(!result.candidate_service_qualified());
+    }
+
+    #[test]
+    fn site_eligibility_does_not_promote_a_failed_bathing_service() {
+        let control = run("control-001", "incumbent", '7');
+        let candidate = run("candidate-001", "aqua", '8');
+        let control_site = site_profile(crate::site_fit::AquaArchitecture::DirectFlowPassive,
+            &control.device.device_configuration_sha256);
+        let candidate_site = site_profile(crate::site_fit::AquaArchitecture::SameSessionRecirculation,
+            &candidate.device.device_configuration_sha256);
+        let control_site_evidence = site_assessments(&control_site,crate::site_fit::SiteCapabilityOutcome::Satisfied);
+        let candidate_site_evidence = site_assessments(&candidate_site,crate::site_fit::SiteCapabilityOutcome::Satisfied);
+        let qualification = qualification_profile(crate::service_qualification::QualificationClaim::FunctionalService);
+        let control_qualification = service_qualification_record("control-001",&qualification,crate::service_qualification::AssessmentOutcome::Pass);
+        let mut candidate_qualification = service_qualification_record("candidate-001",&qualification,crate::service_qualification::AssessmentOutcome::Pass);
+        candidate_qualification.assessments[2].outcome = crate::service_qualification::AssessmentOutcome::Fail;
+        let result = validate_site_eligible_qualified_matched_comparison(
+            &control,&candidate,ComparisonScope::WaterServiceOnly,
+            &control_site,&control_site_evidence,&candidate_site,&candidate_site_evidence,
+            &qualification,&control_qualification,&candidate_qualification
+        ).expect("qualified service decision is well-formed");
+        assert!(result.both_architectures_site_eligible());
+        assert!(!result.candidate_service_qualified());
+        assert_eq!(
+            result.matched_service_qualification.expect("service decision").disposition,
+            crate::service_qualification::MatchedComparisonDisposition::CandidateFailed
+        );
     }
 
     #[test]
