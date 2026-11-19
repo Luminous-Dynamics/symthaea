@@ -83,7 +83,7 @@ The new `compress_f64_online_selector` / `decompress_f64_online_selector` pair u
 - first chunk defaults deterministically to Raw / Order0;
 - before each later chunk, select the candidate with the smallest mean complete F64C frame length over previous chunks;
 - encode the current chunk with that candidate;
-- after each chunk, both encoder and decoder recompute all eight complete candidate sizes from that chunk and update the same integer totals;
+- after each chunk, both encoder and decoder measure the seven alternatives and reuse the selected child's actual complete-frame length to update the same integer totals;
 - the child F64C header exposes the selected transform/model IDs; the decoder independently computes the expected candidate and rejects a child whose IDs violate the historical policy.
 
 This transmits no additional selector symbols. The selected transform/model IDs already live in the child header and are counted as part of the F64C frame. The policy is decoder-synchronous and uses only prior chunks to select the current chunk. Both sides measure the seven alternatives after encoding/decoding the selected candidate and reuse the selected child's actual frame length, avoiding one redundant re-encode. It remains a diagnostic online baseline, not yet a practical throughput-optimized selector. The policy is not a learned causal mechanism, and it should be compared against simpler features, fixed-share and WZS-style selectors.
@@ -100,7 +100,7 @@ The new `compress_f64_budgeted_selector` / `decompress_f64_budgeted_selector` pa
 
 For (S) chunks, probes are (lceil S/K\rceil), and extra candidate encodes per side are (7\lceil S/K\rceil). Average additional candidate encodes per chunk are approximately (7/K): 7.0 at (K=1), 1.75 at (K=4), 0.4375 at (K=16), and 0.1094 at (K=64). The selected transform is still encoded once per chunk. Larger (K) reduces compute but increases adaptation staleness and potential regret.
 
-The CLI evaluates offline oracle, full historical and sparse-probe policies at chunk sizes 64/256/1024. Sparse rows report (K), probe count, seven extra candidate encodes per probe, complete frame ratio, encode/decode nanoseconds and percentage size gap to the offline oracle. An invariant checks that no online policy produces a smaller complete frame than the per-chunk offline best-of-eight oracle. At (K=1), sparse-probe child frames must equal the full historical selector's child frames; only the outer F64S policy ID/header CRC differ.
+The CLI evaluates offline oracle, full historical and sparse-probe policies at chunk sizes 64/256/1024. CSV rows record probe interval, probe count, extra candidate encodes per side, complete frame ratio, encode/decode nanoseconds and percentage size gap to the offline oracle. Offline and full-historical rows are recorded as probing every segment; single-transform rows record zero selector work. An invariant checks that no online policy produces a smaller complete frame than the per-chunk offline best-of-eight oracle. At (K=1), sparse-probe child frames must equal the full historical selector's child frames; only the outer F64S policy ID/header CRC differ.
 
 These are authored Rust tests, not compiled Rust results. The tests cover bitwise round-trip for all supported probe intervals, K=1 equivalence, invalid interval rejection, policy mismatch, header CRC and offline-oracle dominance. No actual Rust frame size, throughput or energy result is claimed.
 
