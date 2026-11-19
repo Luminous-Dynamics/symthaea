@@ -10,3 +10,7 @@ repository = "https://github.com/Luminous-Dynamics/symthaea"
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
