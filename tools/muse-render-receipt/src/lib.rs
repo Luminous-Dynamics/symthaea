@@ -712,8 +712,9 @@ fn verify_timeline_binding_bundle(
         if binding.renderer_id != track.renderer_id || binding.patch_id != track.patch_id
             || binding.gm_program != track.gm_program
             || binding.asset_sha256.as_deref().is_some_and(|hash| !valid_sha256(hash))
+            || binding.asset_sha256.as_deref().is_some_and(|hash| Some(hash) != receipt.renderer.asset_sha256.as_deref())
         {
-            return Err(format!("instrument binding does not match MIDI track {}", track.track_index));
+            return Err(format!("instrument binding does not match MIDI track or renderer asset {}", track.track_index));
         }
     }
 
@@ -1236,6 +1237,20 @@ mod tests {
         let altered_receipt_bytes = serde_json::to_vec(&seal(altered_receipt_value)).unwrap();
         let altered_receipt = verify_receipt_bytes(&altered_receipt_bytes).unwrap();
         assert!(verify_bundle(&root, &altered_receipt).unwrap_err().contains("render invocation fields"));
+
+        std::fs::write(root.join("render-invocation.json"), &invocation).unwrap();
+
+        // A re-sealed but cross-attempt invocation is not replayable into this attempt.
+        let mut wrong_attempt: Value = serde_json::from_slice(&invocation).unwrap();
+        wrong_attempt["attempt_id"] = Value::String("different-attempt".into());
+        let wrong_attempt_bytes = serde_json::to_vec(&wrong_attempt).unwrap();
+        std::fs::write(root.join("render-invocation.json"), &wrong_attempt_bytes).unwrap();
+        let mut wrong_attempt_receipt: Value = serde_json::to_value(&parsed).unwrap();
+        wrong_attempt_receipt["execution"]["invocation_sha256"] =
+            Value::String(sha256_hex(&wrong_attempt_bytes));
+        let wrong_attempt_sealed = serde_json::to_vec(&seal(wrong_attempt_receipt)).unwrap();
+        let wrong_attempt_receipt = verify_receipt_bytes(&wrong_attempt_sealed).unwrap();
+        assert!(verify_bundle(&root, &wrong_attempt_receipt).unwrap_err().contains("render invocation fields"));
 
         std::fs::write(root.join("render-invocation.json"), &invocation).unwrap();
         let mut corrupted = midi_bytes;
