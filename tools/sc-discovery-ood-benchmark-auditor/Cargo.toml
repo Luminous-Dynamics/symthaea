@@ -17,3 +17,7 @@ jsonschema = { version = "=0.59.0", default-features = false }
 [[bin]]
 name = "sc_discovery_ood_audit"
 path = "src/main.rs"
+
+[[bin]]
+name = "sc_feasibility_gate_audit"
+path = "src/bin/sc_feasibility_gate_audit.rs"
