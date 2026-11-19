@@ -338,6 +338,10 @@ def self_test(manifest: dict[str, Any], manifest_bytes: bytes, protocol_bytes: b
     wrong_resampling_unit["metrics"][0]["interval"]["resampling_unit"] = "candidate"
     must_reject(wrong_resampling_unit, "cluster bootstrap resampled at candidate instead of structure")
 
+    inflated_independent_count = json.loads(json.dumps(scorecard))
+    inflated_independent_count["metrics"][0]["sample_count"] = 241
+    must_reject(inflated_independent_count, "independent sample count exceeds raw observations")
+
     pseudoreplicated_binomial = json.loads(json.dumps(scorecard))
     pseudoreplicated_binomial["metrics"][0]["interval"]["method"] = "clopper_pearson"
     must_reject(pseudoreplicated_binomial, "binomial confidence interval on repeated observations")
