@@ -331,7 +331,7 @@ pub fn decompress_f64(frame: &[u8], max_values: usize) -> Result<Vec<f64>, Numer
 const SEGMENTED_MAGIC: &[u8; 4] = b"F64S";
 const SEGMENTED_VERSION: u16 = 1;
 const SEGMENTED_HEADER_LEN: usize = 32;
-const SEGMENT_SELECTION_POLICY_BEST_OF_FOUR: u8 = 1;
+const SEGMENT_SELECTION_POLICY_BEST_OF_SIX: u8 = 1;
 
 const SEGMENT_SELECTION_POLICY_HISTORICAL_COST: u8 = 2;
 const SEGMENT_CANDIDATES: usize = 6;
@@ -645,7 +645,7 @@ pub fn compress_f64_segmented(
     frame.extend_from_slice(SEGMENTED_MAGIC);
     frame.extend_from_slice(&SEGMENTED_VERSION.to_le_bytes());
     frame.push(0); // flags
-    frame.push(SEGMENT_SELECTION_POLICY_BEST_OF_FOUR);
+    frame.push(SEGMENT_SELECTION_POLICY_BEST_OF_SIX);
     frame.extend_from_slice(&count.to_le_bytes());
     frame.extend_from_slice(&segment_size_u32.to_le_bytes());
     frame.extend_from_slice(&segment_count_u32.to_le_bytes());
@@ -680,7 +680,7 @@ pub fn decompress_f64_segmented(
     if frame[6] != 0 {
         return Err(NumericError::UnsupportedFlags(frame[6]));
     }
-    if frame[7] != SEGMENT_SELECTION_POLICY_BEST_OF_FOUR {
+    if frame[7] != SEGMENT_SELECTION_POLICY_BEST_OF_SIX {
         return Err(NumericError::UnsupportedTransform(frame[7]));
     }
 
@@ -975,16 +975,16 @@ mod tests {
         let mut policy = HistoricalSegmentCosts::default();
         assert_eq!(policy.choose(), 0, "the first segment must use Raw/Order0");
 
-        policy.observe_sizes([100, 80, 60, 40]).unwrap();
+        policy.observe_sizes([100, 80, 60, 40, 90, 70]).unwrap();
         assert_eq!(policy.choose(), 3);
 
         // A later chunk contributes to future choices, not its own selection.
         // The mean costs after two observations are [60, 55, 50, 45].
-        policy.observe_sizes([20, 30, 40, 50]).unwrap();
+        policy.observe_sizes([20, 30, 40, 50, 45, 60]).unwrap();
         assert_eq!(policy.choose(), 3);
 
         let mut tied = HistoricalSegmentCosts::default();
-        tied.observe_sizes([10, 20, 20, 20]).unwrap();
+        tied.observe_sizes([10, 20, 20, 20, 20, 20]).unwrap();
         assert_eq!(tied.choose(), 0);
     }
 
