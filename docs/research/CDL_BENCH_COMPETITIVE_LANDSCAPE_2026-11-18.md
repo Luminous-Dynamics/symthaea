@@ -166,7 +166,45 @@ These results are not directly interchangeable. They use different datasets, bas
 4. add explicit oscillating/sign-alternating and highly redundant server-like regimes;
 5. separate per-dataset gains from geometric means and preserve cases where each method loses.
 
-The new Rust `float64` track is only a raw/XOR-previous-varint correctness baseline with bit-preserving frames and test fixtures. It is not a reimplementation of any of these codecs. See issue [CDL-Bench-007 #12874](https://github.com/Luminous-Dynamics/symthaea/issues/12874).
+The Rust `float64` track now includes raw, XOR-varint, reusable XOR-window and RLE+XOR reference transforms, plus offline best-of-eight and decoder-synchronous historical-cost selectors. It remains a correctness and policy laboratory, not a reimplementation of ALP, ACTF, DeXOR, Rabbit, Dolphin, WZS, EAS or the Dynatrace codec. See issue [CDL-Bench-007 #12874](https://github.com/Luminous-Dynamics/symthaea/issues/12874).
+
+### 1.9 Production observability invalidates some academic dataset assumptions
+
+Urbanides, Weninger and Ertl, *Analyzing and Improving Floating-Point Compression for Application Monitoring Time Series* (SIGMOD Companion 2026), report that their large application-monitoring dataset contains long runs of non-varying values that are not represented well by common finance/weather benchmark sets. Their proposed stack combines record-level RLE with XOR codecs and reports about 23% better compression ratio and 34% higher speed than standalone methods. Their block selector reports within 2% of the optimal ratio and more than 13% over the best single RLE-enhanced compressor. These are published author results, not reproduced here.
+
+- Paper: https://doi.org/10.1145/3788853.3803097
+- Dynatrace summary: https://www.dynatrace.com/research/publications/analyzing-and-improving-floating-point-compression-for-application-monitoring-time-series/
+
+CDL-Bench now contains a deliberately simple exact-bit-pattern `RleXorPrevious` transform and synthetic plateau/mostly-idle fixtures. This must not be described as a reproduction of the Dynatrace codec or selector. The next experiment must acquire a public or appropriately licensed observability corpus and include:
+- constant/flat runs, repeated zeros, repeated sentinel values, and long plateaus;
+- sparse transitions, bursty changes, gaps and sign changes;
+- per-block cardinality and run-length distributions;
+- matched RLE-only, XOR-only, RLE+XOR, and adaptive block-selector ablations.
+
+The industry result makes RLE+XOR and block-level selection prior art. A contribution cannot be claimed from simply composing these methods.
+
+### 1.10 Hierarchical adaptive selectors are now directly competitive
+
+The online EAS article page (assigned to *Future Generation Computer Systems*, Volume 186, January 2027) describes a three-layer lossless floating-point compression system:
+1. a fast fixed-parameter O(n) execution layer;
+2. a data-feature-driven decision layer that narrows to 3–5 candidate parameter values;
+3. a deep optimization layer using simulated annealing and parallel encoding competition.
+
+It also combines ALP/XOR selection and vectorized, cache-aware kernels, and reports evaluations on 30 datasets. Since the issue date is in January 2027, treat the abstract/page as an online-available pre-publication comparator as of this research snapshot, not a peer-reviewed reproduction performed here.
+
+- Article page: https://www.sciencedirect.com/science/article/pii/S0167739X26003766
+
+This is a close architectural neighbor to any proposed “fast / medium / deep” selector. CDL-Bench should compare against the same hierarchy where code/data become available and must not claim hierarchical candidate selection or multi-stage optimization alone as novel.
+
+### 1.11 A shared external harness can reduce duplicate codec engineering
+
+TerseTS is an open-source Zig library with a small C API and Rust bindings. Its repository currently describes more than a dozen lossless and lossy methods in a single framework, but explicitly labels the project beta and not production-ready. The EDBT 2026 demo paper describes an extensible architecture that separates logical compression from physical encoding and exposes a common compress/decompress interface.
+
+- Code: https://github.com/cmcuza/TerseTS
+- Documentation: https://www.tersets.com/
+- EDBT demo paper: https://doi.org/10.48786/EDBT.2026.74
+
+TerseTS should be evaluated as an optional comparison adapter/harness, not adopted into the production cognitive stack. Its license is Apache-2.0, but method support, precision semantics, error-bound definitions, build version and exact-lossless guarantees must be checked method by method before including a result on the exact-lossless leaderboard.
 
 ## 2. Revised benchmark matrix
 
