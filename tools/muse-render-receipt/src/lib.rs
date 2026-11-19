@@ -961,10 +961,14 @@ pub fn verify_midi_event_manifest(m: &MidiPerformanceManifestV1, bytes: &[u8]) -
                         MidiMessage::NoteOn { key, .. } | MidiMessage::NoteOff { key, .. } => inc(&mut actual_off, OffKey {
                             track:index, channel, pitch:key.as_int(), tick,
                         }),
-                        _ => {}
+                        _ => return Err(format!("unexpected unmanifested MIDI channel message in track {index}")),
                     }
                 }
-                _ => {}
+                TrackEventKind::Meta(MetaMessage::EndOfTrack) => {}
+                TrackEventKind::Meta(_) => return Err(format!("unexpected unmanifested MIDI metadata in track {index}")),
+                TrackEventKind::SysEx(_) | TrackEventKind::Escape(_) => {
+                    return Err(format!("unexpected unmanifested MIDI system-exclusive event in track {index}"));
+                }
             }
         }
     }
@@ -1608,6 +1612,19 @@ mod tests {
     #[test]
     fn midi_event_manifest_matches_real_smf_bytes() {
         verify_midi_event_manifest(&manifest(), &simple_midi()).unwrap();
+    }
+    #[test]
+    fn midi_event_manifest_rejects_unmanifested_pitch_bend_controller() {
+        let mut bytes = simple_midi();
+        let track_start = bytes.windows(4).rposition(|window| window == b"MTrk").unwrap();
+        let length_start = track_start + 4;
+        let old_len = u32::from_be_bytes(bytes[length_start..length_start + 4].try_into().unwrap());
+        let end_of_track = bytes.len() - 4;
+        bytes.splice(end_of_track..end_of_track, [0x00,0xe0,0x00,0x40]);
+        let new_len = old_len + 4;
+        bytes[length_start..length_start + 4].copy_from_slice(&new_len.to_be_bytes());
+        assert!(verify_midi_event_manifest(&manifest(), &bytes)
+            .unwrap_err().contains("unmanifested MIDI channel message"));
     }
     #[test]
     fn complete_bundle_integrity_passes_then_rejects_midi_tampering() {
