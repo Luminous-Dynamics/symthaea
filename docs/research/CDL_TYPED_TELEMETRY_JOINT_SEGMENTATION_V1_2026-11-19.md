@@ -49,6 +49,25 @@ Do not silently assume that records are regularly sampled, that equal values mea
 
 Run-length coding is not universally beneficial. Every run form needs a literal escape and a break-even rule that includes run length, type/tag overhead, timestamp cost and checksums. Short runs should remain literals when that is cheaper.
 
+### Candidate A: state-delta event coding for sparse multi-field updates
+
+For each stable `(entity_id, series_id)`, maintain the last decoded typed record and encode the next observation as an event:
+
+`(time_delta, series_id, changed_field_bitmap, presence/null operations, changed_values)`
+
+This changes the unit of coding from “a row of values” to “a state transition”. When a metric record changes only two of twelve fields, the unchanged ten fields do not need to be emitted again. When no value field changes, encode only the timestamp/heartbeat semantics; aggregate identical state intervals only when the timestamp rule is explicit and valid.
+
+Important invariants:
+- A zero bit in `changed_field_bitmap` means “same value as prior state”, not null.
+- Null-to-value, value-to-null and null-to-NaN are explicit operations.
+- Compare f64 fields by exact u64 bits; signed zero and different NaN payloads are different values.
+- Field order and types come from a versioned schema; schema and dictionaries are charged.
+- Interleaved entities require per-key prior state. Bound the state table and use deterministic eviction/checkpoint rules; never assume the decoder has hidden state from an earlier session.
+- Checkpoints must permit bounded recovery and random access. Count their bytes and measure replay depth.
+- A reset/restart is a semantic event, not silently interpreted as “all fields unchanged”.
+
+A state-delta arm should be compared with scalar RLE, field-vector RLE, whole-record RLE, per-column ALP/Pco, and the current fixed-chunk codecs. Report update density (changed fields / total fields), state-table hit rate, checkpoint bytes, eviction frequency, decode replay depth, and random-access latency. This is a research candidate, not an implementation claim or novelty claim by itself; sparse updates and delta coding are established ideas. The proposed research contribution would be the decoder-verifiable integration with typed schema, bounded state, adaptive segmentation and a fully charged compute/size budget.
+
 ## New hypothesis: jointly choose segmentation and codec
 
 The current fixed chunks make boundary placement exogenous. Production data can contain long idle periods, sharp bursts and mixed regimes that do not align with 64/256/1024 boundaries.
