@@ -1,0 +1,552 @@
+{
+  "schema_version": "0.1.0",
+  "programme": "PLASMA-THERMAL-METROLOGY-001",
+  "generated_date": "2026-11-12",
+  "claim_ceiling": "METROLOGY_CONTRACT_AND_SOURCE_CROSSWALK_ONLY_NO_PHYSICAL_RESULT",
+  "service_modes": [
+    {
+      "service_mode_id": "THERMAL_STORE_CHARGE_HOLD_DISCHARGE",
+      "functional_output": "useful heat delivered at a declared temperature, pressure, flow and duration after an explicit storage hold",
+      "required_phases": [
+        "grid_input",
+        "charge",
+        "hold",
+        "discharge",
+        "customer_boundary"
+      ],
+      "efficiency_metric": "useful_heat_delivered_j / total_grid_side_electrical_input_j",
+      "prohibited_substitutions": [
+        "heater_nameplate_power",
+        "peak_plasma_temperature",
+        "furnace_setpoint",
+        "stored_energy_increase_only",
+        "heat_to_electricity_efficiency_without_power_cycle"
+      ]
+    },
+    {
+      "service_mode_id": "THERMAL_MATERIAL_PROCESSING",
+      "functional_output": "specification-conforming treated material mass or area with declared material-quality and throughput outcomes",
+      "required_phases": [
+        "grid_input",
+        "power_conversion",
+        "process_gas_or_direct_heat",
+        "material_control_volume",
+        "cooling_or_post_treatment",
+        "product_quality"
+      ],
+      "efficiency_metric": "grid_side_electricity_per_conforming_output_mass_or_area",
+      "prohibited_substitutions": [
+        "plasma_terminal_efficiency_as_grid_efficiency",
+        "material_quality_as_energy_efficiency",
+        "single_temperature_sensor_as_uniformity",
+        "furnace_setpoint_as_sample_temperature"
+      ]
+    }
+  ],
+  "evidence_statuses": [
+    "METERED_PHYSICAL",
+    "CALIBRATED_PHYSICAL_OBSERVATION",
+    "SOURCE_REPORTED",
+    "MODELLED",
+    "DERIVED",
+    "UNKNOWN",
+    "NOT_APPLICABLE"
+  ],
+  "heating_methods": [
+    {
+      "method_id": "RESISTANCE_JOULE",
+      "class": "RESISTIVE_ELECTRIFIED_HEATING"
+    },
+    {
+      "method_id": "MICROWAVE_NON_PLASMA",
+      "class": "NON_CONTACT_ELECTRIFIED_HEATING"
+    },
+    {
+      "method_id": "INDUCTION",
+      "class": "NON_CONTACT_ELECTRIFIED_HEATING"
+    },
+    {
+      "method_id": "MICROWAVE_INDUCED_PLASMA",
+      "class": "PLASMA_HEATING"
+    },
+    {
+      "method_id": "ARC_OR_DC_PLASMA",
+      "class": "PLASMA_HEATING"
+    }
+  ],
+  "measurement_layers": [
+    {
+      "layer_id": "GRID_SIDE_ELECTRICITY",
+      "required_for_all_service_modes": true,
+      "channels": [
+        {
+          "channel": "grid_active_power_w",
+          "quantity": "power",
+          "unit": "W"
+        },
+        {
+          "channel": "grid_energy_j",
+          "quantity": "energy",
+          "unit": "J"
+        },
+        {
+          "channel": "grid_voltage_v",
+          "quantity": "voltage",
+          "unit": "V"
+        },
+        {
+          "channel": "grid_current_a",
+          "quantity": "current",
+          "unit": "A"
+        },
+        {
+          "channel": "power_factor_or_waveform_profile",
+          "quantity": "dimensionless_or_waveform",
+          "unit": "declared"
+        },
+        {
+          "channel": "startup_standby_shutdown_energy_j",
+          "quantity": "energy",
+          "unit": "J"
+        }
+      ],
+      "metadata_required": [
+        "meter_id",
+        "meter_boundary_id",
+        "calibration_id",
+        "calibration_validity",
+        "uncertainty",
+        "sample_clock_epoch",
+        "sampling_interval",
+        "raw_artifact_digest",
+        "decoder_version"
+      ],
+      "rules": [
+        "meter_boundary_ids_must_be_unique",
+        "total_meter_and_branch_meters_must_not_overlap",
+        "unknown_auxiliary_energy_blocks_completeness"
+      ]
+    },
+    {
+      "layer_id": "POWER_CONVERSION_AND_COUPLING",
+      "required_for_all_service_modes": true,
+      "channels": [
+        {
+          "channel": "power_converter_input_w",
+          "quantity": "power",
+          "unit": "W"
+        },
+        {
+          "channel": "power_converter_output_w",
+          "quantity": "power",
+          "unit": "W"
+        },
+        {
+          "channel": "reflected_or_mismatch_power_w",
+          "quantity": "power",
+          "unit": "W"
+        },
+        {
+          "channel": "cooling_auxiliary_power_w",
+          "quantity": "power",
+          "unit": "W"
+        },
+        {
+          "channel": "fan_pump_control_auxiliary_power_w",
+          "quantity": "power",
+          "unit": "W"
+        }
+      ],
+      "metadata_required": [
+        "conversion_stage_id",
+        "input_boundary_id",
+        "output_boundary_id",
+        "meter_ids_or_unknown_reason",
+        "calibration_refs",
+        "uncertainty",
+        "time_alignment"
+      ],
+      "rules": [
+        "do_not_infer_absorbed_process_power_from_generator_nameplate",
+        "unknown_conversion_or_auxiliary_load_remains_unknown"
+      ]
+    },
+    {
+      "layer_id": "PROCESS_GAS_AND_PLASMA_COUPLING",
+      "required_for": [
+        "THERMAL_MATERIAL_PROCESSING"
+      ],
+      "channels": [
+        {
+          "channel": "process_gas_mass_flow_kg_s",
+          "quantity": "mass_flow",
+          "unit": "kg/s"
+        },
+        {
+          "channel": "gas_inlet_temperature_k",
+          "quantity": "temperature",
+          "unit": "K"
+        },
+        {
+          "channel": "gas_outlet_temperature_k",
+          "quantity": "temperature",
+          "unit": "K"
+        },
+        {
+          "channel": "gas_inlet_pressure_pa",
+          "quantity": "pressure",
+          "unit": "Pa"
+        },
+        {
+          "channel": "gas_outlet_pressure_pa",
+          "quantity": "pressure",
+          "unit": "Pa"
+        },
+        {
+          "channel": "gas_composition",
+          "quantity": "composition",
+          "unit": "declared"
+        },
+        {
+          "channel": "plasma_diagnostic_observation",
+          "quantity": "typed_observation",
+          "unit": "declared"
+        }
+      ],
+      "metadata_required": [
+        "gas_identity",
+        "property_model_or_calibration_ref",
+        "measurement_location",
+        "calibration_id",
+        "uncertainty",
+        "sample_clock_epoch",
+        "raw_artifact_digest"
+      ],
+      "rules": [
+        "gas_enthalpy_must_use_source_qualified_property_model",
+        "plasma_generator_power_is_not_absorbed_heat",
+        "unknown_process_gas_enthalpy_remains_unknown"
+      ]
+    },
+    {
+      "layer_id": "MATERIAL_OR_STORE_CONTROL_VOLUME",
+      "required_for_all_service_modes": true,
+      "channels": [
+        {
+          "channel": "initial_material_or_store_mass_kg",
+          "quantity": "mass",
+          "unit": "kg"
+        },
+        {
+          "channel": "initial_temperature_field",
+          "quantity": "temperature_field",
+          "unit": "K"
+        },
+        {
+          "channel": "temperature_time_field",
+          "quantity": "temperature_field_trace",
+          "unit": "K"
+        },
+        {
+          "channel": "heat_flux_field",
+          "quantity": "heat_flux_field_trace",
+          "unit": "W/m2"
+        },
+        {
+          "channel": "ambient_boundary",
+          "quantity": "boundary_condition",
+          "unit": "declared"
+        },
+        {
+          "channel": "stored_energy_increase_j",
+          "quantity": "energy",
+          "unit": "J"
+        },
+        {
+          "channel": "stored_energy_after_hold_j",
+          "quantity": "energy",
+          "unit": "J"
+        },
+        {
+          "channel": "storage_hold_loss_j",
+          "quantity": "energy",
+          "unit": "J"
+        }
+      ],
+      "metadata_required": [
+        "article_or_store_id",
+        "batch_id",
+        "as_built_geometry_digest",
+        "material_property_source",
+        "material_property_validity_range",
+        "sensor_ids",
+        "calibration_ids",
+        "sensor_positions",
+        "spatial_frame_id",
+        "uncertainty",
+        "raw_artifact_digest"
+      ],
+      "rules": [
+        "single_temperature_sensor_does_not_establish_volume_uniformity",
+        "temperature_setpoint_is_not_measured_material_temperature",
+        "derived_energy_requires_material_properties_and_uncertainty"
+      ]
+    },
+    {
+      "layer_id": "USEFUL_HEAT_DELIVERY",
+      "required_for": [
+        "THERMAL_STORE_CHARGE_HOLD_DISCHARGE"
+      ],
+      "channels": [
+        {
+          "channel": "delivered_heat_flow_w",
+          "quantity": "power",
+          "unit": "W"
+        },
+        {
+          "channel": "outlet_temperature_k",
+          "quantity": "temperature",
+          "unit": "K"
+        },
+        {
+          "channel": "outlet_pressure_pa",
+          "quantity": "pressure",
+          "unit": "Pa"
+        },
+        {
+          "channel": "outlet_mass_flow_kg_s",
+          "quantity": "mass_flow",
+          "unit": "kg/s"
+        },
+        {
+          "channel": "useful_heat_delivered_j",
+          "quantity": "energy",
+          "unit": "J"
+        },
+        {
+          "channel": "residual_store_energy_j",
+          "quantity": "energy",
+          "unit": "J"
+        }
+      ],
+      "metadata_required": [
+        "customer_boundary_id",
+        "service_contract_id",
+        "heat_transfer_property_model",
+        "meter_or_calorimeter_id",
+        "calibration_id",
+        "uncertainty",
+        "time_interval",
+        "raw_artifact_digest"
+      ],
+      "rules": [
+        "furnace_output_is_not_customer_heat_without_delivery_boundary",
+        "thermal_efficiency_must_state_numerator_denominator_and_hold_duration"
+      ]
+    },
+    {
+      "layer_id": "PRODUCT_QUALITY_AND_THROUGHPUT",
+      "required_for": [
+        "THERMAL_MATERIAL_PROCESSING"
+      ],
+      "channels": [
+        {
+          "channel": "conforming_output_mass_kg",
+          "quantity": "mass",
+          "unit": "kg"
+        },
+        {
+          "channel": "rejected_or_reworked_fraction",
+          "quantity": "fraction",
+          "unit": "1"
+        },
+        {
+          "channel": "product_quality_observables",
+          "quantity": "typed_observation",
+          "unit": "declared"
+        },
+        {
+          "channel": "cycle_time_s",
+          "quantity": "duration",
+          "unit": "s"
+        },
+        {
+          "channel": "post_treatment_energy_j",
+          "quantity": "energy",
+          "unit": "J"
+        }
+      ],
+      "metadata_required": [
+        "specification_id",
+        "sampling_plan",
+        "test_method",
+        "instrument_ids",
+        "calibration_refs",
+        "batch_id",
+        "uncertainty",
+        "raw_artifact_digest"
+      ],
+      "rules": [
+        "material_quality_is_not_energy_efficiency",
+        "dried_and_pre_fired_specimens_are_separate_strata",
+        "independent_specimen_replicates_are_not_repeated_measurements"
+      ]
+    }
+  ],
+  "auxiliary_load_roles": [
+    "power_conversion",
+    "matching_or_impedance_network",
+    "magnetron_or_rf_generator",
+    "transformer_or_rectifier",
+    "induction_supply",
+    "cooling",
+    "fans",
+    "pumps",
+    "vacuum",
+    "process_gas_conditioning",
+    "controls_and_instrumentation",
+    "post_treatment",
+    "other_declared"
+  ],
+  "unknown_value_semantics": {
+    "absent_meter": "BLOCKED",
+    "explicit_zero_with_meter": "OBSERVED_ZERO",
+    "meter_present_value_unavailable": "BLOCKED",
+    "source_omits_quantity": "UNKNOWN",
+    "not_applicable_with_reason": "NOT_APPLICABLE"
+  },
+  "comparability_rules": [
+    "same service_mode",
+    "same material_or_store_identity_or_justified_paired_batch",
+    "same initial material state and thermal history stratum",
+    "same target temperature/time trajectory",
+    "same output quality/service limits",
+    "same customer boundary and delivery duration",
+    "same included auxiliary and meter boundary",
+    "same energy basis and units",
+    "uncertainty and missingness visible",
+    "vendor_claims_not_merged_with_calibrated_physical_observations"
+  ],
+  "source_crosswalk": [
+    {
+      "source_case_id": "PLASMA-MW-MGO-REFRACTORY-PILOT-2025",
+      "service_mode": "THERMAL_MATERIAL_PROCESSING",
+      "reported_outcomes": [
+        "MgO density",
+        "microstructure",
+        "flexural strength",
+        "phase composition"
+      ],
+      "energy_boundary_status": "UNKNOWN",
+      "grid_meter_status": "UNKNOWN",
+      "process_gas_enthalpy_status": "UNKNOWN",
+      "auxiliaries_status": "UNKNOWN",
+      "sample_temperature_time_field_status": "MUST_EXTRACT",
+      "product_quality_status": "SOURCE_REPORTED",
+      "disposition": "INSUFFICIENT_ENERGY_BOUNDARY_FOR_EFFICIENCY_COMPARISON"
+    },
+    {
+      "source_case_id": "PLASMA-MW-CERAMIC-FIRING-2026",
+      "service_mode": "THERMAL_MATERIAL_PROCESSING",
+      "reported_outcomes": [
+        "water absorption",
+        "Young modulus",
+        "biaxial strength",
+        "mineralogy",
+        "microstructure"
+      ],
+      "energy_boundary_status": "UNKNOWN",
+      "grid_meter_status": "UNKNOWN",
+      "process_gas_enthalpy_status": "UNKNOWN",
+      "auxiliaries_status": "UNKNOWN",
+      "sample_temperature_time_field_status": "MUST_EXTRACT",
+      "product_quality_status": "SOURCE_REPORTED",
+      "disposition": "MATERIAL_QUALITY_COMPARISON_ONLY_UNTIL_ENERGY_BOUNDARY_ADMITTED"
+    },
+    {
+      "source_case_id": "HTTES-REFRACTORY-950-1800C-MODELLING-2026",
+      "service_mode": "THERMAL_STORE_CHARGE_HOLD_DISCHARGE",
+      "reported_outcomes": [
+        "modelled storage temperature",
+        "modelled discharge power",
+        "modelled capacity",
+        "modelled cost map"
+      ],
+      "energy_boundary_status": "MODELLED_BOUNDARY_MUST_EXTRACT",
+      "grid_meter_status": "MODELLED",
+      "process_gas_enthalpy_status": "MODELLED",
+      "auxiliaries_status": "MODELLED",
+      "sample_temperature_time_field_status": "MODELLED",
+      "product_quality_status": "NOT_APPLICABLE",
+      "disposition": "MODEL_REPRODUCTION_REQUIRED_NOT_PHYSICAL_MEASUREMENT"
+    },
+    {
+      "source_case_id": "HTTES-SANDIA-PARTICLE-6MWH",
+      "service_mode": "THERMAL_STORE_CHARGE_HOLD_DISCHARGE",
+      "reported_outcomes": [
+        "facility capability",
+        "capacity",
+        "temperature envelope"
+      ],
+      "energy_boundary_status": "UNKNOWN",
+      "grid_meter_status": "UNKNOWN",
+      "process_gas_enthalpy_status": "UNKNOWN",
+      "auxiliaries_status": "UNKNOWN",
+      "sample_temperature_time_field_status": "FACILITY_DESCRIPTION_ONLY",
+      "product_quality_status": "NOT_APPLICABLE",
+      "disposition": "FACILITY_CAPABILITY_NOT_PERFORMANCE_DATASET"
+    }
+  ],
+  "negative_controls": [
+    {
+      "control_id": "THERM-MET-NC-001",
+      "condition": "Use nameplate generator power instead of grid-side metered energy.",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "THERM-MET-NC-002",
+      "condition": "Omit cooling/fan/pump/matching or gas conditioning load.",
+      "expected_disposition": "BLOCKED"
+    },
+    {
+      "control_id": "THERM-MET-NC-003",
+      "condition": "Treat absent auxiliary meter as measured zero.",
+      "expected_disposition": "BLOCKED"
+    },
+    {
+      "control_id": "THERM-MET-NC-004",
+      "condition": "Compare furnace setpoint instead of measured sample temperature trajectory.",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "THERM-MET-NC-005",
+      "condition": "Compare dried and pre-fired ceramic specimens as one unstratified group.",
+      "expected_disposition": "NOT_COMPARABLE"
+    },
+    {
+      "control_id": "THERM-MET-NC-006",
+      "condition": "Promote MgO/ceramic material-quality results to wall-plug thermal-storage efficiency.",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "THERM-MET-NC-007",
+      "condition": "Compare thermal material processing to charge/hold/discharge storage as the same service.",
+      "expected_disposition": "NOT_COMPARABLE"
+    },
+    {
+      "control_id": "THERM-MET-NC-008",
+      "condition": "Use one sensor location to claim volume temperature uniformity.",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "THERM-MET-NC-009",
+      "condition": "Compare microwave without plasma to microwave-plasma without shared grid-side meter boundary.",
+      "expected_disposition": "NOT_COMPARABLE"
+    },
+    {
+      "control_id": "THERM-MET-NC-010",
+      "condition": "Drop failed or invalid experimental runs from the outcome denominator without disposition.",
+      "expected_disposition": "REJECTED"
+    }
+  ]
+}
