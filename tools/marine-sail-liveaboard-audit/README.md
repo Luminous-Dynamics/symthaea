@@ -10,6 +10,7 @@ This tool does not generate routes, simulate vessel physics, calculate energy, s
 cargo test --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml
 cargo run --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml -- audit-case docs/research/marine/fixtures/synthetic-sail-liveaboard-case-0001.json
 cargo run --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml -- compare-pair baseline.json candidate.json
+cargo run --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml --bin validate-corpus -- docs/research/marine/fixtures/marine-sail-liveaboard-corpus-0001.json
 cargo clippy --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml --all-targets -- -D warnings
 ```
 
@@ -34,3 +35,12 @@ Pair comparison returns `INCOMPARABLE` when mission/configuration/service/foreca
 - Matching is by exact identifiers/digests and service/mission fields, not inferred rescaling.
 
 A SHA-256-shaped string is only a syntax/identity check. This CLI does not authenticate the signer, source publisher, physical instrument, calibration or underlying measurement.
+
+
+## Frozen adversarial corpus
+
+\`docs/research/marine/fixtures/marine-sail-liveaboard-corpus-0001.json\` freezes sixteen declarative mutation vectors and seven policy arms (S0-S6). Its strict contract is in \`docs/research/marine/marine-sail-liveaboard-corpus.schema.json\`.
+
+The \`validate-corpus\` binary checks policy-arm information boundaries, unique scenario identities, command/target consistency, mutation JSON Pointers, expected dispositions, required threat-family coverage and the benchmark metric contract. It reports \`DECLARATIVE_CORPUS_VALID\`; **it does not execute the mutation vectors against \`audit-case\` or \`compare-pair\` yet**. The current semantic cases remain covered by the standalone audit crate's unit tests. Wiring this registry into a mutation-replay runner is the next P1 increment.
+
+The corpus is synthetic test material, not a weather dataset, vessel-performance dataset, or evidence of a successful passage. All seven arms share one declared compute-budget profile; S6 is evaluator-only and cannot be ranked as a deployable policy.
