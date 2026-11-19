@@ -67,6 +67,14 @@ jobs:
             --out "$RUNNER_TEMP/sc-model-discrimination-receipt.json"
           cat "$RUNNER_TEMP/sc-model-discrimination-receipt.json"
 
+      - name: Audit synthetic shared-nuisance evidence plan
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-capability-plan-harness/Cargo.toml --bin sc_correlated_evidence_audit -- \
+            --schema data/schemas/superconductivity_correlated_evidence_v0_1.schema.json \
+            --fixture data/research/superconductivity_correlated_evidence_fixture_v0_1.json \
+            --out "$RUNNER_TEMP/sc-correlated-evidence-receipt.json"
+          cat "$RUNNER_TEMP/sc-correlated-evidence-receipt.json"
+
       - name: Run Clippy
         run: cargo clippy --locked --manifest-path tools/superconductivity-capability-plan-harness/Cargo.toml --bins -- -D warnings
 
@@ -86,6 +94,9 @@ jobs:
             sha256sum tools/superconductivity-capability-plan-harness/src/bin/sc_model_discrimination_audit.rs
             sha256sum data/schemas/superconductivity_model_discrimination_v0_1.schema.json
             sha256sum data/research/superconductivity_model_discrimination_fixture_v0_1.json
+            sha256sum tools/superconductivity-capability-plan-harness/src/bin/sc_correlated_evidence_audit.rs
+            sha256sum data/schemas/superconductivity_correlated_evidence_v0_1.schema.json
+            sha256sum data/research/superconductivity_correlated_evidence_fixture_v0_1.json
             if [ -f tools/superconductivity-capability-plan-harness/Cargo.lock ]; then
               sha256sum tools/superconductivity-capability-plan-harness/Cargo.lock
             else
@@ -104,4 +115,5 @@ jobs:
             ${{ runner.temp }}/sc-capability-plan-environment.txt
             ${{ runner.temp }}/sc-capability-plan-receipt.json
             ${{ runner.temp }}/sc-model-discrimination-receipt.json
+            ${{ runner.temp }}/sc-correlated-evidence-receipt.json
             ${{ runner.temp }}/sc-rustfmt.patch
