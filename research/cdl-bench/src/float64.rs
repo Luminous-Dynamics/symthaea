@@ -477,23 +477,44 @@ fn segment_candidate_from_child_header(child: &[u8]) -> Result<u8, NumericError>
 #[derive(Default)]
 struct HistoricalSegmentCosts {
     totals: [u64; SEGMENT_CANDIDATES],
-    segments: u64,
+    observations: [u64; SEGMENT_CANDIDATES],
 }
 
 impl HistoricalSegmentCosts {
     fn choose(&self) -> u8 {
-        if self.segments == 0 {
-            return 0;
-        }
-        let mut best = 0usize;
-        for candidate in 1..SEGMENT_CANDIDATES {
-            // Every candidate is measured on every segment in this v1 policy,
-            // so all sample counts are identical and comparing sums is exact.
-            if self.totals[candidate] < self.totals[best] {
-                best = candidate;
+        let mut best: Option<usize> = None;
+        for candidate in 0..SEGMENT_CANDIDATES {
+            if self.observations[candidate] == 0 {
+                continue;
+            }
+            let Some(current_best) = best else {
+                best = Some(candidate);
+                continue;
+            };
+            let left = (self.totals[candidate] as u128)
+                * (self.observations[current_best] as u128);
+            let right = (self.totals[current_best] as u128)
+                * (self.observations[candidate] as u128);
+            if left < right {
+                best = Some(candidate);
             }
         }
-        best as u8
+        best.unwrap_or(0) as u8
+    }
+
+    fn observe_candidate(&mut self, candidate: u8, size: usize) -> Result<(), NumericError> {
+        let index = candidate as usize;
+        if index >= SEGMENT_CANDIDATES {
+            return Err(NumericError::UnsupportedTransform(candidate));
+        }
+        let size = u64::try_from(size).map_err(|_| NumericError::LengthOverflow)?;
+        self.totals[index] = self.totals[index]
+            .checked_add(size)
+            .ok_or(NumericError::LengthOverflow)?;
+        self.observations[index] = self.observations[index]
+            .checked_add(1)
+            .ok_or(NumericError::LengthOverflow)?;
+        Ok(())
     }
 
     fn observe_sizes(
@@ -501,13 +522,12 @@ impl HistoricalSegmentCosts {
         sizes: [u64; SEGMENT_CANDIDATES],
     ) -> Result<(), NumericError> {
         for (candidate, size) in sizes.into_iter().enumerate() {
-            self.totals[candidate] = self.totals[candidate]
-                .checked_add(size)
-                .ok_or(NumericError::LengthOverflow)?;
+            let candidate = candidate as u8;
+            self.observe_candidate(
+                candidate,
+                usize::try_from(size).map_err(|_| NumericError::LengthOverflow)?,
+            )?;
         }
-        self.segments = self.segments
-            .checked_add(1)
-            .ok_or(NumericError::LengthOverflow)?;
         Ok(())
     }
 
@@ -519,6 +539,23 @@ impl HistoricalSegmentCosts {
                 u64::try_from(frame.len()).map_err(|_| NumericError::LengthOverflow)?;
         }
         self.observe_sizes(sizes)
+    }
+
+    fn observe_with_selected(
+        &mut self,
+        values: &[f64],
+        selected: u8,
+        selected_frame_len: usize,
+    ) -> Result<(), NumericError> {
+        for candidate in 0..SEGMENT_CANDIDATES as u8 {
+            let size = if candidate == selected {
+                selected_frame_len
+            } else {
+                encode_segment_candidate(values, candidate)?.len()
+            };
+            self.observe_candidate(candidate, size)?;
+        }
+        Ok(())
     }
 }
 
