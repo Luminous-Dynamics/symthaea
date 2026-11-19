@@ -54,6 +54,9 @@ pub enum SiteCapabilityDomain {
     ThermalReceiverAndHeatSinkCompatibility,
     ServiceAndMaintenanceCapacity,
     WetPathHygieneAndCleaning,
+    /// Site-level building water-age / stagnation management, required for declared
+    /// high-risk or low-use building profiles where reduced flow may affect water age.
+    WaterAgeAndStagnationManagement,
     BackflowAndCrossConnectionProtection,
     NetworkConnectivity,
 }
@@ -94,7 +97,8 @@ impl SiteCapabilityDomain {
             Self::ServiceAndMaintenanceCapacity => {
                 SiteCapabilityAuthority::IndependentServiceabilityAssessor
             }
-            Self::WetPathHygieneAndCleaning => {
+            Self::WetPathHygieneAndCleaning
+            | Self::WaterAgeAndStagnationManagement => {
                 SiteCapabilityAuthority::IndependentHygieneExposureAssessor
             }
             Self::BackflowAndCrossConnectionProtection => {
@@ -1210,6 +1214,52 @@ mod tests {
         assert!(result.satisfied_domains.contains(
             &SiteCapabilityDomain::OperatingEnvironmentAndFreezeProtection
         ));
+    }
+
+    #[test]
+    fn high_risk_building_can_add_water_age_and_stagnation_assessment() {
+        let mut profile = profile(AquaArchitecture::DirectFlowPassive);
+        profile
+            .additional_required_domains
+            .push(SiteCapabilityDomain::WaterAgeAndStagnationManagement);
+        profile.method_bindings.push(SiteFitMethodBinding {
+            domain: SiteCapabilityDomain::WaterAgeAndStagnationManagement,
+            method_sha256: digest('1'),
+            method_conditions_sha256: digest('2'),
+        });
+        let assessments = assessments(&profile, SiteCapabilityOutcome::Satisfied);
+        let result = evaluate_site_fit(&profile, &assessments).expect("high-risk site evidence");
+        assert_eq!(result.disposition, SiteFitDisposition::Eligible);
+        assert!(result.satisfied_domains.contains(
+            &SiteCapabilityDomain::WaterAgeAndStagnationManagement
+        ));
+        assert_eq!(
+            SiteCapabilityDomain::WaterAgeAndStagnationManagement.expected_authority(),
+            SiteCapabilityAuthority::IndependentHygieneExposureAssessor
+        );
+    }
+
+    #[test]
+    fn missing_high_risk_water_age_evidence_blocks_eligibility() {
+        let mut profile = profile(AquaArchitecture::DirectFlowPassive);
+        profile
+            .additional_required_domains
+            .push(SiteCapabilityDomain::WaterAgeAndStagnationManagement);
+        profile.method_bindings.push(SiteFitMethodBinding {
+            domain: SiteCapabilityDomain::WaterAgeAndStagnationManagement,
+            method_sha256: digest('1'),
+            method_conditions_sha256: digest('2'),
+        });
+        let mut assessments = assessments(&profile, SiteCapabilityOutcome::Satisfied);
+        assessments.retain(|assessment| {
+            assessment.domain != SiteCapabilityDomain::WaterAgeAndStagnationManagement
+        });
+        let result = evaluate_site_fit(&profile, &assessments).expect("missing high-risk evidence");
+        assert_eq!(result.disposition, SiteFitDisposition::Indeterminate);
+        assert!(result.indeterminate_issues.iter().any(|issue| {
+            issue.domain == SiteCapabilityDomain::WaterAgeAndStagnationManagement
+                && issue.kind == SiteFitIssueKind::MissingAssessment
+        }));
     }
 
     #[test]
