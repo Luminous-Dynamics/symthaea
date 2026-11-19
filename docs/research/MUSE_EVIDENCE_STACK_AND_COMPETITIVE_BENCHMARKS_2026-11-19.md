@@ -102,7 +102,50 @@ Required local benchmark fields:
 
 Paper: https://arxiv.org/abs/2610.36715
 
-### 2.3 General music-generation and evaluation research
+### 2.3 YuE2: direct symbolic score-editing baseline
+
+YuE2 is not just a full-song generation comparator. Its public technical report includes a controlled score-editing evaluation based on the first generated score for each of 192 WildSongBench prompts, two seeds per applicable condition, and 3,844 full-song recordings including unedited controls. It reports these automatic edit-adherence point estimates:
+
+| Edit | Metric | Reported score |
+|---|---|---:|
+| Melody | Target-pitch accuracy | 84.17 / 100 |
+| Harmony | Target-chord agreement | 79.54 / 100 |
+| Rhythm | Relative onset accuracy | 73.43 / 100 |
+| Key | Weighted key score | 90.58 / 100 |
+| Tempo | Acc2 | 95.68 / 100 |
+
+These are useful direct baselines for *target adherence*, not a unified measure of quality or preservation. The report also provides SongBench quality, phoneme error rate and character error rate for edited and unedited outputs. It explicitly notes that each edit regenerates the whole recording: score-level preservation does not imply unchanged waveform, voice, or timbre. The published table reports point estimates and does not claim statistical significance or human preference.
+
+This changes the comparison plan: Muse/Melothaea should not claim to be the first score editor or rely on the existence of a symbolic plan as differentiation. It should target stronger operation-specific adherence **and** exact protected-score preservation, then independently qualify audio preservation.
+
+Candidate matched-task targets, pending pilot and power calibration:
+- Melody target-pitch accuracy: at least 90 / 100.
+- Harmony target-chord agreement: at least 85 / 100.
+- Rhythm relative-onset accuracy: at least 85 / 100.
+- Key weighted score: at least 95 / 100.
+- Tempo Acc2: at least 98 / 100.
+- Protected symbolic content: 100% exact preservation for the explicitly protected scope.
+- Unauthorized symbolic mutations: zero.
+
+These targets apply only if we reproduce the same task definitions, source set, sampling/seed budgets, rendering protocol and metric implementation. They are not comparable to a single candidate result if YuE2 uses different sampling, seed averaging, or selection. The public WildSongBench model leaderboard separately uses different candidate-selection budgets, including best-of-8; always disclose that distinction.
+
+Sources:
+- YuE2 paper: https://arxiv.org/abs/2609.33757
+- YuE2 public score-editing benchmark protocol/results: https://github.com/MaxPlaksin/YuE_Music/blob/main/docs/benchmarks.md
+- WildSongBench results and candidate budgets: https://map-yue2.github.io/
+
+### 2.4 Suno Studio: production-workflow comparator
+
+Suno Studio 2.0 is a product/workflow comparator, not a like-for-like score-preservation benchmark. Its August 2026 release describes a production environment with automation, effects, MIDI, an integrated synth, user-designed plugins, and a conversational interface for generating clips and arranging songs. Subsequent release notes describe improved MIDI-to-audio transcription, creating audio stems from MIDI via the chat interface, improved downbeat detection, clip time-stretching, and editable fade curves.
+
+Muse should not claim parity with a full DAW or production environment until it has equivalent editing, arrangement, MIDI, stems and automation workflows. The defensible differentiator is a stronger semantic transaction layer: source-authored score identities, localized edit scope, protected invariant checks, independent orchestration/render capability evidence, reproducible receipts and reversible candidates.
+
+Sources:
+- Suno Studio 2.0 announcement: https://help.suno.com/en/articles/13670529
+- MIDI and Studio release notes (September 17, 2026): https://suno.com/release-notes
+- Timing, clip-stretch and fade-curve update (October 8, 2026): https://suno.com/release-notes/studio-updates-oct26
+
+### 2.5 General music-generation and evaluation research
 
 The 2026 survey on recent music generation methods and evaluation identifies persistent difficulties in musicality, consistency, controllability, representation, and evaluation. It finds no single sufficient metric and recommends combining distinct objective methods with human listening and task-based evaluations. This supports a multi-scoreboard programme rather than optimizing one embedding score.
 
