@@ -592,6 +592,7 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
             "state_id": state.id,
             "prior_probability": state.prior
         })).collect::<Vec<_>>(),
+        "outcome_labels": instance.outcome_labels,
         "decisions": instance.decisions.iter().map(|decision| json!({
             "decision_id": decision.id,
             "losses_by_model": decision.losses
