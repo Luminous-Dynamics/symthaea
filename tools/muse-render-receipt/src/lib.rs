@@ -1214,6 +1214,20 @@ mod tests {
         assert!(report.wav_integrity_verified);
         assert!(!report.acceptance_eligible);
 
+        // Re-seal a receipt around an invocation file whose hash is correct
+        // but whose claimed MIDI input differs. The semantic join must fail.
+        let mut altered_invocation: Value = serde_json::from_slice(&invocation).unwrap();
+        altered_invocation["input_midi_sha256"] = Value::String(d('a'));
+        let altered_invocation_bytes = serde_json::to_vec(&altered_invocation).unwrap();
+        std::fs::write(root.join("render-invocation.json"), &altered_invocation_bytes).unwrap();
+        let mut altered_receipt_value = serde_json::to_value(&parsed).unwrap();
+        altered_receipt_value["execution"]["invocation_sha256"] =
+            Value::String(sha256_hex(&altered_invocation_bytes));
+        let altered_receipt_bytes = serde_json::to_vec(&seal(altered_receipt_value)).unwrap();
+        let altered_receipt = verify_receipt_bytes(&altered_receipt_bytes).unwrap();
+        assert!(verify_bundle(&root, &altered_receipt).unwrap_err().contains("render invocation fields"));
+
+        std::fs::write(root.join("render-invocation.json"), &invocation).unwrap();
         let mut corrupted = midi_bytes;
         let index = corrupted.iter().rposition(|x| *x == 60).unwrap();
         corrupted[index] = 61;
