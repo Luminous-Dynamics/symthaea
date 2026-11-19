@@ -61,3 +61,24 @@ The report contains descriptive orthogonal coefficients and seed dispersion. It
 does not produce p-values, confidence intervals, musical-quality judgments,
 listener preference, or a causal claim beyond the registered deterministic
 intervention design.
+
+
+
+## Identity-only metrics
+
+Metric names beginning with `identity_` are coverage-audited but are not sent
+through the scalar contrast estimator. They must still have complete 81/81
+observed rows to receive a complete coverage disposition. They produce no rows
+in `effects.csv` or `summary.csv`. Use this mode for exact fingerprints,
+category identifiers, or other values whose numeric encoding is not a
+meaningful interval scale. The coverage report records `analysis_mode=identity_only`;
+ordinary scalar channels use `effect_estimated`.
+
+Examples from the composer adapter are:
+- `identity_score_meter_beats`
+- `identity_score_key_tonic_pc`
+- `identity_exact_fingerprint_high32`
+- `identity_exact_fingerprint_low32`
+
+Tonality is represented by three ordinary 0/1 indicator metrics (major, minor,
+modal), not by taking an artificial average over category codes.
