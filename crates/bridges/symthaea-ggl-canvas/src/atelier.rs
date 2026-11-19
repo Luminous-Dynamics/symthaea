@@ -18,7 +18,7 @@ use symthaea_canvas::{CognitiveSnapshot, SnapshotLimits};
 use crate::{digest_json, safe_group_id, validate_namespace, AdapterError, AdapterResult};
 
 const MAX_VIEWPORT_DIMENSION: f32 = 8_192.0;
-const MAX_GENERATOR_ELEMENTS: usize = 10_000;
+const MAX_GENERATOR_ELEMENTS: usize = 5_000;
 const MAX_SCENE_NODES: usize = 10_000;
 const MAX_SCENE_DEPTH: usize = 128;
 const MAX_POLYGON_POINTS: usize = 256;
@@ -61,6 +61,7 @@ pub struct AtelierProductionReceipt {
     pub height: f32,
     pub max_elements: usize,
     pub max_scene_nodes: usize,
+    pub registered_max_output_nodes: usize,
     pub generated_scene_nodes: usize,
     pub request_digest: String,
     pub scene_digest: String,
@@ -219,6 +220,27 @@ fn validate_scene(node: &SceneNode, depth: usize, visited: &mut usize) -> Adapte
     Ok(())
 }
 
+/// Conservative full-output node ceiling for each registered single-family generator.
+/// Bounds include the Atelier root and the GGL identity wrapper.
+fn registered_max_output_nodes(style: AtelierStyle) -> Option<usize> {
+    match style {
+        AtelierStyle::LSystem => Some(3),
+        AtelierStyle::ParametricCurve => Some(11),
+        AtelierStyle::PersistenceTexture => Some(130),
+        AtelierStyle::ColorField => Some(15),
+        // Fixed 64x64 simulation sampled on a two-cell grid: at most 1024 dots.
+        AtelierStyle::ReactionDiffusion => Some(1_027),
+        // The integer subsampling step has a maximum output just below 6000 points.
+        AtelierStyle::StrangeAttractor => Some(6_002),
+        // q<=13, three phases, 1590 total eigenvalues, plus root/background/wrapper.
+        AtelierStyle::HofstadterButterfly => Some(1_593),
+        // Snapshot limits: 64 pairs per homology family and 64 Betti classes each.
+        AtelierStyle::PersistenceDiagram => Some(263),
+        // Composite has no separately qualified aggregate compute/output budget.
+        AtelierStyle::Composite => None,
+    }
+}
+
 /// Generate one allowlisted Atelier production with explicit seed and bounds.
 ///
 /// This calls Atelier's public generator directly. It does not compute or use
@@ -262,22 +284,17 @@ pub fn generate_atelier_production(
         )));
     }
 
-    // Composite invokes multiple generators. Keep it out of the registry until
-    // its aggregate compute budget has a separately qualified bound.
-    match request.style {
-        AtelierStyle::LSystem
-        | AtelierStyle::ParametricCurve
-        | AtelierStyle::PersistenceTexture
-        | AtelierStyle::ColorField
-        | AtelierStyle::ReactionDiffusion
-        | AtelierStyle::StrangeAttractor
-        | AtelierStyle::HofstadterButterfly
-        | AtelierStyle::PersistenceDiagram => {}
-        AtelierStyle::Composite => {
-            return Err(AdapterError(
+    let registered_max_output_nodes = registered_max_output_nodes(request.style)
+        .ok_or_else(|| {
+            AdapterError(
                 "Atelier Composite is not registered: use explicit bounded productions".into(),
-            ));
-        }
+            )
+        })?;
+    if request.max_scene_nodes < registered_max_output_nodes {
+        return Err(AdapterError(format!(
+            "max_scene_nodes {} is below the registered worst-case bound {} for {:?}",
+            request.max_scene_nodes, registered_max_output_nodes, request.style
+        )));
     }
 
     // Do not silently accept a snapshot that Canvas would need to clamp or
@@ -323,6 +340,7 @@ pub fn generate_atelier_production(
         height: request.height,
         max_elements: request.max_elements,
         max_scene_nodes: request.max_scene_nodes,
+        registered_max_output_nodes,
         generated_scene_nodes: visited,
         request_digest: digest_json(request)?,
         scene_digest: digest_json(&scene)?,
