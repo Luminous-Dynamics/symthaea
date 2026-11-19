@@ -45,7 +45,7 @@ Each architecture has a fixed mandatory domain set. An exact product configurati
 | Same-session recirculation | Dynamic supply, per-inlet supply capacity, water temperature, chemistry/scale, electrical supply/protection, continuous power, drain/waste, installation space/routing, service/maintenance, wet-path hygiene/cleaning, backflow/cross-connection protection | Reservoir, filter, pump, cleaning, retained water and same-session water-quality method are separate eligibility domains |
 | Same-session recirculation + indirect DWHR | Recirculation baseline plus thermal receiver/heat-sink compatibility | Both recirculation-specific and DWHR-specific requirements must pass independently |
 
-A product-specific requirement such as network connectivity may be added when the exact product configuration requires it. Connectivity is not imposed on every architecture by default. The same principle applies to softeners, pumps, dedicated electrical circuits, special ventilation and other installation dependencies.
+A product-specific requirement such as network connectivity may be added when the exact product configuration requires it. Connectivity is not imposed on every architecture by default. The same principle applies to softeners, pumps, dedicated electrical circuits, ambient/freeze protection, special ventilation and other installation dependencies. For example, an exact Orbital configuration can add the optional OperatingEnvironmentAndFreezeProtection domain to encode its 15–35°C operating ambient and minimum 4°C idle requirement; this is not a blanket requirement for every recirculation design.
 
 ## 4. Site capability domains and authorities
 
@@ -57,7 +57,7 @@ The module assigns expected owners. This is an evidence-routing contract, not a 
 | Water-temperature envelope and thermal receiver compatibility | Symtropy thermal authority |
 | Water chemistry and scale | Mycelix Water Quality |
 | Electrical supply/protection and continuous-power availability | Competent independent electrical assessor |
-| Drain/waste geometry and installation space/routing | Competent installation surveyor |
+| Drain/waste geometry, installation space/routing, and operating ambient/freeze protection | Competent installation surveyor |
 | Backflow and cross-connection protection | Competent plumbing assessor |
 | Service and maintenance capacity | Independent serviceability assessor |
 | Wet-path hygiene and cleaning | Independent hygiene/exposure assessor under #12703 |
@@ -147,7 +147,7 @@ No site fit or service qualification is a substitute for competent local plumbin
 
 ## 9. Software implementation status
 
-The Rust module defines five architecture classes, thirteen capability domains, expected-authority mapping, mandatory baseline requirements, product-specific additive requirements, site/device/requirement/method digest binding, currentness handling, and Eligible / Ineligible / Indeterminate dispositions.
+The Rust module defines five architecture classes, fourteen capability domains, expected-authority mapping, mandatory baseline requirements, product-specific additive requirements (including ambient/freeze protection and connectivity where required), site/device/requirement/method digest binding, currentness handling, and Eligible / Ineligible / Indeterminate dispositions.
 
 It currently contains **43 authored unit tests** covering architecture-specific sets, missing/duplicate/unexpected evidence, stale/revoked/ambiguous evidence, wrong site/revision/architecture/device/requirements/method/authority, explicit failure vs uncertainty, additional product-specific connectivity, and site-to-site variation.
 
