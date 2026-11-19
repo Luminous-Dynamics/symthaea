@@ -35,7 +35,7 @@ The output manifest binds the source/program/geometry/scene digests to the gener
 - Maximum polygon vertices: 256.
 - Maximum semantic ID: 256 UTF-8 bytes.
 - Units: absent/null or a non-empty string of at most 64 bytes. Unit labels are retained; there is no implicit unit-to-pixel conversion.
-- Coordinates must be finite and representable by Canvas `f32`.
+- Coordinates and generated arc path endpoints must be finite and representable by Canvas `f32`.
 - Zero-length segments, non-positive radii, zero/over-one-revolution arcs, duplicate IDs, unknown primitives, malformed digests and unsafe namespaces are rejected.
 - Arc start angles are reduced modulo one revolution before trigonometric evaluation.
 - Styles are intentionally not translated in this first geometry adapter; creative profiles remain an independent layer.
