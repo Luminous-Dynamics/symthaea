@@ -883,6 +883,38 @@ struct OffKey { track: usize, channel: u8, pitch: u8, tick: u64 }
 struct ProgramKey { track: usize, channel: u8, program: u8, tick: u64 }
 fn inc<K: Ord>(m: &mut BTreeMap<K, usize>, k: K) { *m.entry(k).or_insert(0) += 1; }
 
+fn verify_instrument_channel_assignments(
+    tracks: &[MidiPerformanceTrackReceiptV1],
+) -> Result<(), String> {
+    let mut channel_by_instrument = BTreeMap::<&str, u8>::new();
+    let mut instrument_by_channel = BTreeMap::<u8, &str>::new();
+    for track in tracks {
+        if let Some(previous) = channel_by_instrument.insert(
+            track.instrument_id.as_str(),
+            track.midi_channel,
+        ) {
+            if previous != track.midi_channel {
+                return Err(format!(
+                    "instrument {} is split across MIDI channels {} and {}",
+                    track.instrument_id, previous, track.midi_channel
+                ));
+            }
+        }
+        if let Some(previous) = instrument_by_channel.insert(
+            track.midi_channel,
+            track.instrument_id.as_str(),
+        ) {
+            if previous != track.instrument_id {
+                return Err(format!(
+                    "MIDI channel {} is shared by instrument instances {} and {}",
+                    track.midi_channel, previous, track.instrument_id
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn verify_midi_event_manifest(m: &MidiPerformanceManifestV1, bytes: &[u8]) -> Result<(), String> {
     let smf = Smf::parse(bytes).map_err(|e| format!("MIDI parse failed: {e}"))?;
     if smf.header.format != Format::Parallel { return Err("MIDI must use Type 1 parallel format".into()); }
@@ -891,6 +923,7 @@ pub fn verify_midi_event_manifest(m: &MidiPerformanceManifestV1, bytes: &[u8]) -
         _ => return Err("MIDI ticks-per-quarter mismatch".into()),
     }
     if smf.tracks.len() != m.tracks.len() + 1 { return Err("MIDI track count mismatch".into()); }
+    verify_instrument_channel_assignments(&m.tracks)?;
 
     let mut track_map = BTreeMap::new();
     let mut expected_names = BTreeMap::new();
@@ -1609,6 +1642,34 @@ mod tests {
             }],
         }
     }
+    #[test]
+    fn instrument_instances_must_have_distinct_stable_channels() {
+        let mut tracks = manifest().tracks;
+        let mut second = tracks[0].clone();
+        second.track_index = 2;
+        second.segment_id = "seg-b".into();
+        second.track_name = "Part 2 seg-b inst-b".into();
+        second.part_id = 2;
+        second.instrument_id = "inst-b".into();
+        assert!(verify_instrument_channel_assignments(&[tracks[0].clone(), second.clone()])
+            .unwrap_err().contains("shared by instrument instances"));
+
+        second.instrument_id = tracks[0].instrument_id.clone();
+        second.midi_channel = 1;
+        assert!(verify_instrument_channel_assignments(&[tracks[0].clone(), second])
+            .unwrap_err().contains("split across MIDI channels"));
+
+        // Repeated timeline segments for one instrument instance retain one channel.
+        assert!(verify_instrument_channel_assignments(&[tracks[0].clone(), {
+            let mut repeated = tracks[0].clone();
+            repeated.track_index = 2;
+            repeated.segment_id = "seg-b".into();
+            repeated.track_name = "Part 1 seg-b inst-a".into();
+            repeated
+        }]).is_ok());
+        tracks.clear();
+    }
+
     #[test]
     fn midi_event_manifest_matches_real_smf_bytes() {
         verify_midi_event_manifest(&manifest(), &simple_midi()).unwrap();
