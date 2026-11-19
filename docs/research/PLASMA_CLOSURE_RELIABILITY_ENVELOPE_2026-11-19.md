@@ -174,3 +174,28 @@ For every admitted run, pin the source record/version, file digests, code commit
 | Physical or experimental validation | Not performed |
 
 This is a specification increment. It does not claim that a Symthaea closure exists, beats SOTA, or has been validated on experimental plasma.
+
+## 11. Active multi-fidelity reference acquisition
+
+Once the paper-faithful reproduction is established, use active simulation selection to reduce the cost of mapping the four envelopes. Do not spend equal kinetic-solver effort on every parameter point if the goal is to identify where the closure becomes inaccurate, inadmissible or overconfident.
+
+Reuse the existing Symthaea active multi-fidelity experiment-design programme [#7685](https://github.com/Luminous-Dynamics/symthaea/issues/7685); do not create a duplicate optimizer here. The proposed acquisition score should estimate the expected reduction in uncertainty about the *envelope boundary* per unit kinetic-solver cost. Inputs may include disagreement between independently trained closures, disagreement between fluid and kinetic trajectories, physical-constraint residuals, distance from training support, and consequence-weighted regions. Disagreement is a reason to request a higher-fidelity reference, not something to average away.
+
+Matched acquisition baselines:
+- uniform amplitude / parameter sweeps;
+- Latin-hypercube or other fixed space-filling samples;
+- adaptive mesh refinement on observed trajectory error;
+- maximum predictive uncertainty;
+- ensemble disagreement only;
+- cost-aware expected information gain / value of information.
+
+Keep a final, sealed kinetic-reference cohort outside acquisition and threshold tuning. Report:
+- number and total cost of kinetic solver calls to reach a fixed envelope-boundary uncertainty;
+- envelope-boundary estimation error and coverage on the sealed cohort;
+- false-safe rate and selective risk after acquisition;
+- sample efficiency by physical regime and extrapolation direction;
+- sensitivity to acquisition seed, candidate pool and solver cost model.
+
+An aspirational target inherited from #7685 is at least 25% fewer expensive reference-solver calls than the registered fixed-sweep baseline while preserving or improving accuracy, admissibility and false-safe coverage on the sealed cohort. This is a research target, not a result or guarantee. Do not optimize solver-call count at the expense of missing a narrow instability region.
+
+This converts the benchmark from "which closure scores highest on a fixed dataset?" to "which measurements and simulations are worth paying for to establish where each closure can be trusted?"
