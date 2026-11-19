@@ -1,4 +1,5 @@
-use serde_json::Value;
+use marine_sail_liveaboard_audit::{audit_case, compare_pair};
+use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
@@ -193,7 +194,7 @@ fn validate(corpus: &Value) -> Result<Value, Vec<String>> {
                         if string_at(mutation, "from_path").is_none_or(|from| !valid_pointer(from)) {
                             errors.push(format!("scenario[{index}] mutation[{mutation_index}] copy needs a valid from_path"));
                         }
-                    } else if op != "remove" && !mutation.get("value").is_some() {
+                    } else if op != "remove" && mutation.get("value").is_none() {
                         errors.push(format!("scenario[{index}] mutation[{mutation_index}] needs a value"));
                     }
                 }
@@ -244,6 +245,201 @@ fn validate(corpus: &Value) -> Result<Value, Vec<String>> {
     }
 }
 
+
+fn decode_pointer(pointer: &str) -> Result<Vec<String>, String> {
+    if !valid_pointer(pointer) {
+        return Err(format!("invalid JSON Pointer: {pointer}"));
+    }
+    Ok(pointer
+        .split('/')
+        .skip(1)
+        .map(|segment| segment.replace("~1", "/").replace("~0", "~"))
+        .collect())
+}
+
+fn descend_mut<'a>(root: &'a mut Value, segments: &[String]) -> Result<&'a mut Value, String> {
+    let mut current = root;
+    for segment in segments {
+        current = match current {
+            Value::Object(map) => map
+                .get_mut(segment)
+                .ok_or_else(|| format!("JSON Pointer segment not found: {segment}"))?,
+            Value::Array(items) => {
+                let index = segment.parse::<usize>()
+                    .map_err(|_| format!("array pointer is not an index: {segment}"))?;
+                items.get_mut(index)
+                    .ok_or_else(|| format!("array pointer index out of range: {index}"))?
+            }
+            _ => return Err(format!("cannot descend through scalar at {segment}")),
+        };
+    }
+    Ok(current)
+}
+
+fn set_pointer(root: &mut Value, pointer: &str, value: Value) -> Result<(), String> {
+    let segments = decode_pointer(pointer)?;
+    let (leaf, parents) = segments.split_last()
+        .ok_or_else(|| "root replacement is not allowed in this corpus".to_owned())?;
+    let parent = descend_mut(root, parents)?;
+    match parent {
+        Value::Object(map) => {
+            map.insert(leaf.clone(), value);
+            Ok(())
+        }
+        Value::Array(items) => {
+            let index = leaf.parse::<usize>()
+                .map_err(|_| format!("array pointer is not an index: {leaf}"))?;
+            let slot = items.get_mut(index)
+                .ok_or_else(|| format!("array pointer index out of range: {index}"))?;
+            *slot = value;
+            Ok(())
+        }
+        _ => Err(format!("cannot set child of scalar at {pointer}")),
+    }
+}
+
+fn remove_pointer(root: &mut Value, pointer: &str) -> Result<(), String> {
+    let segments = decode_pointer(pointer)?;
+    let (leaf, parents) = segments.split_last()
+        .ok_or_else(|| "root removal is not allowed in this corpus".to_owned())?;
+    let parent = descend_mut(root, parents)?;
+    match parent {
+        Value::Object(map) => map
+            .remove(leaf)
+            .map(|_| ())
+            .ok_or_else(|| format!("object key not found: {leaf}")),
+        Value::Array(items) => {
+            let index = leaf.parse::<usize>()
+                .map_err(|_| format!("array pointer is not an index: {leaf}"))?;
+            if index >= items.len() {
+                return Err(format!("array pointer index out of range: {index}"));
+            }
+            items.remove(index);
+            Ok(())
+        }
+        _ => Err(format!("cannot remove child of scalar at {pointer}")),
+    }
+}
+
+fn apply_mutation(target: &mut Value, mutation: &Value) -> Result<(), String> {
+    let operation = string_at(mutation, "operation").unwrap_or("");
+    let path = string_at(mutation, "path").unwrap_or("");
+    match operation {
+        "set" => set_pointer(
+            target,
+            path,
+            mutation.get("value").cloned()
+                .ok_or_else(|| format!("set mutation has no value at {path}"))?,
+        ),
+        "remove" => remove_pointer(target, path),
+        "append" => {
+            let value = mutation.get("value").cloned()
+                .ok_or_else(|| format!("append mutation has no value at {path}"))?;
+            let segments = decode_pointer(path)?;
+            match descend_mut(target, &segments)? {
+                Value::Array(items) => {
+                    items.push(value);
+                    Ok(())
+                }
+                _ => Err(format!("append target is not an array: {path}")),
+            }
+        }
+        "copy" => {
+            let from_path = string_at(mutation, "from_path")
+                .ok_or_else(|| format!("copy mutation has no from_path at {path}"))?;
+            let value = target.pointer(from_path).cloned()
+                .ok_or_else(|| format!("copy source not found: {from_path}"))?;
+            set_pointer(target, path, value)
+        }
+        _ => Err(format!("unknown mutation operation: {operation}")),
+    }
+}
+
+fn execute_corpus(corpus: &Value, source_fixture: &Value) -> Result<Vec<Value>, Vec<String>> {
+    let mut errors = Vec::new();
+    let mut results = Vec::new();
+    let cases = corpus.get("scenario_cases").and_then(Value::as_array)
+        .ok_or_else(|| vec!["scenario_cases is not an array".to_owned()])?;
+
+    for scenario in cases {
+        let id = string_at(scenario, "scenario_id").unwrap_or("<missing>").to_owned();
+        let command = string_at(scenario, "command").unwrap_or("");
+        let mutations = scenario.get("mutations").and_then(Value::as_array)
+            .ok_or_else(|| vec![format!("{id}: mutations is not an array")])?;
+        let mut case = source_fixture.clone();
+        let mut candidate = source_fixture.clone();
+        let target = if command == "audit_case" { &mut case } else { &mut candidate };
+
+        for mutation in mutations {
+            if let Err(error) = apply_mutation(target, mutation) {
+                errors.push(format!("{id}: {error}"));
+            }
+        }
+        if errors.iter().any(|error| error.starts_with(&format!("{id}:"))) {
+            continue;
+        }
+
+        let expected = string_at(scenario, "expected_disposition").unwrap_or("");
+        let (actual, actual_findings, actual_mismatches) = match command {
+            "audit_case" => {
+                let report = audit_case(&case).to_value();
+                let codes = report.get("findings").and_then(Value::as_array)
+                    .into_iter().flatten()
+                    .filter_map(|finding| finding.get("code").and_then(Value::as_str))
+                    .map(str::to_owned).collect::<Vec<_>>();
+                (
+                    string_at(&report, "disposition").unwrap_or("").to_owned(),
+                    codes,
+                    Value::Null
+                )
+            }
+            "compare_pair" => {
+                let report = compare_pair(source_fixture, &candidate);
+                (
+                    string_at(&report, "disposition").unwrap_or("").to_owned(),
+                    Vec::new(),
+                    report.get("mismatched_fields").cloned().unwrap_or(Value::Null)
+                )
+            }
+            _ => {
+                errors.push(format!("{id}: unsupported command {command}"));
+                continue;
+            }
+        };
+
+        let mut case_passed = actual == expected;
+        let mut missing_codes = Vec::new();
+        if let Some(required) = scenario.get("expected_finding_codes").and_then(Value::as_array) {
+            for code in required.iter().filter_map(Value::as_str) {
+                if !actual_findings.iter().any(|actual_code| actual_code == code) {
+                    case_passed = false;
+                    missing_codes.push(code.to_owned());
+                }
+            }
+        }
+        let mut mismatched_fields_pass = true;
+        if let Some(expected_fields) = scenario.get("expected_mismatched_fields") {
+            mismatched_fields_pass = actual_mismatches == *expected_fields;
+            case_passed &= mismatched_fields_pass;
+        }
+        if !case_passed {
+            errors.push(format!(
+                "{id}: expected disposition {expected}, got {actual}; missing codes={missing_codes:?}; mismatch fields matched={mismatched_fields_pass}"
+            ));
+        }
+
+        results.push(json!({
+            "scenario_id": id,
+            "expected_disposition": expected,
+            "actual_disposition": actual,
+            "missing_expected_finding_codes": missing_codes,
+            "expected_mismatched_fields_matched": mismatched_fields_pass,
+            "passed": case_passed
+        }));
+    }
+    if errors.is_empty() { Ok(results) } else { Err(errors) }
+}
+
 fn run() -> Result<(), String> {
     let arguments: Vec<String> = env::args().collect();
     if arguments.len() != 2 {
@@ -253,15 +449,26 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("{}: {error}", arguments[1]))?;
     let corpus: Value = serde_json::from_str(&text)
         .map_err(|error| format!("{}: invalid JSON: {error}", arguments[1]))?;
-    match validate(&corpus) {
-        Ok(report) => println!("{}", serde_json::to_string_pretty(&report).unwrap()),
+    let mut report = match validate(&corpus) {
+        Ok(report) => report,
         Err(errors) => {
             for error in errors {
                 eprintln!("CORPUS_INVALID: {error}");
             }
             return Err("corpus validation failed".to_owned());
         }
-    }
+    };
+    let fixture_path = string_at(&corpus, "source_fixture")
+        .ok_or_else(|| "source_fixture is required".to_owned())?;
+    let fixture_text = fs::read_to_string(fixture_path)
+        .map_err(|error| format!("{fixture_path}: {error}"))?;
+    let fixture: Value = serde_json::from_str(&fixture_text)
+        .map_err(|error| format!("{fixture_path}: invalid JSON: {error}"))?;
+    let results = execute_corpus(&corpus, &fixture).map_err(|errors| errors.join("\\n"))?;
+    report["status"] = json!("CORPUS_EXECUTED");
+    report["executed_scenario_count"] = json!(results.len());
+    report["scenario_results"] = Value::Array(results);
+    println!("{}", serde_json::to_string_pretty(&report).map_err(|error| error.to_string())?);
     Ok(())
 }
 
@@ -291,6 +498,18 @@ mod tests {
         assert_eq!(report["status"], "DECLARATIVE_CORPUS_VALID");
         assert_eq!(report["scenario_count"], 16);
         assert_eq!(report["policy_arm_count"], 7);
+    }
+
+    #[test]
+    fn frozen_mutation_vectors_execute_against_real_audit_engine() {
+        let corpus = fixture();
+        let source_fixture: Value = serde_json::from_str(include_str!(
+            "../../../../docs/research/marine/fixtures/synthetic-sail-liveaboard-case-0001.json"
+        )).expect("base case must parse");
+        let results = execute_corpus(&corpus, &source_fixture)
+            .expect("all frozen mutation vectors should match the current audit engine");
+        assert_eq!(results.len(), 16);
+        assert!(results.iter().all(|result| result["passed"] == true));
     }
 
     #[test]
