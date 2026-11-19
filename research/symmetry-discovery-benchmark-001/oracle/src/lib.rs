@@ -269,6 +269,26 @@ fn multiply(left: Matrix2, right: Matrix2) -> Result<Matrix2, String> {
     Ok(product)
 }
 
+fn transpose(matrix: Matrix2) -> Matrix2 {
+    [
+        [matrix[0][0], matrix[1][0]],
+        [matrix[0][1], matrix[1][1]],
+    ]
+}
+
+/// Verify A^T G A = G using exact checked integer arithmetic.
+/// Unlike the Euclidean-only helper, this supports a non-orthogonal
+/// coordinate representation together with its congruently transformed metric.
+fn validate_metric_isometry(matrix: Matrix2, metric: Matrix2) -> Result<(), String> {
+    let pulled_back = multiply(multiply(transpose(matrix), metric)?, matrix)?;
+    if pulled_back != metric {
+        return Err(format!(
+            "metric-isometry defect: A^T G A = {pulled_back:?}, expected {metric:?}"
+        ));
+    }
+    Ok(())
+}
+
 fn validate_orthogonal_element(element: &Element) -> Result<(), String> {
     for first_column in 0..2 {
         for second_column in 0..2 {
@@ -1435,6 +1455,62 @@ mod tests {
                 .iter()
                 .any(|element| validate_orthogonal_element(element).is_err())
         );
+    }
+
+    #[test]
+    fn dense_conjugation_preserves_the_pulled_back_metric_exactly() {
+        let manifest = manifest();
+
+        // q = S y with det(S) = +1. The D4 matrices are no longer generally
+        // Euclidean-orthogonal in y, but remain isometries of G_y = S^T G_q S.
+        let basis = [[2_i128, 1], [1, 1]];
+        let inverse_basis = [[1_i128, -1], [-1, 2]];
+        let euclidean = [[1_i128, 0], [0, 1]];
+        let transformed_metric =
+            multiply(transpose(basis), multiply(euclidean, basis).unwrap()).unwrap();
+
+        assert_eq!(transformed_metric, [[5, 3], [3, 2]]);
+        let mut saw_non_euclidean_matrix = false;
+        let mut transformed_by_id = BTreeMap::new();
+
+        for element in &manifest.elements {
+            let conjugated = multiply(
+                multiply(inverse_basis, element.matrix).unwrap(),
+                basis,
+            )
+            .unwrap();
+            validate_metric_isometry(conjugated, transformed_metric)
+                .expect("conjugated action must preserve the pulled-back metric");
+            if validate_orthogonal_element(&Element {
+                id: element.id.clone(),
+                matrix: conjugated,
+            })
+            .is_err()
+            {
+                saw_non_euclidean_matrix = true;
+            }
+            transformed_by_id.insert(element.id.clone(), conjugated);
+        }
+
+        assert!(saw_non_euclidean_matrix);
+        for left in &manifest.elements {
+            for right in &manifest.elements {
+                let product = multiply(
+                    transformed_by_id[&left.id],
+                    transformed_by_id[&right.id],
+                )
+                .unwrap();
+                let expected_id =
+                    &manifest.multiplication[&(left.id.clone(), right.id.clone())];
+                assert_eq!(product, transformed_by_id[expected_id]);
+            }
+        }
+
+        // A deliberately stale identity metric must reject a transformed
+        // action that is only orthogonal under the correct congruent metric.
+        assert!(transformed_by_id.values().any(|matrix| {
+            validate_metric_isometry(*matrix, euclidean).is_err()
+        }));
     }
 
     #[test]
