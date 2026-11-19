@@ -99,6 +99,20 @@ The evidence owner must authenticate the issuer against its trusted principal re
 
 The claim profile carries one frozen method binding for every required domain. These are intentionally allowed to differ: Mycelix metrology, a spray-force / coverage test, thermal stability, hygiene sampling and resource closure do not share one method or one apparatus. The profile's overall protocol digest identifies the preregistered claim package; each receipt must match its own domain method and its method-specific conditions while also matching the shared trial conditions. Missing, duplicate, stale, revoked, ambiguous or out-of-scope evidence and method bindings are rejected.
 
+### Exact run, device and trial-context composition
+
+The crate's composed entry point `validate_qualified_matched_comparison` first validates the existing `AquaRunRecord` receipts and matched benchmark context, then evaluates the independent service decisions. It additionally requires:
+
+- the control qualification record's run ID to equal the control `AquaRunRecord.run_id`;
+- the candidate qualification record's run ID to equal the candidate `AquaRunRecord.run_id`;
+- each independent assessment receipt's own run ID to equal its enclosing qualification record's run ID;
+- each qualification record's canonical device-configuration digest to equal that run's canonical `DeviceConfiguration` digest;
+- the qualification profile's full trial-condition digest to equal the benchmark adapter's shared `conditions_bundle_sha256`.
+
+The device digest is supplied by the canonical product/run record and should cover market variant, hardware revision, installation, cleaning protocol and firmware. The condition-bundle digest should cover the full shared matched task and environment context, not device-specific identity. Control and candidate device digests may differ; the shared trial-condition digest may not.
+
+This composed function is the preferred entry point for comparative claims. The lower-level evidence-only helper remains available for isolated validation, but must not be mistaken for a full matched product comparison.
+
 ### Outcomes
 
 - **Pass:** the competent assessor says the domain met its preregistered acceptance rule.
@@ -273,9 +287,9 @@ Synthetic tests validate the evidence gate only. They cannot prove physical perf
 
 ## 10. Source-level implementation status
 
-The Rust module defines seven claim profiles, thirteen evidence domains, explicit authority mapping, per-domain method and method-condition bindings, shared matched-trial condition binding, three-state decisions and matched control/candidate qualification.
+The Rust module defines seven claim profiles, thirteen evidence domains, explicit authority mapping, per-domain method and method-condition bindings, canonical issuer/currentness receipts, unique evidence IDs, exact run/device/condition binding through the composed benchmark adapter, three-state decisions and matched control/candidate qualification.
 
-It currently contains **42 authored unit tests**. This is a source inventory, not an execution pass. No cargo test, rustfmt, Clippy or repository CI pass is claimed for this branch until actually observed on its exact head.
+It currently contains **43 authored unit tests** in the qualification module, plus **8 authored composition tests** in the matched-run adapter. These are source inventories only. This is a source inventory, not an execution pass. No cargo test, rustfmt, Clippy or repository CI pass is claimed for this branch until actually observed on its exact head.
 
 ## 11. Decision gate
 
