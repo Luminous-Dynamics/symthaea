@@ -1,0 +1,44 @@
+name: EV pack capability profile audit
+
+on:
+  pull_request:
+    paths:
+      - "docs/transport/EV_PACK_CAPABILITY_PROFILE_V0_1.md"
+      - "schemas/transport/ev_pack_capability_profile_v0_1.schema.json"
+      - "fixtures/ev_battery/pack_capability_profiles_v0_1.json"
+      - "tools/ev-pack-capability-audit/**"
+      - ".github/workflows/ev-pack-capability-profile-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/ev-pack-capability-audit/Cargo.toml -- --check
+
+      - name: Run validator and permutation tests
+        run: cargo test --manifest-path tools/ev-pack-capability-audit/Cargo.toml
+
+      - name: Audit frozen synthetic corpus
+        run: |
+          cargo run --manifest-path tools/ev-pack-capability-audit/Cargo.toml -- \
+            --schema schemas/transport/ev_pack_capability_profile_v0_1.schema.json \
+            --corpus fixtures/ev_battery/pack_capability_profiles_v0_1.json \
+            > "$RUNNER_TEMP/ev-pack-capability-report.json"
+          jq -e '
+            .case_count == 9 and
+            .accepted_count == 3 and
+            .rejected_count == 6 and
+            (.report_sha256 | test("^[a-f0-9]{64}$"))
+          ' "$RUNNER_TEMP/ev-pack-capability-report.json"
