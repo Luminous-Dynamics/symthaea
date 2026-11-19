@@ -299,3 +299,37 @@ The consolidation package now turns a governed procedure-promotion proposal into
 A separate `ConsolidationReceiptVerifierV1` interface must attest the exact canonical proposal digest before `verify_and_release_promoted_experiences` releases only the selected source-backed experiences to Session B. It rejects altered source revisions, changed output/policy identity, wrong authority scope, mismatched evidence-pack snapshots, and receipts not yet known at transfer time. The transfer must use the exact `known_at` snapshot bound by the proposal; a later snapshot requires a new evidence pack and promotion. Session C repeats the proposal/verification process over the surviving as-known evidence after retraction.
 
 The integration test uses a fixture verifier only. It is not a live Mycelix signature verifier, production authority service, durable memory write, or proof of physical privacy erasure. The existing raw-JSONL evaluator registry remains a separate test seam and still needs to consume this exact proposal/receipt schema.
+
+## Provider-shaped trace adapters (MACE v0.8 research)
+
+The ingress crate contains capture-envelope adapters for Anthropic Managed Agents
+persisted event history and OpenAI Agents SDK session items / RunItem-shaped
+records. They preserve user/assistant messages, tool intents, tool outputs,
+permissions, session status, handoffs and context-management events.
+
+Each imported line is wrapped in a versioned envelope with session ID,
+monotonic capture sequence and importer capture time. Anthropic native event
+IDs are retained for reconnect deduplication; OpenAI input IDs are retained
+where available, with capture sequence as the fallback identity. Changed
+payloads under an existing native ID and reordered new records fail closed.
+
+These are provider-shaped normalizers, not API clients or complete SDK parsers.
+An importer must obtain persisted history and construct the capture envelope.
+Anthropic stream-only event_start/event_delta previews are rejected because
+they are not persisted records. Provider processed_at values remain opaque
+metadata. For OpenAI session items without provider timestamps or stable IDs,
+the importer supplies capture time and sequence; these are never relabelled
+as underlying action occurrence time.
+
+Provider messages, tool intents, tool outputs, permissions, handoffs and
+session-idle events are trace evidence only. The normalized MACE projection
+contains event digests and metadata, not transcript/tool-output bodies. It
+uses event_type provider_trace_capture, which the causal ingester does not
+promote to a world observation or candidate Experience. Execution, outcome,
+source, calibration and consolidation receipts remain separate requirements.
+
+Nine provider-module tests cover classification, reconnect deduplication,
+changed-payload collisions, preview rejection, session separation,
+chronological order, unknown-event preservation and digest-only export. A raw
+MACE integration test asserts provider traces alone produce zero Experiences.
+These tests are authored, not runner-verified.

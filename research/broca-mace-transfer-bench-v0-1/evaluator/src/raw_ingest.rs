@@ -1149,4 +1149,61 @@ mod tests {
         assert_eq!(events[0].sequence, 1);
         assert_eq!(events[0].raw_line_sha256.len(), 64);
     }
+
+    #[test]
+    fn provider_trace_records_never_become_candidate_experiences() {
+        use broca_mace_ingress::providers::{normalize_capture_jsonl, Provider};
+
+        let capture = [
+            serde_json::json!({
+                "schema_version": 1,
+                "session_id": "anthropic-sample",
+                "sequence": 1,
+                "captured_at_ms": 100,
+                "event": {
+                    "id": "evt-tool",
+                    "type": "user.tool_result",
+                    "tool_use_id": "call-1",
+                    "content": "the tool reports success"
+                }
+            }).to_string(),
+            serde_json::json!({
+                "schema_version": 1,
+                "session_id": "anthropic-sample",
+                "sequence": 2,
+                "captured_at_ms": 110,
+                "event": {
+                    "id": "evt-idle",
+                    "type": "session.status_idle",
+                    "stop_reason": {"type": "end_turn"}
+                }
+            }).to_string(),
+        ].join("\n");
+
+        let batch = normalize_capture_jsonl(
+            Provider::AnthropicManagedAgents,
+            "anthropic-sample",
+            &capture
+        ).expect("provider capture normalizes");
+        let mace_jsonl = batch.to_mace_jsonl().expect("trace metadata exports");
+
+        let empty_actions = BTreeMap::new();
+        let empty_outcomes = BTreeMap::new();
+        let empty_sources = BTreeMap::new();
+        let empty_consolidations = BTreeMap::new();
+        let report = derive_as_known(
+            &mace_jsonl,
+            200,
+            200,
+            &empty_actions,
+            &empty_outcomes,
+            &empty_sources,
+            &empty_consolidations
+        ).expect("trace-only MACE records parse");
+
+        assert_eq!(report.raw_event_count, 2);
+        assert_eq!(report.visible_event_count, 2);
+        assert!(report.experiences.is_empty());
+    }
+
 }

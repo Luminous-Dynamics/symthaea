@@ -11,5 +11,6 @@ broca-mace-policy = { path = "../policy" }
 serde_json = "1.0"
 
 [dev-dependencies]
+broca-mace-ingress = { path = "../ingress" }
 serde_json = "1.0"
 sha2 = "0.10"

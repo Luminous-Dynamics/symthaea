@@ -239,3 +239,31 @@ SHA-256(
 `canonical_upstream_identity` should identify the upstream dataset/series or primary source lineage, not a particular publisher's copy, acquisition artifact or transformation. Multiple publishers reusing one BIS/IMF series therefore share one root; separately sourced series with the same legacy numeric ID remain distinct when their verified canonical roots differ. Release/revision identity, exact artifact digest, acquisition mode and transformation digest remain separate receipt fields.
 
 The digest is only a stable identity. Trust still requires independent verification of the lineage receipt's issuer, signature, source policy revision, scope, validity, revocation status and canonical payload binding. The all-zero digest is unknown and fails closed. The current MACE `EvidenceVerifier` implementations remain fixtures/mocks; no production Mycelix cryptographic verifier is claimed.
+
+
+## 9. Provider-native trace capture and evidence boundaries
+
+Provider/session trace means what the agent said, requested, called or received.
+It is distinct from execution authority, independently observed world outcomes,
+source provenance/calibration, and consolidation promotion.
+
+Anthropic Managed Agents persists event history with native event IDs and
+processed_at timestamps. Its event_start and event_delta are stream-only
+previews, not persisted history; reconnect should seed seen IDs from event
+history and skip overlapping live events. OpenAI Agents SDK session items and
+RunItem wrappers distinguish messages, tool calls, tool outputs and handoffs.
+The providers expose different identity and timestamp affordances; adapters
+preserve what is actually available and never invent action occurrence times.
+
+MACE provider adapters map both into untrusted trace classes. Tool-call outputs
+remain claims even when labelled as tool results. They are not world
+observations without independently verified execution and outcome receipts.
+The normalized provider-trace record carries native payload and capture-line
+digests while the original capture artifact remains separately controlled
+under the applicable privacy policy.
+
+This adds a provider-ingest path, not an outcome-verification path. It closes
+the trace-format interoperability gap without weakening the execution,
+outcome, source/calibration and consolidation receipt boundaries. These are
+version-specific research adapters and require golden capture fixtures and
+requalification when provider event schemas change.
