@@ -46,7 +46,7 @@ The verifier checks:
 - event-by-event candidate Score ↔ MIDI-note receipt comparison for source ordinal, PartId, pitch, exact onset/offset at 960 PPQ and the exporter's velocity quantization;
 - consistency of the score-edit input digest, operation IDs, protected-window IDs and independent verifier result;
 - consistency of the receipt with the PartId-aware MIDI manifest, including the repository's 960 ticks-per-quarter resolution;
-- exact timeline, instrument-binding and capability-manifest digests; one-to-one timeline-segment/track correspondence; and renderer/program/patch agreement;
+- exact timeline, instrument-binding and capability-manifest digests; one-to-one timeline-segment/track correspondence; renderer/program/patch agreement; typed instrument-kind validation; per-note sounding-range checks; and per-instrument polyphony sweeps against the declared capability budget;
 - MIDI track/part/program/note event correspondence by parsing the actual SMF bytes, not by trusting manifest summaries;
 - WAV parseability, declared sample format, frame count, finite samples, non-silence, and exact output-byte digest.
 
