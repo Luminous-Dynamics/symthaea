@@ -122,3 +122,20 @@ On the shared four-hypothesis deterministic fixture:
 - exact adaptive minimax decision tree: worst-case cost 2.
 
 The noise-aware crate now calls the deterministic planner's exact static oracle through its existing pinned path dependency. The shared D4 regression independently verifies the minimum static basis costs 3, replays the exact static certificate, and compares it with adaptive minimax worst-case cost 2. The four-model noise-aware greedy weighted set-cover receipts remain a separate non-optimal baseline; they are not mislabelled as the exact static optimum.
+
+
+## Static and adaptive design comparison
+
+The current source also includes a greedy cost-aware static diagnostic-basis selector for all four uncertainty models. It returns:
+- selected admissible probe IDs and summed cost;
+- unresolved candidate pairs under the entire admissible probe family;
+- canonical model binding and replayable receipt.
+
+This greedy set-cover baseline is deliberately **not labelled optimal**. The deterministic planner crate now contains an exhaustive exact static probe-set solver under an explicit subset budget; the noise PR compares static and adaptive policies on the same deterministic fixture, but it must use the same commit of the planner API to qualify that cross-crate result.
+
+The frozen D4 toy case has an adaptive worst-case cost of 2. The noise-aware static basis costs 3 on the same fixture. This is a small design example, not a general performance claim. The deterministic planner's richer context-lookahead fixture separately reports a 5-to-2 static/adaptive comparison; both must be independently reproduced from their checked-in prediction tables.
+
+
+## Current qualification status
+
+Earlier exact-head code checks passed with smaller test sets, but the expanded source now includes the exact static-set-cover comparison and the numeric identifiability additions. The latest source is not treated as qualified until the new PR merge commit passes format, the complete test suite and strict Clippy against the current deterministic-planner base. The broad repository CI remains a separate qualification track.
