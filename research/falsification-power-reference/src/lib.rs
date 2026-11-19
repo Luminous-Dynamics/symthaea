@@ -662,11 +662,13 @@ impl PredictableGaussianMixture {
                 .sum::<f64>();
             let last = normalized.last_mut().expect("non-empty mixture");
             last.weight = 1.0 - prefix_sum;
-            if !last.weight.is_finite() || last.weight <= 0.0 {
-                return Err(SequentialError::MixtureWeightsNotNormalizable);
-            }
         } else {
             normalized[0].weight = 1.0;
+        }
+        if normalized.iter().any(|alternative| {
+            !alternative.weight.is_finite() || alternative.weight <= 0.0
+        }) {
+            return Err(SequentialError::MixtureWeightsNotNormalizable);
         }
 
         let component_count = normalized.len();
@@ -773,7 +775,7 @@ impl PredictableGaussianMixture {
         }
 
         let mut next_components = Vec::with_capacity(self.alternatives.len());
-        for (index, alternative) in self.alternatives.iter().enumerate() {
+        for index in 0..self.alternatives.len() {
             let increment = gaussian_log_likelihood_ratio(
                 pending.expected_discrepancies[index],
                 observed_residual,
@@ -784,7 +786,6 @@ impl PredictableGaussianMixture {
                 return Err(SequentialError::NumericalOverflow);
             }
             next_components.push(next);
-            let _ = alternative;
         }
 
         let next_mixture_log_e = mixture_log_e_value(&self.alternatives, &next_components)?;
@@ -1028,6 +1029,26 @@ mod tests {
             .sum::<f64>()
             .ln();
         assert!((update.log_e_value - direct).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn fixed_mixture_rejects_weights_that_underflow_to_zero_when_normalized() {
+        assert_eq!(
+            PredictableGaussianMixture::new(
+                vec![
+                    MixtureAlternative {
+                        id: "tiny".to_owned(),
+                        weight: f64::MIN_POSITIVE,
+                    },
+                    MixtureAlternative {
+                        id: "large".to_owned(),
+                        weight: f64::MAX,
+                    },
+                ],
+                0.05,
+            ),
+            Err(SequentialError::MixtureWeightsNotNormalizable)
+        );
     }
 
     #[test]
