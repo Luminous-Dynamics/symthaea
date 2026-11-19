@@ -1,0 +1,879 @@
+{
+  "schema": "ggl-visual-qd-pilot-v0.1",
+  "status": "pilot_fixture_not_confirmatory_or_sealed",
+  "owner": "Symthaea CREATIVE-QD-001 (#7933)",
+  "created_utc_date": "2026-11-19",
+  "scope_note": "This file is a machine-readable brief/contract pilot only. It does not yet include SVG/PNG stimuli, reference target programs, licensed external artwork, or human annotations; those are separate preregistered corpus deliverables.",
+  "stimulus_status": "not_materialized",
+  "confirmatory_use_allowed": false,
+  "brief_count": 18,
+  "family_count": 6,
+  "families": [
+    {
+      "family_id": "geometric-ornamental",
+      "label": "Geometric and ornamental",
+      "soft": {
+        "symmetry": 4,
+        "rhythm": 4,
+        "density": 2,
+        "organic_variation": 1,
+        "negative_space": 3
+      }
+    },
+    {
+      "family_id": "icon-poster",
+      "label": "Icon and poster",
+      "soft": {
+        "symmetry": 2,
+        "rhythm": 2,
+        "density": 2,
+        "organic_variation": 1,
+        "negative_space": 3
+      }
+    },
+    {
+      "family_id": "editorial-illustration",
+      "label": "Editorial illustration",
+      "soft": {
+        "symmetry": 1,
+        "rhythm": 2,
+        "density": 3,
+        "organic_variation": 2,
+        "negative_space": 2
+      }
+    },
+    {
+      "family_id": "organic-branching",
+      "label": "Organic and branching",
+      "soft": {
+        "symmetry": 1,
+        "rhythm": 3,
+        "density": 3,
+        "organic_variation": 4,
+        "negative_space": 2
+      }
+    },
+    {
+      "family_id": "abstract-composition",
+      "label": "Abstract composition",
+      "soft": {
+        "symmetry": 2,
+        "rhythm": 3,
+        "density": 2,
+        "organic_variation": 3,
+        "negative_space": 3
+      }
+    },
+    {
+      "family_id": "ambiguous-adversarial",
+      "label": "Ambiguous and adversarial",
+      "soft": {
+        "symmetry": null,
+        "rhythm": null,
+        "density": null,
+        "organic_variation": null,
+        "negative_space": null
+      }
+    }
+  ],
+  "candidate_budget_per_system": 8,
+  "render_contract": {
+    "renderer_owner": "symthaea-canvas",
+    "perception_owner": "symthaea-art-eye",
+    "gallery_owner": "symthaea-gallery",
+    "canonical_canvas_px": [
+      1024,
+      1024
+    ]
+  },
+  "arms": [
+    "atelier_single_candidate",
+    "atelier_best_of_8_disclosed_selection_rule",
+    "vlm_only_generation_or_edit",
+    "vlm_to_ggl_typed_plan_to_canvas",
+    "ggl_conditioned_atelier_generation",
+    "creative_qd_archive_matched_budget",
+    "human_artist_workflow_reference"
+  ],
+  "briefs": [
+    {
+      "brief_id": "GGL-VQ-PILOT-001",
+      "family_id": "geometric-ornamental",
+      "family_label": "Geometric and ornamental",
+      "task_type": "generate",
+      "instruction": "Create a sixfold radial rosette with a quiet central medallion and a clear outer silhouette.",
+      "canvas": {
+        "width": 1024,
+        "height": 1024,
+        "aspect_ratio": 1
+      },
+      "hard_contract": {
+        "primitive_count_min": 18,
+        "primitive_count_max": 48,
+        "required_symmetry_order": 6,
+        "must_preserve": [],
+        "must_change": [],
+        "unsupported_features": "reject_or_preserve_opaque",
+        "deterministic_seed_required": true
+      },
+      "soft_intent_descriptors": {
+        "symmetry": 4,
+        "rhythm": 4,
+        "density": 2,
+        "organic_variation": 1,
+        "negative_space": 3
+      },
+      "rating_dimensions": [
+        "brief_adherence",
+        "structural_correctness",
+        "visual_coherence",
+        "novelty",
+        "controllability"
+      ],
+      "provenance_tier": "synthetic_pilot_brief_authored_for_protocol_testing",
+      "stimulus": {
+        "status": "not_materialized",
+        "required_for_execution": true,
+        "allowed_source": "synthetic_GGL_or_rights_cleared_artist_created"
+      }
+    },
+    {
+      "brief_id": "GGL-VQ-PILOT-002",
+      "family_id": "geometric-ornamental",
+      "family_label": "Geometric and ornamental",
+      "task_type": "edit",
+      "instruction": "Make the outer petals less regular while preserving the centre, sixfold anchor positions and canvas bounds.",
+      "canvas": {
+        "width": 1024,
+        "height": 1024,
+        "aspect_ratio": 1
+      },
+      "hard_contract": {
+        "primitive_count_min": 18,
+        "primitive_count_max": 64,
+        "required_symmetry_order": 6,
+        "must_preserve": [
+          "center.medallion",
+          "radial.anchor.*",
+          "canvas.bounds"
+        ],
+        "must_change": [
+          "outer.petals.curvature"
+        ],
+        "unsupported_features": "reject_or_preserve_opaque",
+        "deterministic_seed_required": true
+      },
+      "soft_intent_descriptors": {
+        "symmetry": 4,
+        "rhythm": 4,
+        "density": 2,
+        "organic_variation": 1,
+        "negative_space": 3
+      },
+      "rating_dimensions": [
+        "brief_adherence",
+        "structural_correctness",
+        "visual_coherence",
+        "novelty",
+        "controllability"
+      ],
+      "provenance_tier": "synthetic_pilot_brief_authored_for_protocol_testing",
+      "stimulus": {
+        "status": "not_materialized",
+        "required_for_execution": true,
+        "allowed_source": "synthetic_GGL_or_rights_cleared_artist_created"
+      }
+    },
+    {
+      "brief_id": "GGL-VQ-PILOT-003",
+      "family_id": "geometric-ornamental",
+      "family_label": "Geometric and ornamental",
+      "task_type": "inverse",
+      "instruction": "Recover candidate reusable construction rules for this synthetic nested-and-rotated rosette; report ambiguity instead of asserting the historical authoring process.",
+      "canvas": {
+        "width": 1024,
+        "height": 1024,
+        "aspect_ratio": 1
+      },
+      "hard_contract": {
+        "primitive_count_min": 18,
+        "primitive_count_max": 48,
+        "required_symmetry_order": 6,
+        "must_preserve": [],
+        "must_change": [],
+        "unsupported_features": "reject_or_preserve_opaque",
+        "deterministic_seed_required": true
+      },
+      "soft_intent_descriptors": {
+        "symmetry": 4,
+        "rhythm": 4,
+        "density": 2,
+        "organic_variation": 1,
+        "negative_space": 3
+      },
+      "rating_dimensions": [
+        "brief_adherence",
+        "structural_correctness",
+        "visual_coherence",
+        "novelty",
+        "controllability"
+      ],
+      "provenance_tier": "synthetic_pilot_brief_authored_for_protocol_testing",
+      "stimulus": {
+        "status": "not_materialized",
+        "required_for_execution": true,
+        "allowed_source": "synthetic_GGL_or_rights_cleared_artist_created"
+      }
+    },
+    {
+      "brief_id": "GGL-VQ-PILOT-004",
+      "family_id": "icon-poster",
+      "family_label": "Icon and poster",
+      "task_type": "generate",
+      "instruction": "Create a monochrome wayfinding icon for a public garden, readable at small size with a single dominant symbol.",
+      "canvas": {
+        "width": 1024,
+        "height": 1024,
+        "aspect_ratio": 1
+      },
+      "hard_contract": {
+        "primitive_count_min": 3,
+        "primitive_count_max": 20,
+        "required_symmetry_order": null,
+        "must_preserve": [],
+        "must_change": [],
+        "unsupported_features": "reject_or_preserve_opaque",
+        "deterministic_seed_required": true
+      },
+      "soft_intent_descriptors": {
+        "symmetry": 2,
+        "rhythm": 2,
+        "density": 2,
+        "organic_variation": 1,
+        "negative_space": 3
+      },
+      "rating_dimensions": [
+        "brief_adherence",
+        "structural_correctness",
+        "visual_coherence",
+        "novelty",
+        "controllability"
+      ],
+      "provenance_tier": "synthetic_pilot_brief_authored_for_protocol_testing",
+      "stimulus": {
+        "status": "not_materialized",
+        "required_for_execution": true,
+        "allowed_source": "synthetic_GGL_or_rights_cleared_artist_created"
+      }
+    },
+    {
+      "brief_id": "GGL-VQ-PILOT-005",
+      "family_id": "icon-poster",
+      "family_label": "Icon and poster",
+      "task_type": "edit",
+      "instruction": "Increase the symbol's stroke weight and preserve all labels, positions, and the original viewBox.",
+      "canvas": {
+        "width": 1024,
+        "height": 1024,
+        "aspect_ratio": 1
+      },
+      "hard_contract": {
+        "primitive_count_min": 3,
+        "primitive_count_max": 30,
+        "required_symmetry_order": null,
+        "must_preserve": [
+          "text.*",
+          "layout.*",
+          "viewBox"
+        ],
+        "must_change": [
+          "symbol.stroke_width"
+        ],
+        "unsupported_features": "reject_or_preserve_opaque",
+        "deterministic_seed_required": true
+      },
+      "soft_intent_descriptors": {
+        "symmetry": 2,
+        "rhythm": 2,
+        "density": 2,
+        "organic_variation": 1,
+        "negative_space": 3
+      },
+      "rating_dimensions": [
+        "brief_adherence",
+        "structural_correctness",
+        "visual_coherence",
+        "novelty",
+        "controllability"
+      ],
+      "provenance_tier": "synthetic_pilot_brief_authored_for_protocol_testing",
+      "stimulus": {
+        "status": "not_materialized",
+        "required_for_execution": true,
+        "allowed_source": "synthetic_GGL_or_rights_cleared_artist_created"
+      }
+    },
+    {
+      "brief_id": "GGL-VQ-PILOT-006",
+      "family_id": "icon-poster",
+      "family_label": "Icon and poster",
+      "task_type": "inverse",
+      "instruction": "Identify the reusable layout and symbol primitives in a synthetic poster, and return equivalent candidate programs if the grouping is not identifiable.",
+      "canvas": {
+        "width": 1024,
+        "height": 1024,
+        "aspect_ratio": 1
+      },
+      "hard_contract": {
+        "primitive_count_min": 3,
+        "primitive_count_max": 40,
+        "required_symmetry_order": null,
+        "must_preserve": [],
+        "must_change": [],
+        "unsupported_features": "reject_or_preserve_opaque",
+        "deterministic_seed_required": true
+      },
+      "soft_intent_descriptors": {
+        "symmetry": 2,
+        "rhythm": 2,
+        "density": 2,
+        "organic_variation": 1,
+        "negative_space": 3
+      },
+      "rating_dimensions": [
+        "brief_adherence",
+        "structural_correctness",
+        "visual_coherence",
+        "novelty",
+        "controllability"
+      ],
+      "provenance_tier": "synthetic_pilot_brief_authored_for_protocol_testing",
+      "stimulus": {
+        "status": "not_materialized",
+        "required_for_execution": true,
+        "allowed_source": "synthetic_GGL_or_rights_cleared_artist_created"
+      }
+    },
+    {
+      "brief_id": "GGL-VQ-PILOT-007",
+      "family_id": "editorial-illustration",
+      "family_label": "Editorial illustration",
+      "task_type": "generate",
+      "instruction": "Create a compact editorial illustration of a person repairing a bicycle using a restrained two-colour palette and clear foreground-background separation.",
+      "canvas": {
+        "width": 1024,
+        "height": 1024,
+        "aspect_ratio": 1
+      },
+      "hard_contract": {
+        "primitive_count_min": 10,
+        "primitive_count_max": 80,
+        "required_symmetry_order": null,
+        "must_preserve": [],
+        "must_change": [],
+        "unsupported_features": "reject_or_preserve_opaque",
+        "deterministic_seed_required": true
+      },
+      "soft_intent_descriptors": {
+        "symmetry": 1,
+        "rhythm": 2,
+        "density": 3,
+        "organic_variation": 2,
+        "negative_space": 2
+      },
+      "rating_dimensions": [
+        "brief_adherence",
+        "structural_correctness",
+        "visual_coherence",
+        "novelty",
+        "controllability"
+      ],
+      "provenance_tier": "synthetic_pilot_brief_authored_for_protocol_testing",
+      "stimulus": {
+        "status": "not_materialized",
+        "required_for_execution": true,
+        "allowed_source": "synthetic_GGL_or_rights_cleared_artist_created"
+      }
+    },
+    {
+      "brief_id": "GGL-VQ-PILOT-008",
+      "family_id": "editorial-illustration",
+      "family_label": "Editorial illustration",
+      "task_type": "edit",
+      "instruction": "Move the repair tool into the person's hand without altering the bicycle frame, headline, or background shapes.",
+      "canvas": {
+        "width": 1024,
+        "height": 1024,
+        "aspect_ratio": 1
+      },
+      "hard_contract": {
+        "primitive_count_min": 10,
+        "primitive_count_max": 90,
+        "required_symmetry_order": null,
+        "must_preserve": [
+          "bicycle.frame",
+          "headline",
+          "background.*"
+        ],
+        "must_change": [
+          "repair_tool.position"
+        ],
+        "unsupported_features": "reject_or_preserve_opaque",
+        "deterministic_seed_required": true
+      },
+      "soft_intent_descriptors": {
+        "symmetry": 1,
+        "rhythm": 2,
+        "density": 3,
+        "organic_variation": 2,
+        "negative_space": 2
+      },
+      "rating_dimensions": [
+        "brief_adherence",
+        "structural_correctness",
+        "visual_coherence",
+        "novelty",
+        "controllability"
+      ],
+      "provenance_tier": "synthetic_pilot_brief_authored_for_protocol_testing",
+      "stimulus": {
+        "status": "not_materialized",
+        "required_for_execution": true,
+        "allowed_source": "synthetic_GGL_or_rights_cleared_artist_created"
+      }
+    },
+    {
+      "brief_id": "GGL-VQ-PILOT-009",
+      "family_id": "editorial-illustration",
+      "family_label": "Editorial illustration",
+      "task_type": "inverse",
+      "instruction": "Infer a layered composition grammar from a synthetic editorial scene; preserve object roles and layer order but allow multiple equivalent programs.",
+      "canvas": {
+        "width": 1024,
+        "height": 1024,
+        "aspect_ratio": 1
+      },
+      "hard_contract": {
+        "primitive_count_min": 10,
+        "primitive_count_max": 80,
+        "required_symmetry_order": null,
+        "must_preserve": [],
+        "must_change": [],
+        "unsupported_features": "reject_or_preserve_opaque",
+        "deterministic_seed_required": true
+      },
+      "soft_intent_descriptors": {
+        "symmetry": 1,
+        "rhythm": 2,
+        "density": 3,
+        "organic_variation": 2,
+        "negative_space": 2
+      },
+      "rating_dimensions": [
+        "brief_adherence",
+        "structural_correctness",
+        "visual_coherence",
+        "novelty",
+        "controllability"
+      ],
+      "provenance_tier": "synthetic_pilot_brief_authored_for_protocol_testing",
+      "stimulus": {
+        "status": "not_materialized",
+        "required_for_execution": true,
+        "allowed_source": "synthetic_GGL_or_rights_cleared_artist_created"
+      }
+    },
+    {
+      "brief_id": "GGL-VQ-PILOT-010",
+      "family_id": "organic-branching",
+      "family_label": "Organic and branching",
+      "task_type": "generate",
+      "instruction": "Generate a branching plant-like structure with variable branch lengths, bounded growth and visibly non-identical branches.",
+      "canvas": {
+        "width": 1024,
+        "height": 1024,
+        "aspect_ratio": 1
+      },
+      "hard_contract": {
+        "primitive_count_min": 12,
+        "primitive_count_max": 120,
+        "required_symmetry_order": null,
+        "must_preserve": [],
+        "must_change": [],
+        "unsupported_features": "reject_or_preserve_opaque",
+        "deterministic_seed_required": true
+      },
+      "soft_intent_descriptors": {
+        "symmetry": 1,
+        "rhythm": 3,
+        "density": 3,
+        "organic_variation": 4,
+        "negative_space": 2
+      },
+      "rating_dimensions": [
+        "brief_adherence",
+        "structural_correctness",
+        "visual_coherence",
+        "novelty",
+        "controllability"
+      ],
+      "provenance_tier": "synthetic_pilot_brief_authored_for_protocol_testing",
+      "stimulus": {
+        "status": "not_materialized",
+        "required_for_execution": true,
+        "allowed_source": "synthetic_GGL_or_rights_cleared_artist_created"
+      }
+    },
+    {
+      "brief_id": "GGL-VQ-PILOT-011",
+      "family_id": "organic-branching",
+      "family_label": "Organic and branching",
+      "task_type": "edit",
+      "instruction": "Increase local branch variation while preserving the trunk, root attachment, and overall bounding box.",
+      "canvas": {
+        "width": 1024,
+        "height": 1024,
+        "aspect_ratio": 1
+      },
+      "hard_contract": {
+        "primitive_count_min": 12,
+        "primitive_count_max": 150,
+        "required_symmetry_order": null,
+        "must_preserve": [
+          "trunk",
+          "root",
+          "canvas.bounds"
+        ],
+        "must_change": [
+          "branch.local_variation"
+        ],
+        "unsupported_features": "reject_or_preserve_opaque",
+        "deterministic_seed_required": true
+      },
+      "soft_intent_descriptors": {
+        "symmetry": 1,
+        "rhythm": 3,
+        "density": 3,
+        "organic_variation": 4,
+        "negative_space": 2
+      },
+      "rating_dimensions": [
+        "brief_adherence",
+        "structural_correctness",
+        "visual_coherence",
+        "novelty",
+        "controllability"
+      ],
+      "provenance_tier": "synthetic_pilot_brief_authored_for_protocol_testing",
+      "stimulus": {
+        "status": "not_materialized",
+        "required_for_execution": true,
+        "allowed_source": "synthetic_GGL_or_rights_cleared_artist_created"
+      }
+    },
+    {
+      "brief_id": "GGL-VQ-PILOT-012",
+      "family_id": "organic-branching",
+      "family_label": "Organic and branching",
+      "task_type": "inverse",
+      "instruction": "Recover a bounded recursive or L-system-like candidate grammar and quantify residuals; do not assume the source used an L-system.",
+      "canvas": {
+        "width": 1024,
+        "height": 1024,
+        "aspect_ratio": 1
+      },
+      "hard_contract": {
+        "primitive_count_min": 12,
+        "primitive_count_max": 120,
+        "required_symmetry_order": null,
+        "must_preserve": [],
+        "must_change": [],
+        "unsupported_features": "reject_or_preserve_opaque",
+        "deterministic_seed_required": true
+      },
+      "soft_intent_descriptors": {
+        "symmetry": 1,
+        "rhythm": 3,
+        "density": 3,
+        "organic_variation": 4,
+        "negative_space": 2
+      },
+      "rating_dimensions": [
+        "brief_adherence",
+        "structural_correctness",
+        "visual_coherence",
+        "novelty",
+        "controllability"
+      ],
+      "provenance_tier": "synthetic_pilot_brief_authored_for_protocol_testing",
+      "stimulus": {
+        "status": "not_materialized",
+        "required_for_execution": true,
+        "allowed_source": "synthetic_GGL_or_rights_cleared_artist_created"
+      }
+    },
+    {
+      "brief_id": "GGL-VQ-PILOT-013",
+      "family_id": "abstract-composition",
+      "family_label": "Abstract composition",
+      "task_type": "generate",
+      "instruction": "Compose an abstract visual study using circles, lines and translucent planes, with deliberate asymmetry and a readable focal hierarchy.",
+      "canvas": {
+        "width": 1024,
+        "height": 1024,
+        "aspect_ratio": 1
+      },
+      "hard_contract": {
+        "primitive_count_min": 8,
+        "primitive_count_max": 70,
+        "required_symmetry_order": null,
+        "must_preserve": [],
+        "must_change": [],
+        "unsupported_features": "reject_or_preserve_opaque",
+        "deterministic_seed_required": true
+      },
+      "soft_intent_descriptors": {
+        "symmetry": 2,
+        "rhythm": 3,
+        "density": 2,
+        "organic_variation": 3,
+        "negative_space": 3
+      },
+      "rating_dimensions": [
+        "brief_adherence",
+        "structural_correctness",
+        "visual_coherence",
+        "novelty",
+        "controllability"
+      ],
+      "provenance_tier": "synthetic_pilot_brief_authored_for_protocol_testing",
+      "stimulus": {
+        "status": "not_materialized",
+        "required_for_execution": true,
+        "allowed_source": "synthetic_GGL_or_rights_cleared_artist_created"
+      }
+    },
+    {
+      "brief_id": "GGL-VQ-PILOT-014",
+      "family_id": "abstract-composition",
+      "family_label": "Abstract composition",
+      "task_type": "edit",
+      "instruction": "Shift the focal cluster left while preserving the secondary cluster, palette assignments and negative-space corridor.",
+      "canvas": {
+        "width": 1024,
+        "height": 1024,
+        "aspect_ratio": 1
+      },
+      "hard_contract": {
+        "primitive_count_min": 8,
+        "primitive_count_max": 80,
+        "required_symmetry_order": null,
+        "must_preserve": [
+          "secondary.cluster",
+          "palette.*",
+          "negative_space.corridor"
+        ],
+        "must_change": [
+          "focal.cluster.position"
+        ],
+        "unsupported_features": "reject_or_preserve_opaque",
+        "deterministic_seed_required": true
+      },
+      "soft_intent_descriptors": {
+        "symmetry": 2,
+        "rhythm": 3,
+        "density": 2,
+        "organic_variation": 3,
+        "negative_space": 3
+      },
+      "rating_dimensions": [
+        "brief_adherence",
+        "structural_correctness",
+        "visual_coherence",
+        "novelty",
+        "controllability"
+      ],
+      "provenance_tier": "synthetic_pilot_brief_authored_for_protocol_testing",
+      "stimulus": {
+        "status": "not_materialized",
+        "required_for_execution": true,
+        "allowed_source": "synthetic_GGL_or_rights_cleared_artist_created"
+      }
+    },
+    {
+      "brief_id": "GGL-VQ-PILOT-015",
+      "family_id": "abstract-composition",
+      "family_label": "Abstract composition",
+      "task_type": "inverse",
+      "instruction": "Find compact alternative programs that reproduce the composition within a declared rendering tolerance; retain non-identifiable alternatives.",
+      "canvas": {
+        "width": 1024,
+        "height": 1024,
+        "aspect_ratio": 1
+      },
+      "hard_contract": {
+        "primitive_count_min": 8,
+        "primitive_count_max": 70,
+        "required_symmetry_order": null,
+        "must_preserve": [],
+        "must_change": [],
+        "unsupported_features": "reject_or_preserve_opaque",
+        "deterministic_seed_required": true
+      },
+      "soft_intent_descriptors": {
+        "symmetry": 2,
+        "rhythm": 3,
+        "density": 2,
+        "organic_variation": 3,
+        "negative_space": 3
+      },
+      "rating_dimensions": [
+        "brief_adherence",
+        "structural_correctness",
+        "visual_coherence",
+        "novelty",
+        "controllability"
+      ],
+      "provenance_tier": "synthetic_pilot_brief_authored_for_protocol_testing",
+      "stimulus": {
+        "status": "not_materialized",
+        "required_for_execution": true,
+        "allowed_source": "synthetic_GGL_or_rights_cleared_artist_created"
+      }
+    },
+    {
+      "brief_id": "GGL-VQ-PILOT-016",
+      "family_id": "ambiguous-adversarial",
+      "family_label": "Ambiguous and adversarial",
+      "task_type": "abstain",
+      "instruction": "Make the left side more balanced but keep the exact same layout and move the focal object substantially left.",
+      "canvas": {
+        "width": 1024,
+        "height": 1024,
+        "aspect_ratio": 1
+      },
+      "hard_contract": {
+        "primitive_count_min": 0,
+        "primitive_count_max": 100,
+        "required_symmetry_order": null,
+        "must_preserve": [
+          "all.object.positions"
+        ],
+        "must_change": [
+          "focal.object.position"
+        ],
+        "unsupported_features": "reject_or_preserve_opaque",
+        "deterministic_seed_required": true
+      },
+      "expected_behavior": "request_clarification_or_abstain",
+      "soft_intent_descriptors": {
+        "symmetry": null,
+        "rhythm": null,
+        "density": null,
+        "organic_variation": null,
+        "negative_space": null
+      },
+      "rating_dimensions": [
+        "brief_adherence",
+        "structural_correctness",
+        "visual_coherence",
+        "novelty",
+        "controllability"
+      ],
+      "provenance_tier": "synthetic_pilot_brief_authored_for_protocol_testing",
+      "stimulus": {
+        "status": "not_materialized",
+        "required_for_execution": true,
+        "allowed_source": "synthetic_GGL_or_rights_cleared_artist_created"
+      }
+    },
+    {
+      "brief_id": "GGL-VQ-PILOT-017",
+      "family_id": "ambiguous-adversarial",
+      "family_label": "Ambiguous and adversarial",
+      "task_type": "abstain",
+      "instruction": "Make the design perfectly fourfold symmetric while preserving the intentionally unequal measured placements and without moving any object.",
+      "canvas": {
+        "width": 1024,
+        "height": 1024,
+        "aspect_ratio": 1
+      },
+      "hard_contract": {
+        "primitive_count_min": 0,
+        "primitive_count_max": 100,
+        "required_symmetry_order": 4,
+        "must_preserve": [
+          "all.measured.positions"
+        ],
+        "must_change": [
+          "global.symmetry"
+        ],
+        "unsupported_features": "reject_or_preserve_opaque",
+        "deterministic_seed_required": true
+      },
+      "expected_behavior": "report_conflict_and_abstain",
+      "soft_intent_descriptors": {
+        "symmetry": null,
+        "rhythm": null,
+        "density": null,
+        "organic_variation": null,
+        "negative_space": null
+      },
+      "rating_dimensions": [
+        "brief_adherence",
+        "structural_correctness",
+        "visual_coherence",
+        "novelty",
+        "controllability"
+      ],
+      "provenance_tier": "synthetic_pilot_brief_authored_for_protocol_testing",
+      "stimulus": {
+        "status": "not_materialized",
+        "required_for_execution": true,
+        "allowed_source": "synthetic_GGL_or_rights_cleared_artist_created"
+      }
+    },
+    {
+      "brief_id": "GGL-VQ-PILOT-018",
+      "family_id": "ambiguous-adversarial",
+      "family_label": "Ambiguous and adversarial",
+      "task_type": "abstain",
+      "instruction": "Recover the one true original artist program from this raster image, even though several constructions produce the same pixels.",
+      "canvas": {
+        "width": 1024,
+        "height": 1024,
+        "aspect_ratio": 1
+      },
+      "hard_contract": {
+        "primitive_count_min": 0,
+        "primitive_count_max": 100,
+        "required_symmetry_order": null,
+        "must_preserve": [],
+        "must_change": [],
+        "unsupported_features": "reject_or_preserve_opaque",
+        "deterministic_seed_required": true
+      },
+      "expected_behavior": "return_equivalence_class_not_singleton",
+      "soft_intent_descriptors": {
+        "symmetry": null,
+        "rhythm": null,
+        "density": null,
+        "organic_variation": null,
+        "negative_space": null
+      },
+      "rating_dimensions": [
+        "brief_adherence",
+        "structural_correctness",
+        "visual_coherence",
+        "novelty",
+        "controllability"
+      ],
+      "provenance_tier": "synthetic_pilot_brief_authored_for_protocol_testing",
+      "stimulus": {
+        "status": "not_materialized",
+        "required_for_execution": true,
+        "allowed_source": "synthetic_GGL_or_rights_cleared_artist_created"
+      }
+    }
+  ]
+}
