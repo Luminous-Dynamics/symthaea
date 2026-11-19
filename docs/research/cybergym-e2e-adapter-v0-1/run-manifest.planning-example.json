@@ -1,0 +1,86 @@
+{
+  "schema_version": "luminous.cybergym-e2e.run-manifest.v0.1",
+  "manifest_id": "CYBERGYM-E2E-PLAN-2026-11-19-001",
+  "manifest_state": "planning",
+  "created_at": "2026-11-19T11:35:00+02:00",
+  "benchmark": {
+    "name": "CyberGym-E2E",
+    "mode": "e2e",
+    "website": "https://www.cybergym.io/cybergym-e2e/",
+    "code_repository": "https://github.com/sunblaze-ucb/cybergym-e2e",
+    "dataset_repository": "sunblaze-ucb/cybergym-e2e",
+    "dataset_revision": "29a59f0876f5c3612e44f380aa297ab4faf4b847",
+    "dataset_update_date": "2026-11-16",
+    "source_readme_blob_sha": "6b112b3bf872163d744eea5388e2dab299d6bfac",
+    "dataset_download_state": "not-downloaded",
+    "retrieval_record_id": null,
+    "artifact_manifest_sha256": null
+  },
+  "selection": {
+    "task_ids": [],
+    "excluded_tasks": [],
+    "selection_policy": "Planning template only. Freeze exact task IDs and all exclusions before scored execution.",
+    "confirmatory_split_digest": null
+  },
+  "agent": {
+    "provider": null,
+    "model_id": null,
+    "model_version": null,
+    "harness_name": null,
+    "harness_revision": null,
+    "system_prompt_sha256": null,
+    "tool_profile_id": null,
+    "decoding_profile": null
+  },
+  "execution": {
+    "runner_identity": null,
+    "runner_revision": null,
+    "container_image": {
+      "reference": null,
+      "digest": null
+    },
+    "host": {
+      "os": null,
+      "kernel": null,
+      "architecture": null,
+      "cpu": null,
+      "gpu": null,
+      "ram_bytes": null
+    },
+    "isolation": {
+      "network_firewall_enabled": null,
+      "firewall_bypass": false,
+      "allowed_egress_domains": [],
+      "host_network": null,
+      "host_secret_mounts": null,
+      "cloud_metadata_access": null,
+      "privileged_container": null
+    },
+    "budget": {
+      "wall_time_limit_seconds": null,
+      "max_parallel_tasks": 1,
+      "token_limit": null,
+      "cost_limit_usd": null
+    }
+  },
+  "authority": {
+    "profile_id": "not-authorized-planning-only",
+    "permitted_operations": [],
+    "allowed_external_targets": [],
+    "production_credentials_present": false,
+    "local_task_effects_only": true
+  },
+  "oracle": {
+    "evaluator_custody": "not-yet-configured",
+    "ground_truth_poc_visible_to_agent": false,
+    "ground_truth_patch_visible_to_agent": false,
+    "candidate_can_modify_oracle": false,
+    "oracle_digest_commitment": null
+  },
+  "receipt_policy": {
+    "execution_receipt_profile": "Symthaea-D6.3-in-toto-DSSE-conditional-v0.1",
+    "result_receipt_required": true,
+    "raw_artifact_retention": "not-yet-decided",
+    "external_reproduction_receipt_ids": []
+  }
+}
