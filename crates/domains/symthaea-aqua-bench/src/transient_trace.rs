@@ -975,6 +975,11 @@ pub fn validate_matched_event_replay(
     if control.command.unit != candidate.command.unit {
         return Err(TransientTraceError::EventReplayMismatch { field: "command.unit" });
     }
+    for role in [RawArtifactRole::EventLog] {
+        if artifact_digest(control, role) != artifact_digest(candidate, role) {
+            return Err(TransientTraceError::EventReplayMismatch { field: "event_log" });
+        }
+    }
     if control.command.samples != candidate.command.samples {
         return Err(TransientTraceError::EventReplayMismatch { field: "command.samples" });
     }
@@ -1021,6 +1026,8 @@ pub fn validate_matched_event_replay(
                 || left.site_conditions_sha256 != right.site_conditions_sha256
                 || left.survey_receipt_sha256 != right.survey_receipt_sha256
                 || left.observation_window != right.observation_window
+                || artifact_digest(control, RawArtifactRole::SiteObservationRecord)
+                    != artifact_digest(candidate, RawArtifactRole::SiteObservationRecord)
             {
                 return Err(TransientTraceError::EventReplayMismatch { field: "site_observation" });
             }
@@ -1040,17 +1047,23 @@ pub fn validate_matched_event_replay(
     Ok(())
 }
 
+fn artifact_digest(profile: &TransientEventProfile, role: RawArtifactRole) -> Option<&str> {
+    profile
+        .raw_artifacts
+        .iter()
+        .find(|artifact| artifact.role == role)
+        .map(|artifact| artifact.sha256.as_str())
+}
+
 fn channel_signature(
     channel: &TraceChannel,
-) -> (String, String, String, String, String, String, String, String, u64, u64, u64, u64, u64) {
+) -> (String, String, String, String, String, String, u64, u64, u64, u64, u64) {
     (
         channel.channel_id.clone(),
         format!("{:?}", channel.role),
         channel.location.clone(),
         format!("{:?}", channel.datum),
         format!("{:?}", channel.unit),
-        channel.instrument_id.clone(),
-        channel.calibration_receipt_sha256.clone(),
         channel.anti_alias_filter_id.clone(),
         channel.sample_rate_hz.to_bits(),
         channel.effective_bandwidth_hz.to_bits(),
@@ -1587,6 +1600,36 @@ mod tests {
         let mut candidate = profile();
         candidate.profile_id = "candidate-sag-001".to_owned();
         assert_eq!(validate_matched_event_replay(&control, &candidate), Ok(()));
+    }
+
+    #[test]
+    fn matched_replay_allows_distinct_sensor_ids_when_method_contract_matches() {
+        let control = profile();
+        let mut candidate = profile();
+        candidate.profile_id = "candidate-sag-001".to_owned();
+        candidate.acquisition.channels[0].instrument_id = "independent-pressure-meter".to_owned();
+        candidate.acquisition.channels[0].calibration_receipt_sha256 = digest('8');
+        candidate.acquisition.channels[1].instrument_id = "independent-flow-meter".to_owned();
+        candidate.acquisition.channels[1].calibration_receipt_sha256 = digest('9');
+
+        assert_eq!(validate_matched_event_replay(&control, &candidate), Ok(()));
+    }
+
+    #[test]
+    fn matched_replay_rejects_a_different_event_log() {
+        let control = profile();
+        let mut candidate = profile();
+        candidate.profile_id = "candidate-sag-001".to_owned();
+        candidate.raw_artifacts
+            .iter_mut()
+            .find(|artifact| artifact.role == RawArtifactRole::EventLog)
+            .unwrap()
+            .sha256 = digest('8');
+
+        assert_eq!(
+            validate_matched_event_replay(&control, &candidate),
+            Err(TransientTraceError::EventReplayMismatch { field: "event_log" })
+        );
     }
 
     #[test]
