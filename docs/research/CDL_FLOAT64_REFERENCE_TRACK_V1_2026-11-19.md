@@ -53,6 +53,8 @@ The command emits frame lengths and encode/decode nanoseconds for the single-str
 - high-precision decimal-like;
 - long plateau steps;
 - mostly-idle telemetry-like streams with long exact repeats;
+- alternating positive/negative zero runs;
+- repeated distinct NaN payloads, infinities and zero runs;
 - random-bit-pattern streams.
 
 Each stream is evaluated with raw, XOR-previous-varint, XOR-leading/trailing window, and RLE+XOR transforms under order-0 and order-1 entropy models. The segment portfolio tries all eight combinations per chunk and picks the smallest complete child F64C frame. The F64S container header, every F64C child header, child CRCs, and the inner CDL payloads are all counted in the reported frame size. Zstandard is measured on the original raw little-endian f64 bytes if installed. The CLI does not yet invoke DeXOR, ACTF, Gorilla, Chimp, Rabbit or Dolphin.
