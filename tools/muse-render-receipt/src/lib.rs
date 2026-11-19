@@ -1444,15 +1444,16 @@ pub fn verify_bundle(root: &Path, r: &ReceiptV1) -> Result<BundleReportV1, Strin
     })
 }
 
-pub fn receipt_only_report(r: &ReceiptV1) -> BundleReportV1 {
-    BundleReportV1 {
+pub fn receipt_only_report(r: &ReceiptV1) -> Result<BundleReportV1, String> {
+    validate_receipt(r)?;
+    Ok(BundleReportV1 {
         attempt_id:r.attempt_id.clone(), attempt_state:r.attempt_state.clone(),
         receipt_seal_verified:true, bundle_integrity_verified:false,
         midi_event_manifest_verified:false, wav_integrity_verified:false,
         acceptance_eligible:false,
         trust_level:if r.attempt_state == "outcome_unknown" { "unresolved_execution" } else { "receipt_only" }.into(),
-        notes:vec!["receipt-only mode does not read or re-hash the artifact bundle".into()],
-    }
+        notes:vec!["receipt-only mode verifies the receipt seal but does not read or re-hash the artifact bundle".into()],
+    })
 }
 
 #[cfg(test)]
@@ -1513,6 +1514,13 @@ mod tests {
         receipt.attempt_id = "tampered-after-parse".into();
         assert!(validate_receipt(&receipt).unwrap_err().contains("seal mismatch"));
         assert!(verify_bundle(Path::new("missing-bundle"), &receipt).unwrap_err().contains("seal mismatch"));
+    }
+
+    #[test]
+    fn receipt_only_library_report_rejects_stale_seal() {
+        let mut receipt = verify_receipt_bytes(&sample_receipt()).unwrap();
+        receipt.attempt_id = "tampered-receipt-only".into();
+        assert!(receipt_only_report(&receipt).unwrap_err().contains("seal mismatch"));
     }
 
     #[test]
