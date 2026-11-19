@@ -9,12 +9,18 @@
 //! The module is deliberately fail-closed: malformed, incomplete, unsynchronized or
 //! non-comparable traces cannot be promoted to a valid event replay.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
 use chrono::DateTime;
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
+
+/// Canonical per-channel raw trace format: UTF-8 CSV with exactly
+/// `offset_us,channel_id,value` columns.
+pub const TRANSIENT_TRACE_CSV_MEDIA_TYPE: &str =
+    "text/csv; profile=aqua-transient-trace-v1";
 
 fn is_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
@@ -355,9 +361,9 @@ pub struct TraceChannel {
     pub sample_count: usize,
     pub dropped_sample_count: usize,
     pub sample_gap_report_sha256: Option<String>,
-    /// Populated by the raw-trace decoder after the manifest is read.
+    /// Populated only by the hash-verifying raw-trace decoder.
     #[serde(skip)]
-    pub samples: Vec<TraceSample>,
+    samples: Vec<TraceSample>,
 }
 
 impl TraceChannel {
@@ -588,6 +594,7 @@ pub struct RawArtifact {
     pub role: RawArtifactRole,
     pub sha256: String,
     pub byte_length: u64,
+    pub media_type: Option<String>,
 }
 
 impl RawArtifact {
@@ -595,6 +602,14 @@ impl RawArtifact {
         require_digest("raw_artifact.sha256", &self.sha256)?;
         if self.byte_length == 0 {
             return Err(TransientTraceError::EmptyRawArtifact);
+        }
+        if self.media_type.as_deref().is_none_or(str::is_empty) {
+            return Err(TransientTraceError::MissingRawArtifactMediaType);
+        }
+        if self.role == RawArtifactRole::UnfilteredTrace
+            && self.media_type.as_deref() != Some(TRANSIENT_TRACE_CSV_MEDIA_TYPE)
+        {
+            return Err(TransientTraceError::RawArtifactMediaTypeMismatch);
         }
         Ok(())
     }
@@ -647,6 +662,12 @@ pub enum TransientTraceError {
     TraceArtifactNotFound { channel_id: String },
     DuplicateArtifactRole { role: RawArtifactRole },
     EmptyRawArtifact,
+    MissingRawArtifactMediaType,
+    RawArtifactMediaTypeMismatch,
+    RawArtifactBytesNotDeclared,
+    RawArtifactLengthMismatch,
+    RawArtifactDigestMismatch,
+    RawTraceCsvDecode { message: String },
     CommandFamilyMismatch,
     CommandUnitMismatch,
     CommandShapeMismatch,
@@ -704,6 +725,12 @@ impl Display for TransientTraceError {
             }
             Self::DuplicateArtifactRole { role } => write!(f, "duplicate raw artifact role: {role:?}"),
             Self::EmptyRawArtifact => write!(f, "raw artifact byte length must be greater than zero"),
+            Self::MissingRawArtifactMediaType => write!(f, "raw artifact media type is missing"),
+            Self::RawArtifactMediaTypeMismatch => write!(f, "unfiltered trace artifact does not use the canonical Aqua CSV media type"),
+            Self::RawArtifactBytesNotDeclared => write!(f, "raw bytes do not match any declared unfiltered trace artifact"),
+            Self::RawArtifactLengthMismatch => write!(f, "raw artifact byte length does not match its manifest"),
+            Self::RawArtifactDigestMismatch => write!(f, "raw artifact SHA-256 does not match its bytes"),
+            Self::RawTraceCsvDecode { message } => write!(f, "raw transient trace CSV decode failed: {message}"),
             Self::CommandFamilyMismatch => write!(f, "command type is incompatible with event family"),
             Self::CommandUnitMismatch => write!(f, "command sample value does not match its declared unit"),
             Self::CommandShapeMismatch => write!(f, "command waveform does not exhibit the declared event-family behavior"),
@@ -777,31 +804,145 @@ impl TransientEventProfile {
             })
     }
 
-    /// Attach decoded samples to the exact manifest channel named by the raw-trace decoder.
-    pub fn attach_channel_samples(
+    /// Verify the declared unfiltered-trace artifact bytes and atomically decode all
+    /// channels that reference this exact digest.
+    ///
+    /// Canonical CSV is UTF-8 with exactly `offset_us,channel_id,value` columns. Rows may
+    /// be interleaved between channels; timestamps are validated per channel afterwards.
+    /// A digest and byte length are checked before any samples are attached.
+    pub fn attach_unfiltered_trace_csv(
         &mut self,
-        channel_id: &str,
-        samples: Vec<TraceSample>,
+        bytes: &[u8],
     ) -> Result<(), TransientTraceError> {
-        let channel = self
+        let actual_length = u64::try_from(bytes.len())
+            .map_err(|_| TransientTraceError::RawArtifactLengthMismatch)?;
+        let actual_digest = hex::encode(Sha256::digest(bytes));
+        let artifact = self
+            .raw_artifacts
+            .iter()
+            .find(|artifact| {
+                artifact.role == RawArtifactRole::UnfilteredTrace
+                    && artifact.sha256.eq_ignore_ascii_case(&actual_digest)
+            })
+            .ok_or(TransientTraceError::RawArtifactBytesNotDeclared)?;
+
+        if artifact.byte_length != actual_length {
+            return Err(TransientTraceError::RawArtifactLengthMismatch);
+        }
+        if artifact.media_type.as_deref() != Some(TRANSIENT_TRACE_CSV_MEDIA_TYPE) {
+            return Err(TransientTraceError::RawArtifactMediaTypeMismatch);
+        }
+
+        let declared_channels: HashMap<&str, &TraceChannel> = self
             .acquisition
             .channels
-            .iter_mut()
-            .find(|channel| channel.channel_id == channel_id)
-            .ok_or_else(|| TransientTraceError::UnknownChannel {
-                channel_id: channel_id.to_owned(),
+            .iter()
+            .map(|channel| (channel.channel_id.as_str(), channel))
+            .collect();
+        if declared_channels.len() != self.acquisition.channels.len() {
+            return Err(TransientTraceError::DuplicateChannelId {
+                channel_id: "duplicate channel ID".to_owned(),
+            });
+        }
+
+        let mut reader = csv::ReaderBuilder::new()
+            .has_headers(true)
+            .flexible(false)
+            .from_reader(bytes);
+        let headers = reader
+            .headers()
+            .map_err(|error| TransientTraceError::RawTraceCsvDecode {
+                message: error.to_string(),
             })?;
-        if !channel.samples.is_empty() {
-            return Err(TransientTraceError::ChannelSamplesAlreadyAttached {
-                channel_id: channel.channel_id.clone(),
+        if headers.len() != 3
+            || headers.get(0) != Some("offset_us")
+            || headers.get(1) != Some("channel_id")
+            || headers.get(2) != Some("value")
+        {
+            return Err(TransientTraceError::RawTraceCsvDecode {
+                message: "expected exact header offset_us,channel_id,value".to_owned(),
             });
         }
-        if channel.sample_count != samples.len() {
-            return Err(TransientTraceError::SampleCountMismatch {
-                channel_id: channel.channel_id.clone(),
-            });
+
+        let mut samples_by_channel: HashMap<String, Vec<TraceSample>> = HashMap::new();
+        for record in reader.records() {
+            let record = record.map_err(|error| TransientTraceError::RawTraceCsvDecode {
+                message: error.to_string(),
+            })?;
+            let offset_us = record
+                .get(0)
+                .ok_or_else(|| TransientTraceError::RawTraceCsvDecode {
+                    message: "missing offset_us field".to_owned(),
+                })?
+                .parse::<u64>()
+                .map_err(|error| TransientTraceError::RawTraceCsvDecode {
+                    message: format!("invalid offset_us: {error}"),
+                })?;
+            let channel_id = record
+                .get(1)
+                .ok_or_else(|| TransientTraceError::RawTraceCsvDecode {
+                    message: "missing channel_id field".to_owned(),
+                })?
+                .to_owned();
+            let value = record
+                .get(2)
+                .ok_or_else(|| TransientTraceError::RawTraceCsvDecode {
+                    message: "missing value field".to_owned(),
+                })?
+                .parse::<f64>()
+                .map_err(|error| TransientTraceError::RawTraceCsvDecode {
+                    message: format!("invalid numeric value: {error}"),
+                })?;
+
+            let channel = declared_channels
+                .get(channel_id.as_str())
+                .ok_or_else(|| TransientTraceError::UnknownChannel {
+                    channel_id: channel_id.clone(),
+                })?;
+            if !channel.raw_trace_sha256.eq_ignore_ascii_case(&actual_digest) {
+                return Err(TransientTraceError::TraceArtifactNotFound { channel_id });
+            }
+            samples_by_channel
+                .entry(channel_id)
+                .or_default()
+                .push(TraceSample { offset_us, value });
         }
-        channel.samples = samples;
+
+        // Validate every affected channel before mutating any channel.
+        let mut pending = Vec::new();
+        for channel in self.acquisition.channels.iter().filter(|channel| {
+            channel.raw_trace_sha256.eq_ignore_ascii_case(&actual_digest)
+        }) {
+            if !channel.samples.is_empty() {
+                return Err(TransientTraceError::ChannelSamplesAlreadyAttached {
+                    channel_id: channel.channel_id.clone(),
+                });
+            }
+            let samples = samples_by_channel
+                .remove(&channel.channel_id)
+                .ok_or_else(|| TransientTraceError::SampleCountMismatch {
+                    channel_id: channel.channel_id.clone(),
+                })?;
+            if channel.sample_count != samples.len() {
+                return Err(TransientTraceError::SampleCountMismatch {
+                    channel_id: channel.channel_id.clone(),
+                });
+            }
+            pending.push((channel.channel_id.clone(), samples));
+        }
+        if pending.is_empty() || !samples_by_channel.is_empty() {
+            return Err(TransientTraceError::RawArtifactBytesNotDeclared);
+        }
+
+        for (channel_id, samples) in pending {
+            let channel = self
+                .acquisition
+                .channels
+                .iter_mut()
+                .find(|channel| channel.channel_id == channel_id)
+                .expect("channel was resolved during preflight");
+            channel.samples = samples;
+        }
         Ok(())
     }
 
@@ -1170,8 +1311,18 @@ mod tests {
                 channels: vec![pressure_channel("terminal-pressure", "terminal-outlet"), flow_channel()],
             },
             raw_artifacts: vec![
-                RawArtifact { role: RawArtifactRole::UnfilteredTrace, sha256: digest('3'), byte_length: 10_000 },
-                RawArtifact { role: RawArtifactRole::EventLog, sha256: digest('4'), byte_length: 1_024 },
+                RawArtifact {
+                    role: RawArtifactRole::UnfilteredTrace,
+                    sha256: digest('3'),
+                    byte_length: 10_000,
+                    media_type: Some(TRANSIENT_TRACE_CSV_MEDIA_TYPE.to_owned()),
+                },
+                RawArtifact {
+                    role: RawArtifactRole::EventLog,
+                    sha256: digest('4'),
+                    byte_length: 1_024,
+                    media_type: Some("application/json".to_owned()),
+                },
             ],
             analysis: None,
         }
