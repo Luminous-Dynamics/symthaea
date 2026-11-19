@@ -67,8 +67,9 @@ pub enum PrototypeRepresentation {
 
 /// Describes the exact acoustic HDC space used to produce a prototype artifact.
 ///
-/// The fingerprint is an integrity check over this descriptor, not an acoustic
-/// similarity representation. BLAKE3 is used for exact identity only.
+/// The fingerprint is a deterministic descriptor checksum, not an acoustic
+/// similarity representation or a signed provenance/authenticity proof. BLAKE3
+/// is used for exact identity only.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PrototypeEncoderMetadata {
     /// Metadata schema version.
