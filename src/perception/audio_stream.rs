@@ -253,26 +253,28 @@ pub(super) fn run_worker(
 ) {
     let mut processor = StreamProcessor::new(config.stream_config.clone());
 
-    // Load phoneme prototypes when configured so the phoneme channel is
-    // actually exercised (StreamFrame.phoneme stays None otherwise).
+    // Load only artifacts explicitly trained in this live raw-frame mel-HDC space.
+    // Legacy and temporally-windowed models remain inspectable, but are not
+    // silently compared against single-frame stream codes.
     if let Some(ref path) = config.prototype_model_path {
         match symthaea_stt::TrainedPrototypes::load(path) {
-            Ok(prototypes) => {
-                tracing::info!(
-                    "STT worker: loaded {} phoneme prototypes from {}",
+            Ok(prototypes) => match processor.load_trained_prototypes(&prototypes) {
+                Ok(()) => tracing::info!(
+                    "STT worker: loaded {} compatible phoneme prototypes from {}",
                     prototypes.len(),
                     path.display()
-                );
-                processor.load_prototypes(&prototypes.as_pairs());
-            }
-            Err(e) => {
-                tracing::warn!(
-                    "STT worker: failed to load prototypes from {}: {} \
-                     (continuing with HV texture only)",
+                ),
+                Err(error) => tracing::warn!(
+                    "STT worker: refusing incompatible prototype artifact {}: {}",
                     path.display(),
-                    e
-                );
-            }
+                    error
+                ),
+            },
+            Err(error) => tracing::warn!(
+                "STT worker: failed to load prototypes from {}: {}",
+                path.display(),
+                error
+            ),
         }
     }
 
