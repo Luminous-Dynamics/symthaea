@@ -199,6 +199,11 @@ pub struct AudioPerception {
 impl AudioPerception {
     /// Create a new audio perception system
     pub fn new(config: AudioPerceptionConfig) -> Result<Self> {
+        if config.sample_rate == 0 {
+            return Err(anyhow::anyhow!(
+                "audio perception sample rate must be greater than zero"
+            ));
+        }
         let projector = symthaea_stt::AudioProjector::new(
             symthaea_stt::AudioConfig {
                 sample_rate: config.sample_rate,
@@ -498,6 +503,16 @@ mod tests {
         assert!(config.enable_prosody);
         assert!(config.prototypes_path.is_none());
         assert!((config.confidence_threshold - 0.3).abs() < 0.01);
+    }
+
+    #[cfg(feature = "voice-stt")]
+    #[test]
+    fn audio_perception_rejects_zero_sample_rate_configuration() {
+        let config = AudioPerceptionConfig {
+            sample_rate: 0,
+            ..AudioPerceptionConfig::default()
+        };
+        assert!(AudioPerception::new(config).is_err());
     }
 
     #[test]
