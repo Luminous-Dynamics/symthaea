@@ -398,7 +398,7 @@ pub fn canonical_search_problem_bytes(problem: &SearchProblemV1) -> Vec<u8> {
 pub fn canonical_multi_environment_problem_bytes(
     problem: &MultiEnvironmentProblemV1,
 ) -> Vec<u8> {
-    let mut bytes = b"luminous.symmetry_quotient.multi_environment_problem.v1\\0".to_vec();
+    let mut bytes = b"luminous.symmetry_quotient.multi_environment_problem.v1\0".to_vec();
     append_contract_string(&mut bytes, &problem.problem_id);
     bytes.extend_from_slice(&(problem.candidate_ids.len() as u64).to_le_bytes());
     for candidate_id in &problem.candidate_ids {
