@@ -47,13 +47,13 @@ The verifier checks:
 - consistency of the score-edit input digest, operation IDs, protected-window IDs and independent verifier result;
 - consistency of the receipt with the PartId-aware MIDI manifest, including the repository's 960 ticks-per-quarter resolution;
 - exact timeline, instrument-binding and capability-manifest digests; one-to-one timeline-segment/track correspondence; renderer/program/patch agreement; typed instrument-kind validation; per-note sounding-range checks; and per-instrument polyphony sweeps against the declared capability budget;
-- MIDI track/part/program/note event correspondence by parsing the actual SMF bytes, not by trusting manifest summaries;
+- MIDI track/part/program/note event correspondence by parsing the actual SMF bytes, not by trusting manifest summaries; unexpected controller messages, unrecognized metadata, and system-exclusive/escape events are rejected because the exporter does not declare them;
 - WAV parseability, declared sample format, frame count, finite samples, non-silence, and exact output-byte digest.
 
 ## Important boundaries
 
 - A passing integrity check is not an edit-acceptance decision.
-- `validate_receipt` recomputes the receipt seal in the public library API; callers cannot bypass seal verification by constructing a typed `ReceiptV1` and calling `verify_bundle` directly.
+- `validate_receipt` and receipt-only reporting recompute the receipt seal in the public library API; callers cannot bypass seal verification by constructing a typed `ReceiptV1` and calling library report functions directly.
 - V1 binds one shared renderer asset digest per attempt. Per-instrument heterogeneous asset sets require a future receipt schema; the verifier rejects missing or mismatched binding/receipt asset digests.
 - The standalone verifier independently re-derives the current velocity-only ScoreEditPlanV1 transformation from the source Score, checks every candidate note field and velocity, validates exact edit receipt deltas, and checks verifier report counts/issues. It does not yet independently support future ScoreEdit operation classes; unknown schema/operation classes must not be silently accepted.
 - MIDI parsing verifies the MIDI file against its own manifest. It does not prove the renderer consumed that MIDI. The invocation/executor evidence and trust boundary remain separate.
