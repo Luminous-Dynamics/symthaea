@@ -15,6 +15,8 @@ use std::collections::BTreeSet;
 use std::fmt;
 use symthaea_canvas::scene_graph::{NodeKind, SceneNode, Style, Transform};
 
+pub mod atelier;
+
 const ADAPTER_VERSION: &str = "0.2.0";
 const CANVAS_SCHEMA: &str = "symthaea-canvas-scene-node-serde-v1";
 const DIGEST_ENCODING: &str = "serde-json-compact-struct-order-v1";
