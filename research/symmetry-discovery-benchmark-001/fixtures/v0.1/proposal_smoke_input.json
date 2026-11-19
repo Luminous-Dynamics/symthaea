@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "benchmark_id": "LUMINOUS-SYMM-QUALIFIED-DISCOVERY-001",
-  "execution_id": "fixture-proposal-oracle-smoke-v0.1",
+  "execution_id": "fixture-structural-proposal-oracle-smoke-v0.1",
   "split": "fixture_sanity",
   "benchmark_track": "exact_finite_structural_stabilizer",
   "method": {
@@ -13,23 +13,35 @@
   "proposals": [
     {
       "case_id": "D4-SQUARE-POINTSET-001",
-      "proposed_subgroup_ids": ["e", "r90", "r180", "r270", "fx", "fy", "fdiag", "fanti"]
+      "proposed_subgroup_ids": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
     },
     {
       "case_id": "C4-CHIRAL-ORBIT-001",
-      "proposed_subgroup_ids": ["e", "r90", "r180", "r270", "fx", "fy", "fdiag", "fanti"]
+      "proposed_subgroup_ids": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ]
     },
     {
       "case_id": "D4-NEAR-SYMMETRY-BREAK-001",
-      "proposed_subgroup_ids": ["e"]
-    },
-    {
-      "case_id": "D4-REGRESSION-D4-001",
-      "proposed_subgroup_ids": ["e", "r90", "r180", "r270", "fx", "fy", "fdiag", "fanti"]
-    },
-    {
-      "case_id": "D4-REGRESSION-C4-001",
-      "proposed_subgroup_ids": ["e", "r90", "r180", "r270"]
+      "proposed_subgroup_ids": [
+        "e"
+      ]
     }
   ]
 }
