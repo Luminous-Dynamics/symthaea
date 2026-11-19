@@ -16,6 +16,7 @@
     "input_midi_path",
     "input_midi_sha256",
     "output_audio_path",
+    "output_audio_sha256",
     "arguments",
     "started_at",
     "finished_at",
@@ -86,6 +87,10 @@
     },
     "exit_code": {
       "type": "integer"
+    },
+    "output_audio_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     }
   }
 }
