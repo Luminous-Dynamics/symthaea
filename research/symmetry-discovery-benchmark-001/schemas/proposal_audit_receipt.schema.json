@@ -423,10 +423,7 @@
                           "type": "integer"
                         },
                         "transformed_coefficient": {
-                          "type": "integer",
-                          "not": {
-                            "const": 0
-                          }
+                          "type": "integer"
                         }
                       }
                     }
