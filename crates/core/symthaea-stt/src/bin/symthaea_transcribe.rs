@@ -642,6 +642,10 @@ fn cmd_benchmark(audio_file: &Path, iterations: usize) -> std::io::Result<()> {
 
     // Initialize engine with random prototypes
     let mut engine = TranscriptionEngine::new();
+    engine
+        .projector
+        .validate_input_sample_rate(sample_rate)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
     let inventory = PhonemeInventory::new();
     for phoneme in inventory.all() {
         let hv = HV16::random(&phoneme.ipa);
