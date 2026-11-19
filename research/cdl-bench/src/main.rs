@@ -598,6 +598,18 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
         .map(|chunk| u64::from_le_bytes(chunk.try_into().expect("eight-byte chunk")))
         .map(f64::from_bits)
         .collect();
+    // Deliberately misalign regime boundaries with 64/256/1024-value
+    // chunks and K=1/4/16/64 probe schedules. Even periods contain exact
+    // repeated bit patterns; odd periods contain random IEEE-754 patterns.
+    let probe_aliasing: Vec<f64> = (0..count)
+        .map(|i| {
+            if (i / 1537) % 2 == 0 {
+                f64::from_bits(0x4045_4000_0000_0000)
+            } else {
+                random_bits[i]
+            }
+        })
+        .collect();
 
     let sources = [
         ("constant", constant),
@@ -608,6 +620,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
         ("telemetry-idle-runs", telemetry_idle),
         ("signed-zero-switches", signed_zero_switches),
         ("nan-payload-runs", nan_payload_runs),
+        ("probe-period-misaligned-regimes", probe_aliasing),
         ("random-bit-pattern", random_bits),
     ];
 
