@@ -81,6 +81,7 @@ pub struct SubgroupHypothesisV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubgroupEnumerationEvidenceV1 {
     pub group_axiom_checks: u64,
+    pub raw_subset_masks_scanned: u64,
     pub candidate_subsets_examined: u64,
     pub identity_membership_checks: u64,
     pub inverse_closure_checks: u64,
@@ -328,6 +329,12 @@ pub fn enumerate_subgroups(
             required: u64::MAX,
             maximum: budget.maximum_work_units,
         })?;
+    let raw_subset_masks_scanned = 1_u64.checked_shl(order as u32).ok_or(
+        SubgroupErrorV1::WorkBudgetExceeded {
+            required: u64::MAX,
+            maximum: budget.maximum_work_units,
+        },
+    )?;
     let order_squared = (order as u64)
         .checked_mul(order as u64)
         .ok_or(SubgroupErrorV1::WorkBudgetExceeded {
@@ -336,6 +343,7 @@ pub fn enumerate_subgroups(
         })?;
     let worst_case_subset_work = candidate_subset_count
         .checked_mul(order_squared + order as u64)
+        .and_then(|value| value.checked_add(raw_subset_masks_scanned))
         .and_then(|value| value.checked_add(validated.axiom_checks))
         .ok_or(SubgroupErrorV1::WorkBudgetExceeded {
             required: u64::MAX,
@@ -412,7 +420,7 @@ pub fn enumerate_subgroups(
 
     let total_work_units = validated
         .axiom_checks
-        .checked_add(subsets_examined)
+        .checked_add(raw_subset_masks_scanned)
         .and_then(|value| value.checked_add(inverse_checks))
         .and_then(|value| value.checked_add(product_checks))
         .ok_or(SubgroupErrorV1::WorkBudgetExceeded {
@@ -434,8 +442,9 @@ pub fn enumerate_subgroups(
         subgroups,
         evidence: SubgroupEnumerationEvidenceV1 {
             group_axiom_checks: validated.axiom_checks,
+            raw_subset_masks_scanned,
             candidate_subsets_examined: subsets_examined,
-            identity_membership_checks: subsets_examined,
+            identity_membership_checks: raw_subset_masks_scanned,
             inverse_closure_checks: inverse_checks,
             product_closure_checks: product_checks,
             total_work_units,
@@ -1127,6 +1136,14 @@ mod tests {
             let enumeration = enumerate_subgroups(&group, SubgroupBudgetV1::default()).unwrap();
             assert_eq!(enumeration.subgroups.len(), expected_count);
             assert!(enumeration.evidence.complete_subset_lattice_search);
+            assert_eq!(
+                enumeration.evidence.raw_subset_masks_scanned,
+                1_u64 << group.element_ids.len()
+            );
+            assert_eq!(
+                enumeration.evidence.identity_membership_checks,
+                1_u64 << group.element_ids.len()
+            );
             assert_eq!(enumeration.subgroups[0].element_indices, vec![0]);
             assert_eq!(
                 enumeration.subgroups.last().unwrap().element_indices.len(),
