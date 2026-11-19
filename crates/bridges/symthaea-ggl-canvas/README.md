@@ -62,6 +62,20 @@ The all-in-one `Composite` style is not registered because its aggregate compute
 
 Additional bounds include an 8,192 scene-unit viewport, max_elements 5,000, max 10,000 visited nodes, depth 128, 256 polygon vertices, 256 gradient stops, 512 KiB per path, bounded scene strings and transforms, and a snapshot check that rejects rather than silently sanitizing/truncating inputs. Negative scale is allowed for reflection, while near-zero and unbounded transforms are rejected.
 
+
+## Visual-fidelity benchmark update (2026-11-19)
+
+The visual-QD pilot is being extended with a **separate faithfulness diagnostic**, not a single aesthetic leaderboard:
+
+- VectorGym (EMNLP 2026) is the broad multi-task baseline: Sketch2SVG, expert-authored complex SVG edits, Text2SVG and captioning. Its authors report a Qwen3-VL 8B GRPO baseline as open-source SOTA on their tasks, matching GPT-4o in their evaluation. [Paper](https://aclanthology.org/2026.emnlp-main.820/)
+- Vector-Bench (July 2026) is the surgical edit/preservation reference: 40 difficult repair tasks, 60.55 protected objects on average, and a reported best endpoint with 15.0% full-specification success and 43.7% mean repair progress. [Paper](https://arxiv.org/abs/2607.19056)
+- SVG-Score (September 2026) adds human-aligned semantic evaluation: its project page reports 8,671 SVGs, 1,858 captions and held-out human ratings; the authors show that generic CLIP barely responds to count and spatial-relation errors. [Paper](https://arxiv.org/abs/2609.03806) · [Project/results](https://potpov.github.io/svg-score-webpage/)
+- SVGFaith (November 4, 2026) is the newest relevant meta-evaluation: 1,842 controlled contrastive pairs over eight capability axes plus 1,327 human-annotated Arena comparisons. It reports that several embedding metrics are much stronger on object identity (at least 0.789 pairwise accuracy) than on spatial relations / attribute binding (at most 0.672), and proposes dependency-aware requirement scoring. These are author-reported preprint results, not results from GGL. [Paper](https://arxiv.org/abs/2611.06048) · [Code/data](https://github.com/Yukinonooo/SVGFaith)
+
+**GGL's response:** add a requirement-dependency graph whose leaves are atomic visual claims. Each requirement is independently classified as hard-geometric, render-observable, uncertain-perceptual, or human-judged. Hard geometry is checked by deterministic GGL/Canvas relations; rendered semantics use a separately calibrated visual evaluator; aesthetic preference remains human feedback. Parent requirements may depend on prerequisite nodes, but a failed prerequisite makes dependent claims fail or become not-evaluable—it must not silently disappear inside a scalar average. Keep the eight GGL diagnostic axes explicitly versioned and distinct from SVGFaith's axis labels.
+
+Targets should be reported separately: exact relation pass rate, pairwise faithfulness accuracy by axis/direction, spatial/attribute-binding accuracy, false acceptance of hard negatives, protected-object UCR, abstention calibration, human agreement and evaluator cost. Do not use CLIP score as the geometry verifier, and do not use an LLM judge as the hard-contract authority.
+
 ## Qualification
 
 `tests/adapter.rs` exercises all four supported primitives, raw source SHA binding, deterministic output, actual Canvas SVG rendering, stable IDs and malformed-input controls. `symthaea-canvas/tests/ggl_adapter_conformance.rs` independently checks the serialized Canvas fixture against the Rust types and renderer.
