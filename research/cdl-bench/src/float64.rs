@@ -107,18 +107,34 @@ fn encode_transform(values: &[f64], transform: Float64Transform) -> Result<Vec<u
         }
         Float64Transform::XorLeadingTrailing => {
             let mut previous = 0u64;
+            let mut window: Option<(u32, u32)> = None;
             for value in values {
                 let current = value.to_bits();
                 let residual = current ^ previous;
                 if residual == 0 {
-                    output.push(0);
+                    output.push(0); // zero XOR residual
                 } else {
-                    output.push(1);
-                    let leading = residual.leading_zeros() as u8;
-                    let trailing = residual.trailing_zeros() as u8;
-                    let width = 64 - leading as u32 - trailing as u32;
-                    output.push(leading);
-                    output.push(trailing);
+                    let actual_leading = residual.leading_zeros();
+                    let actual_trailing = residual.trailing_zeros();
+                    let reuse = window
+                        .map(|(leading, trailing)| {
+                            actual_leading >= leading && actual_trailing >= trailing
+                        })
+                        .unwrap_or(false);
+
+                    let (leading, trailing) = if reuse {
+                        output.push(1); // reuse prior window
+                        window.expect("reuse requires an initialized window")
+                    } else {
+                        output.push(2); // define a new window
+                        let next = (actual_leading, actual_trailing);
+                        output.push(next.0 as u8);
+                        output.push(next.1 as u8);
+                        window = Some(next);
+                        next
+                    };
+
+                    let width = 64 - leading - trailing;
                     let meaningful = residual >> trailing;
                     let payload_bytes = (width as usize + 7) / 8;
                     for byte in 0..payload_bytes {
@@ -166,19 +182,29 @@ fn decode_transform(
         }
         Float64Transform::XorLeadingTrailing => {
             let mut previous = 0u64;
+            let mut window: Option<(u32, u32)> = None;
             for _ in 0..count {
                 let marker = *bytes.get(cursor).ok_or(NumericError::TruncatedVarint)?;
                 cursor += 1;
                 let residual = match marker {
                     0 => 0,
-                    1 => {
-                        let leading = *bytes.get(cursor).ok_or(NumericError::TruncatedVarint)? as u32;
-                        cursor += 1;
-                        let trailing = *bytes.get(cursor).ok_or(NumericError::TruncatedVarint)? as u32;
-                        cursor += 1;
-                        if leading >= 64 || trailing >= 64 || leading + trailing >= 64 {
-                            return Err(NumericError::NumericOverflow);
-                        }
+                    1 | 2 => {
+                        let (leading, trailing) = if marker == 2 {
+                            let leading =
+                                *bytes.get(cursor).ok_or(NumericError::TruncatedVarint)? as u32;
+                            cursor += 1;
+                            let trailing =
+                                *bytes.get(cursor).ok_or(NumericError::TruncatedVarint)? as u32;
+                            cursor += 1;
+                            if leading >= 64 || trailing >= 64 || leading + trailing >= 64 {
+                                return Err(NumericError::NumericOverflow);
+                            }
+                            window = Some((leading, trailing));
+                            (leading, trailing)
+                        } else {
+                            window.ok_or(NumericError::NonCanonicalVarint)?
+                        };
+
                         let width = 64 - leading - trailing;
                         let payload_bytes = (width as usize + 7) / 8;
                         let end = cursor
@@ -199,14 +225,21 @@ fn decode_transform(
                                 return Err(NumericError::NonCanonicalVarint);
                             }
                         }
-                        if (meaningful & 1) == 0
-                            || ((meaningful >> (width - 1)) & 1) == 0
-                        {
+                        if meaningful == 0 {
                             return Err(NumericError::NonCanonicalVarint);
                         }
+
                         let residual = meaningful << trailing;
-                        if residual.leading_zeros() != leading
-                            || residual.trailing_zeros() != trailing
+                        if marker == 2 {
+                            if (meaningful & 1) == 0
+                                || ((meaningful >> (width - 1)) & 1) == 0
+                                || residual.leading_zeros() != leading
+                                || residual.trailing_zeros() != trailing
+                            {
+                                return Err(NumericError::NonCanonicalVarint);
+                            }
+                        } else if residual.leading_zeros() < leading
+                            || residual.trailing_zeros() < trailing
                         {
                             return Err(NumericError::NonCanonicalVarint);
                         }
@@ -1029,12 +1062,13 @@ mod tests {
     #[test]
     fn xor_leading_trailing_rejects_malformed_markers_and_spans() {
         for payload in [
-            vec![2],                         // unsupported marker
-            vec![1, 64, 0],                   // leading span out of range
-            vec![1, 0, 64],                   // trailing span out of range
-            vec![1, 32, 32],                  // empty meaningful window
-            vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // zero meaningful residual
-            vec![1, 0, 58, 0b1100_0001],      // nonzero unused upper bits
+            vec![3],                         // unsupported marker
+            vec![2, 64, 0],                   // leading span out of range
+            vec![2, 0, 64],                   // trailing span out of range
+            vec![2, 32, 32],                  // empty meaningful window
+            vec![2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // zero meaningful residual
+            vec![2, 0, 58, 0b1100_0001],      // nonzero unused upper bits
+            vec![1, 0, 0, 0],                 // reuse marker before any window
         ] {
             assert!(
                 decode_transform(&payload, Float64Transform::XorLeadingTrailing, 1).is_err(),
