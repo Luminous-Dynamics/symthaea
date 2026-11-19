@@ -1176,11 +1176,12 @@ fn verify_timeline_binding_bundle(
     }
     let mut capability_map = BTreeMap::new();
     for capability in capabilities {
+        let _kind = &capability.kind;
         if capability.id.trim().is_empty()
             || capability.sounding_range.lowest_midi > capability.sounding_range.highest_midi
             || capability.max_polyphony == 0 || capability.max_polyphony > 64
         {
-            return Err(format!("instrument capability {} has an invalid kind/range/polyphony budget", capability.id));
+            return Err(format!("instrument capability {} has an invalid range/polyphony budget", capability.id));
         }
         let id = capability.id.clone();
         if capability_map.insert(id.clone(), capability).is_some() {
@@ -1188,8 +1189,6 @@ fn verify_timeline_binding_bundle(
         }
     }
 
-    let used_instruments: std::collections::BTreeSet<&str> =
-        manifest.tracks.iter().map(|track| track.instrument_id.as_str()).collect();
     let mut track_map = BTreeMap::new();
     for track in &manifest.tracks {
         if track_map.insert(track.track_index, track).is_some() {
@@ -1197,9 +1196,6 @@ fn verify_timeline_binding_bundle(
         }
         let capability = capability_map.get(&track.instrument_id)
             .ok_or_else(|| format!("missing capability profile for instrument {}", track.instrument_id))?;
-        if !used_instruments.contains(track.instrument_id.as_str()) {
-            return Err("instrument capability is not bound to a used instrument".into());
-        }
         if capability.id != track.instrument_id {
             return Err("instrument capability identity does not match the MIDI track".into());
         }
