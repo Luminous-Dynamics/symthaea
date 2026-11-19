@@ -141,6 +141,33 @@ The CDL-Bench research branch now includes `ScmExpertMixturePredictor` (fixed-sh
 
 Its 40-stream public-development reference simulation shows a very small overall ideal-code-cost improvement versus lag, but a small regression on intervention streams. We therefore treat expert mixing as an adaptation baseline and falsification tool, not as a claimed causal-compression breakthrough. The report clearly separates ideal prequential bits from actual arithmetic-coded frame measurements.
 
+### 1.8 2026 floating-point time-series codecs materially raise the bar
+
+The floating-point benchmark needs to include several recent specialized algorithms that are more directly relevant than the current causal/i16 prototype.
+
+**DeXOR (PVLDB 2026, Vol. 19 No. 5).** DeXOR performs decimal-space XOR on common decimal prefixes/suffixes and includes exception handling for extreme exponents. Its paper reports evaluation across 22 datasets, claiming a 15% higher compression ratio and 20% faster decompression than its compared state of the art. Unlike several other recent papers, its authors publish code and datasets:
+- Paper: https://www.vldb.org/pvldb/vol19/p849-li.pdf
+- Artifact: https://github.com/SuDIS-ZJU/DeXOR
+- The repository supports Gorilla, Chimp, Chimp128, Elf, ElfPlus, Camel, DeXOR, ALP and other methods; reproducing the paper requires the documented Java 8 / Maven / TSFile setup.
+
+**Rabbit (25 March 2026).** Rabbit predicts temporal branch/flag distributions and applies a dedicated encoding to significant bits. Its paper reports an average 4.15% compression improvement over ACTF across 28 datasets, with a reported maximum relative reduction of 43.04% on highly redundant Server31/34/41 traces, plus 4.27% compression-time and 3.74% decompression-time improvements. The article's data availability statement does not publish a software artifact, so this is a paper-reported comparator unless an implementation is obtained.
+- Paper: https://www.mdpi.com/2073-8994/18/4/558
+
+**Dolphin (11 February 2026).** Dolphin targets oscillating floating-point streams where XOR residuals have few leading zeros. It uses a prefix-skip mechanism and adaptive multi-branch encoding. Its paper reports 1.6–1.8% compression-ratio improvement over its compared state-of-the-art methods (maximum 3.73%) on 18 datasets, with 9.3–18.3% faster compression and 8.5–9.7% faster decompression. The paper says code availability is not applicable; treat it as paper-only until an implementation can be reproduced.
+- Paper: https://link.springer.com/article/10.1007/s44443-026-00553-5
+
+**ACTF (2024).** ACTF remains a direct floating-point baseline, with a paper-reported average 12.25% compression-ratio improvement over Chimp/Gorilla-era comparators across 30 datasets. Rabbit uses it as a baseline, and Dolphin describes it as a prior algorithm to improve.
+- Paper: https://www.sciencedirect.com/science/article/pii/S1319157824003355
+
+These results are not directly interchangeable. They use different datasets, baseline versions, precision distributions, chunk sizes and ratio definitions. No single headline figure is a universal ranking. CDL-Bench should:
+1. reproduce DeXOR first because its implementation/data are available;
+2. include ACTF and its official baselines on the exact same double-precision corpora;
+3. treat Rabbit and Dolphin as paper-reported context until their code/configuration can be reproduced;
+4. add explicit oscillating/sign-alternating and highly redundant server-like regimes;
+5. separate per-dataset gains from geometric means and preserve cases where each method loses.
+
+The new Rust `float64` track is only a raw/XOR-previous-varint correctness baseline with bit-preserving frames and test fixtures. It is not a reimplementation of any of these codecs. See issue [CDL-Bench-007 #12874](https://github.com/Luminous-Dynamics/symthaea/issues/12874).
+
 ## 2. Revised benchmark matrix
 
 CDL-Bench should publish three compatible but separate tracks.
