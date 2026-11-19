@@ -142,7 +142,7 @@ impl Rng {
 }
 
 fn generated_worlds(clusters: u64) -> Vec<Case> {
-    let mut cases = Vec::with_capacity(clusters as usize * 16);
+    let mut cases = Vec::with_capacity(clusters as usize * 17);
     let baseline = Scope {
         regime: Regime::Baseline,
         objective: Objective::Quality,
@@ -268,6 +268,38 @@ fn generated_worlds(clusters: u64) -> Vec<Case> {
             shifted,
             0.88,
             0.32,
+            Some(Action::A),
+            false,
+        ));
+
+        let mut common_mode_shift = pair(
+            baseline,
+            id + 260,
+            family + 4,
+            0.80,
+            0.40,
+        );
+        common_mode_shift.push(exp(
+            id + 264,
+            family + 8,
+            shifted,
+            Action::A,
+            0.95,
+        ));
+        common_mode_shift.push(exp(
+            id + 265,
+            family + 9,
+            shifted,
+            Action::B,
+            0.55,
+        ));
+        cases.push(case(
+            cluster,
+            "common_mode_baseline_shift_same_effect",
+            common_mode_shift,
+            shifted,
+            1.0,
+            0.0,
             Some(Action::A),
             false,
         ));
@@ -778,6 +810,20 @@ mod tests {
     use super::*;
 
     #[test]
+    fn generated_common_mode_baseline_shift_preserves_treatment_effect() {
+        let cases = generated_worlds(1);
+        let item = cases
+            .iter()
+            .find(|case| case.family == "common_mode_baseline_shift_same_effect")
+            .unwrap();
+        let exact = decide(Policy::CausalQualified, &item.memory, item.query);
+        let transported = decide(Policy::InvariantTransport, &item.memory, item.query);
+
+        assert_eq!(exact.action, None);
+        assert_eq!(transported.action, Some(Action::A));
+    }
+
+    #[test]
     fn invariant_transport_wins_few_shot_but_abstains_on_mechanism_break() {
         let cases = generated_worlds(1);
         let invariant = cases
@@ -887,12 +933,12 @@ mod tests {
         let first = generated_worlds(8);
         let second = generated_worlds(8);
         assert_eq!(format!("{first:?}"), format!("{second:?}"));
-        assert_eq!(first.len(), 128);
+        assert_eq!(first.len(), 136);
         assert_eq!(first[0].cluster, 1);
-        assert_eq!(first[16].cluster, 2);
+        assert_eq!(first[17].cluster, 2);
         assert_ne!(
             first[0].memory[0].source_family,
-            first[16].memory[0].source_family
+            first[17].memory[0].source_family
         );
     }
 
@@ -914,7 +960,7 @@ mod tests {
     fn qualified_policy_has_no_generated_fixture_overclaims_or_invalid_reuse() {
         let cases = generated_worlds(16);
         let score = evaluate(Policy::CausalQualified, &cases);
-        assert_eq!(score.count, 256);
+        assert_eq!(score.count, 272);
         assert_eq!(score.overclaims, 0);
         assert_eq!(score.invalid_refs, 0);
         assert_eq!(score.unsupported_a, 0);

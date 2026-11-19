@@ -39,8 +39,6 @@ pub struct Scope {
 
 /// SHA-256 digest of a canonical upstream provenance-root identity.
 /// A digest identifies a root; it does not itself authenticate its issuer.
-/// SHA-256 digest of a canonical upstream provenance-root identity.
-/// A digest identifies a root; it does not itself authenticate its issuer.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SourceRootDigest([u8; 32]);
 
@@ -420,70 +418,129 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
             .add(item);
     }
 
-    let pool_action = |action: Action| -> Option<QualifiedGroup> {
-        let target = groups.get(&(query.scope.regime, action))?;
-        if target.count == 0 || target.source_families.is_empty() {
-            return None;
-        }
-
-        let mut pooled = target.clone();
-        let mut validated_source_regimes = 0usize;
-
-        for ((regime, candidate_action), source) in &groups {
-            if *candidate_action != action
-                || *regime == query.scope.regime
-                || !source.is_qualified()
-            {
-                continue;
-            }
-
-            if !source.source_families.is_disjoint(&target.source_families)
-                || !source.source_root_digests.is_disjoint(&target.source_root_digests)
-            {
-                return None;
-            }
-
-            let worst_case_effect_difference = (source.mean() - target.mean()).abs()
-                + source.mean_error_bound()
-                + target.mean_error_bound();
-            if worst_case_effect_difference > INVARIANCE_EQUIVALENCE_MARGIN {
-                return None;
-            }
-
-            pooled.sum += source.sum;
-            pooled.count += source.count;
-            pooled.error_bound_sum += source.error_bound_sum;
-            pooled.evidence_ids.extend(source.evidence_ids.iter().copied());
-            pooled
-                .source_families
-                .extend(source.source_families.iter().copied());
-            pooled
-                .source_root_digests
-                .extend(source.source_root_digests.iter().copied());
-            pooled
-                .source_events
-                .extend(source.source_events.iter().copied());
-            validated_source_regimes += 1;
-        }
-
-        (validated_source_regimes > 0).then_some(pooled)
-    };
-
-    let Some(a) = pool_action(Action::A) else {
+    // A target-regime witness for each action is mandatory. A single target
+    // observation is sufficient for a few-shot transfer test, but each source
+    // regime must carry independently qualified evidence for both actions.
+    let Some(target_a) = groups.get(&(query.scope.regime, Action::A)) else {
         return Decision::abstain();
     };
-    let Some(b) = pool_action(Action::B) else {
+    let Some(target_b) = groups.get(&(query.scope.regime, Action::B)) else {
         return Decision::abstain();
     };
+    if target_a.count == 0 || target_b.count == 0 {
+        return Decision::abstain();
+    }
 
-    let action = if a.mean() > b.mean() { Action::A } else { Action::B };
-    let difference = (a.mean() - b.mean()).abs();
-    let mut evidence_ids = a.evidence_ids;
-    evidence_ids.extend(b.evidence_ids);
+    let target_effect = target_a.mean() - target_b.mean();
+    let target_effect_error =
+        target_a.mean_error_bound() + target_b.mean_error_bound();
+    let target_families: BTreeSet<u16> = target_a
+        .source_families
+        .union(&target_b.source_families)
+        .copied()
+        .collect();
+    let target_roots: BTreeSet<SourceRootDigest> = target_a
+        .source_root_digests
+        .union(&target_b.source_root_digests)
+        .copied()
+        .collect();
+
+    let source_regimes: BTreeSet<Regime> = groups
+        .keys()
+        .filter_map(|(regime, _)| {
+            (*regime != query.scope.regime).then_some(*regime)
+        })
+        .collect();
+
+    let mut pooled_effect = target_effect;
+    let mut pooled_effect_error = target_effect_error;
+    let mut effect_regime_count = 1usize;
+    let mut evidence_ids = target_a.evidence_ids.clone();
+    evidence_ids.extend(target_b.evidence_ids.iter().copied());
+
+    let mut used_source_families = BTreeSet::new();
+    let mut used_source_roots = BTreeSet::new();
+    let mut validated_source_regimes = 0usize;
+
+    for regime in source_regimes {
+        let Some(source_a) = groups.get(&(regime, Action::A)) else {
+            continue;
+        };
+        let Some(source_b) = groups.get(&(regime, Action::B)) else {
+            continue;
+        };
+        if !source_a.is_qualified() || !source_b.is_qualified() {
+            continue;
+        }
+
+        let source_families: BTreeSet<u16> = source_a
+            .source_families
+            .union(&source_b.source_families)
+            .copied()
+            .collect();
+        let source_roots: BTreeSet<SourceRootDigest> = source_a
+            .source_root_digests
+            .union(&source_b.source_root_digests)
+            .copied()
+            .collect();
+
+        // No family or root may be laundered across source/target regimes or
+        // reused across nominally independent source regimes.
+        if !source_families.is_disjoint(&target_families)
+            || !source_roots.is_disjoint(&target_roots)
+            || !source_families.is_disjoint(&used_source_families)
+            || !source_roots.is_disjoint(&used_source_roots)
+        {
+            return Decision::abstain();
+        }
+
+        // Compare the causal contrast A-B, not each action's absolute outcome
+        // mean. This admits common-mode outcome shifts while rejecting effect
+        // modification. Error bounds are conservatively summed across all
+        // four action/regime means.
+        let source_effect = source_a.mean() - source_b.mean();
+        let source_effect_error =
+            source_a.mean_error_bound() + source_b.mean_error_bound();
+        let worst_case_effect_difference = (source_effect - target_effect).abs()
+            + source_effect_error
+            + target_effect_error;
+        if worst_case_effect_difference > INVARIANCE_EQUIVALENCE_MARGIN {
+            return Decision::abstain();
+        }
+
+        pooled_effect += source_effect;
+        pooled_effect_error += source_effect_error;
+        effect_regime_count += 1;
+        evidence_ids.extend(source_a.evidence_ids.iter().copied());
+        evidence_ids.extend(source_b.evidence_ids.iter().copied());
+        used_source_families.extend(source_families);
+        used_source_roots.extend(source_roots);
+        validated_source_regimes += 1;
+    }
+
+    if validated_source_regimes == 0 {
+        return Decision::abstain();
+    }
+
+    // Equal-weight regime contrasts avoid raw-outcome pooling bias from
+    // unequal A/B sample counts. Abstain if the aggregate effect interval
+    // still crosses zero.
+    let regime_count = effect_regime_count as f64;
+    let transported_effect = pooled_effect / regime_count;
+    let transported_error = pooled_effect_error / regime_count;
+    if transported_effect.abs() <= transported_error {
+        return Decision::abstain();
+    }
+
+    let action = if transported_effect > 0.0 {
+        Action::A
+    } else {
+        Action::B
+    };
 
     Decision {
         action: Some(action),
-        causal_claim: (difference >= 0.05).then_some(action),
+        causal_claim: (transported_effect.abs() >= 0.05).then_some(action),
         evidence_ids,
         probe: None,
     }
@@ -615,6 +672,50 @@ mod tests {
                 objective: Objective::Quality,
             },
         )
+    }
+
+    #[test]
+    fn invariant_transport_accepts_common_mode_baseline_shift() {
+        let memory = vec![
+            transport_case(30, 40, Regime::Baseline, Action::A, 0.80),
+            transport_case(31, 41, Regime::Baseline, Action::A, 0.80),
+            transport_case(32, 50, Regime::Baseline, Action::B, 0.40),
+            transport_case(33, 51, Regime::Baseline, Action::B, 0.40),
+            transport_case(34, 60, Regime::Shifted, Action::A, 0.95),
+            transport_case(35, 61, Regime::Shifted, Action::B, 0.55),
+        ];
+        let query = Query {
+            scope: Scope {
+                regime: Regime::Shifted,
+                objective: Objective::Quality,
+            },
+        };
+        let exact = decide(Policy::CausalQualified, &memory, query);
+        let transported = decide(Policy::InvariantTransport, &memory, query);
+
+        assert_eq!(exact.action, None);
+        assert_eq!(transported.action, Some(Action::A));
+        assert!(transported.causal_claim.is_some());
+    }
+
+    #[test]
+    fn invariant_transport_abstains_without_both_target_action_witnesses() {
+        let memory = vec![
+            transport_case(40, 40, Regime::Baseline, Action::A, 0.92),
+            transport_case(41, 41, Regime::Baseline, Action::A, 0.90),
+            transport_case(42, 50, Regime::Baseline, Action::B, 0.32),
+            transport_case(43, 51, Regime::Baseline, Action::B, 0.34),
+            transport_case(44, 60, Regime::Shifted, Action::A, 0.91),
+        ];
+        let query = Query {
+            scope: Scope {
+                regime: Regime::Shifted,
+                objective: Objective::Quality,
+            },
+        };
+        let decision = decide(Policy::InvariantTransport, &memory, query);
+        assert_eq!(decision.action, None);
+        assert!(decision.evidence_ids.is_empty());
     }
 
     #[test]

@@ -37,7 +37,7 @@ This is a stronger compile-time boundary than placing the oracle in another Rust
 
 ## Scenario families
 
-The deterministic fixed corpus includes seventeen two-session cases:
+The deterministic fixed corpus includes eighteen two-session cases:
 
 1. Identified interventional effect transfer.
 2. Confounded observational association decoy.
@@ -56,6 +56,7 @@ The deterministic fixed corpus includes seventeen two-session cases:
 15. Mechanism-break negative control after a regime shift.
 16. Common-cause attack: two source-family labels share one upstream root.
 17. Error-interval negative control: point estimates are close but measurement bounds exceed the equivalence margin.
+18. Common-mode baseline shift with invariant treatment effect.
 
 ## Compared policies
 
@@ -120,7 +121,7 @@ Do not pool percentages across these tasks. Reproduce each official protocol sep
 
 ## Generated stress tranche (MACE v0.6 research)
 
-A second evaluator binary adds **256 deterministic clusters × 16 scenario families = 4,096 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, a shared-common-root attack, an error-interval negative control, qualified negative experience, few-shot invariant transport, a mechanism-break negative control, and an unseen-target case that triggers active probing.
+A second evaluator binary adds **256 deterministic clusters × 17 scenario families = 4,352 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, a shared-common-root attack, an error-interval negative control, qualified negative experience, few-shot invariant transport, a mechanism-break negative control, and an unseen-target case that triggers active probing.
 
 Run it independently:
 
@@ -133,11 +134,11 @@ The candidate gate requires unique event IDs, at least two distinct nonzero sour
 
 This is a generated synthetic stress distribution—not an official MemoryArena/AMA-Bench adapter, learned-policy train/test split, sealed external oracle or real-world causal discovery. Source-family IDs vary to expose correlation/identity failures, but independence is not cryptographically attested. Bootstrap intervals quantify variation over these generated clusters only; they do not establish external validity. Session-C corrections are applied as observed source-state updates before the next decision.
 
-## Invariant transport experiment (MACE v0.5 research)
+## Invariant transport experiment (MACE v0.6 research)
 
-The candidate crate adds an `invariant_transport` policy alongside exact-scope `causal_qualified`. It may pool prior-regime experience only when the objective matches exactly, both actions have target-regime witnesses, prior-regime support has distinct source families and upstream roots, and source/target families and roots are disjoint. The worst-case difference between source and target effect intervals must fit within a fixed 0.12 normalized-utility equivalence margin.
+The candidate crate adds an `invariant_transport` policy alongside exact-scope `causal_qualified`. It compares the treatment contrast `mean(A) - mean(B)` across regimes—not the absolute outcome level for each action—so a common-mode baseline shift does not invalidate an unchanged action effect. Both actions need target-regime witnesses; each source regime needs independently qualified evidence for both actions; source/target family and root digests must be disjoint. The worst-case difference between source and target treatment-effect intervals must fit within a fixed 0.12 normalized-utility equivalence margin.
 
-The generated suite includes a few-shot invariant positive control and a mechanism-break negative control. Exact-scope policy should abstain on the positive few-shot case; invariant transport may transfer. It must abstain when action effects move beyond the tolerance or source families overlap.
+The generated suite includes a few-shot invariant positive control, a common-mode baseline-shift positive control, and a mechanism-break negative control. Exact-scope policy should abstain on the positive few-shot case; invariant transport may transfer. It must abstain when treatment effects move beyond the tolerance, target action witnesses are missing, or source-family/root lineage overlaps.
 
 This is a transparent empirical-invariance heuristic, not a general transportability proof. The 0.12 margin is a preregistered prototype constant, not empirically calibrated. Each observation carries a claimed absolute measurement-error bound; transport requires `abs(mean_source - mean_target) + mean_error_source + mean_error_target <= 0.12`. This is a deterministic worst-case interval-containment condition, not a statistical confidence interval. The bounds and root IDs remain candidate-visible claims and need sensor/protocol and source-ledger attestation.
 
@@ -368,3 +369,15 @@ The three evidence planes remain deliberately distinct:
 - Symthaea consolidation emits a proposal; an independent consolidation receipt verifier must attest the exact decision/input/output before the candidate can consume the promoted procedure.
 
 The older raw-JSONL evaluator now fails closed when the outcome receipt does not bind the exact preserved observation line, observed-at time, utility value and unit. The receipt registry remains a synthetic injected verifier seam. The canonical ingress/consolidation cross-crate path is stronger, but the raw-JSONL evaluator still uses a parallel test-only receipt schema; unifying it with the existing evidence receipt bundle and consolidation receipt types is the next integration task.
+
+### Treatment-effect transport semantics (MACE v0.6)
+
+Transport compares the causal contrast `mean(A) - mean(B)` between regimes. It does not require each action's absolute outcome mean to remain stable. This avoids rejecting a portable action effect when an environment-wide baseline shift moves both outcomes equally.
+
+For source regime `s` and target regime `t`, the deterministic worst-case check is:
+
+`abs((mean_A_s - mean_B_s) - (mean_A_t - mean_B_t)) + err_A_s + err_B_s + err_A_t + err_B_t <= 0.12`
+
+The target must contain a witness for each action; every contributing source regime must contain independently qualified evidence for both actions. Root and family digests must be disjoint across source/target and across contributing source regimes. The aggregated effect is an equal-weight average of regime contrasts, avoiding raw-outcome pooling bias from unequal action counts. If its error interval crosses zero, the policy abstains.
+
+This remains a deterministic prototype: measurement bounds and root digests require independent attestation, and the fixed equivalence margin is not a learned or statistically calibrated confidence level.

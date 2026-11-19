@@ -187,6 +187,15 @@ fn cases() -> Vec<Scenario> {
         item.source_root_digest = fixture_root_digest(700);
     }
 
+    let common_mode_shift = vec![
+        experience(180, 330, baseline_quality, Action::A, 0.80),
+        experience(181, 331, baseline_quality, Action::A, 0.80),
+        experience(182, 340, baseline_quality, Action::B, 0.40),
+        experience(183, 341, baseline_quality, Action::B, 0.40),
+        experience(184, 350, shifted_quality, Action::A, 0.95),
+        experience(185, 351, shifted_quality, Action::B, 0.55),
+    ];
+
     let mut wide_intervals = valid_pair(baseline_quality, 170, 0.92, 0.32);
     wide_intervals.push(experience(174, 304, shifted_quality, Action::A, 0.91));
     wide_intervals.push(experience(175, 305, shifted_quality, Action::B, 0.33));
@@ -339,6 +348,15 @@ fn cases() -> Vec<Scenario> {
             0.90,
             None,
             true,
+        ),
+        scenario(
+            "common_mode_baseline_shift_same_effect",
+            common_mode_shift,
+            Query { scope: shifted_quality },
+            1.0,
+            0.0,
+            Some(Action::A),
+            false,
         ),
         scenario(
             "invariance_interval_too_wide",
