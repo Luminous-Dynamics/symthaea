@@ -115,6 +115,9 @@ fn require_digest(field: &'static str, value: &str) -> Result<(), ContractError>
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BenchmarkConditions {
     pub task_profile_id: String,
+    /// Canonical digest of the complete matched trial condition bundle consumed by
+    /// independent endpoint assessments, including the exact task and shared conditions.
+    pub conditions_bundle_sha256: String,
     pub duration_seconds: u32,
     pub inlet_water_profile_sha256: String,
     pub delivery_conditions_sha256: String,
@@ -126,6 +129,10 @@ pub struct BenchmarkConditions {
 impl BenchmarkConditions {
     pub fn validate(&self) -> Result<(), ContractError> {
         require_nonempty("task_profile_id", &self.task_profile_id)?;
+        require_digest(
+            "conditions_bundle_sha256",
+            &self.conditions_bundle_sha256,
+        )?;
         if self.duration_seconds == 0 {
             return Err(ContractError::ZeroDuration);
         }
@@ -153,6 +160,11 @@ impl BenchmarkConditions {
         if self.task_profile_id != other.task_profile_id {
             return Err(ContractError::ContextMismatch {
                 field: "task_profile_id",
+            });
+        }
+        if self.conditions_bundle_sha256 != other.conditions_bundle_sha256 {
+            return Err(ContractError::ContextMismatch {
+                field: "conditions_bundle_sha256",
             });
         }
         if self.duration_seconds != other.duration_seconds {
@@ -346,6 +358,19 @@ pub fn validate_qualified_matched_comparison(
     QualifiedComparisonError,
 > {
     validate_matched_comparison(control, candidate, scope)?;
+    qualification_profile
+        .validate()
+        .map_err(QualifiedComparisonError::ServiceQualification)?;
+    if qualification_profile.conditions_sha256 != control.conditions.conditions_bundle_sha256
+        || qualification_profile.conditions_sha256
+            != candidate.conditions.conditions_bundle_sha256
+    {
+        return Err(QualifiedComparisonError::Benchmark(
+            ContractError::ContextMismatch {
+                field: "qualification_conditions_sha256",
+            },
+        ));
+    }
     crate::service_qualification::evaluate_matched_service_qualification(
         qualification_profile,
         control_qualification,
@@ -375,6 +400,7 @@ mod tests {
             run_id: run_id.to_owned(),
             conditions: BenchmarkConditions {
                 task_profile_id: "STANDARD_SHOWER".to_owned(),
+                conditions_bundle_sha256: digest('b'),
                 duration_seconds: 600,
                 inlet_water_profile_sha256: digest('a'),
                 delivery_conditions_sha256: digest('b'),
@@ -627,6 +653,68 @@ mod tests {
         assert_eq!(
             result.disposition,
             crate::service_qualification::MatchedComparisonDisposition::ControlIndeterminate
+        );
+    }
+
+    #[test]
+    fn qualified_comparison_requires_service_profile_to_bind_run_condition_bundle() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let candidate = run("candidate-001", "aqua-test-article", '8');
+        let profile = qualification_profile(
+            crate::service_qualification::QualificationClaim::FunctionalService,
+        );
+        let control_assessment = service_qualification_record(
+            "control-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let candidate_assessment = service_qualification_record(
+            "candidate-001",
+            &profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let mut unrelated_profile = profile.clone();
+        unrelated_profile.conditions_sha256 = digest('z');
+        let unrelated_control = service_qualification_record(
+            "control-001",
+            &unrelated_profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let unrelated_candidate = service_qualification_record(
+            "candidate-001",
+            &unrelated_profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+
+        assert_eq!(
+            validate_qualified_matched_comparison(
+                &control,
+                &candidate,
+                ComparisonScope::WaterServiceOnly,
+                &unrelated_profile,
+                &unrelated_control,
+                &unrelated_candidate,
+            ),
+            Err(QualifiedComparisonError::Benchmark(
+                ContractError::ContextMismatch {
+                    field: "qualification_conditions_sha256"
+                }
+            ))
+        );
+
+        // The bound profile remains valid for the same run context.
+        assert_eq!(
+            validate_qualified_matched_comparison(
+                &control,
+                &candidate,
+                ComparisonScope::WaterServiceOnly,
+                &profile,
+                &control_assessment,
+                &candidate_assessment,
+            )
+            .expect("bound profile")
+            .disposition,
+            crate::service_qualification::MatchedComparisonDisposition::CandidateQualified
         );
     }
 
