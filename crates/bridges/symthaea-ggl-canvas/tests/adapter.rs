@@ -127,6 +127,10 @@ fn rejects_duplicate_ids_unknown_primitives_and_invalid_arcs() {
     let mut invalid_arc: serde_json::Value = serde_json::from_str(COMPILED).unwrap();
     invalid_arc["primitives"][3]["sweep_rad"] = 9.0.into();
     assert!(adapt_compiled_scene(&invalid_arc.to_string(), "fixture").is_err());
+
+    let mut out_of_range_arc: serde_json::Value = serde_json::from_str(COMPILED).unwrap();
+    out_of_range_arc["primitives"][3]["cx"] = 1.0e300.into();
+    assert!(adapt_compiled_scene(&out_of_range_arc.to_string(), "fixture").is_err());
 }
 
 #[test]
@@ -167,6 +171,17 @@ fn supports_full_circle_arcs_as_two_svg_arc_segments() {
     match &output.scene.children[3].children[0].kind {
         NodeKind::Path { d } => assert_eq!(d.matches(" A ").count(), 2),
         other => panic!("full circular arc must remain a path: {other:?}"),
+    }
+}
+
+#[test]
+fn preserves_negative_arc_sweep_direction_after_axis_reflection() {
+    let mut negative_sweep: serde_json::Value = serde_json::from_str(COMPILED).unwrap();
+    negative_sweep["primitives"][3]["sweep_rad"] = (-1.5).into();
+    let output = adapt_compiled_scene(&negative_sweep.to_string(), "fixture").unwrap();
+    match &output.scene.children[3].children[0].kind {
+        NodeKind::Path { d } => assert!(d.contains("A 3.000000000000 3.000000000000 0 0 1")),
+        other => panic!("negative circular arc must remain a path: {other:?}"),
     }
 }
 
