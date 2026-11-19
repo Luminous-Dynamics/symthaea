@@ -284,7 +284,22 @@ impl AudioPerception {
         Ok(input)
     }
 
-    /// Process raw audio samples
+    /// Validate the source sample rate before processing PCM samples.
+    pub fn process_samples_at_rate(
+        &mut self,
+        samples: &[f32],
+        sample_rate: u32,
+    ) -> Result<AudioPerceptionResult> {
+        self.projector
+            .validate_input_sample_rate(sample_rate)
+            .map_err(anyhow::Error::msg)
+            .context("Audio sample rate does not match the perception encoder")?;
+        self.process_samples(samples)
+    }
+
+    /// Process mono PCM samples already resampled to the projector's configured rate.
+    ///
+    /// Prefer process_samples_at_rate() when the source sample rate is known.
     pub fn process_samples(&mut self, samples: &[f32]) -> Result<AudioPerceptionResult> {
         let start = std::time::Instant::now();
 
