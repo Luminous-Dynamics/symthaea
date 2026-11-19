@@ -15,7 +15,7 @@ pub mod numeric;
 pub mod float64;
 
 pub use numeric::{compress_i16, decompress_i16, NumericError, NumericTransform};
-pub use float64::{compress_f64, compress_f64_segmented, decompress_f64, decompress_f64_segmented, Float64Transform};
+pub use float64::{compress_f64, compress_f64_segmented, compress_f64_online_selector, decompress_f64, decompress_f64_segmented, decompress_f64_online_selector, Float64Transform};
 
 pub use causal::{e3_mechanism_splits, generate_fsm, generate_scm, generate_scm_with_config, FsmTrace, GeneratorError, ScmIntervention, ScmMechanismConfig, ScmResponse, ScmTrace};
 pub use scm_predictor::{ScmChangePointMixturePredictor, ScmExpertMixturePredictor, ScmFieldPredictor, ScmHybridPredictor, ScmLagPredictor, ScmParentPredictor, ScmShuffledParentPredictor};
