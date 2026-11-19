@@ -21,13 +21,13 @@ use sha2::{Digest, Sha256};
 use symthaea_music_theory::score_validation::is_universal_invariant;
 use symthaea_music_theory::{
     MusicalIntent, PitchClass, Score, ScoreValidationConfig, Style, ValidationSeverity,
-    compose_with_grammar_plan, validate_score,
+    compose_with_grammar_plan, validate_score, VoiceRole,
 };
 
 const HEADER: &str =
     "case_id,cohort,style,seed,valence_code,arousal_code,energy_code,bars_code";
 
-const METRICS: [&str; 18] = [
+const METRICS: [&str; 28] = [
     "score_note_count",
     "score_total_beats",
     "score_total_seconds",
@@ -46,6 +46,16 @@ const METRICS: [&str; 18] = [
     "score_warning_count",
     "score_universal_valid",
     "score_full_validation_valid",
+    "score_pitch_class_diversity",
+    "score_pitch_class_entropy_bits",
+    "score_melody_mean_interval_semitones",
+    "score_melody_step_fraction",
+    "score_melody_leap_fraction",
+    "score_onset_ioi_stddev_beats",
+    "score_offbeat_onset_fraction",
+    "score_voice_role_entropy_bits",
+    "score_duration_variety_count",
+    "score_section_intensity_stddev",
 ];
 
 const CONFIRMATION_STYLES: [&str; 6] = [
@@ -366,6 +376,22 @@ fn population_stddev(values: &[f64]) -> Option<f64> {
     Some(variance.sqrt())
 }
 
+fn categorical_entropy_bits(counts: &[usize], total: usize) -> Option<f64> {
+    if total == 0 {
+        return None;
+    }
+    Some(
+        counts
+            .iter()
+            .filter(|count| **count > 0)
+            .map(|count| {
+                let probability = *count as f64 / total as f64;
+                -probability * probability.log2()
+            })
+            .sum(),
+    )
+}
+
 fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
@@ -468,6 +494,80 @@ fn compose_case(
         )
     };
 
+    let mut pitch_class_counts = [0usize; 12];
+    for note in &score.notes {
+        pitch_class_counts[(note.pitch.midi() % 12) as usize] += 1;
+    }
+    let pitch_class_diversity = pitch_class_counts.iter().filter(|count| **count > 0).count();
+    let pitch_class_entropy = categorical_entropy_bits(&pitch_class_counts, note_count);
+
+    let mut melody_notes: Vec<_> = score
+        .notes
+        .iter()
+        .filter(|note| note.role == VoiceRole::Melody)
+        .collect();
+    melody_notes.sort_by(|left, right| left.onset.beats().total_cmp(&right.onset.beats()));
+    let melody_intervals: Vec<f64> = melody_notes
+        .windows(2)
+        .map(|pair| {
+            (f64::from(pair[1].pitch.midi()) - f64::from(pair[0].pitch.midi())).abs()
+        })
+        .collect();
+    let melody_mean_interval = mean(&melody_intervals);
+    let melody_step_fraction = if melody_intervals.is_empty() {
+        None
+    } else {
+        Some(
+            melody_intervals.iter().filter(|interval| **interval <= 2.0).count() as f64
+                / melody_intervals.len() as f64,
+        )
+    };
+    let melody_leap_fraction = if melody_intervals.is_empty() {
+        None
+    } else {
+        Some(
+            melody_intervals.iter().filter(|interval| **interval > 7.0).count() as f64
+                / melody_intervals.len() as f64,
+        )
+    };
+
+    let mut onsets: Vec<f64> = score.notes.iter().map(|note| note.onset.beats()).collect();
+    onsets.sort_by(f64::total_cmp);
+    let onset_intervals: Vec<f64> = onsets.windows(2).map(|pair| pair[1] - pair[0]).collect();
+    let onset_ioi_stddev = population_stddev(&onset_intervals);
+    let offbeat_onset_fraction = if onsets.is_empty() {
+        None
+    } else {
+        Some(
+            onsets
+                .iter()
+                .filter(|onset| (*onset - onset.round()).abs() > 1.0e-9)
+                .count() as f64
+                / onsets.len() as f64,
+        )
+    };
+
+    let mut role_counts = [0usize; 4];
+    for note in &score.notes {
+        let index = match note.role {
+            VoiceRole::Melody => 0,
+            VoiceRole::Harmony => 1,
+            VoiceRole::Bass => 2,
+            VoiceRole::CounterMelody => 3,
+        };
+        role_counts[index] += 1;
+    }
+    let role_entropy = categorical_entropy_bits(&role_counts, note_count);
+
+    let duration_variety_count = if durations.is_empty() {
+        None
+    } else {
+        let distinct: HashSet<u64> = durations.iter().map(|duration| duration.to_bits()).collect();
+        Some(distinct.len() as f64)
+    };
+
+    let intensity_stddev = population_stddev(&intensities);
+
     let metrics = vec![
         ("score_note_count", Some(note_count as f64)),
         ("score_total_beats", Some(total_beats)),
@@ -496,6 +596,16 @@ fn compose_case(
             "score_full_validation_valid",
             Some(if validation.valid { 1.0 } else { 0.0 }),
         ),
+        ("score_pitch_class_diversity", Some(pitch_class_diversity as f64)),
+        ("score_pitch_class_entropy_bits", pitch_class_entropy),
+        ("score_melody_mean_interval_semitones", melody_mean_interval),
+        ("score_melody_step_fraction", melody_step_fraction),
+        ("score_melody_leap_fraction", melody_leap_fraction),
+        ("score_onset_ioi_stddev_beats", onset_ioi_stddev),
+        ("score_offbeat_onset_fraction", offbeat_onset_fraction),
+        ("score_voice_role_entropy_bits", role_entropy),
+        ("score_duration_variety_count", duration_variety_count),
+        ("score_section_intensity_stddev", intensity_stddev),
     ];
 
     let note = format!(
