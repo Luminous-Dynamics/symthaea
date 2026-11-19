@@ -988,6 +988,22 @@ pub fn verify_midi_event_manifest(m: &MidiPerformanceManifestV1, bytes: &[u8]) -
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct SoundingRangeV1 {
+    lowest_midi: u8,
+    highest_midi: u8,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct InstrumentCapabilityV1 {
+    id: String,
+    kind: String,
+    sounding_range: SoundingRangeV1,
+    max_polyphony: u8,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct MidiInstrumentBindingV1 {
     instrument_id: String,
     renderer_id: String,
@@ -1108,20 +1124,80 @@ fn verify_timeline_binding_bundle(
     if domain_sha256(MIDI_CAPABILITY_DIGEST_SCHEMA_V1.as_bytes(), &capability_bytes) != receipt.midi.capability_sha256 {
         return Err("instrument-capability digest mismatch".into());
     }
-    let capabilities: Value = serde_json::from_slice(&capability_bytes)
+    let capabilities: Vec<InstrumentCapabilityV1> = serde_json::from_slice(&capability_bytes)
         .map_err(|e| format!("instrument capabilities JSON invalid: {e}"))?;
-    let capability_array = capabilities.as_array()
-        .ok_or("instrument capabilities must be a JSON array")?;
-    let mut capability_ids = Vec::new();
-    for capability in capability_array {
-        capability_ids.push(string_field(capability, "id", "instrument capability")?.to_owned());
+    if capabilities.len() > 128
+        || capabilities.windows(2).any(|pair| pair[0].id >= pair[1].id)
+    {
+        return Err("instrument capabilities must be unique, sorted by ID, and within the v1 resource limit".into());
     }
-    if capability_ids.windows(2).any(|pair| pair[0] >= pair[1]) {
-        return Err("instrument capabilities must be unique and sorted by ID".into());
+    let mut capability_map = BTreeMap::new();
+    for capability in capabilities {
+        if capability.id.trim().is_empty() || capability.kind.trim().is_empty()
+            || capability.sounding_range.lowest_midi > capability.sounding_range.highest_midi
+            || capability.max_polyphony == 0 || capability.max_polyphony > 64
+        {
+            return Err(format!("instrument capability {} has an invalid kind/range/polyphony budget", capability.id));
+        }
+        let id = capability.id.clone();
+        if capability_map.insert(id.clone(), capability).is_some() {
+            return Err(format!("duplicate instrument capability {id}"));
+        }
     }
+
+    let used_instruments: std::collections::BTreeSet<&str> =
+        manifest.tracks.iter().map(|track| track.instrument_id.as_str()).collect();
+    let mut track_map = BTreeMap::new();
     for track in &manifest.tracks {
-        if capability_ids.binary_search(&track.instrument_id).is_err() {
-            return Err(format!("missing capability profile for instrument {}", track.instrument_id));
+        if track_map.insert(track.track_index, track).is_some() {
+            return Err("duplicate track index during capability verification".into());
+        }
+        let capability = capability_map.get(&track.instrument_id)
+            .ok_or_else(|| format!("missing capability profile for instrument {}", track.instrument_id))?;
+        if !used_instruments.contains(track.instrument_id.as_str()) {
+            return Err("instrument capability is not bound to a used instrument".into());
+        }
+        if capability.id != track.instrument_id {
+            return Err("instrument capability identity does not match the MIDI track".into());
+        }
+    }
+
+    let mut polyphony_events: BTreeMap<String, Vec<(u64, i8)>> = BTreeMap::new();
+    for note in &manifest.notes {
+        let track = track_map.get(&note.track_index)
+            .ok_or_else(|| format!("note {} references missing track during capability check", note.source_note_ordinal))?;
+        let capability = capability_map.get(&track.instrument_id)
+            .ok_or_else(|| format!("missing capability for track instrument {}", track.instrument_id))?;
+        if note.pitch_midi < capability.sounding_range.lowest_midi
+            || note.pitch_midi > capability.sounding_range.highest_midi
+        {
+            return Err(format!("note {} pitch {} is outside capability range {}..={} for {}",
+                note.source_note_ordinal, note.pitch_midi, capability.sounding_range.lowest_midi,
+                capability.sounding_range.highest_midi, track.instrument_id));
+        }
+        if note.start_tick >= note.end_tick {
+            return Err(format!("note {} has invalid timing for capability check", note.source_note_ordinal));
+        }
+        let events = polyphony_events.entry(track.instrument_id.clone()).or_default();
+        events.push((note.start_tick, 1));
+        events.push((note.end_tick, -1));
+    }
+    for (instrument_id, events) in &mut polyphony_events {
+        events.sort_by_key(|(tick, delta)| (*tick, *delta));
+        let capability = capability_map.get(instrument_id)
+            .ok_or_else(|| format!("missing capability for instrument {instrument_id}"))?;
+        let mut active = 0_i32;
+        let mut peak = 0_i32;
+        for (_, delta) in events {
+            active += i32::from(*delta);
+            if active < 0 {
+                return Err(format!("instrument {instrument_id} polyphony event sequence is inconsistent"));
+            }
+            peak = peak.max(active);
+        }
+        if peak > i32::from(capability.max_polyphony) {
+            return Err(format!("instrument {instrument_id} reaches {peak} simultaneous notes, exceeding declared polyphony {}",
+                capability.max_polyphony));
         }
     }
     Ok(())
