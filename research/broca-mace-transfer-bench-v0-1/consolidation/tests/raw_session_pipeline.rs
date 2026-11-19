@@ -52,6 +52,7 @@ impl EvidenceVerifier for FixtureVerifier {
         Some(VerifiedLineage {
             source_family: u16::try_from(event_id).ok()?,
             source_root_id: 10_000 + event_id,
+            source_root_digest: fixture_root_digest(10_000 + event_id),
             trust_status: SourceTrustStatus::TrustedForScope,
             trust_policy_digest: "8".repeat(64),
             acquisition_mode: "fixture-ledger".into(),
@@ -135,6 +136,12 @@ impl EvidenceVerifier for FixtureVerifier {
             Some(SourceLifecycleStatus::Active)
         }
     }
+}
+
+fn fixture_root_digest(seed: u32) -> broca_mace_policy::SourceRootDigest {
+    let mut bytes = [0_u8; 32];
+    bytes[..4].copy_from_slice(&seed.to_be_bytes());
+    broca_mace_policy::SourceRootDigest::from_bytes(bytes)
 }
 
 fn target_scope() -> Scope {

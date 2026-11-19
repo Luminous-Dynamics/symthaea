@@ -46,6 +46,12 @@ struct Case {
     truth: Truth,
 }
 
+fn fixture_root_digest(seed: u32) -> broca_mace_policy::SourceRootDigest {
+    let mut bytes = [0_u8; 32];
+    bytes[..4].copy_from_slice(&seed.to_be_bytes());
+    broca_mace_policy::SourceRootDigest::from_bytes(bytes)
+}
+
 fn exp(
     id: u32,
     family: u16,
@@ -57,6 +63,7 @@ fn exp(
         event_id: id,
         source_family: family,
         source_root_id: u32::from(family),
+        source_root_digest: fixture_root_digest(u32::from(family)),
         scope,
         action,
         observed_utility: utility,
@@ -309,6 +316,7 @@ fn generated_worlds(clusters: u64) -> Vec<Case> {
         );
         for item in common_cause.iter_mut().filter(|item| item.action == Action::A) {
             item.source_root_id = u32::from(family + 15);
+            item.source_root_digest = fixture_root_digest(u32::from(family + 15));
         }
         cases.push(case(
             cluster,

@@ -48,6 +48,12 @@ struct Scenario {
     oracle: OracleTruth,
 }
 
+fn fixture_root_digest(seed: u32) -> broca_mace_policy::SourceRootDigest {
+    let mut bytes = [0_u8; 32];
+    bytes[..4].copy_from_slice(&seed.to_be_bytes());
+    broca_mace_policy::SourceRootDigest::from_bytes(bytes)
+}
+
 fn experience(
     event_id: u32,
     source_family: u16,
@@ -59,6 +65,7 @@ fn experience(
         event_id,
         source_family,
         source_root_id: u32::from(source_family),
+        source_root_digest: fixture_root_digest(u32::from(source_family)),
         scope,
         action,
         observed_utility,
@@ -177,6 +184,7 @@ fn cases() -> Vec<Scenario> {
     let mut common_cause = valid_pair(baseline_quality, 160, 0.96, 0.65);
     for item in common_cause.iter_mut().filter(|item| item.action == Action::A) {
         item.source_root_id = 700;
+        item.source_root_digest = fixture_root_digest(700);
     }
 
     let mut wide_intervals = valid_pair(baseline_quality, 170, 0.92, 0.32);
