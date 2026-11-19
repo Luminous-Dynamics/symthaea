@@ -1,0 +1,559 @@
+name: CEB Contract Validation V0
+
+on:
+  pull_request:
+    paths:
+      - "benchmarks/ceb/**"
+      - "docs/research/COMPUTATIONAL_ENGINEERING_BENCH_V0_2026-11-02.md"
+      - "docs/research/CEB_VERIFIER_INTEGRITY_PROTOCOL_V0_2026-11-02.md"
+      - ".github/workflows/ceb-contract-validation-v0.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install pinned Draft 2020-12 validator
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pinned schema validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv "$RUNNER_TEMP/ceb-jsonschema"
+          "$RUNNER_TEMP/ceb-jsonschema/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
+      - name: Validate CEB schemas, catalog, receipt sample and negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/ceb-jsonschema/bin/python" - <<'PY'
+          import base64
+          import copy
+          import json
+          import re
+          from datetime import datetime
+          from pathlib import Path, PurePosixPath
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          root = Path("benchmarks/ceb")
+          format_checker = FormatChecker()
+
+          def load_schema(name):
+              value = json.loads((root / name).read_text())
+              Draft202012Validator.check_schema(value)
+              return value
+
+          task_schema = load_schema("task.schema.json")
+          receipt_schema = load_schema("run-receipt.schema.json")
+          envelope_schema = load_schema("dsse-envelope.schema.json")
+          worlds_schema = load_schema("repository-worlds.schema.json")
+          task_validator = Draft202012Validator(task_schema, format_checker=format_checker)
+          receipt_validator = Draft202012Validator(receipt_schema, format_checker=format_checker)
+          envelope_validator = Draft202012Validator(envelope_schema, format_checker=format_checker)
+          worlds_validator = Draft202012Validator(worlds_schema, format_checker=format_checker)
+
+          def expect_reject(validator, value, label):
+              if not list(validator.iter_errors(value)):
+                  raise SystemExit(f"negative control unexpectedly passed: {label}")
+
+          catalog = json.loads((root / "catalog.v0.json").read_text())
+          if catalog["status"] != "design_only":
+              raise SystemExit("catalog status must remain design_only until qualification")
+          if catalog["task_count"] != len(catalog["tasks"]):
+              raise SystemExit("catalog task_count disagrees with actual task rows")
+          task_ids = [task["task_id"] for task in catalog["tasks"]]
+          if len(task_ids) != len(set(task_ids)):
+              raise SystemExit("catalog has duplicate task IDs")
+          if not all(task["execution_status"] == "design_only" for task in catalog["tasks"]):
+              raise SystemExit("unqualified task is incorrectly marked executable")
+          for task in catalog["tasks"]:
+              task_validator.validate(task)
+              if task["lane"] not in task_schema["properties"]["lane"]["enum"]:
+                  raise SystemExit(f"unknown task lane: {task['lane']}")
+
+          if "benchmark_integrity" not in task_schema["properties"]["lane"]["enum"]:
+              raise SystemExit("benchmark_integrity lane missing from task schema")
+          if "isolated_microvm" not in str(task_schema["allOf"]):
+              raise SystemExit("fixture-ready/qualified tasks must pin isolated runner profiles")
+
+          # The repository-twin gold graph is itself benchmark evidence: validate
+          # every node anchor and relationship before it can be used as an oracle.
+          fixture_root = root / "fixtures/repository-twin-synthetic-v0"
+          graph = json.loads((fixture_root / "gold-graph.v0.json").read_text())
+          mutations = json.loads((fixture_root / "mutations.v0.json").read_text())
+
+          def validate_repository_fixture(graph_value, mutations_value):
+              if graph_value["status"] != "design_only_unverified":
+                  raise ValueError("repository graph must remain explicitly unverified")
+              if graph_value["authority_policy"]["compiler_verified"] != "none":
+                  raise ValueError("fixture must not claim compiler-verified graph facts")
+              nodes = graph_value["nodes"]
+              ids = [node["id"] for node in nodes]
+              if len(ids) != len(set(ids)):
+                  raise ValueError("duplicate repository graph node IDs")
+              id_set = set(ids)
+              counts = graph_value["counts"]
+              actual = {
+                  "package_nodes": sum(node["kind"] == "package" for node in nodes),
+                  "symbol_and_test_nodes": sum(node["kind"] not in {"package", "feature", "target", "external_dependency"} for node in nodes),
+                  "feature_and_target_nodes": sum(node["kind"] in {"feature", "target"} for node in nodes),
+                  "external_dependency_nodes": sum(node["kind"] == "external_dependency" for node in nodes),
+                  "total_nodes": len(nodes),
+                  "edges": len(graph_value["edges"])
+              }
+              if counts != actual:
+                  raise ValueError("repository graph node/edge counts do not match its records")
+              edge_keys = [(edge["from"], edge["to"], edge["relation"]) for edge in graph_value["edges"]]
+              if len(edge_keys) != len(set(edge_keys)):
+                  raise ValueError("duplicate repository graph edges")
+              for edge in graph_value["edges"]:
+                  if edge["from"] not in id_set or edge["to"] not in id_set:
+                      raise ValueError("repository graph edge has a dangling endpoint")
+                  if edge["authority"] not in {"syntax_declared", "expected_semantic", "manifest_declared"}:
+                      raise ValueError("repository graph edge has an unknown authority")
+                  if edge["authority"] == "compiler_verified":
+                      raise ValueError("unverified fixture cannot contain compiler_verified edges")
+              for node in nodes:
+                  rel = PurePosixPath(node["path"])
+                  if rel.is_absolute() or not rel.parts or ".." in rel.parts or "\\" in node["path"] or "\x00" in node["path"]:
+                      raise ValueError(f"unsafe source path in graph node {node['id']}")
+                  source_path = fixture_root / Path(*rel.parts)
+                  try:
+                      source_path.resolve().relative_to(fixture_root.resolve())
+                  except ValueError as error:
+                      raise ValueError(f"source anchor escapes fixture root: {node['id']}") from error
+                  lines = source_path.read_text().splitlines()
+                  anchor = node["source_anchor"]
+                  if anchor["line"] < 1 or anchor["line"] > len(lines):
+                      raise ValueError(f"source line is out of range for {node['id']}")
+                  if lines[anchor["line"] - 1].strip() != anchor["text"]:
+                      raise ValueError(f"source declaration anchor mismatch for {node['id']}")
+                  declared_name = node["name"].split("::")[-1]
+                  if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", declared_name):
+                      identity_pattern = r"(?<![A-Za-z0-9_])" + re.escape(declared_name) + r"(?![A-Za-z0-9_])"
+                      identity_matches = re.search(identity_pattern, anchor["text"]) is not None
+                  else:
+                      identity_matches = declared_name in anchor["text"]
+                  if not identity_matches:
+                      raise ValueError(f"source anchor does not declare graph node name: {node['id']}")
+                  expected_anchor_authority = (
+                      "manifest_text_anchor"
+                      if anchor["kind"] == "manifest_name_anchor"
+                      else "source_text_anchor"
+                  )
+                  if anchor["authority"] != expected_anchor_authority:
+                      raise ValueError(f"unexpected source-anchor authority for {node['id']}")
+              if mutations_value["fixture_id"] != graph_value["fixture_id"]:
+                  raise ValueError("mutation scenarios refer to a different fixture ID")
+              cases = mutations_value["mutations"]
+              case_ids = [case["id"] for case in cases]
+              if len(case_ids) != len(set(case_ids)):
+                  raise ValueError("duplicate repository mutation scenario IDs")
+              for case in cases:
+                  unknown = set(case["expected_impact"]) - id_set
+                  if unknown:
+                      raise ValueError(f"mutation {case['id']} references unknown graph nodes: {sorted(unknown)}")
+              if not ids:
+                  raise ValueError("repository graph contains no nodes")
+              return len(nodes), len(graph_value["edges"]), len(cases)
+
+          repo_node_count, repo_edge_count, repo_mutation_count = validate_repository_fixture(graph, mutations)
+          if repo_node_count != 32 or repo_edge_count != 37 or repo_mutation_count != 7:
+              raise SystemExit("repository-twin synthetic fixture changed without an explicit benchmark revision")
+
+          worlds = json.loads((fixture_root / "worlds.v0.json").read_text())
+
+          def validate_repository_worlds(worlds_value, graph_value):
+              worlds_validator.validate(worlds_value)
+              if worlds_value["fixture_id"] != graph_value["fixture_id"]:
+                  raise ValueError("configuration-world matrix refers to a different repository fixture")
+              facts = worlds_value["conditional_facts"]
+              fact_ids = [fact["node_id"] for fact in facts]
+              if len(fact_ids) != len(set(fact_ids)):
+                  raise ValueError("duplicate conditional fact node ID")
+              conditional_nodes = {
+                  node["id"] for node in graph_value["nodes"]
+                  if node["kind"] in {"feature", "target", "external_dependency"} or "conditional" in node
+              }
+              if set(fact_ids) != conditional_nodes:
+                  raise ValueError("conditional fact inventory must exactly cover all feature/target-gated graph nodes")
+              vocabulary = set(worlds_value["feature_vocabulary"])
+              if len(vocabulary) != len(worlds_value["feature_vocabulary"]):
+                  raise ValueError("duplicate feature name in configuration-world vocabulary")
+              world_ids = [world["id"] for world in worlds_value["worlds"]]
+              if len(world_ids) != len(set(world_ids)):
+                  raise ValueError("duplicate configuration-world ID")
+              if len(world_ids) != 10:
+                  raise ValueError("V0 requires five Cargo feature-selection modes on each of two targets")
+              required_feature_modes = {
+                  (True, frozenset()),
+                  (False, frozenset()),
+                  (False, frozenset({"audit"})),
+                  (False, frozenset({"windows-native"})),
+                  (False, frozenset({"audit", "windows-native"}))
+              }
+              required_configurations = {
+                  (target_os, defaults_enabled, explicit)
+                  for target_os in {"linux", "windows"}
+                  for defaults_enabled, explicit in required_feature_modes
+              }
+              observed_configurations = {
+                  (world["target_os"], world["default_features_enabled"], frozenset(world["explicit_features"]))
+                  for world in worlds_value["worlds"]
+              }
+              if observed_configurations != required_configurations:
+                  raise ValueError("world matrix does not cover each default/explicit feature mode exactly once on both targets")
+              all_fact_ids = set(fact_ids)
+              for world in worlds_value["worlds"]:
+                  target_os = world["target_os"]
+                  triple = world["target_triple"]
+                  if target_os == "windows" and "windows" not in triple:
+                      raise ValueError(f"Windows world has non-Windows target triple: {world['id']}")
+                  if target_os == "linux" and "linux" not in triple:
+                      raise ValueError(f"Linux world has non-Linux target triple: {world['id']}")
+                  explicit_features = set(world["explicit_features"])
+                  if not explicit_features <= vocabulary:
+                      raise ValueError(f"world explicitly enables an undeclared Cargo feature: {world['id']}")
+                  computed_effective = set(explicit_features)
+                  if world["default_features_enabled"]:
+                      computed_effective.update({"audit"})
+                  declared_effective = set(world["effective_features"])
+                  if declared_effective != computed_effective:
+                      raise ValueError(f"declared effective Cargo features do not match defaults plus explicit features: {world['id']}")
+                  effective_features = computed_effective
+                  expected_triple = {
+                      "linux": "x86_64-unknown-linux-gnu",
+                      "windows": "x86_64-pc-windows-msvc"
+                  }[world["target_os"]]
+                  if world["target_triple"] != expected_triple:
+                      raise ValueError(f"target triple does not match target_os for world: {world['id']}")
+                  computed_active = set()
+                  for fact in facts:
+                      activation = fact["activation"]
+                      feature_ok = "feature" not in activation or activation["feature"] in effective_features
+                      target_ok = "target_os" not in activation or activation["target_os"] == target_os
+                      if feature_ok and target_ok:
+                          computed_active.add(fact["node_id"])
+                  declared_active = set(world["expected_active_nodes"])
+                  declared_inactive = set(world["expected_inactive_nodes"])
+                  if declared_active & declared_inactive:
+                      raise ValueError(f"world marks a conditional fact both active and inactive: {world['id']}")
+                  if declared_active | declared_inactive != all_fact_ids:
+                      raise ValueError(f"world does not account for every conditional fact exactly once: {world['id']}")
+                  if declared_active != computed_active or declared_inactive != all_fact_ids - computed_active:
+                      raise ValueError(f"conditional activation mismatch for configuration world: {world['id']}")
+              return len(world_ids), len(facts)
+
+          world_count, conditional_fact_count = validate_repository_worlds(worlds, graph)
+          if world_count != 10 or conditional_fact_count != 7:
+              raise SystemExit("repository target/feature world matrix changed without an explicit benchmark revision")
+
+          def expect_world_reject(worlds_value, graph_value, label):
+              try:
+                  validate_repository_worlds(worlds_value, graph_value)
+              except (ValidationError, ValueError, KeyError):
+                  return
+              raise SystemExit(f"repository configuration-world negative control unexpectedly passed: {label}")
+
+          mutant_worlds = copy.deepcopy(worlds)
+          linux_native = next(world for world in mutant_worlds["worlds"] if world["id"] == "linux-windows-native")
+          linux_native["expected_active_nodes"].append("sym.windows.os_version")
+          linux_native["expected_inactive_nodes"].remove("sym.windows.os_version")
+          expect_world_reject(mutant_worlds, graph, "Windows-only symbol activated on Linux")
+
+          mutant_worlds = copy.deepcopy(worlds)
+          linux_default = next(world for world in mutant_worlds["worlds"] if world["id"] == "linux-default")
+          linux_default["expected_active_nodes"].remove("sym.audit.record_access")
+          linux_default["expected_inactive_nodes"].append("sym.audit.record_access")
+          expect_world_reject(mutant_worlds, graph, "Cargo default audit feature incorrectly inactive")
+
+          mutant_worlds = copy.deepcopy(worlds)
+          windows_audit = next(world for world in mutant_worlds["worlds"] if world["id"] == "windows-audit")
+          windows_audit["expected_active_nodes"].remove("sym.audit.record_access")
+          windows_audit["expected_inactive_nodes"].append("sym.audit.record_access")
+          expect_world_reject(mutant_worlds, graph, "explicitly enabled audit feature symbol incorrectly inactive")
+
+          mutant_worlds = copy.deepcopy(worlds)
+          linux_default = next(world for world in mutant_worlds["worlds"] if world["id"] == "linux-default")
+          linux_default["effective_features"] = []
+          expect_world_reject(mutant_worlds, graph, "effective Cargo feature set disagrees with default-feature policy")
+
+          mutant_worlds = copy.deepcopy(worlds)
+          mutant_worlds["worlds"][0]["target_triple"] = "x86_64-pc-windows-msvc"
+          expect_world_reject(mutant_worlds, graph, "target triple does not match target OS")
+
+          mutant_worlds = copy.deepcopy(worlds)
+          windows_default = next(world for world in mutant_worlds["worlds"] if world["id"] == "windows-default")
+          windows_default["default_features_enabled"] = False
+          windows_default["explicit_features"] = ["audit"]
+          expect_world_reject(mutant_worlds, graph, "duplicated feature configuration hides missing default world")
+
+          mutant_worlds = copy.deepcopy(worlds)
+          mutant_worlds["worlds"][1]["id"] = mutant_worlds["worlds"][0]["id"]
+          expect_world_reject(mutant_worlds, graph, "duplicate configuration-world ID")
+
+          def expect_repo_reject(graph_value, mutations_value, label):
+              try:
+                  validate_repository_fixture(graph_value, mutations_value)
+              except (ValueError, OSError, KeyError):
+                  return
+              raise SystemExit(f"repository graph negative control unexpectedly passed: {label}")
+
+          mutant_graph = copy.deepcopy(graph)
+          mutant_graph["edges"][0]["to"] = "sym.not-present"
+          expect_repo_reject(mutant_graph, mutations, "dangling graph edge")
+
+          mutant_graph = copy.deepcopy(graph)
+          mutant_graph["nodes"][0]["source_anchor"]["line"] = 999999
+          expect_repo_reject(mutant_graph, mutations, "invalid source declaration anchor")
+
+          mutant_graph = copy.deepcopy(graph)
+          mutant_graph["edges"][0]["authority"] = "compiler_verified"
+          expect_repo_reject(mutant_graph, mutations, "semantic authority inflation")
+
+          mutant_graph = copy.deepcopy(graph)
+          mutant_graph["counts"]["edges"] += 1
+          expect_repo_reject(mutant_graph, mutations, "forged graph edge count")
+
+          mutant_graph = copy.deepcopy(graph)
+          mutant_graph["edges"].append(copy.deepcopy(mutant_graph["edges"][0]))
+          expect_repo_reject(mutant_graph, mutations, "duplicate graph edge")
+
+          mutant_graph = copy.deepcopy(graph)
+          mutant_graph["nodes"][0]["source_anchor"]["text"] = "not the source line"
+          expect_repo_reject(mutant_graph, mutations, "source anchor text mismatch")
+
+          mutant_graph = copy.deepcopy(graph)
+          mutant_graph["nodes"][0]["path"] = "../../grader.json"
+          expect_repo_reject(mutant_graph, mutations, "source path traversal")
+
+          mutant_mutations = copy.deepcopy(mutations)
+          mutant_mutations["mutations"][0]["expected_impact"].append("sym.not-present")
+          expect_repo_reject(graph, mutant_mutations, "mutation references unknown graph node")
+
+          mutant_mutations = copy.deepcopy(mutations)
+          mutant_mutations["mutations"][1]["id"] = mutant_mutations["mutations"][0]["id"]
+          expect_repo_reject(graph, mutant_mutations, "duplicate mutation scenario ID")
+
+          # A valid source line is not sufficient: it must declare the named node.
+          mutant_graph = copy.deepcopy(graph)
+          user_node = next(node for node in mutant_graph["nodes"] if node["id"] == "sym.User")
+          user_node["source_anchor"] = {
+              "line": 4,
+              "kind": "declaration_anchor",
+              "text": "pub struct UserId(pub u64);",
+              "authority": "source_text_anchor"
+          }
+          expect_repo_reject(mutant_graph, mutations, "valid line anchor for wrong symbol")
+
+          # Manifest identity has its own provenance authority; swapping it to a
+          # source-code authority must be rejected.
+          mutant_graph = copy.deepcopy(graph)
+          package_node = next(node for node in mutant_graph["nodes"] if node["id"] == "pkg.domain")
+          package_node["source_anchor"]["authority"] = "source_text_anchor"
+          expect_repo_reject(mutant_graph, mutations, "manifest anchor authority mismatch")
+
+          # Positive shape control: a design-only task is valid as a design record.
+          task_validator.validate(catalog["tasks"][0])
+
+          # Negative control: host execution cannot be called fixture-ready.
+          fixture_ready = copy.deepcopy(catalog["tasks"][0])
+          fixture_ready["execution_status"] = "fixture_ready"
+          fixture_ready["source_snapshot"].update({
+              "uri": "fixture://synthetic",
+              "revision": "fixture-revision-1",
+              "tree_sha256": "a" * 64
+          })
+          fixture_ready["environment"].update({
+              "image": "oci://fixture@sha256:" + "b" * 64,
+              "toolchain_lock_sha256": "c" * 64,
+              "runner_profile": "trusted_host_development",
+              "runner_policy_sha256": "f" * 64
+          })
+          fixture_ready["acceptance"].update({
+              "reference_patch_sha256": "d" * 64,
+              "independent_grader": "isolated-grader",
+              "grader_sha256": "e" * 64,
+              "checks": [{
+                  "check_id": "hidden.correctness",
+                  "kind": "hidden_test",
+                  "authority": "independent_grader",
+                  "required": True,
+                  "description": "Hidden behavior contract is verified independently."
+              }]
+          })
+          expect_reject(task_validator, fixture_ready, "fixture_ready task on trusted host")
+
+          def validate_statement(value):
+              receipt_validator.validate(value)
+              predicate = value["predicate"]
+              checks = predicate["checks"]
+              required = [check for check in checks if check["required"]]
+              check_ids = [check["check_id"] for check in checks]
+              if len(check_ids) != len(set(check_ids)):
+                  raise ValueError("duplicate check IDs")
+              artifact_ids = [item["artifact_id"] for item in predicate["artifacts"]]
+              if len(artifact_ids) != len(set(artifact_ids)):
+                  raise ValueError("duplicate artifact IDs")
+              counts = {
+                  "required_check_count": len(required),
+                  "required_pass_count": sum(check["status"] == "pass" for check in required),
+                  "required_fail_count": sum(check["status"] == "fail" for check in required),
+                  "required_error_count": sum(check["status"] == "error" for check in required),
+                  "required_skipped_count": sum(check["status"] == "skipped" for check in required),
+              }
+              for field, expected in counts.items():
+                  if predicate["result"][field] != expected:
+                      raise ValueError(f"claimed {field} does not match check rows")
+              subjects = value["subject"]
+              subject_names = [subject["name"] for subject in subjects]
+              if len(subject_names) != len(set(subject_names)):
+                  raise ValueError("duplicate in-toto subject names")
+              subject_digests = {
+                  subject["name"]: subject["digest"]["sha256"]
+                  for subject in subjects
+              }
+              if set(subject_digests) != {"ceb/candidate.patch", "ceb/source.tree", "ceb/result.tree"}:
+                  raise ValueError("statement must bind exactly candidate patch, source tree and result tree subjects")
+              candidate = predicate["candidate"]
+              task = predicate["task"]
+              if candidate["base_tree_sha256"] != task["source_tree_sha256"]:
+                  raise ValueError("candidate base tree does not match the task source tree")
+              if subject_digests["ceb/candidate.patch"] != candidate["patch_sha256"]:
+                  raise ValueError("in-toto candidate subject does not match predicate patch digest")
+              if subject_digests["ceb/source.tree"] != task["source_tree_sha256"]:
+                  raise ValueError("in-toto source subject does not match predicate source tree digest")
+              if subject_digests["ceb/result.tree"] != candidate["result_tree_sha256"]:
+                  raise ValueError("in-toto result subject does not match predicate result tree digest")
+              for changed_path in candidate["changed_paths"]:
+                  relative = PurePosixPath(changed_path)
+                  if relative.is_absolute() or not relative.parts or ".." in relative.parts or "." in relative.parts:
+                      raise ValueError(f"candidate changed path is not canonical and relative: {changed_path!r}")
+                  if "\\" in changed_path or "\x00" in changed_path:
+                      raise ValueError(f"candidate changed path contains a forbidden separator/control: {changed_path!r}")
+              execution = predicate["execution"]
+              started = datetime.fromisoformat(execution["started_at_utc"].replace("Z", "+00:00"))
+              finished = datetime.fromisoformat(execution["finished_at_utc"].replace("Z", "+00:00"))
+              if finished < started:
+                  raise ValueError("execution finish precedes start")
+              if execution["stage"] == "primary" and execution["regrade_of_receipt_sha256"] is not None:
+                  raise ValueError("primary receipt cannot point to a prior regrade receipt")
+              result = predicate["result"]
+              if result["verdict"] == "pass":
+                  if not required or any(check["status"] != "pass" for check in required):
+                      raise ValueError("pass requires every required check to pass")
+                  if any(check["evidence_sha256"] is None for check in required):
+                      raise ValueError("pass requires evidence digests for every required check")
+                  if result["safety_violation"] or result["protocol_violation"]:
+                      raise ValueError("pass cannot include a safety or protocol violation")
+              elif result["verdict"] == "fail":
+                  if not (result["required_fail_count"] or result["required_error_count"] or result["safety_violation"] or result["protocol_violation"]):
+                      raise ValueError("fail requires a failed/error check or explicit safety/protocol violation")
+
+          # Validate the explicitly unresolved example statement.
+          sample_path = root / "examples/design-only-unexecuted-example.statement.json"
+          statement = json.loads(sample_path.read_text())
+          validate_statement(statement)
+          if statement["predicate"]["result"]["verdict"] != "unresolved":
+              raise SystemExit("design-only statement example must be unresolved")
+          if statement["predicate"]["execution"]["runner_profile"] != "simulation":
+              raise SystemExit("design-only statement example must not claim isolation")
+
+          # A primary execution can truthfully pass on its own. That receipt
+          # is not final acceptance: the pair verifier must later require a
+          # matching pristine-regrade receipt from an independent run.
+          valid_primary_pass = copy.deepcopy(statement)
+          predicate = valid_primary_pass["predicate"]
+          predicate["checks"][0].update({"status": "pass", "evidence_sha256": "9" * 64})
+          predicate["result"].update({
+              "verdict": "pass",
+              "required_check_count": 1,
+              "required_pass_count": 1,
+              "required_fail_count": 0,
+              "required_error_count": 0,
+              "required_skipped_count": 0,
+              "safety_violation": False,
+              "protocol_violation": False
+          })
+          predicate["execution"].update({
+              "stage": "primary",
+              "runner_profile": "isolated_microvm",
+              "image_digest": "sha256:" + "f" * 64,
+              "network_policy": "disabled",
+              "regrade_of_receipt_sha256": None
+          })
+          predicate["grader"].update({
+              "trust_domain": "separate_host_control_plane",
+              "candidate_access": "read_only"
+          })
+          validate_statement(valid_primary_pass)
+
+          # The corresponding pristine-regrade statement must bind the primary
+          # receipt digest and remain a distinct run.
+          valid_regrade_pass = copy.deepcopy(valid_primary_pass)
+          valid_regrade_pass["predicate"]["execution"].update({
+              "run_id": "independent-regrade-run-0002",
+              "stage": "pristine_regrade",
+              "regrade_of_receipt_sha256": "a" * 64
+          })
+          validate_statement(valid_regrade_pass)
+
+          def expect_statement_reject(mutant, label):
+              try:
+                  validate_statement(mutant)
+              except (ValidationError, ValueError):
+                  return
+              raise SystemExit(f"receipt semantic negative control unexpectedly passed: {label}")
+
+          for label, mutate in [
+              ("regrade without parent receipt", lambda p: p["execution"].update({"stage": "pristine_regrade", "regrade_of_receipt_sha256": None})),
+              ("primary receipt with regrade parent", lambda p: p["execution"].update({"regrade_of_receipt_sha256": "a" * 64})),
+              ("pass on simulation runner", lambda p: p["execution"].update({"runner_profile": "simulation"})),
+              ("pass without image digest", lambda p: p["execution"].update({"image_digest": None})),
+              ("pass with unrestricted network", lambda p: p["execution"].update({"network_policy": "unrestricted_not_qualifying"})),
+              ("pass after safety violation", lambda p: p["result"].update({"safety_violation": True})),
+              ("pass without required check evidence digest", lambda p: p["checks"][0].update({"evidence_sha256": None})),
+              ("pass when a required check row is skipped", lambda p: p["checks"][0].update({"status": "skipped"})),
+              ("forged required-pass counter", lambda p: p["result"].update({"required_pass_count": 0})),
+              ("duplicate check identity", lambda p: p["checks"].append(copy.deepcopy(p["checks"][0]))),
+              ("candidate subject digest mismatch", lambda p: p["subject"][0]["digest"].update({"sha256": "8" * 64})),
+              ("result tree subject digest mismatch", lambda p: p["subject"][2]["digest"].update({"sha256": "6" * 64})),
+              ("base tree provenance mismatch", lambda p: p["candidate"].update({"base_tree_sha256": "7" * 64})),
+              ("execution finish precedes start", lambda p: p["execution"].update({"started_at_utc": "2026-11-03T00:00:00Z", "finished_at_utc": "2026-11-02T00:00:00Z"})),
+              ("path traversal in changed paths", lambda p: p["candidate"].update({"changed_paths": ["../grader.sh"]})),
+              ("fail without a failed/error check", lambda p: p["result"].update({"verdict": "fail"})),
+          ]:
+              mutant = copy.deepcopy(valid_primary_pass)
+              mutate(mutant["predicate"] if label not in {"candidate subject digest mismatch", "result tree subject digest mismatch"} else mutant)
+              expect_statement_reject(mutant, label)
+
+          # A shape-only envelope with a real serialized statement payload.
+          # The placeholder signature is NOT cryptographically verified here.
+          payload_bytes = json.dumps(valid_primary_pass, sort_keys=True, separators=(",", ":")).encode("utf-8")
+          envelope = {
+              "payloadType": "application/vnd.in-toto+json",
+              "payload": base64.b64encode(payload_bytes).decode("ascii"),
+              "signatures": [{"keyid": "schema-shape-only", "sig": "AA=="}]
+          }
+          envelope_validator.validate(envelope)
+          decoded_statement = json.loads(base64.b64decode(envelope["payload"], validate=True))
+          validate_statement(decoded_statement)
+          expect_reject(envelope_validator, {**envelope, "signatures": []}, "DSSE envelope without signatures")
+          expect_reject(envelope_validator, {**envelope, "payloadType": "application/json"}, "wrong authenticated payload type")
+          expect_reject(envelope_validator, {**envelope, "payload": "not base64!"}, "malformed base64 payload")
+          expect_reject(envelope_validator, {**envelope, "signatures": [{"keyid": "", "sig": "AA=="}]}, "empty DSSE key identifier")
+
+          print(
+              "CEB_CONTRACT_SCHEMA_PASS: "
+              f"tasks={len(task_ids)} unique_tasks={len(set(task_ids))} "
+              f"schemas=4 negative_controls=39 worlds={world_count} conditional_facts={conditional_fact_count}"
+          )
+          print("CEB_CLAIM_BOUNDARY: schema validation is not DSSE signature verification or runner qualification")
+          PY

@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-ceb-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = ["audit"]
+audit = []
+windows-native = ["dep:windows-sys"]
+
+[dependencies]
+symthaea-ceb-domain.workspace = true
+symthaea-ceb-service.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_System_SystemInformation"], optional = true }
+
+[dev-dependencies]
+symthaea-ceb-store.workspace = true

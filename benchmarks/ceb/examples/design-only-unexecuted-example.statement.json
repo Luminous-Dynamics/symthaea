@@ -1,0 +1,103 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "ceb/candidate.patch",
+      "digest": {
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "name": "ceb/source.tree",
+      "digest": {
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    },
+    {
+      "name": "ceb/result.tree",
+      "digest": {
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      }
+    }
+  ],
+  "predicateType": "https://luminousdynamics.io/attestations/ceb-run/v0",
+  "predicate": {
+    "schema_version": 0,
+    "receipt_kind": "ceb_run_receipt",
+    "receipt_id": "design-only-example-0001",
+    "task": {
+      "task_id": "CEB-RUST-001",
+      "task_contract_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "source_tree_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "fixture_revision": "not-provisioned",
+      "source_tree_digest_algorithm": "ceb-tree-v1"
+    },
+    "candidate": {
+      "base_tree_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "patch_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "result_tree_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "changed_paths": []
+    },
+    "agent": {
+      "agent_id": "not-run",
+      "model_id": "not-run",
+      "harness_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "configuration_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "secrets_exposed": false
+    },
+    "execution": {
+      "run_id": "not-executed-design-example",
+      "stage": "primary",
+      "runner_profile": "simulation",
+      "image_digest": null,
+      "runner_policy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "network_policy": "unrestricted_not_qualifying",
+      "started_at_utc": "2026-11-02T00:00:00Z",
+      "finished_at_utc": "2026-11-02T00:00:00Z",
+      "regrade_of_receipt_sha256": null,
+      "toolchain_lock_sha256": null
+    },
+    "grader": {
+      "grader_id": "not-provisioned",
+      "grader_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "trust_domain": "same_guest_not_qualifying",
+      "candidate_access": "read_only",
+      "hidden_tests_visible_to_agent": false,
+      "grader_writable_by_agent": false
+    },
+    "checks": [
+      {
+        "check_id": "fixture.not-provisioned",
+        "kind": "unit_test",
+        "required": true,
+        "authority": "independent_grader",
+        "status": "skipped",
+        "evidence_sha256": null
+      }
+    ],
+    "result": {
+      "verdict": "unresolved",
+      "required_check_count": 1,
+      "required_pass_count": 0,
+      "required_fail_count": 0,
+      "required_error_count": 0,
+      "required_skipped_count": 1,
+      "safety_violation": false,
+      "protocol_violation": false
+    },
+    "resources": {
+      "wall_clock_ms": 0,
+      "cpu_time_ms": 0,
+      "peak_memory_bytes": 0,
+      "peak_disk_bytes": 0,
+      "output_bytes": 0,
+      "input_tokens": null,
+      "output_tokens": null,
+      "cost_usd": null,
+      "turns": 0,
+      "tool_calls": 0
+    },
+    "artifacts": []
+  }
+}
