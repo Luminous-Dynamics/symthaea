@@ -79,3 +79,19 @@ The public arXiv HTML for AutoSuperCon describes the extraction method and evalu
 Itani et al., *Large language models for superconductor discovery*, Journal of Magnetism and Magnetic Materials 652 (15 August 2026), reports 78,203 literature-derived records across 19,058 unique compositions, including experimentally reported superconductors and non-superconductors. Its tasks include SC/NSC classification, composition/structure-aware Tc prediction and inverse design. The paper reports that 28% of inverse-design outputs were unseen in its training data and identifies GNoME candidates with predicted Tc > 10 K; those outputs are unverified and are not discoveries. A count discrepancy (78,203 in the abstract versus 78,204 in one methods description) must be resolved against the official release before replay.
 
 The paper identifies the official data site at https://www.nemad.org, code repository at https://github.com/sumanitani/LLM_for_Superconductors and model index at https://huggingface.co/sumanitani. Data, code and checkpoint reuse terms must be separately pinned before copying or retraining. Reproduction is tracked in [NEMAD-SC-REPRO-001 #12648](https://github.com/Luminous-Dynamics/symthaea/issues/12648). This remains a distinct label/extraction track from AutoSuperCon and BEE-NET.
+
+## Additional 2026 baselines (19 November 2026)
+
+Two recently published approaches expand the evaluation landscape:
+
+- **Feasibility-first hierarchical inference** (Physical Review Materials, 25 August 2026, DOI 10.1103/bg57-bjdk) evaluates superconducting feasibility first using an electronic-compositional backbone, then predicts (T_c) conditionally using additional structural and magnetic/orbital descriptors. The abstract reports a reduction in end-to-end (T_c) error on a balanced dataset of more than 26,000 inorganic materials, including superconductors and non-superconductors. Exact metrics, split manifests, and artifact identities remain to be audited; the registry therefore marks it not reproduced.
+- **DataG Non-Sc / genome-inspired extrapolation** (Scientific Reports, early access 29 October 2026, DOI 10.1038/s41598-026-76977-w) introduces a 53,196-material non-superconductor control dataset and compares ten ML with nine neural-network models. The paper reports Pu-based and hydride candidate predictions, including a predicted (T_c\sim89\,K) for Pu2Co17; these are predictions, not measured materials. The dataset's non-superconducting label criteria, row manifest, group splits, and model artifacts require independent qualification. Radioactive actinide candidates stay computational-only unless a qualified institution explicitly handles the relevant review.
+
+These methods create complementary benchmark tracks rather than one unified leaderboard:
+1. feasibility classification with calibrated abstention and hard negative controls;
+2. conditional (T_c) regression given superconducting feasibility;
+3. family/prototype/source/time extrapolation;
+4. mechanism-conditioned observables and model discrimination;
+5. synthesis/phase realization and same-specimen experimental confirmation.
+
+Do not score a candidate merely because it is ranked highly. A useful discovery claim requires the identity, mechanism applicability, predicted and observed properties, synthesis pathway, and independent validation to be separately evidenced.
