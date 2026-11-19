@@ -134,3 +134,44 @@ Required rules for that extension:
 7. Include negative controls for database non-report treated as negative, condition-mismatched labels, family/source leakage, and selective abstention on the hardest class.
 
 The research target is not simply a better (T_c) MAE. It is calibrated detection of *where superconductivity is evidenced*, followed by conditional property prediction, OOD abstention, and prospective confirmation. This target needs source-qualified labels before model training or SOTA comparison.
+
+## v0.2 implementation: tri-state feasibility followed by conditional Tc
+
+The new synthetic-only contract `SC-FEASIBILITY-GATE-0.1` turns the feasibility-first research specification into an executable admission gate. Its Rust binary is `sc_feasibility_gate_audit`.
+
+### Label semantics
+
+Every record has one of three condition-qualified states:
+
+- `observed_superconducting`: a superconducting transition is reported with a defined observation criterion and scope;
+- `observed_non_superconducting_under_conditions`: no transition was observed within explicit sample, method, pressure and temperature scope;
+- `unknown_or_not_reported`: evidence is unavailable or insufficient to establish either state.
+
+**Database absence is never a verified negative.** Negative labels must carry condition-qualified experimental or targeted-literature evidence and a stated no-transition criterion. The same material can have different outcomes under different pressure/temperature/sample conditions; those conditions remain part of the observation.
+
+### Two-stage scoring contract
+
+Stage one predicts (P(SC\mid x,c)), with abstention. Unknown/unreported rows must abstain and cannot carry a probability or a conditional (T_c) estimate. Abstention on a known labelled row is permitted but reduces reported coverage.
+
+Stage two predicts (T_c) only for observed superconducting records with a measured (T_c) target. The auditor rejects (T_c) predictions on negative or unknown rows and reports (T_c) MAE, interval coverage and prediction coverage only on the positive labelled population. Stage-one Brier score and log loss are computed only over known positive/negative labels with non-abstained probabilities. These metrics are not conflated.
+
+### Synthetic fixture check
+
+The six-record fixture includes two observed superconductors, two condition-qualified negative controls and two unknown/not-reported rows. The two unknown rows must abstain. The conditional-(T_c) stage scores only the two positive rows; the negative and unknown rows do not become artificial (T_c=0) labels. This demonstrates contract behaviour only; it is not a dataset, trained classifier, calibration claim, or materials result.
+
+Negative controls reject:
+- unknown records assigned a confident feasibility probability;
+- any conditional (T_c) prediction for unknown or observed-negative cases;
+- observed (T_c) attached to an unknown record;
+- negative labels supported only by unknown/not-reported scope;
+- inconsistent (T_c) point estimates and intervals.
+
+### Why this matters against current SOTA
+
+The August 2026 Physical Review Materials hierarchical-inference paper formalizes feasibility-first prediction on more than 26,000 inorganic materials and reports lower end-to-end (T_c) error using conditional, task-dependent descriptor weighting. The October 2026 DataG Non-Sc paper reports a 53,196-material negative-class dataset. These are serious baselines, but their data definitions and artifacts still require independent audit before reproduction.
+
+A May 2026 LLM active-learning study reports over 70% fewer experiments to reach top-performing candidates across four materials datasets. It is not a superconductivity-specific result. It supplies an important process comparator: evaluate information gained and validated candidates per experimental budget, rather than only regression error. A 2026 critical review of materials active learning also warns that apparently standard AL results can depend on hidden choices in sampling, validation and workflow design. We therefore require frozen candidate pools, explicit costs, matched data and splits, paired uncertainty intervals, full abstention/coverage reporting, and prospective evaluation.
+
+### Remaining scope
+
+This v0.2 contract does not train a model, admit external data, estimate calibration from a real population, or implement condition/family/source OOD splits; the existing OOD auditor remains responsible for those split checks. The next extension needs training-fold-only calibration, grouped bootstrap, prospective candidate freezes, condition- and source-qualified negative controls, and end-to-end false-positive experiment burden. The exact-head workflow now runs and lints both binaries and uploads separate evidence receipts.
