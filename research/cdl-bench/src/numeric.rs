@@ -62,6 +62,7 @@ pub enum NumericError {
     InvalidSegmentSize,
     UnsupportedFlags(u8),
     SegmentPolicyMismatch { expected: u8, actual: u8 },
+    InvalidProbeInterval,
 }
 
 impl fmt::Display for NumericError {
@@ -86,6 +87,7 @@ impl fmt::Display for NumericError {
             Self::InvalidSegmentSize => write!(f, "segment size must be positive"),
             Self::UnsupportedFlags(v) => write!(f, "unsupported numeric frame flags {v}"),
             Self::SegmentPolicyMismatch { expected, actual } => write!(f, "segment policy mismatch: expected candidate {expected}, got {actual}"),
+            Self::InvalidProbeInterval => write!(f, "probe interval must be a power of two from 1 through 128"),
         }
     }
 }
