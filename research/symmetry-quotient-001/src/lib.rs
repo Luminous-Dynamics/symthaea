@@ -8,6 +8,8 @@
 // Explicit indices keep finite multiplication/action tables auditable.
 #![allow(clippy::needless_range_loop)]
 
+pub mod complete_task_contract;
+
 use std::collections::BTreeSet;
 use std::fmt;
 
