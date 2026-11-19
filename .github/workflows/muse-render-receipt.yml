@@ -6,6 +6,7 @@ on:
       - "tools/muse-render-receipt/**"
       - "docs/research/MUSE_RENDER_EXECUTION_RECEIPT_V1.md"
       - "docs/research/schemas/muse-render-execution-receipt-v1.schema.json"
+      - "docs/research/schemas/muse-render-invocation-v1.schema.json"
       - ".github/workflows/muse-render-receipt.yml"
   push:
     branches:
