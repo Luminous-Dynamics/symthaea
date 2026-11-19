@@ -77,11 +77,15 @@ The command also emits two segmented rows at chunk sizes 64, 256 and 1,024:
   best-of-eight oracle.
 
 The CLI CSV includes `oracle_gap_pct`, `probe_interval`, `probe_count` and
-`extra_candidate_encodes`. Every online frame is checked to be no smaller
-than the offline best-of-eight frame for the same source and fixed chunking.
-For (K=1), budgeted sparse-probe child frames must match the full
-historical-cost selector's child frames exactly (the outer F64S policy ID and
-header CRC differ).
+`extra_candidate_encodes`. For a fair compute comparison, the offline oracle
+and full historical selector are recorded as probing every segment
+(`probe_interval=1`, `probe_count=S`, seven extra candidate encodes per
+segment). Sparse rows count only scheduled probes. Single-transform rows have
+zero selector probes/extra candidate encodes. Every online frame is checked to
+be no smaller than the offline best-of-eight frame for the same source and
+fixed chunking. For (K=1), budgeted sparse-probe child frames must match the
+full historical-cost selector's child frames exactly (the outer F64S policy
+ID and header CRC differ).
 
 
 For a stream with (S) segments and probe interval (K), the number of probes
