@@ -312,9 +312,11 @@ mod tests {
     }
 
     #[test]
-    fn changing_dataset_evaluator_or_solver_metadata_invalidates_replay() {
+    fn changing_provenance_or_intervention_metadata_invalidates_replay() {
         let (problem, action) = fixture();
         let original = metadata();
+        assert_eq!(SearchProblemMetadataV1::FIELD_COUNT, 21);
+        assert_eq!(original.fields().len(), SearchProblemMetadataV1::FIELD_COUNT);
         let outcome = compile_complete_task_quotient(
             &problem,
             &original,
