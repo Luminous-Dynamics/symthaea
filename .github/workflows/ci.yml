@@ -1763,6 +1763,9 @@ jobs:
       - name: Test research crate
         run: cargo test --locked --manifest-path research/falsification-power-reference/Cargo.toml --all-targets
 
+      - name: Calibrate predictable sequential null and post-hoc leakage control
+        run: cargo run --locked --manifest-path research/falsification-power-reference/Cargo.toml --example sequential_null_calibration
+
       - name: Strict Clippy for research crate
         run: cargo clippy --locked --manifest-path research/falsification-power-reference/Cargo.toml --all-targets -- -D warnings
 
