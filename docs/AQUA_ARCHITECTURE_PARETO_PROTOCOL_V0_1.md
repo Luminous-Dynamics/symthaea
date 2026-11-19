@@ -5,7 +5,7 @@
 **Parent:** integrated bathing service #12660  
 **Product anchor:** AQS-1 #12717  
 **Qualification contract:** #12865 / draft PR #12867  
-**Comparator evidence:** `docs/research/aqua-evidence-corpus-v0.1.json` (21 entries / 132 source-classified claims at the current research snapshot)
+**Comparator evidence:** `docs/research/aqua-evidence-corpus-v0.1.json` (21 entries / 134 source-classified claims at the current research snapshot)
 
 ## 1. The paradigm shift: choose the service architecture, not the showerhead
 
@@ -70,11 +70,13 @@ Aqua should capture actual instrumented values rather than treating catalogue fl
 
 CLASP's *South African ShowerHeads Testing Report* (October 2022; Herman Strauss / Jackstra Solutions) tested 19 anonymized showerheads selected using distributor sales data and house-brand retail selection. Omega Test House (Centurion) performed the measurements. The report says the laboratory held SANAS and ILAC accreditations for various plumbing-component methods and that tests complied with ISO/IEC 17025; it does not establish that every reported method was within a specific accredited scope. The stated instrument uncertainties were 0.3% of reading for the flow meter and 2.9% for the pressure transmitter, each at 95% confidence.
 
-The test ramp was approximately 250–550 kPa. Its summary interpolated flow at 250, 300 and 500 kPa and rounded values to the nearest 1 L/min. At 300 kPa the selected sample averages were:
+The test ramp was approximately 250–550 kPa. Its summary interpolated flow at 250, 300 and 500 kPa and rounded values to the nearest 1 L/min. At 300 kPa the primary CLASP PDF's selected-sample averages were:
 - 25 L/min for fixed-orifice flow profiles;
 - 7 L/min for pressure-compensating flow profiles;
 - 10.9 L/min for products marketed as water-saving;
 - 8.0 L/min for the high-price category.
+
+The Water Research Commission's September/October 2025 *Water Wheel* secondary summary of the same CLASP report gives 24 L/min for fixed-orifice and 6.6 L/min for pressure-compensating profiles. The primary PDF's table states that its summary values were rounded to the nearest 1 L/min; retain the 25/7 and 24/6.6 representations with their respective sources rather than averaging them or asserting an unverified raw-data correction.
 
 The report classified 58% of the selected showerhead profiles as fixed-orifice and 42% as pressure-compensating. It explicitly states that category sample sizes were limited and that larger samples are needed before asserting statistically significant trends by price. The identities of brands/models were obscured, so this is a local market/technology benchmark—not an exact SKU competitor list.
 
@@ -95,6 +97,7 @@ These are research recommendations in a 2022 report, not proof that a national s
 Sources:
 - CLASP report PDF (October 2022): https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf
 - CLASP report summary: https://www.clasp.ngo/research/all/south-african-shower-heads-testing-report/
+- WRC *The Water Wheel*, September/October 2025 secondary summary: https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf
 
 ### 2.8 WaterSense numerical baseline — exceed the floor, not merely the label
 
