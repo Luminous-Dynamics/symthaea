@@ -1235,51 +1235,22 @@ mod tests {
 
     #[test]
     fn failed_sample_attachment_does_not_mutate_channel_state() {
-        let mut value = TransientEventProfile::from_json_manifest(
-            &serde_json::json!({
-                "schema_version": "0.1.0",
-                "profile_id": "minimal",
-                "profile_revision": 1,
-                "profile_kind": "synthetic",
-                "event_family": "supply_sag",
-                "task_profile_id": "task",
-                "conditions_sha256": "c".repeat(64),
-                "protocol_sha256": "d".repeat(64),
-                "event_start": "2026-11-19T00:00:00Z",
-                "event_duration_ms": 1,
-                "synthetic_profile": {
-                    "generator_id": "g",
-                    "generator_sha256": "e".repeat(64),
-                    "generator_parameters_sha256": "f".repeat(64)
-                },
-                "command": {
-                    "input_kind": "upstream_pressure_command",
-                    "channel_id": "command",
-                    "unit": "kPa",
-                    "waveform_sha256": "1".repeat(64),
-                    "samples": [
-                        {"offset_us": 0, "value": 300.0},
-                        {"offset_us": 1000, "value": 200.0}
-                    ]
-                },
-                "acquisition": {
-                    "clock_id": "clock",
-                    "timestamp_basis": "ptp",
-                    "clock_sync_uncertainty_us": 1.0,
-                    "maximum_clock_sync_uncertainty_us": 2.0,
-                    "maximum_channel_alignment_skew_us": 0,
-                    "clock_sync_receipt_sha256": "2".repeat(64),
-                    "channels": []
-                },
-                "raw_artifacts": [
-                    {"role":"unfiltered_trace","sha256":"3".repeat(64),"byte_length":1},
-                    {"role":"event_log","sha256":"4".repeat(64),"byte_length":1}
-                ]
+        let mut value = profile();
+        value.acquisition.channels[0].samples.clear();
+
+        assert_eq!(
+            value.attach_channel_samples(
+                "terminal-pressure",
+                vec![
+                    TraceSample { offset_us: 0, value: 1.0 },
+                    TraceSample { offset_us: 1_000, value: 2.0 },
+                ],
+            ),
+            Err(TransientTraceError::SampleCountMismatch {
+                channel_id: "terminal-pressure".to_owned()
             })
-            .to_string(),
-        )
-        .unwrap_err();
-        assert!(matches!(value, TransientTraceError::ManifestDecode { .. }));
+        );
+        assert!(value.acquisition.channels[0].samples.is_empty());
     }
 
     #[test]
