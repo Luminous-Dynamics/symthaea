@@ -35,6 +35,16 @@ bool read_varint(const std::vector<std::uint8_t>& bytes,
     return false;
 }
 
+std::vector<std::uint8_t> encode_xor_varint(const std::vector<std::uint64_t>& values) {
+    std::vector<std::uint8_t> out;
+    std::uint64_t previous = 0;
+    for (const auto current : values) {
+        write_varint(current ^ previous, out);
+        previous = current;
+    }
+    return out;
+}
+
 std::vector<std::uint8_t> encode(const std::vector<std::uint64_t>& values) {
     std::vector<std::uint8_t> out;
     std::uint64_t previous = 0;
@@ -94,6 +104,7 @@ bool expect_reject(const std::vector<std::uint8_t>& bytes,
 
 bool round_trip(const char* name, const std::vector<std::uint64_t>& values) {
     const auto encoded = encode(values);
+    const auto xor_varint = encode_xor_varint(values);
     std::vector<std::uint64_t> decoded;
     if (!decode(encoded, values.size(), decoded) || decoded != values) {
         std::cerr << "round-trip failed: " << name << "\n";
@@ -104,8 +115,13 @@ bool round_trip(const char* name, const std::vector<std::uint64_t>& values) {
         static_cast<double>(encoded.size()) / raw_bytes;
     std::cout << name << ": values=" << values.size()
               << " raw_bytes=" << static_cast<std::size_t>(raw_bytes)
+              << " xor_varint_bytes=" << xor_varint.size()
               << " rle_xor_bytes=" << encoded.size()
-              << " ratio=" << ratio << "\n";
+              << " rle_vs_xor_pct="
+              << (xor_varint.empty() ? 0.0 :
+                  (static_cast<double>(encoded.size()) /
+                   static_cast<double>(xor_varint.size()) - 1.0) * 100.0)
+              << " rle_to_raw_ratio=" << ratio << "\n";
     return true;
 }
 
