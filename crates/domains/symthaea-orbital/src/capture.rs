@@ -737,6 +737,15 @@ mod tests {
     }
 
     #[test]
+    fn negative_orientation_or_clearance_is_rejected_as_invalid_range() {
+        let mut observation = readiness_observation();
+        observation.interface_orientation_error_rad = -0.001;
+        let result = evaluate_readiness(&spec(), &observation);
+        assert_eq!(result.status, ReadinessStatus::Rejected);
+        assert!(result.reason_codes.contains(&CaptureReasonCode::InvalidMeasurementRange));
+    }
+
+    #[test]
     fn missing_transform_or_nonfinite_measurement_is_indeterminate() {
         let mut observation = readiness_observation();
         observation.frame_transform_id.clear();
@@ -777,6 +786,19 @@ mod tests {
         let result = evaluate_capture(&spec, &readiness, &confirmation);
         assert_eq!(result.status, CaptureStatus::Indeterminate);
         assert!(result.reason_codes.contains(&CaptureReasonCode::RetentionTestNotPerformed));
+    }
+
+    #[test]
+    fn rejected_readiness_cannot_be_overridden_by_unknown_latch() {
+        let spec = spec();
+        let mut approach = readiness_observation();
+        approach.approach_outcome = ApproachOutcome::TimedOut;
+        let readiness = evaluate_readiness(&spec, &approach);
+        let mut confirmation = confirmation_observation();
+        confirmation.latch_state = LatchState::Unknown;
+        let result = evaluate_capture(&spec, &readiness, &confirmation);
+        assert_eq!(result.status, CaptureStatus::Rejected);
+        assert!(result.reason_codes.contains(&CaptureReasonCode::ReadinessNotAccepted));
     }
 
     #[test]
