@@ -152,6 +152,31 @@ The PR branch now contains `research/cdl-bench/src/telemetry.rs`, exported from 
 
 The current environment has no Rust toolchain (`rustc`, `cargo`, `rustfmt` unavailable), so these tests have **not** run and Rust compilation/formatting are **not verified**. The C++ reference exercises the corresponding transform logic independently but is not a substitute for compiling or testing the Rust source. The Rust frame is still a fixed eight-lane prototype; it does not yet include a general schema registry, random-access index, schema evolution, per-segment independent child frames, or production recovery protocol.
 
+## LZV segmentation control (WZS-inspired, not WZS) — 2026-11-19
+
+A deterministic prefix-only LZV segmentation reference is now checked in:
+
+- C++20 reference: `research/cdl-bench/reference/lzv_segmentation_reference.cpp`
+- Reproduction script: `scripts/research/cdl_lzv_segmentation_reference.sh`
+- Rust module (authored; compiler validation pending): `research/cdl-bench/src/segmentation.rs`
+- Public API: `segment_lzv(values: &[u64], config: LzvConfig)`
+
+For each new bit pattern, the detector computes the leading-zero count of the exact XOR residual against the prior decoded value. It compares the most recent fast-window distribution with an older slow window using exact integer mean and population-variance comparisons. A pending-change latch preserves a detected shift until the minimum segment length is legal; a cooldown reduces repeated alarms; maximum segment length forces a boundary even without a detected change. Decisions depend only on the reconstructed prefix and fixed config—no boundary labels are transmitted.
+
+The independent C++20 reference passed strict-warning compilation (`-O2 -std=c++20 -Wall -Wextra -Wconversion -Werror`) and four tests:
+- constant stream: only forced max-length boundaries;
+- stationary random stream: no unnecessary early splits;
+- abrupt stable-to-random shift: boundary within 32 observations after the transition;
+- deterministic and empty-input behavior.
+
+Observed example boundaries with default configuration (fast=8, slow=16, min=32, max=512, cooldown=32):
+- constant 2,048 values: `0,512,1024,1536,2048`;
+- stationary-random 4,096 values: `0,512,1024,1536,2048,2560,3072,3584,4096`;
+- stable→random 2,048 values: `0,512,1024,1056,1568,2048`;
+- stable→random→stable 1,536 values: `0,512,544,1026,1536`.
+
+These results validate deterministic segmentation behaviour only. They do not measure compression size, false alarms across a broad distribution suite, throughput or random access, and do not establish WZS performance or reproduce the WZS paper. The C++ reference is independent of the Rust translation. Six Rust unit tests are authored but unrun because no Rust toolchain is available in this environment.
+
 ## New hypothesis: jointly choose segmentation and codec
 
 The current fixed chunks make boundary placement exogenous. Production data can contain long idle periods, sharp bursts and mixed regimes that do not align with 64/256/1024 boundaries.
