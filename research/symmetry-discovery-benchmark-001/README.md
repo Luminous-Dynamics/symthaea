@@ -303,3 +303,15 @@ The active-subgroup fixture now has a separate Rust 1.96 oracle under `subgroup-
 - the full-scan/adaptive ratio.
 
 The oracle is code-independent from the Symthaea subgroup-active implementation. The fixture workflow runs format, locked tests and strict Clippy for this oracle. A matching fixture row is not a performance claim; it is a reproducibility check on the frozen mathematical instance and objective.
+
+
+## Exact-action adversarial gate (v0.1 implementation hardening)
+
+The Rust ground-truth oracle now enforces more than the abstract multiplication table:
+
+- Every declared D4 matrix must satisfy the Euclidean metric identity (A^T A=I).
+- An adversarial test conjugates the *entire* D4 representation by a dense unimodular shear. All 64 products still match the original abstract D4 multiplication table, while the transformed matrices fail the Euclidean isometry check. This is the negative control that prevents “group axioms passed” from being mislabeled “physical point-group action passed.”
+- JSON numeric-token preservation is enabled in `serde_json` so exact decimal parsing sees the original token instead of an already-rounded binary float. A precision-sensitive decimal regression checks this boundary.
+- Matrix multiplication and point actions use checked (i128) arithmetic and fail closed on overflow; polynomial expansion already uses checked coefficients, powers and accumulation.
+
+These gates make the oracle a verifier of both abstract group structure and its declared representation/metric—not merely a group-table parser.
