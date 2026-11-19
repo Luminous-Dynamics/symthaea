@@ -94,7 +94,12 @@ segmented policies:
 The CSV also includes `oracle_gap_pct`, `probe_interval`, `probe_count`,
 `candidate_switches` and `oracle_candidate_mismatch_segments`. A candidate
 mismatch is a different transform/model ID from the per-chunk offline choice;
-it is a selection-behaviour diagnostic, not a byte-regret metric. Offline and full-historical rows are recorded as probing every
+it is a selection-behaviour diagnostic, not a byte-regret metric.
+
+The CLI extracts candidate IDs from the self-describing F64C child headers in
+each F64S frame. Its source tests verify trace length and K=1 equivalence for
+offline/full/sparse policies, and reject malformed/truncated frames and
+impossible segment counts before allocating the trace. Offline and full-historical rows are recorded as probing every
 segment; sparse rows count only the scheduled common probes. Every online
 frame is checked to be no smaller than the offline best-of-eight frame for the
 same source and fixed chunking. For K=1, sparse-probe child frames must match
