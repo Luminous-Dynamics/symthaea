@@ -119,6 +119,11 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         }
         let evidence_scope = required_text(condition, "evidence_scope")?;
         let criterion = required_text(condition, "transition_criterion")?;
+        let minimum_detectable_tc = nullable_number(
+            &condition["minimum_detectable_tc_k"],
+            &format!("record {id} minimum_detectable_tc_k"),
+        )?;
+        let detection_description = required_text(condition, "detection_limit_description")?;
         match label {
             "observed_superconducting" => {
                 if evidence_scope == "unknown_or_not_reported" || criterion == "unknown" || criterion == "none" {
@@ -131,6 +136,15 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
                 }
                 if criterion != "none" {
                     return Err(format!("negative label {id} must state criterion=none under its observation conditions"));
+                }
+                let detection_floor = minimum_detectable_tc.ok_or_else(|| {
+                    format!("negative label {id} requires a qualified minimum_detectable_tc_k")
+                })?;
+                if detection_floor < lower_t || detection_floor > upper_t {
+                    return Err(format!("negative label {id} detection floor lies outside its measurement temperature range"));
+                }
+                if detection_description.trim().is_empty() {
+                    return Err(format!("negative label {id} requires a detection-limit description"));
                 }
             }
             "unknown_or_not_reported" => {
@@ -416,6 +430,13 @@ mod tests {
     fn publication_date_must_be_a_real_calendar_date() {
         assert!(mutated_fixture(|fixture| {
             fixture["records"][0]["publication_date"] = json!("2026-02-30");
+        }).is_err());
+    }
+
+    #[test]
+    fn negative_label_requires_detection_floor() {
+        assert!(mutated_fixture(|fixture| {
+            fixture["records"][1]["condition_context"]["minimum_detectable_tc_k"] = Value::Null;
         }).is_err());
     }
 
