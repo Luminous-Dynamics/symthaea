@@ -213,6 +213,11 @@ fn solve_node(
             });
         }
 
+        // A zero-information probe cannot improve on stopping immediately:
+        // the unresolved leaf retains the same hypotheses at zero extra cost.
+        if worst_case_remaining >= active_mask.count_ones() as usize {
+            continue;
+        }
         let worst_case_cost = probe
             .cost
             .checked_add(worst_case_child_cost)
@@ -371,8 +376,10 @@ mod tests {
                 node.active_hypothesis_mask,
                 problem.hypothesis_ids.len(),
             ) {
-                if problem.allowed_outcomes_by_hypothesis[hypothesis_index][probe_index]
-                    .contains(&branch.outcome)
+                match branch.outcome {
+                RobustPolicyOutcomeV1::Value(outcome)
+                    if problem.allowed_outcomes_by_hypothesis[hypothesis_index][probe_index]
+                        .contains(&outcome) =>
                 {
                     assert_ne!(
                         branch.child.active_hypothesis_mask & (1_u64 << hypothesis_index),
@@ -380,6 +387,15 @@ mod tests {
                         "the planner eliminated a hypothesis that allows this outcome"
                     );
                 }
+                RobustPolicyOutcomeV1::Abstained => {
+                    assert_ne!(
+                        branch.child.active_hypothesis_mask & (1_u64 << hypothesis_index),
+                        0,
+                        "the planner eliminated a hypothesis after an abstention"
+                    );
+                }
+                RobustPolicyOutcomeV1::Value(_) => {}
+            }
             }
             assert_all_predictions_have_branches(problem, &branch.child);
         }
@@ -399,24 +415,25 @@ mod tests {
     }
 
     #[test]
-    fn possible_abstention_has_its_own_branch_and_preserves_every_candidate() {
+    fn possible_abstention_has_its_own_non_eliminating_branch() {
         let mut problem = fixture();
-        problem.probes.truncate(1);
         problem.probes[0].may_abstain = true;
-        let budget = QualificationBudgetV1::default();
-        let receipt = solve_bounded_noise_policy(&problem, budget).unwrap();
-
-        let abstention = receipt
-            .root
-            .branches
-            .iter()
-            .find(|branch| branch.outcome == RobustPolicyOutcomeV1::Abstained)
+        let partitions = outcome_partitions(&problem, full_mask(3), 0);
+        let abstention = partitions
+            .get(&RobustPolicyOutcomeV1::Abstained)
+            .copied()
             .expect("declared abstention must have an explicit policy branch");
-        assert_eq!(abstention.child.active_hypothesis_mask, full_mask(3));
-        assert_eq!(abstention.child.worst_case_remaining, 3);
+        assert_eq!(abstention, full_mask(3));
+
+        let mut one_probe_problem = problem.clone();
+        one_probe_problem.probes.truncate(1);
+        let budget = QualificationBudgetV1::default();
+        let receipt = solve_bounded_noise_policy(&one_probe_problem, budget).unwrap();
+        // Since this single probe can abstain and leave every candidate alive,
+        // the minimax planner correctly prefers the zero-cost unresolved leaf.
+        assert!(receipt.root.probe_id.is_none());
         assert_eq!(receipt.root.worst_case_remaining, 3);
-        assert_all_predictions_have_branches(&problem, &receipt.root);
-        verify_bounded_noise_policy(&problem, &receipt, budget).unwrap();
+        verify_bounded_noise_policy(&one_probe_problem, &receipt, budget).unwrap();
     }
 
     #[test]
