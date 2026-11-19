@@ -1,0 +1,547 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-sail-liveaboard-case:0.1.0",
+  "title": "Marine Sail-Liveaboard Mission Co-Design Case",
+  "description": "Cross-owner case manifest for matched, forecast-aware sailing and habitat-service policy evaluation. It composes owner-native reports; it is not a vessel simulator, route planner, energy model, safety authority, or physical qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "record_status",
+    "comparison",
+    "craft",
+    "mission",
+    "environment",
+    "policy_arm",
+    "owner_receipts",
+    "required_resource_dimensions",
+    "evaluator_boundary",
+    "claim_ceiling"
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "owner_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner_repo",
+        "artifact_id",
+        "revision",
+        "artifact_sha256",
+        "disposition",
+        "evidence_class",
+        "claim_limit"
+      ],
+      "properties": {
+        "owner_repo": {
+          "type": "string",
+          "enum": [
+            "Luminous-Dynamics/symthaea",
+            "Luminous-Dynamics/symtropy",
+            "Luminous-Dynamics/sol-atlas-leptos",
+            "Luminous-Dynamics/mycelix.net",
+            "external"
+          ]
+        },
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "disposition": {
+          "type": "string",
+          "enum": [
+            "supported",
+            "partial",
+            "unknown",
+            "incomplete",
+            "rejected",
+            "expired",
+            "revoked",
+            "synthetic_only"
+          ]
+        },
+        "evidence_class": {
+          "type": "string",
+          "enum": [
+            "measured",
+            "validated_model",
+            "unvalidated_model",
+            "published",
+            "vendor_claim",
+            "derived",
+            "synthetic",
+            "assumed",
+            "unknown"
+          ]
+        },
+        "claim_limit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "available_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "rights_status": {
+          "type": "string",
+          "enum": [
+            "public",
+            "permissioned",
+            "restricted",
+            "unknown",
+            "not_applicable"
+          ]
+        }
+      }
+    },
+    "time_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "end",
+        "clock_id"
+      ],
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "clock_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "family",
+        "information_policy",
+        "compute_budget_ms"
+      ],
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "family": {
+          "type": "string",
+          "enum": [
+            "fixed_conservative",
+            "polar_vmg",
+            "transition_aware_vmg",
+            "weather_routing",
+            "reserve_aware_weather_routing",
+            "integrated_advisory",
+            "perfect_foresight_oracle"
+          ]
+        },
+        "information_policy": {
+          "type": "string",
+          "enum": [
+            "as_of_decision_time",
+            "realized_environment_evaluator_only"
+          ]
+        },
+        "compute_budget_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "policy_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "family": {
+                "const": "perfect_foresight_oracle"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "information_policy": {
+                "const": "realized_environment_evaluator_only"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "family": {
+                "not": {
+                  "const": "perfect_foresight_oracle"
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "information_policy": {
+                "const": "as_of_decision_time"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "record_status": {
+      "type": "string",
+      "enum": [
+        "synthetic",
+        "shadow_replay",
+        "measured_campaign",
+        "published_reproduction"
+      ]
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "comparison_group_id",
+        "candidate_id",
+        "service_fingerprint_sha256",
+        "paired_baseline_ids"
+      ],
+      "properties": {
+        "comparison_group_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "service_fingerprint_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "paired_baseline_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "matching_deviations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "craft": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "craft_identity",
+        "architecture",
+        "length_overall_m",
+        "loading_condition_id",
+        "configuration_refs"
+      ],
+      "properties": {
+        "craft_identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "architecture": {
+          "type": "string",
+          "enum": [
+            "monohull",
+            "catamaran",
+            "trimaran",
+            "other_declared"
+          ]
+        },
+        "length_overall_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "loading_condition_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/owner_ref"
+          }
+        }
+      }
+    },
+    "mission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mission_identity",
+        "mission_profile_sha256",
+        "occupants",
+        "target_duration_h",
+        "arrival_window",
+        "route_or_waypoint_ref",
+        "service_level_ref",
+        "reserve_policy_ref"
+      ],
+      "properties": {
+        "mission_identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "mission_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "occupants": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "target_duration_h": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "arrival_window": {
+          "$ref": "#/$defs/time_window"
+        },
+        "route_or_waypoint_ref": {
+          "$ref": "#/$defs/owner_ref"
+        },
+        "service_level_ref": {
+          "$ref": "#/$defs/owner_ref"
+        },
+        "reserve_policy_ref": {
+          "$ref": "#/$defs/owner_ref"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_snapshots",
+        "realized_environment_ref"
+      ],
+      "properties": {
+        "decision_snapshots": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "decision_time",
+              "forecast_ref",
+              "source_issue_time",
+              "available_at",
+              "valid_window"
+            ],
+            "properties": {
+              "decision_time": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "forecast_ref": {
+                "$ref": "#/$defs/owner_ref"
+              },
+              "source_issue_time": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "available_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "valid_window": {
+                "$ref": "#/$defs/time_window"
+              }
+            }
+          }
+        },
+        "realized_environment_ref": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/owner_ref"
+            }
+          ],
+          "description": "Evaluator-only realized environment. Semantic validation must enforce that this reference is never supplied to a deployable policy before its decision time."
+        }
+      }
+    },
+    "policy_arm": {
+      "$ref": "#/$defs/policy"
+    },
+    "owner_receipts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "reference"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "sailing_route_candidate",
+              "tack_gybe_transition",
+              "sail_capability_graph",
+              "operational_design_domain",
+              "COLREG_encounter",
+              "mission_energy_budget",
+              "voyage_power_trace",
+              "resource_service_schedule",
+              "resource_autonomy_vector",
+              "watermaker_service",
+              "service_continuity",
+              "habitat_metabolism",
+              "hydrodynamic_validation",
+              "physical_campaign"
+            ]
+          },
+          "reference": {
+            "$ref": "#/$defs/owner_ref"
+          }
+        }
+      }
+    },
+    "required_resource_dimensions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "propulsion_energy",
+          "hotel_auxiliary_energy",
+          "fuel_inventory",
+          "battery_usable_energy",
+          "potable_water",
+          "food_nutrient_groups",
+          "grey_black_water_capacity",
+          "consumables",
+          "critical_spares",
+          "emergency_reserve"
+        ]
+      }
+    },
+    "hard_gate_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Canonical, non-compensable gate IDs consumed from owner reports. A case with a missing required gate is not eligible."
+    },
+    "evaluator_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_inputs_as_of_cutoff_only",
+        "realized_environment_evaluator_only",
+        "missing_values_are_unknown",
+        "no_actuation",
+        "no_authority_grant",
+        "perfect_foresight_is_non_deployable"
+      ],
+      "properties": {
+        "decision_inputs_as_of_cutoff_only": {
+          "const": true
+        },
+        "realized_environment_evaluator_only": {
+          "const": true
+        },
+        "missing_values_are_unknown": {
+          "const": true
+        },
+        "no_actuation": {
+          "const": true
+        },
+        "no_authority_grant": {
+          "const": true
+        },
+        "perfect_foresight_is_non_deployable": {
+          "const": true
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "cross_owner_composition_only"
+    }
+  }
+}
