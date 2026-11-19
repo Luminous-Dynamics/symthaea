@@ -143,13 +143,25 @@ The canonical owner must authenticate the issuer and issue the verification rece
 
 Only Eligible configurations may proceed as eligible entries in #12875's site-specific comparison. Eligibility does not mean physically installed, safe, compliant, performant or cost-effective. A qualified service result must still pass #12867's independent completed-service gate, and measured Pareto outcomes must still be generated under a matched test protocol.
 
+### Composed comparison entry point
+
+The Aqua benchmark crate now provides `validate_site_qualified_matched_comparison`. It takes exact control and candidate run records, independent service qualification records, and separate architecture/site profiles with their evidence packets. It:
+
+1. requires both site profiles to refer to the same surveyed site ID, revision and site-condition digest;
+2. binds each site profile's device digest to the corresponding run's exact device-configuration digest;
+3. evaluates site fit separately for the control and candidate;
+4. refuses to continue unless **both** results are Eligible;
+5. then invokes the canonical matched-run and non-compensatory service-qualification gate.
+
+The control and candidate may use different architecture classes and device configurations, but cannot borrow evidence from another surveyed site or another device. The result returns both site-fit receipts and the service-qualification result. The function does not rank architectures or calculate savings.
+
 No site fit or service qualification is a substitute for competent local plumbing/electrical/building approval, product certification, microbiological clearance, human-factors assessment or physical commissioning.
 
 ## 9. Software implementation status
 
 The Rust module defines five architecture classes, fourteen capability domains, expected-authority mapping, mandatory baseline requirements, product-specific additive requirements (including ambient/freeze protection and connectivity where required), site/device/requirement/method digest binding, currentness handling, and Eligible / Ineligible / Indeterminate dispositions.
 
-It currently contains **45 authored unit tests** covering architecture-specific sets, missing/duplicate/unexpected evidence, stale/revoked/ambiguous evidence, wrong site/revision/architecture/device/requirements/method/authority, explicit failure vs uncertainty, additional product-specific connectivity and ambient/freeze protection, and site-to-site variation.
+It currently contains **45 authored unit tests** in the site-fit module covering architecture-specific sets, missing/duplicate/unexpected evidence, stale/revoked/ambiguous evidence, wrong site/revision/architecture/device/requirements/method/authority, explicit failure vs uncertainty, additional product-specific connectivity and ambient/freeze protection, and site-to-site variation. The matched-run adapter adds **6 site-composition tests** for two eligible architectures, ineligible control/candidate, indeterminate evidence, surveyed-site mismatch and wrong-device binding, in addition to the earlier completed-service composition tests.
 
 These are authored tests, not execution passes. No cargo test, rustfmt, Clippy or repository CI pass is claimed until observed on the exact PR head.
 
