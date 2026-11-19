@@ -64,8 +64,8 @@ The command also emits two segmented rows at chunk sizes 64, 256 and 1,024:
   decoder rejects a child whose IDs do not match its historical policy. There
   is no additional selector symbol or intervention information.
 - `budgeted_sparse_probe` uses the same historical policy, but only probes all
-  eight candidates on the first chunk and then every (K)-th chunk. Supported
-  (K) values are powers of two from 1 through 128 and the interval is recorded
+  eight candidates on the first chunk and then every `K`-th chunk. Supported
+  `K` values are powers of two from 1 through 128 and the interval is recorded
   in the CRC-protected F64S header. Between probes, both sides retain the same
   candidate-cost history and encode only the incumbent. The decoder derives
   the same probe schedule and rejects a child whose selected candidate differs
@@ -73,9 +73,9 @@ The command also emits two segmented rows at chunk sizes 64, 256 and 1,024:
   Importantly, **only common probe chunks update cross-candidate means**.
   We do not add extra measurements for just the incumbent between probes,
   which would compare candidate means on different, selection-biased sample
-  sets. The CLI reports (K), number of probes, seven extra candidate encodes
-  per probe, complete frame ratio and percentage size gap to the offline
-  best-of-eight oracle.
+  sets. The CLI reports `K`, probe count, separate encoder-extra and
+  decoder-recompute counts, complete frame ratio and percentage size gap to
+  the offline best-of-eight oracle.
 
 The CLI CSV separates encoder and decoder work with
 `encoder_extra_candidate_encodes` and `decoder_candidate_reencodes`:
