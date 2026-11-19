@@ -168,6 +168,35 @@ Representative segmentation-only output (default 32/512 bounds):
 
 **Evidence boundary:** these are segmentation diagnostics, not compression results. No child codec was run on segments, no segment header/selector metadata was measured, and no comparison was made with full WZS. The detector's parameters were tuned on synthetic development fixtures and require blind evaluation against CUSUM, fixed windows, MDL segmentation and WZS when its full artifact becomes available. Also, zero alarms in 64 random seeds is not a production false-alarm-rate guarantee.
 
+## Rabbit-derived predictive branch-mapping diagnostic (2026-11-19)
+
+A separate flag-mapping reference now exists at `research/cdl-bench/reference/rabbit_branch_mapper_reference.cpp`, with runner `scripts/research/cdl_rabbit_branch_mapper_reference.sh`. It implements only the paper-described four-branch prefix map `{0,10,110,111}`, previous-block branch-frequency ranking, and decoder-synchronous mapping reconstruction. It uses default identity ranking for the first block, then ranks branches by the previous block's counts. Ties break by branch ID ascending (the paper does not specify tie handling).
+
+It deliberately does **not** implement ACTF's XOR branch classifier/payloads or Rabbit's TOE. The output contains only abstract branch flags, so it is not a full Rabbit codec, not an end-to-end size comparison, and not a Rabbit reproduction. It exists to isolate and test the synchronization/flag-length hypothesis before implementing complex payload branches.
+
+A proposed guarded control is also tested (our extension, not part of Rabbit): it bootstraps with fixed two-bit flags; then it uses the dynamic map only when the previous histogram satisfies Rabbit's predicted-gain condition (x_1 > x_3+x_4); from the third block onward, the last two branch histograms must additionally have total-variation distance (le 0.10). Encoder and decoder derive this decision from the prior decoded prefix without transmitting a mapping or mode label.
+
+Strict C++20 compilation (`-O2 -Wall -Wextra -Wconversion -Werror`) and seven tests passed, including 100 randomized exact encode/decode trials, the four expected prefix lengths, branch-gain lemma checks, deterministic output and malformed stream rejection. The 1,000-symbol block is the paper's default; 250- and 500-symbol sub-blocks are additional diagnostics.
+
+### Flag-only synthetic results
+
+All results below are **flag bits only**, over 4,000 abstract branch symbols, with no ACTF payload, XOR residuals, TOE, frame/header bytes or runtime claims:
+
+| Regime | Fixed 2-bit | Previous-block mapper | Guarded control | Same-block fixed-or-dynamic oracle |
+|---|---:|---:|---:|---:|
+| Stationary skew | 8,000 | 5,200 | 5,900 | 5,200 |
+| Uniform | 8,000 | 9,000 | 8,000 | 8,000 |
+| One-block shift, block 1,000 | 8,000 | 6,760 | 8,160 | 5,200 |
+| One-block shift, block 500 | 8,000 | 5,880 | 7,800 | 5,200 |
+| One-block shift, block 250 | 8,000 | 6,800 | 7,020 | 4,960 |
+| Alternating dominant, block 1,000 | 8,000 | 9,880 | 8,860 | 5,200 |
+| Alternating dominant, block 500 | 8,000 | 6,820 | 7,800 | 5,200 |
+| Alternating dominant, block 250 | 8,000 | 6,410 | 6,850 | 4,960 |
+
+The paper-style mapping captures the expected gain on a stable skewed distribution, but its one-block predictive lag creates real regressions under uniform and alternating branch traffic. The guarded control prevents the uniform regression and reduces the alternating penalty, but it still loses to fixed flags on the first block after a sudden distribution change (8,160 vs 8,000 bits at 1,000-symbol blocks). Smaller blocks reduce the duration of the stale mapping, but change the number of block transitions and therefore require full framing/compute measurements.
+
+**Evidence boundary:** this isolates the prefix-flag mechanism only. It does not validate Rabbit's ACTF-derived branch classification, TOE bit-elision proof, full byte/bitstream framing, paper datasets, implementation, or headline compression/time gains. The same-block oracle is an offline upper bound over only two flag choices (fixed 2-bit vs dynamic 1/2/3/3), using current-block counts; it does not include payloads or side-information costs. The guarded variant is our hypothesis and has not yet been evaluated on blind or production-derived data.
+
 ## Current Rust implementation status (compiler validation pending)
 
 The PR branch now contains `research/cdl-bench/src/telemetry.rs`, exported from `lib.rs`, with a `cdl-bench telemetry` synthetic command. The first frame has a fixed eight-lane schema, entity/series keys, exact u64 field payloads, explicit null/presence and changed-field masks, canonical u64 varints, deterministic bounded LRU state, segment-start checkpoints, and header/inner/raw-stream CRCs. The shared arithmetic coder is used for the transformed stream. Eight Rust tests are authored for round-trip, determinism, empty streams, truncation, single-bit mutations, resource limits, invalid field values and malformed varints.
