@@ -190,7 +190,12 @@
           "minLength": 1
         },
         "timestamp_basis": {
-          "enum": ["monotonic", "utc_disciplined", "ptp", "other_declared"]
+          "enum": [
+            "monotonic",
+            "utc_disciplined",
+            "ptp",
+            "other_declared"
+          ]
         },
         "clock_sync_uncertainty_us": {
           "type": "number",
@@ -316,7 +321,8 @@
         "unit",
         "instrument_id",
         "calibration_receipt_sha256",
-        "measurement_uncertainty"
+        "measurement_uncertainty",
+        "quality_state"
       ],
       "properties": {
         "channel_id": {
@@ -324,7 +330,13 @@
           "minLength": 1
         },
         "quality_state": {
-          "enum": ["valid", "clipped", "saturated", "out_of_range", "unknown"]
+          "enum": [
+            "valid",
+            "clipped",
+            "saturated",
+            "out_of_range",
+            "unknown"
+          ]
         },
         "role": {
           "enum": [
@@ -405,11 +417,19 @@
         {
           "if": {
             "properties": {
-              "dropped_sample_count": { "minimum": 1 }
+              "dropped_sample_count": {
+                "minimum": 1
+              }
             },
-            "required": ["dropped_sample_count"]
+            "required": [
+              "dropped_sample_count"
+            ]
           },
-          "then": { "required": ["sample_gap_report_sha256"] }
+          "then": {
+            "required": [
+              "sample_gap_report_sha256"
+            ]
+          }
         }
       ]
     }
