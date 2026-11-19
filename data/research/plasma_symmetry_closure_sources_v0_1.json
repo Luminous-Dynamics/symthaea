@@ -1,0 +1,177 @@
+{
+  "schema_version": "luminous.plasma-symmetry-closure-source-register.v0.1",
+  "register_id": "PLASMA-SYMMETRY-CLOSURE-SOURCES-001",
+  "generated_date": "2026-11-19",
+  "evidence_boundary": {
+    "luminous_reproduction": false,
+    "physical_measurements": false,
+    "note": "Literature metadata and source-reported findings only. Data/code access and redistribution rights remain subject to separate audit."
+  },
+  "sources": [
+    {
+      "source_id": "mcgrae_menge_symmetry_reconnection_2026",
+      "title": "Embedding physical symmetries into machine-learned reduced plasma physics models via data augmentation",
+      "authors": [
+        "M. C. McGrae-Menge",
+        "J. R. Pierce",
+        "F. Fiuza",
+        "E. P. Alves"
+      ],
+      "doi": "10.1103/9fq1-vpqz",
+      "source_url": "https://doi.org/10.1103/9fq1-vpqz",
+      "published_date": "2026-02-23",
+      "source_type": "peer_reviewed_numerical_study",
+      "task_lane": "magnetic_reconnection_pressure_tensor_and_fluid_equation_discovery",
+      "plasma_regime": "fully_kinetic_particle_in_cell_magnetic_reconnection",
+      "methods": [
+        "symmetry_preserving_data_augmentation",
+        "sparse_regression",
+        "neural_network_closures"
+      ],
+      "transformation_families_reported": [
+        "Lorentz_boost",
+        "Galilean_boost"
+      ],
+      "reported_findings": [
+        "Symmetry-augmented data improved inference of fluid equations and pressure-tensor closures in the studied PIC magnetic-reconnection cases.",
+        "The authors report suppression of spurious inertial-frame-dependent correlations.",
+        "The authors report improved data efficiency and performance over unaugmented models and selected theoretical closures."
+      ],
+      "metric_policy": "Do not invent numerical gains from the abstract; extract exact tables, splits and uncertainty from the paper/supplement before reproducing.",
+      "data_access_state": "NOT_YET_AUDITED",
+      "code_access_state": "NOT_YET_AUDITED",
+      "redistribution_rights_state": "NOT_YET_AUDITED",
+      "source_revision": "publisher_version_2026-02-23",
+      "luminous_reproduction": false,
+      "claim_ceiling": "PUBLISHED_KINETIC_PIC_NUMERICAL_STUDY_ONLY_NO_LUMINOUS_REPRODUCTION_OR_EXPERIMENTAL_TOKAMAK_TRANSFER_CLAIM"
+    },
+    {
+      "source_id": "burles_online_fno_landaudamping_2026",
+      "title": "A neural operator closure for Landau damping in electrostatic plasma",
+      "authors": [
+        "Samuel Burles",
+        "Enrico Camporeale",
+        "Oreste Pezzi"
+      ],
+      "doi": "10.1017/S0022377826102517",
+      "source_url": "https://doi.org/10.1017/S0022377826102517",
+      "published_date": "2026-10-30",
+      "source_type": "peer_reviewed_numerical_study",
+      "task_lane": "electrostatic_landau_damping_heat_flux_closure",
+      "plasma_regime": "one_dimensional_electrostatic_linear_and_nonlinear_landau_damping",
+      "methods": [
+        "fourier_neural_operator",
+        "online_aposteriori_training",
+        "trailing_history_window",
+        "differentiable_fluid_solver"
+      ],
+      "transformation_families_reported": [],
+      "reported_findings": [
+        "FNO closure is trained online inside a differentiable fluid solver using closed-solver trajectories.",
+        "The closure uses a trailing window of resolved-moment history and is non-Markovian.",
+        "The authors report linear and nonlinear Landau-damping reproduction, interpolation to unseen initial perturbation amplitudes, and stability in independent fluid simulations."
+      ],
+      "metric_policy": "Preserve the 1D electrostatic regime, rollout horizon, initial-amplitude scan, solver and memory-window details. Do not promote to magnetic-reconnection or tokamak evidence.",
+      "data_access_state": "NOT_YET_AUDITED",
+      "code_access_state": "NOT_YET_AUDITED",
+      "redistribution_rights_state": "NOT_YET_AUDITED",
+      "source_revision": "publisher_version_2026-10-30",
+      "luminous_reproduction": false,
+      "claim_ceiling": "PUBLISHED_1D_ELECTROSTATIC_NUMERICAL_STUDY_ONLY_NO_LUMINOUS_REPRODUCTION_OR_CROSS_REGIME_CLAIM"
+    },
+    {
+      "source_id": "huang_fno_landaudamping_2025",
+      "title": "Machine-learning heat flux closure for multi-moment fluid modeling of nonlinear Landau damping",
+      "authors": [
+        "Ziyu Huang",
+        "Chuanfei Dong",
+        "Liang Wang"
+      ],
+      "doi": "10.1073/pnas.2419073122",
+      "source_url": "https://doi.org/10.1073/pnas.2419073122",
+      "published_date": "2025-03-18",
+      "source_type": "peer_reviewed_numerical_study",
+      "task_lane": "electrostatic_landau_damping_heat_flux_closure",
+      "plasma_regime": "one_dimensional_electrostatic_linear_and_nonlinear_landau_damping",
+      "methods": [
+        "fourier_neural_operator",
+        "vlasov_reference_data",
+        "multi_moment_fluid_model"
+      ],
+      "transformation_families_reported": [],
+      "reported_findings": [
+        "The authors report a learned heat-flux closure that reproduces linear and nonlinear Landau-damping evolution against their Vlasov references."
+      ],
+      "metric_policy": "Keep this offline-training/online-deployment setup distinct from the 2026 online a-posteriori FNO training paper.",
+      "data_access_state": "ZENODO_DATASET_REPORTED_RIGHTS_AUDIT_PENDING",
+      "code_access_state": "NOT_YET_AUDITED",
+      "redistribution_rights_state": "NOT_YET_AUDITED",
+      "source_revision": "publisher_version_2025-03-18",
+      "luminous_reproduction": false,
+      "claim_ceiling": "PUBLISHED_1D_ELECTROSTATIC_NUMERICAL_STUDY_ONLY_NO_LUMINOUS_REPRODUCTION_OR_CROSS_REGIME_CLAIM"
+    },
+    {
+      "source_id": "ingelsten_sparse_heatflux_2025",
+      "title": "Data-driven discovery of a heat flux closure for electrostatic plasma phenomena",
+      "authors": [
+        "Emil R. Ingelsten",
+        "M. C. McGrae-Menge",
+        "E. P. Alves",
+        "Istvan Pusztai"
+      ],
+      "doi": "10.1017/S0022377825000285",
+      "source_url": "https://doi.org/10.1017/S0022377825000285",
+      "published_date": "2025-04",
+      "source_type": "peer_reviewed_simulation_analysis",
+      "task_lane": "electrostatic_landau_damping_and_two_stream_heat_flux_equation_discovery",
+      "plasma_regime": "electrostatic_landau_damped_langmuir_waves_and_two_stream_instabilities",
+      "methods": [
+        "OSIRIS_particle_in_cell_data",
+        "sparse_regression",
+        "heat_flux_closure_discovery"
+      ],
+      "transformation_families_reported": [],
+      "reported_findings": [
+        "The abstract reports six sparse-regression terms that together explain more than 95 percent of heat-flux variation in the studied cases.",
+        "The paper investigates dependence on thermal speed and growth/damping rate."
+      ],
+      "metric_policy": "The >95 percent figure is source- and task-specific. Do not combine it with FNO rollout metrics or magnetic-reconnection closure results.",
+      "data_access_state": "NOT_YET_AUDITED",
+      "code_access_state": "NOT_YET_AUDITED",
+      "redistribution_rights_state": "NOT_YET_AUDITED",
+      "source_revision": "publisher_version_2025",
+      "luminous_reproduction": false,
+      "claim_ceiling": "PUBLISHED_ELECTROSTATIC_SIMULATION_ANALYSIS_ONLY_NO_LUMINOUS_REPRODUCTION_OR_CROSS_REGIME_CLAIM"
+    },
+    {
+      "source_id": "plasma_moment_closure_review_2026",
+      "title": "The machine learning approach to moment closure relations for plasma: a review",
+      "authors": [],
+      "doi": "10.1017/S0022377826102013",
+      "source_url": "https://doi.org/10.1017/S0022377826102013",
+      "published_date": "2026",
+      "source_type": "peer_reviewed_review",
+      "task_lane": "cross_regime_methodological_review_not_benchmark_case",
+      "plasma_regime": "multiple_plasma_regimes_as_reviewed",
+      "methods": [
+        "neural_network_surrogates",
+        "fourier_neural_operators",
+        "sparse_regression",
+        "symbolic_equation_discovery"
+      ],
+      "transformation_families_reported": [],
+      "reported_findings": [
+        "Identifies off-diagonal pressure-tensor accuracy, out-of-distribution generalization, stable solver integration and physical consistency as important open challenges.",
+        "Discusses symmetry and entropy-production constraints as physical admissibility checks.",
+        "Highlights the distinction between offline fit and online deployment."
+      ],
+      "metric_policy": "Review-level synthesis only; do not treat the review as an experimental performance point.",
+      "data_access_state": "NOT_APPLICABLE_REVIEW",
+      "code_access_state": "NOT_APPLICABLE_REVIEW",
+      "redistribution_rights_state": "NOT_YET_AUDITED",
+      "source_revision": "publisher_version_2026",
+      "luminous_reproduction": false,
+      "claim_ceiling": "REVIEW_SYNTHESIS_ONLY_NO_PRIMARY_DATA_OR_LUMINOUS_REPRODUCTION_CLAIM"
+    }
+  ]
+}
