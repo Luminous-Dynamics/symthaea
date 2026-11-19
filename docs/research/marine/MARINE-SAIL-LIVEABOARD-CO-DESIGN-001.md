@@ -129,7 +129,7 @@ Do not force an energy reduction target where it would trade away safety, schedu
 
 ## 10. P0/P1/P2/P3 release sequence
 
-- **P0:** Strict case schema, owner-reference map, synthetic positive/negative cases, independent join oracle, time-availability checks, no physics/planner.
+- **P0:** Strict case schema, explicit hard-gate evaluations, synthetic fixture, and standalone Rust audit CLI (`tools/marine-sail-liveaboard-audit`) with semantic/time-availability checks and a matched-case oracle; no physics/planner.
 - **P1:** Candidate comparison by consuming native receipts and independently rechecking identity, service match, gate completeness and objective reconciliation.
 - **P2:** Rights-reviewed shadow replay and held-out route/weather/load cases; outputs advisory/read-only.
 - **P3:** Extend LOS-18 staged demonstrator with sailcraft/propulsion electrical interfaces; bench/dockside instrumentation first, then permissioned sheltered-water trials after qualified review.
@@ -161,3 +161,12 @@ The comparison must recognize capabilities that already exist in commercial sail
 ## 13. Claim ceiling
 
 A P0 pass means only that the composition contract, temporal-information rules and frozen synthetic examples behave as specified. It does not validate polar data, weather forecasts, hull stability, actual sailing performance, battery endurance, solar yield, water quality, habitability, autonomous navigation, COLREG compliance, seaworthiness, class/flag certification or permission to operate. Every physical claim requires source-bound, independent validation on the exact configuration and operating envelope.
+
+
+## 14. P0 implementation status (2026-11-19)
+
+- The P0 standalone Rust audit is source-committed under `tools/marine-sail-liveaboard-audit/`.
+- The CLI separates `INVALID`, `BLOCKED`, `INCOMPLETE`, `SYNTHETIC_ONLY` and `ELIGIBLE_FOR_COMPARISON`; only the first four can arise from the current synthetic fixture.
+- Pair comparison checks identical mission/service/configuration/environment/gate inputs and excludes the sail-route candidate output from shared-input identity comparison.
+- Thirteen tests are authored for forecast-time leakage, impossible forecast timestamps, revoked evidence, missing resource dimensions, unresolved gates, malformed digests, evaluator-only truth, schema-version changes, mission mismatch and synthetic-only non-promotion.
+- Exact Rust formatting, compilation, Clippy and test execution are pending because the current environment does not expose a Rust toolchain. The workflow is path-scoped and will run independently; no CI pass is claimed.
