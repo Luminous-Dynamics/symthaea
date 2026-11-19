@@ -286,6 +286,7 @@ pub fn solve_bounded_noise_policy(
 pub fn verify_bounded_noise_policy(
     problem: &BoundedNoiseProblemV1,
     receipt: &RobustPolicyReceiptV1,
+    expected_budget: QualificationBudgetV1,
 ) -> Result<RobustPolicySummaryV1, RobustPlannerErrorV1> {
     problem
         .validate()
@@ -293,10 +294,11 @@ pub fn verify_bounded_noise_policy(
     if receipt.schema_version != 1
         || receipt.problem_id != problem.problem_id
         || receipt.problem_contract_bytes != problem.canonical_bytes()
+        || receipt.budget != expected_budget
     {
         return Err(RobustPlannerErrorV1::ReceiptMismatch);
     }
-    let replayed = solve_bounded_noise_policy(problem, receipt.budget)?;
+    let replayed = solve_bounded_noise_policy(problem, expected_budget)?;
     if *receipt != replayed {
         return Err(RobustPlannerErrorV1::ReceiptMismatch);
     }
@@ -380,7 +382,7 @@ mod tests {
         assert_eq!(receipt.root.worst_case_remaining, 1);
         assert_eq!(receipt.root.worst_case_cost, 2);
         assert_all_predictions_have_branches(&problem, &receipt.root);
-        let summary = verify_bounded_noise_policy(&problem, &receipt).unwrap();
+        let summary = verify_bounded_noise_policy(&problem, &receipt, budget).unwrap();
         assert!(summary.identified);
         assert_eq!(summary.worst_case_cost, 2);
     }
@@ -478,19 +480,28 @@ mod tests {
     fn forged_or_mutated_policy_receipts_are_rejected() {
         let problem = fixture();
         let receipt = solve_bounded_noise_policy(&problem, QualificationBudgetV1::default()).unwrap();
-        verify_bounded_noise_policy(&problem, &receipt).unwrap();
+        verify_bounded_noise_policy(&problem, &receipt, QualificationBudgetV1::default()).unwrap();
 
         let mut forged = receipt.clone();
         forged.root.worst_case_remaining = 3;
         assert_eq!(
-            verify_bounded_noise_policy(&problem, &forged),
+            verify_bounded_noise_policy(&problem, &forged, QualificationBudgetV1::default()),
             Err(RobustPlannerErrorV1::ReceiptMismatch)
         );
 
         let mut changed_problem = problem.clone();
         changed_problem.allowed_outcomes_by_hypothesis[0][0].push(99);
         assert_eq!(
-            verify_bounded_noise_policy(&changed_problem, &receipt),
+            verify_bounded_noise_policy(&changed_problem, &receipt, QualificationBudgetV1::default()),
+            Err(RobustPlannerErrorV1::ReceiptMismatch)
+        );
+
+        let changed_budget = QualificationBudgetV1 {
+            max_total_cost: QualificationBudgetV1::default().max_total_cost - 1,
+            ..QualificationBudgetV1::default()
+        };
+        assert_eq!(
+            verify_bounded_noise_policy(&problem, &receipt, changed_budget),
             Err(RobustPlannerErrorV1::ReceiptMismatch)
         );
     }
