@@ -988,7 +988,8 @@ mod tests {
     fn duplicate_assessment_domain_is_rejected() {
         let profile = profile(AquaArchitecture::DirectFlowPassive);
         let mut assessments = assessments(&profile, SiteCapabilityOutcome::Satisfied);
-        assessments.push(assessments[0].clone());
+        let duplicate = assessments[0].clone();
+        assessments.push(duplicate);
         assert!(matches!(
             evaluate_site_fit(&profile, &assessments),
             Err(SiteFitError::DuplicateAssessment { .. })
@@ -1023,11 +1024,7 @@ mod tests {
         assessments.push(SiteCapabilityAssessment {
             domain: SiteCapabilityDomain::NetworkConnectivity,
             outcome: SiteCapabilityOutcome::Satisfied,
-            evidence: Some(evidence(
-                SiteCapabilityDomain::NetworkConnectivity,
-                &profile,
-                "network-evidence",
-            )),
+            evidence: None,
         });
         assert!(matches!(
             evaluate_site_fit(&profile, &assessments),
@@ -1112,7 +1109,8 @@ mod tests {
     #[test]
     fn duplicate_method_binding_is_rejected_in_profile() {
         let mut profile = profile(AquaArchitecture::DirectFlowPassive);
-        profile.method_bindings.push(profile.method_bindings[0].clone());
+        let first_binding = profile.method_bindings[0].clone();
+        profile.method_bindings.push(first_binding);
         assert!(matches!(
             profile.validate(),
             Err(SiteFitError::DuplicateMethodBinding { .. })
