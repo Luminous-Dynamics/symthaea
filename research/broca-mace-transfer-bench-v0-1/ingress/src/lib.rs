@@ -1,3 +1,4 @@
+pub mod claims;
 pub mod providers;
 
 // Copyright (C) 2026 Luminous Dynamics

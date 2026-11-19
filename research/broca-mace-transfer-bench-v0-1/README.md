@@ -342,3 +342,9 @@ The provider capture envelope accepts an optional thread_id (or stream_id). Sequ
 ## Provider trace benchmark
 
 See [MACE Provider-Native Trace Integrity and Outcome Grounding Benchmark v0.1](../../docs/research/MACE_PROVIDER_TRACE_INTEGRITY_BENCHMARK_V0_1.md) for the proposed trace-integrity, outcome-grounding, source-lineage, lifecycle, transfer and cross-provider evaluation tracks, baselines and qualification targets.
+
+## Provider claim source spans
+
+The ingress crate now includes a source-span validator for extractor-generated claims. Each proposal binds the original capture digest, provider event/thread identity, native event ID, JSON Pointer, UTF-8 byte range, exact span digest, assertion digest and extractor configuration. Validation returns an explicitly untrusted claim with the exact source text. It cannot become a candidate Experience, execution authority or world-outcome receipt; independent grounding and Mycelix/Symtropy receipts remain mandatory.
+
+See [MACE Provider-Native Trace Integrity and Outcome Grounding Benchmark v0.1](../../docs/research/MACE_PROVIDER_TRACE_INTEGRITY_BENCHMARK_V0_1.md). This is an authored implementation and test tranche, not runner-verified.

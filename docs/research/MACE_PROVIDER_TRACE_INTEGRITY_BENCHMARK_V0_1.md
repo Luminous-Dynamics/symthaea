@@ -233,3 +233,19 @@ The current ingress adapter is a provider-shaped capture-envelope normalizer. It
 
 Provider capture metadata is not a replacement for the original privacy-controlled artifact. The original capture must remain available under the source retention/deletion policy if exact replay is required.
 
+
+## 10. Source-span claim grounding (MACE provider-claims v0.1)
+
+The ingress crate adds a provider-neutral claim-span validator for extractor-produced statements. A proposal binds:
+- exact source capture SHA-256;
+- capture-line SHA-256 and provider-event payload SHA-256;
+- provider, session, thread, native event ID/type and provider-local sequence;
+- RFC 6901 JSON Pointer into the decoded event;
+- UTF-8 byte offsets and SHA-256 of the exact selected substring;
+- assertion digest and extractor ID/version/config digest.
+
+Validation re-normalizes the original capture artifact and verifies every identity/digest before returning an `UntrustedProviderClaimV1`. The returned object exposes the exact source text and assertion but is deliberately incapable of becoming a MACE `Experience`, an execution authorization or an outcome receipt. It requires a separate grounding process to establish whether the assertion is entailed by the source, and separate Mycelix/Symtropy receipts to establish truth, execution and outcome.
+
+The first tests cover Anthropic persisted tool-result text, OpenAI RunItem tool output, whole-capture mutation, source-span mutation, non-string JSON pointers, UTF-8 boundary errors, assertion-digest mismatch, provider/thread/native-event mismatch, and invalid pointers/bounds. These are authored source tests only; no Rust runner pass is claimed.
+
+**Important boundary:** exact source-span binding proves where text came from, not that the text is true, complete, authorized or causally explanatory. A tool-output quote remains a tool-output claim.
