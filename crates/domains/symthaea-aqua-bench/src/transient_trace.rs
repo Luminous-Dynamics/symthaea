@@ -991,15 +991,20 @@ pub fn validate_matched_event_replay(
 
 fn channel_signature(
     channel: &TraceChannel,
-) -> (String, String, String, String, String, u64, u64) {
+) -> (String, String, String, String, String, String, String, u64, u64, u64, u64, u64) {
     (
         channel.channel_id.clone(),
         format!("{:?}", channel.role),
         channel.location.clone(),
         format!("{:?}", channel.datum),
         format!("{:?}", channel.unit),
+        channel.instrument_id.clone(),
+        channel.anti_alias_filter_id.clone(),
         channel.sample_rate_hz.to_bits(),
         channel.effective_bandwidth_hz.to_bits(),
+        channel.measurement_uncertainty.to_bits(),
+        channel.sample_count as u64,
+        channel.dropped_sample_count as u64,
     )
 }
 
@@ -1386,6 +1391,7 @@ mod tests {
         let mut value = profile();
         value.event_family = EventFamily::RapidValveEvent;
         value.command.kind = CommandKind::ValveState;
+        value.command.unit = CommandUnit::Boolean;
         value.command.samples[0].value = CommandValue::Boolean(false);
         value.command.samples[1].value = CommandValue::Boolean(true);
         value.command.samples[2].value = CommandValue::Boolean(false);
