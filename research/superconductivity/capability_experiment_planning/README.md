@@ -206,3 +206,59 @@ Lee et al.'s 2026 *Self-driving laboratory 2.0* review identifies interoperabili
 ## What v0.3 adds, and what it does not
 
 `sc_correlated_evidence_audit` adds a discrete shared-calibration latent state. It handles one common cause shared across the selected action set, while retaining the v0.2 conditional-independence assumption *given* that state and model. It is not yet a full hierarchical Bayesian model of all sample, batch, instrument and operator effects. Next steps are multiple partially shared nuisance groups, continuous random effects, unknown nuisance-prior inference, likelihood calibration, and outcome-adaptive decision trees. Do not claim real-world calibration robustness until those are validated on source/specimen-linked observations.
+
+## v0.4 research track: expected value of sample information for downstream decisions
+
+The new `SC-DECISION-VALUE-0.1` contract asks a more operational question than the v0.2/v0.3 information-gain objectives:
+
+> Which feasible experiment is expected to improve the downstream decision enough to justify its cost?
+
+The Rust auditor `sc_decision_value_audit` includes:
+- four model hypotheses, including `none_of_above`;
+- a shared discrete calibration nuisance state, drawn once for the full selected observation set;
+- explicit candidate decisions and a non-negative loss for every decision/model pair;
+- capability-gated experiments, cost budget and non-compensable eligibility;
+- exact feasible-subset oracles for expected value of sample information (EVSI) and mutual information;
+- greedy marginal-EVSI-per-cost and marginal-information-per-cost baselines;
+- separate SHA-256-bound schema/fixture receipts and adversarial tests.
+
+For posterior (p(M\mid y)), decision (d), and declared loss (L(d,M)), Bayes risk is:
+
+[
+R(p)=\min_d\sum_M p(M)L(d,M).
+]
+
+For selected measurements (Y_S), expected value of sample information is:
+
+[
+\operatorname{EVSI}(S)=R(p_0)-\mathbb E_{Y_S}[R(p(M\mid Y_S))].
+]
+
+The exact joint outcome probabilities preserve the v0.3 common-cause model:
+
+[
+p(y_{1:k}\mid M)=\sum_c p(c)\prod_i p(y_i\mid M,c).
+]
+
+This intentionally does **not** reward information that does not change a downstream decision. The current fixture uses a hard budget plus EVSI maximization, with cost as a tie-breaker; it does not yet fold arbitrary resource costs into the loss. A later multi-resource objective should separately model time, sample consumption, queue occupancy, failure risk and financial cost.
+
+### Synthetic fixture result (declared illustrative losses and likelihoods)
+
+With budget 8 and prior-optimal decision `stop_or_defer` (prior expected loss 2.55), the exact EVSI plan selects:
+1. qualify the thermodynamic measurement channel;
+2. perform the bulk thermodynamic observation;
+3. measure the stiffness tensor.
+
+Its cost is **5 units**, expected posterior decision risk is **1.6568125**, and EVSI is **0.8931875** loss units.
+
+The exact mutual-information plan also buys the field-angle (H_{c2}) observation. It costs **7 units** and has greater information gain, but produces the **same** expected downstream decision-risk reduction (0.8931875). On this fixture, the extra measurement is informationally interesting but decision-irrelevant under the declared loss table.
+
+The myopic EVSI-per-cost policy selects only the immediately available stiffness measurement and achieves EVSI **0.5875**. It misses the zero-immediate-value thermodynamic qualification action and follow-up.
+
+These are exact calculations over the synthetic fixture only. The decision losses are illustrative and are not a real project's economic utility, engineering risk, or laboratory cost function.
+
+### Benchmark implication and limits
+
+Compare EVSI planning against (a) mutual-information maximization, (b) target-variance reduction, (c) expected improvement / knowledge gradient where a scalar candidate objective is meaningful, (d) cost-aware batch Bayesian optimization, (e) D-optimal/log-determinant and risk-aware goal-oriented OED, and (f) random feasible / domain-expert policy baselines. Freeze the candidate pool, priors, loss table, costs, capabilities, measurement likelihoods and stopping rules. Evaluate decision regret and realized decision quality, not just information gained.
+
+The v0.4 finite oracle has known discrete likelihoods and losses, one shared nuisance factor, binary observations and at most ten actions. It does not implement posterior decision trees, unknown loss functions, distributionally robust EVSI, multiple correlated nuisance groups, continuous observations or real-money/sample/time accounting. Its synthetic result does not establish superiority over SOTA. The hosted exact-head workflow now tests/lints all four planning binaries and emits a separate decision-value receipt.
