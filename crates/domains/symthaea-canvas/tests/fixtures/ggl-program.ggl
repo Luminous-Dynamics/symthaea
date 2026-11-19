@@ -1,0 +1,7 @@
+GGL 0.1
+units mm
+point O = (1, 2)
+circle circle.primary at O radius 4.75
+segment segment.axis from (-2, 1.25) to (5.5, -4)
+polygon polygon.triangle at O sides 3 radius 3 rotation deg(12)
+arc arc.quarter at O radius 3 start rad(0.25) sweep rad(1.5)
