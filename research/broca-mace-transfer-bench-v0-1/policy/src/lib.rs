@@ -276,6 +276,7 @@ fn scope_aware_policy(memory: &[Experience], query: Query) -> Decision {
 
 pub fn is_qualified(item: &Experience, query: Query) -> bool {
     item.scope == query.scope
+        && item.source_family != 0
         && item.source_root_digest.is_known()
         && item.observed_utility.is_finite()
         && (0.0..=1.0).contains(&item.observed_utility)
@@ -385,6 +386,7 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
 /// separately by the invariant-transport policy.
 pub fn is_transfer_qualified(item: &Experience, query: Query) -> bool {
     item.scope.objective == query.scope.objective
+        && item.source_family != 0
         && item.source_root_digest.is_known()
         && item.observed_utility.is_finite()
         && (0.0..=1.0).contains(&item.observed_utility)
@@ -881,6 +883,20 @@ mod tests {
         assert_eq!(digest, SourceRootDigest::UNKNOWN);
         assert!(!digest.is_known());
     }
+    #[test]
+    fn unknown_source_family_is_not_qualified_or_transferable() {
+        let scope = Scope {
+            regime: Regime::Baseline,
+            objective: Objective::Quality,
+        };
+        let mut item = sample(60, 10, Action::A, 0.9, scope);
+        item.source_family = 0;
+        let query = Query { scope };
+
+        assert!(!is_qualified(&item, query));
+        assert!(!is_transfer_qualified(&item, query));
+    }
+
     #[test]
     fn scope_mismatch_is_not_eligible() {
         let source_scope = Scope {
