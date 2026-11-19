@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/symmetry-discovery-benchmark-001/schemas/s3_permutation_fixture.schema.json",
+  "title": "S3 coordinate-permutation benchmark fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "action",
+    "seed_point",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "benchmark_id": {
+      "const": "LUMINOUS-SYMM-PERMUTATION-001"
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group_id",
+        "action_kind",
+        "identity_element_id",
+        "elements",
+        "multiplication_table",
+        "inverse_table"
+      ],
+      "properties": {
+        "group_id": {
+          "const": "S3"
+        },
+        "action_kind": {
+          "const": "coordinate_permutation_on_R3"
+        },
+        "identity_element_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "elements": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "image"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "image": {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2
+                  }
+                ],
+                "items": false,
+                "minItems": 3,
+                "maxItems": 3
+              }
+            }
+          }
+        },
+        "multiplication_table": {
+          "type": "array",
+          "minItems": 36,
+          "maxItems": 36,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "left",
+              "right",
+              "product"
+            ],
+            "properties": {
+              "left": {
+                "type": "string"
+              },
+              "right": {
+                "type": "string"
+              },
+              "product": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "inverse_table": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "element",
+              "inverse"
+            ],
+            "properties": {
+              "element": {
+                "type": "string"
+              },
+              "inverse": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "seed_point": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "split",
+          "target_subgroup_ids",
+          "expected_subgroup_label",
+          "point_orbit"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "split": {
+            "const": "fixture_sanity"
+          },
+          "target_subgroup_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "expected_subgroup_label": {
+            "enum": [
+              "C1",
+              "C2_s12",
+              "C2_s01",
+              "C2_s02",
+              "C3",
+              "S3"
+            ]
+          },
+          "point_orbit": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "items": false,
+              "minItems": 3,
+              "maxItems": 3
+            }
+          }
+        }
+      }
+    }
+  }
+}
