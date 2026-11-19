@@ -66,6 +66,20 @@ Consumer Reports' 2026 panel reports both claimed and measured model flow. Examp
 
 Aqua should capture actual instrumented values rather than treating catalogue flow as measured flow. Consumer Reports' comfort method is not interchangeable with EN 18021, UWL or WaterSense procedures.
 
+### 2.6 WaterSense numerical baseline — exceed the floor, not merely the label
+
+EPA's WaterSense Version 1.1 showerhead specification includes method-specific minimum-flow requirements: at 20 psi, measured flow must be at least 60% of maximum rated flow; at 45 and 80 psi, at least 75%. It also requires at least 2.0 ounces of spray force at 20 psi and defines annular-ring spray-coverage limits (combined 2- and 4-inch rings no more than 75% of collected volume; combined 2-, 4- and 6-inch rings at least 25%).
+
+These are US programme certification criteria, not South African law and not Aqua certification. Their value to Aqua is a useful independently developed performance floor for compatible showerhead configurations. Aqua should use the same pressure datum, apparatus and standard revision before comparing ratios.
+
+Internal AQS-1 research targets, not achieved results:
+- At least 80% of maximum rated flow at 20 psi and at least 85% at 45 / 80 psi, compared with WaterSense's 60% and 75% minima, respectively.
+- Meet the applicable 2.0-ounce spray-force minimum at 20 psi while also checking user comfort; do not assume that maximizing force is always better.
+- Meet the applicable annular-ring coverage constraints, then optimize normalized spatial uniformity and task-specific rinsing on a separate preregistered metric.
+- Continue low-head site-envelope experiments (e.g. 50 / 75 / 100 kPa dynamic points) as a distinct local stress test. Do not label those points WaterSense-equivalent without a method-approved conversion.
+
+Source: EPA WaterSense Performance Overview: https://www.epa.gov/system/files/documents/2022-05/ws-products-perfomance-showerheads.pdf
+
 ### 2.4 2026 DWHR–heat-pump coupling changes the topology question
 
 Bouvenot and Beaudet's *Energy and Buildings* paper, published 1 October 2026, examines coupling shower drain-water heat recovery with electric and heat-pump storage water heaters (DOI: 10.1016/j.enbuild.2026.117761).
@@ -236,7 +250,8 @@ These are internal design targets. They are not regulatory requirements, certifi
 
 ### Direct-flow AQS-1
 - Investigate 4.5–5.5 L/min at the declared 300 kPa reference point only where task quality and applicable standardized force/coverage methods pass.
-- Initial flow-retention hypothesis: at least 70% at the specified low-pressure point relative to the specified reference point; 80% stretch. Always report absolute flow, task result and uncertainty alongside the ratio.
+- At compatible WaterSense/ASME/CSA pressure points, target at least 80% of maximum rated flow at 20 psi and at least 85% at 45 / 80 psi, exceeding the programme's 60% / 75% minimum-flow criteria. Report absolute flow, force, coverage, task result and uncertainty alongside each ratio.
+- Separately investigate 50 / 75 / 100 kPa local low-head stress points where the exact hardware and rig are rated. These do not replace the standard pressure points or inherit WaterSense certification status.
 - At least 20% less fresh water per qualified completed task than the strongest exact direct-flow comparator, including warm-up, rinse, purge and failed attempts.
 
 ### Indirect DWHR / power coupling
