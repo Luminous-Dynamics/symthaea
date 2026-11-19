@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 #include <limits>
 #include <map>
 #include <random>
@@ -62,6 +64,13 @@ bool read_varint(const std::vector<std::uint8_t>& in, std::size_t& pos, std::uin
         }
     }
     return false;
+}
+
+bool write_file(const std::string& path, const std::vector<std::uint8_t>& bytes) {
+    std::ofstream file(path, std::ios::binary);
+    if (!file) return false;
+    file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    return static_cast<bool>(file);
 }
 
 std::vector<std::uint8_t> encode_raw(const std::vector<Record>& records) {
@@ -233,13 +242,21 @@ std::vector<Record> make_fixture(const std::string& mode, std::uint64_t seed) {
     return records;
 }
 
-bool run_fixture(const std::string& name, const std::vector<Record>& source) {
+bool run_fixture(const std::string& name, const std::vector<Record>& source,
+                 const std::filesystem::path& emit_directory) {
     const auto raw = encode_raw(source);
     const auto encoded = encode_state_delta(source);
     std::vector<Record> decoded;
     if (!decode_state_delta(encoded, decoded) || decoded != source) {
         std::cerr << "round-trip failed: " << name << "\n";
         return false;
+    }
+    if (!emit_directory.empty()) {
+        if (!write_file((emit_directory / (name + "_raw.bin")).string(), raw) ||
+            !write_file((emit_directory / (name + "_state_delta.bin")).string(), encoded)) {
+            std::cerr << "failed to write benchmark artifacts: " << name << "\n";
+            return false;
+        }
     }
     const double ratio = raw.empty() ? 0.0 : static_cast<double>(encoded.size()) / static_cast<double>(raw.size());
     std::cout << name << ": records=" << source.size()
@@ -260,11 +277,25 @@ bool rejected(const std::vector<std::uint8_t>& bytes, const char* label) {
 }
 } // namespace
 
-int main() {
-    if (!run_fixture("sparse-updates", make_fixture("sparse", 0x5eedULL)) ||
-        !run_fixture("bursty-updates", make_fixture("bursty", 0x5eedULL)) ||
-        !run_fixture("noisy-updates", make_fixture("noisy", 0x5eedULL)) ||
-        !run_fixture("mostly-idle", make_fixture("idle", 0x5eedULL))) return 1;
+int main(int argc, char** argv) {
+    std::filesystem::path emit_directory;
+    if (argc == 3 && std::string(argv[1]) == "--emit-dir") {
+        emit_directory = argv[2];
+        std::error_code ec;
+        std::filesystem::create_directories(emit_directory, ec);
+        if (ec) {
+            std::cerr << "cannot create artifact directory: " << ec.message() << "\n";
+            return 2;
+        }
+    } else if (argc != 1) {
+        std::cerr << "usage: " << argv[0] << " [--emit-dir DIRECTORY]\n";
+        return 2;
+    }
+
+    if (!run_fixture("sparse-updates", make_fixture("sparse", 0x5eedULL), emit_directory) ||
+        !run_fixture("bursty-updates", make_fixture("bursty", 0x5eedULL), emit_directory) ||
+        !run_fixture("noisy-updates", make_fixture("noisy", 0x5eedULL), emit_directory) ||
+        !run_fixture("mostly-idle", make_fixture("idle", 0x5eedULL), emit_directory)) return 1;
 
     auto one = make_fixture("sparse", 0x1234ULL);
     one.resize(3U);
