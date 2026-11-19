@@ -140,6 +140,7 @@ def generate_cases(base_fixture):
                             "single generic rational vector orbit under "
                             "the target D4 subgroup"
                         ),
+                        "split_assignment": "permuted-index-v1",
                     },
                 }
             )
