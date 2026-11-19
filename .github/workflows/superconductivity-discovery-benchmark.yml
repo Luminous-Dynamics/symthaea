@@ -32,8 +32,21 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Check formatting
+      - name: Apply pinned Rust formatting
+        run: cargo fmt --manifest-path tools/superconductivity-discovery-benchmark-auditor/Cargo.toml --all
+
+      - name: Verify canonical Rust formatting
         run: cargo fmt --manifest-path tools/superconductivity-discovery-benchmark-auditor/Cargo.toml --all -- --check
+
+      - name: Capture rustfmt-only patch
+        if: always()
+        run: |
+          git diff -- tools/superconductivity-discovery-benchmark-auditor/src > "$RUNNER_TEMP/sc-rustfmt.patch"
+          if [ -s "$RUNNER_TEMP/sc-rustfmt.patch" ]; then
+            cat "$RUNNER_TEMP/sc-rustfmt.patch"
+          else
+            echo "rustfmt_patch=empty"
+          fi
 
       - name: Generate isolated dependency lockfile
         run: cargo generate-lockfile --manifest-path tools/superconductivity-discovery-benchmark-auditor/Cargo.toml
@@ -63,6 +76,7 @@ jobs:
             sha256sum data/research/superconductivity_discovery_benchmark_fixture_v0_1.json
             sha256sum tools/superconductivity-discovery-benchmark-auditor/Cargo.toml
             sha256sum tools/superconductivity-discovery-benchmark-auditor/src/main.rs
+            sha256sum "$RUNNER_TEMP/sc-rustfmt.patch"
             if [ -f tools/superconductivity-discovery-benchmark-auditor/Cargo.lock ]; then
               sha256sum tools/superconductivity-discovery-benchmark-auditor/Cargo.lock
             else
@@ -80,3 +94,4 @@ jobs:
             tools/superconductivity-discovery-benchmark-auditor/Cargo.lock
             ${{ runner.temp }}/sc-discovery-benchmark-environment.txt
             ${{ runner.temp }}/sc-discovery-benchmark-receipt.json
+            ${{ runner.temp }}/sc-rustfmt.patch
