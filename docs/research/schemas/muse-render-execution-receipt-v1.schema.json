@@ -111,13 +111,22 @@
       "additionalProperties": false,
       "required": [
         "manifest_schema",
+        "manifest_digest_schema",
         "manifest_sha256",
-        "midi_sha256",
+        "score_digest_schema",
         "score_sha256",
+        "timeline_digest_schema",
         "timeline_sha256",
+        "binding_digest_schema",
+        "binding_sha256",
+        "capability_digest_schema",
         "capability_sha256",
+        "midi_sha256",
         "byte_length",
         "ticks_per_quarter",
+        "tempo_microseconds_per_quarter",
+        "meter_numerator",
+        "meter_denominator",
         "note_count"
       ],
       "properties": {
@@ -146,13 +155,41 @@
           "minimum": 1
         },
         "ticks_per_quarter": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 32767
+          "const": 960
         },
         "note_count": {
           "type": "integer",
           "minimum": 1
+        },
+        "manifest_digest_schema": {
+          "const": "muse-midi-performance-manifest-serde-json-sha256-v1"
+        },
+        "score_digest_schema": {
+          "const": "muse-score-serde-json-sha256-v1"
+        },
+        "timeline_digest_schema": {
+          "const": "muse-orchestration-timeline-serde-json-sha256-v1"
+        },
+        "binding_digest_schema": {
+          "const": "muse-midi-instrument-bindings-serde-json-sha256-v1"
+        },
+        "binding_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "capability_digest_schema": {
+          "const": "muse-midi-instrument-capabilities-serde-json-sha256-v1"
+        },
+        "tempo_microseconds_per_quarter": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "meter_numerator": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 255
+        },
+        "meter_denominator": {
+          "const": 4
         }
       }
     },
