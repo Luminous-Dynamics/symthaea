@@ -592,7 +592,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     println!("# values={count}");
     println!("# seed={seed}");
     println!("# representation=IEEE-754-binary64 exact bit preservation");
-    println!("source,mode,transform,model,segment_size,probe_interval,probe_count,extra_candidate_encodes,raw_bytes,frame_bytes,zstd_raw_bytes,ratio,encode_ns,decode_ns,round_trip");
+    println!("source,mode,transform,model,segment_size,probe_interval,probe_count,extra_candidate_encodes,oracle_gap_pct,raw_bytes,frame_bytes,zstd_raw_bytes,ratio,encode_ns,decode_ns,round_trip");
 
     for (name, values) in sources {
         let raw_len = values.len().checked_mul(8).ok_or("float raw length overflow")?;
@@ -634,7 +634,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                     Float64Transform::RleXorPrevious => "rle_xor_previous",
                 };
                 println!(
-                    "{name},single,{transform_name},{model_name},NA,NA,NA,NA,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
+                    "{name},single,{transform_name},{model_name},NA,NA,NA,NA,NA,NA,NA,{},{},{zstd},{ratio},{encode_ns},{decode_ns},exact",
                     raw.len(),
                     frame.len()
                 );
@@ -682,7 +682,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 format!("{:.6}", online_frame.len() as f64 / raw.len() as f64)
             };
             println!(
-                "{name},online_historical_cost,past_segment_mean,best_of_eight,{segment_size},NA,NA,NA,{},{},{zstd},{online_ratio},{online_encode_ns},{online_decode_ns},exact",
+                "{name},online_historical_cost,past_segment_mean,best_of_eight,{segment_size},NA,NA,NA,NA,{},{},{zstd},{online_ratio},{online_encode_ns},{online_decode_ns},exact",
                 raw.len(),
                 online_frame.len()
             );
@@ -711,6 +711,16 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 } else {
                     format!("{:.6}", budgeted_frame.len() as f64 / raw.len() as f64)
                 };
+                let oracle_gap_pct = if frame.is_empty() {
+                    0.0
+                } else {
+                    (budgeted_frame.len() as f64 / frame.len() as f64 - 1.0) * 100.0
+                };
+                if oracle_gap_pct < -1e-9 {
+                    return Err(format!(
+                        "budgeted selector beat offline best-of-eight oracle for {name}/{segment_size}/{probe_interval}"
+                    ).into());
+                }
                 let segment_count = if values.is_empty() {
                     0
                 } else {
@@ -723,7 +733,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
                 };
                 let extra_candidate_encodes = probe_count * 7;
                 println!(
-                    "{name},budgeted_sparse_probe,historical_probe,best_of_eight,{segment_size},{probe_interval},{probe_count},{extra_candidate_encodes},{},{},{zstd},{budgeted_ratio},{budgeted_encode_ns},{budgeted_decode_ns},exact",
+                    "{name},budgeted_sparse_probe,historical_probe,best_of_eight,{segment_size},{probe_interval},{probe_count},{extra_candidate_encodes},{oracle_gap_pct:.6},{},{},{zstd},{budgeted_ratio},{budgeted_encode_ns},{budgeted_decode_ns},exact",
                     raw.len(),
                     budgeted_frame.len()
                 );
