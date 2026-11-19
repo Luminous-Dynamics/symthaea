@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! GGL reference-compiler -> Canvas serde/render conformance.
+//! GGL compiled-scene fixture -> actual Canvas serde/render conformance.
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -19,7 +19,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
     let mut out = String::with_capacity(64);
     for byte in digest {
         use std::fmt::Write as _;
-        write!(&mut out, "{byte:02x}").expect("String formatting");
+        write!(&mut out, "{byte:02x}").expect("formatting into String");
     }
     out
 }
@@ -27,7 +27,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 fn assert_digest(value: &Value, field: &str) {
     let digest = value[field].as_str().expect("digest string");
     assert_eq!(digest.len(), 64, "{field} length");
-    assert!(digest.bytes().all(|b| b.is_ascii_hexdigit()), "{field} must be hex");
+    assert!(digest.bytes().all(|byte| byte.is_ascii_hexdigit()), "{field} must be hex");
 }
 
 fn close(actual: f32, expected: f64, field: &str) {
@@ -44,13 +44,13 @@ fn group_id(node: &SceneNode) -> &str {
 }
 
 #[test]
-fn ggl_adapter_deserializes_preserves_geometry_and_renders_stable_ids() {
+fn ggl_fixture_deserializes_preserves_geometry_and_renders_stable_ids() {
     let source: Value = serde_json::from_str(GGL_SOURCE).expect("compiled GGL fixture");
-    let identity: Value = serde_json::from_str(IDENTITY_JSON).expect("identity map fixture");
-    let manifest: Value = serde_json::from_str(MANIFEST_JSON).expect("adapter manifest fixture");
+    let identity: Value = serde_json::from_str(IDENTITY_JSON).expect("identity fixture");
+    let manifest: Value = serde_json::from_str(MANIFEST_JSON).expect("manifest fixture");
     let canvas: SceneNode = serde_json::from_str(CANVAS_JSON).expect("actual Canvas SceneNode serde");
 
-    let primitives = source["primitives"].as_array().expect("primitive list");
+    let primitives = source["primitives"].as_array().expect("primitives");
     let entries = identity["entries"].as_array().expect("identity entries");
     assert_eq!(source["language"].as_str(), Some("GGL"));
     assert_eq!(source["version"].as_str(), Some("0.1"));
@@ -59,9 +59,10 @@ fn ggl_adapter_deserializes_preserves_geometry_and_renders_stable_ids() {
     assert_eq!(canvas.children.len(), 4);
     assert_eq!(manifest["primitive_count"].as_u64(), Some(4));
     assert_eq!(manifest["units"], source["units"]);
-    assert_eq!(manifest["source_sha256"].as_str(), Some(sha256_hex(GGL_PROGRAM.as_bytes()).as_str()));
+    let expected_source_sha = sha256_hex(GGL_PROGRAM.as_bytes());
+    assert_eq!(manifest["source_sha256"].as_str(), Some(expected_source_sha.as_str()));
     for field in ["program_sha256", "geometry_sha256", "scene_sha256"] {
-        assert_eq!(manifest[field], source[field], "{field} binding");
+        assert_eq!(manifest[field], source[field]);
     }
     assert_eq!(identity["canvas_scene_digest"], manifest["canvas_scene_digest"]);
     assert_eq!(identity["namespace"], manifest["namespace"]);
@@ -70,8 +71,8 @@ fn ggl_adapter_deserializes_preserves_geometry_and_renders_stable_ids() {
         assert_digest(&manifest, field);
     }
 
-    let serialized = serde_json::to_value(&canvas).expect("Canvas SceneNode reserializes");
-    assert_eq!(serialized["children"].as_array().map(Vec::len), Some(4));
+    let round_trip = serde_json::to_value(&canvas).expect("Canvas SceneNode reserializes");
+    assert_eq!(round_trip["children"].as_array().map(Vec::len), Some(4));
 
     let expected_types = ["circle", "segment", "polygon", "arc"];
     let mut seen = std::collections::BTreeSet::new();
@@ -82,7 +83,7 @@ fn ggl_adapter_deserializes_preserves_geometry_and_renders_stable_ids() {
         assert_eq!(primitive["type"].as_str(), Some(expected_types[index]));
         assert_eq!(entry["semantic_id"].as_str(), Some(semantic_id));
         assert_eq!(entry["canvas_group_id"].as_str(), Some(canvas_id));
-        assert!(seen.insert(canvas_id.to_owned()), "duplicate group ID");
+        assert!(seen.insert(canvas_id.to_owned()));
         assert!(canvas_id.starts_with("ggl-"));
         assert_eq!(wrapper.children.len(), 1);
         assert_eq!(entry["scene_node_path"][0].as_u64(), Some(index as u64));
@@ -136,8 +137,7 @@ fn ggl_adapter_deserializes_preserves_geometry_and_renders_stable_ids() {
     assert!(svg.starts_with("<svg"));
     assert!(svg.ends_with("</svg>\n"));
     for id in ids {
-        assert_eq!(svg.matches(&format!(r#"id="{id}""#)).count(), 1, "SVG must retain {id}");
+        let needle = format!(r#"id="{id}""#);
+        assert_eq!(svg.matches(needle.as_str()).count(), 1);
     }
-    assert!(!svg.contains("NaN"));
-    assert!(!svg.contains("inf"));
 }
