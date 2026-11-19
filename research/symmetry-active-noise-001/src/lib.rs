@@ -2076,6 +2076,17 @@ pub fn verify_persistent_noise_probe_design_receipt(
     Ok(())
 }
 
+pub fn verify_persistent_noise_probe_design_under_unknown_state(
+    problem: &PersistentNoiseProblemV1,
+    receipt: &ProbeDesignReceiptV1,
+) -> Result<(), NoiseErrorV1> {
+    let replayed = design_persistent_noise_probe_set_under_unknown_state(problem)?;
+    if *receipt != replayed {
+        return Err(NoiseErrorV1::ReceiptMismatch);
+    }
+    Ok(())
+}
+
 pub fn verify_bounded_interval_probe_design_receipt(
     problem: &BoundedIntervalProblemV1,
     receipt: &ProbeDesignReceiptV1,
@@ -2313,6 +2324,34 @@ mod tests {
     }
 
     #[test]
+    fn unknown_state_persistent_design_receipt_rejects_forgery() {
+        let problem = PersistentNoiseProblemV1 {
+            problem_id: "unknown-state-receipt-v1".to_owned(),
+            hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned()],
+            probes: vec![
+                NoiseProbeV1 {
+                    probe_id: "p0".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+            ],
+            error_state_ids: vec!["low".to_owned(), "high".to_owned()],
+            predicted_outcomes_by_hypothesis: vec![
+                vec![vec![0, 1]],
+                vec![vec![1, 0]],
+            ],
+        };
+        let receipt = design_persistent_noise_probe_set_under_unknown_state(&problem).unwrap();
+        verify_persistent_noise_probe_design_under_unknown_state(&problem, &receipt).unwrap();
+        let mut forged = receipt.clone();
+        forged.complete_pairwise_separation = !forged.complete_pairwise_separation;
+        assert_eq!(
+            verify_persistent_noise_probe_design_under_unknown_state(&problem, &forged),
+            Err(NoiseErrorV1::ReceiptMismatch)
+        );
+    }
+
+    #[test]
     fn unknown_state_persistent_probe_design_covers_cross_state_obligations() {
         let problem = PersistentNoiseProblemV1 {
             problem_id: "unknown-state-design-v1".to_owned(),
@@ -2349,7 +2388,7 @@ mod tests {
             robust.unresolved_obligations[1].error_state_id.as_deref(),
             Some("high::low")
         );
-        assert!(robust.optimality_certified == false);
+        assert!(!robust.optimality_certified);
     }
 
     #[test]
