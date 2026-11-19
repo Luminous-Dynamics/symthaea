@@ -844,6 +844,63 @@ mod tests {
     }
 
     #[test]
+    fn site_qualified_comparison_rejects_ineligible_control() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let candidate = run("candidate-001", "aqua-test-article", '8');
+        let service_profile = qualification_profile(
+            crate::service_qualification::QualificationClaim::FunctionalService,
+        );
+        let control_qualification = service_qualification_record(
+            "control-001",
+            &service_profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let candidate_qualification = service_qualification_record(
+            "candidate-001",
+            &service_profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let control_site = site_fit_profile(
+            crate::site_fit::AquaArchitecture::DirectFlowPassive,
+            &control.device.device_configuration_sha256,
+        );
+        let candidate_site = site_fit_profile(
+            crate::site_fit::AquaArchitecture::SameSessionRecirculation,
+            &candidate.device.device_configuration_sha256,
+        );
+        let mut control_evidence = site_fit_assessments(
+            &control_site,
+            crate::site_fit::SiteCapabilityOutcome::Satisfied,
+        );
+        control_evidence[0].outcome = crate::site_fit::SiteCapabilityOutcome::Unsatisfied;
+        let candidate_evidence = site_fit_assessments(
+            &candidate_site,
+            crate::site_fit::SiteCapabilityOutcome::Satisfied,
+        );
+
+        let result = validate_site_qualified_matched_comparison(
+            &control,
+            &candidate,
+            ComparisonScope::WaterServiceOnly,
+            &service_profile,
+            &control_qualification,
+            &candidate_qualification,
+            &control_site,
+            &control_evidence,
+            &candidate_site,
+            &candidate_evidence,
+        );
+
+        assert!(matches!(
+            result,
+            Err(QualifiedComparisonError::SiteNotEligible {
+                side: ComparisonSide::Control,
+                result
+            }) if result.disposition == crate::site_fit::SiteFitDisposition::Ineligible
+        ));
+    }
+
+    #[test]
     fn site_qualified_comparison_rejects_ineligible_candidate() {
         let control = run("control-001", "incumbent-shower", '7');
         let candidate = run("candidate-001", "aqua-test-article", '8');
