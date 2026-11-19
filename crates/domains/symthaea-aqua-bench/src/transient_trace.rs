@@ -819,6 +819,7 @@ impl TransientEventProfile {
         declared_sha256: &str,
         bytes: &[u8],
     ) -> Result<(), TransientTraceError> {
+        self.validate_artifacts()?;
         require_digest("declared_sha256", declared_sha256)?;
         let actual_length = u64::try_from(bytes.len())
             .map_err(|_| TransientTraceError::RawArtifactLengthMismatch)?;
@@ -1621,6 +1622,16 @@ mod tests {
             value.validate(),
             Err(TransientTraceError::RawArtifactMediaTypeMismatch)
         );
+    }
+
+    #[test]
+    fn rejects_duplicate_unfiltered_trace_artifact_digests() {
+        let mut value = profile();
+        value.raw_artifacts.push(value.raw_artifacts[0].clone());
+        assert!(matches!(
+            value.validate(),
+            Err(TransientTraceError::DuplicateRawTraceArtifactDigest { .. })
+        ));
     }
 
     #[test]
