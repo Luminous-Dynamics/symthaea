@@ -7,6 +7,7 @@
   "additionalProperties": false,
   "required": [
     "schema",
+    "attempt_id",
     "renderer_id",
     "renderer_version",
     "executable_sha256",
@@ -91,6 +92,12 @@
     "output_audio_sha256": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
+    },
+    "attempt_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
     }
   }
 }
