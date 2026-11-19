@@ -351,11 +351,14 @@ pub enum SiteFitDisposition {
 }
 
 /// Why a required site capability cannot currently support an Eligible decision.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SiteFitIssueKind {
     MissingAssessment,
     MissingEvidence,
     EvidenceNotCurrent(QualificationEvidenceStatus),
+    EvidenceDomainMismatch {
+        actual: SiteCapabilityDomain,
+    },
     WrongAuthority {
         expected: SiteCapabilityAuthority,
         actual: SiteCapabilityAuthority,
@@ -504,7 +507,16 @@ pub fn evaluate_site_fit(
         }
 
         let expected_authority = domain.expected_authority();
-        if evidence.domain != domain || evidence.authority != expected_authority {
+        if evidence.domain != domain {
+            indeterminate_issues.push(SiteFitIssue {
+                domain,
+                kind: SiteFitIssueKind::EvidenceDomainMismatch {
+                    actual: evidence.domain,
+                },
+            });
+            continue;
+        }
+        if evidence.authority != expected_authority {
             indeterminate_issues.push(SiteFitIssue {
                 domain,
                 kind: SiteFitIssueKind::WrongAuthority {
@@ -913,6 +925,21 @@ mod tests {
         assert_eq!(
             result.indeterminate_issues[0].kind,
             SiteFitIssueKind::RequirementsMismatch
+        );
+    }
+
+    #[test]
+    fn evidence_for_another_capability_domain_is_indeterminate() {
+        let profile = profile(AquaArchitecture::DirectFlowPassive);
+        let mut assessments = assessments(&profile, SiteCapabilityOutcome::Satisfied);
+        assessments[0].evidence.as_mut().expect("evidence").domain =
+            SiteCapabilityDomain::WaterChemistryAndScale;
+        let result = evaluate_site_fit(&profile, &assessments).expect("wrong evidence domain");
+        assert_eq!(
+            result.indeterminate_issues[0].kind,
+            SiteFitIssueKind::EvidenceDomainMismatch {
+                actual: SiteCapabilityDomain::WaterChemistryAndScale
+            }
         );
     }
 
