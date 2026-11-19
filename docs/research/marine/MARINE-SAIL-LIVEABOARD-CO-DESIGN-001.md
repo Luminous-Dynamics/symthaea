@@ -37,9 +37,9 @@ The opposite may also occur: a longer sailing route may create a more reliable s
 | #10988 / #11115 / #11126 | Mission evidence join, service continuity and restoration | Evidence ontology / service-continuity evaluator |
 | #8082 / #11442 / #11513 / #11765 | Hydro/propulsor, model V&V, fidelity and robust Pareto | CFD, hydrodynamics, optimizer, Pareto engine |
 | #11064 / #11093 | Physical campaign binding and staged demonstrator | Instrument registry / acquisition hardware |
-| Symtropy #2048 | Shipbuilding design-for-manufacture and assembly | Shipyard scheduler / manufacturing ledger |
+| Sol-Atlas #115 / #654 / #809 | Source-qualified spatial/temporal maritime projection and metocean/access context; CRS/datum, coverage, uncertainty, rights and reversible source links | Navigation, weather forecasting or bathymetric authority |\n| Mycelix #5968 / #5974 / #6154 | Cross-stack golden-trace coordination and serialized vessel/component configuration, manufacturing, inspection and repair lineage | Naval-architecture approval or engineering qualification |\n| Symtropy #2048 | Shipbuilding design-for-manufacture and assembly | Shipyard scheduler / manufacturing ledger |
 
-## 4. Comparison protocol
+Sol-Atlas context is read-only and source-reversible: it may qualify where/when a metocean or access observation applies, but does not turn a mapped value into a forecast or navigation instruction. Mycelix binds exact component/configuration/maintenance evidence and the cross-stack golden trace; it does not make the originating engineering claim true.\n\n## 4. Comparison protocol
 
 Every policy arm receives the same craft identity, loading, mission/service fingerprint, forecast issue-time snapshots, route constraints, resource inventory, hard gates and compute budget.
 
