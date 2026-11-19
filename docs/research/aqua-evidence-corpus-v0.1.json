@@ -6026,6 +6026,92 @@
           "limitations": [
             "Do not assume pressure compensation alone guarantees spray quality, comfort or hygiene."
           ]
+        },
+        {
+          "claim_id": "wrc.2025.clasp.pressure-compensating-flow-at-300kpa",
+          "parameter": "mean_flow_rate",
+          "original_value": "WRC 2025 secondary summary reports 6.6 L/min average for pressure-compensating flow-regulator showerheads at 300 kPa.",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 6.6,
+            "unit": "L/min"
+          },
+          "evidence_class": "independent_market_sample",
+          "result_class": "measured",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Water Wheel September/October 2025 secondary summary of the October 2022 CLASP South African ShowerHeads Testing Report",
+            "sample_count": 19,
+            "pressure_datum": "Dynamic showerhead supply pressure",
+            "unknown_conditions": [
+              "secondary summary does not publish the row-level raw values",
+              "calculation/rounding basis for difference from the primary CLASP summary table"
+            ],
+            "notes": "Secondary summary of the CLASP 19-head sample. The primary CLASP PDF table rounds its pressure-compensating group average to 7 L/min."
+          },
+          "source": {
+            "url": "https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf",
+            "publisher": "Water Research Commission, The Water Wheel (September/October 2025)",
+            "source_type": "independent_market_study",
+            "published_on": null,
+            "accessed_on": "2026-11-19",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Secondary source representation of CLASP data; use alongside, not in place of, the primary CLASP PDF."
+          },
+          "limitations": [
+            "The primary CLASP PDF reports the same category as 7 L/min after rounding to the nearest 1 L/min.",
+            "Do not average the two summaries or infer a new exact mean without the raw group observations."
+          ]
+        },
+        {
+          "claim_id": "wrc.2025.clasp.fixed-orifice-flow-at-300kpa",
+          "parameter": "mean_flow_rate",
+          "original_value": "WRC 2025 secondary summary reports 24 L/min average for fixed-orifice showerheads at 300 kPa.",
+          "canonical_value": {
+            "kind": "scalar",
+            "value": 24,
+            "unit": "L/min"
+          },
+          "evidence_class": "independent_market_sample",
+          "result_class": "measured",
+          "conditions": {
+            "mode": null,
+            "pressure_kpa": 300,
+            "temperature_c": null,
+            "duration_min": null,
+            "task": null,
+            "method": "Water Wheel September/October 2025 secondary summary of the October 2022 CLASP South African ShowerHeads Testing Report",
+            "sample_count": 19,
+            "pressure_datum": "Dynamic showerhead supply pressure",
+            "unknown_conditions": [
+              "secondary summary does not publish the row-level raw values",
+              "calculation/rounding basis for difference from the primary CLASP summary table"
+            ],
+            "notes": "Secondary summary of the CLASP 19-head sample. The primary CLASP PDF table rounds its fixed-orifice group average to 25 L/min."
+          },
+          "source": {
+            "url": "https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf",
+            "publisher": "Water Research Commission, The Water Wheel (September/October 2025)",
+            "source_type": "independent_market_study",
+            "published_on": null,
+            "accessed_on": "2026-11-19",
+            "document_sha256": null
+          },
+          "comparison": {
+            "status": "context_only",
+            "reason": "Secondary source representation of CLASP data; use alongside, not in place of, the primary CLASP PDF."
+          },
+          "limitations": [
+            "The primary CLASP PDF reports the same category as 25 L/min after rounding to the nearest 1 L/min.",
+            "Do not average the two summaries or infer a new exact mean without the raw group observations."
+          ]
         }
       ]
     }
