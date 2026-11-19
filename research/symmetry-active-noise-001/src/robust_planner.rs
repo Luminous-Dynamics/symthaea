@@ -43,9 +43,17 @@ pub enum RobustLeafReasonV1 {
     NoInformativeProbe,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum RobustPolicyOutcomeV1 {
+    Value(u32),
+    /// The probe was attempted but produced no usable observation.
+    /// This branch preserves the complete active hypothesis mask.
+    Abstained,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RobustPolicyBranchV1 {
-    pub outcome: u32,
+    pub outcome: RobustPolicyOutcomeV1,
     pub child: Box<RobustPolicyNodeV1>,
 }
 
@@ -113,14 +121,19 @@ fn outcome_partitions(
     problem: &BoundedNoiseProblemV1,
     active_mask: u64,
     probe_index: usize,
-) -> BTreeMap<u32, u64> {
+) -> BTreeMap<RobustPolicyOutcomeV1, u64> {
     let mut groups = BTreeMap::new();
     for hypothesis_index in indices(active_mask, problem.hypothesis_ids.len()) {
-        for outcome in
-            &problem.allowed_outcomes_by_hypothesis[hypothesis_index][probe_index]
-        {
-            *groups.entry(*outcome).or_insert(0) |= 1_u64 << hypothesis_index;
+        for outcome in &problem.allowed_outcomes_by_hypothesis[hypothesis_index][probe_index] {
+            *groups
+                .entry(RobustPolicyOutcomeV1::Value(*outcome))
+                .or_insert(0) |= 1_u64 << hypothesis_index;
         }
+    }
+    if problem.probes[probe_index].may_abstain {
+        // Missingness is a probe-level event, not evidence about which
+        // hypothesis generated the observation.
+        groups.insert(RobustPolicyOutcomeV1::Abstained, active_mask);
     }
     groups
 }
@@ -345,15 +358,13 @@ mod tests {
             .iter()
             .position(|probe| &probe.probe_id == probe_id)
             .unwrap();
-        let branch_outcomes: Vec<u32> = node.branches.iter().map(|branch| branch.outcome).collect();
-        let expected: Vec<u32> = outcome_partitions(
-            problem,
-            node.active_hypothesis_mask,
-            probe_index,
-        )
-        .keys()
-        .copied()
-        .collect();
+        let branch_outcomes: Vec<RobustPolicyOutcomeV1> =
+            node.branches.iter().map(|branch| branch.outcome).collect();
+        let expected: Vec<RobustPolicyOutcomeV1> =
+            outcome_partitions(problem, node.active_hypothesis_mask, probe_index)
+                .keys()
+                .copied()
+                .collect();
         assert_eq!(branch_outcomes, expected);
         for branch in &node.branches {
             for hypothesis_index in indices(
@@ -385,6 +396,27 @@ mod tests {
         let summary = verify_bounded_noise_policy(&problem, &receipt, budget).unwrap();
         assert!(summary.identified);
         assert_eq!(summary.worst_case_cost, 2);
+    }
+
+    #[test]
+    fn possible_abstention_has_its_own_branch_and_preserves_every_candidate() {
+        let mut problem = fixture();
+        problem.probes.truncate(1);
+        problem.probes[0].may_abstain = true;
+        let budget = QualificationBudgetV1::default();
+        let receipt = solve_bounded_noise_policy(&problem, budget).unwrap();
+
+        let abstention = receipt
+            .root
+            .branches
+            .iter()
+            .find(|branch| branch.outcome == RobustPolicyOutcomeV1::Abstained)
+            .expect("declared abstention must have an explicit policy branch");
+        assert_eq!(abstention.child.active_hypothesis_mask, full_mask(3));
+        assert_eq!(abstention.child.worst_case_remaining, 3);
+        assert_eq!(receipt.root.worst_case_remaining, 3);
+        assert_all_predictions_have_branches(&problem, &receipt.root);
+        verify_bounded_noise_policy(&problem, &receipt, budget).unwrap();
     }
 
     #[test]
