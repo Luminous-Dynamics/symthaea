@@ -7,6 +7,12 @@
 //! validates policy parameters, consciousness state, URL structure, origin
 //! scope, and local-network access before an action is dispatched.
 //!
+//! This is an application-level URL preflight, not a browser network sandbox.
+//! Chromium performs its own DNS, redirects, subresource fetches, service-worker
+//! requests and other socket activity. Production deployments must separately
+//! constrain the browser workload at the OS/kernel boundary (for example, with
+//! a Nixward workload/cgroup policy). See NETWORK_SECURITY_BOUNDARY.md.
+//!
 //! Phi is a caution signal, not an authority grant. A sufficient Phi can pass
 //! an action's coherence threshold, but it never overrides a URL denial.
 
@@ -131,9 +137,14 @@ impl Default for BrowserSafetyPolicy {
 impl BrowserSafetyPolicy {
     /// Evaluate a URL and return an auditable decision.
     ///
-    /// This performs syntactic origin and IP-literal checks. A production
-    /// network boundary should additionally pin DNS resolution and re-check the
-    /// resolved address on redirects to prevent DNS rebinding.
+    /// This performs URL-policy, canonical-host, and IP-literal preflight only.
+    ///
+    /// It does not resolve DNS, observe Chromium's connected peer, or intercept
+    /// redirects, subresources, service workers, WebSockets, WebRTC or QUIC.
+    /// A production deployment must constrain the Chromium workload through an
+    /// independent OS/kernel egress policy and a trusted resolver path. The
+    /// server-side Prism Reqwest client does not automatically mediate Chromium.
+    /// See crates/domains/symthaea-browser/NETWORK_SECURITY_BOUNDARY.md.
     pub fn evaluate_url(&self, raw_url: &str) -> PolicyDecision {
         if !self.policy_values_valid() {
             return Self::deny(PolicyDenial::InvalidPolicy, None);

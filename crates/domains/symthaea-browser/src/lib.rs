@@ -45,6 +45,11 @@
 //! `required_phi()` threshold. Phi can increase caution but cannot create
 //! authority. `BrowserSafetyPolicy` also applies canonical origin checks and
 //! denies local-network targets by default.
+//!
+//! These are action/URL preflight controls, not a Chromium network sandbox.
+//! Production browser workloads require an independent network boundary that
+//! controls the browser process's actual DNS and socket activity. See
+//! `NETWORK_SECURITY_BOUNDARY.md` for the workload/cgroup design.
 
 #![deny(unsafe_code)]
 

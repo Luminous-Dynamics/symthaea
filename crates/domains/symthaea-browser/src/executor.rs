@@ -4,7 +4,11 @@
 //!
 //! Callers submit a [`BrowserAction`] to this layer rather than invoking CDP
 //! mutation methods directly. Every attempt yields an [`ActionReceipt`] that
-//! records authorization, outcome, output, and elapsed time.
+//! records application-level authorization, outcome, output, and elapsed time.
+//!
+//! The receipt does not attest DNS answers, socket peers, TLS identity, or
+//! Chromium's complete network activity. Chromium's network stack must be
+//! constrained independently at the browser workload/cgroup boundary.
 
 use std::time::Instant;
 
@@ -68,7 +72,11 @@ impl<'a> BrowserExecutor<'a> {
         }
     }
 
-    /// Dispatch an action after evaluating capability, Phi, and URL policy.
+    /// Dispatch an action after evaluating capability, Phi, and URL preflight.
+    ///
+    /// This gates the CDP action, not every request Chromium may issue because
+    /// of that action. Redirects, subresources and other browser sockets remain
+    /// subject to the OS/kernel network policy.
     pub async fn execute(&self, action: BrowserAction) -> ActionReceipt {
         let started = Instant::now();
         let decision = self.policy.evaluate_action(&action, self.phi);
