@@ -19,7 +19,7 @@ dependencies.
 - E3 public development fixtures with held-out combinations assembled from individually seen mechanism components; metadata is not serialized into learner-visible streams. These fixed tuples are visible in source and are not a blind test split.
 - CLI file encode/decode and an E0 length comparison against installed
   Zstandard, Brotli, XZ and gzip commands.
-- Exact IEEE-754 f64 raw/XOR-previous framing, bit-preserving test fixtures, a fixed-chunk best-of-four size oracle, and a decoder-synchronous historical-cost online selector.
+- Exact IEEE-754 f64 raw/XOR-previous/XOR-leading-trailing framing, bit-preserving test fixtures, a fixed-chunk best-of-six size oracle, and a decoder-synchronous historical-cost online selector.
 - SCM-specific typed-field, temporal-lag, oracle-parent, hybrid and
   shuffled-parent byte predictors, plus fixed-share and CUSUM change-point
   mixtures, all using the same arithmetic coder and exact decoder path.
@@ -30,6 +30,7 @@ The `float` command generates constant, smooth-ramp, oscillating,
 high-precision and random-bit-pattern streams. It compares:
 - raw IEEE-754 binary64 bit patterns;
 - XOR with the previous u64 bit pattern, encoded as a canonical u64 varint;
+- XOR with the previous u64 bit pattern, storing leading/trailing zero spans and only the meaningful middle bits;
 - order-0 and order-1 byte CDF models;
 - Zstandard on the original raw little-endian bytes, when installed.
 
@@ -41,23 +42,25 @@ and subnormals.
 
 The command also emits two segmented rows at chunk sizes 64, 256 and 1,024:
 
-- `segment_portfolio` is an **offline best-of-four size oracle**. For each
-  complete chunk, the encoder tries Raw/Order0, Raw/Order1, XOR/Order0 and
-  XOR/Order1, then keeps the smallest complete F64C child frame. Every child
-  header and CRC, plus the outer F64S header, counts toward the total size.
-  The decoder independently recomputes all four canonical child frames after
+- `segment_portfolio` is an **offline best-of-six size oracle**. For each
+  complete chunk, the encoder tries Raw/Order0, Raw/Order1, XOR-varint/Order0,
+  XOR-varint/Order1, XOR-leading-trailing/Order0 and XOR-leading-trailing/Order1,
+  then keeps the smallest complete F64C child frame. Every child header and
+  CRC, plus the outer F64S header, counts toward the total size. The decoder
+  independently recomputes all six canonical child frames after
   reconstruction and rejects a child that is not the exact smallest choice.
   The selector sees the current chunk before choosing and is not a streaming
   algorithm, online predictive gate, or WZS reproduction.
 - `online_historical_cost` chooses the current chunk from the average complete
-  child-frame sizes measured on **previous** chunks only. The first chunk uses
-  Raw/Order0. After each chunk, both encoder and decoder recompute all four
-  candidate frame sizes from that chunk to update the same integer history.
+  child-frame sizes for all six candidates measured on **previous** chunks only.
+  The first chunk uses Raw/Order0. After each chunk, both encoder and decoder
+  recompute all six candidate frame sizes from that chunk to update the same
+  integer history.
   The selected transform/model is recorded in the child's F64C header and the
   decoder rejects a child whose IDs do not match its historical policy. There
   is no additional selector symbol or intervention information.
 
-The online policy is a compute-heavy diagnostic: it makes four candidate
+The online policy is a compute-heavy diagnostic: it makes six candidate
 measurements per chunk on both sides. It is not yet optimized for throughput.
 Both policies use the 32-byte F64S outer header and count each F64C child
 header/CRC. They provide different reference points: an offline size oracle
