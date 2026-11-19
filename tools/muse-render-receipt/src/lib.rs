@@ -391,6 +391,8 @@ pub fn validate_receipt(r: &ReceiptV1) -> Result<(), String> {
                 || r.audio.audio_sha256.is_none() || r.audio.byte_length.unwrap_or(0) == 0
                 || r.audio.sample_rate_hz.unwrap_or(0) == 0 || r.audio.channels.unwrap_or(0) == 0
                 || r.audio.frames.unwrap_or(0) == 0 || r.execution.finished_at.is_none()
+                || r.execution.started_at.is_none() || r.execution.invocation_sha256.is_none()
+                || r.execution.executor_id.trim().is_empty()
             { return Err("completed state lacks reconciled execution or WAV evidence".into()); }
         }
         "failed" => {
@@ -590,6 +592,9 @@ fn verify_midi_bundle(root: &Path, r: &ReceiptV1) -> Result<(), String> {
     let bytes = read(&root.join("midi-manifest.json"), "MIDI manifest")?;
     let m: MidiPerformanceManifestV1 = serde_json::from_slice(&bytes)
         .map_err(|e| format!("MIDI manifest JSON invalid: {e}"))?;
+    if m.tracks.iter().any(|track| track.renderer_id != r.renderer.renderer_id) {
+        return Err("MIDI instrument binding names a different renderer identity".into());
+    }
     if m.schema != MIDI_MANIFEST_SCHEMA_V1 || m.score_digest_schema != MIDI_SCORE_DIGEST_SCHEMA_V1
         || m.timeline_digest_schema != MIDI_TIMELINE_DIGEST_SCHEMA_V1
         || m.binding_digest_schema != MIDI_BINDING_DIGEST_SCHEMA_V1
