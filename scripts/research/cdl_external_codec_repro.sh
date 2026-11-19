@@ -8,7 +8,7 @@ readonly DEXOR_COMMIT="06128b3df57cc1e8c53681231e235e22eb508c8d"
 readonly TERSETS_COMMIT="64abd7767f8fc6ac1ef4e932f2027a74cf8fb4a0"
 readonly TARGET_TRIPLE="x86_64-linux"
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT_DIR="${CDL_EXTERNAL_OUT:-$ROOT_DIR/target/cdl-external}"
 DEXOR_DIR="${DEXOR_DIR:-}"
 TERSETS_DIR="${TERSETS_DIR:-}"
