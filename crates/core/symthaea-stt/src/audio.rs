@@ -16,7 +16,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 /// Audio frontend configuration
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AudioConfig {
     /// Sample rate (Hz)
     pub sample_rate: u32,
@@ -401,6 +401,11 @@ impl AudioProjector {
         Self::new(AudioConfig::default(), LtcConfig::default())
     }
 
+    /// Encoder configuration shared with offline training and streaming inference.
+    pub fn config(&self) -> &AudioConfig {
+        self.frontend.config()
+    }
+
     /// Reset projector state
     pub fn reset(&mut self) {
         self.ltc.reset();
@@ -604,7 +609,7 @@ impl AudioProjector {
     /// Uses THERMOMETER encoding: for each mel bin, include all basis vectors
     /// from level 0 up to the current level. This ensures similar mel values
     /// produce similar HVs (smooth similarity gradient).
-    fn direct_mel_hv(mel_features: &[f32], prev_features: Option<&[f32]>) -> HV16 {
+    pub(crate) fn direct_mel_hv(mel_features: &[f32], prev_features: Option<&[f32]>) -> HV16 {
         use crate::hdc::BundleAccumulator;
         let mut acc = BundleAccumulator::new();
 
@@ -968,6 +973,24 @@ mod tests {
         for filter in &filters {
             assert_eq!(filter.len(), config.n_fft / 2 + 1);
         }
+    }
+
+    #[test]
+    fn direct_mel_hdc_preserves_local_quantization_neighborhoods() {
+        let baseline = vec![-0.2_f32; 40];
+        let adjacent = vec![0.0_f32; 40];
+        let distant = vec![0.8_f32; 40];
+
+        let reference = AudioProjector::direct_mel_hv(&baseline, None);
+        let near = AudioProjector::direct_mel_hv(&adjacent, None);
+        let far = AudioProjector::direct_mel_hv(&distant, None);
+
+        let near_similarity = reference.similarity(&near);
+        let far_similarity = reference.similarity(&far);
+        assert!(
+            near_similarity > far_similarity,
+            "adjacent mel levels should remain closer than distant levels: near={near_similarity}, far={far_similarity}"
+        );
     }
 
     #[test]

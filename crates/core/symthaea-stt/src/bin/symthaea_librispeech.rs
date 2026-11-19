@@ -24,7 +24,8 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use symthaea_stt::{
     AudioFrontend, AudioProjector, BatchConfig, BatchTrainer, BootstrapConfig, CmuDictionary,
-    PhonemeResonator, TextToPhonemes, TrainedPrototypes, phoneme_error_rate,
+    PhonemeResonator, PrototypeEncoderMetadata, TextToPhonemes, TrainedPrototypes,
+    phoneme_error_rate,
 };
 
 static DOWNLOAD: Emoji<'_, '_> = Emoji("📥 ", "");
@@ -959,8 +960,15 @@ fn evaluate_model(
     let prototypes =
         TrainedPrototypes::load(model_path).map_err(|e| format!("Failed to load model: {}", e))?;
 
+    let expected_encoder = PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(
+        AudioProjector::default_config().config().clone(),
+    );
+    prototypes
+        .validate_encoder(&expected_encoder)
+        .map_err(|error| format!("Incompatible temporal-window prototype artifact: {error}"))?;
+
     println!(
-        "Loaded {} phoneme prototypes",
+        "Loaded {} compatible temporal-window phoneme prototypes",
         style(prototypes.len()).green()
     );
 

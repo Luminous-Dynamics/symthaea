@@ -122,7 +122,7 @@ pub use audio::{AudioConfig, AudioFrontend, AudioProjector};
 pub use batch::{BatchConfig, BatchDiscovery, BatchProcessor, BatchStats, BatchTrainer};
 pub use bootstrap::{
     AdaptivePrototype, AdaptivePrototypeSet, AdaptiveStats, BootstrapConfig, BootstrapPipeline,
-    TrainedPrototypes,
+    PrototypeEncoderMetadata, PrototypeRepresentation, TrainedPrototypes,
 };
 pub use crystal_reservoir::{
     CrystalActivation, CrystalReservoir, GaborFilter, OnlinePrototypeClassifier,
