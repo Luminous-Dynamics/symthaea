@@ -2442,6 +2442,85 @@ mod tests {
     }
 
     #[test]
+    fn unknown_state_persistent_design_receipt_rejects_forgery() {
+        let problem = PersistentNoiseProblemV1 {
+            problem_id: "unknown-state-receipt-v1".to_owned(),
+            hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned()],
+            probes: vec![
+                NoiseProbeV1 {
+                    probe_id: "p0".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+            ],
+            error_state_ids: vec!["low".to_owned(), "high".to_owned()],
+            predicted_outcomes_by_hypothesis: vec![vec![vec![0, 1]], vec![vec![1, 0]]],
+        };
+        let receipt = design_persistent_noise_probe_set_under_unknown_state(&problem).unwrap();
+        verify_persistent_noise_probe_design_under_unknown_state(&problem, &receipt).unwrap();
+        let mut forged = receipt.clone();
+        forged.complete_pairwise_separation = !forged.complete_pairwise_separation;
+        assert_eq!(
+            verify_persistent_noise_probe_design_under_unknown_state(&problem, &forged),
+            Err(NoiseErrorV1::ReceiptMismatch)
+        );
+    }
+
+    #[test]
+    fn unknown_bias_probe_design_replays_pair_witnesses_and_ambiguity_frontier() {
+        let problem = SharedAdditiveBiasProblemV1 {
+            problem_id: "unknown-bias-probe-design-v1".to_owned(),
+            quantity_unit_id: "millimetre-integer".to_owned(),
+            hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned(), "H-C".to_owned()],
+            probes: vec![
+                NoiseProbeV1 {
+                    probe_id: "p0".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p1".to_owned(),
+                    cost: 2,
+                    admissible: true,
+                },
+            ],
+            nominal_predictions_by_hypothesis: vec![
+                vec![0, 10],
+                vec![3, 13],
+                vec![3, 14],
+            ],
+            global_bias_interval: FixedIntervalV1::new(-5, 5).unwrap(),
+        };
+        let receipt = design_shared_bias_probe_set_under_unknown_bias(&problem).unwrap();
+        assert_eq!(receipt.unresolved_pairs.len(), 1);
+        assert_eq!(
+            (
+                receipt.unresolved_pairs[0].hypothesis_a.as_str(),
+                receipt.unresolved_pairs[0].hypothesis_b.as_str()
+            ),
+            ("H-A", "H-B")
+        );
+        assert_eq!(receipt.covered_pair_witnesses.len(), 2);
+        let h_a_h_c = receipt
+            .covered_pair_witnesses
+            .iter()
+            .find(|witness| witness.hypothesis_a == "H-A" && witness.hypothesis_b == "H-C")
+            .unwrap();
+        assert_eq!(h_a_h_c.witness_probe_ids.len(), 2);
+        assert_eq!(receipt.selected_probe_ids, vec!["p0", "p1"]);
+        assert!(!receipt.complete_pairwise_separation);
+        assert!(!receipt.optimality_certified);
+        verify_shared_bias_probe_design_under_unknown_bias(&problem, &receipt).unwrap();
+
+        let mut forged = receipt.clone();
+        forged.selected_cost += 1;
+        assert_eq!(
+            verify_shared_bias_probe_design_under_unknown_bias(&problem, &forged),
+            Err(NoiseErrorV1::ReceiptMismatch)
+        );
+    }
+
+    #[test]
     fn bounded_numeric_probe_set_reports_minimum_cost_greedy_witness_basis() {
         let problem = BoundedIntervalProblemV1 {
             problem_id: "bounded-interval-probe-design-v1".to_owned(),
