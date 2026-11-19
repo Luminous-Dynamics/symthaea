@@ -17,6 +17,7 @@ pub const FORMAL_TOP_K: usize = 100;
 pub const TEXTUAL_MAX_MESSAGES: usize = 20;
 pub const TEXTUAL_MAX_WORDS: usize = 2_000;
 pub const MAX_IMAGE_BYTES: usize = 10 * 1024 * 1024;
+pub const MAX_ADD_REQUEST_IMAGE_BYTES: usize = 30 * 1024 * 1024;
 pub const MAX_SEARCH_RESPONSE_IMAGE_BYTES: usize = 30 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -147,7 +148,10 @@ fn image_data_uri_decoded_len(value: &str) -> Result<usize, AmlReject> {
     let (header, payload) = value
         .split_once(',')
         .ok_or(AmlReject::InvalidImageDataUri)?;
-    if !header.starts_with("data:image/") || !header.ends_with(";base64") {
+    if !matches!(
+        header,
+        "data:image/jpeg;base64" | "data:image/png;base64" | "data:image/webp;base64"
+    ) {
         return Err(AmlReject::InvalidImageDataUri);
     }
     if payload.is_empty() || payload.len() % 4 != 0 {
@@ -169,7 +173,11 @@ fn image_data_uri_decoded_len(value: &str) -> Result<usize, AmlReject> {
     {
         return Err(AmlReject::InvalidBase64);
     }
-    if padding > 2 {
+    if padding > 2
+        || (padding == 1 && alphabet_len % 4 != 3)
+        || (padding == 2 && alphabet_len % 4 != 2)
+        || (padding == 0 && alphabet_len % 4 != 0)
+    {
         return Err(AmlReject::InvalidBase64);
     }
     Ok((bytes.len() / 4) * 3 - padding)
@@ -246,7 +254,9 @@ pub fn validate_add_request(track: Track, request: &AddRequest) -> Result<(), Am
     for message in &request.messages {
         image_bytes = image_bytes.saturating_add(validate_message(track, message)?);
     }
-    let _ = image_bytes;
+    if track == Track::Multimodal && image_bytes > MAX_ADD_REQUEST_IMAGE_BYTES {
+        return Err(AmlReject::SearchImageBudgetExceeded);
+    }
     Ok(())
 }
 
@@ -916,6 +926,43 @@ mod tests {
         assert_eq!(
             validate_search_request_for_track(Track::Multimodal, &request),
             Ok(())
+        );
+    }
+
+    #[test]
+    fn unsupported_image_mime_and_malformed_base64_are_rejected() {
+        let svg = AddRequest {
+            request_id: "svg".into(),
+            user_id: "user".into(),
+            session_id: "session".into(),
+            messages: vec![Message {
+                role: Role::User,
+                timestamp_ms: None,
+                content: MessageContent::Parts(vec![
+                    ContentPart::ImageDataUri("data:image/svg+xml;base64,PHN2Zz4=".into()),
+                ]),
+            }],
+        };
+        assert_eq!(
+            validate_add_request(Track::Multimodal, &svg),
+            Err(AmlReject::InvalidImageDataUri)
+        );
+
+        let bad_padding = AddRequest {
+            request_id: "bad-padding".into(),
+            user_id: "user".into(),
+            session_id: "session".into(),
+            messages: vec![Message {
+                role: Role::User,
+                timestamp_ms: None,
+                content: MessageContent::Parts(vec![
+                    ContentPart::ImageDataUri("data:image/png;base64,a===".into()),
+                ]),
+            }],
+        };
+        assert_eq!(
+            validate_add_request(Track::Multimodal, &bad_padding),
+            Err(AmlReject::InvalidBase64)
         );
     }
 
