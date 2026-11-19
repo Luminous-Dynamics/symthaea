@@ -14,7 +14,7 @@ use std::io::Read;
 use std::path::Path;
 
 pub const RECEIPT_SCHEMA_V1: &str = "muse-render-execution-receipt-v1";
-pub const RECEIPT_DIGEST_RECIPE_V1: &str = "muse-render-execution-receipt-jcs-sha256-v1";
+pub const RECEIPT_DIGEST_RECIPE_V1: &str = "muse-render-execution-receipt-sorted-json-sha256-v1";
 pub const RECEIPT_DIGEST_DOMAIN_V1: &[u8] = b"luminous-dynamics-muse-render-execution-receipt-v1";
 pub const MIDI_MANIFEST_SCHEMA_V1: &str = "muse-midi-performance-v1";
 pub const MIDI_MANIFEST_DIGEST_SCHEMA_V1: &str = "muse-midi-performance-manifest-serde-json-sha256-v1";
@@ -1157,7 +1157,7 @@ fn verify_timeline_binding_bundle(
         if binding.renderer_id != track.renderer_id || binding.patch_id != track.patch_id
             || binding.gm_program != track.gm_program
             || binding.asset_sha256.as_deref().is_some_and(|hash| !valid_sha256(hash))
-            || binding.asset_sha256.as_deref().is_some_and(|hash| Some(hash) != receipt.renderer.asset_sha256.as_deref())
+            || binding.asset_sha256 != receipt.renderer.asset_sha256
         {
             return Err(format!("instrument binding does not match MIDI track or renderer asset {}", track.track_index));
         }
