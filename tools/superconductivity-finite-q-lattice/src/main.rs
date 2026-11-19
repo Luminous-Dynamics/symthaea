@@ -3,7 +3,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::env;
-use std::f64::consts::{PI, TAU};
+use std::f64::consts::TAU;
 use std::fs;
 use std::process;
 
@@ -397,7 +397,8 @@ impl Model {
                 "boundary_condition": "periodic",
                 "length": self.length,
                 "sites": self.site_ids.len(),
-                "directed_links": self.links.len()
+                "directed_links": self.links.len(),
+                "link_ids": self.links.iter().map(|edge| edge.id.clone()).collect::<Vec<_>>()
             },
             "modes": self.modes.iter().map(|mode| json!({
                 "mode_id": mode.id,
@@ -600,7 +601,7 @@ mod tests {
         let zero_mode = model.modes.iter().position(|mode| mode.q == 0).unwrap();
         let plus_mode = model.modes.iter().position(|mode| mode.q == 2).unwrap();
         let minus_mode = model.modes.iter().position(|mode| mode.q == 6).unwrap();
-        assert!(model.momentum_quartet_allowed(plus_mode, zero_mode, zero_mode, minus_mode));
+        assert!(model.momentum_quartet_allowed(plus_mode, zero_mode, minus_mode, zero_mode));
         assert!(!model.momentum_quartet_allowed(plus_mode, zero_mode, zero_mode, zero_mode));
     }
 
