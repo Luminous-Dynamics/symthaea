@@ -316,7 +316,7 @@ pub fn validate_matched_comparison(
 }
 
 /// Error returned by the composed matched-run and service-qualification gate.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ComparisonSide {
     Control,
     Candidate,
@@ -709,6 +709,496 @@ mod tests {
         assert_eq!(
             validate_matched_comparison(&control, &candidate, ComparisonScope::WaterAndEnergy,),
             Ok(())
+        );
+    }
+
+    fn site_fit_profile(
+        architecture: crate::site_fit::AquaArchitecture,
+        device_configuration_sha256: &str,
+    ) -> crate::site_fit::SiteFitProfile {
+        use crate::site_fit::{SiteFitMethodBinding, SiteFitProfile};
+        let mut profile = SiteFitProfile {
+            site_profile_id: "SITE-SHARED-001".to_owned(),
+            site_revision: "survey-r4".to_owned(),
+            site_conditions_sha256: digest('9'),
+            architecture_profile_id: format!("SITE-PROFILE-{architecture:?}"),
+            architecture,
+            device_configuration_sha256: device_configuration_sha256.to_owned(),
+            requirements_sha256: digest('8'),
+            additional_required_domains: Vec::new(),
+            method_bindings: Vec::new(),
+        };
+        profile.method_bindings = profile
+            .required_domains()
+            .into_iter()
+            .map(|domain| SiteFitMethodBinding {
+                domain,
+                method_sha256: digest('c'),
+                method_conditions_sha256: digest('d'),
+            })
+            .collect();
+        profile
+    }
+
+    fn site_fit_assessments(
+        profile: &crate::site_fit::SiteFitProfile,
+        outcome: crate::site_fit::SiteCapabilityOutcome,
+    ) -> Vec<crate::site_fit::SiteCapabilityAssessment> {
+        use crate::site_fit::{SiteCapabilityAssessment, SiteFitEvidenceRef};
+        profile
+            .required_domains()
+            .into_iter()
+            .map(|domain| {
+                let binding = profile
+                    .method_bindings
+                    .iter()
+                    .find(|binding| binding.domain == domain)
+                    .expect("site capability method binding");
+                SiteCapabilityAssessment {
+                    domain,
+                    outcome,
+                    evidence: Some(SiteFitEvidenceRef {
+                        domain,
+                        authority: domain.expected_authority(),
+                        issuer_principal_id: format!("site-issuer-{domain:?}"),
+                        authority_verification_receipt_sha256: digest('e'),
+                        status: crate::service_qualification::QualificationEvidenceStatus::Current,
+                        record_id: format!("site-evidence-{domain:?}"),
+                        evidence_sha256: digest('f'),
+                        method_sha256: binding.method_sha256.clone(),
+                        method_conditions_sha256: binding.method_conditions_sha256.clone(),
+                        site_profile_id: profile.site_profile_id.clone(),
+                        site_revision: profile.site_revision.clone(),
+                        site_conditions_sha256: profile.site_conditions_sha256.clone(),
+                        architecture_profile_id: profile.architecture_profile_id.clone(),
+                        architecture: profile.architecture,
+                        device_configuration_sha256: profile.device_configuration_sha256.clone(),
+                        requirements_sha256: profile.requirements_sha256.clone(),
+                    }),
+                }
+            })
+            .collect()
+    }
+
+    fn site_fit_profile(
+        architecture: crate::site_fit::AquaArchitecture,
+        device_configuration_sha256: &str,
+    ) -> crate::site_fit::SiteFitProfile {
+        use crate::site_fit::{SiteFitMethodBinding, SiteFitProfile};
+        let mut profile = SiteFitProfile {
+            site_profile_id: "SITE-SHARED-001".to_owned(),
+            site_revision: "survey-r4".to_owned(),
+            site_conditions_sha256: digest('9'),
+            architecture_profile_id: format!("SITE-PROFILE-{architecture:?}"),
+            architecture,
+            device_configuration_sha256: device_configuration_sha256.to_owned(),
+            requirements_sha256: digest('8'),
+            additional_required_domains: Vec::new(),
+            method_bindings: Vec::new(),
+        };
+        profile.method_bindings = profile
+            .required_domains()
+            .into_iter()
+            .map(|domain| SiteFitMethodBinding {
+                domain,
+                method_sha256: digest('c'),
+                method_conditions_sha256: digest('d'),
+            })
+            .collect();
+        profile
+    }
+
+    fn site_fit_assessments(
+        profile: &crate::site_fit::SiteFitProfile,
+        outcome: crate::site_fit::SiteCapabilityOutcome,
+    ) -> Vec<crate::site_fit::SiteCapabilityAssessment> {
+        use crate::site_fit::{SiteCapabilityAssessment, SiteFitEvidenceRef};
+        profile
+            .required_domains()
+            .into_iter()
+            .map(|domain| {
+                let binding = profile
+                    .method_bindings
+                    .iter()
+                    .find(|binding| binding.domain == domain)
+                    .expect("site capability method binding");
+                SiteCapabilityAssessment {
+                    domain,
+                    outcome,
+                    evidence: Some(SiteFitEvidenceRef {
+                        domain,
+                        authority: domain.expected_authority(),
+                        issuer_principal_id: format!("site-issuer-{domain:?}"),
+                        authority_verification_receipt_sha256: digest('e'),
+                        status: crate::service_qualification::QualificationEvidenceStatus::Current,
+                        record_id: format!("site-evidence-{domain:?}"),
+                        evidence_sha256: digest('f'),
+                        method_sha256: binding.method_sha256.clone(),
+                        method_conditions_sha256: binding.method_conditions_sha256.clone(),
+                        site_profile_id: profile.site_profile_id.clone(),
+                        site_revision: profile.site_revision.clone(),
+                        site_conditions_sha256: profile.site_conditions_sha256.clone(),
+                        architecture_profile_id: profile.architecture_profile_id.clone(),
+                        architecture: profile.architecture,
+                        device_configuration_sha256: profile.device_configuration_sha256.clone(),
+                        requirements_sha256: profile.requirements_sha256.clone(),
+                    }),
+                }
+            })
+            .collect()
+    }
+
+    fn site_fit_profile(
+        architecture: crate::site_fit::AquaArchitecture,
+        device_configuration_sha256: &str,
+    ) -> crate::site_fit::SiteFitProfile {
+        use crate::site_fit::{SiteFitMethodBinding, SiteFitProfile};
+        let mut profile = SiteFitProfile {
+            site_profile_id: "SITE-SHARED-001".to_owned(),
+            site_revision: "survey-r4".to_owned(),
+            site_conditions_sha256: digest('9'),
+            architecture_profile_id: format!("SITE-PROFILE-{architecture:?}"),
+            architecture,
+            device_configuration_sha256: device_configuration_sha256.to_owned(),
+            requirements_sha256: digest('8'),
+            additional_required_domains: Vec::new(),
+            method_bindings: Vec::new(),
+        };
+        profile.method_bindings = profile
+            .required_domains()
+            .into_iter()
+            .map(|domain| SiteFitMethodBinding {
+                domain,
+                method_sha256: digest('c'),
+                method_conditions_sha256: digest('d'),
+            })
+            .collect();
+        profile
+    }
+
+    fn site_fit_assessments(
+        profile: &crate::site_fit::SiteFitProfile,
+        outcome: crate::site_fit::SiteCapabilityOutcome,
+    ) -> Vec<crate::site_fit::SiteCapabilityAssessment> {
+        use crate::site_fit::{SiteCapabilityAssessment, SiteFitEvidenceRef};
+        profile
+            .required_domains()
+            .into_iter()
+            .map(|domain| {
+                let binding = profile
+                    .method_bindings
+                    .iter()
+                    .find(|binding| binding.domain == domain)
+                    .expect("site capability method binding");
+                SiteCapabilityAssessment {
+                    domain,
+                    outcome,
+                    evidence: Some(SiteFitEvidenceRef {
+                        domain,
+                        authority: domain.expected_authority(),
+                        issuer_principal_id: format!("site-issuer-{domain:?}"),
+                        authority_verification_receipt_sha256: digest('e'),
+                        status: crate::service_qualification::QualificationEvidenceStatus::Current,
+                        record_id: format!("site-evidence-{domain:?}"),
+                        evidence_sha256: digest('f'),
+                        method_sha256: binding.method_sha256.clone(),
+                        method_conditions_sha256: binding.method_conditions_sha256.clone(),
+                        site_profile_id: profile.site_profile_id.clone(),
+                        site_revision: profile.site_revision.clone(),
+                        site_conditions_sha256: profile.site_conditions_sha256.clone(),
+                        architecture_profile_id: profile.architecture_profile_id.clone(),
+                        architecture: profile.architecture,
+                        device_configuration_sha256: profile.device_configuration_sha256.clone(),
+                        requirements_sha256: profile.requirements_sha256.clone(),
+                    }),
+                }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn site_qualified_comparison_accepts_two_eligible_architectures_at_one_site() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let candidate = run("candidate-001", "aqua-test-article", '8');
+        let service_profile = qualification_profile(
+            crate::service_qualification::QualificationClaim::WaterAndEnergyEfficiency,
+        );
+        let control_qualification = service_qualification_record(
+            "control-001",
+            &service_profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let candidate_qualification = service_qualification_record(
+            "candidate-001",
+            &service_profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let control_site = site_fit_profile(
+            crate::site_fit::AquaArchitecture::DirectFlowPassive,
+            &control.device.device_configuration_sha256,
+        );
+        let candidate_site = site_fit_profile(
+            crate::site_fit::AquaArchitecture::SameSessionRecirculation,
+            &candidate.device.device_configuration_sha256,
+        );
+        let control_site_assessments = site_fit_assessments(
+            &control_site,
+            crate::site_fit::SiteCapabilityOutcome::Satisfied,
+        );
+        let candidate_site_assessments = site_fit_assessments(
+            &candidate_site,
+            crate::site_fit::SiteCapabilityOutcome::Satisfied,
+        );
+
+        let result = validate_site_qualified_matched_comparison(
+            &control,
+            &candidate,
+            ComparisonScope::WaterAndEnergy,
+            &service_profile,
+            &control_qualification,
+            &candidate_qualification,
+            &control_site,
+            &control_site_assessments,
+            &candidate_site,
+            &candidate_site_assessments,
+        )
+        .expect("both architectures fit the same site and both service records qualify");
+
+        assert_eq!(
+            result.control_site_fit.disposition,
+            crate::site_fit::SiteFitDisposition::Eligible
+        );
+        assert_eq!(
+            result.candidate_site_fit.disposition,
+            crate::site_fit::SiteFitDisposition::Eligible
+        );
+        assert_eq!(
+            result.service_qualification.disposition,
+            crate::service_qualification::MatchedComparisonDisposition::CandidateQualified
+        );
+    }
+
+    #[test]
+    fn site_qualified_comparison_rejects_ineligible_candidate() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let candidate = run("candidate-001", "aqua-test-article", '8');
+        let service_profile = qualification_profile(
+            crate::service_qualification::QualificationClaim::FunctionalService,
+        );
+        let control_qualification = service_qualification_record(
+            "control-001",
+            &service_profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let candidate_qualification = service_qualification_record(
+            "candidate-001",
+            &service_profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let control_site = site_fit_profile(
+            crate::site_fit::AquaArchitecture::DirectFlowPassive,
+            &control.device.device_configuration_sha256,
+        );
+        let candidate_site = site_fit_profile(
+            crate::site_fit::AquaArchitecture::SameSessionRecirculation,
+            &candidate.device.device_configuration_sha256,
+        );
+        let control_evidence = site_fit_assessments(
+            &control_site,
+            crate::site_fit::SiteCapabilityOutcome::Satisfied,
+        );
+        let mut candidate_evidence = site_fit_assessments(
+            &candidate_site,
+            crate::site_fit::SiteCapabilityOutcome::Satisfied,
+        );
+        candidate_evidence[0].outcome = crate::site_fit::SiteCapabilityOutcome::Unsatisfied;
+
+        let result = validate_site_qualified_matched_comparison(
+            &control,
+            &candidate,
+            ComparisonScope::WaterServiceOnly,
+            &service_profile,
+            &control_qualification,
+            &candidate_qualification,
+            &control_site,
+            &control_evidence,
+            &candidate_site,
+            &candidate_evidence,
+        );
+
+        assert!(matches!(
+            result,
+            Err(QualifiedComparisonError::SiteNotEligible {
+                side: ComparisonSide::Candidate,
+                result
+            }) if result.disposition == crate::site_fit::SiteFitDisposition::Ineligible
+        ));
+    }
+
+    #[test]
+    fn site_qualified_comparison_rejects_indeterminate_site_evidence() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let candidate = run("candidate-001", "aqua-test-article", '8');
+        let service_profile = qualification_profile(
+            crate::service_qualification::QualificationClaim::FunctionalService,
+        );
+        let control_qualification = service_qualification_record(
+            "control-001",
+            &service_profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let candidate_qualification = service_qualification_record(
+            "candidate-001",
+            &service_profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let control_site = site_fit_profile(
+            crate::site_fit::AquaArchitecture::DirectFlowPassive,
+            &control.device.device_configuration_sha256,
+        );
+        let candidate_site = site_fit_profile(
+            crate::site_fit::AquaArchitecture::SameSessionRecirculation,
+            &candidate.device.device_configuration_sha256,
+        );
+        let control_evidence = site_fit_assessments(
+            &control_site,
+            crate::site_fit::SiteCapabilityOutcome::Satisfied,
+        );
+        let mut candidate_evidence = site_fit_assessments(
+            &candidate_site,
+            crate::site_fit::SiteCapabilityOutcome::Satisfied,
+        );
+        candidate_evidence[0].evidence.as_mut().expect("evidence").status =
+            crate::service_qualification::QualificationEvidenceStatus::Stale;
+
+        let result = validate_site_qualified_matched_comparison(
+            &control,
+            &candidate,
+            ComparisonScope::WaterServiceOnly,
+            &service_profile,
+            &control_qualification,
+            &candidate_qualification,
+            &control_site,
+            &control_evidence,
+            &candidate_site,
+            &candidate_evidence,
+        );
+
+        assert!(matches!(
+            result,
+            Err(QualifiedComparisonError::SiteNotEligible {
+                side: ComparisonSide::Candidate,
+                result
+            }) if result.disposition == crate::site_fit::SiteFitDisposition::Indeterminate
+        ));
+    }
+
+    #[test]
+    fn site_qualified_comparison_rejects_different_site_surveys() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let candidate = run("candidate-001", "aqua-test-article", '8');
+        let service_profile = qualification_profile(
+            crate::service_qualification::QualificationClaim::FunctionalService,
+        );
+        let control_qualification = service_qualification_record(
+            "control-001",
+            &service_profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let candidate_qualification = service_qualification_record(
+            "candidate-001",
+            &service_profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let control_site = site_fit_profile(
+            crate::site_fit::AquaArchitecture::DirectFlowPassive,
+            &control.device.device_configuration_sha256,
+        );
+        let mut candidate_site = site_fit_profile(
+            crate::site_fit::AquaArchitecture::SameSessionRecirculation,
+            &candidate.device.device_configuration_sha256,
+        );
+        candidate_site.site_conditions_sha256 = digest('0');
+        let control_evidence = site_fit_assessments(
+            &control_site,
+            crate::site_fit::SiteCapabilityOutcome::Satisfied,
+        );
+        let candidate_evidence = site_fit_assessments(
+            &candidate_site,
+            crate::site_fit::SiteCapabilityOutcome::Satisfied,
+        );
+
+        assert_eq!(
+            validate_site_qualified_matched_comparison(
+                &control,
+                &candidate,
+                ComparisonScope::WaterServiceOnly,
+                &service_profile,
+                &control_qualification,
+                &candidate_qualification,
+                &control_site,
+                &control_evidence,
+                &candidate_site,
+                &candidate_evidence,
+            ),
+            Err(QualifiedComparisonError::SiteContextMismatch {
+                field: "site_conditions_sha256"
+            })
+        );
+    }
+
+    #[test]
+    fn site_qualified_comparison_rejects_wrong_device_binding() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let candidate = run("candidate-001", "aqua-test-article", '8');
+        let service_profile = qualification_profile(
+            crate::service_qualification::QualificationClaim::FunctionalService,
+        );
+        let control_qualification = service_qualification_record(
+            "control-001",
+            &service_profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let candidate_qualification = service_qualification_record(
+            "candidate-001",
+            &service_profile,
+            crate::service_qualification::AssessmentOutcome::Pass,
+        );
+        let control_site = site_fit_profile(
+            crate::site_fit::AquaArchitecture::DirectFlowPassive,
+            &control.device.device_configuration_sha256,
+        );
+        let candidate_site = site_fit_profile(
+            crate::site_fit::AquaArchitecture::SameSessionRecirculation,
+            &digest('0'),
+        );
+        let control_evidence = site_fit_assessments(
+            &control_site,
+            crate::site_fit::SiteCapabilityOutcome::Satisfied,
+        );
+        let candidate_evidence = site_fit_assessments(
+            &candidate_site,
+            crate::site_fit::SiteCapabilityOutcome::Satisfied,
+        );
+
+        assert_eq!(
+            validate_site_qualified_matched_comparison(
+                &control,
+                &candidate,
+                ComparisonScope::WaterServiceOnly,
+                &service_profile,
+                &control_qualification,
+                &candidate_qualification,
+                &control_site,
+                &control_evidence,
+                &candidate_site,
+                &candidate_evidence,
+            ),
+            Err(QualifiedComparisonError::Benchmark(
+                ContractError::ContextMismatch {
+                    field: "candidate_site_device_configuration_sha256"
+                }
+            ))
         );
     }
 
