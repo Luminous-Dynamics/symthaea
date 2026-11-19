@@ -128,6 +128,42 @@ impl EventCommand {
                 _ => return Err(TransientTraceError::CommandUnitMismatch),
             }
         }
+
+        let transition_count = self
+            .samples
+            .windows(2)
+            .filter(|pair| pair[0].value != pair[1].value)
+            .count();
+        let shape_valid = match (family, self.kind) {
+            (EventFamily::SupplySag, CommandKind::UpstreamPressure) => self
+                .samples
+                .windows(2)
+                .any(|pair| matches!((&pair[0].value, &pair[1].value),
+                    (CommandValue::PressureKpa(before), CommandValue::PressureKpa(after)) if after < before)),
+            (EventFamily::SupplyRamp, CommandKind::UpstreamPressure) => {
+                let values: Vec<f64> = self.samples.iter().filter_map(|sample| {
+                    if let CommandValue::PressureKpa(value) = sample.value { Some(value) } else { None }
+                }).collect();
+                let nondecreasing = values.windows(2).all(|pair| pair[1] >= pair[0]);
+                let nonincreasing = values.windows(2).all(|pair| pair[1] <= pair[0]);
+                transition_count > 0 && (nondecreasing || nonincreasing)
+            }
+            (EventFamily::IntermittentSupply, CommandKind::UpstreamPressure) => self
+                .samples
+                .iter()
+                .any(|sample| matches!(sample.value, CommandValue::PressureKpa(value) if value == 0.0)),
+            (EventFamily::ConcurrentDemandStep, CommandKind::BranchDemand) => self
+                .samples
+                .windows(2)
+                .any(|pair| matches!((&pair[0].value, &pair[1].value),
+                    (CommandValue::BranchFlowLpm(before), CommandValue::BranchFlowLpm(after)) if after > before)),
+            (EventFamily::RepeatedDemandCycling, _) => transition_count >= 2,
+            (EventFamily::RapidValveEvent, CommandKind::ValveState) => transition_count >= 1,
+            _ => false,
+        };
+        if !shape_valid {
+            return Err(TransientTraceError::CommandShapeMismatch);
+        }
         Ok(())
     }
 }
@@ -536,6 +572,7 @@ pub enum TransientTraceError {
     EmptyRawArtifact,
     CommandFamilyMismatch,
     CommandUnitMismatch,
+    CommandShapeMismatch,
     InvalidCommandValue,
     InsufficientCommandSamples,
     NonMonotonicCommandTime,
@@ -581,6 +618,7 @@ impl Display for TransientTraceError {
             Self::EmptyRawArtifact => write!(f, "raw artifact byte length must be greater than zero"),
             Self::CommandFamilyMismatch => write!(f, "command type is incompatible with event family"),
             Self::CommandUnitMismatch => write!(f, "command sample value does not match its declared unit"),
+            Self::CommandShapeMismatch => write!(f, "command waveform does not exhibit the declared event-family behavior"),
             Self::InvalidCommandValue => write!(f, "command value must be finite and non-negative"),
             Self::InsufficientCommandSamples => write!(f, "event command needs at least two samples"),
             Self::NonMonotonicCommandTime => write!(f, "command timestamps must be strictly increasing"),
@@ -1095,8 +1133,8 @@ mod tests {
         let mut value = profile();
         value.event_family = EventFamily::ConcurrentDemandStep;
         value.command.kind = CommandKind::BranchDemand;
-        value.command.samples.iter_mut().for_each(|sample| {
-            sample.value = CommandValue::BranchFlowLpm(3.0);
+        value.command.samples.iter_mut().enumerate().for_each(|(index, sample)| {
+            sample.value = CommandValue::BranchFlowLpm(if index == 0 { 0.0 } else { 3.0 });
         });
         assert_eq!(value.validate(), Err(TransientTraceError::MissingSecondaryFlowChannel));
     }
@@ -1109,7 +1147,7 @@ mod tests {
         value.command.samples.iter_mut().for_each(|sample| {
             sample.value = CommandValue::ValveOpen(true);
         });
-        assert_eq!(value.validate(), Err(TransientTraceError::InsufficientSpatialPressureChannels));
+        assert_eq!(value.validate(), Err(TransientTraceError::CommandShapeMismatch));
     }
 
     #[test]
@@ -1117,11 +1155,41 @@ mod tests {
         let mut value = profile();
         value.event_family = EventFamily::RapidValveEvent;
         value.command.kind = CommandKind::ValveState;
+        value.command.samples[0].value = CommandValue::ValveOpen(false);
+        value.command.samples[1].value = CommandValue::ValveOpen(true);
+        value.command.samples[2].value = CommandValue::ValveOpen(false);
+        value.acquisition.channels.insert(1, pressure_channel("adjacent-branch-pressure", "adjacent-terminal-branch"));
+        assert_eq!(value.validate(), Ok(()));
+    }
+
+    #[test]
+    fn rejects_supply_sag_label_without_a_pressure_decrease() {
+        let mut value = profile();
+        value.command.samples.iter_mut().for_each(|sample| {
+            sample.value = CommandValue::PressureKpa(300.0);
+        });
+        assert_eq!(value.validate(), Err(TransientTraceError::CommandShapeMismatch));
+    }
+
+    #[test]
+    fn rejects_intermittent_supply_without_a_zero_supply_interval() {
+        let mut value = profile();
+        value.event_family = EventFamily::IntermittentSupply;
+        value.command.samples.iter_mut().for_each(|sample| {
+            sample.value = CommandValue::PressureKpa(150.0);
+        });
+        assert_eq!(value.validate(), Err(TransientTraceError::CommandShapeMismatch));
+    }
+
+    #[test]
+    fn rejects_valve_event_without_a_state_transition() {
+        let mut value = profile();
+        value.event_family = EventFamily::RapidValveEvent;
+        value.command.kind = CommandKind::ValveState;
         value.command.samples.iter_mut().for_each(|sample| {
             sample.value = CommandValue::ValveOpen(true);
         });
-        value.acquisition.channels.insert(1, pressure_channel("adjacent-branch-pressure", "adjacent-terminal-branch"));
-        assert_eq!(value.validate(), Ok(()));
+        assert_eq!(value.validate(), Err(TransientTraceError::CommandShapeMismatch));
     }
 
     #[test]
