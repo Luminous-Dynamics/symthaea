@@ -76,25 +76,33 @@ The command also emits two segmented rows at chunk sizes 64, 256 and 1,024:
   per probe, complete frame ratio and percentage size gap to the offline
   best-of-eight oracle.
 
-The CLI CSV includes `oracle_gap_pct`, `probe_interval`, `probe_count` and
-`extra_candidate_encodes`. For a fair compute comparison, the offline oracle
-and full historical selector are recorded as probing every segment
-(`probe_interval=1`, `probe_count=S`, seven extra candidate encodes per
-segment). Sparse rows count only scheduled probes. Single-transform rows have
-zero selector probes/extra candidate encodes. Every online frame is checked to
-be no smaller than the offline best-of-eight frame for the same source and
-fixed chunking. For (K=1), budgeted sparse-probe child frames must match the
-full historical-cost selector's child frames exactly (the outer F64S policy
-ID and header CRC differ).
+The CLI CSV separates encoder and decoder work with
+`encoder_extra_candidate_encodes` and `decoder_candidate_reencodes`:
+- Single-transform rows: 0 / 0.
+- Offline best-of-eight: 7 extra encoder encodes per segment (eight candidates
+  are tried; one is selected), and 8 decoder candidate re-encodes per segment
+  because the decoder reconstructs and recomputes all eight canonical frames
+  before accepting the child.
+- Full historical: 7 extra encoder encodes and 7 decoder candidate re-encodes
+  per segment. The selected child's actual complete frame length is reused.
+- Sparse historical: 7 extra encodes per side on each scheduled probe and 0
+  between probes.
 
+The CSV also includes `oracle_gap_pct`, `probe_interval` and
+`probe_count`. Offline and full-historical rows are recorded as probing every
+segment; sparse rows count only the scheduled common probes. Every online
+frame is checked to be no smaller than the offline best-of-eight frame for the
+same source and fixed chunking. For K=1, sparse-probe child frames must match
+the full historical-cost selector's child frames exactly (only the outer F64S
+policy ID/header CRC differ).
 
-For a stream with (S) segments and probe interval (K), the number of probes
-is (lceil S/K ceil), and the extra candidate encodes per side are
-(7\lceil S/K \rceil). Amortized extra candidate encodes per segment are
-approximately (7/K): 7.0 at (K=1), 1.75 at (K=4), 0.4375 at (K=16),
-and 0.1094 at (K=64). The selected candidate is encoded once on every
-segment. The decoder performs corresponding candidate recomputations on probe
-segments to preserve deterministic policy state.
+For a stream with S chunks and probe interval K, the number of probes is
+`ceil(S/K)`; sparse encoder extras and decoder candidate re-encodes are each
+`7*ceil(S/K)`. The amortized extra candidate encodes per segment are about
+7/K: 7.0 at K=1, 1.75 at K=4, 0.4375 at K=16, and 0.1094 at K=64. The chosen
+candidate is still encoded once per chunk and decoded once per chunk. The
+offline decoder intentionally costs more because it verifies canonical
+best-of-eight minimality.
 
 The online policies offer different points on the size/compute frontier:
 full historical measurement gives more frequent feedback, while sparse probes
