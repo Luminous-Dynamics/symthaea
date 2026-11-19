@@ -53,6 +53,8 @@ The verifier checks:
 ## Important boundaries
 
 - A passing integrity check is not an edit-acceptance decision.
+- `validate_receipt` recomputes the receipt seal in the public library API; callers cannot bypass seal verification by constructing a typed `ReceiptV1` and calling `verify_bundle` directly.
+- V1 binds one shared renderer asset digest per attempt. Per-instrument heterogeneous asset sets require a future receipt schema; the verifier rejects missing or mismatched binding/receipt asset digests.
 - The standalone verifier independently re-derives the current velocity-only ScoreEditPlanV1 transformation from the source Score, checks every candidate note field and velocity, validates exact edit receipt deltas, and checks verifier report counts/issues. It does not yet independently support future ScoreEdit operation classes; unknown schema/operation classes must not be silently accepted.
 - MIDI parsing verifies the MIDI file against its own manifest. It does not prove the renderer consumed that MIDI. The invocation/executor evidence and trust boundary remain separate.
 - WAV non-silence and metadata checks do not prove score-to-audio conformance, perceptual quality, musical coherence or human preference.
