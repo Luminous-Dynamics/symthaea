@@ -231,22 +231,42 @@ fn point_from_json(value: &Value, scale: i128, context: &str) -> Result<Point, S
     ))
 }
 
-fn point_apply(matrix: Matrix2, point: Point) -> Point {
-    (
-        matrix[0][0] * point.0 + matrix[0][1] * point.1,
-        matrix[1][0] * point.0 + matrix[1][1] * point.1,
-    )
+fn point_apply(matrix: Matrix2, point: Point) -> Result<Point, String> {
+    let x = matrix[0][0]
+        .checked_mul(point.0)
+        .and_then(|left| {
+            matrix[0][1]
+                .checked_mul(point.1)
+                .and_then(|right| left.checked_add(right))
+        })
+        .ok_or_else(|| "point action overflow in x coordinate".to_owned())?;
+    let y = matrix[1][0]
+        .checked_mul(point.0)
+        .and_then(|left| {
+            matrix[1][1]
+                .checked_mul(point.1)
+                .and_then(|right| left.checked_add(right))
+        })
+        .ok_or_else(|| "point action overflow in y coordinate".to_owned())?;
+    Ok((x, y))
 }
 
-fn multiply(left: Matrix2, right: Matrix2) -> Matrix2 {
+fn multiply(left: Matrix2, right: Matrix2) -> Result<Matrix2, String> {
     let mut product = [[0_i128; 2]; 2];
     for row in 0..2 {
         for column in 0..2 {
-            product[row][column] =
-                left[row][0] * right[0][column] + left[row][1] * right[1][column];
+            let first = left[row][0]
+                .checked_mul(right[0][column])
+                .ok_or_else(|| format!("matrix product overflow at ({row}, {column})"))?;
+            let second = left[row][1]
+                .checked_mul(right[1][column])
+                .ok_or_else(|| format!("matrix product overflow at ({row}, {column})"))?;
+            product[row][column] = first
+                .checked_add(second)
+                .ok_or_else(|| format!("matrix product sum overflow at ({row}, {column})"))?;
         }
     }
-    product
+    Ok(product)
 }
 
 fn validate_orthogonal_element(element: &Element) -> Result<(), String> {
@@ -370,7 +390,7 @@ impl Manifest {
 
         for left in &self.elements {
             for right in &self.elements {
-                let product_matrix = multiply(left.matrix, right.matrix);
+                let product_matrix = multiply(left.matrix, right.matrix)?;
                 let product_id = self
                     .by_matrix
                     .get(&matrix_key(product_matrix))
@@ -403,8 +423,8 @@ impl Manifest {
                 .iter()
                 .find(|element| &element.id == inverse_id)
                 .ok_or_else(|| format!("unknown inverse ID {inverse_id}"))?;
-            if multiply(left.matrix, inverse.matrix) != identity.matrix
-                || multiply(inverse.matrix, left.matrix) != identity.matrix
+            if multiply(left.matrix, inverse.matrix)? != identity.matrix
+                || multiply(inverse.matrix, left.matrix)? != identity.matrix
             {
                 return Err(format!("two-sided inverse fails for {}", left.id));
             }
@@ -507,7 +527,7 @@ impl Manifest {
             let transformed: BTreeSet<Point> = points
                 .iter()
                 .map(|point| point_apply(element.matrix, *point))
-                .collect();
+                .collect::<Result<_, _>>()?;
             if transformed == points {
                 stabilizer.insert(element.id.clone());
             }
@@ -539,7 +559,7 @@ impl Manifest {
             let transformed: Vec<Point> = points
                 .iter()
                 .map(|point| point_apply(element.matrix, *point))
-                .collect();
+                .collect::<Result<_, _>>()?;
             let transformed_set: BTreeSet<Point> = transformed.iter().copied().collect();
             if transformed_set == point_set {
                 let source_to_target = transformed
@@ -1365,6 +1385,19 @@ mod tests {
             oracle.audit_proposed_subgroup(chiral, &["not-an-element".to_owned()]),
             Err("proposal references unknown D4 element not-an-element".to_owned())
         );
+    }
+
+    #[test]
+    fn exact_point_action_rejects_signed_integer_overflow() {
+        let reflection_x = [[-1_i128, 0], [0, 1]];
+        assert!(point_apply(reflection_x, (i128::MIN, 0)).is_err());
+    }
+
+    #[test]
+    fn exact_group_multiplication_rejects_integer_overflow() {
+        let left = [[i128::MAX, 0], [0, 1]];
+        let right = [[2_i128, 0], [0, 1]];
+        assert!(multiply(left, right).is_err());
     }
 
     #[test]
