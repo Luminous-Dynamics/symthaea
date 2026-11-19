@@ -1,0 +1,10 @@
+[workspace]
+resolver = "3"
+
+[package]
+name = "symthaea-plasma-memory-contract"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Exact physical-time and identity contracts for plasma closure memory mechanisms"
