@@ -368,6 +368,7 @@ pub fn certify_uniform_defect_cover(
         .max_by_key(|cell| cell.uniform_cell_defect_upper)
         .ok_or(DefectCoverErrorV1::EmptySampleSet)?;
     let uniform_defect_upper = witness.uniform_cell_defect_upper;
+    let witness_sample_id = witness.sample_id.clone();
     let maximum_sampled_defect_upper = cells
         .iter()
         .map(|cell| cell.observed_defect_upper)
@@ -394,7 +395,7 @@ pub fn certify_uniform_defect_cover(
         verified_interval_cover: true,
         cells,
         uniform_defect_upper,
-        witness_sample_id: witness.sample_id.clone(),
+        witness_sample_id,
         maximum_sampled_defect_upper,
         maximum_coverage_inflation_upper,
         maximum_covering_radius,
