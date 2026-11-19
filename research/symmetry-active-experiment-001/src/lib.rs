@@ -1102,17 +1102,13 @@ mod tests {
         );
     }
 
-
     #[test]
     fn context_probe_produces_a_2_5x_adaptive_saving_over_the_exact_static_basis() {
         let problem = context_lookahead_fixture();
         let adaptive = compile_active_experiment(&problem, budget()).unwrap();
-        let static_design = solve_exact_static_probe_design(
-            &problem,
-            budget(),
-            StaticProbeBudgetV1::default(),
-        )
-        .unwrap();
+        let static_design =
+            solve_exact_static_probe_design(&problem, budget(), StaticProbeBudgetV1::default())
+                .unwrap();
 
         assert_eq!(adaptive.root_worst_case_cost, 2);
         assert_eq!(static_design.selected_probe_ids.len(), 5);
@@ -1154,10 +1150,7 @@ mod tests {
                 budget(),
             )
             .unwrap();
-            assert_eq!(
-                replayed,
-                vec![problem.hypotheses[hypothesis_index].clone()]
-            );
+            assert_eq!(replayed, vec![problem.hypotheses[hypothesis_index].clone()]);
             let PlanDispositionV1::Probe { branches, .. } = &adaptive.root.disposition else {
                 panic!("root must be the context probe");
             };
