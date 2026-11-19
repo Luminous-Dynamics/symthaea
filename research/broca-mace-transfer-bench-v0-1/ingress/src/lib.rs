@@ -639,6 +639,17 @@ impl ConsolidationEvidenceRefV1 {
 
 /// Immutable evidence input to a consolidation decision. This contains no
 /// proposed action, oracle label, or authorization grant.
+/// Exact source revision attached to a candidate consolidation proposal.
+/// The receipt bundle is copied intact; IDs or summaries alone are insufficient.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConsolidationSourceBindingV1 {
+    pub event_id: u32,
+    pub action: Action,
+    pub scope: Scope,
+    pub measurement_error_bound_bits: u64,
+    pub receipts: EvidenceReceiptBundle,
+}
+
 #[derive(Clone, Debug)]
 pub struct ConsolidationEvidencePackV1 {
     as_known: AsKnownQuery,
@@ -801,6 +812,56 @@ impl ConsolidationEvidencePackV1 {
         }
     }
 
+    /// Resolve an exact ordered set of promotable event revisions into
+    /// complete source bindings. This never reconstructs trust from IDs.
+    pub fn source_bindings_for_event_ids(
+        &self,
+        event_ids: &[u32],
+    ) -> Result<Vec<ConsolidationSourceBindingV1>, ConsolidationPackReject> {
+        if event_ids.is_empty() {
+            return Err(ConsolidationPackReject::EmptySelection);
+        }
+
+        let mut seen = BTreeSet::new();
+        let mut bindings = Vec::with_capacity(event_ids.len());
+        for event_id in event_ids {
+            if !seen.insert(*event_id) {
+                return Err(ConsolidationPackReject::DuplicateRequestedEvent(*event_id));
+            }
+            let event = self
+                .events
+                .iter()
+                .find(|event| event.event_id == *event_id)
+                .ok_or(ConsolidationPackReject::MissingAdmittedEvent(*event_id))?;
+            let eligible = event.source_trust_status == SourceTrustStatus::TrustedForScope
+                && event.source_family != 0
+                && event.source_root_digest.is_known()
+                && event.outcome_success
+                && event.intervention
+                && event.prediction_pre_registered
+                && event.outcome_reconciled
+                && event.confounders_controlled
+                && event.delayed_horizon_complete
+                && event.measurement_error_bound.is_finite()
+                && (0.0..=1.0).contains(&event.measurement_error_bound)
+                && event.receipts.outcome_success
+                && event.receipts.source_root_digest == event.source_root_digest;
+            if !eligible {
+                return Err(ConsolidationPackReject::UnqualifiedPromotionEvent(
+                    *event_id,
+                ));
+            }
+            bindings.push(ConsolidationSourceBindingV1 {
+                event_id: event.event_id,
+                action: event.action,
+                scope: event.scope,
+                measurement_error_bound_bits: event.measurement_error_bound.to_bits(),
+                receipts: event.receipts.clone(),
+            });
+        }
+        Ok(bindings)
+    }
+
     pub fn events(&self) -> &[ConsolidationEvidenceRefV1] {
         &self.events
     }
@@ -878,6 +939,7 @@ pub enum ConsolidationPackReject {
     DuplicateRequestedEvent(u32),
     MissingAdmittedEvent(u32),
     DuplicateAdmittedEvent(u32),
+    UnqualifiedPromotionEvent(u32),
     InconsistentKnowledgeSnapshot,
 }
 

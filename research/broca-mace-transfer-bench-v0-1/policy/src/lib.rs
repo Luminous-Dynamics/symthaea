@@ -39,8 +39,16 @@ pub struct Scope {
 
 /// SHA-256 digest of a canonical upstream provenance-root identity.
 /// A digest identifies a root; it does not itself authenticate its issuer.
+/// SHA-256 digest of a canonical upstream provenance-root identity.
+/// A digest identifies a root; it does not itself authenticate its issuer.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SourceRootDigest([u8; 32]);
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SourceRootDigestParseError {
+    InvalidLength { actual: usize },
+    InvalidHex { byte_index: usize },
+}
 
 impl SourceRootDigest {
     pub const UNKNOWN: Self = Self([0; 32]);
@@ -53,11 +61,6 @@ impl SourceRootDigest {
         &self.0
     }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SourceRootDigestParseError {
-    InvalidLength { actual: usize },
-    InvalidHex { byte_index: usize },
-}
     pub fn is_known(self) -> bool {
         self.0 != [0; 32]
     }
