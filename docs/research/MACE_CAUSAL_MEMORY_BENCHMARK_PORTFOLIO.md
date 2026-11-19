@@ -161,6 +161,9 @@ A different source-family string is not proof of independence. The production ga
 - **Candidate/evaluator separation:** candidate policy and evaluator are separate Cargo packages; the evaluator source remains public in the same repository, so it is not a sealed independent evaluator.
 - **Verification:** code has been committed to draft PR #12743. Rust compile/tests/rustfmt have not run in the current execution environment (no Cargo/Rust toolchain is installed); GitHub draft checks are skipped. No test pass or SOTA result is claimed.
 
+
+- **Provider claim-span grounding:** 9 authored tests in `ingress/src/claims.rs` cover exact Anthropic/OpenAI spans, capture mutation, span digest, non-string pointer, UTF-8 boundaries, assertion digest, provider/thread/native identity and invalid spans. These tests have not run. The validator returns untrusted claims only; it is not a candidate-memory path.
+
 ## 7. Immediate next tranche
 
 1. Implement a production Mycelix verifier for canonical event bytes, signed authority receipt chain, source lineage, calibration, outcome reconciliation and lifecycle receipts (#12771, #9075, #297).

@@ -229,7 +229,7 @@ The stronger SOTA claim becomes credible only after an independently operated ev
 
 ## 9. Current implementation boundary
 
-The current ingress adapter is a provider-shaped capture-envelope normalizer. It is not a direct OpenAI or Anthropic API client. It does not yet extract natural-language claims with exact source spans, or operate a live Mycelix/Symtropy signature verifier. The raw MACE integration test is authored but not runner-verified.
+The ingress adapter is a provider-shaped capture-envelope normalizer, not a direct OpenAI or Anthropic API client or complete SDK parser. The new source-span module validates extractor-proposed claims against exact provider-event text locations and returns an untrusted claim object; it does not prove entailment or automatically create candidate Experiences. A live Mycelix/Symtropy signature verifier remains unimplemented. The raw MACE integration and claim-span tests are authored but not runner-verified.
 
 Provider capture metadata is not a replacement for the original privacy-controlled artifact. The original capture must remain available under the source retention/deletion policy if exact replay is required.
 

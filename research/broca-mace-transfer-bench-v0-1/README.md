@@ -177,7 +177,7 @@ Anthropic's Managed Agents describes three replaceable interfaces: an append-onl
 
 TimlMemBench reports 208 reviewed samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases. Its raw-native evaluation requires systems to ingest raw sessions, rather than merely query a prebuilt canonical memory pool. It finds that retrieval accuracy can mask lifecycle, scope, provenance, activation and restraint failures. See the [ACL Anthology paper](https://aclanthology.org/2026.findings-emnlp.507/).
 
-**Implication for MACE:** the workspace now includes receipt-gated structured raw-interaction envelopes and a proposal-only consolidation consumer. However, the fixed/generated evaluator binaries still start from structured `Experience` fixtures. The ingress adapter does not yet parse full natural-language session transcripts or bind candidate-extracted claims to exact source-text spans. A raw-native benchmark must test transcript turns → source-span-bound claims → receipt verification → consolidation → Session-B decision → Session-C correction.
+**Implication for MACE:** the workspace now includes receipt-gated structured raw-interaction envelopes, a proposal-only consolidation consumer, and an exact source-span validator for extractor-produced claims. The fixed/generated policy evaluators still use structured `Experience` fixtures; the span validator is not yet wired into an automatic natural-language transcript extraction and evidence-grounding pipeline. A raw-native benchmark must test transcript turns → source-span-bound untrusted claims → independent entailment and receipt verification → consolidation → Session-B decision → Session-C correction.
 
 ### Agent Memory Challenge Cycle 2
 

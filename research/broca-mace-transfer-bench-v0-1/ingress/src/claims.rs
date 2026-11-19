@@ -430,13 +430,14 @@ mod tests {
             }
         });
         let capture = envelope("openai", 7, 200, None, event);
+        let output = "status=done";
         let proposal = proposal(
             Provider::OpenAiAgentsSdk,
             "openai",
             &capture,
             "/raw_item/output",
             0,
-            10,
+            output.len(),
             "The tool reports status done.",
         );
         let claim = validate_untrusted_provider_claim(&proposal, &capture).unwrap();
