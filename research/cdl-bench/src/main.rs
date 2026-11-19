@@ -664,7 +664,7 @@ fn float_command(args: &[String]) -> Result<(), Box<dyn Error>> {
     }
 
     println!("# note=random-bit-pattern includes arbitrary IEEE-754 payloads, including NaNs, infinities and subnormals");
-    println!("# note=XOR-previous varint and XOR-leading/trailing-zero packing are simple reversible reference transforms, not Gorilla, Chimp or DeXOR");
+    println!("# note=XOR-previous varint and reusable XOR-leading/trailing windows are simple reversible reference transforms, not Gorilla, Chimp or DeXOR");
     println!("# note=segment_portfolio is an offline best-of-six per-chunk size oracle; every child header plus the outer F64S header is counted");
     println!("# note=segment_portfolio is not an online selector or a WZS reproduction");
     println!("# note=online_historical_cost chooses each chunk using only prior chunks; after each chunk both sides recompute all six candidate sizes to update shared policy state");
