@@ -465,10 +465,10 @@ impl HistoricalSegmentCosts {
 /// The first chunk uses Raw/Order0 (candidate 0). Before each later chunk, the
 /// selector chooses the candidate with the lowest *mean complete child-frame
 /// size on previously decoded chunks*. It never uses the current chunk to
-/// choose its encoding. After encoding a chunk, all four candidate sizes are
+/// choose its encoding. After encoding a chunk, all six candidate sizes are
 /// measured to update the policy state for the next chunk.
 ///
-/// The decoder repeats those four measurements from the reconstructed chunk,
+/// The decoder repeats those six measurements from the reconstructed chunk,
 /// derives the same next policy state, and rejects a child whose transform/model
 /// ID does not match the policy's expected choice. The selected child header
 /// already carries the transform/model ID; no additional selector message is
