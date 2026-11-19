@@ -835,55 +835,66 @@ fn measurements_for_case(
     case: &CaseRow,
     source_commit: &str,
     manifest_sha256: &str,
-) -> Vec<Measurement> {
+    reference: Option<&ReferenceArtifact>,
+) -> (Vec<Measurement>, Option<ReferenceArtifact>) {
     let composed = catch_unwind(AssertUnwindSafe(|| {
-        compose_case(case, source_commit, manifest_sha256)
+        compose_case(case, source_commit, manifest_sha256, reference)
     }));
 
     match composed {
-        Ok(Ok(artifact)) => artifact
-            .metrics
-            .into_iter()
-            .map(|(metric, value)| match value {
-                Some(value) if value.is_finite() => Measurement {
-                    case_id: case.case_id.clone(),
-                    metric,
-                    status: "observed",
-                    value: Some(value),
-                    artifact_sha256: artifact.artifact_sha256.clone(),
-                    note: artifact.note.clone(),
-                },
-                Some(_) => Measurement {
-                    case_id: case.case_id.clone(),
-                    metric,
-                    status: "failed",
-                    value: None,
-                    artifact_sha256: artifact.artifact_sha256.clone(),
-                    note: format!("{};metric_value_non_finite", artifact.note),
-                },
-                None => Measurement {
-                    case_id: case.case_id.clone(),
-                    metric,
-                    status: "not_applicable",
-                    value: None,
-                    artifact_sha256: artifact.artifact_sha256.clone(),
-                    note: artifact.note.clone(),
-                },
-            })
-            .collect(),
-        Ok(Err(error)) => failed_measurements(
-            &case.case_id,
-            &error,
-            &format!(
-                "source_commit={source_commit};manifest_sha256={manifest_sha256}"
+        Ok(Ok(artifact)) => {
+            let ComposedArtifact {
+                metrics,
+                artifact_sha256,
+                note,
+                reference,
+            } = artifact;
+            let measurements = metrics
+                .into_iter()
+                .map(|(metric, value)| match value {
+                    Some(value) if value.is_finite() => Measurement {
+                        case_id: case.case_id.clone(),
+                        metric,
+                        status: "observed",
+                        value: Some(value),
+                        artifact_sha256: artifact_sha256.clone(),
+                        note: note.clone(),
+                    },
+                    Some(_) => Measurement {
+                        case_id: case.case_id.clone(),
+                        metric,
+                        status: "failed",
+                        value: None,
+                        artifact_sha256: artifact_sha256.clone(),
+                        note: format!("{note};metric_value_non_finite"),
+                    },
+                    None => Measurement {
+                        case_id: case.case_id.clone(),
+                        metric,
+                        status: "not_applicable",
+                        value: None,
+                        artifact_sha256: artifact_sha256.clone(),
+                        note: note.clone(),
+                    },
+                })
+                .collect();
+            (measurements, reference)
+        }
+        Ok(Err(error)) => (
+            failed_measurements(
+                &case.case_id,
+                &error,
+                &format!("source_commit={source_commit};manifest_sha256={manifest_sha256}"),
             ),
+            None,
         ),
-        Err(_) => failed_measurements(
-            &case.case_id,
-            "composer_panicked",
-            &format!(
-                "source_commit={source_commit};manifest_sha256={manifest_sha256}"
+        Err(_) => (
+            failed_measurements(
+                &case.case_id,
+                "composer_panicked",
+                &format!("source_commit={source_commit};manifest_sha256={manifest_sha256}"),
             ),
+            None,
         ),
     }
 }
@@ -987,12 +998,45 @@ fn run() -> Result<(), String> {
     )
     .map_err(|error| format!("cannot write observation header: {error}"))?;
 
+    let execution_cases = centre_first_cases(&cases)?;
+    let mut reference_by_block: HashMap<(Cohort, Style, u64), ReferenceArtifact> =
+        HashMap::new();
     let mut failed_cases = 0usize;
     let mut not_applicable_rows = 0usize;
     let mut observed_rows = 0usize;
-    for (index, case) in cases.iter().enumerate() {
-        let measurements =
-            measurements_for_case(case, &args[3], &manifest_sha256);
+    for (index, case) in execution_cases.iter().enumerate() {
+        let key = (case.cohort, case.style, case.seed);
+        let is_centre = case.cell == centre_cell();
+        let reference = if is_centre {
+            None
+        } else {
+            reference_by_block.get(&key)
+        };
+        let (measurements, reference_artifact) = if is_centre || reference.is_some() {
+            measurements_for_case(case, &args[3], &manifest_sha256, reference)
+        } else {
+            (
+                failed_measurements(
+                    &case.case_id,
+                    "centre_reference_unavailable",
+                    &format!(
+                        "source_commit={};manifest_sha256={manifest_sha256}",
+                        args[3]
+                    ),
+                ),
+                None,
+            )
+        };
+        if let Some(reference_artifact) = reference_artifact {
+            if reference_by_block.insert(key, reference_artifact).is_some() {
+                return Err(format!(
+                    "duplicate centre reference produced for {}/{}/seed {}",
+                    case.cohort.as_str(),
+                    case.style_name,
+                    case.seed
+                ));
+            }
+        }
         let case_failed = measurements.iter().any(|row| row.status == "failed");
         if case_failed {
             failed_cases += 1;
@@ -1020,7 +1064,7 @@ fn run() -> Result<(), String> {
             eprintln!(
                 "composed {} / {} cases ({} failed cases)",
                 index + 1,
-                cases.len(),
+                execution_cases.len(),
                 failed_cases
             );
         }
@@ -1104,7 +1148,28 @@ mod tests {
     }
 
     #[test]
-    fn pinned_composer_manifest_has_seven_valid_blob_pins() {
+    fn centre_reference_is_first_in_every_style_seed_block() {
+        let cases = expected_cases(&[Cohort::Confirmation]);
+        let ordered = centre_first_cases(&cases).unwrap();
+        assert_eq!(ordered.len(), cases.len());
+        for block in ordered.chunks_exact(81) {
+            assert_eq!(block[0].cell, centre_cell());
+            assert_eq!(
+                block.iter().filter(|case| case.cell == centre_cell()).count(),
+                1
+            );
+        }
+    }
+
+    #[test]
+    fn metric_registry_is_unique_and_matches_the_contract() {
+        assert_eq!(METRICS.len(), 52);
+        let unique: HashSet<&str> = METRICS.iter().copied().collect();
+        assert_eq!(unique.len(), METRICS.len());
+    }
+
+    #[test]
+    fn pinned_composer_manifest_has_thirteen_valid_blob_pins() {
         assert_eq!(PINNED_COMPOSER_BLOBS.len(), 13);
         assert!(is_commit_sha(PINNED_COMPOSER_SOURCE_COMMIT));
         for (path, blob) in PINNED_COMPOSER_BLOBS {
