@@ -213,11 +213,6 @@ fn read_varint_u64(input: &[u8], cursor: &mut usize) -> Result<u64, TelemetryErr
     Err(TelemetryError::VarintOverflow)
 }
 
-fn validate_schema(schema: &TelemetrySchema) {
-    // Field kinds are a closed enum, so every in-memory schema is valid.
-    let _ = schema.fields;
-}
-
 fn validate_record(
     record: &TelemetryRecord,
     schema: &TelemetrySchema,
@@ -400,7 +395,6 @@ pub fn compress_telemetry_records(
     if segment_records == 0 || segment_records > MAX_SEGMENT_RECORDS {
         return Err(TelemetryError::InvalidSegmentSize(segment_records));
     }
-    validate_schema(&schema);
     let transformed = encode_state_delta(records, &schema, state_capacity, segment_records)?;
     let inner = compress(&transformed, model)?;
     let raw = raw_records_bytes(records, &schema)?;
@@ -554,7 +548,7 @@ fn decode_state_delta(
     state_capacity: u32,
     segment_records: u32,
 ) -> Result<Vec<TelemetryRecord>, TelemetryError> {
-    let capacity = count
+    let _raw_capacity = count
         .checked_mul(RAW_BYTES_PER_RECORD)
         .ok_or(TelemetryError::LengthOverflow)?;
     let mut records = Vec::new();
@@ -678,7 +672,6 @@ fn decode_state_delta(
     if cursor != input.len() {
         return Err(TelemetryError::LengthMismatch);
     }
-    let _ = capacity;
     Ok(records)
 }
 
