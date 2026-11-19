@@ -194,6 +194,81 @@
       "split_characterization": "Paper describes exclusion of test materials from training based on structural similarity and reports system-specific MAE. It is a useful structural/system-level theoretical benchmark, not a measured experimental family-OOD benchmark.",
       "reproduction_status": "not_reproduced",
       "claim_ceiling": "Small, theory-focused, ambient-pressure benchmark; complementary to measured-property evaluation."
+    },
+    {
+      "baseline_id": "hierarchical-feasibility-tc-2026",
+      "title": "Hierarchical inference separates superconducting feasibility from critical-temperature optimization",
+      "doi": "10.1103/bg57-bjdk",
+      "source": "https://journals.aps.org/prmaterials/abstract/10.1103/bg57-bjdk",
+      "publication_date": "2026-08-25",
+      "label_authority": "mixed_superconductor_feasibility_and_Tc_dataset",
+      "dataset": {
+        "reported_materials": "more than 26,000 inorganic materials",
+        "class_coverage": [
+          "superconductors",
+          "non-superconductors"
+        ],
+        "class_balance": "described as balanced in the abstract; exact class counts not independently verified here",
+        "descriptor_groups": [
+          "electronic-compositional backbone",
+          "structural",
+          "magnetic/orbital"
+        ],
+        "notes": "The paper frames superconductivity as conditional inference: first estimate feasibility, then predict Tc using an expanded descriptor set. The accessible abstract reports reduced end-to-end Tc prediction error but does not expose the exact score, split manifest, dataset artifact, or checkpoint."
+      },
+      "method": {
+        "architecture": "two-stage hierarchical inference with task-dependent reweighting in a shared descriptor space",
+        "stage_1": "superconducting feasibility using an electronic-compositional backbone",
+        "stage_2": "conditional Tc optimization with additional structural and magnetic/orbital descriptors"
+      },
+      "published_findings": {
+        "reported": "The two-stage framework reduces end-to-end Tc prediction error relative to a single homogeneous inference task.",
+        "numeric_metrics": "not transcribed; no unsupported numeric improvement is inferred from the abstract"
+      },
+      "split_characterization": "Exact random/group/family/source/temporal split definitions and leakage controls require full-method and artifact audit before reproduction.",
+      "reproduction_status": "not_reproduced",
+      "claim_ceiling": "Published feasibility-first hierarchical ML baseline; not a verified new superconducting material and not independently reproduced by this repository."
+    },
+    {
+      "baseline_id": "datag-non-sc-extrapolation-2026",
+      "title": "Genome-inspired AI for extrapolative discovery of high-temperature superconductors",
+      "doi": "10.1038/s41598-026-76977-w",
+      "source": "https://www.nature.com/articles/s41598-026-76977-w",
+      "publication_date": "2026-10-29",
+      "article_status": "early-access accepted article; version of record may replace this version",
+      "label_authority": "negative-class-literature-dataset_and_model_prediction",
+      "dataset": {
+        "negative_control_materials": 53196,
+        "dataset_name": "DataG Non-Sc",
+        "dataset_role": "reported non-superconductor control data addressing the scarcity of negative examples",
+        "candidate_search_sources": [
+          "ICSD",
+          "COD",
+          "Materials Project"
+        ],
+        "notes": "The abstract reports a 53,196-material DataG Non-Sc dataset. The exact row manifest, label criteria for non-superconducting status, class matching, split manifest, and downloadable dataset/checkpoint artifacts still require audit."
+      },
+      "method": {
+        "models_evaluated": {
+          "machine_learning_models": 10,
+          "neural_network_models": 9
+        },
+        "reported_extrapolative_architectures": [
+          "functional convolutional neural network",
+          "long short-term memory"
+        ],
+        "framework": "AI-integrated high-throughput screening using elemental/material descriptors and existing crystallographic entries"
+      },
+      "published_candidate_predictions": {
+        "plutonium_based_candidates": 22,
+        "reported_candidate_threshold_k": 50,
+        "example": "Pu2Co17 is reported with predicted Tc approximately 89 K",
+        "hydride_candidates_over_40": true,
+        "reported_hydride_prediction_ceiling_k": 100,
+        "status": "unverified computational predictions; no synthesis or superconductivity confirmation is claimed here"
+      },
+      "reproduction_status": "not_reproduced",
+      "claim_ceiling": "Published extrapolative candidate-generation baseline. Candidate predictions are not observations, and radioactive actinide candidates remain computational-only absent qualified institutional review."
     }
   ],
   "cross_baseline_rule": "Never pool or directly rank metrics with different label authority, sample population, target definition, pressure/temperature conditions, structure inputs, or split regime.",
