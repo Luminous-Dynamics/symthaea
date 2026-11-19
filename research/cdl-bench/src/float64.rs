@@ -303,17 +303,29 @@ impl HistoricalSegmentCosts {
         best as u8
     }
 
-    fn observe(&mut self, values: &[f64]) -> Result<(), NumericError> {
-        for candidate in 0..SEGMENT_CANDIDATES {
-            let frame = encode_segment_candidate(values, candidate as u8)?;
+    fn observe_sizes(
+        &mut self,
+        sizes: [u64; SEGMENT_CANDIDATES],
+    ) -> Result<(), NumericError> {
+        for (candidate, size) in sizes.into_iter().enumerate() {
             self.totals[candidate] = self.totals[candidate]
-                .checked_add(frame.len() as u64)
+                .checked_add(size)
                 .ok_or(NumericError::LengthOverflow)?;
         }
         self.segments = self.segments
             .checked_add(1)
             .ok_or(NumericError::LengthOverflow)?;
         Ok(())
+    }
+
+    fn observe(&mut self, values: &[f64]) -> Result<(), NumericError> {
+        let mut sizes = [0u64; SEGMENT_CANDIDATES];
+        for candidate in 0..SEGMENT_CANDIDATES {
+            let frame = encode_segment_candidate(values, candidate as u8)?;
+            sizes[candidate] =
+                u64::try_from(frame.len()).map_err(|_| NumericError::LengthOverflow)?;
+        }
+        self.observe_sizes(sizes)
     }
 }
 
@@ -834,6 +846,24 @@ mod tests {
                 assert_same_bits(&decoded, &input);
             }
         }
+    }
+
+    #[test]
+    fn historical_cost_policy_uses_prior_means_and_stable_ties() {
+        let mut policy = HistoricalSegmentCosts::default();
+        assert_eq!(policy.choose(), 0, "the first segment must use Raw/Order0");
+
+        policy.observe_sizes([100, 80, 60, 40]).unwrap();
+        assert_eq!(policy.choose(), 3);
+
+        // A later chunk contributes to future choices, not its own selection.
+        // The mean costs after two observations are [60, 55, 50, 45].
+        policy.observe_sizes([20, 30, 40, 50]).unwrap();
+        assert_eq!(policy.choose(), 3);
+
+        let mut tied = HistoricalSegmentCosts::default();
+        tied.observe_sizes([10, 20, 20, 20]).unwrap();
+        assert_eq!(tied.choose(), 0);
     }
 
     #[test]
