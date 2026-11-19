@@ -1,6 +1,9 @@
 name: Muse Score Edit Qualification
 
 on:
+  push:
+    branches:
+      - 'research/melothaea-score-edit-plan-v1'
   pull_request:
     paths:
       - 'Cargo.toml'
