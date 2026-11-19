@@ -435,7 +435,12 @@ pub struct AddIdempotencyLedger {
 }
 
 impl AddIdempotencyLedger {
-    pub fn begin(&mut self, request: &AddRequest) -> Result<AddRetryState, AmlReject> {
+    pub fn begin(
+        &mut self,
+        track: Track,
+        request: &AddRequest,
+    ) -> Result<AddRetryState, AmlReject> {
+        validate_add_request(track, request)?;
         let digest = add_payload_digest(request);
         match self.entries.get(&request.request_id) {
             Some((existing, Some(response))) if existing == &digest => {
@@ -453,10 +458,12 @@ impl AddIdempotencyLedger {
 
     pub fn complete(
         &mut self,
+        track: Track,
         request: &AddRequest,
         response: AddResponse,
         persisted_and_searchable: bool,
     ) -> Result<(), AmlReject> {
+        validate_add_request(track, request)?;
         validate_add_response(request, &response, persisted_and_searchable)?;
         let digest = add_payload_digest(request);
         let Some((stored_digest, stored_response)) = self.entries.get_mut(&request.request_id)
@@ -709,18 +716,18 @@ mod tests {
     fn add_idempotency_replays_exact_request_and_rejects_payload_rebinding() {
         let request = add_request("write-3");
         let mut ledger = AddIdempotencyLedger::default();
-        assert_eq!(ledger.begin(&request), Ok(AddRetryState::New));
-        assert_eq!(ledger.begin(&request), Ok(AddRetryState::InFlight));
-        ledger.complete(&request, ack(&request), true).unwrap();
+        assert_eq!(ledger.begin(Track::Textual, &request), Ok(AddRetryState::New));
+        assert_eq!(ledger.begin(Track::Textual, &request), Ok(AddRetryState::InFlight));
+        ledger.complete(Track::Textual, &request, ack(&request), true).unwrap();
         assert_eq!(
-            ledger.begin(&request),
+            ledger.begin(Track::Textual, &request),
             Ok(AddRetryState::Committed(ack(&request)))
         );
 
         let mut changed = request.clone();
         changed.messages[0].content = MessageContent::Text("different".into());
         assert_eq!(
-            ledger.begin(&changed),
+            ledger.begin(Track::Textual, &changed),
             Err(AmlReject::RequestIdPayloadConflict)
         );
     }
@@ -764,11 +771,27 @@ mod tests {
     fn idempotency_abandon_only_removes_matching_inflight_payload() {
         let request = add_request("write-4");
         let mut ledger = AddIdempotencyLedger::default();
-        ledger.begin(&request).unwrap();
+        ledger.begin(Track::Textual, &request).unwrap();
         assert_eq!(ledger.abandon(&request), Ok(()));
         assert_eq!(
-            ledger.begin(&request),
+            ledger.begin(Track::Textual, &request),
             Ok(AddRetryState::New)
+        );
+    }
+
+    #[test]
+    fn idempotency_reservation_validates_request_before_claiming_request_id() {
+        let mut invalid = add_request("");
+        invalid.user_id = " ".into();
+        let mut ledger = AddIdempotencyLedger::default();
+        assert_eq!(
+            ledger.begin(Track::Textual, &invalid),
+            Err(AmlReject::EmptyRequestId)
+        );
+        invalid.request_id = "valid-id".into();
+        assert_eq!(
+            ledger.begin(Track::Textual, &invalid),
+            Err(AmlReject::EmptyUserId)
         );
     }
 
