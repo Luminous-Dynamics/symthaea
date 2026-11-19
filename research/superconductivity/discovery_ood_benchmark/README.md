@@ -110,3 +110,27 @@ cargo run --manifest-path tools/sc-discovery-ood-benchmark-auditor/Cargo.toml --
   --schema data/schemas/sc_discovery_benchmark_v0_1.schema.json \
   --fixture data/research/sc_discovery_benchmark_fixture_v0_1.json
 ```
+
+## Integration with the evidence-aware discovery benchmark
+
+This OOD contract has a deliberately narrow role: it owns the split/leakage auditor and evaluation of predictions under family, prototype, source, temporal and condition shifts. The complementary [evidence-aware discovery benchmark PR #12860](https://github.com/Luminous-Dynamics/symthaea/pull/12860) owns the broader observation/evidence contract and the canonical published-baseline registry. Reuse that registry rather than independently curating a second, potentially divergent baseline list.
+
+The canonical registry currently includes AutoSuperCon, BEE-NET, NEMAD, Geisler et al.'s calculated high-field database, HTSC-2025, the 2026 feasibility-first hierarchical inference paper, and DataG Non-Sc. All remain `not_reproduced`; the registry explicitly states that no external data were downloaded and no model training was performed.
+
+## Future v0.2: feasibility-first, then conditional property prediction
+
+The August 2026 hierarchical-inference paper provides a useful architecture comparator: first estimate whether superconductivity is feasible, then estimate (T_c) conditionally. DataG Non-Sc supplies a large reported negative-class track, while AutoSuperCon supplies extracted experimental property observations. These sources must not be naively merged: each negative label needs a source, a measurement/search scope, conditions and a detection/observability criterion.
+
+The current v0.1 OOD schema/auditor does **not** yet encode a calibrated superconducting-feasibility classifier or conditionally gated (T_c) predictions. Treat this as a separately versioned extension, not as an implemented v0.1 capability.
+
+Required rules for that extension:
+
+1. Labels must be tri-state at minimum: `observed_superconducting`, `observed_non_superconducting_under_conditions`, and `unknown_or_not_reported`. Absence from a superconductivity database is not a verified negative.
+2. Stage one emits calibrated (P(SC\mid x, c)) and an abstention state, where (c) carries sample form, pressure, temperature range, measurement method and search coverage. A material may be superconducting under one condition and not another.
+3. Stage two predicts (T_c) and other properties only conditionally on a qualified superconducting feasibility state; preserve probability of feasibility separately. End-to-end candidate ranking must account for false positives, false negatives and abstention rather than silently setting (T_c=0) for unknown labels.
+4. Hold out source/lab, chemistry family, prototype and time in addition to ordinary material groups. Keep all data-derived thresholds, class weighting, calibration and feature selection within training folds.
+5. Report class prevalence and independent material/family counts, macro PR-AUC, ROC-AUC, Brier score, log loss, calibration slope/intercept, recall at a fixed false-discovery rate, selective risk vs coverage, and conditional (T_c) MAE/interval coverage on confirmed positive cases.
+6. Report a separate end-to-end decision metric: validated candidates per fixed compute/experiment budget, false-positive experimental burden, and cost-to-qualified-answer. Do not compare conditional (T_c) MAE to an all-material classifier score.
+7. Include negative controls for database non-report treated as negative, condition-mismatched labels, family/source leakage, and selective abstention on the hardest class.
+
+The research target is not simply a better (T_c) MAE. It is calibrated detection of *where superconductivity is evidenced*, followed by conditional property prediction, OOD abstention, and prospective confirmation. This target needs source-qualified labels before model training or SOTA comparison.
