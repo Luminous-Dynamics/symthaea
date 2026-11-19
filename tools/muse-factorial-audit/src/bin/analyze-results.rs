@@ -734,8 +734,10 @@ fn analyze(
             disposition: status.to_string(),
             analysis_mode: if metric.starts_with("identity_") {
                 "identity_only".to_string()
-            } else {
+            } else if status == "complete" {
                 "effect_estimated".to_string()
+            } else {
+                "not_estimated".to_string()
             },
             artifact_sha256s: artifact_sha256s.join(";"),
             notes: notes.join(" | "),
@@ -1040,6 +1042,27 @@ mod tests {
     }
 
     #[test]
+    fn mismatched_artifact_digests_across_metrics_reject() {
+        let (cases, mut records) = one_complete_block();
+        let mut identity_rows: Vec<InputRecord> = records
+            .iter()
+            .map(|record| {
+                let mut identity = record.clone();
+                identity.metric = "identity_fingerprint_word".to_string();
+                identity
+            })
+            .collect();
+        identity_rows[0].artifact_sha256 = "b".repeat(64);
+        records.extend(identity_rows);
+        assert!(analyze(
+            &cases,
+            &["response".to_string(), "identity_fingerprint_word".to_string()],
+            &records
+        )
+        .is_err());
+    }
+
+    #[test]
     fn identity_metrics_are_coverage_audited_but_never_effect_estimated() {
         let (cases, mut records) = one_complete_block();
         let identity_rows: Vec<InputRecord> = records
@@ -1103,6 +1126,7 @@ mod tests {
         let analysis = analyze(&cases, &["response".to_string()], &records).unwrap();
         assert_eq!(analysis.incomplete_blocks, 0);
         assert_eq!(analysis.coverage[0].disposition, "not_applicable");
+        assert_eq!(analysis.coverage[0].analysis_mode, "not_estimated");
         assert_eq!(analysis.coverage[0].not_applicable, 81);
         assert!(analysis.effects.is_empty());
         assert!(analysis.summaries.is_empty());
