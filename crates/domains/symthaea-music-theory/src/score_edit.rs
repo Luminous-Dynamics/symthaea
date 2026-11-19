@@ -97,6 +97,7 @@ pub enum ScoreEditIssueCodeV1 {
     ProtectedScopeOverlap,
     OverlappingOperations,
     InvalidSourceNoteTime,
+    VerificationFailed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -129,10 +130,52 @@ pub struct ScoreEditReceiptV1 {
     pub protected_window_ids: Vec<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScoreEditVerificationIssueCodeV1 {
+    InvalidPlanSchema,
+    InvalidReceiptSchema,
+    DigestBindingMismatch,
+    OperationListMismatch,
+    ProtectedWindowListMismatch,
+    CandidateMetadataMutation,
+    CandidateNoteCountMismatch,
+    InvalidOperationScope,
+    InvalidSourceNoteTime,
+    MissingAuthorizedChange,
+    UnexpectedReceiptChange,
+    DuplicateReceiptChange,
+    ReceiptDeltaMismatch,
+    UnauthorizedNoteMutation,
+    ProtectedNoteMutation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScoreEditVerificationIssueV1 {
+    pub code: ScoreEditVerificationIssueCodeV1,
+    pub operation_id: Option<String>,
+    pub note_index: Option<usize>,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScoreEditVerificationReportV1 {
+    pub schema: String,
+    pub input_score_sha256: String,
+    pub candidate_note_count: usize,
+    pub authorized_note_count: usize,
+    pub changed_note_count: usize,
+    pub preserved_note_count: usize,
+    pub protected_note_count: usize,
+    pub verified: bool,
+    pub issues: Vec<ScoreEditVerificationIssueV1>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScoreEditCandidateV1 {
     pub candidate: Score,
     pub receipt: ScoreEditReceiptV1,
+    pub verification: ScoreEditVerificationReportV1,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -655,7 +698,470 @@ pub fn apply_score_edit_plan(
         protected_window_ids: plan.protected_windows.iter().map(|window| window.id.clone()).collect(),
     };
 
-    Ok(ScoreEditCandidateV1 { candidate, receipt })
+    let verification = verify_score_edit_candidate(
+        source,
+        &candidate,
+        plan,
+        &receipt,
+        expected_input_score_sha256,
+    );
+    if !verification.verified {
+        return Err(vec![ScoreEditIssueV1 {
+            code: ScoreEditIssueCodeV1::VerificationFailed,
+            operation_id: None,
+            part_id: None,
+            note_index: None,
+            message: format!(
+                "independent candidate verification failed with {} issue(s)",
+                verification.issues.len()
+            ),
+        }]);
+    }
+
+    Ok(ScoreEditCandidateV1 {
+        candidate,
+        receipt,
+        verification,
+    })
+}
+
+/// Independently re-check a candidate against the frozen source, intent plan,
+/// and digest-scoped receipt. This verifier does not trust the executor's
+/// changed-note list: it recomputes the target set from source PartIds and
+/// exact rational time windows, validates every before/after velocity, and
+/// rejects any mutation outside the authorized velocity field.
+pub fn verify_score_edit_candidate(
+    source: &Score,
+    candidate: &Score,
+    plan: &ScoreEditPlanV1,
+    receipt: &ScoreEditReceiptV1,
+    expected_input_score_sha256: &str,
+) -> ScoreEditVerificationReportV1 {
+    use std::collections::BTreeMap;
+
+    let mut issues = Vec::new();
+    let mut expected_changes: BTreeMap<usize, (String, u16, f32, f32)> = BTreeMap::new();
+    let mut selected_note_count = 0usize;
+    let mut protected_note_count = 0usize;
+    let mut changed_note_count = 0usize;
+    let mut preserved_note_count = 0usize;
+
+    let mut issue = |code, operation_id: Option<&str>, note_index: Option<usize>, message: &str| {
+        issues.push(ScoreEditVerificationIssueV1 {
+            code,
+            operation_id: operation_id.map(str::to_owned),
+            note_index,
+            message: message.to_string(),
+        });
+    };
+
+    if plan.schema != SCORE_EDIT_SCHEMA_V1 {
+        issue(
+            ScoreEditVerificationIssueCodeV1::InvalidPlanSchema,
+            None,
+            None,
+            "plan schema is not score-edit-plan-v1",
+        );
+    }
+    if receipt.schema != SCORE_EDIT_SCHEMA_V1
+        || receipt.input_digest_schema != SCORE_EDIT_INPUT_DIGEST_SCHEMA_V1
+    {
+        issue(
+            ScoreEditVerificationIssueCodeV1::InvalidReceiptSchema,
+            None,
+            None,
+            "receipt schema or digest schema is unsupported",
+        );
+    }
+    if !valid_digest(expected_input_score_sha256)
+        || plan.input_score_sha256 != expected_input_score_sha256
+        || receipt.input_score_sha256 != expected_input_score_sha256
+        || plan.input_digest_schema != receipt.input_digest_schema
+    {
+        issue(
+            ScoreEditVerificationIssueCodeV1::DigestBindingMismatch,
+            None,
+            None,
+            "plan and receipt must bind the same trusted source-score digest",
+        );
+    }
+
+    let expected_operation_ids: Vec<String> =
+        plan.operations.iter().map(|operation| operation.id.clone()).collect();
+    if receipt.operation_ids != expected_operation_ids {
+        issue(
+            ScoreEditVerificationIssueCodeV1::OperationListMismatch,
+            None,
+            None,
+            "receipt operation IDs do not exactly match the ordered plan operations",
+        );
+    }
+    let expected_protected_ids: Vec<String> = plan
+        .protected_windows
+        .iter()
+        .map(|window| window.id.clone())
+        .collect();
+    if receipt.protected_window_ids != expected_protected_ids {
+        issue(
+            ScoreEditVerificationIssueCodeV1::ProtectedWindowListMismatch,
+            None,
+            None,
+            "receipt protected-window IDs do not exactly match the ordered plan",
+        );
+    }
+
+    if source.key != candidate.key
+        || source.tempo_bpm != candidate.tempo_bpm
+        || source.meter != candidate.meter
+        || source.total_beats != candidate.total_beats
+    {
+        issue(
+            ScoreEditVerificationIssueCodeV1::CandidateMetadataMutation,
+            None,
+            None,
+            "velocity-only edit changed key, tempo, meter, or total score duration",
+        );
+    }
+    if source.notes.len() != candidate.notes.len() {
+        issue(
+            ScoreEditVerificationIssueCodeV1::CandidateNoteCountMismatch,
+            None,
+            None,
+            "velocity-only edit must preserve the exact note-event count and order",
+        );
+    }
+
+    let Some(score_end) = Moment::from_duration(source.total_beats) else {
+        issue(
+            ScoreEditVerificationIssueCodeV1::InvalidOperationScope,
+            None,
+            None,
+            "source total_beats is not a bounded non-negative rational",
+        );
+        return ScoreEditVerificationReportV1 {
+            schema: "score-edit-verification-report-v1".into(),
+            input_score_sha256: expected_input_score_sha256.to_string(),
+            candidate_note_count: candidate.notes.len(),
+            authorized_note_count: 0,
+            changed_note_count,
+            preserved_note_count,
+            protected_note_count,
+            verified: false,
+            issues,
+        };
+    };
+
+    let mut operation_ids = std::collections::BTreeSet::new();
+    let mut operation_windows: Vec<(&ScalePartVelocityV1, Moment, Moment)> = Vec::new();
+    for operation in &plan.operations {
+        if operation.id.trim().is_empty() || !operation_ids.insert(operation.id.as_str()) {
+            issue(
+                ScoreEditVerificationIssueCodeV1::InvalidOperationScope,
+                Some(&operation.id),
+                None,
+                "operation IDs must be non-empty and unique",
+            );
+            continue;
+        }
+        if operation.part_id == PartId::UNASSIGNED.0
+            || !source.parts().contains(&PartId(operation.part_id))
+            || operation.numerator == 0
+            || operation.denominator == 0
+            || operation.numerator > MAX_VELOCITY_SCALE_COMPONENT
+            || operation.denominator > MAX_VELOCITY_SCALE_COMPONENT
+            || operation.numerator == operation.denominator
+        {
+            issue(
+                ScoreEditVerificationIssueCodeV1::InvalidOperationScope,
+                Some(&operation.id),
+                None,
+                "operation target or velocity scale is invalid",
+            );
+            continue;
+        }
+        match validate_window(operation.start, operation.end, score_end) {
+            Ok((start, end)) => operation_windows.push((operation, start, end)),
+            Err(_) => issue(
+                ScoreEditVerificationIssueCodeV1::InvalidOperationScope,
+                Some(&operation.id),
+                None,
+                "operation time window is invalid for the source score",
+            ),
+        }
+    }
+
+    for (index, (left, left_start, left_end)) in operation_windows.iter().enumerate() {
+        for (right, right_start, right_end) in operation_windows.iter().skip(index + 1) {
+            if left.part_id == right.part_id
+                && intersects(*left_start, *left_end, *right_start, *right_end)
+            {
+                issue(
+                    ScoreEditVerificationIssueCodeV1::InvalidOperationScope,
+                    Some(&right.id),
+                    None,
+                    "plan contains overlapping operations on the same PartId",
+                );
+            }
+        }
+    }
+
+    let mut protected_windows: Vec<(&ProtectedPartWindowV1, Moment, Moment)> = Vec::new();
+    let known_parts: std::collections::BTreeSet<PartId> = source.parts().into_iter().collect();
+    for protected in &plan.protected_windows {
+        if protected.id.trim().is_empty()
+            || protected.part_id == PartId::UNASSIGNED.0
+            || !known_parts.contains(&PartId(protected.part_id))
+        {
+            issue(
+                ScoreEditVerificationIssueCodeV1::InvalidOperationScope,
+                None,
+                None,
+                "protected window ID or PartId is invalid",
+            );
+            continue;
+        }
+        match validate_window(protected.start, protected.end, score_end) {
+            Ok((start, end)) => protected_windows.push((protected, start, end)),
+            Err(_) => issue(
+                ScoreEditVerificationIssueCodeV1::InvalidOperationScope,
+                None,
+                None,
+                "protected window is invalid for the source score",
+            ),
+        }
+    }
+
+    for (operation, start, end) in &operation_windows {
+        for (protected, protected_start, protected_end) in &protected_windows {
+            if operation.part_id == protected.part_id
+                && intersects(*start, *end, *protected_start, *protected_end)
+            {
+                issue(
+                    ScoreEditVerificationIssueCodeV1::ProtectedNoteMutation,
+                    Some(&operation.id),
+                    None,
+                    "plan operation overlaps a protected source window",
+                );
+            }
+        }
+    }
+
+    for (note_index, source_note) in source.notes.iter().enumerate() {
+        for (operation, start, end) in &operation_windows {
+            if source_note.part.0 != operation.part_id {
+                continue;
+            }
+            let (Some(onset), Some(duration)) = (
+                Moment::from_duration(source_note.onset),
+                Moment::from_duration(source_note.duration),
+            ) else {
+                issue(
+                    ScoreEditVerificationIssueCodeV1::InvalidSourceNoteTime,
+                    Some(&operation.id),
+                    Some(note_index),
+                    "source note has invalid rational timing",
+                );
+                continue;
+            };
+            let Some(note_end) = onset.checked_add(duration) else {
+                issue(
+                    ScoreEditVerificationIssueCodeV1::InvalidSourceNoteTime,
+                    Some(&operation.id),
+                    Some(note_index),
+                    "source note end exceeds bounded rational arithmetic",
+                );
+                continue;
+            };
+            if !intersects(onset, note_end, *start, *end) {
+                continue;
+            }
+            if !(start.less_or_equal(onset) && note_end.less_or_equal(*end)) {
+                issue(
+                    ScoreEditVerificationIssueCodeV1::InvalidOperationScope,
+                    Some(&operation.id),
+                    Some(note_index),
+                    "operation intersects a note that crosses its half-open scope boundary",
+                );
+                continue;
+            }
+            selected_note_count += 1;
+            let after = source_note.velocity * f32::from(operation.numerator)
+                / f32::from(operation.denominator);
+            if !after.is_finite() || !(0.0..=1.0).contains(&after) {
+                issue(
+                    ScoreEditVerificationIssueCodeV1::InvalidOperationScope,
+                    Some(&operation.id),
+                    Some(note_index),
+                    "plan produces an invalid velocity",
+                );
+                continue;
+            }
+            if after != source_note.velocity {
+                if expected_changes
+                    .insert(
+                        note_index,
+                        (
+                            operation.id.clone(),
+                            operation.part_id,
+                            source_note.velocity,
+                            after,
+                        ),
+                    )
+                    .is_some()
+                {
+                    issue(
+                        ScoreEditVerificationIssueCodeV1::InvalidOperationScope,
+                        Some(&operation.id),
+                        Some(note_index),
+                        "source note is selected by more than one operation",
+                    );
+                }
+            }
+        }
+    }
+    if selected_note_count == 0 {
+        issue(
+            ScoreEditVerificationIssueCodeV1::InvalidOperationScope,
+            None,
+            None,
+            "plan selects no source notes",
+        );
+    }
+
+    let mut receipt_changes: BTreeMap<usize, &ScoreNoteVelocityChangeV1> = BTreeMap::new();
+    for change in &receipt.changes {
+        if receipt_changes.insert(change.note_index, change).is_some() {
+            issue(
+                ScoreEditVerificationIssueCodeV1::DuplicateReceiptChange,
+                Some(&change.operation_id),
+                Some(change.note_index),
+                "receipt contains duplicate source note ordinals",
+            );
+        }
+    }
+
+    for (note_index, (operation_id, part_id, before, after)) in &expected_changes {
+        match receipt_changes.get(note_index) {
+            None => issue(
+                ScoreEditVerificationIssueCodeV1::MissingAuthorizedChange,
+                Some(operation_id),
+                Some(*note_index),
+                "receipt omitted an authorized velocity change",
+            ),
+            Some(change)
+                if change.operation_id != *operation_id
+                    || change.part_id != *part_id
+                    || change.before != *before
+                    || change.after != *after =>
+            {
+                issue(
+                    ScoreEditVerificationIssueCodeV1::ReceiptDeltaMismatch,
+                    Some(operation_id),
+                    Some(*note_index),
+                    "receipt operation, PartId, or before/after velocity does not match the source-derived expectation",
+                );
+            }
+            Some(_) => {}
+        }
+    }
+    for (note_index, change) in &receipt_changes {
+        if !expected_changes.contains_key(note_index) {
+            issue(
+                ScoreEditVerificationIssueCodeV1::UnexpectedReceiptChange,
+                Some(&change.operation_id),
+                Some(*note_index),
+                "receipt claims a change outside the source-derived authorization set",
+            );
+        }
+    }
+
+    for (note_index, source_note) in source.notes.iter().enumerate() {
+        let Some(candidate_note) = candidate.notes.get(note_index) else {
+            continue;
+        };
+        let expected = expected_changes.get(&note_index);
+        if let Some((operation_id, part_id, before, after)) = expected {
+            if source_note.part != candidate_note.part
+                || source_note.pitch != candidate_note.pitch
+                || source_note.onset != candidate_note.onset
+                || source_note.duration != candidate_note.duration
+                || source_note.role != candidate_note.role
+                || source_note.emphasis != candidate_note.emphasis
+                || source_note.section_intensity != candidate_note.section_intensity
+                || source_note.velocity != *before
+                || candidate_note.velocity != *after
+            {
+                issue(
+                    ScoreEditVerificationIssueCodeV1::UnauthorizedNoteMutation,
+                    Some(operation_id),
+                    Some(note_index),
+                    "authorized note differs outside the exact planned velocity delta",
+                );
+            }
+            if source_note.part.0 != *part_id {
+                issue(
+                    ScoreEditVerificationIssueCodeV1::UnauthorizedNoteMutation,
+                    Some(operation_id),
+                    Some(note_index),
+                    "authorized note PartId differs from the planned target",
+                );
+            }
+        } else if source_note != candidate_note {
+            issue(
+                ScoreEditVerificationIssueCodeV1::UnauthorizedNoteMutation,
+                None,
+                Some(note_index),
+                "non-target source note changed without an authorized operation",
+            );
+        }
+
+        if source_note != candidate_note {
+            changed_note_count += 1;
+        } else {
+            preserved_note_count += 1;
+        }
+
+        for (protected, start, end) in &protected_windows {
+            if source_note.part.0 != protected.part_id {
+                continue;
+            }
+            let (Some(onset), Some(duration)) = (
+                Moment::from_duration(source_note.onset),
+                Moment::from_duration(source_note.duration),
+            ) else {
+                continue;
+            };
+            let Some(note_end) = onset.checked_add(duration) else {
+                continue;
+            };
+            if intersects(onset, note_end, *start, *end) {
+                protected_note_count += 1;
+                if source_note != candidate_note {
+                    issue(
+                        ScoreEditVerificationIssueCodeV1::ProtectedNoteMutation,
+                        None,
+                        Some(note_index),
+                        "note inside a protected PartId/time window changed",
+                    );
+                }
+            }
+        }
+    }
+
+    let verified = issues.is_empty()
+        && source.notes.len() == candidate.notes.len()
+        && receipt_changes.len() == expected_changes.len();
+    ScoreEditVerificationReportV1 {
+        schema: "score-edit-verification-report-v1".into(),
+        input_score_sha256: expected_input_score_sha256.to_string(),
+        candidate_note_count: candidate.notes.len(),
+        authorized_note_count: expected_changes.len(),
+        changed_note_count,
+        preserved_note_count,
+        protected_note_count,
+        verified,
+        issues,
+    }
 }
 
 #[cfg(test)]
