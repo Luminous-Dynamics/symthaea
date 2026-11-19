@@ -77,6 +77,10 @@ jobs:
           expect_rejected(bad, "undeclared root property")
 
           bad = copy.deepcopy(example)
+          bad["authority"]["allowed_external_targets"] = "none"
+          expect_rejected(bad, "non-array external target declaration")
+
+          bad = copy.deepcopy(example)
           bad["manifest_state"] = "frozen"
           expect_rejected(bad, "frozen manifest without integrity-checked dataset and complete run context")
 
