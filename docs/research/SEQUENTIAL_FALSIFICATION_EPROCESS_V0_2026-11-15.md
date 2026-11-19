@@ -1,7 +1,7 @@
 # Sequential falsification e-process reference v0
 
 **Date:** 2026-11-15  
-**Status:** implementation candidate; exact-head Rust qualification pending  
+**Status:** sequential API implemented; exact-head Rust qualification pending  
 **Owner:** Symthaea #12402  
 **Stacked implementation:** PR #12399 branch research/falsification-power-reference-v0-1
 
@@ -149,3 +149,20 @@ Before claiming statistical validity in a campaign:
 - independent review of the alternative custody and action-prediction event log.
 
 A successful implementation test is not a scientific result, an external benchmark result, or physical validation.
+
+
+## 10. Implementation status and symmetry-discovery adapter
+
+The Rust source now implements `PredictableGaussianEProcess` and `PredictableGaussianMixture` in the dependency-free power reference crate.
+
+- A prediction is committed with an observation ID, decision digest, expected discrepancy (d_t), and known positive (sigma_t). Only the matching residual can consume it.
+- The log likelihood-ratio increment is `d_t * Y_t / sigma_t^2 - d_t^2 / (2 sigma_t^2)`.
+- The current log-evidence and running-maximum log-evidence are both retained. The anytime p-value is derived from the running maximum, so adverse later observations cannot erase a prior boundary crossing.
+- The fixed mixture validates and normalizes alternative identities/weights once, freezes that set, and evaluates weighted component e-values in log space. It does not expose the post-hoc maximum component as the global mixture result.
+- Invalid chronology, duplicate observation IDs, mismatched decision digests, non-finite inputs and numerical overflow fail without consuming the pending observation.
+
+For a symmetry candidate, the null is zero-mean paired residual under the declared transformation and registered alternatives are candidate symmetry-breaking residual patterns. Crossing the mixture boundary falsifies the proposed invariance under this conditional observation model. A non-crossing result is unresolved, not proof of symmetry.
+
+The implementation is binary64 research code, not a formally verified floating-point e-process certificate. The conditional Gaussian assumptions, adaptive action process, numerical error, null calibration and alternative custody must be independently reviewed. The API does not create multiplicity control across candidate transformations or probe families, and does not cover persistent/correlated noise without a separately justified conditional law.
+
+The focused Rust 1.96 workflow must still establish formatting, all-target tests and strict Clippy on the exact updated head before this implementation is marked qualified.
