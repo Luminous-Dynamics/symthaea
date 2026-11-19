@@ -257,11 +257,9 @@ fn main() {
             counts: HashMap::new(),
             config: BootstrapConfig::default(),
             version: env!("CARGO_PKG_VERSION").to_string(),
-        encoder_metadata: Some(
-            PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(
+            encoder_metadata: Some(PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(
                 projector.config().clone(),
-            ),
-        ),
+            )),
         };
 
         trained.enforce_separation(cli.min_separation);
@@ -281,11 +279,9 @@ fn main() {
         counts: HashMap::new(),
         config: BootstrapConfig::default(),
         version: env!("CARGO_PKG_VERSION").to_string(),
-    encoder_metadata: Some(
-        PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(
+        encoder_metadata: Some(PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(
             projector.config().clone(),
-        ),
-    ),
+        )),
     };
 
     if let Err(e) = trained.save(&cli.output) {
