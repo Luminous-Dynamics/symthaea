@@ -269,3 +269,46 @@ A full-suite SOTA claim requires official protocol compliance, exact dataset rev
 A benchmark result qualifies only the exact model/harness/profile, task revision, dataset version, environment, permissions, budget and tested strata.
 
 It does not establish general cybersecurity mastery, production operator qualification, safe autonomous production patching, zero residual vulnerability, or universal security. The result must map into the existing claim-specific evidence and competency machinery; it must not create a new universal cyber score or trust badge.
+
+
+## 12. Machine-readable run configuration and dataset lock
+
+The branch now includes:
+- [Run manifest schema](cybergym-e2e-adapter-v0-1/run-manifest.schema.json): closed JSON Schema, planning/frozen distinction and conditional preflight requirements.
+- [Planning example](cybergym-e2e-adapter-v0-1/run-manifest.planning-example.json): explicitly not executed, with no tasks, model, budget, runner or authority configured.
+- [Dataset lock](cybergym-e2e-adapter-v0-1/dataset-lock.json): exact dataset revision and upstream README blob identity, with retrieval state still `not-retrieved`.
+
+The run manifest is an **input/configuration record**, not a run result. Execution outcomes, timing, task dispositions and verification statements must be emitted as separate receipt objects, reusing the D6.3/in-toto receipt work. The planning example must not be presented as benchmark evidence.
+
+The schema makes a frozen manifest require an integrity-checked dataset, a non-empty frozen task list, pinned agent/harness identity, container and host context, network firewall enabled, no privileged/host-network/secret-mount/cloud-metadata access, no production credentials or external targets, and separate evaluator custody. The PoC visibility rule is conditional: hidden in `e2e`, supplied in `patch-only`; the ground-truth patch remains hidden in both.
+
+## 13. Separate Artificial Analysis CyberGym-E2E-AA track — snapshot 2026-11-19
+
+A second public evaluation must be tracked separately:
+
+- Official page: https://artificialanalysis.ai/evaluations/cybergym-e2e-aa
+- Methodology: linked from that page.
+- It evaluates **131 filtered memory-safety tasks from 131 C/C++ projects**, one task per project, on Artificial Analysis' Stirrup harness with a 90-minute attempt per task.
+- Its headline pass@1 requires S1–S3: a PoC crashes the unpatched build, the candidate patch stops that crash, and the project's functionality tests pass.
+- Stage 4 ground-truth vulnerability closure is recorded as a diagnostic but **does not contribute to its headline score**.
+- The official page inspected 2026-11-19 reports Kimi K3.1 Pro at about 95% pass@1, with 27 of 36 models present on the score view.
+
+This is not directly comparable with Berkeley RDI's 920-task full benchmark: it is a filtered one-project-per-task C/C++ subset, uses a separate harness, and scores S1–S3 rather than S4. In particular, its approximately 95% headline pass@1 must not be compared to the original benchmark's S4 result or described as a verified ground-truth repair rate.
+
+Use it as a **separate S1–S3 reproduction/comparison track**. The original 920-task dataset remains the broader lifecycle track and must retain S4 as a distinct ground-truth diagnostic.
+
+## 14. November 19 external benchmark update for the multimodal research owner
+
+The existing Symthaea [#12837 AV-STREAM-001](https://github.com/Luminous-Dynamics/symthaea/issues/12837) already composes Symtropy's [#6201 typed observation replay contract](https://github.com/Luminous-Dynamics/symtropy/pull/6201). Two external references sharpen the target:
+
+- **DIVE** (https://arxiv.org/abs/2610.28405): 525 audio/video samples, six interaction tasks, separately measures response quality, response-window decisions and latency. The paper reports leading average response-window rates no higher than 53.77% despite sub-second average response latency.
+- **OASIS** (https://openaccess.thecvf.com/content/CVPR2026/html/Liang_OASIS_On-Demand_Hierarchical_Event_Memory_for_Streaming_Video_Reasoning_CVPR_2026_paper.html): hierarchical, on-demand event memory. The paper reports gains over base models on streaming benchmarks, including Qwen3-VL-8B + OASIS improving StreamBench average from 56.0 to 62.1 in its reported setup.
+
+These are architecture/task comparators, not matched Luminous baselines. The research priority should be evidence-indexed temporal event memory and calibrated intervene/withhold decisions, using Symtropy's causal replay and the existing #5169 turn controller. A memory summary remains a retrieval index, never a new observation; DIVE response quality, window compliance, false intervention and latency remain separate measures.
+
+## 15. Reproducibility status update
+
+- Upstream CyberGym-E2E README was fetched directly from `sunblaze-ucb/cybergym-e2e`; its README blob SHA is `6b112b3bf872163d744eea5388e2dab299d6bfac`.
+- The README pins dataset revision `29a59f0876f5c3612e44f380aa297ab4faf4b847` and says it was updated on 2026-11-16 after task archives were repacked following a reported leakage issue.
+- The dataset lock records `not-retrieved`; no task archives have been downloaded or run by this branch.
+- The branch still contains protocol/schema/fixture work only. No benchmark execution, Rust tests, CI pass or SOTA claim is asserted.
