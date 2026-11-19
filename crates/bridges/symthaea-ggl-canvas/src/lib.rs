@@ -17,6 +17,9 @@ use symthaea_canvas::scene_graph::{NodeKind, SceneNode, Style, Transform};
 
 const ADAPTER_VERSION: &str = "0.2.0";
 const CANVAS_SCHEMA: &str = "symthaea-canvas-scene-node-serde-v1";
+const DIGEST_ENCODING: &str = "serde-json-compact-struct-order-v1";
+const MAX_JSON_BYTES: usize = 32 * 1024 * 1024;
+const MAX_UNITS_BYTES: usize = 64;
 const MAX_PRIMITIVES: usize = 100_000;
 const MAX_POLYGON_VERTICES: usize = 256;
 const MAX_ID_BYTES: usize = 256;
@@ -43,7 +46,7 @@ pub struct IdentityEntry {
     pub scene_node_path: Vec<usize>,
     pub leaf_node_path: Vec<usize>,
     pub primitive_type: String,
-    pub source_line: Option<usize>,
+    pub source_line: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -72,6 +75,7 @@ pub struct AdapterManifest {
     pub scene_sha256: String,
     pub canvas_scene_digest: String,
     pub identity_map_digest: String,
+    pub digest_encoding: String,
     pub unsupported_or_opaque_count: usize,
 }
 
@@ -181,7 +185,7 @@ fn svg_arc_path(primitive: &Value) -> AdapterResult<String> {
     let cx = number_field(primitive, "cx")?;
     let cy = number_field(primitive, "cy")?;
     let radius = number_field(primitive, "radius")?;
-    let start = number_field(primitive, "start_rad")?;
+    let start = number_field(primitive, "start_rad")?.rem_euclid(TAU);
     let sweep = number_field(primitive, "sweep_rad")?;
     if radius <= 0.0 {
         return fail("arc radius must be positive");
@@ -285,6 +289,9 @@ fn compile_primitive(primitive: &Value) -> AdapterResult<(String, NodeKind)> {
 /// caller must supply an explicit viewport/unit conversion when needed.
 pub fn adapt_compiled_scene(json: &str, namespace: &str) -> AdapterResult<AdapterOutput> {
     validate_namespace(namespace)?;
+    if json.len() > MAX_JSON_BYTES {
+        return fail(format!("compiled scene exceeds {MAX_JSON_BYTES} byte input limit"));
+    }
     let source: Value = serde_json::from_str(json)
         .map_err(|error| AdapterError(format!("invalid compiled GGL JSON: {error}")))?;
     if string_field(&source, "language")? != "GGL" {
@@ -301,10 +308,12 @@ pub fn adapt_compiled_scene(json: &str, namespace: &str) -> AdapterResult<Adapte
     if primitives.len() > MAX_PRIMITIVES {
         return fail(format!("primitive count exceeds limit {MAX_PRIMITIVES}"));
     }
-    if let Some(declared) = source.get("primitive_count").and_then(Value::as_u64) {
-        if declared != primitives.len() as u64 {
-            return fail("primitive_count does not match the primitives array");
-        }
+    let declared_count = source
+        .get("primitive_count")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| AdapterError("primitive_count must be an unsigned integer".into()))?;
+    if declared_count != primitives.len() as u64 {
+        return fail("primitive_count does not match the primitives array");
     }
 
     let source_sha = string_field(&source, "source_sha256")?.to_owned();
@@ -320,7 +329,17 @@ pub fn adapt_compiled_scene(json: &str, namespace: &str) -> AdapterResult<Adapte
         validate_sha256(name, digest)?;
     }
 
-    let units = source.get("units").and_then(Value::as_str).map(str::to_owned);
+    let units = match source.get("units") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(value)) if !value.is_empty() && value.len() <= MAX_UNITS_BYTES => {
+            Some(value.clone())
+        }
+        Some(_) => {
+            return fail(format!(
+                "units must be a non-empty string of at most {MAX_UNITS_BYTES} bytes"
+            ));
+        }
+    };
     let mut ids = BTreeSet::new();
     let mut wrappers = Vec::with_capacity(primitives.len());
     let mut entries = Vec::with_capacity(primitives.len());
@@ -376,6 +395,7 @@ pub fn adapt_compiled_scene(json: &str, namespace: &str) -> AdapterResult<Adapte
         scene_sha256: scene_sha,
         canvas_scene_digest,
         identity_map_digest,
+        digest_encoding: DIGEST_ENCODING.into(),
         unsupported_or_opaque_count: 0,
     };
 
