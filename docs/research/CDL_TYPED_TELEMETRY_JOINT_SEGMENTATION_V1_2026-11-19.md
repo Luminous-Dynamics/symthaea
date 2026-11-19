@@ -107,6 +107,51 @@ This diagnostic suggests that the state-delta grammar can expose additional stru
 
 **Evidence boundary:** these are synthetic C++ transform-only bytes, not a Rust run, entropy-coded frame sizes, production telemetry measurements or a comparison to ALP/Pco/Gorilla/Chimp/ACTF/Rabbit/DeXOR. The raw baseline is an explicit simple record serialization; no schema dictionary, checksum, random-access index, checkpoint schedule, state-table bound, or general-purpose codec is included. The exceptionally high reduction therefore demonstrates that sparse per-key updates create exploitable structure in this generator, not expected end-to-end production compression. The next implementation must add bounded per-key state, checkpoint/recovery and a complete framed stream before these numbers can be interpreted operationally.
 
+## Independent bounded-state reference and Zstandard control (2026-11-19)
+
+A second, stricter C++20 reference is checked in at `research/cdl-bench/reference/typed_record_delta_bounded_reference.cpp`. Unlike the earlier 32-key/no-cap prototype above, this implementation mirrors the current TRD1 algorithm's core state rules: stable `(entity, series)` keys, bounded per-key LRU state, deterministic tie-breaking, segment-start state resets, full checkpoints for first-seen/evicted keys, timestamp delta/absolute handling including regressions, explicit null/presence changes, canonical changed-field masks, U32/Boolean range checks, and exact u64 payloads.
+
+The reference compiled and executed with:
+
+```sh
+g++ -O2 -std=c++20 -Wall -Wextra -Wconversion -Werror \
+  research/cdl-bench/reference/typed_record_delta_bounded_reference.cpp \
+  -o /tmp/typed_record_delta_bounded_reference
+/tmp/typed_record_delta_bounded_reference
+```
+
+Result: 200 randomized round-trip trials passed across varying key counts, interleaved series, state capacities (1–12), segment intervals (1–50), field changes and timestamp regressions. Six malformed inputs were rejected (truncated timestamp, noncanonical timestamp varint, invalid timestamp mode, truncated control bytes, truncated final field payload and trailing data). Four deterministic 65,536-record synthetic workloads also round-tripped exactly.
+
+### Transform-only and Zstandard results
+
+All four workloads use 64 keys and eight typed lanes. The canonical raw representation includes eight schema-kind bytes plus 81 bytes per record (timestamp, entity, series, presence bitmap and eight u64 field slots). TRD1 state-delta bytes are the uncompressed changed-field transform, before arithmetic coding and outer frame/checksum bytes.
+
+| Workload | Raw bytes | State-delta bytes | Transform reduction |
+|---|---:|---:|---:|
+| Sparse updates | 5,308,424 | 647,997 | 87.79% |
+| Bursty updates | 5,308,424 | 832,949 | 84.31% |
+| Noisy updates | 5,308,424 | 3,768,429 | 29.01% |
+| Mostly idle | 5,308,424 | 590,645 | 88.87% |
+
+Zstandard CLI 1.5.7 at level 19 was then applied to both the raw canonical records and the TRD1 state-delta transform. Both compressed outputs decompressed and byte-compared exactly with their inputs:
+
+| Workload | Zstd(raw) | Zstd(state-delta) | Change vs Zstd(raw) |
+|---|---:|---:|---:|
+| Sparse | 223,103 B | 84,743 B | -62.02% |
+| Bursty | 367,194 B | 223,915 B | -39.02% |
+| Noisy | 2,603,078 B | 2,316,026 B | -11.03% |
+| Mostly idle | 153,234 B | 5,596 B | -96.35% |
+
+These values supersede neither the earlier simple reference results nor any Rust benchmark; they are a **separate, expanded fixture set and grammar**. The reproduction runner is `scripts/research/cdl_typed_record_delta_bounded_reference.sh`; it compiles with strict warnings, runs the randomized/malformed tests, writes temporary raw/transform fixtures, compresses both with the same Zstd version/level and checks exact decompression.
+
+**Evidence boundary:** this is an independent C++ algorithm reference and transform+Zstd diagnostic, not the Rust implementation, not arithmetic-coded TRD1 frame sizes, and not production telemetry or a matched ALP/Pco/Gorilla/Chimp/Rabbit/WZS comparison. The high gains are from synthetic low-update workloads; noisy data is intentionally included and still benefits in this generated workload, but that is not evidence of production distributional generalization. No throughput, peak RSS, actual BTreeMap allocation, checkpoint random-access index or full schema-registry costs were measured.
+
+## Current Rust implementation status (compiler validation pending)
+
+The PR branch now contains `research/cdl-bench/src/telemetry.rs`, exported from `lib.rs`, with a `cdl-bench telemetry` synthetic command. The first frame has a fixed eight-lane schema, entity/series keys, exact u64 field payloads, explicit null/presence and changed-field masks, canonical u64 varints, deterministic bounded LRU state, segment-start checkpoints, and header/inner/raw-stream CRCs. The shared arithmetic coder is used for the transformed stream. Eight Rust tests are authored for round-trip, determinism, empty streams, truncation, single-bit mutations, resource limits, invalid field values and malformed varints.
+
+The current environment has no Rust toolchain (`rustc`, `cargo`, `rustfmt` unavailable), so these tests have **not** run and Rust compilation/formatting are **not verified**. The C++ reference exercises the corresponding transform logic independently but is not a substitute for compiling or testing the Rust source. The Rust frame is still a fixed eight-lane prototype; it does not yet include a general schema registry, random-access index, schema evolution, per-segment independent child frames, or production recovery protocol.
+
 ## New hypothesis: jointly choose segmentation and codec
 
 The current fixed chunks make boundary placement exogenous. Production data can contain long idle periods, sharp bursts and mixed regimes that do not align with 64/256/1024 boundaries.
