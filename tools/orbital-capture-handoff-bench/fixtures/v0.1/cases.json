@@ -20,7 +20,8 @@
     "max_joint_abs_rad": 2.9,
     "max_bus_angular_rate_rad_s": 0.02,
     "max_attitude_error_rad": 0.02,
-    "min_joint_limit_margin_rad": 0.05
+    "min_joint_limit_margin_rad": 0.05,
+    "client_id": "serviced-client-001"
   },
   "cases": [
     {
@@ -64,7 +65,8 @@
         "arm_receipt": "synthetic:arm-001",
         "latch_receipt": "synthetic:latch-001",
         "retention_receipt": "synthetic:retention-001",
-        "attitude_error_rad": 0.005
+        "attitude_error_rad": 0.005,
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -80,7 +82,8 @@
         "frame_id": "TARGET-LVLH-001",
         "epoch_tick": 1000,
         "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
-        "interface_revision": 3
+        "interface_revision": 3,
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -124,7 +127,8 @@
         "arm_receipt": "synthetic:arm",
         "latch_receipt": "synthetic:l",
         "retention_receipt": "synthetic:r",
-        "attitude_error_rad": 0.005
+        "attitude_error_rad": 0.005,
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -168,7 +172,8 @@
         "arm_receipt": "synthetic:arm",
         "latch_receipt": "synthetic:l",
         "retention_receipt": "synthetic:r",
-        "attitude_error_rad": 0.005
+        "attitude_error_rad": 0.005,
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -212,7 +217,8 @@
         "arm_receipt": "synthetic:arm",
         "latch_receipt": "synthetic:l",
         "retention_receipt": "synthetic:r",
-        "attitude_error_rad": 0.005
+        "attitude_error_rad": 0.005,
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -255,7 +261,8 @@
         "arm_receipt": "synthetic:arm",
         "latch_receipt": "synthetic:l",
         "retention_receipt": "synthetic:r",
-        "attitude_error_rad": 0.005
+        "attitude_error_rad": 0.005,
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -299,7 +306,8 @@
         "arm_receipt": "synthetic:arm",
         "latch_receipt": "synthetic:l",
         "retention_receipt": "synthetic:r",
-        "attitude_error_rad": 0.005
+        "attitude_error_rad": 0.005,
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -343,7 +351,8 @@
         "arm_receipt": "synthetic:arm",
         "latch_receipt": "synthetic:l",
         "retention_receipt": "synthetic:r",
-        "attitude_error_rad": 0.005
+        "attitude_error_rad": 0.005,
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -387,7 +396,8 @@
         "arm_receipt": "synthetic:arm",
         "latch_receipt": "synthetic:l",
         "retention_receipt": "synthetic:r",
-        "attitude_error_rad": 0.005
+        "attitude_error_rad": 0.005,
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -431,7 +441,8 @@
         "arm_receipt": "synthetic:arm",
         "latch_receipt": "synthetic:l",
         "retention_receipt": "synthetic:r",
-        "attitude_error_rad": 0.005
+        "attitude_error_rad": 0.005,
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -475,7 +486,8 @@
         "arm_receipt": "synthetic:arm",
         "latch_receipt": "synthetic:l",
         "retention_receipt": "synthetic:r",
-        "attitude_error_rad": 0.005
+        "attitude_error_rad": 0.005,
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -518,7 +530,8 @@
         "contact_receipt": "synthetic:c",
         "arm_receipt": "synthetic:arm",
         "latch_receipt": "synthetic:l",
-        "attitude_error_rad": 0.005
+        "attitude_error_rad": 0.005,
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -561,7 +574,8 @@
         "arm_receipt": "synthetic:arm",
         "latch_receipt": "synthetic:l",
         "retention_receipt": "synthetic:r",
-        "attitude_error_rad": 0.005
+        "attitude_error_rad": 0.005,
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -605,7 +619,8 @@
         "arm_receipt": "synthetic:arm",
         "latch_receipt": "synthetic:l",
         "retention_receipt": "synthetic:r",
-        "attitude_error_rad": 0.005
+        "attitude_error_rad": 0.005,
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -618,7 +633,8 @@
         "speed_mps": 0.02
       },
       "contact": {
-        "approach_receipt": "synthetic:approach-only"
+        "approach_receipt": "synthetic:approach-only",
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -662,7 +678,8 @@
         "arm_receipt": "synthetic:arm",
         "latch_receipt": "synthetic:l",
         "retention_receipt": "synthetic:r",
-        "attitude_error_rad": 0.005
+        "attitude_error_rad": 0.005,
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -706,7 +723,8 @@
         "contact_receipt": "synthetic:c",
         "arm_receipt": "synthetic:arm",
         "latch_receipt": "synthetic:l",
-        "retention_receipt": "synthetic:r"
+        "retention_receipt": "synthetic:r",
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -750,7 +768,8 @@
         "contact_receipt": "synthetic:c",
         "arm_receipt": "synthetic:arm",
         "latch_receipt": "synthetic:l",
-        "retention_receipt": "synthetic:r"
+        "retention_receipt": "synthetic:r",
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -794,7 +813,8 @@
         "contact_receipt": "synthetic:c",
         "arm_receipt": "synthetic:arm",
         "latch_receipt": "synthetic:l",
-        "retention_receipt": "synthetic:r"
+        "retention_receipt": "synthetic:r",
+        "client_id": "serviced-client-001"
       }
     },
     {
@@ -830,6 +850,96 @@
           0.015,
           0.015,
           0.015
+        ],
+        "latch_state": "engaged",
+        "retention_state": "passed",
+        "approach_receipt": "synthetic:approach-001",
+        "contact_receipt": "synthetic:contact-001",
+        "arm_receipt": "synthetic:arm-001",
+        "latch_receipt": "synthetic:latch-001",
+        "retention_receipt": "synthetic:retention-001",
+        "attitude_error_rad": 0.005,
+        "client_id": "serviced-client-001"
+      }
+    },
+    {
+      "id": "CLIENT_ID_MISMATCH",
+      "class": "positive_control",
+      "expected": "rejected",
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
+      "contact": {
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3,
+        "position_error_m": 0.003,
+        "relative_speed_mps": 0.015,
+        "relative_angular_rate_rad_s": 0.001,
+        "contact_impulse_ns": 0.4,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.06,
+        "joint_angles_rad": [
+          0.2,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.001,
+          -0.001,
+          0.002
+        ],
+        "latch_state": "engaged",
+        "retention_state": "passed",
+        "approach_receipt": "synthetic:approach-001",
+        "contact_receipt": "synthetic:contact-001",
+        "arm_receipt": "synthetic:arm-001",
+        "latch_receipt": "synthetic:latch-001",
+        "retention_receipt": "synthetic:retention-001",
+        "attitude_error_rad": 0.005,
+        "client_id": "unrelated-client"
+      }
+    },
+    {
+      "id": "CLIENT_ID_MISSING",
+      "class": "positive_control",
+      "expected": "indeterminate",
+      "approach": {
+        "outcome": "docked",
+        "distance_m": 0.8,
+        "speed_mps": 0.02
+      },
+      "contact": {
+        "frame_id": "TARGET-LVLH-001",
+        "epoch_tick": 1000,
+        "interface_id": "COOPERATIVE-CAPTURE-PORT-A",
+        "interface_revision": 3,
+        "position_error_m": 0.003,
+        "relative_speed_mps": 0.015,
+        "relative_angular_rate_rad_s": 0.001,
+        "contact_impulse_ns": 0.4,
+        "end_effector_error_m": 0.002,
+        "collision_clearance_m": 0.06,
+        "joint_angles_rad": [
+          0.2,
+          -0.4,
+          0.7,
+          0.1,
+          -0.3,
+          0.2,
+          0.1
+        ],
+        "bus_angular_velocity_rad_s": [
+          0.001,
+          -0.001,
+          0.002
         ],
         "latch_state": "engaged",
         "retention_state": "passed",
