@@ -96,6 +96,44 @@
       "claim_ceiling": "Calculated-label spectral-function prediction and candidate screening baseline. Its MAE must not be compared as if it were measured experimental Tc."
     },
     {
+      "baseline_id": "geisler-hcfield-2026",
+      "title": "Towards the discovery of high critical magnetic field superconductors",
+      "source": "https://doi.org/10.1038/s41524-026-02266-9",
+      "source_preprint": "https://arxiv.org/abs/2601.21044",
+      "source_version": "npj Computational Materials accepted article (published 2026-08-12); arXiv:2601.21044",
+      "source_date": "2026-08-12",
+      "label_authority": "calculated_first_principles",
+      "dataset": {
+        "approximate_superconductors": 7300,
+        "pairing_scope": "electron-phonon-mediated",
+        "calculated_properties": [
+          "Hc",
+          "Hc1",
+          "Hc2",
+          "coherence_length",
+          "London_penetration_depth",
+          "Ginzburg-Landau_parameter"
+        ],
+        "method": "alpha2F(omega) spectral functions and DFT Fermi surfaces combined with clean-limit Eliashberg theory; strong-coupling and electron-phonon mass-renormalization effects included",
+        "notes": "The article reports a consistent computational database covering approximately 7,300 superconductors. The accessible abstract identifies a Supplementary Information file, but this inventory has not yet verified a public machine-readable bulk data archive, immutable artifact digest, or code snapshot. Exact row count and conditions must be pinned before reproduction."
+      },
+      "published_findings": {
+        "qualitative": [
+          "unexpectedly large number of Type-I superconductors",
+          "larger unit cells generically support higher critical fields and Type-II behaviour",
+          "strong-coupling and electron-phonon mass-renormalization corrections are important for critical-field predictions"
+        ],
+        "numerical_prediction_metrics": "not transcribed into this registry; no unsupported score is inferred from the abstract"
+      },
+      "comparison_rules": {
+        "calculated_vs_measured": "Keep clean-limit Eliashberg outputs separate from measured Hc/Hc1/Hc2 observations.",
+        "material_state": "Retain structure, Fermi-surface provenance, spectral-function version, pressure, temperature, field orientation and clean/dirty-limit assumptions.",
+        "derived_quantities": "Do not silently equate microscopic xi0 with near-Tc xi_GL or mix independent penetration-depth estimators."
+      },
+      "reproduction_status": "not_reproduced",
+      "claim_ceiling": "Published first-principles / clean-limit Eliashberg critical-field database and qualitative findings; not an experimental Hc2 predictor and not independently replayed by this repository."
+    },
+    {
       "baseline_id": "htsc-2025",
       "title": "HTSC-2025: A benchmark dataset of ambient-pressure high-temperature superconductors for AI-driven critical temperature prediction",
       "doi": "10.1088/1674-1056/adf042",
