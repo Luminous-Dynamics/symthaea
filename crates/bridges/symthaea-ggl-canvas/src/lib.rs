@@ -190,6 +190,9 @@ fn svg_arc_path(primitive: &Value) -> AdapterResult<String> {
     if radius <= 0.0 {
         return fail("arc radius must be positive");
     }
+    to_f32(cx, "arc.cx")?;
+    to_f32(cy, "arc.cy")?;
+    to_f32(radius, "arc.radius")?;
     if sweep.abs() <= EPSILON {
         return fail("arc sweep must be non-zero");
     }
@@ -201,10 +204,14 @@ fn svg_arc_path(primitive: &Value) -> AdapterResult<String> {
     let point = |angle: f64| (cx + radius * angle.cos(), -(cy + radius * angle.sin()));
     let format = |value: f64| format!("{value:.12}");
     let (x0, y0) = point(start);
+    to_f32(x0, "arc.start_x")?;
+    to_f32(y0, "arc.start_y")?;
     let sweep_flag = if sweep < 0.0 { 1 } else { 0 };
 
     if (sweep.abs() - TAU).abs() <= 1.0e-9 {
         let (xm, ym) = point(start + sweep / 2.0);
+        to_f32(xm, "arc.mid_x")?;
+        to_f32(ym, "arc.mid_y")?;
         return Ok(format!(
             "M {} {} A {} {} 0 0 {} {} {} A {} {} 0 0 {} {} {}",
             format(x0), format(y0), format(radius), format(radius), sweep_flag,
@@ -214,6 +221,8 @@ fn svg_arc_path(primitive: &Value) -> AdapterResult<String> {
     }
 
     let (x1, y1) = point(start + sweep);
+    to_f32(x1, "arc.end_x")?;
+    to_f32(y1, "arc.end_y")?;
     let large_arc = if sweep.abs() > std::f64::consts::PI { 1 } else { 0 };
     Ok(format!(
         "M {} {} A {} {} 0 {} {} {} {}",
