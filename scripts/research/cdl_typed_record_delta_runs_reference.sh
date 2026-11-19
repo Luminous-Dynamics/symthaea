@@ -25,7 +25,7 @@ printf 'zstd_version='
 printf 'zstd_level=%s\n' "${LEVEL}"
 printf 'fixture,raw_bytes,state_delta_bytes,state_delta_record_run_bytes,zstd_raw_bytes,zstd_state_delta_bytes,zstd_record_run_bytes,run_vs_state_delta_pct,zstd_run_vs_zstd_delta_pct,zstd_run_vs_zstd_raw_pct\n'
 
-for name in sparse bursty noisy idle; do
+for name in sparse_grouped bursty_grouped noisy_grouped idle_grouped sparse_interleaved bursty_interleaved noisy_interleaved idle_interleaved; do
   raw="${OUT_DIR}/streams/${name}_raw.bin"
   delta="${OUT_DIR}/streams/${name}_state_delta.bin"
   runs="${OUT_DIR}/streams/${name}_state_delta_record_runs.bin"
