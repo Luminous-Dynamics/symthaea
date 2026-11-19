@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-ggl-canvas"
+version = "0.1.0"
+edition = "2024"
+description = "Typed GGL compiled-scene adapter for Symthaea Canvas"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+sha2.workspace = true
+symthaea-canvas = { path = "../../domains/symthaea-canvas" }
