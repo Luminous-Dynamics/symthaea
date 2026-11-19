@@ -61,6 +61,7 @@ pub enum NumericError {
     NumericOverflow,
     InvalidSegmentSize,
     UnsupportedFlags(u8),
+    SegmentPolicyMismatch { expected: u8, actual: u8 },
 }
 
 impl fmt::Display for NumericError {
@@ -84,6 +85,7 @@ impl fmt::Display for NumericError {
             Self::NumericOverflow => write!(f, "decoded value is outside the i16 range"),
             Self::InvalidSegmentSize => write!(f, "segment size must be positive"),
             Self::UnsupportedFlags(v) => write!(f, "unsupported numeric frame flags {v}"),
+            Self::SegmentPolicyMismatch { expected, actual } => write!(f, "segment policy mismatch: expected candidate {expected}, got {actual}"),
         }
     }
 }
