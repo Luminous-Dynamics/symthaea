@@ -1279,6 +1279,44 @@ mod tests {
     }
 
     #[test]
+    fn independent_verifier_counts_and_protects_a_separate_part_window() {
+        let source = source_score();
+        let mut edit_plan = plan(vec![operation("soften-answer", 0, 2)]);
+        edit_plan.protected_windows.push(ProtectedPartWindowV1 {
+            id: "protected-bass-opening".into(),
+            part_id: 20,
+            start: EditBeatV1 {
+                numerator: 0,
+                denominator: 1,
+            },
+            end: EditBeatV1 {
+                numerator: 1,
+                denominator: 1,
+            },
+        });
+        let mut result = apply_score_edit_plan(&source, &edit_plan, &digest())
+            .expect("editing another part must preserve the protected bass");
+        assert!(result.verification.verified);
+        assert_eq!(result.verification.protected_note_count, 1);
+        assert_eq!(result.verification.changed_note_count, 2);
+        assert_eq!(result.verification.preserved_note_count, 2);
+
+        result.candidate.notes[3].velocity = 0.3;
+        let report = verify_score_edit_candidate(
+            &source,
+            &result.candidate,
+            &edit_plan,
+            &result.receipt,
+            &digest(),
+        );
+        assert!(!report.verified);
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == ScoreEditVerificationIssueCodeV1::ProtectedNoteMutation
+                && issue.note_index == Some(3)
+        }));
+    }
+
+    #[test]
     fn independent_verifier_rejects_non_target_note_mutation() {
         let source = source_score();
         let edit_plan = plan(vec![operation("soften-answer", 0, 2)]);
