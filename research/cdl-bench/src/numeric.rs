@@ -59,6 +59,7 @@ pub enum NumericError {
     VarintOverflow,
     NonCanonicalVarint,
     NumericOverflow,
+    InvalidSegmentSize,
 }
 
 impl fmt::Display for NumericError {
@@ -80,6 +81,7 @@ impl fmt::Display for NumericError {
             Self::VarintOverflow => write!(f, "unsigned varint exceeds u32"),
             Self::NonCanonicalVarint => write!(f, "non-canonical overlong unsigned varint"),
             Self::NumericOverflow => write!(f, "decoded value is outside the i16 range"),
+            Self::InvalidSegmentSize => write!(f, "segment size must be positive"),
         }
     }
 }
