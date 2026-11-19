@@ -83,13 +83,13 @@ use the strict importer described in [RESULTS_SCHEMA.md](RESULTS_SCHEMA.md):
 
 ```sh
 cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin analyze-results -- \
-  discovery observations.csv note_density,mean_pitch coverage.csv effects.csv summary.csv
+  discovery observations.csv note_density,mean_pitch coverage.csv effects.csv summary.csv axis-invariance.csv
 ```
 
 The metric list is explicit so wholly absent metrics are visible as 81/81 missing
 within every expected block. Incomplete blocks remain in coverage reports and
 produce no contrast estimates; the command exits non-zero after writing reports.
-Missing, failed, and not-applicable values are never imputed as zero.
+Missing, failed, and not-applicable values are never imputed as zero. The axis-invariance report compares full-score digests across 27 matched slices for each control axis; fully not-applicable blocks remain explicit and do not fail the run.
 
 
 ## Composer execution adapter
