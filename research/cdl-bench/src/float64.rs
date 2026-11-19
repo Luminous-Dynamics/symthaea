@@ -425,6 +425,8 @@ const SEGMENTED_HEADER_LEN: usize = 32;
 const SEGMENT_SELECTION_POLICY_BEST_OF_EIGHT: u8 = 1;
 
 const SEGMENT_SELECTION_POLICY_HISTORICAL_COST: u8 = 2;
+const SEGMENT_SELECTION_POLICY_BUDGETED: u8 = 3;
+const MAX_PROBE_INTERVAL_LOG2: u8 = 7;
 const SEGMENT_CANDIDATES: usize = 8;
 
 fn encode_segment_candidate(
@@ -727,6 +729,204 @@ pub fn decompress_f64_online_selector(
     Ok(output)
 }
 
+
+fn validate_probe_interval(probe_interval: usize) -> Result<u8, NumericError> {
+    if probe_interval == 0
+        || !probe_interval.is_power_of_two()
+        || probe_interval > (1usize << MAX_PROBE_INTERVAL_LOG2)
+    {
+        return Err(NumericError::InvalidProbeInterval);
+    }
+    Ok(probe_interval.trailing_zeros() as u8)
+}
+
+/// Encode f64 chunks using sparse counterfactual candidate measurements.
+///
+/// The first chunk and then every Kth chunk are probe segments. On a probe,
+/// the encoder measures all eight candidate frame sizes, reusing the selected
+/// child frame's actual length; on other chunks it records only the selected
+/// candidate's actual length. Candidate means use per-candidate observation
+/// counts. The F64S flags byte stores log2(K), so the decoder reproduces the
+/// same probe schedule without a per-chunk selector side channel.
+pub fn compress_f64_budgeted_selector(
+    values: &[f64],
+    segment_size: usize,
+    probe_interval: usize,
+) -> Result<Vec<u8>, NumericError> {
+    if segment_size == 0 {
+        return Err(NumericError::InvalidSegmentSize);
+    }
+    let probe_log2 = validate_probe_interval(probe_interval)?;
+    let segment_count = if values.is_empty() {
+        0
+    } else {
+        (values.len() - 1) / segment_size + 1
+    };
+    let segment_size_u32 =
+        u32::try_from(segment_size).map_err(|_| NumericError::LengthOverflow)?;
+    let segment_count_u32 =
+        u32::try_from(segment_count).map_err(|_| NumericError::LengthOverflow)?;
+    let count = u64::try_from(values.len()).map_err(|_| NumericError::LengthOverflow)?;
+    let raw = raw_bits_bytes(values)?;
+
+    let mut frame = Vec::new();
+    frame.extend_from_slice(SEGMENTED_MAGIC);
+    frame.extend_from_slice(&SEGMENTED_VERSION.to_le_bytes());
+    frame.push(probe_log2);
+    frame.push(SEGMENT_SELECTION_POLICY_BUDGETED);
+    frame.extend_from_slice(&count.to_le_bytes());
+    frame.extend_from_slice(&segment_size_u32.to_le_bytes());
+    frame.extend_from_slice(&segment_count_u32.to_le_bytes());
+    frame.extend_from_slice(&crc32(&raw).to_le_bytes());
+    let header_crc = crc32(&frame);
+    frame.extend_from_slice(&header_crc.to_le_bytes());
+    debug_assert_eq!(frame.len(), SEGMENTED_HEADER_LEN);
+
+    let mut history = HistoricalSegmentCosts::default();
+    for (segment_index, segment) in values.chunks(segment_size).enumerate() {
+        let selected = history.choose();
+        let child = encode_segment_candidate(segment, selected)?;
+        frame.extend_from_slice(&child);
+
+        if segment_index % probe_interval == 0 {
+            history.observe_with_selected(segment, selected, child.len())?;
+        } else {
+            history.observe_candidate(selected, child.len())?;
+        }
+    }
+    Ok(frame)
+}
+
+/// Decode a sparse-probe F64S frame using the interval recorded in its flags
+/// byte. Candidate choices are derived only from prior chunk observations.
+pub fn decompress_f64_budgeted_selector(
+    frame: &[u8],
+    max_values: usize,
+) -> Result<Vec<f64>, NumericError> {
+    if frame.len() < SEGMENTED_HEADER_LEN {
+        return Err(NumericError::TruncatedHeader);
+    }
+    if &frame[0..4] != SEGMENTED_MAGIC {
+        return Err(NumericError::BadMagic);
+    }
+    let version = u16::from_le_bytes([frame[4], frame[5]]);
+    if version != SEGMENTED_VERSION {
+        return Err(NumericError::UnsupportedVersion(version));
+    }
+    let probe_log2 = frame[6];
+    if probe_log2 > MAX_PROBE_INTERVAL_LOG2 {
+        return Err(NumericError::InvalidProbeInterval);
+    }
+    if frame[7] != SEGMENT_SELECTION_POLICY_BUDGETED {
+        return Err(NumericError::UnsupportedTransform(frame[7]));
+    }
+    let probe_interval = 1usize
+        .checked_shl(probe_log2 as u32)
+        .ok_or(NumericError::InvalidProbeInterval)?;
+
+    let count = u64::from_le_bytes(
+        frame[8..16].try_into().map_err(|_| NumericError::LengthMismatch)?,
+    );
+    let segment_size = u32::from_le_bytes(
+        frame[16..20].try_into().map_err(|_| NumericError::LengthMismatch)?,
+    ) as usize;
+    let segment_count = u32::from_le_bytes(
+        frame[20..24].try_into().map_err(|_| NumericError::LengthMismatch)?,
+    ) as usize;
+    let raw_crc = u32::from_le_bytes(
+        frame[24..28].try_into().map_err(|_| NumericError::LengthMismatch)?,
+    );
+    let header_crc = u32::from_le_bytes(
+        frame[28..32].try_into().map_err(|_| NumericError::LengthMismatch)?,
+    );
+
+    if count > max_values as u64 {
+        return Err(NumericError::OutputLimitExceeded {
+            declared: count,
+            limit: max_values,
+        });
+    }
+    if segment_size == 0 {
+        return Err(NumericError::InvalidSegmentSize);
+    }
+    if crc32(&frame[..28]) != header_crc {
+        return Err(NumericError::ChecksumMismatch);
+    }
+
+    let count = usize::try_from(count).map_err(|_| NumericError::LengthOverflow)?;
+    let expected_segments = if count == 0 {
+        0
+    } else {
+        (count - 1) / segment_size + 1
+    };
+    if segment_count != expected_segments {
+        return Err(NumericError::LengthMismatch);
+    }
+
+    let mut output = Vec::with_capacity(count);
+    let mut cursor = SEGMENTED_HEADER_LEN;
+    let mut history = HistoricalSegmentCosts::default();
+
+    for segment_index in 0..segment_count {
+        let header_end = cursor
+            .checked_add(HEADER_LEN)
+            .ok_or(NumericError::LengthOverflow)?;
+        if header_end > frame.len() {
+            return Err(NumericError::TruncatedHeader);
+        }
+        let inner_len = u64::from_le_bytes(
+            frame[cursor + 16..cursor + 24]
+                .try_into()
+                .map_err(|_| NumericError::LengthMismatch)?,
+        );
+        let inner_len = usize::try_from(inner_len).map_err(|_| NumericError::LengthOverflow)?;
+        let child_len = HEADER_LEN
+            .checked_add(inner_len)
+            .ok_or(NumericError::LengthOverflow)?;
+        let child_end = cursor
+            .checked_add(child_len)
+            .ok_or(NumericError::LengthOverflow)?;
+        if child_end > frame.len() {
+            return Err(NumericError::LengthMismatch);
+        }
+
+        let expected_candidate = history.choose();
+        let child = &frame[cursor..child_end];
+        let actual_candidate = segment_candidate_from_child_header(child)?;
+        if actual_candidate != expected_candidate {
+            return Err(NumericError::SegmentPolicyMismatch {
+                expected: expected_candidate,
+                actual: actual_candidate,
+            });
+        }
+
+        let expected_values = if segment_index + 1 == segment_count {
+            count - output.len()
+        } else {
+            segment_size
+        };
+        let decoded = decompress_f64(child, expected_values)?;
+        if decoded.len() != expected_values {
+            return Err(NumericError::LengthMismatch);
+        }
+
+        if segment_index % probe_interval == 0 {
+            history.observe_with_selected(&decoded, expected_candidate, child.len())?;
+        } else {
+            history.observe_candidate(expected_candidate, child.len())?;
+        }
+        output.extend_from_slice(&decoded);
+        cursor = child_end;
+    }
+
+    if cursor != frame.len() || output.len() != count {
+        return Err(NumericError::LengthMismatch);
+    }
+    if crc32(&raw_bits_bytes(&output)?) != raw_crc {
+        return Err(NumericError::ChecksumMismatch);
+    }
+    Ok(output)
+}
 
 fn best_segment_candidate_frame(
     values: &[f64],
