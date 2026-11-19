@@ -2,7 +2,7 @@
 
 **Snapshot:** 2026-11-19  
 **Entries:** 21  
-**Claims:** 132
+**Claims:** 134
 
 > Source-classified evidence register. Manufacturer declarations, independent measurements, independent research recommendations, standards/programme criteria, local installation references and peer-reviewed results are kept distinct. Values marked unknown have not been inferred. This corpus is not a product certification or evidence of Aqua performance.
 
@@ -819,6 +819,8 @@
 | `clasp.sa.2022.proposed-preferred-wels-band` | proposed_preferred_flow_band | 4.5–6 L/min | independent_recommendation | proposed | mode=Proposed future South African water-efficiency labelling scheme; method=CLASP report recommendations section; flow band conditional on performance requirements; unknown: whether a national WELS scheme or rating band has since been adopted, final official test methods and thresholds | context_only: Independent research recommendation; not an enacted WELS rating or certification result. | [CLASP / Herman Strauss (Jackstra Solutions); laboratory testing by Omega Test House (Pty) Ltd](https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf); independent_market_study; 2022-10-01 |
 | `clasp.sa.2022.proposed-test-pressures` | proposed_test_pressure_points | At least 150 kPa and 300 kPa. | independent_recommendation | proposed | pressure points=150, 300 kPa; method=CLASP report recommendations; reference to AS 3662 / proposed SANS test framework; unknown: whether a current official SANS method has since incorporated these points | context_only: Independent research proposal for future local test standard; not proof of the current normative procedure. | [CLASP / Herman Strauss (Jackstra Solutions); laboratory testing by Omega Test House (Pty) Ltd](https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf); independent_market_study; 2022-10-01 |
 | `clasp.sa.2022.flow-regulator-design-principle` | pressure-compensating-design-principle | Prefer a pressure-compensating flow characteristic that maintains acceptable flow across the installation pressure envelope. | independent_recommendation | proposed | pressure points=150, 250, 300, 350, 500 kPa; method=CLASP report analysis and recommendations; comparison between fixed-orifice and pressure-compensating flow profiles; unknown: formal local acceptance criteria, task-quality equivalence under the full pressure envelope | context_only: Independent design recommendation from a limited flow-profile test; not a tested Aqua design rule. | [CLASP / Herman Strauss (Jackstra Solutions); laboratory testing by Omega Test House (Pty) Ltd](https://www.clasp.ngo/wp-content/uploads/2022/10/SA-Showerheads-Testing-Report.pdf); independent_market_study; 2022-10-01 |
+| `wrc.2025.clasp.pressure-compensating-flow-at-300kpa` | mean_flow_rate | 6.6 L/min | independent_market_sample | measured | pressure=300 kPa; method=Water Wheel September/October 2025 secondary summary of the October 2022 CLASP South African ShowerHeads Testing Report; sample n=19; datum=Dynamic showerhead supply pressure; unknown: secondary summary does not publish the row-level raw values, calculation/rounding basis for difference from the primary CLASP summary table; Secondary summary of the CLASP 19-head sample. The primary CLASP PDF table rounds its pressure-compensating group average to 7 L/min. | context_only: Secondary source representation of CLASP data; use alongside, not in place of, the primary CLASP PDF. | [Water Research Commission, The Water Wheel (September/October 2025)](https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf); independent_market_study; date not stated |
+| `wrc.2025.clasp.fixed-orifice-flow-at-300kpa` | mean_flow_rate | 24 L/min | independent_market_sample | measured | pressure=300 kPa; method=Water Wheel September/October 2025 secondary summary of the October 2022 CLASP South African ShowerHeads Testing Report; sample n=19; datum=Dynamic showerhead supply pressure; unknown: secondary summary does not publish the row-level raw values, calculation/rounding basis for difference from the primary CLASP summary table; Secondary summary of the CLASP 19-head sample. The primary CLASP PDF table rounds its fixed-orifice group average to 25 L/min. | context_only: Secondary source representation of CLASP data; use alongside, not in place of, the primary CLASP PDF. | [Water Research Commission, The Water Wheel (September/October 2025)](https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf); independent_market_study; date not stated |
 
 **Limitations — `clasp.sa.2022.sample-size`:**
 - Do not infer brand-level or SKU-level superiority; sample identities were anonymized.
@@ -861,6 +863,14 @@
 
 **Limitations — `clasp.sa.2022.flow-regulator-design-principle`:**
 - Do not assume pressure compensation alone guarantees spray quality, comfort or hygiene.
+
+**Limitations — `wrc.2025.clasp.pressure-compensating-flow-at-300kpa`:**
+- The primary CLASP PDF reports the same category as 7 L/min after rounding to the nearest 1 L/min.
+- Do not average the two summaries or infer a new exact mean without the raw group observations.
+
+**Limitations — `wrc.2025.clasp.fixed-orifice-flow-at-300kpa`:**
+- The primary CLASP PDF reports the same category as 25 L/min after rounding to the nearest 1 L/min.
+- Do not average the two summaries or infer a new exact mean without the raw group observations.
 
 ---
 
