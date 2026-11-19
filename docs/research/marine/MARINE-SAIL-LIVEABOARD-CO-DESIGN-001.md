@@ -96,10 +96,10 @@ No nameplate PV capacity is credited as delivered energy. No absent energy chann
 11. Water, food, waste or critical consumables become limiting before energy.
 12. Sail/steering sensor or actuator fault, failed transition, or reef/furl capability withdrawal.
 13. Traffic, visibility or weather pushes a candidate outside its ODD.
-17. A commercial or research router returns a route only after automatically relaxing a declared hard comfort limit; preserve it as BLOCKED for that hard-comfort mission rather than counting it as compliant.
-14. Common-cause failure affects purportedly redundant generation/sensing/communications.
-15. Configuration change or evidence revocation invalidates only dependent capabilities.
-16. No policy meets all gates: return no feasible mission plan, with reasons.
+14. A commercial or research router returns a route only after automatically relaxing a declared hard comfort limit; preserve it as BLOCKED for that hard-comfort mission rather than counting it as compliant.
+15. Common-cause failure affects purportedly redundant generation/sensing/communications.
+16. Configuration change or evidence revocation invalidates only dependent capabilities.
+17. No policy meets all gates: return no feasible mission plan, with reasons.
 
 ## 8. Metrics
 
@@ -172,3 +172,52 @@ A P0 pass means only that the composition contract, temporal-information rules a
 - Pair comparison checks identical mission/service/configuration/environment/gate inputs and excludes the sail-route candidate output from shared-input identity comparison.
 - Sixteen tests are authored for forecast-time leakage, impossible forecast timestamps, revoked evidence, missing resource dimensions, unresolved gates, malformed digests, evaluator-only truth, schema-version changes, mission mismatch and synthetic-only non-promotion.
 - Exact Rust formatting, compilation, Clippy and test execution are pending because the current environment does not expose a Rust toolchain. The workflow is path-scoped and will run independently; no CI pass is claimed.
+
+
+## 15. Frozen paired-mission adversarial corpus
+
+\`docs/research/marine/fixtures/marine-sail-liveaboard-corpus-0001.json\` is the versioned synthetic scenario registry; its contract is \`docs/research/marine/marine-sail-liveaboard-corpus.schema.json\`. The initial corpus freezes 16 cases and all seven arms S0-S6. It includes temporal forecast leakage, impossible issue/availability order, realized-truth leakage, failed or omitted hard gates, missing/duplicated autonomy dimensions, hard-comfort fallback, missing fallback provenance, malformed identity, and four paired-case mismatch/upper-bound controls.
+
+Each vector declares a command (\`audit_case\` or \`compare_pair\`), a mutation target, JSON-Pointer mutation operations, expected disposition and either expected finding codes or mismatched fields. The standalone \`validate-corpus\` Rust binary checks schema-relevant structure and required threat-family coverage, with six validator tests authored. It is deliberately called a *declarative corpus validator*: it does not yet apply every vector to the audit engine. Existing audit-engine unit tests exercise sixteen semantic falsifiers; P1 must connect the frozen vectors to executable mutation replay and assert every listed expected outcome.
+
+All policy arms use the same declared budget profile. S0-S5 are deployable information sets restricted to data available at each decision time. S6 is an evaluator-only perfect-foresight bound, never a competitor or deployable policy. Scenario identifiers and expected outputs are frozen; changing either requires a corpus-version increment and review.
+
+## 16. Benchmark design and SOTA comparison protocol
+
+### Information-matched baselines
+
+Compare against the strongest feasible, rights-cleared baseline at the exact craft and configuration:
+- S0 fixed conservative schedule;
+- S1 measured or independently validated polar-table VMG and conventional tack selection;
+- S2 transition-cost-aware VMG;
+- S3 a current commercial-grade weather route (PredictWind where licensed and reproducibly exportable) or a documented equivalent using the same forecast snapshot;
+- S4 the best reserve-aware route/service policy available from existing owners;
+- S5 this integrated advisory composition;
+- S6 a perfect-foresight evaluator bound used only to estimate the information gap and regret.
+
+PredictWind already provides fastest-time and comfort routing, wave-motion metrics, connected-data personalized AI polars and night adaptation. Its current help material says it attempts the requested comfort constraints and then reruns without them when no compliant route is found. Therefore the decisive test is not whether this programme can produce a route: it is whether hard/soft status is preserved, the constraints are never silently relaxed, and the route is compared on identical services, forecast information and craft inputs. Proprietary systems are not assumed to export all intermediate state; when they do not, mark the comparison incomplete rather than reverse-engineering or inventing missing evidence.
+
+ORC VPP is a recognized steady-state force-balance and speed-prediction reference for sailing performance. Reproduce/compare that narrow sailing layer before making hull or polar claims; it is not a liveaboard service-availability benchmark. Raymarine wind-angle steering and Garmin's sailboat autopilot hardware remain control-system comparators, not proof of an integrated autonomous mission planner.
+
+### Primary and secondary measures
+
+Report the complete resource vector and carrier-specific energy ledger. The preregistered headline efficiency measure is purchased-energy equivalent per delivered occupied berth-day, with shore electricity, fuel LHV, generator output and conversion losses disclosed separately. Never let that headline replace the carrier-specific ledger or hide water, food, waste, spares, reserve, service or comfort regressions.
+
+For robust performance, report paired mission regret and CVaR95 across held-out forecast-error/weather episodes, plus route/arrival regret, missed service floors, plan churn and p50/p95/p99 compute latency. Report all safety and service gates as counts and denominators, including unknown, abstained and infeasible cases.
+
+### Statistical protocol
+
+Freeze vessel/configuration, displacement/loading, occupancy, service profile, start/arrival constraints, forecast issue snapshots, policy versions and compute budgets before evaluation. Split by whole voyage or independent weather episode—not adjacent timesteps—so near-duplicate weather does not leak between development and evaluation. Stratify at minimum across three preregistered wind/sea-state, solar/load and forecast-error regimes. Determine sample size prospectively from pilot variance and a power analysis; do not call an arbitrary small scenario count statistically conclusive. Use paired trajectories and block-bootstrap confidence intervals by voyage/episode. Publish all strata, failures, abstentions, incomplete records and Pareto trade-offs.
+
+### Challenge targets, not achieved results
+
+- Zero false-feasible plans on the frozen negative controls.
+- Zero accepted hard-gate or essential-service violations; zero future-information leakage and zero unauthorized commands.
+- 100% exact mission/configuration/occupancy/service matching before a paired score is emitted.
+- 100% independent-oracle agreement on hand-checkable synthetic cases.
+- At least 10% lower purchased-energy equivalent per delivered occupied berth-day than the strongest information-matched deployable baseline, across at least three strata, with a conservative paired improvement interval above zero and no degradation in arrival, comfort, service continuity, resource autonomy or hard constraints.
+- At least 10% lower CVaR95 mission regret than the strongest reserve-aware baseline on held-out forecast-error episodes, with no increase in gate failures.
+- Runtime and compute-budget reporting at p50/p95/p99; quality improvement must be measured at equal information and declared compute budgets.
+
+The 10% figures are aspirational research gates, not forecasts or reported performance. Failure to beat the baseline is a valid result. If uncertainty intervals overlap, or the vendor baseline cannot be reproduced with equivalent information, report no demonstrated superiority.
+
