@@ -1545,11 +1545,15 @@ mod tests {
             }
         }
 
-        // A deliberately stale identity metric must reject at least one
-        // transformed action that is only orthogonal under the congruent metric.
-        assert!(transformed_by_id.values().any(|matrix| {
-            validate_metric_isometry(*matrix, euclidean).is_err()
-        }));
+        // A deliberately stale identity metric must reject some, but not
+        // all, transformed actions: identity and the central half-turn remain
+        // Euclidean-orthogonal while the dense conjugated reflections/rotations do not.
+        let stale_metric_failures = transformed_by_id
+            .values()
+            .filter(|matrix| validate_metric_isometry(**matrix, euclidean).is_err())
+            .count();
+        assert!(stale_metric_failures > 0);
+        assert!(stale_metric_failures < transformed_by_id.len());
     }
 
     #[test]
