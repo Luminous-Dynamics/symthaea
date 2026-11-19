@@ -973,6 +973,43 @@ mod tests {
     }
 
     #[test]
+    fn frozen_cost_benchmarks_report_c4_and_d4_against_full_scan() {
+        let (eb, ab, sb) = budgets();
+
+        let c4_problem = problem(cyclic_group(4, "C4"), vec![1, 2, 3]);
+        let SubgroupPolicyOutcomeV1::Identifiable(c4) =
+            compile_subgroup_policy(&c4_problem, eb, ab, sb).unwrap()
+        else {
+            panic!("complete C4 membership family should be identifiable");
+        };
+        let c4_full_scan: u64 = c4_problem.probes.iter()
+            .filter(|probe| probe.admissible)
+            .map(|probe| probe.cost)
+            .sum();
+        assert_eq!(c4_full_scan, 3);
+        assert_eq!(c4.adaptive_policy.root_worst_case_cost, 2);
+        assert_eq!(c4_full_scan / c4.adaptive_policy.root_worst_case_cost, 1);
+
+        let d4_problem = problem(dihedral_group(4, "D4"), (1..8).collect());
+        let SubgroupPolicyOutcomeV1::Identifiable(d4) =
+            compile_subgroup_policy(&d4_problem, eb, ab, sb).unwrap()
+        else {
+            panic!("complete D4 membership family should be identifiable");
+        };
+        let d4_full_scan: u64 = d4_problem.probes.iter()
+            .filter(|probe| probe.admissible)
+            .map(|probe| probe.cost)
+            .sum();
+        assert_eq!(d4_full_scan, 11);
+        assert_eq!(d4.adaptive_policy.root_worst_case_cost, 9);
+        let StaticBaselineV1::Exact(static_basis) = d4.static_baseline else {
+            panic!("D4 static basis fits the exact subset budget");
+        };
+        assert_eq!(static_basis.selected_cost, 10);
+        assert!(static_basis.optimality_certified);
+    }
+
+    #[test]
     fn incomplete_probe_family_returns_unresolved_pairs() {
         let p = problem(dihedral_group(4, "D4"), vec![1]);
         let (eb, ab, sb) = budgets();
