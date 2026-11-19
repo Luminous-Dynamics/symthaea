@@ -1362,11 +1362,8 @@ pub fn compile_contextual_multi_environment_quotient(
             candidate_ids: problem.candidate_ids.clone(),
             semantics: environment.semantics.clone(),
         };
-        let outcome = compile_quotient(
-            &search_problem,
-            &subgroup.restricted_action,
-            stage_budget,
-        )?;
+        let outcome =
+            compile_quotient(&search_problem, &subgroup.restricted_action, stage_budget)?;
         let CompileOutcomeV1::Authorized(certificate) = outcome else {
             return Err(QuotientErrorV1::TaskSemanticsMismatch);
         };
@@ -1400,11 +1397,8 @@ pub fn verify_contextual_multi_environment_quotient(
     {
         return Err(QuotientErrorV1::EnvironmentCertificateMismatch);
     }
-    let expected = compile_contextual_multi_environment_quotient(
-        problem,
-        ambient_action,
-        budget,
-    )?;
+    let expected =
+        compile_contextual_multi_environment_quotient(problem, ambient_action, budget)?;
     if *certificate != expected {
         return Err(QuotientErrorV1::EnvironmentCertificateMismatch);
     }
@@ -1486,14 +1480,20 @@ pub fn verify_multi_environment_quotient(
             &quotient.certificate,
             stage_budget,
         )?;
-        per_environment_orbit_counts.push((environment.environment_id.clone(), receipt.orbit_count));
+        per_environment_orbit_counts
+            .push((environment.environment_id.clone(), receipt.orbit_count));
     }
 
     Ok(MultiEnvironmentVerificationReceiptV1 {
         problem_id: problem.problem_id.clone(),
         environment_count: problem.environments.len(),
         ambient_group_order: ambient_action.group.multiplication.len(),
-        common_subgroup_order: certificate.common_subgroup.restricted_action.group.multiplication.len(),
+        common_subgroup_order: certificate
+            .common_subgroup
+            .restricted_action
+            .group
+            .multiplication
+            .len(),
         candidate_count: problem.candidate_ids.len(),
         per_environment_orbit_counts,
     })
