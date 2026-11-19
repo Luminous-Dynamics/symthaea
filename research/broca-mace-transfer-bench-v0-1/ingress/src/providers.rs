@@ -83,6 +83,8 @@ pub enum ProviderTraceReject {
 pub struct ProviderTraceEvent {
     pub provider: Provider,
     pub session_id: String,
+    pub thread_id: Option<String>,
+    /// Sequence within the provider thread/session event stream.
     pub sequence: u64,
     // Importer capture time, not underlying action or outcome time.
     pub captured_at_ms: u64,
@@ -227,7 +229,7 @@ pub fn normalize_capture_jsonl(
 
     let mut events = Vec::new();
     let mut seen = BTreeMap::<String, String>::new();
-    let mut last_sequence: Option<u64> = None;
+    let mut last_sequence_by_thread = BTreeMap::<Option<String>, u64>::new();
     let mut duplicate_event_count = 0usize;
 
     for (line_index, line) in input.lines().enumerate() {
@@ -253,6 +255,9 @@ pub fn normalize_capture_jsonl(
             .get("sequence")
             .and_then(Value::as_u64)
             .ok_or(ProviderTraceReject::InvalidSequence(line_number))?;
+        let thread_id = string_at(&envelope, "thread_id")
+            .or_else(|| string_at(&envelope, "stream_id"))
+            .map(str::to_owned);
         let captured_at_ms = envelope
             .get("captured_at_ms")
             .and_then(Value::as_u64)
@@ -281,14 +286,16 @@ pub fn normalize_capture_jsonl(
                     .to_owned(),
             ),
             Provider::OpenAiAgentsSdk => string_at(&event, "input_id")
+                .or_else(|| string_at(event.get("raw_item").unwrap_or(&event), "input_id"))
                 .or_else(|| string_at(&envelope, "input_id"))
                 .filter(|value| !value.is_empty())
                 .map(str::to_owned),
         };
+        let stream_identity = thread_id.as_deref().unwrap_or("session");
         let identity = native_event_id
             .as_ref()
-            .map(|id| format!("native:{id}"))
-            .unwrap_or_else(|| format!("sequence:{sequence}"));
+            .map(|id| format!("{stream_identity}:native:{id}"))
+            .unwrap_or_else(|| format!("{stream_identity}:sequence:{sequence}"));
         let canonical_event = serde_json::to_vec(&event)
             .map_err(|_| ProviderTraceReject::InvalidEnvelope(line_number))?;
         let event_payload_sha256 = sha256_hex(&canonical_event);
@@ -298,21 +305,26 @@ pub fn normalize_capture_jsonl(
                 return Err(ProviderTraceReject::ConflictingDuplicateIdentity(line_number));
             }
             duplicate_event_count += 1;
-            if last_sequence.is_none_or(|previous| sequence > previous) {
-                last_sequence = Some(sequence);
+            let last = last_sequence_by_thread.get(&thread_id).copied();
+            if last.is_none_or(|previous| sequence > previous) {
+                last_sequence_by_thread.insert(thread_id.clone(), sequence);
             }
             continue;
         }
 
-        if last_sequence.is_some_and(|previous| sequence <= previous) {
+        if last_sequence_by_thread
+            .get(&thread_id)
+            .is_some_and(|previous| sequence <= *previous)
+        {
             return Err(ProviderTraceReject::NonMonotonicSequence(line_number));
         }
-        last_sequence = Some(sequence);
+        last_sequence_by_thread.insert(thread_id.clone(), sequence);
         seen.insert(identity, event_payload_sha256.clone());
 
         events.push(ProviderTraceEvent {
             provider,
             session_id: expected_session_id.to_owned(),
+            thread_id,
             sequence,
             captured_at_ms,
             native_event_id,
@@ -350,6 +362,8 @@ impl ProviderTraceBatch {
                 .map_err(|_| ProviderTraceReject::SequenceOverflow)?;
             let payload = json!({
                 "provider": event.provider.as_str(),
+                "provider_thread_id": event.thread_id,
+                "provider_sequence": event.sequence,
                 "provider_event_class": event.class.as_str(),
                 "native_event_id": event.native_event_id,
                 "native_event_type": event.native_event_type,
@@ -566,6 +580,82 @@ mod tests {
             ).unwrap_err(),
             ProviderTraceReject::NonMonotonicSequence(2)
         );
+    }
+
+    #[test]
+    fn thread_sequences_are_independent_and_mace_export_uses_import_order() {
+        let input = [
+            json!({
+                "schema_version": 1,
+                "session_id": "anthropic",
+                "thread_id": "primary",
+                "sequence": 1,
+                "captured_at_ms": 100,
+                "event": {"id": "primary-1", "type": "agent.message"}
+            }).to_string(),
+            json!({
+                "schema_version": 1,
+                "session_id": "anthropic",
+                "thread_id": "child",
+                "sequence": 1,
+                "captured_at_ms": 101,
+                "event": {"id": "child-1", "type": "agent.message"}
+            }).to_string(),
+            json!({
+                "schema_version": 1,
+                "session_id": "anthropic",
+                "thread_id": "primary",
+                "sequence": 2,
+                "captured_at_ms": 102,
+                "event": {"id": "primary-2", "type": "agent.message"}
+            }).to_string(),
+        ].join("\n");
+        let batch = normalize_capture_jsonl(
+            Provider::AnthropicManagedAgents,
+            "anthropic",
+            &input
+        ).unwrap();
+
+        assert_eq!(batch.events[0].sequence, 1);
+        assert_eq!(batch.events[1].sequence, 1);
+        assert_eq!(batch.events[2].sequence, 2);
+        assert_eq!(batch.events[0].thread_id.as_deref(), Some("primary"));
+        assert_eq!(batch.events[1].thread_id.as_deref(), Some("child"));
+
+        let normalized = batch.to_mace_jsonl().unwrap();
+        let records: Vec<Value> = normalized
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(records[0]["sequence"], 1);
+        assert_eq!(records[1]["sequence"], 2);
+        assert_eq!(records[2]["sequence"], 3);
+        assert_eq!(records[1]["payload"]["provider_sequence"], 1);
+        assert_eq!(records[1]["payload"]["provider_thread_id"], "child");
+    }
+
+    #[test]
+    fn openai_raw_item_input_id_is_used_for_reconnect_deduplication() {
+        let event = json!({
+            "type": "input_item",
+            "raw_item": {
+                "input_id": "input-123",
+                "role": "user",
+                "content": "hello"
+            }
+        });
+        let input = [
+            envelope("openai", 1, 100, event.clone()),
+            envelope("openai", 1, 101, event)
+        ].join("\n");
+        let batch = normalize_capture_jsonl(
+            Provider::OpenAiAgentsSdk,
+            "openai",
+            &input
+        ).unwrap();
+        assert_eq!(batch.events.len(), 1);
+        assert_eq!(batch.duplicate_event_count, 1);
+        assert_eq!(batch.events[0].native_event_id.as_deref(), Some("input-123"));
     }
 
     #[test]

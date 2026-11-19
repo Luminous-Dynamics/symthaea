@@ -267,3 +267,8 @@ the trace-format interoperability gap without weakening the execution,
 outcome, source/calibration and consolidation receipt boundaries. These are
 version-specific research adapters and require golden capture fixtures and
 requalification when provider event schemas change.
+
+
+### Multi-agent thread ordering
+
+The provider capture envelope accepts an optional thread_id (or stream_id). Sequence numbers are validated within each thread, not globally across concurrently executing subagents. The normalized event retains provider_sequence and provider_thread_id. MACE's raw JSONL requires one ingest sequence, so the exporter assigns a separate import-order sequence while preserving the provider's per-thread ordering metadata. This records a partial order without claiming a causal order between independent threads.
