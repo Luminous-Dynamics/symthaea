@@ -314,6 +314,7 @@ impl Model {
         Ok(transformed)
     }
 
+    #[cfg(test)]
     fn independently_rotated_mode(&self, mode_index: usize, chi: &[f64]) -> Result<Self, String> {
         if chi.len() != self.length || mode_index >= self.modes.len() {
             return Err("invalid independent component rotation".to_owned());
