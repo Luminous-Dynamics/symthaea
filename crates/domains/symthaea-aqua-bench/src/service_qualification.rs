@@ -956,6 +956,7 @@ mod tests {
         let profile = profile(QualificationClaim::FunctionalService);
         let mut record = record("candidate-01", &profile, AssessmentOutcome::Pass);
         record.assessments.push(assessment(
+            "candidate-01",
             QualificationDomain::AccessibilityAndUsability,
             AssessmentOutcome::Pass,
             &profile,
