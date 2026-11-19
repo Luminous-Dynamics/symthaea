@@ -186,15 +186,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // This is a regression sanity gate, not a formal proof or a substitute for
     // a calibrated campaign. The tolerance allows Monte Carlo variation.
     if single_upper > ALPHA + 0.02 || mixture_upper > ALPHA + 0.02 {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        return Err(std::io::Error::other(
             "predictable null crossing rate exceeded the calibration tolerance",
         )
         .into());
     }
     if leaked_lower < 0.50 {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        return Err(std::io::Error::other(
             "post-hoc leakage control did not show material false promotion",
         )
         .into());
