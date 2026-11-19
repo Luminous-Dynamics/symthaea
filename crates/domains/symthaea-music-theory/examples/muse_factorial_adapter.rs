@@ -479,6 +479,52 @@ fn categorical_entropy_bits(counts: &[usize], total: usize) -> Option<f64> {
     )
 }
 
+fn semantic_score_sha256(score: &Score) -> Result<String, String> {
+    let mut events: Vec<(u16, u8, u8, i64, i64, i64, i64, u32, u8, u32)> = score
+        .notes
+        .iter()
+        .map(|note| {
+            let role = match note.role {
+                VoiceRole::Melody => 0,
+                VoiceRole::Harmony => 1,
+                VoiceRole::Bass => 2,
+                VoiceRole::CounterMelody => 3,
+            };
+            let emphasis = match note.emphasis {
+                Emphasis::Normal => 0,
+                Emphasis::Climax => 1,
+                Emphasis::Cadential => 2,
+                Emphasis::PhraseStart => 3,
+            };
+            (
+                note.part.0,
+                role,
+                note.pitch.midi(),
+                note.onset.num(),
+                note.onset.den(),
+                note.duration.num(),
+                note.duration.den(),
+                note.velocity.to_bits(),
+                emphasis,
+                note.section_intensity.to_bits(),
+            )
+        })
+        .collect();
+    events.sort();
+
+    let canonical = (
+        score.key,
+        score.tempo_bpm.to_bits(),
+        score.meter,
+        score.total_beats.num(),
+        score.total_beats.den(),
+        events,
+    );
+    let bytes = to_vec(&canonical)
+        .map_err(|error| format!("cannot serialize canonical score events: {error}"))?;
+    Ok(sha256_hex(&bytes))
+}
+
 fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
@@ -515,6 +561,7 @@ fn compose_case(
     let artifact_bytes = to_vec(&score)
         .map_err(|error| format!("cannot serialize symbolic score: {error}"))?;
     let artifact_sha256 = sha256_hex(&artifact_bytes);
+    let semantic_sha256 = semantic_score_sha256(&score)?;
     let current_fingerprint =
         symthaea_music_theory::fingerprint::structural_fingerprint(&score, &realization.form);
     let current_exact_fingerprint =
@@ -777,7 +824,7 @@ fn compose_case(
     ];
 
     let note = format!(
-        "source_commit={source_commit};composer_reference_commit={};manifest_sha256={manifest_sha256};engine_version={};grammar_family={:?};support_axes={};tonality={:?};plan_kind={plan_kind};universal_fatal={universal_fatal_count};style_fatal={};warnings={warning_count};validation_valid={};exact_fingerprint={current_exact_fingerprint:016x};reference_exact_fingerprint={:016x}",
+        "source_commit={source_commit};composer_reference_commit={};manifest_sha256={manifest_sha256};engine_version={};grammar_family={:?};support_axes={};tonality={:?};plan_kind={plan_kind};universal_fatal={universal_fatal_count};style_fatal={};warnings={warning_count};validation_valid={};artifact_sha256={artifact_sha256};semantic_sha256={semantic_sha256};exact_fingerprint={current_exact_fingerprint:016x};reference_exact_fingerprint={:016x}",
         PINNED_COMPOSER_SOURCE_COMMIT,
         symthaea_music_theory::MUSIC_THEORY_ENGINE_VERSION,
         case.style.grammar_family(),
@@ -1178,6 +1225,40 @@ mod tests {
             assert!(!path.is_empty());
             assert!(is_commit_sha(blob));
         }
+    }
+
+    #[test]
+    fn semantic_digest_is_invariant_to_note_vector_order_but_binds_note_content() {
+        let mut score = Score::new(
+            symthaea_music_theory::Key::major(PitchClass::C),
+            120.0,
+            4,
+        );
+        score.push(symthaea_music_theory::ScoreNote {
+            part: symthaea_music_theory::PartId(1),
+            pitch: symthaea_music_theory::Pitch::from_midi(60),
+            onset: symthaea_music_theory::Duration::new(0, 1),
+            duration: symthaea_music_theory::Duration::new(1, 1),
+            velocity: 0.7,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::PhraseStart,
+            section_intensity: 0.8,
+        });
+        score.push(symthaea_music_theory::ScoreNote {
+            part: symthaea_music_theory::PartId(2),
+            pitch: symthaea_music_theory::Pitch::from_midi(48),
+            onset: symthaea_music_theory::Duration::new(0, 1),
+            duration: symthaea_music_theory::Duration::new(2, 1),
+            velocity: 0.5,
+            role: VoiceRole::Bass,
+            emphasis: Emphasis::Normal,
+            section_intensity: 0.6,
+        });
+        let digest = semantic_score_sha256(&score).unwrap();
+        score.notes.reverse();
+        assert_eq!(semantic_score_sha256(&score).unwrap(), digest);
+        score.notes[0].velocity = 0.9;
+        assert_ne!(semantic_score_sha256(&score).unwrap(), digest);
     }
 
     #[test]
