@@ -253,7 +253,14 @@ fn parse_records(input: &str) -> Result<Vec<InputRecord>, String> {
         *first = first.trim_start_matches('\u{feff}').to_string();
     }
 
-    let allowed = ["case_id", "metric", "status", "value", "artifact_sha256", "note"];
+    let allowed = [
+        "case_id",
+        "metric",
+        "status",
+        "value",
+        "artifact_sha256",
+        "note",
+    ];
     let required = ["case_id", "metric", "status", "value", "artifact_sha256"];
     let mut positions = HashMap::new();
     for (index, name) in header.iter().enumerate() {
@@ -490,13 +497,7 @@ fn analyze(
             }
         }
 
-        let status = disposition(
-            block_cases.len(),
-            observed,
-            not_applicable,
-            failed,
-            missing,
-        );
+        let status = disposition(block_cases.len(), observed, not_applicable, failed, missing);
         if status != "complete" {
             incomplete_blocks += 1;
         } else {
@@ -616,8 +617,7 @@ fn coverage_csv(rows: &[CoverageRow]) -> String {
 }
 
 fn effects_csv(rows: &[EffectRow]) -> String {
-    let mut output =
-        String::from("cohort,style,seed,metric,term,order,estimate\n");
+    let mut output = String::from("cohort,style,seed,metric,term,order,estimate\n");
     for row in rows {
         output.push_str(&csv_record(&[
             row.cohort.clone(),
@@ -633,9 +633,8 @@ fn effects_csv(rows: &[EffectRow]) -> String {
 }
 
 fn summary_csv(rows: &[SummaryRow]) -> String {
-    let mut output = String::from(
-        "cohort,style,metric,term,order,seed_count,mean,sample_sd,minimum,maximum\n",
-    );
+    let mut output =
+        String::from("cohort,style,metric,term,order,seed_count,mean,sample_sd,minimum,maximum\n");
     for row in rows {
         output.push_str(&csv_record(&[
             row.cohort.clone(),
@@ -645,7 +644,9 @@ fn summary_csv(rows: &[SummaryRow]) -> String {
             row.order.to_string(),
             row.seed_count.to_string(),
             row.mean.to_string(),
-            row.sample_sd.map(|value| value.to_string()).unwrap_or_default(),
+            row.sample_sd
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
             row.minimum.to_string(),
             row.maximum.to_string(),
         ]));
@@ -763,8 +764,9 @@ mod tests {
 
     #[test]
     fn parser_supports_quoted_commas_newlines_and_escaped_quotes() {
-        let parsed = parse_csv("a,b\r\n\"x,y\",\"line one\r\nline two\"\r\n\"say \"\"hi\"\"\",z\r\n")
-            .unwrap();
+        let parsed =
+            parse_csv("a,b\r\n\"x,y\",\"line one\r\nline two\"\r\n\"say \"\"hi\"\"\",z\r\n")
+                .unwrap();
         assert_eq!(parsed.len(), 3);
         assert_eq!(parsed[0], vec!["a", "b"]);
         assert_eq!(parsed[1], vec!["x,y", "line one\r\nline two"]);
@@ -845,7 +847,11 @@ mod tests {
         let analysis = analyze(&cases, &["response".to_string()], &records).unwrap();
         assert_eq!(analysis.coverage[0].failed, 1);
         assert_eq!(analysis.coverage[0].missing, 0);
-        assert!(analysis.coverage[0].notes.contains("composer returned an error"));
+        assert!(
+            analysis.coverage[0]
+                .notes
+                .contains("composer returned an error")
+        );
         assert_eq!(analysis.effects.len(), 0);
     }
 
@@ -884,7 +890,10 @@ mod tests {
             "DISCOVERY__Classical__s90210__v0a0e0b0",
             "b".repeat(64)
         );
-        assert_eq!(parse_records(&(header.to_string() + &good)).unwrap().len(), 1);
+        assert_eq!(
+            parse_records(&(header.to_string() + &good)).unwrap().len(),
+            1
+        );
 
         let bad_digest = format!(
             "{},response,observed,1.25,short,broken\n",
