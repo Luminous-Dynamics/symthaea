@@ -65,6 +65,7 @@ pub struct ConformalUpdate {
 pub struct ConformalObservationReceipt {
     pub schema_version: u32,
     pub candidate_id: String,
+    pub alpha: f64,
     pub observation_id: String,
     pub decision_digest: String,
     pub score_id: String,
@@ -81,6 +82,7 @@ impl ConformalObservationReceipt {
         let mut bytes = b"luminous.falsification.conformal_receipt.v1\0".to_vec();
         bytes.extend_from_slice(&self.schema_version.to_le_bytes());
         append_string(&mut bytes, &self.candidate_id);
+        bytes.extend_from_slice(&self.alpha.to_bits().to_le_bytes());
         append_string(&mut bytes, &self.observation_id);
         append_string(&mut bytes, &self.decision_digest);
         append_string(&mut bytes, &self.score_id);
@@ -260,10 +262,12 @@ impl FiniteReferenceConformalEProcess {
             .iter()
             .map(|score| score.ln())
             .collect::<Vec<_>>();
-        let maximum_log_score = reference_log_scores
+        let maximum_reference_log_score = reference_log_scores
             .iter()
             .copied()
-            .fold(observed_log_score, f64::max);
+            .reduce(f64::max)
+            .ok_or(ConformalError::InvalidReferenceCount)?;
+        let maximum_log_score = observed_log_score.max(maximum_reference_log_score);
         let scaled_sum = (observed_log_score - maximum_log_score).exp()
             + reference_log_scores
                 .iter()
@@ -300,6 +304,7 @@ impl FiniteReferenceConformalEProcess {
         let receipt = ConformalObservationReceipt {
             schema_version: 1,
             candidate_id: self.candidate_id.clone(),
+            alpha: self.alpha,
             observation_id: observation_id.to_owned(),
             decision_digest: decision_digest.to_owned(),
             score_id: score_id.to_owned(),
@@ -348,7 +353,10 @@ pub fn verify_conformal_transcript(
     validate_identifier(candidate_id)?;
     let mut process = FiniteReferenceConformalEProcess::new(candidate_id, alpha)?;
     for receipt in receipts {
-        if receipt.schema_version != 1 || receipt.candidate_id != candidate_id {
+        if receipt.schema_version != 1
+            || receipt.candidate_id != candidate_id
+            || receipt.alpha.to_bits() != alpha.to_bits()
+        {
             return Err(ConformalError::ReceiptCandidateMismatch);
         }
         process.commit_score(
@@ -507,17 +515,41 @@ mod tests {
     fn running_maximum_is_not_erased_by_later_low_conformal_factors() {
         let mut process =
             FiniteReferenceConformalEProcess::new("candidate-symmetry", 0.05).unwrap();
+        let mut first_crossing = None;
+        for step in 0..3 {
+            let observation_id = format!("obs-{step}");
+            let decision_digest = format!("decision-{step}");
+            let reference_batch_id = format!("refs-{step}");
+            process
+                .commit_score(
+                    observation_id.clone(),
+                    decision_digest.clone(),
+                    "score-v1",
+                    reference_batch_id.clone(),
+                    2,
+                )
+                .unwrap();
+            first_crossing = Some(
+                process
+                    .observe(
+                        &observation_id,
+                        &decision_digest,
+                        "score-v1",
+                        &reference_batch_id,
+                        100.0,
+                        &[1.0, 1.0],
+                    )
+                    .unwrap(),
+            );
+        }
+        let first = first_crossing.expect("three conformal updates were executed");
+        assert!(first.update.crossed_alpha);
+
         process
-            .commit_score("obs-1", "decision-1", "score-v1", "refs-1", 2)
-            .unwrap();
-        let first = process
-            .observe("obs-1", "decision-1", "score-v1", "refs-1", 100.0, &[1.0, 1.0])
-            .unwrap();
-        process
-            .commit_score("obs-2", "decision-2", "score-v1", "refs-2", 2)
+            .commit_score("obs-3", "decision-3", "score-v1", "refs-3", 2)
             .unwrap();
         let second = process
-            .observe("obs-2", "decision-2", "score-v1", "refs-2", 0.01, &[10.0, 10.0])
+            .observe("obs-3", "decision-3", "score-v1", "refs-3", 0.01, &[10.0, 10.0])
             .unwrap();
         assert!(second.update.log_e_value < first.update.log_e_value);
         assert_eq!(
