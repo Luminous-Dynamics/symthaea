@@ -30,7 +30,7 @@ example under /tmp) so they do not contaminate the next run.
 Analyze the resulting observations. The metric registry must be explicit:
 
     METRICS='score_note_count,score_total_beats,score_total_seconds,score_tempo_bpm,score_notes_per_beat,score_mean_pitch_midi,score_pitch_span_semitones,score_pitch_stddev_midi,score_mean_velocity,score_velocity_stddev,score_mean_section_intensity,score_mean_note_duration_beats,score_assigned_part_fraction,score_universal_fatal_count,score_style_fatal_count,score_warning_count,score_universal_valid,score_full_validation_valid,score_pitch_class_diversity,score_pitch_class_entropy_bits,score_melody_mean_interval_semitones,score_melody_step_fraction,score_melody_leap_fraction,score_onset_ioi_stddev_beats,score_offbeat_onset_fraction,score_voice_role_entropy_bits,score_duration_variety_count,score_section_intensity_stddev,identity_score_meter_beats,score_distinct_midi_pitches,identity_score_key_tonic_pc,score_key_major_indicator,score_key_minor_indicator,score_key_modal_indicator,score_emphasis_normal_count,score_emphasis_climax_count,score_emphasis_cadential_count,score_emphasis_phrase_start_count,score_form_section_count,score_plan_requested_bars,score_plan_realized_bars,score_fingerprint_form_distance,score_fingerprint_harmony_distance,score_fingerprint_orchestration_distance,score_fingerprint_rhythm_distance,score_fingerprint_contour_distance,score_fingerprint_tempo_meter_distance,score_fingerprint_pitch_class_distance,score_fingerprint_interval_distance,score_fingerprint_chord_quality_distance,score_fingerprint_cadence_distance,score_fingerprint_motif_distance,identity_exact_fingerprint_high32,identity_exact_fingerprint_low32'
-    cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin analyze-results -- discovery /tmp/muse-observations.csv "$METRICS" coverage.csv effects.csv summary.csv
+    cargo run --manifest-path tools/muse-factorial-audit/Cargo.toml --bin analyze-results -- discovery /tmp/muse-observations.csv "$METRICS" coverage.csv effects.csv summary.csv axis-invariance.csv
 
 The root Cargo workspace currently needs the separate unmanifested-member
 exclusion repair before this example can be compiled through Cargo. Do not
@@ -138,10 +138,14 @@ measure listener preference, certify legal rights, or establish that the
 composer's metric definitions are perceptually valid.
 
 Any not_applicable or failed value suppresses effect estimates for that
-style/seed/metric block in analyze-results. The analyzer still writes complete
-coverage reports and returns non-zero for incomplete blocks. A command exit of
-zero from the adapter only means that no composer execution failed; it does not
-mean every metric block is eligible for estimation.
+style/seed/metric block in analyze-results. A block with 81 explicit
+not_applicable rows is retained as not_applicable and does not fail the run;
+mixed not_applicable/observed, failed, or missing rows remain incomplete and
+cause a non-zero analyzer exit after writing all reports. The axis-invariance
+report independently compares exact score digests over 27 matched slices per
+factor and marks declared unsupported axes as negative controls. A command exit
+of zero from the adapter only means that no composer execution failed; it does
+not mean every metric block is eligible for effect estimation.
 
 ## Qualification boundary
 
