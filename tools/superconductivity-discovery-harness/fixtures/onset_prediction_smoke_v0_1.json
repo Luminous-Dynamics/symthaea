@@ -1,0 +1,100 @@
+{
+  "contract": "SC-ONSET-PREDICTION-AUDIT-0.1",
+  "benchmark_id": "synthetic_interval_censored_onset_calibration_001",
+  "fixture_only": true,
+  "temperature_unit": "kelvin",
+  "source_reference": "Method inspiration only: https://arxiv.org/abs/2611.23527",
+  "pairs": [
+    {
+      "pair_id": "synthetic_pair_01",
+      "precursor_ids": ["synthetic_precursor_a", "synthetic_precursor_b"],
+      "evidence_kind": "left_censored",
+      "lower_bound_k": null,
+      "upper_bound_k": 900,
+      "exact_onset_k": null,
+      "evidence_ids": ["synthetic_xrd_trial_01"],
+      "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "pair_id": "synthetic_pair_02",
+      "precursor_ids": ["synthetic_precursor_c", "synthetic_precursor_d"],
+      "evidence_kind": "right_censored",
+      "lower_bound_k": 1150,
+      "upper_bound_k": null,
+      "exact_onset_k": null,
+      "evidence_ids": ["synthetic_xrd_trial_02"],
+      "raw_data_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "pair_id": "synthetic_pair_03",
+      "precursor_ids": ["synthetic_precursor_e", "synthetic_precursor_f"],
+      "evidence_kind": "interval_censored",
+      "lower_bound_k": 700,
+      "upper_bound_k": 850,
+      "exact_onset_k": null,
+      "evidence_ids": ["synthetic_xrd_trial_03_low", "synthetic_xrd_trial_03_high"],
+      "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "pair_id": "synthetic_pair_04",
+      "precursor_ids": ["synthetic_precursor_g", "synthetic_precursor_h"],
+      "evidence_kind": "exact",
+      "lower_bound_k": null,
+      "upper_bound_k": null,
+      "exact_onset_k": 650,
+      "evidence_ids": ["synthetic_in_situ_xrd_04"],
+      "raw_data_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "pair_id": "synthetic_pair_05",
+      "precursor_ids": ["synthetic_precursor_i", "synthetic_precursor_j"],
+      "evidence_kind": "exact",
+      "lower_bound_k": null,
+      "upper_bound_k": null,
+      "exact_onset_k": 930,
+      "evidence_ids": ["synthetic_in_situ_xrd_05"],
+      "raw_data_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "pair_id": "synthetic_pair_06",
+      "precursor_ids": ["synthetic_precursor_k", "synthetic_precursor_l"],
+      "evidence_kind": "left_censored",
+      "lower_bound_k": null,
+      "upper_bound_k": 520,
+      "exact_onset_k": null,
+      "evidence_ids": ["synthetic_xrd_trial_06"],
+      "raw_data_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+  ],
+  "models": [
+    {
+      "model_id": "synthetic_compact_aft",
+      "model_artifact_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "uncertainty_method": "synthetic_predeclared_log_normal_scale; not fitted to external data",
+      "training_pair_ids": ["synthetic_training_pair_101", "synthetic_training_pair_102"],
+      "predictions": [
+        {"pair_id": "synthetic_pair_01", "median_onset_k": 760, "log_sigma": 0.15},
+        {"pair_id": "synthetic_pair_02", "median_onset_k": 1400, "log_sigma": 0.15},
+        {"pair_id": "synthetic_pair_03", "median_onset_k": 770, "log_sigma": 0.15},
+        {"pair_id": "synthetic_pair_04", "median_onset_k": 670, "log_sigma": 0.12},
+        {"pair_id": "synthetic_pair_05", "median_onset_k": 890, "log_sigma": 0.12},
+        {"pair_id": "synthetic_pair_06", "median_onset_k": 500, "log_sigma": 0.15}
+      ]
+    },
+    {
+      "model_id": "synthetic_tammann_reference",
+      "model_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "uncertainty_method": "synthetic_predeclared_residual_scale; not fitted to external data",
+      "training_pair_ids": ["synthetic_training_pair_201", "synthetic_training_pair_202"],
+      "predictions": [
+        {"pair_id": "synthetic_pair_01", "median_onset_k": 1100, "log_sigma": 0.30},
+        {"pair_id": "synthetic_pair_02", "median_onset_k": 1000, "log_sigma": 0.30},
+        {"pair_id": "synthetic_pair_03", "median_onset_k": 1000, "log_sigma": 0.30},
+        {"pair_id": "synthetic_pair_04", "median_onset_k": 900, "log_sigma": 0.30},
+        {"pair_id": "synthetic_pair_05", "median_onset_k": 1000, "log_sigma": 0.30},
+        {"pair_id": "synthetic_pair_06", "median_onset_k": 650, "log_sigma": 0.30}
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic onset-evaluation plumbing only; no real reaction onset, model accuracy, phase yield, material synthesizability or laboratory outcome is established."
+}
