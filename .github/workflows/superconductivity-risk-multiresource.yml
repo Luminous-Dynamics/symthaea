@@ -6,6 +6,7 @@ on:
       - "tools/superconductivity-capability-plan-harness/**"
       - "data/schemas/superconductivity_risk_multiresource_v0_1.schema.json"
       - "data/research/superconductivity_risk_multiresource_fixture_*.json"
+      - "data/research/superconductivity_risk_multiresource_suite_v0_1.json"
       - "research/superconductivity/capability_experiment_planning/risk_multiresource/**"
       - ".github/workflows/superconductivity-risk-multiresource.yml"
   workflow_dispatch:
@@ -90,6 +91,7 @@ jobs:
             sha256sum data/research/superconductivity_risk_multiresource_fixture_v0_1.json
             sha256sum data/research/superconductivity_risk_multiresource_fixture_expected_vs_tail_v0_1.json
             sha256sum data/research/superconductivity_risk_multiresource_fixture_information_only_v0_1.json
+            sha256sum data/research/superconductivity_risk_multiresource_suite_v0_1.json
             sha256sum tools/superconductivity-capability-plan-harness/Cargo.toml
             sha256sum tools/superconductivity-capability-plan-harness/src/bin/sc_risk_multiresource_audit.rs
             sha256sum "$RUNNER_TEMP/sc-risk-multiresource-receipt.json"
@@ -112,4 +114,5 @@ jobs:
             ${{ runner.temp }}/sc-risk-multiresource-receipt.json
             ${{ runner.temp }}/sc-risk-expected-vs-tail-receipt.json
             ${{ runner.temp }}/sc-risk-information-only-receipt.json
+            data/research/superconductivity_risk_multiresource_suite_v0_1.json
             ${{ runner.temp }}/sc-risk-rustfmt.patch
