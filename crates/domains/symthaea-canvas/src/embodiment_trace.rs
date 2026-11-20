@@ -1,0 +1,386 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Versioned, deterministic event traces for embodiment replay and benchmarking.
+//!
+//! Traces make the semantic control plane testable without a renderer, model,
+//! network connection, or live cognitive runtime. Replay is fail-fast: an
+//! unsupported schema or invalid event rejects the whole trace.
+
+use std::fmt;
+
+use serde::{Deserialize, Serialize};
+
+use crate::embodiment::{
+    EmbodimentActivity, EmbodimentController, EmbodimentEvent, EmbodimentEventKind,
+    EmbodimentIngestError, EmbodimentSnapshot,
+};
+
+/// Current serialized trace schema.
+pub const EMBODIMENT_TRACE_SCHEMA_VERSION: u16 = 1;
+/// Bound untrusted trace input before replay.
+pub const MAX_EMBODIMENT_TRACE_EVENTS: usize = 65_536;
+/// Bound externally supplied session identifiers.
+pub const MAX_EMBODIMENT_SESSION_ID_BYTES: usize = 128;
+
+/// Serializable, versioned event corpus for one embodiment session.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EmbodimentTrace {
+    pub schema_version: u16,
+    pub session_id: String,
+    pub events: Vec<EmbodimentEvent>,
+}
+
+impl EmbodimentTrace {
+    pub fn new(session_id: impl Into<String>) -> Self {
+        Self {
+            schema_version: EMBODIMENT_TRACE_SCHEMA_VERSION,
+            session_id: session_id.into(),
+            events: Vec::new(),
+        }
+    }
+
+    pub fn push(&mut self, event: EmbodimentEvent) -> Result<(), EmbodimentTraceError> {
+        if self.events.len() >= MAX_EMBODIMENT_TRACE_EVENTS {
+            return Err(EmbodimentTraceError::TooManyEvents {
+                received: self.events.len().saturating_add(1),
+                maximum: MAX_EMBODIMENT_TRACE_EVENTS,
+            });
+        }
+        self.events.push(event);
+        Ok(())
+    }
+
+    /// Reduce the complete trace into a final semantic snapshot.
+    ///
+    /// The method never returns a partial snapshot. A malformed event rejects
+    /// the complete trace with its zero-based event index.
+    pub fn replay(&self) -> Result<EmbodimentSnapshot, EmbodimentTraceError> {
+        self.validate_header()?;
+        if self.events.len() > MAX_EMBODIMENT_TRACE_EVENTS {
+            return Err(EmbodimentTraceError::TooManyEvents {
+                received: self.events.len(),
+                maximum: MAX_EMBODIMENT_TRACE_EVENTS,
+            });
+        }
+
+        let mut controller = EmbodimentController::new();
+        for (index, event) in self.events.iter().cloned().enumerate() {
+            controller
+                .ingest(event)
+                .map_err(|source| EmbodimentTraceError::EventRejected { index, source })?;
+        }
+        Ok(controller.snapshot().clone())
+    }
+
+    /// Compute deterministic, renderer-independent counts and completed
+    /// activity intervals from a valid trace.
+    ///
+    /// The currently active interval is reported separately and is not counted
+    /// as completed duration because its end boundary is not known.
+    pub fn summarize(&self) -> Result<EmbodimentTraceSummary, EmbodimentTraceError> {
+        let final_snapshot = self.replay()?;
+
+        let mut activity_changes = 0usize;
+        let mut completed_activity_intervals = 0usize;
+        let mut speaking_intervals_completed = 0usize;
+        let mut speaking_duration_ns = 0u128;
+        let mut viseme_event_count = 0usize;
+        let mut uncertainty_observation_count = 0usize;
+        let mut previous_activity: Option<(EmbodimentActivity, u64)> = None;
+
+        for event in &self.events {
+            match &event.kind {
+                EmbodimentEventKind::ActivityChanged { activity } => {
+                    if let Some((previous, started_at)) = previous_activity {
+                        if previous != *activity {
+                            activity_changes = activity_changes.saturating_add(1);
+                            let duration = event.monotonic_ns.saturating_sub(started_at);
+                            completed_activity_intervals =
+                                completed_activity_intervals.saturating_add(1);
+                            if previous == EmbodimentActivity::Speaking {
+                                speaking_intervals_completed =
+                                    speaking_intervals_completed.saturating_add(1);
+                                speaking_duration_ns =
+                                    speaking_duration_ns.saturating_add(u128::from(duration));
+                            }
+                            previous_activity = Some((*activity, event.monotonic_ns));
+                        }
+                    } else {
+                        activity_changes = activity_changes.saturating_add(1);
+                        previous_activity = Some((*activity, event.monotonic_ns));
+                    }
+                }
+                EmbodimentEventKind::VisemeChanged { .. } => {
+                    viseme_event_count = viseme_event_count.saturating_add(1);
+                }
+                EmbodimentEventKind::UncertaintyChanged { .. } => {
+                    uncertainty_observation_count =
+                        uncertainty_observation_count.saturating_add(1);
+                }
+                _ => {}
+            }
+        }
+
+        Ok(EmbodimentTraceSummary {
+            session_id: self.session_id.clone(),
+            event_count: self.events.len(),
+            activity_changes,
+            completed_activity_intervals,
+            speaking_intervals_completed,
+            speaking_duration_ns,
+            viseme_event_count,
+            uncertainty_observation_count,
+            open_activity: previous_activity.map(|(activity, started_at_ns)| {
+                OpenActivityInterval {
+                    activity,
+                    started_at_ns,
+                }
+            }),
+            final_snapshot,
+        })
+    }
+
+    fn validate_header(&self) -> Result<(), EmbodimentTraceError> {
+        if self.schema_version != EMBODIMENT_TRACE_SCHEMA_VERSION {
+            return Err(EmbodimentTraceError::UnsupportedSchemaVersion {
+                received: self.schema_version,
+                supported: EMBODIMENT_TRACE_SCHEMA_VERSION,
+            });
+        }
+        if self.session_id.trim().is_empty()
+            || self.session_id.len() > MAX_EMBODIMENT_SESSION_ID_BYTES
+            || self.session_id.chars().any(char::is_control)
+        {
+            return Err(EmbodimentTraceError::InvalidSessionId);
+        }
+        Ok(())
+    }
+}
+
+/// An activity interval still open at the end of a trace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OpenActivityInterval {
+    pub activity: EmbodimentActivity,
+    pub started_at_ns: u64,
+}
+
+/// Stable summary suitable for benchmark output and trace comparison.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EmbodimentTraceSummary {
+    pub session_id: String,
+    pub event_count: usize,
+    pub activity_changes: usize,
+    pub completed_activity_intervals: usize,
+    pub speaking_intervals_completed: usize,
+    pub speaking_duration_ns: u128,
+    pub viseme_event_count: usize,
+    pub uncertainty_observation_count: usize,
+    pub open_activity: Option<OpenActivityInterval>,
+    pub final_snapshot: EmbodimentSnapshot,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum EmbodimentTraceError {
+    UnsupportedSchemaVersion {
+        received: u16,
+        supported: u16,
+    },
+    InvalidSessionId,
+    TooManyEvents {
+        received: usize,
+        maximum: usize,
+    },
+    EventRejected {
+        index: usize,
+        source: EmbodimentIngestError,
+    },
+}
+
+impl fmt::Display for EmbodimentTraceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnsupportedSchemaVersion {
+                received,
+                supported,
+            } => write!(
+                f,
+                "unsupported embodiment trace schema {received}; supported version is {supported}"
+            ),
+            Self::InvalidSessionId => write!(f, "invalid embodiment trace session identifier"),
+            Self::TooManyEvents { received, maximum } => {
+                write!(f, "trace has {received} events; maximum is {maximum}")
+            }
+            Self::EventRejected { index, source } => {
+                write!(f, "trace event at index {index} was rejected: {source}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for EmbodimentTraceError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::embodiment::{SignalProvenance, Viseme};
+
+    fn event(sequence: u64, monotonic_ns: u64, kind: EmbodimentEventKind) -> EmbodimentEvent {
+        EmbodimentEvent {
+            sequence,
+            monotonic_ns,
+            provenance: SignalProvenance::RuntimeEvent,
+            kind,
+        }
+    }
+
+    fn sample_trace() -> EmbodimentTrace {
+        let mut trace = EmbodimentTrace::new("session-test-01");
+        trace
+            .push(event(
+                1,
+                100,
+                EmbodimentEventKind::ActivityChanged {
+                    activity: EmbodimentActivity::Speaking,
+                },
+            ))
+            .unwrap();
+        trace
+            .push(event(
+                2,
+                110,
+                EmbodimentEventKind::VisemeChanged {
+                    viseme: Viseme::Aa,
+                    weight: 0.8,
+                },
+            ))
+            .unwrap();
+        trace
+            .push(event(
+                3,
+                200,
+                EmbodimentEventKind::ActivityChanged {
+                    activity: EmbodimentActivity::Idle,
+                },
+            ))
+            .unwrap();
+        trace
+            .push(event(
+                4,
+                210,
+                EmbodimentEventKind::ActivityChanged {
+                    activity: EmbodimentActivity::Listening,
+                },
+            ))
+            .unwrap();
+        trace
+    }
+
+    #[test]
+    fn replay_is_deterministic() {
+        let trace = sample_trace();
+        let first = trace.replay().unwrap();
+        let second = trace.replay().unwrap();
+        assert_eq!(first, second);
+        assert_eq!(
+            first.current_activity(),
+            Some(EmbodimentActivity::Listening)
+        );
+    }
+
+    #[test]
+    fn summary_counts_only_completed_activity_intervals() {
+        let summary = sample_trace().summarize().unwrap();
+        assert_eq!(summary.event_count, 4);
+        assert_eq!(summary.activity_changes, 3);
+        assert_eq!(summary.completed_activity_intervals, 2);
+        assert_eq!(summary.speaking_intervals_completed, 1);
+        assert_eq!(summary.speaking_duration_ns, 100);
+        assert_eq!(summary.viseme_event_count, 1);
+        assert_eq!(
+            summary.open_activity,
+            Some(OpenActivityInterval {
+                activity: EmbodimentActivity::Listening,
+                started_at_ns: 210,
+            })
+        );
+    }
+
+    #[test]
+    fn trace_round_trips_through_json_and_replays_identically() {
+        let trace = sample_trace();
+        let encoded = serde_json::to_string(&trace).unwrap();
+        let decoded: EmbodimentTrace = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, trace);
+        assert_eq!(decoded.replay().unwrap(), trace.replay().unwrap());
+    }
+
+    #[test]
+    fn unsupported_schema_fails_before_replay() {
+        let mut trace = sample_trace();
+        trace.schema_version = EMBODIMENT_TRACE_SCHEMA_VERSION + 1;
+        assert_eq!(
+            trace.replay(),
+            Err(EmbodimentTraceError::UnsupportedSchemaVersion {
+                received: EMBODIMENT_TRACE_SCHEMA_VERSION + 1,
+                supported: EMBODIMENT_TRACE_SCHEMA_VERSION,
+            })
+        );
+    }
+
+    #[test]
+    fn blank_session_identifier_is_rejected() {
+        let mut trace = sample_trace();
+        trace.session_id = "   ".to_string();
+        assert_eq!(
+            trace.replay(),
+            Err(EmbodimentTraceError::InvalidSessionId)
+        );
+    }
+
+    #[test]
+    fn malformed_event_fails_trace_at_exact_index() {
+        let mut trace = sample_trace();
+        trace.events.push(event(
+            4,
+            220,
+            EmbodimentEventKind::ActivityChanged {
+                activity: EmbodimentActivity::Fault,
+            },
+        ));
+        assert!(matches!(
+            trace.replay(),
+            Err(EmbodimentTraceError::EventRejected { index: 4, .. })
+        ));
+    }
+
+    #[test]
+    fn trace_capacity_is_enforced_on_append() {
+        let mut trace = EmbodimentTrace::new("bounded-session");
+        for sequence in 0..MAX_EMBODIMENT_TRACE_EVENTS as u64 {
+            trace
+                .push(event(
+                    sequence + 1,
+                    sequence + 1,
+                    EmbodimentEventKind::ActivityChanged {
+                        activity: EmbodimentActivity::Idle,
+                    },
+                ))
+                .unwrap();
+        }
+        let result = trace.push(event(
+            MAX_EMBODIMENT_TRACE_EVENTS as u64 + 1,
+            MAX_EMBODIMENT_TRACE_EVENTS as u64 + 1,
+            EmbodimentEventKind::ActivityChanged {
+                activity: EmbodimentActivity::Idle,
+            },
+        ));
+        assert_eq!(
+            result,
+            Err(EmbodimentTraceError::TooManyEvents {
+                received: MAX_EMBODIMENT_TRACE_EVENTS + 1,
+                maximum: MAX_EMBODIMENT_TRACE_EVENTS,
+            })
+        );
+    }
+}
