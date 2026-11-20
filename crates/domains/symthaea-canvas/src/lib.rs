@@ -36,7 +36,8 @@ pub use aesthetic_score::aesthetic_score;
 pub use animation::{FrameContext, MotionPreference};
 pub use embodiment::{
     EmbodimentActivity, EmbodimentController, EmbodimentEvent, EmbodimentEventKind,
-    EmbodimentIngestError, EmbodimentSnapshot, GazeTarget, Observed, SignalProvenance,
+    EmbodimentIngestError, EmbodimentSequenceError, EmbodimentEventSequencer,
+    EmbodimentSnapshot, GazeTarget, Observed, SignalProvenance,
     SpeechOutputState, Viseme, VisemeSignal,
 };
 pub use embodiment_trace::{
