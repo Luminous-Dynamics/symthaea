@@ -478,27 +478,11 @@
             "type": "object",
             "additionalProperties": false,
             "required": [
-              "source_event_ids",
-              "target_event_ids",
+              "source_note_ordinals",
+              "target_note_ordinals",
               "relation"
             ],
             "properties": {
-              "source_event_ids": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 128
-                }
-              },
-              "target_event_ids": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 128
-                }
-              },
               "relation": {
                 "enum": [
                   "preserve",
@@ -508,6 +492,20 @@
                   "delete",
                   "insert"
                 ]
+              },
+              "source_note_ordinals": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "target_note_ordinals": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0
+                }
               }
             }
           }
