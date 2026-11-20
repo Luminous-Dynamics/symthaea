@@ -41,3 +41,7 @@ path = "src/bin/sc_causal_transition_audit.rs"
 [[bin]]
 name = "sc_causal_identification_audit"
 path = "src/bin/sc_causal_identification_audit.rs"
+
+[[bin]]
+name = "sc_active_rct_allocation_audit"
+path = "src/bin/sc_active_rct_allocation_audit.rs"

@@ -1,0 +1,38 @@
+{
+  "contract": "SC-ACTIVE-RCT-ALLOCATION-SUITE-0.1",
+  "suite_id": "superconductivity_active_randomized_specimen_allocation_suite_001",
+  "fixture_only": true,
+  "schema_path": "data/schemas/superconductivity_active_rct_allocation_v0_1.schema.json",
+  "instances": [
+    {
+      "instance_id": "synthetic_family_stratified_active_rct_allocation_001",
+      "path": "data/research/superconductivity_active_rct_allocation_fixture_v0_1.json",
+      "role": "objective_divergence_and_resource_constrained_allocation",
+      "expected_properties": [
+        "27_joint_family_effect_worlds",
+        "minimum_one_randomized_block_per_family",
+        "joint_cate_state_information_vs_ate_precision_vs_decision_evsi_objectives_diverge",
+        "held_out_truth_not_used_for_acquisition",
+        "no_control_negative_control_excluded"
+      ]
+    },
+    {
+      "instance_id": "adversarial_active_rct_randomization_positivity_violation_001",
+      "path": "data/research/superconductivity_active_rct_allocation_fixture_positivity_v0_1.json",
+      "role": "randomization_positivity_fail_closed",
+      "expected_properties": [
+        "eligible_block_outside_randomization_probability_gate_rejected"
+      ]
+    },
+    {
+      "instance_id": "adversarial_active_rct_missing_family_support_001",
+      "path": "data/research/superconductivity_active_rct_allocation_fixture_family_support_v0_1.json",
+      "role": "family_representation_support",
+      "expected_properties": [
+        "cannot_satisfy_minimum_family_allocation",
+        "planner_returns_no_feasible_plan"
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic allocation policy benchmark only. All world states, priors, likelihoods, costs and candidate blocks are invented. No physical specimen is selected or randomized."
+}

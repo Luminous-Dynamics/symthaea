@@ -1,0 +1,419 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_active_rct_allocation_v0_1.schema.json",
+  "title": "Active randomized specimen allocation benchmark",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "instance_id",
+    "fixture_only",
+    "target_estimand",
+    "outcome_labels",
+    "families",
+    "world_states",
+    "decisions",
+    "resources",
+    "allocation_constraints",
+    "candidate_blocks",
+    "held_out_world_state_id",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SC-ACTIVE-RCT-ALLOCATION-0.1"
+    },
+    "instance_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_only": {
+      "const": true
+    },
+    "target_estimand": {
+      "const": "application_weighted_finite_population_ate"
+    },
+    "outcome_labels": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "families": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "family_id",
+          "application_weight",
+          "effect_states"
+        ],
+        "properties": {
+          "family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "application_weight": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "effect_states": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 5,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "state_id",
+                "prior_probability",
+                "ate"
+              ],
+              "properties": {
+                "state_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "prior_probability": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1
+                },
+                "ate": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "world_states": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 125,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "world_state_id",
+          "prior_probability",
+          "family_state_ids",
+          "target_population_ate"
+        ],
+        "properties": {
+          "world_state_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prior_probability": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "family_state_ids": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 5,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "family_id",
+                "family_state_id"
+              ],
+              "properties": {
+                "family_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "family_state_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "target_population_ate": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "decision_id",
+          "losses"
+        ],
+        "properties": {
+          "decision_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "losses": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 125,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "world_state_id",
+                "loss"
+              ],
+              "properties": {
+                "world_state_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "loss": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resource_id",
+          "unit",
+          "capacity",
+          "semantics"
+        ],
+        "properties": {
+          "resource_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "capacity": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "semantics": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "allocation_constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_selected_blocks",
+        "min_selected_blocks",
+        "min_blocks_per_family",
+        "max_blocks_per_family",
+        "max_blocks_per_batch",
+        "min_randomization_probability",
+        "max_randomization_probability"
+      ],
+      "properties": {
+        "max_selected_blocks": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "min_selected_blocks": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "min_blocks_per_family": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_blocks_per_family": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_blocks_per_batch": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "min_randomization_probability": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.5
+        },
+        "max_randomization_probability": {
+          "type": "number",
+          "exclusiveMinimum": 0.5,
+          "maximum": 1
+        }
+      }
+    },
+    "candidate_blocks": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "block_id",
+          "family_id",
+          "batch_id",
+          "specimen_ids",
+          "matched_pair_qualified",
+          "treatment_available",
+          "control_available",
+          "eligible",
+          "exclusion_reason",
+          "randomization_probability",
+          "historical_treatment_propensity",
+          "domain_discrepancy",
+          "family_representation_weight",
+          "resource_consumption",
+          "observation_likelihoods"
+        ],
+        "properties": {
+          "block_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "batch_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "specimen_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "matched_pair_qualified": {
+            "type": "boolean"
+          },
+          "treatment_available": {
+            "type": "boolean"
+          },
+          "control_available": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "exclusion_reason": {
+            "type": "string"
+          },
+          "randomization_probability": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "exclusiveMaximum": 1
+          },
+          "historical_treatment_propensity": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "exclusiveMaximum": 1
+          },
+          "domain_discrepancy": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "family_representation_weight": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "resource_consumption": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "resource_id",
+                "unit",
+                "quantity"
+              ],
+              "properties": {
+                "resource_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "observation_likelihoods": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 5,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "family_state_id",
+                "outcome_probabilities"
+              ],
+              "properties": {
+                "family_state_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "outcome_probabilities": {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "items": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "held_out_world_state_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_ceiling": {
+      "const": "Synthetic active randomized-specimen allocation benchmark only; no real specimen selection, causal effect, superconductivity result or laboratory authorization is established."
+    }
+  }
+}
