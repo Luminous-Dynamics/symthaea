@@ -20,12 +20,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_2238",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 400,
         "screen_reaction_category": "transformed",
         "active_refinement_human_quality_score": 2,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 400
       }
     },
     {
@@ -41,12 +41,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_2226",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 400,
         "screen_reaction_category": "partially_reacted",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 400
       }
     },
     {
@@ -62,12 +62,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_2227",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 400,
         "screen_reaction_category": "partially_reacted",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 400
       }
     },
     {
@@ -83,12 +83,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_2228",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 400,
         "screen_reaction_category": "partially_reacted",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 400
       }
     },
     {
@@ -104,12 +104,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_2229",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 300,
         "screen_reaction_category": "unreacted",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 300
       }
     },
     {
@@ -125,12 +125,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_1222",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 400,
         "screen_reaction_category": "completely_reacted",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 400
       }
     },
     {
@@ -146,12 +146,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_2248",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 400,
         "screen_reaction_category": "partially_reacted",
         "active_refinement_human_quality_score": 2,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 400
       }
     },
     {
@@ -167,12 +167,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_0922",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 400,
         "screen_reaction_category": "unreacted",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 400
       }
     },
     {
@@ -188,12 +188,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_2252",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 400,
         "screen_reaction_category": "unreacted",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 400
       }
     },
     {
@@ -209,12 +209,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_2246",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 400,
         "screen_reaction_category": "unreacted",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 400
       }
     },
     {
@@ -230,12 +230,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_2438",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 200,
         "screen_reaction_category": "transformed",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 200
       }
     },
     {
@@ -251,12 +251,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_2426",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 200,
         "screen_reaction_category": "transformed",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 200
       }
     },
     {
@@ -272,12 +272,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_2427",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 200,
         "screen_reaction_category": "transformed",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 200
       }
     },
     {
@@ -293,12 +293,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_2428",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 200,
         "screen_reaction_category": "transformed",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 200
       }
     },
     {
@@ -314,12 +314,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_2429",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 200,
         "screen_reaction_category": "transformed",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 200
       }
     },
     {
@@ -335,12 +335,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_1224",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 200,
         "screen_reaction_category": "transformed",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 200
       }
     },
     {
@@ -356,12 +356,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_2635",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 500,
         "screen_reaction_category": "partially_reacted",
         "active_refinement_human_quality_score": 2,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 500
       }
     },
     {
@@ -377,12 +377,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_2735",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 500,
         "screen_reaction_category": "completely_reacted",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 500
       }
     },
     {
@@ -398,12 +398,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_2935",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 300,
         "screen_reaction_category": "transformed",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 300
       }
     },
     {
@@ -419,12 +419,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_1235",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 500,
         "screen_reaction_category": "transformed",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 500
       }
     },
     {
@@ -440,12 +440,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_3538",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 500,
         "screen_reaction_category": "completely_reacted",
         "active_refinement_human_quality_score": 2,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 500
       }
     },
     {
@@ -461,12 +461,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_3035",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 400,
         "screen_reaction_category": "partially_reacted",
         "active_refinement_human_quality_score": 2,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 400
       }
     },
     {
@@ -482,12 +482,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_3548",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 400,
         "screen_reaction_category": "completely_reacted",
         "active_refinement_human_quality_score": 2,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 400
       }
     },
     {
@@ -503,12 +503,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_3546",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": null,
         "screen_reaction_category": "unreacted",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": null
       }
     },
     {
@@ -524,12 +524,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_0446",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 400,
         "screen_reaction_category": "transformed",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 400
       }
     },
     {
@@ -545,12 +545,12 @@
       "precursor_genome_screen_context": {
         "source_sample_id": "PG_0546",
         "source_pair_match": "exact unordered formula-pair match",
-        "screen_heating_temperature_c": 200,
         "screen_reaction_category": "transformed",
         "active_refinement_human_quality_score": 1,
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
-        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
+        "screen_heating_temperature_source_value": 200
       }
     }
   ],
