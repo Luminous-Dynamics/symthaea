@@ -843,7 +843,7 @@ pub fn verify_evidence_bundle_v1(
     let passed_gate_count = statuses.iter().filter(|s| **s == GateStatusV1::Pass).count() as u8;
     let failed_gate_count = statuses.iter().filter(|s| **s == GateStatusV1::Fail).count() as u8;
     let abstained_gate_count = statuses.iter()
-        .filter(|s| matches!(s, GateStatusV1::Abstain | GateStatusV1::NotRun))
+        .filter(|s| matches!(**s, GateStatusV1::Abstain | GateStatusV1::NotRun))
         .count() as u8;
 
     if manifest.outcome.status != verified_status {
@@ -890,16 +890,16 @@ mod tests {
                 "source_audio_sha256": d('d'), "candidate_audio_sha256": d('e'), "candidate_midi_sha256": d('f')
             },
             "components": {
-                "symbolic_edit": {"status":statuses[0],"receipt_sha256":null,"producer_id":null,"producer_version":null,
+                "symbolic_edit": {"status":statuses[0],"receipt_sha256":d('1'),"producer_id":"unit-test","producer_version":"1",
                     "case_sha256":d('a'),"source_score_sha256":d('b'),"candidate_score_sha256":d('c')},
-                "render_execution": {"status":statuses[1],"receipt_sha256":null,"producer_id":null,"producer_version":null,
+                "render_execution": {"status":statuses[1],"receipt_sha256":d('2'),"producer_id":"unit-test","producer_version":"1",
                     "source_score_sha256":d('b'),"candidate_score_sha256":d('c'),"candidate_midi_sha256":d('f'),
-                    "candidate_audio_sha256":d('e'),"attempt_id":null},
-                "acoustic_observation": {"status":statuses[2],"receipt_sha256":null,"producer_id":null,"producer_version":null,
-                    "contract_sha256":null,"source_audio_sha256":d('d'),"candidate_audio_sha256":d('e')},
-                "score_audio_conformance": {"status":statuses[3],"receipt_sha256":null,"producer_id":null,"producer_version":null,
+                    "candidate_audio_sha256":d('e'),"attempt_id":"attempt.unit.001"},
+                "acoustic_observation": {"status":statuses[2],"receipt_sha256":d('3'),"producer_id":"unit-test","producer_version":"1",
+                    "contract_sha256":d('4'),"source_audio_sha256":d('d'),"candidate_audio_sha256":d('e')},
+                "score_audio_conformance": {"status":statuses[3],"receipt_sha256":d('5'),"producer_id":"unit-test","producer_version":"1",
                     "candidate_score_sha256":d('c'),"candidate_audio_sha256":d('e')},
-                "human_acceptance": {"status":statuses[4],"receipt_sha256":null,"producer_id":null,"producer_version":null,
+                "human_acceptance": {"status":statuses[4],"receipt_sha256":d('6'),"producer_id":"unit-test","producer_version":"1",
                     "case_sha256":d('a'),"candidate_score_sha256":d('c'),"candidate_audio_sha256":d('e')}
             },
             "outcome": {
