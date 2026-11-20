@@ -15,7 +15,7 @@ command -v "${ZSTD}" >/dev/null 2>&1 || { echo "missing zstd: ${ZSTD}" >&2; exit
 [[ -f "${SOURCE}" ]] || { echo "missing source: ${SOURCE}" >&2; exit 2; }
 mkdir -p "${OUT_DIR}/streams"
 
-"${CXX}" -O2 -std=c++20 -Wall -Wextra -Wconversion -Werror \
+"${CXX}" -O2 -std=c++20 -Wall -Wextra -Wconversion -Wno-misleading-indentation -Werror \
   "${SOURCE}" -o "${OUT_DIR}/typed_record_partitioned_runs_reference"
 "${OUT_DIR}/typed_record_partitioned_runs_reference" --emit-dir "${OUT_DIR}/streams"
 
