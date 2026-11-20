@@ -6,11 +6,14 @@ use std::collections::BTreeMap;
 pub const SCHEMA_VERSION: &str = "0.1.0";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
 pub enum PhysicsLane {
+    #[serde(rename = "landau_damping_1d_electrostatic")]
     LandauDamping1dElectrostatic,
+    #[serde(rename = "magnetosheath_2d3v_pressure_tensor")]
     Magnetosheath2d3vPressureTensor,
+    #[serde(rename = "icf_nonlocal_electron_heat_transport")]
     IcfNonlocalElectronHeatTransport,
+    #[serde(rename = "pic_field_solver_warm_start")]
     PicFieldSolverWarmStart,
 }
 
@@ -304,7 +307,7 @@ fn candidate_findings(candidate: &CandidateRun) -> Vec<AuditFinding> {
         add("invalid_output_cadence", "output_cadence_seconds must be finite and positive.");
     }
 
-    match candidate.kinetic_fidelity.method {
+    match &candidate.kinetic_fidelity.method {
         KineticMethod::Pic => {
             if candidate.kinetic_fidelity.particles_per_cell.is_none_or(|number| number == 0) {
                 add("pic_particle_count_missing", "PIC candidates require particles_per_cell >= 1.");
@@ -383,7 +386,7 @@ fn candidate_findings(candidate: &CandidateRun) -> Vec<AuditFinding> {
         add("invalid_acquisition_signals", "At least one finite raw acquisition signal is required.");
     }
 
-    match candidate.selection_status {
+    match &candidate.selection_status {
         SelectionStatus::Selected | SelectionStatus::Executed => {
             if candidate.rights_state != RightsState::Verified {
                 add("rights_not_verified", "A selected or executed candidate must have rights_state=verified.");
@@ -638,6 +641,39 @@ mod tests {
         let bytes = serde_json::to_vec(&report.body).expect("serialize");
         report.receipt_sha256 = sha256_hex(&bytes);
         assert!(verify_candidate_report(&candidate, &report).is_err());
+    }
+
+    #[test]
+    fn frozen_valid_candidate_fixture_parses_and_passes() {
+        let input = include_str!("../../../../benchmarks/plasma/active-kinetic-candidate-valid-v0.json");
+        let candidate: CandidateRun = serde_json::from_str(input).expect("candidate fixture parses");
+        let report = audit_candidate(&candidate).expect("audit");
+        assert_eq!(report.body.disposition, AuditDisposition::Admissible);
+        assert!(report.body.findings.is_empty());
+    }
+
+    #[test]
+    fn frozen_rights_negative_control_is_rejected() {
+        let input =
+            include_str!("../../../../benchmarks/plasma/active-kinetic-candidate-rights-negative-v0.json");
+        let candidate: CandidateRun =
+            serde_json::from_str(input).expect("negative fixture parses");
+        let report = audit_candidate(&candidate).expect("audit");
+        assert_eq!(report.body.disposition, AuditDisposition::Rejected);
+        assert!(report.body.findings.iter().any(|finding| {
+            finding.code == "rights_not_verified"
+        }));
+    }
+
+    #[test]
+    fn unknown_fields_are_rejected_at_top_and_nested_levels() {
+        let mut value = serde_json::to_value(valid_pic_candidate()).expect("serialize");
+        value["unregistered"] = Value::Bool(true);
+        assert!(serde_json::from_value::<CandidateRun>(value).is_err());
+
+        let mut value = serde_json::to_value(valid_pic_candidate()).expect("serialize");
+        value["solver"]["unregistered"] = Value::Bool(true);
+        assert!(serde_json::from_value::<CandidateRun>(value).is_err());
     }
 
     #[test]
