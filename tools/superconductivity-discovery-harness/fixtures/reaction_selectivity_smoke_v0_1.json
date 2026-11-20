@@ -90,7 +90,7 @@
       "characterization_evidence": {
         "sample_id": "sample_hull_false",
         "method": "synthetic powder X-ray diffraction plus Rietveld phase analysis",
-        "conditions_id": "conditions_hull_false_positive",
+        "conditions_id": "characterization_low_hull_wrong_reaction_route",
         "source_locator": "fixture-only/table-1/row-1",
         "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "detection_limit_phase_fraction": 0.02,
@@ -100,7 +100,8 @@
             "identity_status": "identified",
             "phase_fraction": 0.7
           }
-        ]
+        ],
+        "execution_run_id": "run_low_hull_wrong_reaction_route"
       }
     },
     {
@@ -362,7 +363,7 @@
       "characterization_evidence": {
         "sample_id": "sample_multiphase",
         "method": "synthetic powder X-ray diffraction plus Rietveld phase analysis",
-        "conditions_id": "conditions_multiphase",
+        "conditions_id": "characterization_selective_multiphase_target_observed",
         "source_locator": "fixture-only/table-1/row-1",
         "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "detection_limit_phase_fraction": 0.01,
@@ -377,7 +378,8 @@
             "identity_status": "identified",
             "phase_fraction": 0.55
           }
-        ]
+        ],
+        "execution_run_id": "run_selective_multiphase_target_observed"
       }
     }
   ],
