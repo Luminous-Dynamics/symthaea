@@ -683,6 +683,95 @@ mod tests {
         )
     }
 
+    #[derive(Clone, Copy, Debug)]
+    struct SalienceRng {
+        state: u32,
+    }
+
+    impl SalienceRng {
+        fn new(seed: u32) -> Self {
+            Self { state: seed.max(1) }
+        }
+
+        fn unit(&mut self) -> f64 {
+            let mut value = self.state;
+            value ^= value << 13;
+            value ^= value >> 17;
+            value ^= value << 5;
+            self.state = value;
+            f64::from(value) / (f64::from(u32::MAX) + 1.0)
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    struct GeneratedFutureUse {
+        candidate: MemorySurfacingCandidateV1,
+        true_reuse_probability: f64,
+        true_value_gain_micros: f64,
+        realised_reuse: bool,
+    }
+
+    #[derive(Clone, Debug, Default)]
+    struct OracleKnapsackState {
+        value_micros: u64,
+        selected_indices: Vec<usize>,
+    }
+
+    fn oracle_knapsack(
+        items: &[GeneratedFutureUse],
+        budget_tokens: u32,
+    ) -> Vec<usize> {
+        let width = usize::try_from(budget_tokens).unwrap();
+        let mut states: Vec<Option<OracleKnapsackState>> = vec![None; width + 1];
+        states[0] = Some(OracleKnapsackState::default());
+
+        for (index, item) in items.iter().enumerate() {
+            let cost = usize::try_from(item.candidate.context_token_cost).unwrap();
+            if cost > width {
+                continue;
+            }
+            let value = (item.true_reuse_probability
+                * item.true_value_gain_micros
+                * 1_000.0)
+                .round() as u64;
+            for capacity in (cost..=width).rev() {
+                let Some(previous) = states[capacity - cost].clone() else {
+                    continue;
+                };
+                let mut next = previous;
+                next.value_micros = next.value_micros.saturating_add(value);
+                next.selected_indices.push(index);
+                let replace = match &states[capacity] {
+                    Some(current) => {
+                        next.value_micros > current.value_micros
+                            || (next.value_micros == current.value_micros
+                                && next.selected_indices < current.selected_indices)
+                    }
+                    None => true,
+                };
+                if replace {
+                    states[capacity] = Some(next);
+                }
+            }
+        }
+
+        states
+            .into_iter()
+            .flatten()
+            .reduce(|best, current| {
+                if current.value_micros > best.value_micros
+                    || (current.value_micros == best.value_micros
+                        && current.selected_indices < best.selected_indices)
+                {
+                    current
+                } else {
+                    best
+                }
+            })
+            .unwrap_or_default()
+            .selected_indices
+    }
+
     #[test]
     fn model_proposed_future_value_can_surface_rare_successes() {
         let low_value_failure = candidate(
@@ -1025,6 +1114,185 @@ mod tests {
                 Err(SalienceReject::EvidenceSnapshotMismatch)
             );
         }
+    }
+
+    #[test]
+    fn generated_future_use_benchmark_calibrates_salience_under_equal_budgets() {
+        const CLUSTERS: usize = 256;
+        const ITEMS_PER_CLUSTER: usize = 16;
+        const CONTEXT_BUDGET: u32 = 64;
+        const AS_KNOWN: AsKnownQuery = AsKnownQuery {
+            valid_at_ms: 100,
+            known_at_ms: 100,
+        };
+
+        let modes = [
+            MemorySurfacingModeV1::FailureOnly,
+            MemorySurfacingModeV1::RecencyFirst,
+            MemorySurfacingModeV1::FrequencyFirst,
+            MemorySurfacingModeV1::PredictedFutureValue,
+        ];
+        let mut rng = SalienceRng::new(0x5eed);
+        let mut forecast_rows = Vec::<(f64, bool)>::new();
+        let mut expected_value = [0.0_f64; 4];
+        let mut realised_value = [0.0_f64; 4];
+        let mut token_use = [0_u64; 4];
+        let mut oracle_value = 0.0_f64;
+
+        for cluster in 0..CLUSTERS {
+            let mut items = Vec::with_capacity(ITEMS_PER_CLUSTER);
+            let mut id_to_index = std::collections::BTreeMap::new();
+
+            for offset in 0..ITEMS_PER_CLUSTER {
+                let event_id = (cluster * ITEMS_PER_CLUSTER + offset + 1) as u32;
+                let latent_value = rng.unit().powf(0.82);
+                let true_reuse_probability = 0.04 + 0.92 * latent_value;
+                let forecast_noise = (rng.unit() * 2.0 - 1.0) * 0.08;
+                let forecast_probability =
+                    (true_reuse_probability + forecast_noise).clamp(0.02, 0.98);
+                let true_value_gain_micros = 1_200.0 + 8_000.0 * latent_value;
+                let predicted_value_gain = (1_200.0
+                    + 8_000.0 * latent_value
+                    + (rng.unit() * 2.0 - 1.0) * 800.0)
+                    .clamp(500.0, 10_000.0)
+                    .round() as u32;
+                let uncertainty_penalty =
+                    120 + ((1.0 - latent_value) * 200.0).round() as u32;
+                let context_tokens = 6 + (rng.unit() * 15.0).floor() as u32;
+                let observed_failure = rng.unit() < 0.25;
+                let last_accessed_at_ms = (rng.unit() * 100.0).floor() as i64;
+                let access_frequency = (rng.unit() * 20.0).floor() as u32;
+                let realised_reuse = rng.unit() < true_reuse_probability;
+                forecast_rows.push((forecast_probability, realised_reuse));
+
+                let evidence_digest = digest(&format!("salience-evidence-{event_id}"));
+                let forecast = prediction(
+                    event_id,
+                    (forecast_probability * 10_000.0).round() as u16,
+                    predicted_value_gain,
+                    uncertainty_penalty,
+                    evidence_digest,
+                );
+                let value = candidate(
+                    event_id,
+                    context_tokens,
+                    observed_failure,
+                    last_accessed_at_ms,
+                    access_frequency,
+                    Some(forecast),
+                );
+                id_to_index.insert(event_id, items.len());
+                items.push(GeneratedFutureUse {
+                    candidate: value,
+                    true_reuse_probability,
+                    true_value_gain_micros,
+                    realised_reuse,
+                });
+            }
+
+            for (mode_index, mode) in modes.iter().copied().enumerate() {
+                let candidates: Vec<_> =
+                    items.iter().map(|item| item.candidate.clone()).collect();
+                let plan = select_for_context(
+                    &candidates,
+                    mode,
+                    scope(),
+                    AS_KNOWN,
+                    CONTEXT_BUDGET,
+                )
+                .unwrap();
+                for surfaced in &plan.surfaced {
+                    let index = *id_to_index.get(&surfaced.event_id).unwrap();
+                    let item = &items[index];
+                    expected_value[mode_index] +=
+                        item.true_reuse_probability * item.true_value_gain_micros;
+                    if item.realised_reuse {
+                        realised_value[mode_index] += item.true_value_gain_micros;
+                    }
+                    token_use[mode_index] +=
+                        u64::from(item.candidate.context_token_cost);
+                }
+                assert!(plan.context_tokens_used <= CONTEXT_BUDGET);
+            }
+
+            let oracle_indices = oracle_knapsack(&items, CONTEXT_BUDGET);
+            for index in oracle_indices {
+                let item = &items[index];
+                oracle_value +=
+                    item.true_reuse_probability * item.true_value_gain_micros;
+            }
+        }
+
+        let total = forecast_rows.len() as f64;
+        let observed_rate = forecast_rows
+            .iter()
+            .filter(|(_, outcome)| *outcome)
+            .count() as f64
+            / total;
+        let mut brier = 0.0_f64;
+        let mut base_rate_brier = 0.0_f64;
+        let mut bin_count = [0_u32; 10];
+        let mut bin_probability = [0.0_f64; 10];
+        let mut bin_outcome = [0.0_f64; 10];
+        for (probability, outcome) in &forecast_rows {
+            let observed = if *outcome { 1.0 } else { 0.0 };
+            brier += (probability - observed).powi(2);
+            base_rate_brier += (observed_rate - observed).powi(2);
+            let bin = ((probability * 10.0).floor() as usize).min(9);
+            bin_count[bin] += 1;
+            bin_probability[bin] += probability;
+            bin_outcome[bin] += observed;
+        }
+        brier /= total;
+        base_rate_brier /= total;
+        let mut expected_calibration_error = 0.0_f64;
+        for bin in 0..10 {
+            if bin_count[bin] == 0 {
+                continue;
+            }
+            let count = f64::from(bin_count[bin]);
+            let mean_probability = bin_probability[bin] / count;
+            let observed_frequency = bin_outcome[bin] / count;
+            expected_calibration_error +=
+                count / total * (mean_probability - observed_frequency).abs();
+        }
+
+        let predicted_index = 3;
+        assert_eq!(forecast_rows.len(), CLUSTERS * ITEMS_PER_CLUSTER);
+        assert!(brier < base_rate_brier);
+        assert!(expected_calibration_error < 0.05);
+        assert!(expected_value[predicted_index] > expected_value[0] * 1.5);
+        assert!(expected_value[predicted_index] > expected_value[1] * 1.5);
+        assert!(expected_value[predicted_index] > expected_value[2] * 1.5);
+        assert!(
+            expected_value[predicted_index] / oracle_value > 0.98,
+            "predicted policy regret exceeded the generated oracle tolerance"
+        );
+        assert!(realised_value[predicted_index] > realised_value[0]);
+        assert!(realised_value[predicted_index] > realised_value[1]);
+        assert!(realised_value[predicted_index] > realised_value[2]);
+        let predicted_value_per_token =
+            expected_value[predicted_index] / token_use[predicted_index] as f64;
+        for mode_index in 0..3 {
+            let baseline_value_per_token =
+                expected_value[mode_index] / token_use[mode_index] as f64;
+            assert!(predicted_value_per_token > baseline_value_per_token * 1.4);
+        }
+
+        println!(
+            concat!(
+                "salience_generated clusters={} forecasts={} brier={:.4} ",
+                "base_rate_brier={:.4} ece={:.4} predicted_vs_oracle={:.4} ",
+                "predicted_expected_utility_per_cluster={:.1}"
+            ),
+            CLUSTERS,
+            forecast_rows.len(),
+            brier,
+            base_rate_brier,
+            expected_calibration_error,
+            expected_value[predicted_index] / oracle_value,
+            expected_value[predicted_index] / CLUSTERS as f64
+        );
     }
 
     #[test]

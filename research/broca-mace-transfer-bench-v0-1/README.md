@@ -416,3 +416,7 @@ The manifest is self-declared metadata: it proves consistency with the captured 
 ### Bitemporal and scope-safe predictive salience
 
 The consolidation salience planner pins each candidate to the exact source scope and `(valid_at, known_at)` snapshot. Both coordinates are carried into the receipt-bound evidence digest and resulting surfacing-plan digest. Failure-only, recency-first, frequency-first and predicted-future-value selection all reject cross-scope evidence and evidence from a different knowledge snapshot; a model prediction cannot bypass the gate. Salience only chooses which already-admitted records to surface in context; it cannot promote evidence or grant action authority.
+
+### Predictive-salience calibration benchmark (authored, not runner-verified)
+
+A deterministic generated test evaluates 4,096 future-use forecasts over 256 task clusters with an equal 64-token context budget. It compares failure-only, recency-first, frequency-first and predicted-future-value selection. Forecasts are scored with Brier and ten-bin expected-calibration error; selectors are scored on hidden expected reuse value, one sampled realised outcome, value per token and regret against an oracle knapsack. Hidden future labels are held outside the selector inputs. This is a synthetic development/qualification fixture, not an AML or CL-Bench result. Future external-validity work must hold out task families, source roots, model versions and environment mechanisms.

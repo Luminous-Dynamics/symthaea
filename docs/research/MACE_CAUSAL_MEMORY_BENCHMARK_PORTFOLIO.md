@@ -329,3 +329,15 @@ The `consolidation::salience` module compares failure-only, recency-first, frequ
 Every candidate is now pinned to source scope and the exact `(valid_at, known_at)` snapshot from its receipt-derived evidence reference. All selection modes enforce this, not merely the predicted-value mode. A later retraction or a memory from a different objective/regime cannot be surfaced merely because it is recent, frequently accessed or tagged as a failure. The plan digest includes both temporal coordinates. This remains context selection, not promotion or authority.
 
 Anthropic's November 6, 2026 *The components of agent memory* report motivates the future-use salience hypothesis. Its vendor-reported CL-Bench database task found gains from memory for Opus 5.5 and Sonnet 5.5, while a fixed "record only failures" instruction reduced the gains for stronger models. These are internal-task vendor results, not directly comparable to MACE or AML. The next research step is held-out future-use calibration: compare actual downstream utility/regret under equal token budgets, report ranking quality and probability calibration, and test whether predicted-value surfacing beats failure-only, recency and frequency baselines without increasing stale or cross-scope activation.
+
+### Predictive-salience calibration protocol
+
+A generated development control now specifies 256 task clusters × 16 memory candidates = 4,096 future-use forecasts under a fixed 64-token context budget. It compares failure-only, recency-first, frequency-first and predicted-future-value selectors. It separates:
+- forecast calibration (Brier score, base-rate Brier, ten-bin ECE);
+- selected expected downstream utility and one sampled realised outcome;
+- expected utility per surfaced token;
+- regret against a hidden-label oracle knapsack under the same budget.
+
+The selector receives only candidate-visible forecasts, source evidence, access telemetry and the fixed budget. Future reuse labels and true value remain evaluator-side. The development fixture has authored thresholds for forecast improvement, policy lift and oracle regret; no measured result is claimed until the Rust test runs. A credible external claim still requires held-out task-family, source-root, model-version and mechanism splits, with independent labels and paired uncertainty.
+
+Anthropic's *The components of agent memory* (November 6, 2026) motivates this research direction but is not a directly comparable benchmark. Its vendor-reported CL-Bench database task found that persistent memory raised Opus 5.5 from 0.655 to 0.838 and Sonnet 5.5 from 0.644 to 0.833; a fixed "record only failures" instruction reduced gains for stronger models. The lesson is not that predicted-value salience already wins, but that memory selection rules should be tested against downstream reuse instead of assuming failure-only or frequency-only retention is optimal.
