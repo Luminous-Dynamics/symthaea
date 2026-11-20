@@ -1,0 +1,69 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "variational-particle-measure-neural-field-operator-v0.1",
+  "created_at": "2026-11-20",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12960",
+  "status": "mathematical_specification_only",
+  "method_hypothesis": {
+    "learned_object": "scalar_discrete_particle_field_energy_functional",
+    "force_definition": "negative_particle_coordinate_gradient_of_energy",
+    "electric_field_definition": "force_divided_by_particle_charge_under_pinned_units",
+    "continuous_force_conservative_by_construction": true,
+    "discrete_time_energy_exact": false,
+    "exact_discrete_energy_requires": "compatible_discrete_gradient_AVF_or_variational_integrator_and_registered_nonlinear_solver_tolerance"
+  },
+  "conditional_symmetries": [
+    "permutation_invariance_of_energy_implies_particle_force_permutation_equivariance",
+    "periodic_common_translation_invariance_implies_zero_total_internal_force",
+    "external_forces_and_nonperiodic_boundaries_may_break_translation_identity",
+    "gauge_and_k_zero_mode_convention_must_be_pinned"
+  ],
+  "candidate_methods": [
+    "source_NEOPIC_direct_NUFNO",
+    "scalar_particle_energy_functional_with_gradient_force",
+    "permutation_invariant_pairwise_Hamiltonian_model",
+    "grid_FNO_with_consistent_potential_gradient",
+    "PIF_Fourier_PIC",
+    "CIC_PIC",
+    "Barnes_Hut_where_applicable",
+    "direct_sum_small_N_reference",
+    "energy_charge_conserving_implicit_PIC"
+  ],
+  "known_answer_tests": [
+    "N1_self_force",
+    "N2_like_charge_action_reaction",
+    "N2_unlike_charge_sign",
+    "small_periodic_N_energy_force_reference",
+    "particle_permutation_invariance",
+    "common_periodic_translation_invariance",
+    "gauge_zero_mode_convention",
+    "coincident_particle_declared_softening",
+    "finite_difference_force_jacobian_symmetry",
+    "configuration_space_curl",
+    "directional_derivative_of_energy"
+  ],
+  "benchmark_metrics": [
+    "particlewise_force_and_field_error",
+    "configuration_space_curl_residual",
+    "force_jacobian_symmetry_residual",
+    "translation_and_permutation_residual",
+    "self_force_and_pair_action_reaction",
+    "discrete_Poisson_residual",
+    "total_kinetic_potential_energy_drift",
+    "momentum_and_net_internal_force_residual",
+    "particle_field_work_exchange",
+    "Landau_damping_rate_and_field_energy",
+    "two_stream_growth_saturation_time_peak",
+    "particle_position_velocity_distribution_error",
+    "particle_count_transfer_both_directions",
+    "reverse_mode_gradient_and_JVP_cost",
+    "full_particle_field_step_cost"
+  ],
+  "claim_limits": {
+    "variational_NEOPIC_implemented": false,
+    "learned_energy_trained": false,
+    "exact_discrete_energy": false,
+    "SOTA_superiority": false,
+    "plasma_control_validation": false
+  }
+}
