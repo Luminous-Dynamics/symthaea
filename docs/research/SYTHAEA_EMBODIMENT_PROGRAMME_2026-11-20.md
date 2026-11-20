@@ -94,6 +94,18 @@ Sources:
 - https://doi.org/10.1145/3772318.3790845
 - https://anam.ai/tools/avatar-quality-benchmark
 
+### Facial fidelity benchmark references
+
+For the optional humanoid backend, use established facial-animation datasets and metrics rather than inventing a Symthaea-only score:
+
+- The 2025 ICCV MemoryTalker paper evaluates on VOCASET and BIWI using Face Vertex Error (FVE), Lip Vertex Error (LVE), Fréchet Inception Distance (FID), Lip Dynamic Time Warping (LDTW), and Lip-max. Its table reports LVE 0.293 on VOCASET and 0.187 on BIWI, with corresponding baseline comparisons against FaceFormer, CodeTalker, SelfTalk and UniTalker.
+- The 2025 Computer Graphics Forum benchmark evaluates deterministic and non-deterministic models on BIWI, Multiface and 3DMEAD. It reports LVE, Mean Vertex Error (MVE), upper-face dynamics deviation (FDD), and diversity/coverage-oriented metrics for non-deterministic models, plus a 7-point human assessment of lip-sync and realism. The authors report that rankings change across datasets and objective scores do not always align with subjective ratings.
+- Therefore, facial-backend SOTA claims must be dataset- and metric-specific. Compare exact dataset versions, subject splits, preprocessing, mesh topology, audio sampling, inference hardware and stochastic sampling protocol. Never use one paper's best table value as a universal target.
+
+Sources:
+- https://openaccess.thecvf.com/content/ICCV2025/papers/Kim_MemoryTalker_Personalized_Speech-Driven_3D_Facial_Animation_via_Audio-Guided_Stylization_ICCV_2025_paper.pdf
+- https://onlinelibrary.wiley.com/doi/10.1111/cgf.70073
+
 ## Proposed architecture
 
 ### 1. Semantic control plane
