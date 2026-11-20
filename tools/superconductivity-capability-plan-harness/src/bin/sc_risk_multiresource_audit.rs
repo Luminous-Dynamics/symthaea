@@ -940,6 +940,10 @@ mod tests {
         assert!((weighted_cvar(&[0.0,10.0], &[0.8,0.2], 0.0).unwrap()-2.0).abs()<1.0e-12);
         assert!((weighted_cvar(&[0.0,10.0], &[0.8,0.2], 0.9).unwrap()-10.0).abs()<1.0e-12);
         assert!((weighted_cvar(&[0.0,10.0], &[0.8,0.2], 0.8).unwrap()-10.0).abs()<1.0e-12);
+        // The 15% upper tail contains all 10% mass at loss 20 plus only
+        // 5% of the mass at loss 10: (0.1*20 + 0.05*10) / 0.15.
+        let fractional = weighted_cvar(&[0.0,10.0,20.0], &[0.7,0.2,0.1], 0.85).unwrap();
+        assert!((fractional - (2.5 / 0.15)).abs() < 1.0e-12);
         assert!((weighted_cvar(&[0.0,10.0], &[0.8,0.2], 0.999_999).unwrap()-10.0).abs()<1.0e-9);
     }
     #[test]
