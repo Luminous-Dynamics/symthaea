@@ -57,7 +57,7 @@ After those exclusions, the benchmark cohort is:
 
 The binary endpoint is therefore 253 positive (25.3%) and 747 negative (74.7%). The label mapping follows Walters et al.: complete and partial are reactive; unreacted and transformed are non-reactive *for the cross-precursor-product endpoint*. Transformed does not mean chemically inert.
 
-The auditor applies exclusions in this order: physical failure first, then quality score 3, then a known category. It fails closed if residual unknown outcomes remain or if the counts diverge from the pinned paper cohort.
+The auditor applies exclusions in this order: physical failure first, then quality score 3, then a known category. It fails closed if residual unknown outcomes remain or if the counts diverge from the pinned paper cohort. Its receipt also exports one compact record per source sample: source-ordered and canonical precursor identities, outcome and binary endpoint, cohort/exclusion status, active scan/refinement indices and quality flags, refinement phase weights, reported outcome phases, recorded furnace/setpoint/time, thermal-profile summary, target formula/stoichiometry and reaction-energy field. This allows later benchmarks to reuse the exact eligible cohort without reverse-engineering the summary counts. Raw XRD patterns and refinement binaries are not copied into the receipt; the source ledger's file paths and dataset license remain the provenance boundary.
 
 ## Thermal metadata: do not substitute melting point for the experiment
 
@@ -93,7 +93,7 @@ cargo run --manifest-path tools/superconductivity-discovery-harness/Cargo.toml -
   --out precursor-genome-audit-receipt.json
 ```
 
-The exact-head GitHub workflow fetches the pinned upstream ledger, verifies its Git blob object ID, runs the Rust tests and emits the compact audit receipt.
+The exact-head GitHub workflow fetches the pinned upstream ledger, verifies its Git blob object ID, runs the Rust tests and emits the row-level audit receipt as an artifact. The workflow prints only the receipt summary to logs.
 
 ## Claim ceiling
 
