@@ -14,7 +14,8 @@
     "zenodo_raw_artifacts_doi",
     "expected_profile",
     "publication_comparison",
-    "claim_ceiling"
+    "claim_ceiling",
+    "measurement_units"
   ],
   "properties": {
     "contract": {
@@ -174,6 +175,62 @@
     },
     "claim_ceiling": {
       "const": "Frozen identity and profile for the public Precursor Genome ledger. Counts are source-snapshot bookkeeping, not the paper's model-training cohort or raw in-situ onset measurements."
+    },
+    "measurement_units": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "heating_temperature",
+        "heating_time",
+        "provenance_url"
+      ],
+      "properties": {
+        "heating_temperature": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_field",
+            "unit",
+            "provenance"
+          ],
+          "properties": {
+            "source_field": {
+              "const": "synthesis.heating_temperature"
+            },
+            "unit": {
+              "const": "degree_Celsius"
+            },
+            "provenance": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "heating_time": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_field",
+            "unit",
+            "provenance"
+          ],
+          "properties": {
+            "source_field": {
+              "const": "synthesis.heating_time"
+            },
+            "unit": {
+              "const": "minute"
+            },
+            "provenance": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "provenance_url": {
+          "const": "https://arxiv.org/abs/2607.09903"
+        }
+      }
     }
   }
 }
