@@ -2,7 +2,8 @@
 //!
 //! Usage:
 //!   cargo run -p symthaea-canvas --example embodiment_trace_replay -- --trace trace.json
-//!   cargo run -p symthaea-canvas --example embodiment_trace_replay -- \\\n//!     --trace trace.json --iterations 500
+//!   cargo run -p symthaea-canvas --example embodiment_trace_replay --
+//!     --trace trace.json --iterations 500
 //!
 //! This measures semantic reduction only. It does not measure SVG rasterization,
 //! browser presentation, audio playback, GPU rendering, or human perception.
