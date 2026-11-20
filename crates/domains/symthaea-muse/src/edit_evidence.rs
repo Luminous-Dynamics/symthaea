@@ -69,7 +69,7 @@ fn validate_score(score: &Score, label: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn required<'a>(value: &'a Value, key: &str, label: &str) -> Result<&'a Value, String> {
+fn required(value: &Value, key: &str, label: &str) -> Result<&Value, String> {
     value.get(key).ok_or_else(|| format!("{label} is missing {key}"))
 }
 
@@ -481,8 +481,10 @@ pub fn evaluate_velocity_case(
         .all(|item| item.get("passed").and_then(Value::as_bool) == Some(true));
     let correspondence_required = required(evaluation, "correspondence_required", "evaluation")?
         .as_bool().ok_or("correspondence_required must be boolean")?;
-    let correspondence_pass = correspondence_required
-        && mapped_sources == source.notes.len()
+    if !correspondence_required {
+        return Err("abstain: v1 symbolic scoring requires explicit event correspondence".into());
+    }
+    let correspondence_pass = mapped_sources == source.notes.len()
         && mapped_targets == candidate.notes.len()
         && coverage >= minimum_coverage;
     let human = required(evaluation, "human_evaluation", "evaluation")?;
@@ -634,6 +636,9 @@ mod tests {
         assert_eq!(result["instruction_compatibility"]["verdict"], "not_run");
         assert_eq!(result["integrity"]["verdict"], "not_run");
         verify_result_seal(&result).unwrap();
+        let mut tampered = result.clone();
+        tampered["artifacts"]["case_sha256"] = json!("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        assert!(verify_result_seal(&tampered).is_err());
     }
 
     #[test]
