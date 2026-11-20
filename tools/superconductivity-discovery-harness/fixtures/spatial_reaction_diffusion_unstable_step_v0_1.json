@@ -1,0 +1,28 @@
+{
+  "contract": "SC-SPATIAL-REACTION-DIFFUSION-0.1",
+  "benchmark_id": "adversarial_unstable_explicit_time_step_001",
+  "fixture_only": true,
+  "concentration_reference": "Dimensionless mobile-species concentration normalized to reservoir reference concentration c0; spatial coordinate is meters; time is seconds.",
+  "cases": [
+    {
+      "case_id": "unstable_step",
+      "length_m": 0.00001,
+      "grid_cells": 16,
+      "duration_s": 5,
+      "time_step_s": 0.05,
+      "reservoir_a": 1,
+      "reservoir_b": 1,
+      "initial_a": 0,
+      "initial_b": 0,
+      "transport_matrix_m2_s": {
+        "d_aa": 1e-10,
+        "d_ab": 0,
+        "d_bb": 1e-10
+      },
+      "target_rate_s_inverse": 0.8,
+      "competitor_rate_s_inverse": 0.05,
+      "thermodynamic_preference": "target_favored"
+    }
+  ],
+  "claim_ceiling": "Synthetic one-dimensional reaction-diffusion reference only; no measured transport coefficient, phase yield, superconducting material or laboratory procedure is established."
+}
