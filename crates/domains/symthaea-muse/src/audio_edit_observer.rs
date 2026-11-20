@@ -540,6 +540,25 @@ mod tests {
         bytes
     }
 
+    fn int16_wav(samples: &[i16], sample_rate_hz: u32) -> Vec<u8> {
+        let spec = WavSpec {
+            channels: 1,
+            sample_rate: sample_rate_hz,
+            bits_per_sample: 16,
+            sample_format: SampleFormat::Int,
+        };
+        let mut bytes = Vec::new();
+        {
+            let cursor = Cursor::new(&mut bytes);
+            let mut writer = WavWriter::new(cursor, spec).unwrap();
+            for &sample in samples {
+                writer.write_sample(sample).unwrap();
+            }
+            writer.finalize().unwrap();
+        }
+        bytes
+    }
+
     fn stereo_wav(samples: &[[f32; 2]], sample_rate_hz: u32) -> Vec<u8> {
         let spec = WavSpec {
             channels: 2,
@@ -598,6 +617,22 @@ mod tests {
         assert_eq!(result["preservation"]["status"], "pass");
         assert_eq!(result["outcome"]["acoustic_observation_status"], "pass");
         verify_gain_envelope_observation_seal(&result).unwrap();
+    }
+
+    #[test]
+    fn integer_pcm16_gain_envelope_is_decoded_and_measured() {
+        let source_samples = vec![8192_i16; 1_000];
+        let mut candidate_samples = source_samples.clone();
+        for sample in &mut candidate_samples[100..400] {
+            *sample = 4096; // approximately -6.02 dB relative to 8192
+        }
+        let source = int16_wav(&source_samples, 8_000);
+        let candidate = int16_wav(&candidate_samples, 8_000);
+        let result = observe_gain_envelope_v1(&source, &candidate, &contract()).unwrap();
+        assert_eq!(result["audio"]["source_sample_format"], "pcm_integer");
+        assert_eq!(result["audio"]["source_bits_per_sample"], 16);
+        assert_eq!(result["target"]["status"], "pass");
+        assert_eq!(result["preservation"]["status"], "pass");
     }
 
     #[test]
