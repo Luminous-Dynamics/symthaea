@@ -23,7 +23,7 @@ The Rust auditor accepts a user-supplied local ledger file. It verifies the Git 
 | XRD scans / Rietveld refinement cases | 1,351 / 1,950 |
 | Samples with active refinement selection | 1,030 |
 | Active refinement quality | score 1: 685; score 2: 320; score 3: 10; missing: 15; no active selection: 5 |
-| Active refinement acceptance | accepted 1,005; rejected 11; missing 19 |
+| Active refinement acceptance | accepted 1,005; rejected 11; missing 14 |
 | Setpoint + category + no failure + accepted quality 1/2 | 944 |
 
 Counts are computed from the pinned public JSON snapshot. They are not paper model training rows and not the onset validation set.
