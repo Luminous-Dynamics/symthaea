@@ -237,7 +237,8 @@
         "support_precision",
         "false_support_rate_all_negatives",
         "false_support_rate_measured_negatives",
-        "event_recall"
+        "event_recall",
+        "cluster_bootstrap"
       ],
       "properties": {
         "held_out_dataset_sha256": {
@@ -357,6 +358,69 @@
           ],
           "minimum": 0,
           "maximum": 1
+        },
+        "cluster_bootstrap": {
+          "$ref": "#/$defs/clusterBootstrap"
+        }
+      }
+    },
+    "bootstrapInterval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower_95",
+        "upper_95",
+        "valid_replicates"
+      ],
+      "properties": {
+        "lower_95": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "upper_95": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "valid_replicates": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        }
+      }
+    },
+    "clusterBootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "support_precision",
+        "false_support_rate_all_negatives",
+        "event_recall",
+        "support_coverage",
+        "brier_score"
+      ],
+      "properties": {
+        "support_precision": {
+          "$ref": "#/$defs/bootstrapInterval"
+        },
+        "false_support_rate_all_negatives": {
+          "$ref": "#/$defs/bootstrapInterval"
+        },
+        "event_recall": {
+          "$ref": "#/$defs/bootstrapInterval"
+        },
+        "support_coverage": {
+          "$ref": "#/$defs/bootstrapInterval"
+        },
+        "brier_score": {
+          "$ref": "#/$defs/bootstrapInterval"
         }
       }
     }
