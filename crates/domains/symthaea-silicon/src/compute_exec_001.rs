@@ -7,6 +7,7 @@
 //! It validates protocol objects before a driver is permitted to act on them.
 
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
@@ -194,6 +195,13 @@ impl BufferPermissions {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BufferOwnership {
     HostOwned,
+    /// DMA returned the buffer, but digest and independent-oracle checks have
+    /// not completed. The buffer is not reusable until verification succeeds.
+    OutputUnverified {
+        command_id: String,
+        device_epoch: String,
+        sequence: u64,
+    },
     DeviceOwned {
         device_epoch: String,
         sequence: u64,
@@ -301,6 +309,36 @@ pub enum CompletionDisposition {
     CompletedOutputAvailable,
     RejectedBeforeExecution,
     Quarantined,
+}
+
+/// Proof token created only by verify_exact_output_bytes after the actual
+/// output bytes pass digest, operation-layout and independent-oracle checks.
+/// Private fields prevent callers from constructing a token themselves.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedExactOutput {
+    command_id: String,
+    device_id: String,
+    device_epoch: String,
+    sequence: u64,
+    operation_id: String,
+    output_handle_id: String,
+    output_generation: u64,
+    output_sha256: String,
+    output_bytes: u64,
+}
+
+impl VerifiedExactOutput {
+    pub fn output_sha256(&self) -> &str {
+        &self.output_sha256
+    }
+
+    pub fn output_bytes(&self) -> u64 {
+        self.output_bytes
+    }
+
+    pub fn operation_id(&self) -> &str {
+        &self.operation_id
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -538,8 +576,28 @@ impl ExecutionLedger {
         match completion.status.as_str() {
             "completed" => {
                 validate_success_result(completion, &pending, capabilities)?;
+                let output_generation = parse_decimal_u64(
+                    &pending.output.generation,
+                    false,
+                    "command.output.generation",
+                )?;
+                let output_key = BufferKey {
+                    handle_id: pending.output.handle_id.clone(),
+                    generation: output_generation,
+                };
                 for key in &pending.buffers {
-                    registry.set_ownership(key, BufferOwnership::HostOwned);
+                    if *key == output_key {
+                        registry.set_ownership(
+                            key,
+                            BufferOwnership::OutputUnverified {
+                                command_id: pending.command_id.clone(),
+                                device_epoch: self.device_epoch.clone(),
+                                sequence,
+                            },
+                        );
+                    } else {
+                        registry.set_ownership(key, BufferOwnership::HostOwned);
+                    }
                 }
                 self.pending.remove(&sequence);
                 Ok(CompletionDisposition::CompletedOutputAvailable)
@@ -572,6 +630,40 @@ impl ExecutionLedger {
             _ => Err(ValidationError::new(
                 "UNKNOWN_COMPLETION_STATUS",
                 "completion status is not admitted by protocol v0.1",
+            )),
+        }
+    }
+
+    /// Return an output buffer to reusable host ownership only when a proof
+    /// token produced by verify_exact_output_bytes binds the exact command,
+    /// device epoch, output handle and generation.
+    pub fn confirm_output_verified(
+        &mut self,
+        verified: &VerifiedExactOutput,
+        registry: &mut BufferRegistry,
+    ) -> ValidationResult<()> {
+        let key = BufferKey {
+            handle_id: verified.output_handle_id.clone(),
+            generation: verified.output_generation,
+        };
+        let ownership = registry.entry(&key)?.ownership.clone();
+        match ownership {
+            BufferOwnership::OutputUnverified {
+                command_id,
+                device_epoch,
+                sequence,
+            } if command_id == verified.command_id
+                && device_epoch == verified.device_epoch
+                && sequence == verified.sequence
+                && self.device_id == verified.device_id
+                && self.device_epoch == verified.device_epoch =>
+            {
+                registry.set_ownership(&key, BufferOwnership::HostOwned);
+                Ok(())
+            }
+            _ => Err(ValidationError::new(
+                "OUTPUT_VERIFICATION_OWNERSHIP_MISMATCH",
+                "verification token does not match an unverified output owned by this ledger",
             )),
         }
     }
@@ -631,7 +723,25 @@ impl ExecutionLedger {
                 );
             }
         }
+        let mut unverified_output_interrupted = false;
+        for buffer in registry.buffers.values_mut() {
+            if let BufferOwnership::OutputUnverified {
+                device_epoch,
+                sequence,
+                ..
+            } = buffer.ownership.clone()
+            {
+                if device_epoch == old_epoch {
+                    unverified_output_interrupted = true;
+                    buffer.ownership = BufferOwnership::Quarantined {
+                        device_epoch: old_epoch.clone(),
+                        sequence,
+                    };
+                }
+            }
+        }
         if reset_interrupted_work
+            || unverified_output_interrupted
             || registry.buffers.values().any(|buffer| {
                 matches!(
                     &buffer.ownership,
@@ -1407,6 +1517,183 @@ fn validate_sha256(value: &str, field: &'static str) -> ValidationResult<()> {
     Ok(())
 }
 
+/// Verify returned output bytes after DMA ownership has returned.
+/// Checks command/completion identity, canonical semantics, output binding,
+/// the device-reported SHA-256, operation-specific byte layout, and exact
+/// byte-for-byte equality with an independent canonical oracle result.
+pub fn verify_exact_output_bytes(
+    command: &HdcCommand,
+    completion: &HdcCompletion,
+    actual_output: &[u8],
+    oracle_output: &[u8],
+) -> ValidationResult<VerifiedExactOutput> {
+    validate_completion_envelope(completion)?;
+    if completion.status != "completed" {
+        return Err(ValidationError::new(
+            "OUTPUT_NOT_COMPLETED",
+            "only a completed command can enter exact output verification",
+        ));
+    }
+    if command.schema != "luminous.hdc-device-command"
+        || command.schema_version != PROTOCOL_VERSION
+        || completion.command_id != command.command_id
+        || completion.device_id != command.device_id
+        || completion.device_epoch != command.device_epoch
+        || completion.sequence != command.sequence
+        || completion.operation_id != command.operation_id
+        || completion.implementation_sha256 != command.implementation_sha256
+        || completion.semantic_contract_sha256 != command.semantic_contract.contract_sha256
+    {
+        return Err(ValidationError::new(
+            "OUTPUT_VERIFICATION_IDENTITY_MISMATCH",
+            "completion identity does not match the original command",
+        ));
+    }
+    if command.semantic_contract.contract_version != "1.0.0"
+        || command.semantic_contract.contract_id != expected_contract_id(&command.operation_id)?
+        || command.semantic_contract.contract_sha256
+            != expected_contract_sha256(&command.operation_id)?
+    {
+        return Err(ValidationError::new(
+            "OUTPUT_VERIFICATION_NONCANONICAL_SEMANTICS",
+            "command does not bind the host-pinned semantic contract",
+        ));
+    }
+    validate_sha256(&command.implementation_sha256, "command.implementation_sha256")?;
+
+    let expected_role = output_role(&command.operation_id);
+    let output_descriptor = command
+        .buffers
+        .iter()
+        .find(|buffer| buffer.role == expected_role)
+        .ok_or_else(|| ValidationError::new(
+            "MISSING_COMMAND_OUTPUT",
+            "command does not contain its operation-specific output buffer",
+        ))?;
+    if output_descriptor.access != "write" {
+        return Err(ValidationError::new(
+            "COMMAND_OUTPUT_NOT_WRITABLE",
+            "operation output descriptor must declare write access",
+        ));
+    }
+    let output_binding = completion.output_buffer.as_ref().ok_or_else(|| {
+        ValidationError::new("MISSING_OUTPUT_BINDING", "completion has no output binding")
+    })?;
+    if output_binding.role != output_descriptor.role
+        || output_binding.handle_id != output_descriptor.handle_id
+        || parse_decimal_u64(&output_binding.generation, false, "completion.output.generation")?
+            != parse_decimal_u64(&output_descriptor.generation, false, "command.output.generation")?
+        || parse_decimal_u64(&output_binding.offset_bytes, true, "completion.output.offset")?
+            != parse_decimal_u64(&output_descriptor.offset_bytes, true, "command.output.offset")?
+        || parse_decimal_u64(&output_binding.length_bytes, false, "completion.output.length")?
+            != parse_decimal_u64(&output_descriptor.length_bytes, false, "command.output.length")?
+    {
+        return Err(ValidationError::new(
+            "OUTPUT_VERIFICATION_BUFFER_MISMATCH",
+            "completion output binding differs from the submitted command",
+        ));
+    }
+
+    let expected_len = match command.operation_id.as_str() {
+        "hdc.bind_xor.exact.v1" => VECTOR_BYTES as usize,
+        "hdc.hamming.exact.v1" => 2,
+        "hdc.top1.exact.v1" => RESULT_RECORD_BYTES as usize,
+        _ => return Err(ValidationError::new("UNKNOWN_OPERATION", "operation is not admitted")),
+    };
+    if parse_decimal_u64(&output_descriptor.length_bytes, false, "command.output.length")?
+        != expected_len as u64
+        || actual_output.len() != expected_len
+        || oracle_output.len() != expected_len
+    {
+        return Err(ValidationError::new(
+            "OUTPUT_LENGTH_MISMATCH",
+            format!("command, actual and oracle output must each be exactly {expected_len} bytes"),
+        ));
+    }
+
+    let result = completion.result.as_ref().ok_or_else(|| {
+        ValidationError::new("MISSING_COMPLETION_RESULT", "completed result object is absent")
+    })?;
+    let actual_sha256 = format!("{:x}", Sha256::digest(actual_output));
+    if actual_sha256 != result.output_sha256 {
+        return Err(ValidationError::new(
+            "OUTPUT_DIGEST_MISMATCH",
+            "device-reported output SHA-256 differs from the actual returned bytes",
+        ));
+    }
+
+    match command.operation_id.as_str() {
+        "hdc.bind_xor.exact.v1" => {
+            if result.winner_stable_id.is_some()
+                || result.hamming_distance_bits.is_some()
+                || result.result_record_bytes.is_some()
+            {
+                return Err(ValidationError::new(
+                    "INVALID_XOR_RESULT",
+                    "XOR completion must not include scalar Top-1/Hamming fields",
+                ));
+            }
+        }
+        "hdc.hamming.exact.v1" => {
+            let distance = u16::from_le_bytes([actual_output[0], actual_output[1]]) as u64;
+            if distance > DIMENSION_BITS
+                || result.hamming_distance_bits != Some(distance)
+                || result.winner_stable_id.is_some()
+                || result.result_record_bytes.is_some()
+            {
+                return Err(ValidationError::new(
+                    "INVALID_HAMMING_RESULT_BYTES",
+                    "encoded Hamming output does not match the completion's exact distance",
+                ));
+            }
+        }
+        "hdc.top1.exact.v1" => {
+            let winner_id = u64::from_le_bytes(actual_output[0..8].try_into().map_err(|_| {
+                ValidationError::new("INVALID_TOP1_OUTPUT", "winner ID field is truncated")
+            })?);
+            let distance = u16::from_le_bytes([actual_output[8], actual_output[9]]) as u64;
+            let reserved_is_zero = actual_output[10..16].iter().all(|byte| *byte == 0);
+            let reported_id = result.winner_stable_id.as_deref()
+                .ok_or_else(|| ValidationError::new("MISSING_WINNER_ID", "Top-1 result has no winner ID"))?;
+            if parse_decimal_u64(reported_id, true, "winner_stable_id")? != winner_id
+                || result.hamming_distance_bits != Some(distance)
+                || distance > DIMENSION_BITS
+                || result.result_record_bytes != Some(RESULT_RECORD_BYTES)
+                || !reserved_is_zero
+            {
+                return Err(ValidationError::new(
+                    "INVALID_TOP1_OUTPUT_BYTES",
+                    "Top-1 bytes do not match result metadata or reserved bytes are non-zero",
+                ));
+            }
+        }
+        _ => return Err(ValidationError::new("UNKNOWN_OPERATION", "operation is not admitted")),
+    }
+
+    if actual_output != oracle_output {
+        return Err(ValidationError::new(
+            "OUTPUT_ORACLE_MISMATCH",
+            "actual device output differs from the independent exact oracle bytes",
+        ));
+    }
+
+    Ok(VerifiedExactOutput {
+        command_id: command.command_id.clone(),
+        device_id: command.device_id.clone(),
+        device_epoch: command.device_epoch.clone(),
+        sequence: parse_decimal_u64(&command.sequence, false, "command.sequence")?,
+        operation_id: command.operation_id.clone(),
+        output_handle_id: output_descriptor.handle_id.clone(),
+        output_generation: parse_decimal_u64(
+            &output_descriptor.generation,
+            false,
+            "command.output.generation",
+        )?,
+        output_sha256: actual_sha256,
+        output_bytes: actual_output.len() as u64,
+    })
+}
+
 /// Parse canonical decimal text without floating-point conversion. This
 /// preserves all u64 values and rejects signs, whitespace and leading zeros.
 pub fn parse_decimal_u64(
@@ -1539,8 +1826,24 @@ mod tests {
                 .unwrap(),
             CompletionDisposition::CompletedOutputAvailable
         );
-        assert_eq!(registry.ownership("fixture-result", 1), Some(&BufferOwnership::HostOwned));
+        assert!(matches!(
+            registry.ownership("fixture-result", 1),
+            Some(BufferOwnership::OutputUnverified { .. })
+        ));
+        assert_eq!(registry.ownership("fixture-query", 1), Some(&BufferOwnership::HostOwned));
         assert_eq!(ledger.pending_count(), 0);
+
+        let mut output = vec![0u8; RESULT_RECORD_BYTES as usize];
+        let winner_id = completion.result.as_ref().unwrap().winner_stable_id
+            .as_ref().unwrap().parse::<u64>().unwrap();
+        let distance = completion.result.as_ref().unwrap().hamming_distance_bits.unwrap() as u16;
+        output[0..8].copy_from_slice(&winner_id.to_le_bytes());
+        output[8..10].copy_from_slice(&distance.to_le_bytes());
+        completion.result.as_mut().unwrap().output_sha256 =
+            format!("{:x}", Sha256::digest(&output));
+        let proof = verify_exact_output_bytes(&command, &completion, &output, &output).unwrap();
+        ledger.confirm_output_verified(&proof, &mut registry).unwrap();
+        assert_eq!(registry.ownership("fixture-result", 1), Some(&BufferOwnership::HostOwned));
     }
 
     #[test]
@@ -1641,6 +1944,87 @@ mod tests {
             4
         );
         assert_eq!(registry.ownership("fixture-result", 1), Some(&BufferOwnership::HostOwned));
+    }
+
+    #[test]
+    fn output_verification_rejects_digest_and_oracle_mismatches() {
+        let (capabilities, command, mut completion, mut registry, mut ledger) = setup();
+        ledger.submit(&command, &capabilities, &mut registry).unwrap();
+        ledger.accept_completion(&completion, &capabilities, &mut registry).unwrap();
+
+        let mut output = vec![0u8; RESULT_RECORD_BYTES as usize];
+        output[0..8].copy_from_slice(&42u64.to_le_bytes());
+        output[8..10].copy_from_slice(&7u16.to_le_bytes());
+        completion.result.as_mut().unwrap().output_sha256 =
+            format!("{:x}", Sha256::digest(&output));
+
+        let mut wrong_digest = completion.clone();
+        wrong_digest.result.as_mut().unwrap().output_sha256 = "a".repeat(64);
+        assert_eq!(
+            verify_exact_output_bytes(&command, &wrong_digest, &output, &output)
+                .unwrap_err().code,
+            "OUTPUT_DIGEST_MISMATCH"
+        );
+
+        let mut wrong_oracle = output.clone();
+        wrong_oracle[0] ^= 1;
+        assert_eq!(
+            verify_exact_output_bytes(&command, &completion, &output, &wrong_oracle)
+                .unwrap_err()
+                .code,
+            "OUTPUT_ORACLE_MISMATCH"
+        );
+        assert!(matches!(
+            registry.ownership("fixture-result", 1),
+            Some(BufferOwnership::OutputUnverified { .. })
+        ));
+    }
+
+    #[test]
+    fn output_verification_rejects_nonzero_top1_reserved_bytes() {
+        let (capabilities, command, mut completion, mut registry, mut ledger) = setup();
+        ledger.submit(&command, &capabilities, &mut registry).unwrap();
+        ledger.accept_completion(&completion, &capabilities, &mut registry).unwrap();
+
+        let mut output = vec![0u8; RESULT_RECORD_BYTES as usize];
+        output[0..8].copy_from_slice(&42u64.to_le_bytes());
+        output[8..10].copy_from_slice(&7u16.to_le_bytes());
+        output[10] = 1;
+        completion.result.as_mut().unwrap().output_sha256 =
+            format!("{:x}", Sha256::digest(&output));
+        assert_eq!(
+            verify_exact_output_bytes(&command, &completion, &output, &output)
+                .unwrap_err()
+                .code,
+            "INVALID_TOP1_OUTPUT_BYTES"
+        );
+        assert!(matches!(
+            registry.ownership("fixture-result", 1),
+            Some(BufferOwnership::OutputUnverified { .. })
+        ));
+    }
+
+    #[test]
+    fn reset_quarantines_outputs_that_have_not_passed_oracle_verification() {
+        let (capabilities, command, completion, mut registry, mut ledger) = setup();
+        ledger.submit(&command, &capabilities, &mut registry).unwrap();
+        ledger.accept_completion(&completion, &capabilities, &mut registry).unwrap();
+        assert!(matches!(
+            registry.ownership("fixture-result", 1),
+            Some(BufferOwnership::OutputUnverified { .. })
+        ));
+
+        ledger
+            .reset("ffeeddccbbaa99887766554433221100", &mut registry)
+            .unwrap();
+        assert!(matches!(
+            registry.ownership("fixture-result", 1),
+            Some(BufferOwnership::Quarantined { .. })
+        ));
+        assert_eq!(
+            ledger.confirm_dma_quiescent("00112233445566778899aabbccddeeff", &mut registry),
+            4
+        );
     }
 
     #[test]
