@@ -18,6 +18,7 @@ on:
       - "data/schemas/precursor_genome_source_manifest_v0_1.schema.json"
       - "data/research/precursor_genome_source_manifest_v0_1.json"
       - "data/research/sc_onset_in_situ_validation_v0_1.json"
+      - "data/research/sc_onset_pair_holdout_manifest_v0_1.json"
       - "research/superconductivity/capability_experiment_planning/precursor_genome/**"
       - "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_*.json"
       - "tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"
@@ -40,6 +41,7 @@ on:
       - "data/schemas/precursor_genome_source_manifest_v0_1.schema.json"
       - "data/research/precursor_genome_source_manifest_v0_1.json"
       - "data/research/sc_onset_in_situ_validation_v0_1.json"
+      - "data/research/sc_onset_pair_holdout_manifest_v0_1.json"
       - "research/superconductivity/capability_experiment_planning/precursor_genome/**"
       - "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_*.json"
       - "tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"
@@ -305,6 +307,7 @@ jobs:
             sha256sum data/schemas/precursor_genome_source_manifest_v0_1.schema.json
             sha256sum data/research/precursor_genome_source_manifest_v0_1.json
             sha256sum data/research/sc_onset_in_situ_validation_v0_1.json
+            sha256sum data/research/sc_onset_pair_holdout_manifest_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/src/bin/precursor_genome_audit.rs
             sha256sum tools/superconductivity-discovery-harness/fixtures/onset_prediction_smoke_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/fixtures/onset_prediction_suite_v0_1.json
