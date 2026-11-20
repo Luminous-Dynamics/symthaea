@@ -94,6 +94,8 @@ pub struct SplitManifestV1 {
     pub train_sha256: String,
     pub calibration_sha256: String,
     pub heldout_sha256: String,
+    pub task_family_split_sha256: String,
+    pub source_root_split_sha256: String,
     pub training_clusters: usize,
     pub calibration_clusters: usize,
     pub heldout_clusters: usize,
@@ -102,6 +104,7 @@ pub struct SplitManifestV1 {
 pub struct ModelV1 {
     weights: [f64; 8],
     training: Identity,
+    pub training_base_rate_bps: u16,
     pub model_sha256: String,
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -205,10 +208,30 @@ pub fn qualify_splits(
     ensure_disjoint(&train.identity, &cal.identity)?;
     ensure_disjoint(&train.identity, &test.identity)?;
     ensure_disjoint(&cal.identity, &test.identity)?;
+    let mut family_hasher = Sha256::new();
+    family_hasher.update(b"mace:task-family-split:v1\\0");
+    let mut root_hasher = Sha256::new();
+    root_hasher.update(b"mace:source-root-split:v1\\0");
+    for (label, identity) in [
+        ("train", &train.identity),
+        ("calibration", &cal.identity),
+        ("heldout", &test.identity),
+    ] {
+        field(&mut family_hasher, label.as_bytes());
+        for family in &identity.families {
+            family_hasher.update(family.to_be_bytes());
+        }
+        field(&mut root_hasher, label.as_bytes());
+        for root in &identity.roots {
+            root_hasher.update(root.as_bytes());
+        }
+    }
     Ok(SplitManifestV1 {
         train_sha256: train.digest,
         calibration_sha256: cal.digest,
         heldout_sha256: test.digest,
+        task_family_split_sha256: sha(&family_hasher.finalize()),
+        source_root_split_sha256: sha(&root_hasher.finalize()),
         training_clusters: train.identity.clusters.len(),
         calibration_clusters: cal.identity.clusters.len(),
         heldout_clusters: test.identity.clusters.len(),
@@ -224,6 +247,10 @@ pub fn train(rows: &[ExampleV1], config: ModelConfigV1) -> Result<ModelV1, Rejec
     let mut ordered: Vec<_> = rows.iter().collect();
     ordered.sort_by_key(|row| row.event_id);
     let count = ordered.len() as f64;
+    let positives = ordered.iter().filter(|row| row.future_reused).count() as f64;
+    let training_base_rate_bps = (10_000.0 * positives / count)
+        .round()
+        .clamp(0.0, 10_000.0) as u16;
     let rate = f64::from(config.learning_rate_micros) / 1_000_000.0;
     let l2 = f64::from(config.l2_micros) / 1_000_000.0;
     let mut weights = [0.0_f64; 8];
@@ -248,10 +275,12 @@ pub fn train(rows: &[ExampleV1], config: ModelConfigV1) -> Result<ModelV1, Rejec
     hasher.update(config.epochs.to_be_bytes());
     hasher.update(config.learning_rate_micros.to_be_bytes());
     hasher.update(config.l2_micros.to_be_bytes());
+    hasher.update(training_base_rate_bps.to_be_bytes());
     for weight in weights { hasher.update(weight.to_bits().to_be_bytes()); }
     Ok(ModelV1 {
         weights,
         training: split.identity,
+        training_base_rate_bps,
         model_sha256: sha(&hasher.finalize()),
     })
 }
@@ -347,14 +376,16 @@ pub fn evaluate(
     let probabilities: Vec<f64> = rows.iter().map(|row| {
         calibrator.predict_bps(model, row.features).map(|value| f64::from(value) / 10_000.0)
     }).collect::<Result<_, _>>()?;
-    let rate = rows.iter().filter(|row| row.future_reused).count() as f64
-        / rows.len() as f64;
+    // Deployable reference uses only training labels; held-out labels are
+    // reserved for evaluation and cannot set the comparator's prevalence.
+    let training_base_rate =
+        f64::from(model.training_base_rate_bps) / 10_000.0;
     let mut brier = 0.0;
     let mut base_brier = 0.0;
     for (row, probability) in rows.iter().zip(&probabilities) {
         let target = if row.future_reused { 1.0 } else { 0.0 };
         brier += (*probability - target).powi(2);
-        base_brier += (rate - target).powi(2);
+        base_brier += (training_base_rate - target).powi(2);
     }
     brier /= rows.len() as f64;
     base_brier /= rows.len() as f64;
@@ -527,6 +558,35 @@ mod tests {
         assert_eq!(prediction.prediction_sha256, prediction.canonical_digest());
         assert_eq!(prediction.model_id, "mace-learned-future-use");
         assert_eq!(prediction.model_version, "logistic-platt-v1");
+    }
+
+    #[test]
+    fn split_manifest_binds_task_family_and_source_root_membership() {
+        let training = rows(1, 1, 10);
+        let calibration = rows(10_000, 100, 30);
+        let heldout = rows(20_000, 200, 50);
+        let manifest = qualify_splits(&training, &calibration, &heldout).unwrap();
+        assert_eq!(manifest.task_family_split_sha256.len(), 64);
+        assert_eq!(manifest.source_root_split_sha256.len(), 64);
+    }
+
+    #[test]
+    fn heldout_prevalence_does_not_change_training_base_rate_comparator() {
+        let training = rows(1, 1, 10);
+        let calibration = rows(10_000, 100, 30);
+        let mut heldout_a = rows(20_000, 200, 50);
+        let mut heldout_b = heldout_a.clone();
+        for row in &mut heldout_b {
+            row.future_reused = !row.future_reused;
+        }
+        let model = train(&training, ModelConfigV1::default()).unwrap();
+        let calibrator = calibrate(&model, &calibration).unwrap();
+        let score_a = evaluate(&model, &calibrator, &heldout_a).unwrap();
+        let score_b = evaluate(&model, &calibrator, &heldout_b).unwrap();
+        assert_eq!(
+            score_a.base_rate_brier_micros,
+            score_b.base_rate_brier_micros
+        );
     }
 
     #[test]
