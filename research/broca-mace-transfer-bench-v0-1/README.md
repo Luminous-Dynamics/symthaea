@@ -37,7 +37,7 @@ This is a stronger compile-time boundary than placing the oracle in another Rust
 
 ## Scenario families
 
-The deterministic fixed corpus includes eighteen two-session cases:
+The deterministic fixed corpus includes twenty two-session cases:
 
 1. Identified interventional effect transfer.
 2. Confounded observational association decoy.
@@ -57,14 +57,16 @@ The deterministic fixed corpus includes eighteen two-session cases:
 16. Common-cause attack: two source-family labels share one upstream root.
 17. Error-interval negative control: point estimates are close but measurement bounds exceed the equivalence margin.
 18. Common-mode baseline shift with invariant treatment effect.
+19. High-reward observational causal decoy.
+20. Unsupported quasi-experimental causal decoy.
 
 ## Compared policies
 
 - `no_memory`: fixed conservative fallback.
 - `frequency_only`: aggregate all observed outcomes, ignoring scope and evidence governance.
 - `scope_aware`: restrict to exact regime and objective, but does not qualify source or causal evidence.
-- `causal_qualified`: require exact scope, intervention, pre-registration, reconciled outcome, trusted non-retracted source, confounder control, completed delayed horizon, unique event IDs, at least two nonzero source-family labels and at least two distinct verified upstream source-root digests. A comparative decision also requires qualified support for both candidate actions; one-sided support abstains.
-- `invariant_transport`: reuse prior-regime effects only with target-regime witnesses, disjoint source families and roots, and worst-case source/target effect-interval difference within the fixed 0.12 normalized-utility margin.
+- `causal_qualified`: require exact scope, receipt-verified randomized causal design, pre-registration, reconciled outcome, trusted non-retracted source, confounder control, completed delayed horizon, unique event IDs, distinct source families and verified upstream roots. The design must bind known design/estimand digests, treatment-assignment bounds within [0.05, 0.95], maximum absolute standardized mean difference ≤0.10, and interference control. A comparative decision also requires qualified support for both actions; one-sided support abstains.
+- `invariant_transport`: reuse prior-regime effects only with target-regime witnesses, method-qualified causal design, disjoint source families and roots, and worst-case source/target effect-interval difference within the fixed 0.12 normalized-utility margin.
 - `active_probe`: try exact-scope and invariant transport first; otherwise emit a typed, bounded environment-interaction request.
 
 The oracle is evaluator-only and is not linked as a dependency into the candidate-policy crate.
@@ -79,7 +81,7 @@ The oracle is evaluator-only and is not linked as a dependency into the candidat
 
 ## What v0.1 can and cannot establish
 
-The harness regression-tests transparent policy rules against fixed and generated synthetic failure modes. The causal-qualified and invariant-transport policies are hand-authored, not learned causal models. A zero-overclaim or high-accuracy result on these eighteen fixed cases is **not** evidence of causal discovery, real-world transfer, general intelligence or SOTA.
+The harness regression-tests transparent policy rules against fixed and generated synthetic failure modes. The causal-qualified and invariant-transport policies are hand-authored, not learned causal models. A zero-overclaim or high-accuracy result on these twenty fixed cases is **not** evidence of causal discovery, real-world transfer, general intelligence or SOTA.
 
 Remaining gaps:
 - hidden external evaluator custody or sealed labels;
@@ -119,9 +121,9 @@ Do not pool percentages across these tasks. Reproduce each official protocol sep
 - [#8265](https://github.com/Luminous-Dynamics/symthaea/issues/8265): claim identity versus similarity.
 - [#11816](https://github.com/Luminous-Dynamics/symthaea/issues/11816): evaluator and oracle independence.
 
-## Generated stress tranche (MACE v0.6 research)
+## Generated stress tranche (MACE v0.12 research)
 
-A second evaluator binary adds **256 deterministic clusters × 17 scenario families = 4,352 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, a shared-common-root attack, an error-interval negative control, a common-mode baseline-shift positive control, qualified negative experience, few-shot invariant transport, a mechanism-break negative control, and an unseen-target case that triggers active probing.
+A second evaluator binary adds **256 deterministic clusters × 19 scenario families = 4,864 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, a shared-common-root attack, an error-interval negative control, a common-mode baseline-shift positive control, qualified negative experience, few-shot invariant transport, a mechanism-break negative control, an unseen-target case that triggers active probing, and high-reward observational / unsupported quasi-experimental causal decoys.
 
 Run it independently:
 
@@ -134,7 +136,7 @@ The candidate gate requires unique event IDs, at least two distinct nonzero sour
 
 This is a generated synthetic stress distribution—not an official MemoryArena/AMA-Bench adapter, learned-policy train/test split, sealed external oracle or real-world causal discovery. Source-family IDs vary to expose correlation/identity failures, but independence is not cryptographically attested. Bootstrap intervals quantify variation over these generated clusters only; they do not establish external validity. Session-C corrections are applied as observed source-state updates before the next decision.
 
-## Invariant transport experiment (MACE v0.6 research)
+## Invariant transport experiment (MACE v0.12 research)
 
 The candidate crate adds an `invariant_transport` policy alongside exact-scope `causal_qualified`. It compares the treatment contrast `mean(A) - mean(B)` across regimes—not the absolute outcome level for each action—so a common-mode baseline shift does not invalidate an unchanged action effect. Both actions need target-regime witnesses; each source regime needs independently qualified evidence for both actions; source/target family and root digests must be disjoint. The worst-case difference between source and target treatment-effect intervals must fit within a fixed 0.12 normalized-utility equivalence margin.
 
@@ -476,3 +478,12 @@ The report includes Brier score versus a **training-only** base-rate comparator,
 
 
 For capability-level Cycle 2 anchors and +5-point targets (explicit recall, multi-hop, temporal, governance, care, workflow, privacy, streaming; coding new-feature/bug-fix; multimodal retrieval/relational/temporal/continual/personalization/governance), see the comparison table in [MACE_CAUSAL_MEMORY_BENCHMARK_PORTFOLIO.md](../../docs/research/MACE_CAUSAL_MEMORY_BENCHMARK_PORTFOLIO.md).
+## Causal identification gate (MACE v0.12 research)
+
+MACE no longer treats `intervention_confirmed` and `confounders_controlled` booleans as sufficient causal-identification metadata. Candidate-visible experiences carry a typed `CausalIdentificationV1`: method, receipt-bound design and estimand digests, treatment-assignment overlap bounds, covariate-balance bound and interference-control status.
+
+Only a receipt-verified randomized design currently qualifies for causal transfer. The prototype gate requires known design/estimand digests, propensity bounds within [0.05, 0.95], maximum absolute standardized mean difference ≤0.10, and interference control. Observational and quasi-experimental histories remain admitted and retrievable as observations, but are not promoted into causal rules. The fixed and generated suites contain high-reward observational and unsupported quasi-experimental decoys; the exact-scope and transport paths share the same method gate.
+
+These thresholds are prototype settings, not universal causal-inference standards. The injected `EvidenceVerifier` must bind the design receipt to the randomization mechanism, eligible population, preregistration, estimand, covariates and outcome horizon. Current implementations are fixtures; no live Mycelix signature or randomization audit is claimed. Quasi-experimental support requires separate diagnostics (e.g. DiD pre-trends, IV strength/exclusion, RD manipulation/continuity, and synthetic-control donor/placebo tests) rather than simply enabling a generic flag.
+
+The canonical consolidation source-binding digest now includes all seven causal-design fields. A mutation test changes method, design digest, estimand digest, lower/upper assignment bounds, balance bound and interference status one at a time and requires the canonical source-binding digest to change.
