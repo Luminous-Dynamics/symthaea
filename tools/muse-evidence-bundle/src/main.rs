@@ -25,6 +25,9 @@ fn run() -> Result<i32, String> {
     let evidence_dir = PathBuf::from(&args[3]);
     let manifest = fs::read(&manifest_path)
         .map_err(|error| format!("read {}: {error}", manifest_path.display()))?;
+    let case = read_optional(&evidence_dir.join("case.json"))?;
+    let source_audio = read_optional(&evidence_dir.join("source-audio.wav"))?;
+    let gain_contract = read_optional(&evidence_dir.join("gain-envelope-contract.json"))?;
     let symbolic = read_optional(&evidence_dir.join("symbolic-result.json"))?;
     let render = read_optional(&evidence_dir.join("render-receipt.json"))?;
     let acoustic = read_optional(&evidence_dir.join("acoustic-result.json"))?;
@@ -34,6 +37,9 @@ fn run() -> Result<i32, String> {
     let render_bundle_root = render_root.is_dir().then_some(render_root.as_path());
 
     let inputs = EvidenceInputsV1 {
+        case_json: case.as_deref(),
+        source_audio_wav: source_audio.as_deref(),
+        gain_envelope_contract_json: gain_contract.as_deref(),
         symbolic_result_json: symbolic.as_deref(),
         render_receipt_json: render.as_deref(),
         render_bundle_root,
