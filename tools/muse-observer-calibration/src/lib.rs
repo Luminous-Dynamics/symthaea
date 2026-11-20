@@ -21,6 +21,9 @@ pub const CALIBRATOR_ID_V1: &str = "muse-isotonic-salience-calibrator";
 pub const CALIBRATOR_VERSION_V1: &str = "0.1.0";
 pub const MAX_DATASET_OBSERVATIONS_V1: usize = 2_000_000;
 const DATASET_DOMAIN_V1: &[u8] = b"luminous-dynamics-muse-observer-calibration-dataset-v1";
+const SPLIT_DOMAIN_V1: &[u8] = b"luminous-dynamics-muse-observer-calibration-split-v1";
+const CONTRACT_DOMAIN_V1: &[u8] = b"luminous-dynamics-muse-observer-calibration-contract-v1";
+const MODEL_DOMAIN_V1: &[u8] = b"luminous-dynamics-muse-observer-calibration-model-v1";
 const BUNDLE_DOMAIN_V1: &[u8] = b"luminous-dynamics-muse-observer-calibration-bundle-v1";
 const MAX_BOOTSTRAP_SCORING_ROWS_V1: usize = 100_000_000;
 
@@ -259,7 +262,7 @@ fn dataset_digest(dataset: &CalibrationDatasetV1) -> Result<String, String> {
     let mut value = serde_json::to_value(dataset)
         .map_err(|error| format!("calibration dataset serialization failed: {error}"))?;
     value["dataset_sha256"] = Value::String(String::new());
-    Ok(domain_digest(DATASET_DOMAIN_V1, &canonical_json_bytes(&value)?))
+    Ok(domain_digest(SPLIT_DOMAIN_V1, &canonical_json_bytes(&value)?))
 }
 
 fn contract_digest(contract: &CalibrationContractV1) -> Result<String, String> {
@@ -850,7 +853,7 @@ pub fn run_calibration_v1(
         "fit_positive_count": fit_positive,
         "blocks": blocks
     });
-    let model_sha = domain_digest(BUNDLE_DOMAIN_V1, &canonical_json_bytes(&model_value)?);
+    let model_sha = domain_digest(MODEL_DOMAIN_V1, &canonical_json_bytes(&model_value)?);
     let model: IsotonicModelV1 = serde_json::from_value({
         let mut value = model_value;
         value["model_sha256"] = Value::String(model_sha);
