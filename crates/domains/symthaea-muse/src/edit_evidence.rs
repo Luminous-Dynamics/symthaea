@@ -7,10 +7,9 @@ use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
 use std::time::Instant;
 use symthaea_music_theory::{
-    pitch::{Pitch, PitchClass},
+    pitch::Pitch,
     rhythm::Duration,
     score::{Emphasis, PartId, Score, ScoreNote, VoiceRole},
-    harmony::Key,
 };
 
 const CASE_SCHEMA: &str = "muse-edit-evidence-case-v1";
@@ -143,7 +142,7 @@ fn score_metadata_equal(a: &Score, b: &Score) -> bool {
 }
 
 fn metric(id: &str, numerator: usize, denominator: usize, threshold: f64, lower: bool) -> Value {
-    let score = (denominator != 0).then_some(numerator as f64 / denominator as f64);
+    let score = if denominator == 0 { None } else { Some(numerator as f64 / denominator as f64) };
     let passed = score.map(|actual| {
         if lower { actual <= threshold } else { actual >= threshold }
     }).unwrap_or(true);
@@ -370,6 +369,7 @@ pub fn evaluate_velocity_case(
         let id = request.as_str().ok_or("target metric IDs must be strings")?;
         target_metrics.push(match id {
             "exact_event_accuracy" | "velocity_accuracy" => metric(id, target_correct, target_expected, 1.0, false),
+            "instruction_rubric_pass" => unavailable_metric(id),
             _ => unavailable_metric(id),
         });
     }
@@ -416,8 +416,13 @@ pub fn evaluate_velocity_case(
         }));
     }
 
+    // Instruction-language evidence is a separate conjunct, not a symbolic
+    // target metric. Keep its not_run result visible without conflating it
+    // with the deterministic score-space operation gate.
     let target_pass = target_metrics.iter()
-        .all(|item| item.get("passed").and_then(Value::as_bool) == Some(true));
+        .filter(|item| item.get("metric_id").and_then(Value::as_str) != Some("instruction_rubric_pass"))
+        .all(|item| item.get("passed").and_then(Value::as_bool) == Some(true))
+        && target_expected > 0;
     let mut preservation_metrics = Vec::new();
     for request in requested_preservation {
         let id = request.as_str().ok_or("preservation metric IDs must be strings")?;
@@ -501,7 +506,7 @@ pub fn evaluate_velocity_case(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_music_theory::harmony::Key;
+    use symthaea_music_theory::{harmony::Key, pitch::PitchClass};
 
     fn note(part: u16, beat: i64, velocity: f32) -> ScoreNote {
         ScoreNote {
