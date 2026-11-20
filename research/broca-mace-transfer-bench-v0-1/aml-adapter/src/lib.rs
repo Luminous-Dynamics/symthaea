@@ -78,6 +78,45 @@ pub struct AddResponse {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AddVisibilityReceiptV1 {
+    pub track: Track,
+    pub request_id: String,
+    pub user_id: String,
+    pub session_id: String,
+    pub request_payload_digest: String,
+    pub write_receipt_digest: String,
+    pub search_visibility_receipt_digest: String,
+    pub persisted_at_ms: i64,
+    pub searchable_at_ms: i64,
+    pub visible_memory_ids: Vec<String>,
+}
+
+pub trait AddVisibilityVerifierV1 {
+    fn verify(&self, receipt: &AddVisibilityReceiptV1) -> Result<(), AmlReject>;
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifiedAddVisibilityV1 {
+    track: Track,
+    request_id: String,
+    user_id: String,
+    session_id: String,
+    request_payload_digest: String,
+    response: AddResponse,
+    visible_memory_ids: Vec<String>,
+}
+
+impl VerifiedAddVisibilityV1 {
+    pub fn visible_memory_ids(&self) -> &[String] {
+        &self.visible_memory_ids
+    }
+
+    pub fn request_payload_digest(&self) -> &str {
+        &self.request_payload_digest
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SearchRequest {
     pub query: MessageContent,
     pub options: Option<Vec<String>>,
@@ -119,7 +158,12 @@ pub enum AmlReject {
     EmptyCreatedAt,
     InvalidTopK,
     EmptySearchUserId,
-    AddNotPersistedAndSearchable,
+    AddVisibilityBindingMismatch,
+    AddVisibilityInvalidReceiptDigest,
+    AddVisibilityInvalidTimeOrder,
+    AddVisibilityNoSearchableItems,
+    AddVisibilityDuplicateMemoryId,
+    AddVisibilityVerificationFailed,
     AddResponseNotSuccessful,
     AddResponseEchoMismatch,
     SearchResponseTooLarge,
@@ -137,6 +181,13 @@ pub enum AmlReject {
 fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn is_lower_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value.bytes().all(|byte| {
+            byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+        })
 }
 
 fn hash_field(hasher: &mut Sha256, value: &str) {
@@ -366,13 +417,13 @@ pub fn chunk_textual_messages(
 }
 
 pub fn validate_add_response(
+    track: Track,
     request: &AddRequest,
     response: &AddResponse,
-    persisted_and_searchable: bool,
-) -> Result<(), AmlReject> {
-    if !persisted_and_searchable {
-        return Err(AmlReject::AddNotPersistedAndSearchable);
-    }
+    receipt: &AddVisibilityReceiptV1,
+    verifier: &impl AddVisibilityVerifierV1,
+) -> Result<VerifiedAddVisibilityV1, AmlReject> {
+    validate_add_request(track, request)?;
     if !response.success {
         return Err(AmlReject::AddResponseNotSuccessful);
     }
@@ -382,7 +433,51 @@ pub fn validate_add_response(
     {
         return Err(AmlReject::AddResponseEchoMismatch);
     }
-    Ok(())
+
+    let payload_digest = add_payload_digest(track, request);
+    if receipt.track != track
+        || receipt.request_id != request.request_id
+        || receipt.user_id != request.user_id
+        || receipt.session_id != request.session_id
+        || receipt.request_payload_digest != payload_digest
+    {
+        return Err(AmlReject::AddVisibilityBindingMismatch);
+    }
+    if !is_lower_sha256(&receipt.write_receipt_digest)
+        || !is_lower_sha256(&receipt.search_visibility_receipt_digest)
+    {
+        return Err(AmlReject::AddVisibilityInvalidReceiptDigest);
+    }
+    if receipt.persisted_at_ms < 0
+        || receipt.searchable_at_ms < receipt.persisted_at_ms
+    {
+        return Err(AmlReject::AddVisibilityInvalidTimeOrder);
+    }
+    if receipt.visible_memory_ids.is_empty() {
+        return Err(AmlReject::AddVisibilityNoSearchableItems);
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    for memory_id in &receipt.visible_memory_ids {
+        if memory_id.trim().is_empty() {
+            return Err(AmlReject::AddVisibilityNoSearchableItems);
+        }
+        if !seen.insert(memory_id.as_str()) {
+            return Err(AmlReject::AddVisibilityDuplicateMemoryId);
+        }
+    }
+    verifier
+        .verify(receipt)
+        .map_err(|_| AmlReject::AddVisibilityVerificationFailed)?;
+
+    Ok(VerifiedAddVisibilityV1 {
+        track,
+        request_id: request.request_id.clone(),
+        user_id: request.user_id.clone(),
+        session_id: request.session_id.clone(),
+        request_payload_digest: payload_digest,
+        response: response.clone(),
+        visible_memory_ids: receipt.visible_memory_ids.clone(),
+    })
 }
 
 /// Request-body identity for idempotent Add retries. Length-prefixing prevents
@@ -479,16 +574,22 @@ impl AddIdempotencyLedger {
         }
     }
 
-    pub fn complete(
+pub fn complete(
         &mut self,
         track: Track,
         request: &AddRequest,
-        response: AddResponse,
-        persisted_and_searchable: bool,
+        verified: VerifiedAddVisibilityV1,
     ) -> Result<(), AmlReject> {
         validate_add_request(track, request)?;
-        validate_add_response(request, &response, persisted_and_searchable)?;
         let digest = add_payload_digest(track, request);
+        if verified.track != track
+            || verified.request_id != request.request_id
+            || verified.user_id != request.user_id
+            || verified.session_id != request.session_id
+            || verified.request_payload_digest != digest
+        {
+            return Err(AmlReject::AddVisibilityBindingMismatch);
+        }
         let key = idempotency_key(track, request);
         let Some((stored_digest, stored_response)) = self.entries.get_mut(&key)
         else {
@@ -500,7 +601,7 @@ impl AddIdempotencyLedger {
         if stored_response.is_some() {
             return Err(AmlReject::AddAlreadyCompleted);
         }
-        *stored_response = Some(response);
+        *stored_response = Some(verified.response);
         Ok(())
     }
 
@@ -711,6 +812,74 @@ mod tests {
         }
     }
 
+    struct TestAddVisibilityVerifier;
+
+    impl AddVisibilityVerifierV1 for TestAddVisibilityVerifier {
+        fn verify(&self, receipt: &AddVisibilityReceiptV1) -> Result<(), AmlReject> {
+            let expected_write = sha256_hex(
+                format!(
+                    "fixture-write:{}:{}",
+                    receipt.request_payload_digest,
+                    receipt.persisted_at_ms
+                )
+                .as_bytes(),
+            );
+            let expected_search = sha256_hex(
+                format!(
+                    "fixture-search:{}:{}",
+                    receipt.request_payload_digest,
+                    receipt.searchable_at_ms
+                )
+                .as_bytes(),
+            );
+            if receipt.write_receipt_digest != expected_write
+                || receipt.search_visibility_receipt_digest != expected_search
+            {
+                return Err(AmlReject::AddVisibilityVerificationFailed);
+            }
+            Ok(())
+        }
+    }
+
+    fn visibility_receipt(
+        track: Track,
+        request: &AddRequest,
+    ) -> AddVisibilityReceiptV1 {
+        let digest = add_payload_digest(track, request);
+        let persisted_at_ms = 10;
+        let searchable_at_ms = 11;
+        AddVisibilityReceiptV1 {
+            track,
+            request_id: request.request_id.clone(),
+            user_id: request.user_id.clone(),
+            session_id: request.session_id.clone(),
+            request_payload_digest: digest.clone(),
+            write_receipt_digest: sha256_hex(
+                format!("fixture-write:{digest}:{persisted_at_ms}").as_bytes(),
+            ),
+            search_visibility_receipt_digest: sha256_hex(
+                format!("fixture-search:{digest}:{searchable_at_ms}").as_bytes(),
+            ),
+            persisted_at_ms,
+            searchable_at_ms,
+            visible_memory_ids: vec!["memory-1".into()],
+        }
+    }
+
+    fn verified_add(
+        track: Track,
+        request: &AddRequest,
+    ) -> VerifiedAddVisibilityV1 {
+        validate_add_response(
+            track,
+            request,
+            &ack(request),
+            &visibility_receipt(track, request),
+            &TestAddVisibilityVerifier,
+        )
+        .expect("fixture write/search receipts should verify")
+    }
+
     #[test]
     fn add_request_validates_track_role_content_and_ids() {
         let request = add_request("write-1");
@@ -726,19 +895,91 @@ mod tests {
     }
 
     #[test]
-    fn add_ack_requires_persisted_searchable_write_and_exact_echo() {
+    fn add_ack_requires_exact_echo_and_verified_visibility() {
         let request = add_request("write-2");
-        assert_eq!(
-            validate_add_response(&request, &ack(&request), false),
-            Err(AmlReject::AddNotPersistedAndSearchable)
-        );
+        let receipt = visibility_receipt(Track::Textual, &request);
         let mut mismatch = ack(&request);
         mismatch.user_id = "another-user".into();
         assert_eq!(
-            validate_add_response(&request, &mismatch, true),
-            Err(AmlReject::AddResponseEchoMismatch)
+            validate_add_response(
+                Track::Textual,
+                &request,
+                &mismatch,
+                &receipt,
+                &TestAddVisibilityVerifier,
+            )
+            .err(),
+            Some(AmlReject::AddResponseEchoMismatch)
         );
-        assert_eq!(validate_add_response(&request, &ack(&request), true), Ok(()));
+        let verified = validate_add_response(
+            Track::Textual,
+            &request,
+            &ack(&request),
+            &receipt,
+            &TestAddVisibilityVerifier,
+        )
+        .unwrap();
+        assert_eq!(verified.visible_memory_ids(), &["memory-1".to_owned()]);
+    }
+
+    #[test]
+    fn add_visibility_receipt_rejects_binding_empty_visibility_bad_time_and_forgery() {
+        let request = add_request("write-visibility");
+        let mut wrong_user = visibility_receipt(Track::Textual, &request);
+        wrong_user.user_id = "another-user".into();
+        assert_eq!(
+            validate_add_response(
+                Track::Textual,
+                &request,
+                &ack(&request),
+                &wrong_user,
+                &TestAddVisibilityVerifier,
+            )
+            .err(),
+            Some(AmlReject::AddVisibilityBindingMismatch)
+        );
+
+        let mut empty = visibility_receipt(Track::Textual, &request);
+        empty.visible_memory_ids.clear();
+        assert_eq!(
+            validate_add_response(
+                Track::Textual,
+                &request,
+                &ack(&request),
+                &empty,
+                &TestAddVisibilityVerifier,
+            )
+            .err(),
+            Some(AmlReject::AddVisibilityNoSearchableItems)
+        );
+
+        let mut bad_time = visibility_receipt(Track::Textual, &request);
+        bad_time.searchable_at_ms = 9;
+        assert_eq!(
+            validate_add_response(
+                Track::Textual,
+                &request,
+                &ack(&request),
+                &bad_time,
+                &TestAddVisibilityVerifier,
+            )
+            .err(),
+            Some(AmlReject::AddVisibilityInvalidTimeOrder)
+        );
+
+        let mut forged = visibility_receipt(Track::Textual, &request);
+        forged.search_visibility_receipt_digest = "0".repeat(64);
+        assert_eq!(
+            validate_add_response(
+                Track::Textual,
+                &request,
+                &ack(&request),
+                &forged,
+                &TestAddVisibilityVerifier,
+            )
+            .err(),
+            Some(AmlReject::AddVisibilityVerificationFailed)
+        );
     }
 
     #[test]
@@ -747,7 +988,9 @@ mod tests {
         let mut ledger = AddIdempotencyLedger::default();
         assert_eq!(ledger.begin(Track::Textual, &request), Ok(AddRetryState::New));
         assert_eq!(ledger.begin(Track::Textual, &request), Ok(AddRetryState::InFlight));
-        ledger.complete(Track::Textual, &request, ack(&request), true).unwrap();
+        ledger
+            .complete(Track::Textual, &request, verified_add(Track::Textual, &request))
+            .unwrap();
         assert_eq!(
             ledger.begin(Track::Textual, &request),
             Ok(AddRetryState::Committed(ack(&request)))
@@ -758,6 +1001,24 @@ mod tests {
         assert_eq!(
             ledger.begin(Track::Textual, &changed),
             Err(AmlReject::RequestIdPayloadConflict)
+        );
+    }
+
+    #[test]
+    fn idempotency_completion_rejects_visibility_token_from_another_scope() {
+        let request = add_request("verified-token-scope");
+        let mut other_user = request.clone();
+        other_user.user_id = "eval:user:two".into();
+        let mut ledger = AddIdempotencyLedger::default();
+        ledger.begin(Track::Textual, &request).unwrap();
+        let foreign = verified_add(Track::Textual, &other_user);
+        assert_eq!(
+            ledger.complete(Track::Textual, &request, foreign),
+            Err(AmlReject::AddVisibilityBindingMismatch)
+        );
+        assert_eq!(
+            ledger.begin(Track::Textual, &request),
+            Ok(AddRetryState::InFlight)
         );
     }
 
@@ -816,16 +1077,14 @@ mod tests {
             .complete(
                 Track::Textual,
                 &user_one,
-                ack(&user_one),
-                true,
+                verified_add(Track::Textual, &user_one),
             )
             .unwrap();
         ledger
             .complete(
                 Track::Textual,
                 &user_two,
-                ack(&user_two),
-                true,
+                verified_add(Track::Textual, &user_two),
             )
             .unwrap();
         assert_eq!(
@@ -848,8 +1107,7 @@ mod tests {
             .complete(
                 Track::Coding,
                 &same_tenant_other_track,
-                ack(&same_tenant_other_track),
-                true,
+                verified_add(Track::Coding, &same_tenant_other_track),
             )
             .unwrap();
         assert_eq!(

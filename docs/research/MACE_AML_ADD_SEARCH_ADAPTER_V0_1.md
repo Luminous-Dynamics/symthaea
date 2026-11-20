@@ -27,11 +27,11 @@ Required fields:
 
 Textual/Coding content is a string. Multimodal content can be a string or ordered text/image_url parts.
 
-Successful Add returns HTTP 200 only after the write is durable and immediately searchable. success must be true and request_id, user_id and session_id must echo byte-for-byte. HTTP 202 is only supported with an approved Add-status route; this prototype does not implement it.
+Successful Add returns HTTP 200 only after the write is durable and immediately searchable. The adapter models this with a typed write/search-visibility receipt bound to track, user, session and the exact request digest. A configured `AddVisibilityVerifierV1` authenticates the durable-write and read-after-write receipts before creating a private `VerifiedAddVisibilityV1` token; only that token can complete an idempotency reservation. HTTP 202 is only supported with an approved Add-status route; this prototype does not implement it. The checked-in verifier is fixture-only, not a live signed Mycelix/backend verifier.
 
 Textual chunks are split at the first of 20 messages or 2,000 words, counted by the frozen AML adapter. Streaming uses incremental session/task units; Coding preserves repository/session trajectories; Multimodal follows benchmark source units and media limits.
 
-The Rust adapter injects a FrozenAdapterWordCounter and records its version in TextualChunkPlan. The whitespace counter in tests is test-only and must not be used for an official run. A locally invented tokenizer would not establish compatibility with the frozen counter.
+The Rust adapter injects a FrozenAdapterWordCounter and records its version in TextualChunkPlan. Add idempotency is scoped by `(track, user_id, request_id)`; the body digest is track-domain-separated and payload rebinding within the same key is rejected. The whitespace counter in tests is test-only and must not be used for an official run. A locally invented tokenizer would not establish compatibility with the frozen counter.
 
 Chunk IDs are deterministic: logical request ID plus chunk index. An in-memory idempotency helper binds each request ID to a length-prefixed SHA-256 request digest. Same ID/same digest replays the in-flight/committed state; same ID/different digest is rejected. A hosted service must persist dedupe state atomically with the memory write.
 
@@ -80,9 +80,9 @@ These are programme goals, not achieved results. Recalculate absolute thresholds
 
 ## Implementation boundary
 
-The workspace contains broca-aml-adapter with 14 authored unit tests. Implemented: typed contract core, injected-counter Textual chunking, SHA-256 Add identity/idempotency helper, Add echo/persistence-gate validation, track-aware Search validation, Top-K/result-order checks and multimodal data-URI/media validation.
+The workspace contains broca-aml-adapter with 18 authored unit tests. Implemented: typed contract core, injected-counter Textual chunking, tenant/track-scoped SHA-256 Add idempotency, response-echo validation and receipt-bound write/search-visibility verification, track-aware Search validation, Top-K/result-order checks and multimodal data-URI/media validation.
 
-Not implemented: HTTP service, authentication middleware, persistent store, atomic database idempotency, embeddings/retrieval/ranking, verified official word counter, live smoke/full evaluation, Cycle 2 submission, or end-to-end wiring from #12731 consolidation receipts into AML Add/Search.
+Not implemented: HTTP service, authentication middleware, persistent store, atomic database idempotency, live signed write/search-visibility verifier, embeddings/retrieval/ranking, verified official word counter, live smoke/full evaluation, Cycle 2 submission, or end-to-end wiring from #12731 consolidation receipts into AML Add/Search.
 
 Rust compile/tests/rustfmt have not run in this environment. Source-level checks are not test passes. No official compatibility pass or SOTA advantage is claimed.
 
