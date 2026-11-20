@@ -159,6 +159,7 @@ pub struct BootstrapIntervalV1 {
 pub struct ClusterBootstrapMetricsV1 {
     pub support_precision: BootstrapIntervalV1,
     pub false_support_rate_all_negatives: BootstrapIntervalV1,
+    pub false_support_rate_measured_negatives: BootstrapIntervalV1,
     pub event_recall: BootstrapIntervalV1,
     pub support_coverage: BootstrapIntervalV1,
     pub brier_score: BootstrapIntervalV1,
@@ -750,6 +751,7 @@ fn cluster_bootstrap_metrics(
 
     let mut support_precision = Vec::new();
     let mut false_support_all = Vec::new();
+    let mut false_support_measured = Vec::new();
     let mut event_recall = Vec::new();
     let mut support_coverage = Vec::new();
     let mut brier = Vec::new();
@@ -763,6 +765,7 @@ fn cluster_bootstrap_metrics(
         let metrics = held_out_metrics(model, threshold, &sampled, dataset_sha256, contract.ece_bins);
         if let Some(value) = metrics.support_precision { support_precision.push(value); }
         if let Some(value) = metrics.false_support_rate_all_negatives { false_support_all.push(value); }
+        if let Some(value) = metrics.false_support_rate_measured_negatives { false_support_measured.push(value); }
         if let Some(value) = metrics.event_recall { event_recall.push(value); }
         support_coverage.push(metrics.support_coverage);
         if let Some(value) = metrics.brier_score { brier.push(value); }
@@ -770,6 +773,7 @@ fn cluster_bootstrap_metrics(
     Ok(ClusterBootstrapMetricsV1 {
         support_precision: bootstrap_interval(support_precision),
         false_support_rate_all_negatives: bootstrap_interval(false_support_all),
+        false_support_rate_measured_negatives: bootstrap_interval(false_support_measured),
         event_recall: bootstrap_interval(event_recall),
         support_coverage: bootstrap_interval(support_coverage),
         brier_score: bootstrap_interval(brier),
