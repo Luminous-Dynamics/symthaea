@@ -20,10 +20,7 @@ PZG2 is an experiment in this design space, not a claim that grouped frames or s
 
 ## 2. PZG2 reference format
 
-The independent reference is:
-
-- `research/cdl-bench/reference/compression_granularity_group_reference.cpp`
-- `scripts/research/cdl_group_granularity_reference.sh`
+The C++20 reference and reproduction script are supplied in the companion artifact bundle `CDL_PZG2_reference_bundle_2026-11-20.zip`. They were executed locally, but **the source and shell script have not yet been imported into this repository branch**. The benchmark source is therefore not currently available at the two repository paths named in the earlier draft of this report. This is a research artifact, not a checked-in implementation claim.
 
 PZG2 contains:
 
@@ -39,19 +36,9 @@ PZG2 v1 deliberately accepts only globally strictly increasing unique timestamps
 
 ## 3. Reproduction
 
-Requirements: C++20 compiler, `pkg-config`, libzstd headers/library. The script builds with:
+Requirements: C++20 compiler, `pkg-config`, libzstd headers/library. After extracting the companion artifact bundle, run the included shell script from a Git worktree that has the required system tools. The script expects the source at `research/cdl-bench/reference/compression_granularity_group_reference.cpp`; until the files are imported, use the exact source and script from the bundle rather than assuming those paths exist in the checkout.
 
-```bash
-scripts/research/cdl_group_granularity_reference.sh
-```
-
-Optional Zstandard level:
-
-```bash
-ZSTD_LEVEL=19 scripts/research/cdl_group_granularity_reference.sh
-```
-
-The checked local run used GCC 14.2.0, libzstd 1.5.7, `-O2 -std=c++20 -Wall -Wextra -Wconversion -Wno-misleading-indentation -Werror`, and Zstandard level 19. The warning suppression is limited to misleading-indentation warnings arising from compact reference formatting; all other enabled warnings remain fatal.
+The checked local run used GCC 14.2.0, libzstd 1.5.7, `-O2 -std=c++20 -Wall -Wextra -Wconversion -Wno-misleading-indentation -Werror`, and Zstandard level 19. A fresh local rerun on 2026-11-20 reproduced the same level-19 complete-frame sizes exactly and re-ran the test suite. A level-3 smoke run also passed. The warning suppression is limited to misleading-indentation warnings arising from compact reference formatting; all other enabled warnings remain fatal.
 
 The fixtures are deterministic synthetic workloads with 65,536 records, 64 keys and eight typed fields, using the same generator and seed as the existing PRN1 comparison harness (`0x7e1e0001`). Workloads: sparse updates, bursty updates, mostly idle and noisy/all-field updates. These are controlled stress fixtures, not production observations.
 
