@@ -14,6 +14,20 @@ struct Evidence {
     lower_k: Option<f64>,
     upper_k: Option<f64>,
     exact_k: Option<f64>,
+    observations: Vec<EvidenceObservation>,
+}
+#[derive(Clone, Debug)]
+struct EvidenceObservation {
+    id: String,
+    sample_id: String,
+    execution_run_id: String,
+    conditions_id: String,
+    characterization_method: String,
+    outcome: String,
+    dwell_k: f64,
+    observed_onset_k: Option<f64>,
+    measurement_uncertainty_k: Option<f64>,
+    detection_limit_wt_percent: f64,
     raw_data_sha256: String,
 }
 #[derive(Clone, Copy, Debug)]
@@ -74,6 +88,59 @@ fn string_list(value: &Value, key: &str) -> Result<Vec<String>, String> {
 fn valid_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
+fn parse_observation(value: &Value, pair_id: &str) -> Result<EvidenceObservation, String> {
+    let id = text_field(value, "observation_id")?.to_owned();
+    let sample_id = text_field(value, "sample_id")?.to_owned();
+    let execution_run_id = text_field(value, "execution_run_id")?.to_owned();
+    let conditions_id = text_field(value, "conditions_id")?.to_owned();
+    let characterization_method = text_field(value, "characterization_method")?.to_owned();
+    let outcome = text_field(value, "outcome")?.to_owned();
+    let dwell_k = number_field(value, "dwell_temperature_k")?;
+    let observed_onset_k = optional_number(value, "observed_onset_k")?;
+    let measurement_uncertainty_k = optional_number(value, "measurement_uncertainty_k")?;
+    let detection_limit_wt_percent = number_field(value, "detection_limit_wt_percent")?;
+    let raw_data_sha256 = text_field(value, "raw_data_sha256")?.to_owned();
+    if dwell_k <= 0.0 || detection_limit_wt_percent <= 0.0 || detection_limit_wt_percent > 100.0 {
+        return Err(format!("pair {pair_id} observation {id} has invalid temperature or detection limit"));
+    }
+    if !valid_sha256(&raw_data_sha256) {
+        return Err(format!("pair {pair_id} observation {id} raw_data_sha256 must be 64 hexadecimal characters"));
+    }
+    match outcome.as_str() {
+        "cross_precursor_product_detected"
+        | "no_cross_precursor_product"
+        | "transformed_only"
+        | "uncharacterizable" => {
+            if observed_onset_k.is_some() || measurement_uncertainty_k.is_some() {
+                return Err(format!("pair {pair_id} observation {id} must not attach an exact onset to a categorical dwell result"));
+            }
+        }
+        "exact_onset_measured" => {
+            let onset = observed_onset_k.ok_or_else(|| format!("pair {pair_id} exact observation {id} lacks observed_onset_k"))?;
+            let uncertainty = measurement_uncertainty_k.ok_or_else(|| format!("pair {pair_id} exact observation {id} lacks measurement_uncertainty_k"))?;
+            if onset <= 0.0 || uncertainty <= 0.0 || (onset - dwell_k).abs() > uncertainty {
+                return Err(format!("pair {pair_id} exact observation {id} has inconsistent measured onset and dwell temperature"));
+            }
+        }
+        _ => return Err(format!("pair {pair_id} observation {id} has unsupported outcome {outcome}")),
+    }
+    Ok(EvidenceObservation {
+        id,
+        sample_id,
+        execution_run_id,
+        conditions_id,
+        characterization_method,
+        outcome,
+        dwell_k,
+        observed_onset_k,
+        measurement_uncertainty_k,
+        detection_limit_wt_percent,
+        raw_data_sha256,
+    })
+}
+fn same_temperature(left: f64, right: f64) -> bool {
+    (left - right).abs() <= 1.0e-9 * left.abs().max(right.abs()).max(1.0)
+}
 fn parse_evidence(value: &Value) -> Result<Evidence, String> {
     let pair_id = text_field(value, "pair_id")?.to_owned();
     let kind = text_field(value, "evidence_kind")?.to_owned();
@@ -84,26 +151,60 @@ fn parse_evidence(value: &Value) -> Result<Evidence, String> {
     if precursors.len() != 2 || precursors[0] == precursors[1] {
         return Err(format!("pair {pair_id} must identify exactly two distinct precursor IDs"));
     }
-    let _evidence_ids = string_list(value, "evidence_ids")?;
-    let raw_data_sha256 = text_field(value, "raw_data_sha256")?.to_owned();
-    if !valid_sha256(&raw_data_sha256) {
-        return Err(format!("pair {pair_id} raw_data_sha256 must be 64 hexadecimal characters"));
+    let observation_rows = value.get("evidence_observations").and_then(Value::as_array)
+        .ok_or_else(|| format!("pair {pair_id} evidence_observations must be an array"))?;
+    if observation_rows.is_empty() {
+        return Err(format!("pair {pair_id} must contain at least one evidence observation"));
+    }
+    let mut observations = Vec::with_capacity(observation_rows.len());
+    let mut observation_ids = HashSet::new();
+    for row in observation_rows {
+        let observation = parse_observation(row, &pair_id)?;
+        if !observation_ids.insert(observation.id.clone()) {
+            return Err(format!("pair {pair_id} contains duplicate observation ID {}", observation.id));
+        }
+        observations.push(observation);
     }
     let positive = |x: Option<f64>| x.is_some_and(|v| v.is_finite() && v > 0.0);
+    let has_outcome_at = |outcome: &str, temperature: f64| {
+        observations.iter().any(|observation| {
+            observation.outcome == outcome && same_temperature(observation.dwell_k, temperature)
+        })
+    };
     let valid = match kind.as_str() {
-        "left_censored" => lower_k.is_none() && positive(upper_k) && exact_k.is_none(),
-        "right_censored" => positive(lower_k) && upper_k.is_none() && exact_k.is_none(),
+        "left_censored" => {
+            lower_k.is_none() && positive(upper_k) && exact_k.is_none()
+                && has_outcome_at("cross_precursor_product_detected", upper_k.unwrap_or_default())
+        }
+        "right_censored" => {
+            positive(lower_k) && upper_k.is_none() && exact_k.is_none()
+                && has_outcome_at("no_cross_precursor_product", lower_k.unwrap_or_default())
+        }
         "interval_censored" => {
             positive(lower_k) && positive(upper_k) && exact_k.is_none()
-                && lower_k.zip(upper_k).is_some_and(|(lower, upper)| lower < upper)
+                && lower_k.zip(upper_k).is_some_and(|(lower, upper)| {
+                    lower < upper
+                        && has_outcome_at("no_cross_precursor_product", lower)
+                        && has_outcome_at("cross_precursor_product_detected", upper)
+                })
         }
-        "exact" => lower_k.is_none() && upper_k.is_none() && positive(exact_k),
+        "exact" => {
+            lower_k.is_none() && upper_k.is_none() && positive(exact_k)
+                && observations.iter().any(|observation| {
+                    observation.outcome == "exact_onset_measured"
+                        && observation.observed_onset_k.is_some_and(|onset| {
+                            same_temperature(onset, exact_k.unwrap_or_default())
+                        })
+                })
+        }
         _ => false,
     };
     if !valid {
-        return Err(format!("pair {pair_id} has inconsistent {kind} onset bounds"));
+        return Err(format!(
+            "pair {pair_id} has inconsistent {kind} onset bounds or lacks matching characterized evidence"
+        ));
     }
-    Ok(Evidence { pair_id, kind, lower_k, upper_k, exact_k, raw_data_sha256 })
+    Ok(Evidence { pair_id, kind, lower_k, upper_k, exact_k, observations })
 }
 fn parse_model(value: &Value, evaluation_ids: &HashSet<String>) -> Result<Model, String> {
     let id = text_field(value, "model_id")?.to_owned();
@@ -232,7 +333,19 @@ fn model_receipt(model: &Model, evidence: &[Evidence]) -> Result<Value, String> 
         per_pair.push(json!({
             "pair_id": row.pair_id,
             "evidence_kind": row.kind,
-            "raw_data_sha256": row.raw_data_sha256,
+            "evidence_observations": row.observations.iter().map(|observation| json!({
+                "observation_id": observation.id,
+                "sample_id": observation.sample_id,
+                "execution_run_id": observation.execution_run_id,
+                "conditions_id": observation.conditions_id,
+                "characterization_method": observation.characterization_method,
+                "outcome": observation.outcome,
+                "dwell_temperature_k": observation.dwell_k,
+                "observed_onset_k": observation.observed_onset_k,
+                "measurement_uncertainty_k": observation.measurement_uncertainty_k,
+                "detection_limit_wt_percent": observation.detection_limit_wt_percent,
+                "raw_data_sha256": observation.raw_data_sha256
+            })).collect::<Vec<_>>(),
             "median_prediction_k": prediction.median_k,
             "log_sigma": prediction.log_sigma,
             "observed_log_probability": log_probability,
@@ -485,4 +598,22 @@ mod tests {
         let error = audit(&schema, &serde_json::to_vec(&data).unwrap()).unwrap_err();
         assert!(error.contains("artifact digest"));
     }
+    #[test]
+    fn transformed_only_observation_cannot_be_used_as_a_nonreaction_bound() {
+        let (schema, fixture) = inputs();
+        let mut data: Value = serde_json::from_slice(&fixture).unwrap();
+        data["pairs"][1]["evidence_observations"][0]["outcome"] = json!("transformed_only");
+        let error = audit(&schema, &serde_json::to_vec(&data).unwrap()).unwrap_err();
+        assert!(error.contains("lacks matching characterized evidence"));
+    }
+
+    #[test]
+    fn interval_censoring_requires_both_nonreaction_and_reaction_evidence() {
+        let (schema, fixture) = inputs();
+        let mut data: Value = serde_json::from_slice(&fixture).unwrap();
+        data["pairs"][2]["evidence_observations"][0]["outcome"] = json!("uncharacterizable");
+        let error = audit(&schema, &serde_json::to_vec(&data).unwrap()).unwrap_err();
+        assert!(error.contains("lacks matching characterized evidence"));
+    }
+
 }
