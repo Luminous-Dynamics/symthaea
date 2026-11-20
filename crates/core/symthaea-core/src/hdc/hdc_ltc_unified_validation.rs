@@ -1256,4 +1256,41 @@ mod tests {
             iter_sim
         );
     }
+
+    #[test]
+    fn iterative_closed_form_error_sweep_by_dt_tau_ratio() {
+        let tau_values = [0.1_f32, 1.0, 10.0];
+        let dt_tau_ratios = [0.1_f32, 1.0, 10.0];
+
+        for tau in tau_values {
+            for ratio in dt_tau_ratios {
+                let config = ValidationConfig {
+                    tau_base: tau,
+                    scenario_name: "dt/tau ratio sweep",
+                    input_scale: 1.0,
+                    total_time: tau * ratio,
+                    dimension: 64,
+                };
+                let result = validate_iterative_closed_form_vs_rk4(&config);
+                println!(
+                    "tau_base={tau:.3}, dt/tau={ratio:.3}: {}",
+                    result.report()
+                );
+                assert!(
+                    result.relative_error_percent.is_finite(),
+                    "relative error must remain finite at tau={tau}, dt/tau={ratio}"
+                );
+                assert!(
+                    result.similarity.is_finite(),
+                    "trajectory similarity must remain finite at tau={tau}, dt/tau={ratio}"
+                );
+                assert!(
+                    result.relative_error_percent < 1.0,
+                    "iterative trajectory error exceeded 1% at tau={tau}, dt/tau={ratio}: {}%",
+                    result.relative_error_percent
+                );
+            }
+        }
+    }
+
 }
