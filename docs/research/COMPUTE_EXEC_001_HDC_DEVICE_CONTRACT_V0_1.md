@@ -119,7 +119,7 @@ For all operations, max_transfer_bytes is interpreted as the checked aggregate l
 
 ### 4.3 Completion record
 
-The device completion binds the command ID, device ID, epoch and sequence. A successful completion must also echo an output_buffer object containing the exact output role, opaque handle ID, generation, offset and length from the submitted command. The host compares every field before returning ownership or accepting the result. A matching command ID alone is insufficient.
+The device completion binds the command ID, device ID, epoch, sequence, semantic operation ID and implementation digest. A successful completion must also echo an output_buffer object containing the exact output role, opaque handle ID, generation, offset and length from the submitted command. The host compares every field before returning ownership or accepting the result. A matching command ID alone is insufficient. The host also compares the echoed operation and implementation digest with the pending command; a device/profile change while work is in flight invalidates the completion.
 
 A successful completion includes a bounded result object and output digest. A digest is an integrity aid, not a digital signature or proof of correct computation. Qualification runs must hash the actual returned bytes and compare them with an independently generated software oracle. Physical authenticity requires a separately qualified trust chain.
 
