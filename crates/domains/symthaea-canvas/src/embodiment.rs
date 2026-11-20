@@ -229,8 +229,9 @@ impl EmbodimentController {
             EmbodimentEventKind::ActivityChanged { .. } => {
                 validate_runtime_provenance("activity", event.provenance)?;
             }
-            EmbodimentEventKind::SpeechOutputChanged { .. } => {
+            EmbodimentEventKind::SpeechOutputChanged { state } => {
                 validate_runtime_event_provenance("speech output", event.provenance)?;
+                validate_speech_transition(self.snapshot.current_speech_output(), *state)?;
             }
             EmbodimentEventKind::Reset => {
                 validate_runtime_provenance("reset", event.provenance)?;
@@ -333,6 +334,66 @@ fn validate_runtime_provenance(
     }
 }
 
+
+fn validate_speech_transition(
+    current: Option<SpeechOutputState>,
+    next: SpeechOutputState,
+) -> Result<(), EmbodimentIngestError> {
+    let Some(current) = current else {
+        // An observer may attach to an already-running stream; the initial
+        // Playing observation is authoritative only because the event source
+        // is separately constrained to RuntimeEvent provenance.
+        return Ok(());
+    };
+
+    if current == next {
+        return Ok(());
+    }
+
+    let valid = match current {
+        SpeechOutputState::Synthesizing => matches!(
+            next,
+            SpeechOutputState::Ready
+                | SpeechOutputState::Unavailable
+                | SpeechOutputState::Failed
+                | SpeechOutputState::Interrupted
+        ),
+        SpeechOutputState::Ready => matches!(
+            next,
+            SpeechOutputState::Queued
+                | SpeechOutputState::Unavailable
+                | SpeechOutputState::Failed
+                | SpeechOutputState::Interrupted
+        ),
+        SpeechOutputState::Queued => matches!(
+            next,
+            SpeechOutputState::Playing
+                | SpeechOutputState::Unavailable
+                | SpeechOutputState::Failed
+                | SpeechOutputState::Interrupted
+        ),
+        SpeechOutputState::Playing => matches!(
+            next,
+            SpeechOutputState::Completed
+                | SpeechOutputState::Failed
+                | SpeechOutputState::Interrupted
+        ),
+        SpeechOutputState::Completed
+        | SpeechOutputState::Interrupted
+        | SpeechOutputState::Unavailable
+        | SpeechOutputState::Failed => next == SpeechOutputState::Synthesizing,
+    };
+
+    if valid {
+        Ok(())
+    } else {
+        Err(EmbodimentIngestError::InvalidSpeechTransition {
+            from: current,
+            to: next,
+        })
+    }
+}
+
 fn validate_runtime_event_provenance(
     field: &'static str,
     provenance: SignalProvenance,
@@ -358,6 +419,10 @@ pub enum EmbodimentIngestError {
     TimestampRegression { last: u64, received: u64 },
     InvalidUnitInterval { field: &'static str, value: f32 },
     VisemeWithoutPlayback,
+    InvalidSpeechTransition {
+        from: SpeechOutputState,
+        to: SpeechOutputState,
+    },
     SignalProvenanceNotAllowed {
         field: &'static str,
         provenance: SignalProvenance,
@@ -378,6 +443,9 @@ impl fmt::Display for EmbodimentIngestError {
             }
             Self::VisemeWithoutPlayback => {
                 write!(f, "viseme updates require confirmed speech playback")
+            }
+            Self::InvalidSpeechTransition { from, to } => {
+                write!(f, "invalid speech output transition: {from:?} -> {to:?}")
             }
             Self::SignalProvenanceNotAllowed { field, provenance } => {
                 write!(f, "{field} cannot use {provenance:?} provenance")
@@ -690,6 +758,94 @@ mod tests {
         assert_eq!(*controller.snapshot(), before);
     }
 
+
+
+    #[test]
+    fn queued_audio_cannot_jump_to_completed_without_playback() {
+        let mut controller = EmbodimentController::new();
+        controller
+            .ingest(event(
+                1,
+                10,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Synthesizing,
+                },
+            ))
+            .unwrap();
+        controller
+            .ingest(event(
+                2,
+                20,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Ready,
+                },
+            ))
+            .unwrap();
+        controller
+            .ingest(event(
+                3,
+                30,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Queued,
+                },
+            ))
+            .unwrap();
+
+        let before = controller.snapshot().clone();
+        let result = controller.ingest(event(
+            4,
+            40,
+            EmbodimentEventKind::SpeechOutputChanged {
+                state: SpeechOutputState::Completed,
+            },
+        ));
+        assert_eq!(
+            result,
+            Err(EmbodimentIngestError::InvalidSpeechTransition {
+                from: SpeechOutputState::Queued,
+                to: SpeechOutputState::Completed,
+            })
+        );
+        assert_eq!(*controller.snapshot(), before);
+    }
+
+    #[test]
+    fn completed_utterance_can_begin_a_new_synthesis() {
+        let mut controller = EmbodimentController::new();
+        controller
+            .ingest(event(
+                1,
+                10,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Playing,
+                },
+            ))
+            .unwrap();
+        controller
+            .ingest(event(
+                2,
+                20,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Completed,
+                },
+            ))
+            .unwrap();
+        controller
+            .ingest(event(
+                3,
+                30,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Synthesizing,
+                },
+            ))
+            .unwrap();
+
+        assert_eq!(
+            controller.snapshot().current_speech_output(),
+            Some(SpeechOutputState::Synthesizing)
+        );
+        assert!(controller.snapshot().viseme.is_none());
+    }
 
     #[test]
     fn speech_playback_requires_runtime_event_provenance() {
