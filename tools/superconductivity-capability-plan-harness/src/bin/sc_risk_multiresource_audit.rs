@@ -40,6 +40,8 @@ struct Plan {
     consumption: Vec<u64>,
     expected_risk: f64,
     cvar_risk: f64,
+    expected_regret: f64,
+    cvar_regret: f64,
     expected_evsi: f64,
     cvar_evsi: f64,
     mutual_information_nats: f64,
@@ -510,6 +512,20 @@ impl Instance {
         if (prior_cvar - direct_prior_cvar).abs() > 1.0e-9 {
             return Err("precommitment baseline CVaR disagrees with direct decision CVaR".to_owned());
         }
+        // Regret is measured against the best decision available with full
+        // knowledge of each world state. Report it separately from decision loss.
+        let best_loss_by_world: Vec<f64> = (0..self.worlds.len()).map(|world_index| {
+            self.decisions.iter().map(|decision| decision.losses[world_index])
+                .fold(f64::INFINITY, f64::min)
+        }).collect();
+        let regret_decisions: Vec<Decision> = self.decisions.iter().map(|decision| Decision {
+            id: decision.id.clone(),
+            losses: decision.losses.iter().enumerate()
+                .map(|(world_index, loss)| (loss - best_loss_by_world[world_index]).max(0.0))
+                .collect(),
+        }).collect();
+        let (expected_regret, _) = expected_policy_risk(&masses, &regret_decisions);
+        let (cvar_regret, _, _) = precommitment_cvar(&masses, &regret_decisions, self.alpha)?;
         let expected_evsi = prior_expected - expected_risk;
         let cvar_evsi = prior_cvar - cvar_risk;
         if expected_evsi < -1.0e-8 || cvar_evsi < -1.0e-8 {
@@ -517,6 +533,7 @@ impl Instance {
         }
         Ok(Some(Plan {
             ordered_indices, consumption, expected_risk, cvar_risk,
+            expected_regret, cvar_regret,
             expected_evsi: expected_evsi.max(0.0), cvar_evsi: cvar_evsi.max(0.0),
             mutual_information_nats: self.information_gain(&masses),
             cvar_eta: eta, policy, outcome_count: masses.len(),
@@ -583,6 +600,46 @@ impl Instance {
             for capability in &self.actions[index].provides { available.insert(capability.clone()); }
         }
     }
+    fn dominates_plan(&self, candidate: &Plan, other: &Plan) -> bool {
+        let no_worse = candidate.expected_evsi + 1.0e-12 >= other.expected_evsi
+            && candidate.cvar_evsi + 1.0e-12 >= other.cvar_evsi
+            && candidate.cvar_regret <= other.cvar_regret + 1.0e-12
+            && candidate.consumption.iter().zip(other.consumption.iter())
+                .all(|(left, right)| left <= right);
+        let strictly_better = candidate.expected_evsi > other.expected_evsi + 1.0e-12
+            || candidate.cvar_evsi > other.cvar_evsi + 1.0e-12
+            || candidate.cvar_regret + 1.0e-12 < other.cvar_regret
+            || candidate.consumption.iter().zip(other.consumption.iter())
+                .any(|(left, right)| left < right);
+        no_worse && strictly_better
+    }
+
+    fn pareto_frontier(&self) -> Result<Vec<Plan>, String> {
+        let subset_count = 1_u64.checked_shl(self.actions.len() as u32)
+            .ok_or_else(|| "Pareto subset count overflowed".to_owned())?;
+        let mut feasible = Vec::new();
+        for mask in 0..subset_count {
+            let indices: Vec<usize> = (0..self.actions.len())
+                .filter(|index| (mask & (1_u64 << *index)) != 0).collect();
+            if let Some(plan) = self.plan(&indices)? { feasible.push(plan); }
+        }
+        let mut frontier = Vec::new();
+        for (index, candidate) in feasible.iter().enumerate() {
+            let dominated = feasible.iter().enumerate().any(|(other_index, other)| {
+                other_index != index && self.dominates_plan(other, candidate)
+            });
+            if !dominated { frontier.push(candidate.clone()); }
+        }
+        frontier.sort_by(|left, right| {
+            right.cvar_evsi.total_cmp(&left.cvar_evsi)
+                .then_with(|| right.expected_evsi.total_cmp(&left.expected_evsi))
+                .then_with(|| left.cvar_regret.total_cmp(&right.cvar_regret))
+                .then_with(|| self.reference_cost(left).cmp(&self.reference_cost(right)))
+                .then_with(|| self.plan_ids(left).cmp(&self.plan_ids(right)))
+        });
+        Ok(frontier)
+    }
+
     fn plan_receipt(&self, plan: &Plan) -> Value {
         let measured_ids: Vec<String> = plan.ordered_indices.iter()
             .filter(|i| !self.actions[**i].likelihoods.is_empty())
@@ -610,6 +667,8 @@ impl Instance {
             "reference_resource_consumption":self.reference_cost(plan),
             "expected_posterior_decision_loss":plan.expected_risk,
             "precommitment_cvar_decision_risk":plan.cvar_risk,
+            "expected_decision_regret":plan.expected_regret,
+            "precommitment_cvar_decision_regret":plan.cvar_regret,
             "expected_loss_evsi":plan.expected_evsi,
             "precommitment_cvar_evsi":plan.cvar_evsi,
             "mutual_information_gain_nats":plan.mutual_information_nats,
@@ -637,6 +696,7 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     let expected_greedy = instance.greedy(Objective::ExpectedValue)?;
     let tail_greedy = instance.greedy(Objective::TailRisk)?;
     let information_greedy = instance.greedy(Objective::InformationGain)?;
+    let pareto_frontier = instance.pareto_frontier()?;
     let excluded: Vec<Value> = instance.actions.iter().filter(|a| !a.eligible)
         .map(|a| json!({"action_id":a.id,"exclusion_reason":a.exclusion_reason})).collect();
     Ok(json!({
@@ -675,6 +735,11 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         "mutual_information_oracle":{
             "algorithm":"exact feasible subset enumeration; shared-nuisance model information",
             "plan":instance.plan_receipt(&information_oracle)
+        },
+        "pareto_frontier":{
+            "dominance":"maximize expected-loss EVSI and precommitment CVaR-EVSI; minimize precommitment CVaR regret and every resource consumption dimension",
+            "frontier_size":pareto_frontier.len(),
+            "plans":pareto_frontier.iter().map(|plan|instance.plan_receipt(plan)).collect::<Vec<_>>()
         },
         "greedy_expected_loss_baseline":{
             "algorithm":"myopic marginal expected-loss EVSI per reference resource",
@@ -898,4 +963,28 @@ mod tests {
         assert!(base_mean-mean1 > base_mean-mean2+0.2);
         assert!(base_tail-tail2 > base_tail-tail1+0.2);
     }
+    #[test]
+    fn pareto_frontier_contains_only_nondominated_resource_and_risk_plans() {
+        let (schema, fixture) = inputs();
+        let instance = Instance::from_bytes(&schema, &fixture).unwrap();
+        let frontier = instance.pareto_frontier().unwrap();
+        assert!(!frontier.is_empty());
+        for i in 0..frontier.len() {
+            for j in 0..frontier.len() {
+                if i != j {
+                    assert!(!instance.dominates_plan(&frontier[i], &frontier[j]));
+                }
+            }
+        }
+        let receipt = audit(&schema, &fixture).unwrap();
+        assert_eq!(
+            receipt["pareto_frontier"]["frontier_size"].as_u64().unwrap() as usize,
+            frontier.len()
+        );
+        for plan in &frontier {
+            assert!(plan.expected_regret.is_finite());
+            assert!(plan.cvar_regret.is_finite());
+        }
+    }
+
 }
