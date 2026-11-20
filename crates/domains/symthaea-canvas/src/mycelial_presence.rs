@@ -106,7 +106,7 @@ pub fn build_mycelial_presence(snapshot: &EmbodimentSnapshot) -> SceneNode {
     }
 
     if let Some(uncertainty) = &snapshot.uncertainty {
-        let level = uncertainty.value.clamp(0.0, 1.0);
+        let level = finite_unit(uncertainty.value);
         if level > 0.0 {
             let mut uncertainty_halo = SceneNode::group(Some("uncertainty-halo"));
             uncertainty_halo.style.opacity = Some(0.2 + level * 0.55);
@@ -126,9 +126,8 @@ pub fn build_mycelial_presence(snapshot: &EmbodimentSnapshot) -> SceneNode {
         .viseme
         .as_ref()
         .filter(|_| activity == EmbodimentActivity::Speaking)
-        .map(|observed| observed.value.weight)
-        .unwrap_or(0.0)
-        .clamp(0.0, 1.0);
+        .map(|observed| finite_unit(observed.value.weight))
+        .unwrap_or(0.0);
 
     let mut bloom = SceneNode::group(Some("bloom"));
     bloom.children.push(
@@ -226,7 +225,7 @@ fn add_branch(
     seed: usize,
     base_color: Color,
 ) {
-    let phase = ((seed.wrapping_mul(37) + depth.wrapping_mul(19)) %  nine()) as f32 - 4.0;
+    let phase = ((seed.wrapping_mul(37) + depth.wrapping_mul(19)) % 9) as f32 - 4.0;
     let bend = phase * 0.018;
     let angle_a = angle + bend;
     let angle_b = angle + bend * 1.4;
@@ -285,8 +284,12 @@ fn add_branch(
     );
 }
 
-const fn nine() -> usize {
-    9
+fn finite_unit(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
 }
 
 #[cfg(test)]
