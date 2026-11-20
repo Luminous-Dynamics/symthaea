@@ -825,6 +825,8 @@ impl ExecutionLedger {
                 released += 1;
             }
         }
+        self.rejected_pending
+            .retain(|(epoch, _), _| epoch != old_epoch);
         self.submission_blocked =
             self.recovery_epoch_pending || !self.quiescence_required_epochs.is_empty();
         released
@@ -1842,6 +1844,9 @@ mod tests {
     const COMPLETION: &str = include_str!(
         "../schemas/compute_exec_001/fixtures/valid_hdc_top1_completion_v0_1.json"
     );
+    const REJECTED_COMPLETION: &str = include_str!(
+        "../schemas/compute_exec_001/fixtures/rejected_hdc_top1_completion_v0_1.json"
+    );
 
     fn setup() -> (
         DeviceCapabilities,
@@ -2029,14 +2034,9 @@ mod tests {
 
     #[test]
     fn rejected_completion_requires_explicit_pre_dma_assertion_and_driver_confirmation() {
-        let (capabilities, command, mut completion, mut registry, mut ledger) = setup();
+        let (capabilities, command, _, mut registry, mut ledger) = setup();
+        let completion: HdcCompletion = serde_json::from_str(REJECTED_COMPLETION).unwrap();
         ledger.submit(&command, &capabilities, &mut registry).unwrap();
-        completion.status = "rejected".into();
-        completion.error_code = Some("UNSUPPORTED_DESCRIPTOR".into());
-        completion.rejection_stage = Some("before_dma".into());
-        completion.dma_acquired = Some(false);
-        completion.result = None;
-        completion.output_buffer = None;
 
         assert_eq!(
             ledger.accept_completion(&completion, &capabilities, &mut registry).unwrap(),
