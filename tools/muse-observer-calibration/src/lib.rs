@@ -914,7 +914,7 @@ mod tests {
         let group_number = index / 2;
         CalibrationObservationV1 {
             sample_id: format!("sample-{index}"),
-            source_group_id: format!("work-{}-{split:?}", index / 2),
+            source_group_id: format!("work-{}", index / 2),
             split,
             observer_id: "muse-score-audio-pitch-observer".into(),
             observer_version: "0.1.0".into(),
@@ -985,6 +985,22 @@ mod tests {
             bootstrap_replicates: 200,
             bootstrap_seed: 12345,
         }
+    }
+
+    #[test]
+    fn checked_in_synthetic_fixture_replays_and_keeps_splits_separate() {
+        let dataset: CalibrationDatasetV1 = serde_json::from_str(include_str!(
+            "../../../docs/research/fixtures/muse-observer-calibration-dataset-v1.synthetic.json"
+        )).unwrap();
+        let contract: CalibrationContractV1 = serde_json::from_str(include_str!(
+            "../../../docs/research/fixtures/muse-observer-calibration-contract-v1.synthetic.json"
+        )).unwrap();
+        validate_dataset_v1(&dataset).unwrap();
+        let bundle = run_calibration_v1(&dataset, &contract).unwrap();
+        assert_eq!(bundle.threshold_selection.selection_status, "threshold_selected");
+        assert_eq!(bundle.held_out.total_examples, 13);
+        assert_eq!(bundle.held_out.unmeasured_examples, 1);
+        verify_calibration_bundle_v1(&bundle, &dataset, &contract).unwrap();
     }
 
     #[test]
@@ -1064,9 +1080,7 @@ mod tests {
     fn measured_rows_require_finite_raw_scores() {
         let mut data = dataset();
         data.observations[0].raw_score_db = Some(f64::NAN);
-        data.dataset_sha256.clear();
-        data.dataset_sha256 = dataset_digest(&data).unwrap();
-        assert!(validate_dataset_v1(&data).is_err());
+        assert!(seal_calibration_dataset_v1(&mut data).is_err());
     }
 
     #[test]
