@@ -198,7 +198,7 @@
         "observed_pitch_midi",
         "estimated_frequency_hz",
         "pitch_error_cents",
-        "pitch_confidence",
+        "pitch_salience_margin",
         "window_rms_dbfs",
         "window_start_frame",
         "window_end_frame",
@@ -236,14 +236,6 @@
             "null"
           ]
         },
-        "pitch_confidence": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "minimum": 0,
-          "maximum": 1
-        },
         "window_rms_dbfs": {
           "type": "number",
           "maximum": 24
@@ -269,6 +261,14 @@
             "null"
           ],
           "maxLength": 2048
+        },
+        "pitch_salience_margin": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
         }
       }
     }
