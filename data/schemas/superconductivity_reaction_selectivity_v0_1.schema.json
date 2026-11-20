@@ -117,7 +117,8 @@
                 "enum": [
                   "verified",
                   "unverified"
-                ]
+                ],
+                "description": "Caller/source-declared shared-basis balance assertion; not independently re-proven by this auditor."
               }
             }
           },
@@ -328,13 +329,15 @@
         },
         "balanced_equation": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Reaction equation exactly as declared in the source/input; this v0.1 auditor does not independently balance elemental or charge stoichiometry."
         },
         "balance_status": {
           "enum": [
             "verified",
             "unverified"
-          ]
+          ],
+          "description": "Caller/source-declared balance assertion; verified is required for selectivity assessment but is not independently re-proven by this auditor."
         },
         "product_phase_id": {
           "type": "string",
