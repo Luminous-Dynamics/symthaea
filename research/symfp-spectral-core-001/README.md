@@ -83,3 +83,22 @@ The paired path replays the reference SVD bit-for-bit and records each degree's 
 - no exact-real singular-value guarantee, physical symmetry proof, or pruning authority is claimed.
 
 The next numerical research increment is to derive and verify a conservative singular-value interval that accounts for finite-precision Jacobi rotations and residuals, or to use a separately verified interval-SVD oracle. Until then, the existing Weyl result remains an assumption-qualified spectral compatibility result.
+
+
+## Published non-identifiability counterexamples (explicit regression gates)
+
+The SymFP preprint itself warns that a high pLS / zero leakage is not sufficient to infer the target point group. It gives two concrete examples over degrees (l=0,ldots,9):
+
+- A structure whose true group is **C2** has zero leakage relative to **Cs**.
+- A structure whose true group is **Th** has zero leakage relative to **D6h**.
+
+The representation ranks of the true smaller groups simply fit within the larger target fixed-subspace dimensions. Thus the leakage score measures compatibility with rank constraints; it is not a likelihood, a unique group label, or an action certificate. The paper recommends rank-template matching for discrete point-group identification rather than interpreting pLS as proof.
+
+This reference now encodes both examples as executable Rust negative controls:
+- the C2 receipt must yield pLS=10 against Cs while exact rank-template matching yields C2;
+- the Th receipt must yield pLS=10 against D6h while exact rank-template matching yields Th;
+- the robust interval classifier at zero perturbation must return Th, not D6h, in the second case.
+
+The examples are transcribed from the paper's reported counterexamples; they are not newly observed material samples. They specifically test the boundary between **rank compatibility** and **group identification**. No downstream action, physical or task authority follows from either result.
+
+Reference: Cen et al., *Spectral symmetry fingerprints in equivariant representations*, arXiv:2611.07410 (5 November 2026), leakage-score discussion, p. 21 of the current preprint: https://arxiv.org/abs/2611.07410
