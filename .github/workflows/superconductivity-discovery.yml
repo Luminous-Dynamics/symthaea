@@ -12,6 +12,9 @@ on:
       - "data/schemas/superconductivity_pair_coherence_comparison_v0_1.schema.json"
       - "data/schemas/superconductivity_reaction_selectivity_v0_1.schema.json"
       - "data/schemas/superconductivity_thermochemical_network_v0_1.schema.json"
+      - "data/schemas/superconductivity_spatial_reaction_diffusion_v0_1.schema.json"
+      - "data/schemas/superconductivity_transport_kinetic_selectivity_v0_1.schema.json"
+      - "data/schemas/superconductivity_onset_prediction_v0_1.schema.json"
       - "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_*.json"
       - "tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"
       - "tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json"
@@ -27,6 +30,9 @@ on:
       - "data/schemas/superconductivity_pair_coherence_comparison_v0_1.schema.json"
       - "data/schemas/superconductivity_reaction_selectivity_v0_1.schema.json"
       - "data/schemas/superconductivity_thermochemical_network_v0_1.schema.json"
+      - "data/schemas/superconductivity_spatial_reaction_diffusion_v0_1.schema.json"
+      - "data/schemas/superconductivity_transport_kinetic_selectivity_v0_1.schema.json"
+      - "data/schemas/superconductivity_onset_prediction_v0_1.schema.json"
       - "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_*.json"
       - "tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"
       - "tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json"
@@ -64,6 +70,9 @@ jobs:
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/pair_coherence_audit.rs
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/reaction_selectivity_audit.rs
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/thermochemical_network_audit.rs
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/transport_kinetic_selectivity_audit.rs
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/spatial_reaction_diffusion_audit.rs
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/onset_prediction_audit.rs
 
       - name: Generate isolated dependency lockfile
         run: cargo generate-lockfile --manifest-path tools/superconductivity-discovery-harness/Cargo.toml
@@ -88,6 +97,15 @@ jobs:
 
       - name: Test stoichiometric reaction balance, route connectivity and cycle closure
         run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_thermochemical_network_audit
+
+      - name: Test coupled transport kinetic selectivity auditor
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_transport_kinetic_selectivity_audit
+
+      - name: Test conservative spatial reaction diffusion reference
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_spatial_reaction_diffusion_audit
+
+      - name: Test censoring-aware onset prediction evaluation
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_onset_prediction_audit
 
       - name: Run metrics runner on synthetic plumbing fixture
         run: |
@@ -140,6 +158,30 @@ jobs:
             --fixture tools/superconductivity-discovery-harness/fixtures/thermochemical_network_smoke_v0_1.json \
             --out "$RUNNER_TEMP/sc-thermochemical-network-smoke.json"
           cat "$RUNNER_TEMP/sc-thermochemical-network-smoke.json"
+
+      - name: Run synthetic coupled transport kinetic selectivity audit
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_transport_kinetic_selectivity_audit -- \
+            --schema data/schemas/superconductivity_transport_kinetic_selectivity_v0_1.schema.json \
+            --fixture tools/superconductivity-discovery-harness/fixtures/transport_kinetic_selectivity_smoke_v0_1.json \
+            --out "$RUNNER_TEMP/sc-transport-kinetic-smoke.json"
+          cat "$RUNNER_TEMP/sc-transport-kinetic-smoke.json"
+
+      - name: Run synthetic spatial reaction diffusion reference
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_spatial_reaction_diffusion_audit -- \
+            --schema data/schemas/superconductivity_spatial_reaction_diffusion_v0_1.schema.json \
+            --fixture tools/superconductivity-discovery-harness/fixtures/spatial_reaction_diffusion_smoke_v0_1.json \
+            --out "$RUNNER_TEMP/sc-spatial-reaction-diffusion-smoke.json"
+          cat "$RUNNER_TEMP/sc-spatial-reaction-diffusion-smoke.json"
+
+      - name: Run synthetic onset prediction audit
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_onset_prediction_audit -- \
+            --schema data/schemas/superconductivity_onset_prediction_v0_1.schema.json \
+            --fixture tools/superconductivity-discovery-harness/fixtures/onset_prediction_smoke_v0_1.json \
+            --out "$RUNNER_TEMP/sc-onset-prediction-smoke.json"
+          cat "$RUNNER_TEMP/sc-onset-prediction-smoke.json"
 
       - name: Verify unbalanced reaction negative control is rejected
         run: |
@@ -202,6 +244,9 @@ jobs:
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_pair_coherence_audit -- -D warnings
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_reaction_selectivity_audit -- -D warnings
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_thermochemical_network_audit -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_transport_kinetic_selectivity_audit -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_spatial_reaction_diffusion_audit -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_onset_prediction_audit -- -D warnings
 
       - name: Record exact-run environment and input identities
         if: always()
@@ -229,6 +274,21 @@ jobs:
             sha256sum tools/superconductivity-discovery-harness/fixtures/thermochemical_network_disconnected_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/fixtures/thermochemical_network_suite_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/src/bin/thermochemical_network_audit.rs
+            sha256sum data/schemas/superconductivity_transport_kinetic_selectivity_v0_1.schema.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/transport_kinetic_selectivity_smoke_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/transport_kinetic_selectivity_non_psd_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/transport_kinetic_selectivity_suite_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/src/bin/transport_kinetic_selectivity_audit.rs
+            sha256sum data/schemas/superconductivity_spatial_reaction_diffusion_v0_1.schema.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/spatial_reaction_diffusion_smoke_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/spatial_reaction_diffusion_non_psd_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/spatial_reaction_diffusion_unstable_step_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/spatial_reaction_diffusion_suite_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/src/bin/spatial_reaction_diffusion_audit.rs
+            sha256sum data/schemas/superconductivity_onset_prediction_v0_1.schema.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/onset_prediction_smoke_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/onset_prediction_suite_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/src/bin/onset_prediction_audit.rs
             sha256sum data/research/sc_superconductor_discovery_cases_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/Cargo.toml
             if [ -f tools/superconductivity-discovery-harness/Cargo.lock ]; then
@@ -254,6 +314,9 @@ jobs:
             ${{ runner.temp }}/sc-pair-coherence-smoke.json
             ${{ runner.temp }}/sc-reaction-selectivity-smoke.json
             ${{ runner.temp }}/sc-thermochemical-network-smoke.json
+            ${{ runner.temp }}/sc-transport-kinetic-smoke.json
+            ${{ runner.temp }}/sc-spatial-reaction-diffusion-smoke.json
+            ${{ runner.temp }}/sc-onset-prediction-smoke.json
             ${{ runner.temp }}/sc-thermochemical-unbalanced-negative.log
             ${{ runner.temp }}/sc-thermochemical-charge-negative.log
             ${{ runner.temp }}/sc-thermochemical-disconnected-negative.log
