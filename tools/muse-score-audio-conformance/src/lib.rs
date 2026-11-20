@@ -480,9 +480,6 @@ pub fn evaluate_score_audio_conformance_v1(
     if audio.sample_rate_hz != contract.sample_rate_hz || audio.channels != contract.channels {
         return Err("WAV sample rate/channel count differs from the frozen contract".into());
     }
-    let score_bytes = serde_json::to_vec(&score).map_err(|error| format!("typed Score serialization failed: {error}"))?;
-    let score_hash = sha256(&score_bytes);
-
     if !score.has_part_identity() {
         let mut result = base_result(&score, wav_bytes, &audio, contract, Vec::new(), "abstain", vec!["Score notes do not carry assigned PartId identity".into()])?;
         seal_result(&mut result)?;
