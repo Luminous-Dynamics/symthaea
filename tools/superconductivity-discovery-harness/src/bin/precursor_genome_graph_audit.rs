@@ -208,6 +208,22 @@ fn validate_complete_graph(
     }
     Ok(degree)
 }
+fn verify_source_manifest(source: &Value) -> Result<(), String> {
+    let source_commit = text_field(source, "commit")?;
+    let expected_blob = text_field(source, "ledger_git_blob_sha1")?;
+    if source_commit != SOURCE_COMMIT || expected_blob != SOURCE_BLOB_SHA1 {
+        return Err("manifest source commit/blob differs from the code-pinned release".to_owned());
+    }
+    if text_field(source, "raw_url")? != SOURCE_RAW_URL {
+        return Err("manifest source raw_url differs from the code-pinned immutable download".to_owned());
+    }
+    if text_field(source, "license")? != SOURCE_LICENSE
+        || text_field(source, "license_url")? != SOURCE_LICENSE_URL
+    {
+        return Err("manifest licence metadata differs from the pinned Precursor Genome release".to_owned());
+    }
+    Ok(())
+}
 fn expected_u64(manifest: &Value, field: &str) -> Result<u64, String> {
     manifest.get("expected").and_then(|x| x.get(field)).and_then(Value::as_u64)
         .ok_or_else(|| format!("manifest expected.{field} must be an unsigned integer"))
@@ -251,19 +267,9 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
         return Err("unsupported precursor graph benchmark contract".to_owned());
     }
     let source = manifest.get("source").ok_or("manifest source missing")?;
+    verify_source_manifest(source)?;
     let source_commit = text_field(source, "commit")?;
     let expected_blob = text_field(source, "ledger_git_blob_sha1")?;
-    if source_commit != SOURCE_COMMIT || expected_blob != SOURCE_BLOB_SHA1 {
-        return Err("manifest source commit/blob differs from the code-pinned release".to_owned());
-    }
-    if text_field(source, "raw_url")? != SOURCE_RAW_URL {
-        return Err("manifest source raw_url differs from the code-pinned immutable download".to_owned());
-    }
-    if text_field(source, "license")? != SOURCE_LICENSE
-        || text_field(source, "license_url")? != SOURCE_LICENSE_URL
-    {
-        return Err("manifest licence metadata differs from the pinned Precursor Genome release".to_owned());
-    }
     let actual_blob = git_blob_sha1(ledger_bytes);
     if actual_blob != expected_blob {
         return Err(format!(
@@ -747,6 +753,30 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn source_commit_blob_url_and_licence_are_pinned() {
+        let source = json!({
+            "commit": SOURCE_COMMIT,
+            "ledger_git_blob_sha1": SOURCE_BLOB_SHA1,
+            "raw_url": SOURCE_RAW_URL,
+            "license": SOURCE_LICENSE,
+            "license_url": SOURCE_LICENSE_URL
+        });
+        assert!(verify_source_manifest(&source).is_ok());
+
+        let mut changed_url = source.clone();
+        changed_url["raw_url"] = json!("https://example.invalid/ledger.json");
+        assert!(verify_source_manifest(&changed_url).unwrap_err().contains("raw_url"));
+
+        let mut changed_license = source.clone();
+        changed_license["license"] = json!("UNLICENSED");
+        assert!(verify_source_manifest(&changed_license).unwrap_err().contains("licence"));
+
+        let mut changed_commit = source.clone();
+        changed_commit["commit"] = json!("0000000000000000000000000000000000000000");
+        assert!(verify_source_manifest(&changed_commit).unwrap_err().contains("commit/blob"));
+    }
 
     #[test]
     fn git_blob_sha1_matches_the_empty_git_blob() {
