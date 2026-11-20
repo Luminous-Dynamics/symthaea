@@ -1,0 +1,163 @@
+{
+  "schema_version": "0.1.0",
+  "record_id": "chen-2025-published-summary-v0",
+  "provenance_kind": "published_summary",
+  "snapshot_date": "2026-11-20",
+  "source": {
+    "article_title": "Electrochemical loading enhances deuterium fusion rates in a metal target",
+    "article_doi": "10.1038/s41586-025-09042-7",
+    "article_url": "https://www.nature.com/articles/s41586-025-09042-7",
+    "full_text_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12367529/",
+    "paper_data_statement": "Supporting data are available in the paper and Supplementary Information; the article states that code for data cleaning and analysis and CAD files are archived at Zenodo.",
+    "zenodo_doi_cited_in_article": "10.5281/zenodo.13830012",
+    "zenodo_record_observed_by_title": {
+      "url": "https://zenodo.org/records/14752388",
+      "doi": "10.5281/zenodo.14752388",
+      "version": "v2",
+      "resource_type": "Computational notebook",
+      "description": "Source code and CAD files for manuscript",
+      "aggregate_size_label": "14.8 GB",
+      "accession_relationship_to_article_citation": "unresolved; do not assume equivalence",
+      "files": [
+        {
+          "name": "eCell_CAD.zip",
+          "size_label": "14.8 MB",
+          "advertised_md5": "2a4c4dd05136adbe66d50d679e65d454"
+        },
+        {
+          "name": "In-situ-XRD-cell_Air_CAD.zip",
+          "size_label": "7.4 MB",
+          "advertised_md5": "46b090e96f5c897678d22fd62231159b"
+        },
+        {
+          "name": "In-situ-XRD-cell_Vacuum_CAD.zip",
+          "size_label": "12.8 MB",
+          "advertised_md5": "604bbf5ef2ac186e041dee988ac9e079"
+        },
+        {
+          "name": "Plasma thruster_CADzip.zip",
+          "size_label": "1.9 MB",
+          "advertised_md5": "28e40c5cd865e58d99aa9089857cff73"
+        },
+        {
+          "name": "thunderbird_psd_v2.zip",
+          "size_label": "14.7 GB",
+          "advertised_md5": "4f1f581738cb1b860fd3fafc54a0f63f",
+          "contents_status": "not inspected; preview reports too many files inside ZIP"
+        }
+      ]
+    }
+  },
+  "experiment_scope": {
+    "stimulus": "deuterium ion bombardment of a palladium target; nominal sheath acceleration reported as 30 keV",
+    "electrochemical_condition": "in-situ deuterium loading from heavy-water electrolyte",
+    "reaction": "beam-driven deuterium-deuterium fusion",
+    "energy_boundary": {
+      "reported_fusion_output_w": 1e-9,
+      "reported_input_power_w": 15,
+      "note": "paper explicitly states this apparatus is not net energy"
+    },
+    "cold_fusion_classification": "not accelerator-free room-temperature cold fusion"
+  },
+  "campaigns": [
+    {
+      "campaign": 1,
+      "phase_i_rate": {
+        "value": 135.5,
+        "reported_uncertainty": 0.5,
+        "notation": "135.5(5)",
+        "unit": "neutrons_per_second",
+        "provenance_kind": "published_summary"
+      },
+      "phase_ii_rate": {
+        "value": 156.7,
+        "reported_uncertainty": 0.4,
+        "notation": "156.7(4)",
+        "unit": "neutrons_per_second",
+        "provenance_kind": "published_summary"
+      },
+      "reported_increase": {
+        "value": 15.1,
+        "reported_uncertainty": 0.1,
+        "notation": "15.1(1)",
+        "unit": "percent",
+        "provenance_kind": "published_summary"
+      },
+      "derived_ratio_from_rounded_rates_pct": 15.6457564576,
+      "difference_vs_reported_percentage_points": 0.5457564576,
+      "reconciliation_status": "open; do not replace reported percentage with ratio derived from rounded rates"
+    },
+    {
+      "campaign": 2,
+      "phase_i_rate": {
+        "value": 142.9,
+        "reported_uncertainty": 0.5,
+        "notation": "142.9(5)",
+        "unit": "neutrons_per_second",
+        "provenance_kind": "published_summary"
+      },
+      "phase_ii_rate": {
+        "value": 159.2,
+        "reported_uncertainty": 0.5,
+        "notation": "159.2(5)",
+        "unit": "neutrons_per_second",
+        "provenance_kind": "published_summary"
+      },
+      "reported_increase": {
+        "value": 11.3,
+        "reported_uncertainty": 0.1,
+        "notation": "11.3(1)",
+        "unit": "percent",
+        "provenance_kind": "published_summary"
+      },
+      "derived_ratio_from_rounded_rates_pct": 11.4065780266,
+      "difference_vs_reported_percentage_points": 0.1065780266,
+      "reconciliation_status": "open; do not replace reported percentage with ratio derived from rounded rates"
+    },
+    {
+      "campaign": 3,
+      "phase_i_rate": {
+        "value": 138.6,
+        "reported_uncertainty": 0.3,
+        "notation": "138.6(3)",
+        "unit": "neutrons_per_second",
+        "provenance_kind": "published_summary"
+      },
+      "phase_ii_rate": {
+        "value": 164.3,
+        "reported_uncertainty": 1.3,
+        "notation": "164.3(13)",
+        "unit": "neutrons_per_second",
+        "provenance_kind": "published_summary"
+      },
+      "reported_increase": {
+        "value": 18.5,
+        "reported_uncertainty": 0.2,
+        "notation": "18.5(2)",
+        "unit": "percent",
+        "provenance_kind": "published_summary"
+      },
+      "derived_ratio_from_rounded_rates_pct": 18.5425685426,
+      "difference_vs_reported_percentage_points": 0.0425685426,
+      "reconciliation_status": "close at displayed precision; retain both source values separately"
+    }
+  ],
+  "aggregate": {
+    "author_reported_increase": {
+      "value": 15,
+      "reported_uncertainty": 2,
+      "notation": "15(2)",
+      "unit": "percent",
+      "provenance_kind": "published_summary"
+    },
+    "unweighted_mean_of_three_reported_campaign_percentages": 14.9666666667,
+    "unweighted_mean_status": "derived arithmetic check only; not asserted to be authors' estimator"
+  },
+  "limitations": [
+    "This fixture contains values stated in the published paper, not raw observations.",
+    "The Zenodo archive contents and DOI relationship have not yet been independently resolved.",
+    "Rounded rate pairs and source-reported percent changes are kept as separate claims because direct division does not reproduce every printed campaign percentage.",
+    "The D/Pd ratio during fusion was not directly measured in each fusion run; the paper relates it to separate in-situ XRD characterization.",
+    "This result is accelerator-driven D-D fusion and does not demonstrate cold fusion, excess-energy generation, or net energy."
+  ]
+}
