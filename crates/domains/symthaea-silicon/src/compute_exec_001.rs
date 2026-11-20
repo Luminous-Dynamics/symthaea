@@ -695,31 +695,35 @@ impl ExecutionLedger {
         sequence: u64,
         registry: &mut BufferRegistry,
     ) -> ValidationResult<usize> {
+        let map_key = (old_epoch.to_owned(), sequence);
         let pending = self
             .rejected_pending
-            .remove(&(old_epoch.to_owned(), sequence))
+            .get(&map_key)
+            .cloned()
             .ok_or_else(|| ValidationError::new(
                 "UNKNOWN_REJECTED_COMMAND",
                 "no pre-DMA rejected command awaits driver confirmation for this epoch/sequence",
             ))?;
 
-        let mut released = 0usize;
+        // Validate every buffer before changing any ownership state.
         for key in &pending.buffers {
             let ownership = registry.entry(key)?.ownership.clone();
-            if ownership == (BufferOwnership::Quarantined {
+            if ownership != (BufferOwnership::Quarantined {
                 device_epoch: old_epoch.to_owned(),
                 sequence,
             }) {
-                registry.set_ownership(key, BufferOwnership::HostOwned);
-                released += 1;
-            } else {
                 return Err(ValidationError::new(
                     "REJECTED_BUFFER_OWNERSHIP_MISMATCH",
                     "a rejected command buffer is no longer quarantined under its original epoch/sequence",
                 ));
             }
         }
-        Ok(released)
+
+        self.rejected_pending.remove(&map_key);
+        for key in &pending.buffers {
+            registry.set_ownership(key, BufferOwnership::HostOwned);
+        }
+        Ok(pending.buffers.len())
     }
 
     /// Move a timed-out command into quarantine. A timeout is not proof that
