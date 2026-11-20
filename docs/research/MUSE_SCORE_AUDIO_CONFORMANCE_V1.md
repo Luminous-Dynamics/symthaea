@@ -73,7 +73,7 @@ The SHA-256 receipt is integrity evidence only; it does not establish that the W
 
 ## Authored test coverage
 
-Twelve unit tests are authored at the current implementation stage:
+Fifteen unit tests are authored at the current implementation stage:
 1. exact monophonic sine pitch;
 2. semitone corruption;
 3. octave corruption;
@@ -83,9 +83,12 @@ Twelve unit tests are authored at the current implementation stage:
 7. unassigned PartId;
 8. note shorter than the frozen analysis window;
 9. source/candidate sample-rate mismatch;
-10. unknown Score fields;
-11. receipt tampering;
-12. typed Score digest binding.
+10. low-signal abstention;
+11. out-of-calibration pitch abstention;
+12. explicit confidence-threshold abstention;
+13. unknown Score fields;
+14. receipt tampering;
+15. typed Score digest binding.
 
 These tests have not been compiled or executed in the current environment, which lacks Cargo/rustc/rustfmt. The dedicated GitHub workflow is intended to qualify exact-head formatting, compilation, tests and Clippy.
 
