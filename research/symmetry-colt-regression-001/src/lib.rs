@@ -618,6 +618,32 @@ mod tests {
     }
 
     #[test]
+    fn target_rational_encoding_uses_one_subgroup_independent_denominator() {
+        let x_scaled = 7_i32;
+        let y_scaled = -4_i32;
+        for family in FAMILIES {
+            let projected = reynolds_projection(&base_polynomial(family.base_seed), family).unwrap();
+            let (actual_numerator, actual_denominator) =
+                evaluate_target(&projected, family.members.len(), x_scaled, y_scaled).unwrap();
+
+            let group_multiplier =
+                COMMON_GROUP_DENOMINATOR / i128::try_from(family.members.len()).unwrap();
+            let mut independently_scaled_numerator = 0_i128;
+            for ((power_x, power_y), coefficient) in &projected {
+                let degree = power_x + power_y;
+                let scale_factor = 10_i128.pow(MAX_DEGREE - degree);
+                let x_power = i128::from(x_scaled).pow(*power_x);
+                let y_power = i128::from(y_scaled).pow(*power_y);
+                independently_scaled_numerator +=
+                    coefficient * group_multiplier * scale_factor * x_power * y_power;
+            }
+
+            assert_eq!(actual_denominator, COMMON_TARGET_DENOMINATOR);
+            assert_eq!(actual_numerator, independently_scaled_numerator);
+        }
+    }
+
+    #[test]
     fn training_feature_matrix_has_full_rank_on_a_known_grid() {
         let basis = feature_basis();
         let mut used = BTreeSet::new();
