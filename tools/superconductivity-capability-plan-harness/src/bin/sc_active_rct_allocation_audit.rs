@@ -376,6 +376,13 @@ impl Instance {
         }
         candidates.sort_by(|a,b|a.id.cmp(&b.id));
 
+        let held_out_world_state_id = text_field(&fixture, "held_out_world_state_id")?;
+        if !world_index.contains_key(held_out_world_state_id) {
+            return Err(format!("held_out_world_state_id {held_out_world_state_id} is not in the world-state registry"));
+        }
+        // The held-out identifier is validated for benchmark integrity only.
+        // It is intentionally not copied into the instance or used in acquisition.
+
         let prior: Vec<f64> = worlds.iter().map(|w|w.prior).collect();
         let prior_joint_entropy=entropy(&prior);
         let mut prior_ate_probs=vec![0.0;ate_bin_keys.len()];
