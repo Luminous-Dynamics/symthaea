@@ -227,6 +227,65 @@ The primitive reference compiled locally with GCC 14.2 and strict warnings (`-O2
 
 **Evidence boundary:** the schedule primitive tests only the tie-schedule subgrammar. The integrated three-mode PRN1 implementation has now also been compiled and run locally with GCC 14.2 under `-O2 -std=c++20 -Wall -Wextra -Wconversion -Werror`. The integrated test suite passed empty input; four deterministic 65,536-record mode-0 fixtures; mode-1 duplicate-time groups with a repeated template; alternating two-template groups; mode-2 out-of-order fallback; a same-series multi-row tie-group case; 100 randomized interleaved round-trips; and three malformed-frame cases. The first integrated run exposed an incorrect test bound: the 65,536-row fixture has 1,024 tie groups (not 64), and the correct repeated-template schedule is 1,072 bytes / 8,576 bits. The assertion was corrected from 5,000 to 9,000 bits. The next decoder revision replaced per-group full-key scans with a heap frontier and sparse per-key multiplicity maps; the same strict GCC 14.2 command passed with the new same-series multi-row tie test. A temporary local source copy used formatting-only line breaks to avoid misleading-indentation diagnostics; the checked-in algorithm and corrected threshold were tested. This is C++ reference validation only, not Rust CDL or CI evidence.
 
+
+## Per-series field-columnar hybrid (PCL1) — 2026-11-20
+
+The row-state PRN1 frame now has a second independently decoded child layout, PCL1, to test the strongest lesson from tparquet/ALP/Pco: numeric fields should be exposed as independent typed lanes rather than always serialized as row events.
+
+PCL1 is deliberately narrow: it only accepts globally strictly increasing, unique timestamps. Duplicate-time and out-of-order cases remain on the PRN1 three-mode path.
+
+### Layout
+
+For each (entity, series) child, PCL1 stores:
+1. A row count, first absolute timestamp and positive per-series timestamp deltas.
+2. For each fixed typed field:
+   - an LSB-first presence bitmap across child rows;
+   - an LSB-first changed bitmap across child rows;
+   - a contiguous exact u64 value lane, with one value only for each changed-and-present row.
+3. The outer frame stores schema, key dictionary, row counts, child lengths and CRC32. The decoder validates bitmap padding, canonical update bits, exact child consumption, timestamps, field semantics, key uniqueness, lengths and CRC before merging.
+
+The encoder and decoder reconstruct original records exactly; PCL1 is not a lossy numerical transform. The current version compresses the complete PCL1 frame with the same Zstandard level as the row-state controls. Pco and ALP have **not** yet been integrated into the lane codec selector.
+
+### Tests and local measurements
+
+The C++20 prototype and tests are in:
+- `research/cdl-bench/reference/typed_record_partitioned_runs_reference.cpp`
+- `scripts/research/cdl_partitioned_telemetry_reference.sh`
+
+Local GCC 14.2 execution passed:
+- empty columnar frame;
+- four deterministic 65,536-record sparse, bursty, idle and noisy fixtures;
+- randomized typed-record round-trips at 1, 8, 64, 1,024 and 4,096 distinct keys;
+- corruption checks for bad magic/checksum, truncation and trailing bytes;
+- the existing PRN1 three-mode suite, including duplicate/out-of-order and same-series multi-row tie groups.
+
+The first run caught a field-layout mismatch: the encoder placed exact values before bitmaps while the decoder consumed bitmaps before values. The encoder now stages each lane's values and emits the presence bitmap, changed bitmap, then values; the corrected implementation passed the suite. No byte or compression result from the failing run was retained.
+
+All sizes below are complete raw/global-delta/row-partitioned/field-columnar frames before Zstd, then complete frames compressed with Zstd CLI 1.5.7 level 19. Every compressed frame was decompressed and byte-compared with its original input.
+
+| Workload | Raw frame | Global delta | PRN1 row-partitioned | PCL1 field-columnar | Zstd(raw) | Zstd(global delta) | Zstd(PRN1) | Zstd(PCL1) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Sparse | 5,308,448 | 648,493 | 140,879 | 392,931 | 223,774 | 85,931 | 61,864 | 59,042 |
+| Bursty | 5,308,448 | 833,813 | 320,171 | 585,723 | 367,607 | 224,396 | 204,921 | 188,405 |
+| Mostly idle | 5,308,448 | 590,677 | 8,308 | 334,243 | 153,209 | 5,577 | 4,784 | 5,692 |
+| Noisy | 5,308,448 | 3,769,213 | 3,636,264 | 3,570,899 | 2,603,680 | 2,316,397 | 2,252,910 | 2,042,284 |
+
+Relative to the complete Zstd(PRN1) frames, PCL1 is:
+- **4.56% smaller** on sparse updates;
+- **8.06% smaller** on bursty updates;
+- **18.98% larger** on mostly-idle data;
+- **9.35% smaller** on noisy full-update data.
+
+Relative to Zstd(global state-delta), PCL1 is 31.29% smaller on sparse, 16.04% smaller on bursty, 2.06% larger on idle, and 11.83% smaller on noisy. Relative to Zstd(raw), it is 73.62%, 48.75%, 96.28% and 21.56% smaller, respectively.
+
+This is the first direct signal that the best representation depends on workload regime. PRN1's whole-record heartbeat runs dominate mostly-idle data; PCL1's per-field lanes do better for sparse, bursty and noisy updates. **A per-series/segment row-vs-columnar selector is now more compelling than a single universal child layout.** The choice must account for complete frame size and decode/query cost, not just a local field-lane ratio.
+
+### Evidence boundary and next gates
+
+This is synthetic C++ transform-plus-Zstd evidence, not Rust CDL, not tparquet/ALP/Pco, not production telemetry, and not a SOTA result. The current PCL1 fixed eight-field schema has only an outer CRC (no independent child CRC yet), has no random-access index or checkpointed column lane decode, materializes full input and output in memory, and has only been measured at Zstd level 19. Query projection, per-field ALP/Pco/Zstd choice, throughput, peak RSS, and independent public dataset performance remain unmeasured. PCL1 rejects duplicate and out-of-order global timestamps rather than falling back to tie scheduling.
+
+The next engineering step is an adaptive **per-series/per-segment layout selector** that compares complete PRN1 row-state and PCL1 field-columnar candidates on a bounded sample, records the choice in the frame, and preserves the exact PRN1 order fallback for tied or regressing timestamps. Issue #12956 tracks this lane-layout work; issue #12935 tracks bounded-memory streaming, child indexes, checkpoints and corruption isolation.
+
 ## Current Rust implementation status (compiler validation pending)
 
 The PR branch now contains `research/cdl-bench/src/telemetry.rs`, exported from `lib.rs`, with a `cdl-bench telemetry` synthetic command. The first frame has a fixed eight-lane schema, entity/series keys, exact u64 field payloads, explicit null/presence and changed-field masks, canonical u64 varints, deterministic bounded LRU state, segment-start checkpoints, and header/inner/raw-stream CRCs. The shared arithmetic coder is used for the transformed stream. Eight Rust tests are authored for round-trip, determinism, empty streams, truncation, single-bit mutations, resource limits, invalid field values and malformed varints.
