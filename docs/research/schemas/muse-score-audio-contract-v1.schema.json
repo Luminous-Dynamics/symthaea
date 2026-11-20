@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/muse-score-audio-contract-v1.schema.json",
+  "title": "MUSE Score-Audio Conformance Contract v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "scope_kind",
+    "scope_id",
+    "sample_rate_hz",
+    "channels",
+    "analysis_window_frames",
+    "minimum_signal_rms_dbfs",
+    "minimum_pitch_confidence",
+    "pitch_tolerance_cents"
+  ],
+  "properties": {
+    "schema": {
+      "const": "muse-score-audio-contract-v1"
+    },
+    "scope_kind": {
+      "const": "isolated_stem"
+    },
+    "scope_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "sample_rate_hz": {
+      "type": "integer",
+      "minimum": 8000,
+      "maximum": 192000
+    },
+    "channels": {
+      "const": 1
+    },
+    "analysis_window_frames": {
+      "type": "integer",
+      "enum": [
+        1024,
+        2048,
+        4096,
+        8192,
+        16384
+      ]
+    },
+    "minimum_signal_rms_dbfs": {
+      "type": "number",
+      "minimum": -120,
+      "maximum": 0
+    },
+    "minimum_pitch_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "pitch_tolerance_cents": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 100
+    }
+  }
+}
