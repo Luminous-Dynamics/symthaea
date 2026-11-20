@@ -513,6 +513,37 @@ mod tests {
     }
 
     #[test]
+    fn target_competitor_and_unreacted_a_fractions_close_to_one() {
+        let (schema, fixture) = inputs();
+        let output = audit(&schema, &fixture).unwrap();
+        for case in output["cases"].as_array().unwrap() {
+            let fractions = &case["phase_products_per_area"];
+            let sum = fractions["target_fraction_of_a_available"].as_f64().unwrap()
+                + fractions["competitor_fraction_of_a_available"].as_f64().unwrap()
+                + fractions["unreacted_a_fraction_of_a_available"].as_f64().unwrap();
+            assert!((sum - 1.0).abs() < 1.0e-8);
+        }
+    }
+
+    #[test]
+    fn grid_refinement_runs_with_conservation_at_each_resolution() {
+        let (schema, fixture) = inputs();
+        let data: Value = serde_json::from_slice(&fixture).unwrap();
+        let base = data["cases"][0].clone();
+        for (cells, time_step) in [(24_u64, 0.0005_f64), (48, 0.00025), (96, 0.0000625)] {
+            let mut refined = base.clone();
+            refined["grid_cells"] = json!(cells);
+            refined["time_step_s"] = json!(time_step);
+            let case = parse_case(&refined).unwrap();
+            let result = simulate(&case).unwrap();
+            assert!(result.balance_a.relative_residual < 1.0e-8);
+            assert!(result.balance_b.relative_residual < 1.0e-8);
+            assert!(result.target_product.is_finite() && result.target_product >= 0.0);
+            assert!(result.competitor_product.is_finite() && result.competitor_product >= 0.0);
+        }
+    }
+
+    #[test]
     fn zero_flux_right_boundary_is_conservative() {
         let (schema, fixture) = inputs();
         let output = audit(&schema, &fixture).unwrap();
