@@ -26,7 +26,10 @@ struct BenchmarkReport {
     trace_digest_blake3: String,
     operating_system: &'static str,
     architecture: &'static str,
+    logical_cpus: usize,
+    trace_file_bytes: usize,
     event_count: usize,
+    warmup_iterations: usize,
     iterations: usize,
     replay_latency_min_ns: u64,
     replay_latency_p50_ns: u64,
@@ -86,7 +89,11 @@ fn run() -> Result<(), String> {
     }
 
     let bytes = fs::read(&trace_path).map_err(|error| error.to_string())?;
-    let trace: EmbodimentTrace = serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
+    if bytes.len() as u64 > MAX_TRACE_FILE_BYTES {
+        return Err("trace grew beyond the configured size limit while reading".to_string());
+    }
+    let trace: EmbodimentTrace =
+        serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
     if trace.schema_version != EMBODIMENT_TRACE_SCHEMA_VERSION {
         return Err(format!(
             "trace schema {} is unsupported; this binary supports {}",
@@ -125,7 +132,12 @@ fn run() -> Result<(), String> {
         trace_digest_blake3: blake3::hash(&bytes).to_hex().to_string(),
         operating_system: std::env::consts::OS,
         architecture: std::env::consts::ARCH,
+        logical_cpus: std::thread::available_parallelism()
+            .map(|count| count.get())
+            .unwrap_or(1),
+        trace_file_bytes: bytes.len(),
         event_count: trace.events.len(),
+        warmup_iterations: 3,
         iterations,
         replay_latency_min_ns: samples_ns[0],
         replay_latency_p50_ns: percentile(&samples_ns, 50),
@@ -147,7 +159,8 @@ fn percentile(sorted_samples: &[u64], percentile: usize) -> u64 {
         return 0;
     }
     let bounded = percentile.min(100);
-    let index = ((sorted_samples.len() - 1) * bounded).div_ceil(100);
+    let rank = (sorted_samples.len() * bounded).div_ceil(100);
+    let index = rank.saturating_sub(1);
     sorted_samples[index.min(sorted_samples.len() - 1)]
 }
 
