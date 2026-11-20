@@ -81,3 +81,13 @@ No synthetic and real metrics should be pooled.
 ## Claim ceiling
 
 This is provenance and cohort infrastructure. It does not reproduce the paper's model, validate raw XRD patterns, establish a real reaction-onset distribution, synthesize a new compound or demonstrate superconductivity.
+
+
+## Enforced training holdout
+
+`data/research/sc_onset_pair_holdout_manifest_v0_1.json` is now consumed by the independent `sc_onset_holdout_leakage_audit` Rust binary. A proposed training cohort must declare every row's source, row ID and unordered precursor identities; Precursor Genome rows additionally declare their source sample ID. The auditor rejects:
+- any PG training row whose sample ID is one of the 26 excluded samples;
+- any PG or PG-LIT training row whose unordered formula pair matches a held-out pair, regardless of row ID or source;
+- duplicate training row IDs, repeated-precursor pseudo-pairs and missing/invalid row identities.
+
+A synthetic negative control reverses precursor order and still proves that pair leakage is detected. This is how the 218 PG-LIT same-pair exclusion becomes enforceable without inventing literature record IDs. The fixture only establishes the validator's logic; it is not a real PG-LIT cohort.
