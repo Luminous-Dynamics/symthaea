@@ -2,7 +2,7 @@
 //!
 //! Usage:
 //!   cargo run -p symthaea-canvas --example embodiment_trace_replay -- --trace trace.json
-//!   cargo run -p symthaea-canvas --example embodiment_trace_replay -- --trace trace.json --iterations 500
+//!   cargo run -p symthaea-canvas --example embodiment_trace_replay -- \\\n//!     --trace trace.json --iterations 500
 //!
 //! This measures semantic reduction only. It does not measure SVG rasterization,
 //! browser presentation, audio playback, GPU rendering, or human perception.
@@ -22,6 +22,9 @@ const MAX_ITERATIONS: usize = 1_000_000;
 struct BenchmarkReport {
     trace_schema_version: u16,
     session_id: String,
+    trace_digest_blake3: String,
+    operating_system: &'static str,
+    architecture: &'static str,
     event_count: usize,
     iterations: usize,
     replay_latency_min_ns: u64,
@@ -51,7 +54,9 @@ fn run() -> Result<(), String> {
                 trace_path = Some(PathBuf::from(value));
             }
             "--iterations" => {
-                let value = args.next().ok_or_else(|| "--iterations requires an integer".to_string())?;
+                let value = args
+                    .next()
+                    .ok_or_else(|| "--iterations requires an integer".to_string())?;
                 iterations = value.parse::<usize>().map_err(|error| error.to_string())?;
             }
             "--help" | "-h" => {
@@ -116,6 +121,9 @@ fn run() -> Result<(), String> {
     let report = BenchmarkReport {
         trace_schema_version: trace.schema_version,
         session_id: trace.session_id,
+        trace_digest_blake3: blake3::hash(&bytes).to_hex().to_string(),
+        operating_system: std::env::consts::OS,
+        architecture: std::env::consts::ARCH,
         event_count: trace.events.len(),
         iterations,
         replay_latency_min_ns: samples_ns[0],
