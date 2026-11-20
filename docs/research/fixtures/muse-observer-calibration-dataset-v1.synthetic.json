@@ -9,7 +9,7 @@
   "observations": [
     {
       "sample_id": "sample-0",
-      "source_group_id": "work-0-Fit",
+      "source_group_id": "work-0",
       "split": "fit",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -26,7 +26,7 @@
     },
     {
       "sample_id": "sample-1",
-      "source_group_id": "work-0-Fit",
+      "source_group_id": "work-0",
       "split": "fit",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -43,7 +43,7 @@
     },
     {
       "sample_id": "sample-2",
-      "source_group_id": "work-1-Fit",
+      "source_group_id": "work-1",
       "split": "fit",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -60,7 +60,7 @@
     },
     {
       "sample_id": "sample-3",
-      "source_group_id": "work-1-Fit",
+      "source_group_id": "work-1",
       "split": "fit",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -77,7 +77,7 @@
     },
     {
       "sample_id": "sample-4",
-      "source_group_id": "work-2-Fit",
+      "source_group_id": "work-2",
       "split": "fit",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -94,7 +94,7 @@
     },
     {
       "sample_id": "sample-5",
-      "source_group_id": "work-2-Fit",
+      "source_group_id": "work-2",
       "split": "fit",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -111,7 +111,7 @@
     },
     {
       "sample_id": "sample-6",
-      "source_group_id": "work-3-Fit",
+      "source_group_id": "work-3",
       "split": "fit",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -128,7 +128,7 @@
     },
     {
       "sample_id": "sample-7",
-      "source_group_id": "work-3-Fit",
+      "source_group_id": "work-3",
       "split": "fit",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -145,7 +145,7 @@
     },
     {
       "sample_id": "sample-8",
-      "source_group_id": "work-4-Fit",
+      "source_group_id": "work-4",
       "split": "fit",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -162,7 +162,7 @@
     },
     {
       "sample_id": "sample-9",
-      "source_group_id": "work-4-Fit",
+      "source_group_id": "work-4",
       "split": "fit",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -179,7 +179,7 @@
     },
     {
       "sample_id": "sample-10",
-      "source_group_id": "work-5-Fit",
+      "source_group_id": "work-5",
       "split": "fit",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -196,7 +196,7 @@
     },
     {
       "sample_id": "sample-11",
-      "source_group_id": "work-5-Fit",
+      "source_group_id": "work-5",
       "split": "fit",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -213,7 +213,7 @@
     },
     {
       "sample_id": "sample-12",
-      "source_group_id": "work-6-Fit",
+      "source_group_id": "work-6",
       "split": "fit",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -230,7 +230,7 @@
     },
     {
       "sample_id": "sample-20",
-      "source_group_id": "work-10-ThresholdSelection",
+      "source_group_id": "work-10",
       "split": "threshold_selection",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -247,7 +247,7 @@
     },
     {
       "sample_id": "sample-21",
-      "source_group_id": "work-10-ThresholdSelection",
+      "source_group_id": "work-10",
       "split": "threshold_selection",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -264,7 +264,7 @@
     },
     {
       "sample_id": "sample-22",
-      "source_group_id": "work-11-ThresholdSelection",
+      "source_group_id": "work-11",
       "split": "threshold_selection",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -281,7 +281,7 @@
     },
     {
       "sample_id": "sample-23",
-      "source_group_id": "work-11-ThresholdSelection",
+      "source_group_id": "work-11",
       "split": "threshold_selection",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -298,7 +298,7 @@
     },
     {
       "sample_id": "sample-24",
-      "source_group_id": "work-12-ThresholdSelection",
+      "source_group_id": "work-12",
       "split": "threshold_selection",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -315,7 +315,7 @@
     },
     {
       "sample_id": "sample-25",
-      "source_group_id": "work-12-ThresholdSelection",
+      "source_group_id": "work-12",
       "split": "threshold_selection",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -332,7 +332,7 @@
     },
     {
       "sample_id": "sample-26",
-      "source_group_id": "work-13-ThresholdSelection",
+      "source_group_id": "work-13",
       "split": "threshold_selection",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -349,7 +349,7 @@
     },
     {
       "sample_id": "sample-27",
-      "source_group_id": "work-13-ThresholdSelection",
+      "source_group_id": "work-13",
       "split": "threshold_selection",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -366,7 +366,7 @@
     },
     {
       "sample_id": "sample-28",
-      "source_group_id": "work-14-ThresholdSelection",
+      "source_group_id": "work-14",
       "split": "threshold_selection",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -383,7 +383,7 @@
     },
     {
       "sample_id": "sample-29",
-      "source_group_id": "work-14-ThresholdSelection",
+      "source_group_id": "work-14",
       "split": "threshold_selection",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -400,7 +400,7 @@
     },
     {
       "sample_id": "sample-30",
-      "source_group_id": "work-15-ThresholdSelection",
+      "source_group_id": "work-15",
       "split": "threshold_selection",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -417,7 +417,7 @@
     },
     {
       "sample_id": "sample-31",
-      "source_group_id": "work-15-ThresholdSelection",
+      "source_group_id": "work-15",
       "split": "threshold_selection",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -434,7 +434,7 @@
     },
     {
       "sample_id": "sample-32",
-      "source_group_id": "work-16-ThresholdSelection",
+      "source_group_id": "work-16",
       "split": "threshold_selection",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -451,7 +451,7 @@
     },
     {
       "sample_id": "sample-40",
-      "source_group_id": "work-20-HeldOut",
+      "source_group_id": "work-20",
       "split": "held_out",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -468,7 +468,7 @@
     },
     {
       "sample_id": "sample-41",
-      "source_group_id": "work-20-HeldOut",
+      "source_group_id": "work-20",
       "split": "held_out",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -485,7 +485,7 @@
     },
     {
       "sample_id": "sample-42",
-      "source_group_id": "work-21-HeldOut",
+      "source_group_id": "work-21",
       "split": "held_out",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -502,7 +502,7 @@
     },
     {
       "sample_id": "sample-43",
-      "source_group_id": "work-21-HeldOut",
+      "source_group_id": "work-21",
       "split": "held_out",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -519,7 +519,7 @@
     },
     {
       "sample_id": "sample-44",
-      "source_group_id": "work-22-HeldOut",
+      "source_group_id": "work-22",
       "split": "held_out",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -536,7 +536,7 @@
     },
     {
       "sample_id": "sample-45",
-      "source_group_id": "work-22-HeldOut",
+      "source_group_id": "work-22",
       "split": "held_out",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -553,7 +553,7 @@
     },
     {
       "sample_id": "sample-46",
-      "source_group_id": "work-23-HeldOut",
+      "source_group_id": "work-23",
       "split": "held_out",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -570,7 +570,7 @@
     },
     {
       "sample_id": "sample-47",
-      "source_group_id": "work-23-HeldOut",
+      "source_group_id": "work-23",
       "split": "held_out",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -587,7 +587,7 @@
     },
     {
       "sample_id": "sample-48",
-      "source_group_id": "work-24-HeldOut",
+      "source_group_id": "work-24",
       "split": "held_out",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -604,7 +604,7 @@
     },
     {
       "sample_id": "sample-49",
-      "source_group_id": "work-24-HeldOut",
+      "source_group_id": "work-24",
       "split": "held_out",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -621,7 +621,7 @@
     },
     {
       "sample_id": "sample-50",
-      "source_group_id": "work-25-HeldOut",
+      "source_group_id": "work-25",
       "split": "held_out",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -638,7 +638,7 @@
     },
     {
       "sample_id": "sample-51",
-      "source_group_id": "work-25-HeldOut",
+      "source_group_id": "work-25",
       "split": "held_out",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -655,7 +655,7 @@
     },
     {
       "sample_id": "sample-52",
-      "source_group_id": "work-26-HeldOut",
+      "source_group_id": "work-26",
       "split": "held_out",
       "observer_id": "muse-score-audio-pitch-observer",
       "observer_version": "0.1.0",
@@ -671,5 +671,5 @@
       "reference_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000068fca"
     }
   ],
-  "dataset_sha256": "f43c72355f179e0c6d9d7c73a79cc9a1b70165992396c097f349c8449eb27d13"
+  "dataset_sha256": "d8598a50ba728d8610774706575139553138325d1bbf9547c5a49348cca21c11"
 }
