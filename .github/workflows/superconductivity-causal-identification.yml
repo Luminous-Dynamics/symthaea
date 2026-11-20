@@ -1,0 +1,115 @@
+name: Superconductivity Causal Identification Auditor
+
+on:
+  pull_request:
+    paths:
+      - "tools/superconductivity-capability-plan-harness/**"
+      - "data/schemas/superconductivity_causal_identification_v0_1.schema.json"
+      - "data/research/superconductivity_causal_identification_fixture_*.json"
+      - "data/research/superconductivity_causal_identification_suite_v0_1.json"
+      - "research/superconductivity/capability_experiment_planning/causal_identification/**"
+      - ".github/workflows/superconductivity-causal-identification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: superconductivity-causal-identification-\${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  exact-causal-identification-audit:
+    name: Specimen lineage, overlap, ITT and exact randomization inference
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Apply pinned Rust formatting
+        run: cargo fmt --manifest-path tools/superconductivity-capability-plan-harness/Cargo.toml --all
+
+      - name: Verify canonical Rust formatting
+        run: cargo fmt --manifest-path tools/superconductivity-capability-plan-harness/Cargo.toml --all -- --check
+
+      - name: Capture rustfmt-only patch
+        if: always()
+        run: |
+          git diff --binary -- tools/superconductivity-capability-plan-harness > "$RUNNER_TEMP/sc-causal-identification-rustfmt.patch"
+          sha256sum "$RUNNER_TEMP/sc-causal-identification-rustfmt.patch"
+          git diff --stat -- tools/superconductivity-capability-plan-harness
+
+      - name: Generate isolated lockfile
+        run: cargo generate-lockfile --manifest-path tools/superconductivity-capability-plan-harness/Cargo.toml
+
+      - name: Test all planner binaries
+        run: cargo test --locked --manifest-path tools/superconductivity-capability-plan-harness/Cargo.toml --bins
+
+      - name: Audit blocked-randomized versus historical-targeting fixture
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-capability-plan-harness/Cargo.toml --bin sc_causal_identification_audit -- \
+            --schema data/schemas/superconductivity_causal_identification_v0_1.schema.json \
+            --fixture data/research/superconductivity_causal_identification_fixture_v0_1.json \
+            --out "$RUNNER_TEMP/sc-causal-identification-main-receipt.json"
+          cat "$RUNNER_TEMP/sc-causal-identification-main-receipt.json"
+
+      - name: Audit missing-outcome abstention fixture
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-capability-plan-harness/Cargo.toml --bin sc_causal_identification_audit -- \
+            --schema data/schemas/superconductivity_causal_identification_v0_1.schema.json \
+            --fixture data/research/superconductivity_causal_identification_fixture_missing_v0_1.json \
+            --out "$RUNNER_TEMP/sc-causal-identification-missing-receipt.json"
+          cat "$RUNNER_TEMP/sc-causal-identification-missing-receipt.json"
+
+      - name: Audit positivity-failure abstention fixture
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-capability-plan-harness/Cargo.toml --bin sc_causal_identification_audit -- \
+            --schema data/schemas/superconductivity_causal_identification_v0_1.schema.json \
+            --fixture data/research/superconductivity_causal_identification_fixture_positivity_v0_1.json \
+            --out "$RUNNER_TEMP/sc-causal-identification-positivity-receipt.json"
+          cat "$RUNNER_TEMP/sc-causal-identification-positivity-receipt.json"
+
+      - name: Run Clippy
+        run: cargo clippy --locked --manifest-path tools/superconductivity-capability-plan-harness/Cargo.toml --bins -- -D warnings
+
+      - name: Record exact-head identity and all input digests
+        if: always()
+        run: |
+          {
+            echo "git_head=$(git rev-parse HEAD)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "worktree_status=$(git status --short)"
+            sha256sum data/schemas/superconductivity_causal_identification_v0_1.schema.json
+            sha256sum data/research/superconductivity_causal_identification_fixture_v0_1.json
+            sha256sum data/research/superconductivity_causal_identification_fixture_missing_v0_1.json
+            sha256sum data/research/superconductivity_causal_identification_fixture_positivity_v0_1.json
+            sha256sum data/research/superconductivity_causal_identification_suite_v0_1.json
+            sha256sum tools/superconductivity-capability-plan-harness/Cargo.toml
+            sha256sum tools/superconductivity-capability-plan-harness/src/bin/sc_causal_identification_audit.rs
+            sha256sum "$RUNNER_TEMP/sc-causal-identification-main-receipt.json"
+            sha256sum "$RUNNER_TEMP/sc-causal-identification-missing-receipt.json"
+            sha256sum "$RUNNER_TEMP/sc-causal-identification-positivity-receipt.json"
+            sha256sum tools/superconductivity-capability-plan-harness/Cargo.lock
+          } > "$RUNNER_TEMP/sc-causal-identification-environment.txt"
+
+      - name: Upload exact-run evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sc-causal-identification-exact-run-evidence
+          if-no-files-found: warn
+          path: |
+            tools/superconductivity-capability-plan-harness/Cargo.lock
+            \${{ runner.temp }}/sc-causal-identification-environment.txt
+            \${{ runner.temp }}/sc-causal-identification-main-receipt.json
+            \${{ runner.temp }}/sc-causal-identification-missing-receipt.json
+            \${{ runner.temp }}/sc-causal-identification-positivity-receipt.json
+            \${{ runner.temp }}/sc-causal-identification-rustfmt.patch

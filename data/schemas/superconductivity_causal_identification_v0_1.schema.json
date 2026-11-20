@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_causal_identification_v0_1.schema.json",
+  "title": "Specimen-level causal intervention identification benchmark",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "instance_id",
+    "fixture_only",
+    "target_outcome",
+    "estimand",
+    "samples",
+    "cohorts",
+    "ground_truth",
+    "claim_ceiling",
+    "treatment_receipt_semantics"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SC-CAUSAL-IDENTIFICATION-0.1"
+    },
+    "instance_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_only": {
+      "const": true
+    },
+    "target_outcome": {
+      "type": "string",
+      "minLength": 1
+    },
+    "estimand": {
+      "enum": [
+        "finite_population_average_treatment_effect"
+      ]
+    },
+    "samples": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sample_id",
+          "batch_id",
+          "material_family",
+          "baseline_pairing_proxy",
+          "baseline_coherence_proxy"
+        ],
+        "properties": {
+          "sample_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "batch_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "material_family": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseline_pairing_proxy": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "baseline_coherence_proxy": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "cohorts": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "cohort_id",
+          "assignment_mechanism",
+          "records",
+          "allocation_design"
+        ],
+        "properties": {
+          "cohort_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "assignment_mechanism": {
+            "enum": [
+              "blocked_randomized",
+              "historical_targeting_policy"
+            ]
+          },
+          "records": {
+            "type": "array",
+            "minItems": 8,
+            "maxItems": 40,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "sample_id",
+                "batch_id",
+                "material_family",
+                "treatment_assigned",
+                "assignment_probability",
+                "delivered_dose_fraction",
+                "outcome_observed",
+                "observed_outcome"
+              ],
+              "properties": {
+                "sample_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "batch_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "material_family": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "treatment_assigned": {
+                  "type": "boolean"
+                },
+                "assignment_probability": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "exclusiveMaximum": 1
+                },
+                "delivered_dose_fraction": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "outcome_observed": {
+                  "type": "boolean"
+                },
+                "observed_outcome": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "allocation_design": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "randomization_unit",
+              "allocation_algorithm",
+              "blocking_variable",
+              "randomization_seed",
+              "assignment_receipt"
+            ],
+            "properties": {
+              "randomization_unit": {
+                "const": "specimen"
+              },
+              "allocation_algorithm": {
+                "enum": [
+                  "blocked_complete_randomization_fixed_counts",
+                  "historical_targeting_policy"
+                ]
+              },
+              "blocking_variable": {
+                "type": "string",
+                "minLength": 1
+              },
+              "randomization_seed": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "assignment_receipt": {
+                "type": "array",
+                "minItems": 8,
+                "maxItems": 40,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "sample_id",
+                    "treatment_assigned"
+                  ],
+                  "properties": {
+                    "sample_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "treatment_assigned": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "ground_truth": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sample_id",
+          "outcome_under_control",
+          "outcome_under_treatment"
+        ],
+        "properties": {
+          "sample_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "outcome_under_control": {
+            "type": "number"
+          },
+          "outcome_under_treatment": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "Synthetic causal identification benchmark only; no empirical superconductivity treatment effect or laboratory claim is established."
+    },
+    "treatment_receipt_semantics": {
+      "type": "string",
+      "const": "Primary estimand is intention-to-treat under assignment policy. Delivered dose is separately recorded for compliance auditing; v0.1 does not estimate a dose-response effect."
+    }
+  }
+}

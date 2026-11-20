@@ -1,0 +1,523 @@
+{
+  "contract": "SC-CAUSAL-IDENTIFICATION-0.1",
+  "instance_id": "adversarial_positivity_violation_001",
+  "fixture_only": true,
+  "target_outcome": "synthetic_bulk_coherence_quality_proxy",
+  "estimand": "finite_population_average_treatment_effect",
+  "samples": [
+    {
+      "sample_id": "batch_high_s1",
+      "batch_id": "batch_high",
+      "material_family": "family_alpha",
+      "baseline_pairing_proxy": 0.7,
+      "baseline_coherence_proxy": 0.45
+    },
+    {
+      "sample_id": "batch_high_s2",
+      "batch_id": "batch_high",
+      "material_family": "family_beta",
+      "baseline_pairing_proxy": 0.4,
+      "baseline_coherence_proxy": 0.6
+    },
+    {
+      "sample_id": "batch_high_s3",
+      "batch_id": "batch_high",
+      "material_family": "family_alpha",
+      "baseline_pairing_proxy": 0.7,
+      "baseline_coherence_proxy": 0.45
+    },
+    {
+      "sample_id": "batch_high_s4",
+      "batch_id": "batch_high",
+      "material_family": "family_beta",
+      "baseline_pairing_proxy": 0.4,
+      "baseline_coherence_proxy": 0.6
+    },
+    {
+      "sample_id": "batch_mid_s1",
+      "batch_id": "batch_mid",
+      "material_family": "family_alpha",
+      "baseline_pairing_proxy": 0.7,
+      "baseline_coherence_proxy": 0.45
+    },
+    {
+      "sample_id": "batch_mid_s2",
+      "batch_id": "batch_mid",
+      "material_family": "family_beta",
+      "baseline_pairing_proxy": 0.4,
+      "baseline_coherence_proxy": 0.6
+    },
+    {
+      "sample_id": "batch_mid_s3",
+      "batch_id": "batch_mid",
+      "material_family": "family_alpha",
+      "baseline_pairing_proxy": 0.7,
+      "baseline_coherence_proxy": 0.45
+    },
+    {
+      "sample_id": "batch_mid_s4",
+      "batch_id": "batch_mid",
+      "material_family": "family_beta",
+      "baseline_pairing_proxy": 0.4,
+      "baseline_coherence_proxy": 0.6
+    },
+    {
+      "sample_id": "batch_low_s1",
+      "batch_id": "batch_low",
+      "material_family": "family_alpha",
+      "baseline_pairing_proxy": 0.7,
+      "baseline_coherence_proxy": 0.45
+    },
+    {
+      "sample_id": "batch_low_s2",
+      "batch_id": "batch_low",
+      "material_family": "family_beta",
+      "baseline_pairing_proxy": 0.4,
+      "baseline_coherence_proxy": 0.6
+    },
+    {
+      "sample_id": "batch_low_s3",
+      "batch_id": "batch_low",
+      "material_family": "family_alpha",
+      "baseline_pairing_proxy": 0.7,
+      "baseline_coherence_proxy": 0.45
+    },
+    {
+      "sample_id": "batch_low_s4",
+      "batch_id": "batch_low",
+      "material_family": "family_beta",
+      "baseline_pairing_proxy": 0.4,
+      "baseline_coherence_proxy": 0.6
+    }
+  ],
+  "cohorts": [
+    {
+      "cohort_id": "blocked_randomized",
+      "assignment_mechanism": "blocked_randomized",
+      "records": [
+        {
+          "sample_id": "batch_high_s1",
+          "batch_id": "batch_high",
+          "material_family": "family_alpha",
+          "treatment_assigned": true,
+          "assignment_probability": 0.5,
+          "delivered_dose_fraction": 0.6,
+          "outcome_observed": true,
+          "observed_outcome": 8
+        },
+        {
+          "sample_id": "batch_high_s2",
+          "batch_id": "batch_high",
+          "material_family": "family_beta",
+          "treatment_assigned": true,
+          "assignment_probability": 0.5,
+          "delivered_dose_fraction": 1,
+          "outcome_observed": true,
+          "observed_outcome": 10
+        },
+        {
+          "sample_id": "batch_high_s3",
+          "batch_id": "batch_high",
+          "material_family": "family_alpha",
+          "treatment_assigned": false,
+          "assignment_probability": 0.5,
+          "delivered_dose_fraction": 0,
+          "outcome_observed": true,
+          "observed_outcome": 5
+        },
+        {
+          "sample_id": "batch_high_s4",
+          "batch_id": "batch_high",
+          "material_family": "family_beta",
+          "treatment_assigned": false,
+          "assignment_probability": 0.5,
+          "delivered_dose_fraction": 0,
+          "outcome_observed": true,
+          "observed_outcome": 4
+        },
+        {
+          "sample_id": "batch_mid_s1",
+          "batch_id": "batch_mid",
+          "material_family": "family_alpha",
+          "treatment_assigned": false,
+          "assignment_probability": 0.5,
+          "delivered_dose_fraction": 0,
+          "outcome_observed": true,
+          "observed_outcome": 2
+        },
+        {
+          "sample_id": "batch_mid_s2",
+          "batch_id": "batch_mid",
+          "material_family": "family_beta",
+          "treatment_assigned": true,
+          "assignment_probability": 0.5,
+          "delivered_dose_fraction": 1,
+          "outcome_observed": true,
+          "observed_outcome": 3
+        },
+        {
+          "sample_id": "batch_mid_s3",
+          "batch_id": "batch_mid",
+          "material_family": "family_alpha",
+          "treatment_assigned": true,
+          "assignment_probability": 0.5,
+          "delivered_dose_fraction": 1,
+          "outcome_observed": true,
+          "observed_outcome": 3
+        },
+        {
+          "sample_id": "batch_mid_s4",
+          "batch_id": "batch_mid",
+          "material_family": "family_beta",
+          "treatment_assigned": false,
+          "assignment_probability": 0.5,
+          "delivered_dose_fraction": 0,
+          "outcome_observed": true,
+          "observed_outcome": 0
+        },
+        {
+          "sample_id": "batch_low_s1",
+          "batch_id": "batch_low",
+          "material_family": "family_alpha",
+          "treatment_assigned": true,
+          "assignment_probability": 0.5,
+          "delivered_dose_fraction": 1,
+          "outcome_observed": true,
+          "observed_outcome": -3
+        },
+        {
+          "sample_id": "batch_low_s2",
+          "batch_id": "batch_low",
+          "material_family": "family_beta",
+          "treatment_assigned": false,
+          "assignment_probability": 0.5,
+          "delivered_dose_fraction": 0,
+          "outcome_observed": true,
+          "observed_outcome": -6
+        },
+        {
+          "sample_id": "batch_low_s3",
+          "batch_id": "batch_low",
+          "material_family": "family_alpha",
+          "treatment_assigned": false,
+          "assignment_probability": 0.5,
+          "delivered_dose_fraction": 0,
+          "outcome_observed": true,
+          "observed_outcome": -3
+        },
+        {
+          "sample_id": "batch_low_s4",
+          "batch_id": "batch_low",
+          "material_family": "family_beta",
+          "treatment_assigned": true,
+          "assignment_probability": 0.5,
+          "delivered_dose_fraction": 1,
+          "outcome_observed": true,
+          "observed_outcome": -2
+        }
+      ],
+      "allocation_design": {
+        "randomization_unit": "specimen",
+        "allocation_algorithm": "blocked_complete_randomization_fixed_counts",
+        "blocking_variable": "batch_id",
+        "randomization_seed": 20261120,
+        "assignment_receipt": [
+          {
+            "sample_id": "batch_high_s1",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_high_s2",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_high_s3",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_high_s4",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_low_s1",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_low_s2",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_low_s3",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_low_s4",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_mid_s1",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_mid_s2",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_mid_s3",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_mid_s4",
+            "treatment_assigned": false
+          }
+        ]
+      }
+    },
+    {
+      "cohort_id": "historical_targeting",
+      "assignment_mechanism": "historical_targeting_policy",
+      "records": [
+        {
+          "sample_id": "batch_high_s1",
+          "batch_id": "batch_high",
+          "material_family": "family_alpha",
+          "treatment_assigned": true,
+          "assignment_probability": 0.99,
+          "delivered_dose_fraction": 1,
+          "outcome_observed": true,
+          "observed_outcome": 8
+        },
+        {
+          "sample_id": "batch_high_s2",
+          "batch_id": "batch_high",
+          "material_family": "family_beta",
+          "treatment_assigned": true,
+          "assignment_probability": 0.75,
+          "delivered_dose_fraction": 1,
+          "outcome_observed": true,
+          "observed_outcome": 10
+        },
+        {
+          "sample_id": "batch_high_s3",
+          "batch_id": "batch_high",
+          "material_family": "family_alpha",
+          "treatment_assigned": true,
+          "assignment_probability": 0.75,
+          "delivered_dose_fraction": 1,
+          "outcome_observed": true,
+          "observed_outcome": 7
+        },
+        {
+          "sample_id": "batch_high_s4",
+          "batch_id": "batch_high",
+          "material_family": "family_beta",
+          "treatment_assigned": false,
+          "assignment_probability": 0.75,
+          "delivered_dose_fraction": 0,
+          "outcome_observed": true,
+          "observed_outcome": 4
+        },
+        {
+          "sample_id": "batch_mid_s1",
+          "batch_id": "batch_mid",
+          "material_family": "family_alpha",
+          "treatment_assigned": false,
+          "assignment_probability": 0.5,
+          "delivered_dose_fraction": 0,
+          "outcome_observed": true,
+          "observed_outcome": 2
+        },
+        {
+          "sample_id": "batch_mid_s2",
+          "batch_id": "batch_mid",
+          "material_family": "family_beta",
+          "treatment_assigned": true,
+          "assignment_probability": 0.5,
+          "delivered_dose_fraction": 1,
+          "outcome_observed": true,
+          "observed_outcome": 3
+        },
+        {
+          "sample_id": "batch_mid_s3",
+          "batch_id": "batch_mid",
+          "material_family": "family_alpha",
+          "treatment_assigned": false,
+          "assignment_probability": 0.5,
+          "delivered_dose_fraction": 0,
+          "outcome_observed": true,
+          "observed_outcome": 1
+        },
+        {
+          "sample_id": "batch_mid_s4",
+          "batch_id": "batch_mid",
+          "material_family": "family_beta",
+          "treatment_assigned": true,
+          "assignment_probability": 0.5,
+          "delivered_dose_fraction": 1,
+          "outcome_observed": true,
+          "observed_outcome": 5
+        },
+        {
+          "sample_id": "batch_low_s1",
+          "batch_id": "batch_low",
+          "material_family": "family_alpha",
+          "treatment_assigned": false,
+          "assignment_probability": 0.25,
+          "delivered_dose_fraction": 0,
+          "outcome_observed": true,
+          "observed_outcome": -5
+        },
+        {
+          "sample_id": "batch_low_s2",
+          "batch_id": "batch_low",
+          "material_family": "family_beta",
+          "treatment_assigned": false,
+          "assignment_probability": 0.25,
+          "delivered_dose_fraction": 0,
+          "outcome_observed": true,
+          "observed_outcome": -6
+        },
+        {
+          "sample_id": "batch_low_s3",
+          "batch_id": "batch_low",
+          "material_family": "family_alpha",
+          "treatment_assigned": false,
+          "assignment_probability": 0.25,
+          "delivered_dose_fraction": 0,
+          "outcome_observed": true,
+          "observed_outcome": -3
+        },
+        {
+          "sample_id": "batch_low_s4",
+          "batch_id": "batch_low",
+          "material_family": "family_beta",
+          "treatment_assigned": true,
+          "assignment_probability": 0.25,
+          "delivered_dose_fraction": 1,
+          "outcome_observed": true,
+          "observed_outcome": -2
+        }
+      ],
+      "allocation_design": {
+        "randomization_unit": "specimen",
+        "allocation_algorithm": "historical_targeting_policy",
+        "blocking_variable": "batch_id",
+        "randomization_seed": null,
+        "assignment_receipt": [
+          {
+            "sample_id": "batch_high_s1",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_high_s2",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_high_s3",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_high_s4",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_low_s1",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_low_s2",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_low_s3",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_low_s4",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_mid_s1",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_mid_s2",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_mid_s3",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_mid_s4",
+            "treatment_assigned": true
+          }
+        ]
+      }
+    }
+  ],
+  "ground_truth": [
+    {
+      "sample_id": "batch_high_s1",
+      "outcome_under_control": 6,
+      "outcome_under_treatment": 8
+    },
+    {
+      "sample_id": "batch_high_s2",
+      "outcome_under_control": 5,
+      "outcome_under_treatment": 10
+    },
+    {
+      "sample_id": "batch_high_s3",
+      "outcome_under_control": 5,
+      "outcome_under_treatment": 7
+    },
+    {
+      "sample_id": "batch_high_s4",
+      "outcome_under_control": 4,
+      "outcome_under_treatment": 9
+    },
+    {
+      "sample_id": "batch_mid_s1",
+      "outcome_under_control": 2,
+      "outcome_under_treatment": 4
+    },
+    {
+      "sample_id": "batch_mid_s2",
+      "outcome_under_control": -2,
+      "outcome_under_treatment": 3
+    },
+    {
+      "sample_id": "batch_mid_s3",
+      "outcome_under_control": 1,
+      "outcome_under_treatment": 3
+    },
+    {
+      "sample_id": "batch_mid_s4",
+      "outcome_under_control": 0,
+      "outcome_under_treatment": 5
+    },
+    {
+      "sample_id": "batch_low_s1",
+      "outcome_under_control": -5,
+      "outcome_under_treatment": -3
+    },
+    {
+      "sample_id": "batch_low_s2",
+      "outcome_under_control": -6,
+      "outcome_under_treatment": -1
+    },
+    {
+      "sample_id": "batch_low_s3",
+      "outcome_under_control": -3,
+      "outcome_under_treatment": -1
+    },
+    {
+      "sample_id": "batch_low_s4",
+      "outcome_under_control": -7,
+      "outcome_under_treatment": -2
+    }
+  ],
+  "claim_ceiling": "Synthetic causal identification benchmark only; no empirical superconductivity treatment effect or laboratory claim is established.",
+  "treatment_receipt_semantics": "Primary estimand is intention-to-treat under assignment policy. Delivered dose is separately recorded for compliance auditing; v0.1 does not estimate a dose-response effect."
+}

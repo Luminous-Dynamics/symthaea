@@ -1,0 +1,40 @@
+{
+  "contract": "SC-CAUSAL-IDENTIFICATION-SUITE-0.1",
+  "suite_id": "superconductivity_causal_identification_adversarial_suite_001",
+  "fixture_only": true,
+  "schema_path": "data/schemas/superconductivity_causal_identification_v0_1.schema.json",
+  "instances": [
+    {
+      "instance_id": "synthetic_block_randomization_vs_historical_targeting_001",
+      "path": "data/research/superconductivity_causal_identification_fixture_v0_1.json",
+      "role": "blocked_randomization_vs_historical_targeting",
+      "expected_properties": [
+        "exact_216_blocked_assignments",
+        "pooled_historical_bias",
+        "ITT_preserves_assigned_treatment_with_partial_delivery"
+      ]
+    },
+    {
+      "instance_id": "adversarial_missing_randomized_outcome_001",
+      "path": "data/research/superconductivity_causal_identification_fixture_missing_v0_1.json",
+      "role": "missing_outcome_and_abstention",
+      "expected_properties": [
+        "missing_specimens_remain_in_denominator",
+        "IPW_and_AIPW_abstain_without_missingness_model",
+        "exact_randomization_inference_abstains"
+      ]
+    },
+    {
+      "instance_id": "adversarial_positivity_violation_001",
+      "path": "data/research/superconductivity_causal_identification_fixture_positivity_v0_1.json",
+      "role": "positivity_failure",
+      "expected_properties": [
+        "HT_abstains",
+        "Hajek_abstains",
+        "AIPW_abstains",
+        "propensity_diagnostics_report_overlap_violation"
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic causal identification suite only; no empirical superconductivity treatment effect, material response or laboratory authorization is established."
+}
