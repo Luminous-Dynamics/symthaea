@@ -26,6 +26,9 @@ struct Transport {
 struct Route {
     id: String,
     mobile_requirement: String,
+    thermodynamic_conditions_id: String,
+    reaction_extent_basis_id: String,
+    standard_state_id: String,
     activation_barrier: f64,
     prefactor: f64,
     delta_g: Interval,
@@ -34,6 +37,7 @@ struct Route {
 #[derive(Clone, Debug)]
 struct Case {
     id: String,
+    thermodynamic_conditions_id: String,
     temperature: f64,
     hold_time: f64,
     layer_thickness: f64,
@@ -188,6 +192,9 @@ fn parse_route(value: &Value, label: &str) -> Result<Route, String> {
     Ok(Route {
         id: text_field(value, "route_id")?.to_owned(),
         mobile_requirement: text_field(value, "mobile_species_requirement")?.to_owned(),
+        thermodynamic_conditions_id: text_field(value, "thermodynamic_conditions_id")?.to_owned(),
+        reaction_extent_basis_id: text_field(value, "reaction_extent_basis_id")?.to_owned(),
+        standard_state_id: text_field(value, "standard_state_id")?.to_owned(),
         activation_barrier,
         prefactor,
         delta_g,
@@ -227,6 +234,7 @@ fn parse_case(value: &Value) -> Result<Case, String> {
     }
     let case = Case {
         id: text_field(value, "case_id")?.to_owned(),
+        thermodynamic_conditions_id: text_field(value, "thermodynamic_conditions_id")?.to_owned(),
         temperature: number_field(value, "temperature_k")?,
         hold_time: number_field(value, "hold_time_s")?,
         layer_thickness: number_field(value, "product_layer_thickness_m")?,
@@ -238,6 +246,17 @@ fn parse_case(value: &Value) -> Result<Case, String> {
     if case.temperature <= 0.0 || case.hold_time <= 0.0 || case.layer_thickness <= 0.0
         || case.selectivity_margin < 0.0 {
         return Err(format!("case {} has invalid temperature, hold time, layer thickness or selectivity margin", case.id));
+    }
+    for route in [&case.target, &case.competitor] {
+        if route.thermodynamic_conditions_id != case.thermodynamic_conditions_id {
+            return Err(format!("case {} route {} thermodynamic conditions do not match the case", case.id, route.id));
+        }
+    }
+    if case.target.reaction_extent_basis_id != case.competitor.reaction_extent_basis_id {
+        return Err(format!("case {} target and competitor reaction extent bases do not match", case.id));
+    }
+    if case.target.standard_state_id != case.competitor.standard_state_id {
+        return Err(format!("case {} target and competitor standard states do not match", case.id));
     }
     Ok(case)
 }
@@ -360,6 +379,9 @@ fn fractions_json(fractions: PhaseFractions) -> Value {
 fn case_receipt(case: &Case, result: &CaseResult) -> Value {
     json!({
         "case_id": case.id,
+        "thermodynamic_conditions_id": case.thermodynamic_conditions_id,
+        "reaction_extent_basis_id": case.target.reaction_extent_basis_id,
+        "standard_state_id": case.target.standard_state_id,
         "temperature_k": case.temperature,
         "hold_time_s": case.hold_time,
         "product_layer_thickness_m": case.layer_thickness,
@@ -590,6 +612,25 @@ mod tests {
         let mut data: Value = serde_json::from_slice(&fixture).unwrap();
         data["cases"][0]["transport"]["cross_correlation_coefficient"] = json!(1.1);
         assert!(audit(&schema, &serde_json::to_vec(&data).unwrap()).is_err());
+    }
+
+    #[test]
+    fn target_and_competitor_must_share_conditions_extent_and_standard_state() {
+        let (schema, fixture) = inputs();
+        let mut data: Value = serde_json::from_slice(&fixture).unwrap();
+        data["cases"][0]["competitor_route"]["standard_state_id"] = json!("different_reference");
+        let error = audit(&schema, &serde_json::to_vec(&data).unwrap()).unwrap_err();
+        assert!(error.contains("standard states do not match"));
+
+        let mut data: Value = serde_json::from_slice(&fixture).unwrap();
+        data["cases"][0]["target_route"]["reaction_extent_basis_id"] = json!("different_extent");
+        let error = audit(&schema, &serde_json::to_vec(&data).unwrap()).unwrap_err();
+        assert!(error.contains("reaction extent bases do not match"));
+
+        let mut data: Value = serde_json::from_slice(&fixture).unwrap();
+        data["cases"][0]["target_route"]["thermodynamic_conditions_id"] = json!("different_conditions");
+        let error = audit(&schema, &serde_json::to_vec(&data).unwrap()).unwrap_err();
+        assert!(error.contains("thermodynamic conditions do not match"));
     }
 
     #[test]
