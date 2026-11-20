@@ -42,7 +42,7 @@ The mixed modes (k != 0, eta != 0) matter: position-only and velocity-only margi
 
 ## Test surface
 
-The standalone crate authors 13 tests:
+The standalone crate authors 14 tests:
 
 1. Particle permutation invariance.
 2. Co-located weight split/merge invariance with different particle counts.
@@ -98,4 +98,4 @@ A defensible superiority claim needs: pinned source/configuration, source-report
 - Smilei documentation: https://smileipic.github.io/Smilei/
 - Finn et al. (2026), discrete-gradient Vlasov-Poisson-Landau: https://doi.org/10.1016/j.jcp.2026.114749
 - Qiao et al. (2026), intrinsic local Gauss-law PIC: https://doi.org/10.1016/j.cpc.2026.110296
-- Taitano, Burby & Alekseenko (2026), conditional Vlasov-Ampere formulation: https://doi.org/10.1017/S0022377826000159
+- Taitano, Burby & Alekseenko (2026), conditional Vlasov-Ampere formulation: https://doi.org/10.1017/S0022377826101408
