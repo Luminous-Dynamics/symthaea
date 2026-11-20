@@ -1,12 +1,12 @@
-pub mod coordinate_audit;
-
 //! Small, deterministic reference oracles for electrostatic PIC research.
 //!
 //! These routines are deliberately small-N verification tools, not production
 //! plasma solvers. Their equations and discrete conventions are documented in
 //! the package README.
 
-#![forbid(unsafe_code)]
+#[forbid(unsafe_code)]
+
+pub mod coordinate_audit;
 
 use std::error::Error;
 use std::f64::consts::TAU;
