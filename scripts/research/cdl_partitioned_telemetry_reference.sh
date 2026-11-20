@@ -39,7 +39,6 @@ for name in sparse bursty idle noisy; do
   delta_zst="${OUT_DIR}/streams/${name}_global_delta.zst"
   part_zst="${OUT_DIR}/streams/${name}_partitioned.zst"
   columnar_zst="${OUT_DIR}/streams/${name}_columnar.zst"
-  adaptive_zst="${OUT_DIR}/streams/${name}_adaptive.zst"
 
   "${ZSTD}" -q -"${LEVEL}" -f -c "${raw}" > "${raw_zst}"
   "${ZSTD}" -q -"${LEVEL}" -f -c "${delta}" > "${delta_zst}"
@@ -62,7 +61,6 @@ for name in sparse bursty idle noisy; do
   delta_zst_bytes="$(wc -c < "${delta_zst}" | tr -d ' ')"
   part_zst_bytes="$(wc -c < "${part_zst}" | tr -d ' ')"
   columnar_zst_bytes="$(wc -c < "${columnar_zst}" | tr -d ' ')"
-  adaptive_zst_frame_bytes="$(wc -c < "${adaptive_zst}" | tr -d ' ')"
   row_vs_delta="$(awk -v a="${delta_zst_bytes}" -v b="${part_zst_bytes}" 'BEGIN { printf "%.2f", (b/a-1)*100 }')"
   col_vs_delta="$(awk -v a="${delta_zst_bytes}" -v b="${columnar_zst_bytes}" 'BEGIN { printf "%.2f", (b/a-1)*100 }')"
   raw_adaptive_vs_delta="$(awk -v a="${delta_zst_bytes}" -v b="${adaptive_zst_bytes}" 'BEGIN { printf "%.2f", (b/a-1)*100 }')"
