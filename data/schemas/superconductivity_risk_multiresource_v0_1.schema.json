@@ -1,0 +1,353 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_risk_multiresource_v0_1.schema.json",
+  "title": "Risk-aware multi-resource superconductivity experiment planning instance",
+  "description": "Synthetic joint-world, shared-nuisance experiment plan with vector resource constraints and precommitment CVaR-EVSI.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "instance_id",
+    "fixture_only",
+    "risk_alpha",
+    "reference_resource_id",
+    "world_states",
+    "nuisance_states",
+    "decisions",
+    "resources",
+    "outcome_labels",
+    "initial_capabilities",
+    "actions",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SC-RISK-MULTIRESOURCE-0.1"
+    },
+    "instance_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_only": {
+      "const": true
+    },
+    "risk_alpha": {
+      "type": "number",
+      "minimum": 0.5,
+      "exclusiveMaximum": 1
+    },
+    "reference_resource_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "world_states": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "world_state_id",
+          "prior_probability",
+          "model_family",
+          "phase_realization",
+          "evidence_qualification",
+          "engineering_use"
+        ],
+        "properties": {
+          "world_state_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prior_probability": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "model_family": {
+            "enum": [
+              "conventional_electron_phonon",
+              "multiband_electron_phonon",
+              "finite_q_pairing",
+              "none_of_above"
+            ]
+          },
+          "phase_realization": {
+            "enum": [
+              "realized",
+              "metastable_or_conditional",
+              "not_realized",
+              "unknown"
+            ]
+          },
+          "evidence_qualification": {
+            "enum": [
+              "transport_only",
+              "bulk_thermodynamic_and_magnetic",
+              "unresolved",
+              "unknown"
+            ]
+          },
+          "engineering_use": {
+            "enum": [
+              "application_envelope_met",
+              "not_met",
+              "unmeasured",
+              "unknown"
+            ]
+          }
+        }
+      }
+    },
+    "nuisance_states": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state_id",
+          "prior_probability"
+        ],
+        "properties": {
+          "state_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prior_probability": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "decision_id",
+          "losses"
+        ],
+        "properties": {
+          "decision_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "losses": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "world_state_id",
+                "loss"
+              ],
+              "properties": {
+                "world_state_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "loss": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resource_id",
+          "unit",
+          "capacity",
+          "semantics"
+        ],
+        "properties": {
+          "resource_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "capacity": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "semantics": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "outcome_labels": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "initial_capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action_id",
+          "action_type",
+          "requires_capabilities",
+          "provides_capabilities",
+          "eligible",
+          "exclusion_reason",
+          "resource_consumption",
+          "outcome_likelihoods"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action_type": {
+            "enum": [
+              "capability",
+              "measurement",
+              "replication",
+              "analysis",
+              "synthesis"
+            ]
+          },
+          "requires_capabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "provides_capabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "exclusion_reason": {
+            "type": "string"
+          },
+          "resource_consumption": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "resource_id",
+                "unit",
+                "quantity"
+              ],
+              "properties": {
+                "resource_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "outcome_likelihoods": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "world_state_id",
+                "nuisance_likelihoods"
+              ],
+              "properties": {
+                "world_state_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "nuisance_likelihoods": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "state_id",
+                      "outcome_probabilities"
+                    ],
+                    "properties": {
+                      "state_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "outcome_probabilities": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "Synthetic multi-resource and precommitment tail-risk planning contract only; no physical likelihood, laboratory cost, synthesis yield, superconducting property, or application outcome is calibrated or claimed."
+    }
+  }
+}
