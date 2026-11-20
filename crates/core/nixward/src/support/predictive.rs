@@ -3,12 +3,13 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! LTC Temporal Failure Prediction
 //!
-//! Extrapolates system telemetry forward in time using the O(1) LTC closed-form
-//! solver. Predicts disk exhaustion, memory pressure, store bloat, and error
-//! rate acceleration across multiple time horizons (1h, 6h, 24h, 7d).
+//! Extrapolates system telemetry using budgeted iterative LTC evolution for
+//! short horizons and an explicit O(D) CfC-style one-jump approximation for
+//! longer horizons. Predicts disk exhaustion, memory pressure, store bloat, and
+//! error-rate acceleration across 1h, 6h, 24h and 7d horizons.
 //!
 //! Key insight: encode telemetry as HDC vector → feed to LTC neuron →
-//! `evolve_closed_form(dt, input_hv)` → decode predicted values → check thresholds.
+//! bounded LTC evolution / explicit long-horizon approximation → decode → thresholds.
 
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
