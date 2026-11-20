@@ -1,0 +1,63 @@
+{
+  "schema": "luminous.hdc-device-command",
+  "schema_version": "0.1.0",
+  "command_id": "fixture-top1-0001",
+  "device_id": "sim-iverilog-hdc-tile",
+  "device_epoch": "00112233445566778899aabbccddeeff",
+  "sequence": 1,
+  "operation_id": "hdc.top1.exact.v1",
+  "semantic_contract": {
+    "contract_id": "symthaea.binaryhv.top1-exact",
+    "contract_version": "1.0.0",
+    "contract_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "representation": {
+    "representation_id": "luminous.binaryhv.bipolar.16384.v1",
+    "dimension_bits": 16384,
+    "payload_bytes": 2048,
+    "bit_order": "lsb0",
+    "byte_order": "little"
+  },
+  "workload_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "implementation_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "timeout_ms": 5000,
+  "parameters": {
+    "candidate_count": 2,
+    "tie_break_policy": "lowest_stable_id",
+    "result_record_bytes": 16
+  },
+  "buffers": [
+    {
+      "role": "query",
+      "handle_id": "fixture-query",
+      "generation": 1,
+      "offset_bytes": 0,
+      "length_bytes": 2048,
+      "access": "read"
+    },
+    {
+      "role": "candidate_vectors",
+      "handle_id": "fixture-candidates",
+      "generation": 1,
+      "offset_bytes": 0,
+      "length_bytes": 4096,
+      "access": "read"
+    },
+    {
+      "role": "candidate_ids",
+      "handle_id": "fixture-candidate-ids",
+      "generation": 1,
+      "offset_bytes": 0,
+      "length_bytes": 16,
+      "access": "read"
+    },
+    {
+      "role": "result",
+      "handle_id": "fixture-result",
+      "generation": 1,
+      "offset_bytes": 0,
+      "length_bytes": 16,
+      "access": "write"
+    }
+  ]
+}
