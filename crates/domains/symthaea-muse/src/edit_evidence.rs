@@ -193,6 +193,7 @@ pub fn verify_result_seal(result: &Value) -> Result<(), String> {
 
 /// Evaluate a v1 velocity edit. Score bytes must deserialize as a typed
 /// symthaea_music_theory Score. Optional audio is hashed as raw artifact bytes.
+#[allow(clippy::too_many_lines)] // One v1 scoring transaction keeps all gates in one auditable path.
 pub fn evaluate_velocity_case(
     case_bytes: &[u8],
     source_score_bytes: &[u8],
@@ -296,7 +297,8 @@ pub fn evaluate_velocity_case(
     let mut protected_exact = 0usize;
     let mut outside_expected = 0usize;
     let mut outside_exact = 0usize;
-    let mut collateral_changes = candidate.notes.len().saturating_sub(mapped_targets);
+    let unmapped_candidates = candidate.notes.len().saturating_sub(mapped_targets);
+    let mut collateral_changes = unmapped_candidates;
     let mut scope_pass = true;
     let mut edit_pass = true;
 
@@ -369,7 +371,7 @@ pub fn evaluate_velocity_case(
         let id = request.as_str().ok_or("target metric IDs must be strings")?;
         target_metrics.push(match id {
             "exact_event_accuracy" | "velocity_accuracy" => metric(id, target_correct, target_expected, 1.0, false),
-            "instruction_rubric_pass" => unavailable_metric(id),
+            "instruction_rubric_pass" => continue,
             _ => unavailable_metric(id),
         });
     }
@@ -420,7 +422,6 @@ pub fn evaluate_velocity_case(
     // target metric. Keep its not_run result visible without conflating it
     // with the deterministic score-space operation gate.
     let target_pass = target_metrics.iter()
-        .filter(|item| item.get("metric_id").and_then(Value::as_str) != Some("instruction_rubric_pass"))
         .all(|item| item.get("passed").and_then(Value::as_bool) == Some(true))
         && target_expected > 0;
     let mut preservation_metrics = Vec::new();
@@ -429,7 +430,13 @@ pub fn evaluate_velocity_case(
         preservation_metrics.push(match id {
             "protected_event_agreement" => metric(id, protected_exact, protected_expected, 1.0, false),
             "outside_scope_event_agreement" => metric(id, outside_exact, outside_expected, 1.0, false),
-            "collateral_change_rate" => metric(id, collateral_changes, outside_expected.max(1), 0.0, true),
+            "collateral_change_rate" => metric(
+                id,
+                collateral_changes,
+                outside_expected.saturating_add(unmapped_candidates).max(1),
+                0.0,
+                true,
+            ),
             _ => unavailable_metric(id),
         });
     }
@@ -579,10 +586,10 @@ mod tests {
         let source = score(false);
         let candidate = score(true);
         let result = evaluate_velocity_case(&bytes(&case_for(&source)), &bytes(&source), &bytes(&candidate), None).unwrap();
-        assert_eq!(result["outcome"]["target_pass"], true);
-        assert_eq!(result["outcome"]["preservation_pass"], true);
-        assert_eq!(result["outcome"]["correspondence_pass"], true);
-        assert_eq!(result["outcome"]["strict_sample_exact_match"], false);
+        assert!(result["outcome"]["target_pass"].as_bool().unwrap());
+        assert!(result["outcome"]["preservation_pass"].as_bool().unwrap());
+        assert!(result["outcome"]["correspondence_pass"].as_bool().unwrap());
+        assert!(!result["outcome"]["strict_sample_exact_match"].as_bool().unwrap());
         assert_eq!(result["instruction_compatibility"]["verdict"], "not_run");
         assert_eq!(result["integrity"]["verdict"], "not_run");
         verify_result_seal(&result).unwrap();
@@ -594,7 +601,7 @@ mod tests {
         let mut candidate = score(true);
         candidate.notes[0].velocity = 0.99;
         let result = evaluate_velocity_case(&bytes(&case_for(&source)), &bytes(&source), &bytes(&candidate), None).unwrap();
-        assert_eq!(result["outcome"]["target_pass"], false);
+        assert!(!result["outcome"]["target_pass"].as_bool().unwrap());
     }
 
     #[test]
@@ -603,7 +610,7 @@ mod tests {
         let mut candidate = score(true);
         candidate.notes[2].velocity = 0.51;
         let result = evaluate_velocity_case(&bytes(&case_for(&source)), &bytes(&source), &bytes(&candidate), None).unwrap();
-        assert_eq!(result["outcome"]["preservation_pass"], false);
+        assert!(!result["outcome"]["preservation_pass"].as_bool().unwrap());
     }
 
     #[test]
