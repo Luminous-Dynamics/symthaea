@@ -40,7 +40,8 @@ fn canonical_json_bytes(value: &Value) -> Result<Vec<u8>, String> {
                 keys.sort_unstable();
                 let mut sorted = serde_json::Map::new();
                 for key in keys {
-                    sorted.insert(key.clone(), normalize(&object[key]));
+                    let child = object.get(key).expect("key came from this object");
+                    sorted.insert(key.clone(), normalize(child));
                 }
                 Value::Object(sorted)
             }
@@ -955,6 +956,23 @@ mod tests {
         serde_json::to_vec(value).unwrap()
     }
 
+    fn reverse_object_keys(value: &Value) -> Value {
+        match value {
+            Value::Object(object) => {
+                let mut keys: Vec<&String> = object.keys().collect();
+                keys.sort_unstable_by(|left, right| right.cmp(left));
+                let mut reversed = serde_json::Map::new();
+                for key in keys {
+                    reversed.insert(key.clone(), reverse_object_keys(object.get(key).unwrap()));
+                }
+                Value::Object(reversed)
+            }
+            Value::Array(items) => Value::Array(items.iter().map(reverse_object_keys).collect()),
+            _ => value.clone(),
+        }
+    }
+
+
     #[test]
     fn case_digest_is_independent_of_json_object_key_order() {
         let first: Value = serde_json::from_str(r#"{"z":1,"a":{"y":2,"b":3},"items":[{"d":4,"c":5}]}"#).unwrap();
@@ -974,9 +992,7 @@ mod tests {
         assert_eq!(result["instruction_compatibility"]["verdict"], "not_run");
         assert_eq!(result["integrity"]["verdict"], "not_run");
         verify_result_seal(&result).unwrap();
-        let reordered: Value = serde_json::from_str(
-            &serde_json::to_string(&result).unwrap()
-        ).unwrap();
+        let reordered = reverse_object_keys(&result);
         verify_result_seal(&reordered).unwrap();
         let mut tampered = result.clone();
         tampered["artifacts"]["case_sha256"] = json!("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
