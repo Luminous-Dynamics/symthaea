@@ -1155,10 +1155,12 @@ impl HdcLtcUnifiedNeuron {
         {
             return Err(IterativeEvolutionError::InvalidDynamicsConfiguration);
         }
+        if self.update_count == u64::MAX {
+            return Err(IterativeEvolutionError::UpdateCounterOverflow);
+        }
         if !self.total_time.is_finite()
             || !self.running_mean.is_finite()
             || !self.running_var.is_finite()
-            || self.update_count == u64::MAX
             || !(self.total_time + f64::from(dt)).is_finite()
         {
             return Err(IterativeEvolutionError::InvalidEvolutionClock);
@@ -1191,20 +1193,23 @@ impl HdcLtcUnifiedNeuron {
             return Err(IterativeEvolutionError::InvalidBaseTimeConstant);
         }
 
-        // Compute work in f64 before any float-to-integer cast. This avoids
-        // saturating casts and prevents infinity becoming an enormous loop.
-        let requested_steps = (f64::from(dt) / f64::from(max_substep)).ceil().max(1.0);
-        if !requested_steps.is_finite()
-            || requested_steps > max_substeps as f64
+        // Preserve the existing f32 step-count arithmetic, then promote the
+        // rounded integer request to f64 for budget checks before integer cast.
+        // This avoids adding a spurious sub-step from f32 representation error
+        // while still rejecting overflow/oversized work before the loop.
+        let requested_ratio = dt / max_substep;
+        if !requested_ratio.is_finite() {
+            return Err(IterativeEvolutionError::WorkBudgetExceeded {
+                required_steps: u128::MAX,
+                max_steps: max_substeps,
+            });
+        }
+        let requested_steps = f64::from(requested_ratio.ceil().max(1.0));
+        if requested_steps > max_substeps as f64
             || requested_steps >= usize::MAX as f64
         {
-            let required_steps = if requested_steps.is_finite() {
-                requested_steps as u128
-            } else {
-                u128::MAX
-            };
             return Err(IterativeEvolutionError::WorkBudgetExceeded {
-                required_steps,
+                required_steps: requested_steps as u128,
                 max_steps: max_substeps,
             });
         }
