@@ -289,6 +289,22 @@
         },
         "task_quality_floor": {
           "type": "number"
+        },
+        "fixtures_attempted_per_schedule": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "query_major_mismatches": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidate_major_mismatches": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cross_schedule_mismatches": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
