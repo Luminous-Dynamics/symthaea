@@ -40,7 +40,17 @@
     "output": "electric_field_at_particle_positions",
     "mesh_deposition_for_learned_operator": false,
     "complexity_claim": "O(N_p)_under_paper_assumptions",
-    "exact_energy_conservation": false
+    "exact_energy_conservation": false,
+    "no_physical_eulerian_mesh_or_particle_to_grid_field_deposition": true,
+    "nufft_internal_oversampled_grid": true,
+    "nufft_evaluation": "particle spreading to oversampled uniform grid, FFT, kernel deconvolution and interpolation",
+    "position_normalization": "per_sample min_max_every_timestep_without_padding",
+    "position_lifting": "single_linear_layer_on_normalized_coordinates_not_periodic",
+    "error_analysis_qualification": {
+      "source_acknowledges": "the stated Lipschitz error analysis is written for fixed normalization and periodic lifting; min-max box dependence on particle configuration and particle count is an additional effect not covered",
+      "periodic_seam": "the paper explicitly notes that the linear lifting is discontinuous across the periodic seam and the stated Lipschitz lemma holds only away from it",
+      "effect_on_claim": "the N_p^{-1/2} plus timestep error structure must be requalified for the deployed implementation or reproduced with a fixed normalization and periodic lifting"
+    }
   },
   "source_reported_metrics": {
     "weak_landau_2d2v_particle_counts": [
@@ -102,7 +112,11 @@
     "energy_drift_and_poisson_residual",
     "dimension_and_timestep_transfer",
     "implicit_solver_residual_and_jvp_cost",
-    "end_to_end_particle_field_step_cost"
+    "end_to_end_particle_field_step_cost",
+    "periodic_seam_crossing_field_and_force_jump",
+    "one_particle_extremal_perturbation_normalization_sensitivity",
+    "normalization_lipschitz_sensitivity_vs_particle_count",
+    "open_boundary_normalized_box_padding_and_artificial_periodicity"
   ],
   "claim_limits": {
     "source_reproduction": false,
@@ -110,7 +124,10 @@
     "SOTA_superiority": false,
     "integration_in_symthaea": false,
     "plasma_control_validation": false,
-    "variational_fourier_method_is_prior_art": true
+    "variational_fourier_method_is_prior_art": true,
+    "no_physical_grid_deposition": true,
+    "no_internal_oversampled_grid": false,
+    "deployed_error_theorem_qualified_for_per_sample_minmax_and_linear_periodic_lifting": false
   },
   "related_solver_lanes": [
     {
@@ -128,5 +145,11 @@
       "scope": "full_electromagnetic_Vlasov_Maxwell_where_equation_and_problem_match",
       "comparison_rule": "do_not_compare_as_same_task_to_electrostatic_NEOPIC_runs"
     }
-  ]
+  ],
+  "review_audit": {
+    "pith_review_level": "T0 AI review",
+    "human_review": "none reported by review page at time of inspection",
+    "status": "independent hypotheses for falsification; not established implementation defects",
+    "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12980"
+  }
 }
