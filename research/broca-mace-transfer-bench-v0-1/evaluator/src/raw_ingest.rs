@@ -10,6 +10,7 @@ use broca_mace_consolidation::{
     verify_and_release_promoted_experiences, ConsolidationPolicyV1,
     ConsolidationProposalV1, ConsolidationReceiptContextV1,
     ConsolidationReceiptProposalV1, ConsolidationReceiptVerifierV1,
+    ConsolidationDispositionV1,
     VerifiedConsolidationReceiptV1 as CanonicalVerifiedConsolidationReceipt,
 };
 use broca_mace_ingress::{
@@ -93,7 +94,6 @@ pub(super) struct CanonicalConsolidationAdmission {
     pub proposal: ConsolidationReceiptProposalV1,
     pub evidence_pack: broca_mace_ingress::ConsolidationEvidencePackV1,
     pub verification: CanonicalVerifiedConsolidationReceipt,
-    pub transfer_known_at_ms: i64,
 }
 pub(super) type VerifiedConsolidationRegistry =
     BTreeMap<u32, CanonicalConsolidationAdmission>;
@@ -455,7 +455,10 @@ pub(super) fn derive_as_known(
             continue;
         }
 
-        let Some(admission) = verified_consolidations.get(&event.event_id) else {
+        let Some(admission) = verified_consolidations.get(&event.event_id).filter(|entry| {
+            entry.proposal.as_known.valid_at_ms == valid_at_ms as i64
+                && entry.proposal.as_known.known_at_ms == known_at_ms as i64
+        }) else {
             report.unpromoted_observation_count += 1;
             continue;
         };
@@ -465,7 +468,7 @@ pub(super) fn derive_as_known(
         let Ok((_verified_receipt, released)) = verify_and_release_promoted_experiences(
             &admission.proposal,
             &admission.evidence_pack,
-            admission.transfer_known_at_ms,
+            known_at_ms as i64,
             &verifier,
         ) else {
             report.unpromoted_observation_count += 1;
@@ -874,7 +877,6 @@ mod tests {
             proposal: receipt_proposal,
             evidence_pack: pack.clone(),
             verification,
-            transfer_known_at_ms: pack.as_known().known_at_ms,
         }
     }
 
@@ -1455,22 +1457,19 @@ mod tests {
     }
 
     #[test]
-    fn forget_quarantine_and_privacy_erasure_do_not_enter_transfer_memory() {
-        let mut consolidations = consolidation_registry();
+    fn non_promotion_consolidation_dispositions_do_not_enter_transfer_memory() {
         for disposition in [
-            ConsolidationDisposition::ForgetFromActiveIndex,
-            ConsolidationDisposition::Quarantine,
-            ConsolidationDisposition::EraseForPrivacy,
+            ConsolidationDispositionV1::ForgetFromActiveIndex,
+            ConsolidationDispositionV1::Quarantine,
+            ConsolidationDispositionV1::EraseForPrivacy,
         ] {
-            consolidations.insert(
-                3,
-                VerifiedConsolidationReceipt {
-                    disposition,
-                    source_event_ids: vec![3],
-                    decision_digest: "verified-policy-decision".to_owned(),
-                    verified: true,
-                },
-            );
+            let mut consolidations = consolidation_registry(100, 100);
+            let admission = consolidations
+                .get_mut(&3)
+                .expect("canonical promotion admission exists");
+            admission.proposal.disposition = disposition;
+            admission.verification.proposal_digest = admission.proposal.canonical_digest();
+
             let report = derive_with_consolidations(
                 &jsonl(observation_events()),
                 100,
@@ -1484,17 +1483,16 @@ mod tests {
     }
 
     #[test]
-    fn consolidation_receipt_must_bind_the_exact_source_event() {
-        let mut consolidations = consolidation_registry();
-        consolidations.insert(
-            3,
-            VerifiedConsolidationReceipt {
-                disposition: ConsolidationDisposition::PromoteToProcedure,
-                source_event_ids: vec![999],
-                decision_digest: "verified-but-wrong-source".to_owned(),
-                verified: true,
-            },
-        );
+    fn canonical_receipt_source_substitution_is_rejected_after_digest_reissue() {
+        let mut consolidations = consolidation_registry(100, 100);
+        let admission = consolidations
+            .get_mut(&3)
+            .expect("canonical promotion admission exists");
+        admission.proposal.source_bindings[0].event_id = 999;
+        // Model a receipt issued over the substituted proposal. The evidence
+        // pack still cannot provide the substituted source revision.
+        admission.verification.proposal_digest = admission.proposal.canonical_digest();
+
         let report = derive_with_consolidations(
             &jsonl(observation_events()),
             100,
@@ -1504,6 +1502,42 @@ mod tests {
         .unwrap();
         assert!(!report.experiences.iter().any(|item| item.event_id == 3));
         assert_eq!(report.unpromoted_observation_count, 1);
+    }
+
+    #[test]
+    fn canonical_proposal_digest_tampering_is_rejected() {
+        let mut consolidations = consolidation_registry(100, 100);
+        let admission = consolidations
+            .get_mut(&3)
+            .expect("canonical promotion admission exists");
+        admission.proposal.output_artifact_digest = fixture_sha("different-output");
+        // Keep the verifier-issued digest unchanged.
+        let report = derive_with_consolidations(
+            &jsonl(observation_events()),
+            100,
+            100,
+            &consolidations,
+        )
+        .unwrap();
+        assert!(!report.experiences.iter().any(|item| item.event_id == 3));
+        assert_eq!(report.unpromoted_observation_count, 1);
+    }
+
+    #[test]
+    fn canonical_receipt_cannot_be_replayed_at_a_later_knowledge_time() {
+        let consolidations = consolidation_registry(100, 100);
+        let report = derive_as_known(
+            &jsonl(observation_events()),
+            100,
+            101,
+            &action_registry(),
+            &outcome_registry(),
+            &source_registry(),
+            &consolidations,
+        )
+        .unwrap();
+        assert!(report.experiences.is_empty());
+        assert_eq!(report.unpromoted_observation_count, 4);
     }
 
     #[test]
