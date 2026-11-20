@@ -72,15 +72,25 @@ A successful Add does not make a provider trace trusted memory. Preserve message
 | Isolation | Zero cross-user leakage in adversarial tests |
 | Search | Valid shape, stable IDs, preserved order, no over-top_k output |
 | Textual chunking | 100% parity with the frozen AML counter |
+| Textual Open-Source Methods | At least **66.22/100** (+5.00 over Cycle 2 Resurface 61.22) |
+| Coding Open-Source Methods | At least **68.33% resolved** (+5.00 over Cycle 2 InsightMem 63.33%) |
+| Multimodal Open-Source Methods | At least **48.26/100** (+5.00 over Cycle 2 Khipu 43.26) |
+| Commercial Products | No model restrictions; compare only within the corresponding commercial track/division |
 | Overall | At least +5 percentage points over strongest official result in same track/division |
 | Governance/Safety | At least +10 points over same-track baseline without reducing legitimate-use coverage |
 | Efficiency | Report ingestion/search cost, memory bytes, p50/p95/p99 latency and cost per correct item |
 
 These are programme goals, not achieved results. Next-cycle targets should use the appropriate same-track/division Cycle 2 leader as the baseline and the next cycle's frozen API/model contract.
 
+## Official submission-profile preflight
+
+A new `aml-adapter::submission` module checks declared deployment metadata against the currently published AML rules. It requires participant-hosted HTTPS Add/Search endpoints, rejects obvious local/private endpoints and URL-embedded credentials/query secrets, binds source/runtime digests, and applies the Open-Source Methods model restrictions: `text-embedding-v4` for embedding components and `gpt-4o-mini` for LLM-related components. Rerankers remain unrestricted; Commercial Products have no such model restrictions.
+
+This returns a digest-bound **declaration**, not an attestation. It does not prove public reachability, authentication, runtime model use, or a passed AML Smoke test; those require the deployed service and platform run.
+
 ## Implementation boundary
 
-The workspace contains broca-aml-adapter with 19 authored unit tests. Implemented: typed contract core, injected-counter Textual chunking, tenant/track-scoped SHA-256 Add idempotency with receipt-preserving replay, response-echo validation and receipt-bound write/search-visibility verification, track-aware Search validation, Top-K/result-order checks and multimodal data-URI/media validation.
+The workspace contains broca-aml-adapter with 28 authored unit tests (19 Add/Search contract tests and 9 submission-profile preflight tests). Implemented: typed contract core, a static AML submission-profile preflight for hosting/endpoints/model-policy metadata, injected-counter Textual chunking, tenant/track-scoped SHA-256 Add idempotency with receipt-preserving replay, response-echo validation and receipt-bound write/search-visibility verification, track-aware Search validation, Top-K/result-order checks and multimodal data-URI/media validation.
 
 Not implemented: HTTP service, authentication middleware, persistent store, atomic database idempotency, live signed write/search-visibility verifier, embeddings/retrieval/ranking, verified official word counter, live smoke/full evaluation, Cycle 2 submission, or end-to-end wiring from #12731 consolidation receipts into AML Add/Search.
 

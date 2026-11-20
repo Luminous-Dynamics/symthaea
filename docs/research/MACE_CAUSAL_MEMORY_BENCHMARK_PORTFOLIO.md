@@ -378,3 +378,19 @@ The frontier is moving from static retrieval toward memory that helps models lea
 - matched-context downstream utility and regret.
 
 The goal is not another universal leaderboard score. It is to show, under independent evaluation, that these assurances improve future action quality without increasing stale or unsupported memory activation.
+
+## 9. Agent Memory Challenge Cycle 2: official November 19 results
+
+The official results page reports nine separate leaderboards and 289 entries. Top open-source results:
+- Textual: Resurface **61.22/100** (1st of 89).
+- Coding: InsightMem **63.33% resolved** (1st of 20).
+- Multimodal: Khipu **43.26/100** (1st of 18).
+
+Top commercial results:
+- Textual: MemoraX **69.26/100** (1st of 62).
+- Coding: MemoraX **68.00% resolved** (1st of 11).
+- Multimodal: MemoraX **53.68/100** (1st of 4).
+
+These metrics are track-specific and division-specific; do not pool them or compare MACE synthetic utility to them. For a future Open-Source Methods submission, current programme goals are **66.22 textual**, **68.33% coding resolved**, and **48.26 multimodal**, each 5 points above the relevant Cycle 2 open-source leader. Recalculate when the next cycle freezes its data/API/model rules. The official Add/Search guide also requires `text-embedding-v4` for open-source embedding components and `gpt-4o-mini` for open-source LLM-related components, with unrestricted rerankers; Commercial Products do not have those model restrictions.
+
+The new AML submission preflight checks the declared profile, but it is not a runtime attestation and cannot replace a live, public Smoke test. Cycle 2 is closed; the next eligible cycle is the target.

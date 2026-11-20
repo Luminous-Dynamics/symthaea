@@ -459,3 +459,11 @@ A capture digest binds the bytes that were supplied; it does **not** prove that 
 The older `bind_provider_run_manifest` remains an internal-consistency binder only. It does not produce the verified-complete wrapper. The new type has private fields and can be obtained only through the closure-verification function.
 
 The current verifier is a deterministic test seam, not a production OpenAI/Anthropic export signer or Mycelix receipt verifier. Where a provider API does not expose a signed export-completeness receipt, deployment must use an independently controlled collector/receipt authority or explicitly classify the capture as partial. A self-declared terminal-page flag is not proof by itself.
+
+### AML Cycle 2 result-aware submission preflight
+
+The official Cycle 2 results were published on November 19, 2026: open-source leaders are Resurface Textual 61.22/100, InsightMem Coding 63.33% resolved, and Khipu Multimodal 43.26/100. Commercial leaders are MemoraX Textual 69.26/100, Coding 68.00% resolved, and Multimodal 53.68/100. These are separate metrics and divisions.
+
+The AML API guide also specifies that Open-Source Methods must use `text-embedding-v4` for embeddings and `gpt-4o-mini` for LLM-related components; rerankers are unrestricted. Commercial Products have no such model restrictions.
+
+The `aml-adapter::submission` module now checks declared division, track, participant-hosted API mode, HTTPS Add/Search endpoints, secret-free URLs, source/runtime digests, and division-specific model usage. It returns a digest-bound declaration only: it does not prove endpoint reachability, runtime model identity, or a passed AML Smoke test. Nine authored preflight tests cover model policy, division differences, hosted endpoints, local/secret URLs and declaration digest changes.
