@@ -34,7 +34,7 @@ The synthetic fixture uses:
 - financial budget in USD cents;
 - cryostat and magnetometer booking minutes;
 - specimen mass in mg;
-- furnace minutes and synthesis run slots;
+- furnace minutes, pressure-cell booking minutes and synthesis run slots;
 - precursor mass and compute core-minutes.
 
 The financial-budget resource is the declared reference denominator for greedy-per-cost comparisons. It does not replace vector feasibility.
