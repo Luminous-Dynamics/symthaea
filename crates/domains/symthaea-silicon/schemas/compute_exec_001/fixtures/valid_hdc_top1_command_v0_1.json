@@ -9,7 +9,7 @@
   "semantic_contract": {
     "contract_id": "symthaea.binaryhv.top1-exact",
     "contract_version": "1.0.0",
-    "contract_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    "contract_sha256": "04b106f50f40963f0d2f88f9d779b83d9a55bd22d2e151f45f5211fa05c3f9cd"
   },
   "representation": {
     "representation_id": "luminous.binaryhv.bipolar.16384.v1",
