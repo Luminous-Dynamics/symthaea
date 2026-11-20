@@ -11,7 +11,7 @@
   "families": [
     {
       "family_id": "family_alpha",
-      "application_weight": 0.3333333333333333,
+      "application_weight": 0.6,
       "effect_states": [
         {
           "state_id": "alpha_low",
@@ -32,7 +32,7 @@
     },
     {
       "family_id": "family_beta",
-      "application_weight": 0.3333333333333333,
+      "application_weight": 0.3,
       "effect_states": [
         {
           "state_id": "beta_low",
@@ -53,7 +53,7 @@
     },
     {
       "family_id": "family_gamma",
-      "application_weight": 0.3333333333333333,
+      "application_weight": 0.1,
       "effect_states": [
         {
           "state_id": "gamma_low",
@@ -91,7 +91,7 @@
           "family_state_id": "gamma_low"
         }
       ],
-      "target_population_ate": -1
+      "target_population_ate": -0.9999999999999999
     },
     {
       "world_state_id": "world_alpha_low_beta_low_gamma_mid",
@@ -110,7 +110,7 @@
           "family_state_id": "gamma_mid"
         }
       ],
-      "target_population_ate": -0.3333333333333333
+      "target_population_ate": -0.7999999999999999
     },
     {
       "world_state_id": "world_alpha_low_beta_low_gamma_high",
@@ -129,7 +129,7 @@
           "family_state_id": "gamma_high"
         }
       ],
-      "target_population_ate": 0.6666666666666666
+      "target_population_ate": -0.4999999999999999
     },
     {
       "world_state_id": "world_alpha_low_beta_mid_gamma_low",
@@ -148,7 +148,7 @@
           "family_state_id": "gamma_low"
         }
       ],
-      "target_population_ate": -0.3333333333333333
+      "target_population_ate": -0.4
     },
     {
       "world_state_id": "world_alpha_low_beta_mid_gamma_mid",
@@ -167,7 +167,7 @@
           "family_state_id": "gamma_mid"
         }
       ],
-      "target_population_ate": 0.3333333333333333
+      "target_population_ate": -0.19999999999999998
     },
     {
       "world_state_id": "world_alpha_low_beta_mid_gamma_high",
@@ -186,7 +186,7 @@
           "family_state_id": "gamma_high"
         }
       ],
-      "target_population_ate": 1.3333333333333333
+      "target_population_ate": 0.10000000000000003
     },
     {
       "world_state_id": "world_alpha_low_beta_high_gamma_low",
@@ -205,7 +205,7 @@
           "family_state_id": "gamma_low"
         }
       ],
-      "target_population_ate": 0.6666666666666666
+      "target_population_ate": 0.5
     },
     {
       "world_state_id": "world_alpha_low_beta_high_gamma_mid",
@@ -224,7 +224,7 @@
           "family_state_id": "gamma_mid"
         }
       ],
-      "target_population_ate": 1.3333333333333333
+      "target_population_ate": 0.7
     },
     {
       "world_state_id": "world_alpha_low_beta_high_gamma_high",
@@ -243,7 +243,7 @@
           "family_state_id": "gamma_high"
         }
       ],
-      "target_population_ate": 2.3333333333333335
+      "target_population_ate": 1
     },
     {
       "world_state_id": "world_alpha_mid_beta_low_gamma_low",
@@ -262,7 +262,7 @@
           "family_state_id": "gamma_low"
         }
       ],
-      "target_population_ate": -0.3333333333333333
+      "target_population_ate": 0.19999999999999998
     },
     {
       "world_state_id": "world_alpha_mid_beta_low_gamma_mid",
@@ -281,7 +281,7 @@
           "family_state_id": "gamma_mid"
         }
       ],
-      "target_population_ate": 0.3333333333333333
+      "target_population_ate": 0.4
     },
     {
       "world_state_id": "world_alpha_mid_beta_low_gamma_high",
@@ -300,7 +300,7 @@
           "family_state_id": "gamma_high"
         }
       ],
-      "target_population_ate": 1.3333333333333333
+      "target_population_ate": 0.7
     },
     {
       "world_state_id": "world_alpha_mid_beta_mid_gamma_low",
@@ -319,7 +319,7 @@
           "family_state_id": "gamma_low"
         }
       ],
-      "target_population_ate": 0.3333333333333333
+      "target_population_ate": 0.7999999999999999
     },
     {
       "world_state_id": "world_alpha_mid_beta_mid_gamma_mid",
@@ -338,7 +338,7 @@
           "family_state_id": "gamma_mid"
         }
       ],
-      "target_population_ate": 1
+      "target_population_ate": 0.9999999999999999
     },
     {
       "world_state_id": "world_alpha_mid_beta_mid_gamma_high",
@@ -357,7 +357,7 @@
           "family_state_id": "gamma_high"
         }
       ],
-      "target_population_ate": 2
+      "target_population_ate": 1.2999999999999998
     },
     {
       "world_state_id": "world_alpha_mid_beta_high_gamma_low",
@@ -376,7 +376,7 @@
           "family_state_id": "gamma_low"
         }
       ],
-      "target_population_ate": 1.3333333333333333
+      "target_population_ate": 1.6999999999999997
     },
     {
       "world_state_id": "world_alpha_mid_beta_high_gamma_mid",
@@ -395,7 +395,7 @@
           "family_state_id": "gamma_mid"
         }
       ],
-      "target_population_ate": 2
+      "target_population_ate": 1.9
     },
     {
       "world_state_id": "world_alpha_mid_beta_high_gamma_high",
@@ -414,7 +414,7 @@
           "family_state_id": "gamma_high"
         }
       ],
-      "target_population_ate": 3
+      "target_population_ate": 2.1999999999999997
     },
     {
       "world_state_id": "world_alpha_high_beta_low_gamma_low",
@@ -433,7 +433,7 @@
           "family_state_id": "gamma_low"
         }
       ],
-      "target_population_ate": 0.6666666666666666
+      "target_population_ate": 2
     },
     {
       "world_state_id": "world_alpha_high_beta_low_gamma_mid",
@@ -452,7 +452,7 @@
           "family_state_id": "gamma_mid"
         }
       ],
-      "target_population_ate": 1.3333333333333333
+      "target_population_ate": 2.2
     },
     {
       "world_state_id": "world_alpha_high_beta_low_gamma_high",
@@ -471,7 +471,7 @@
           "family_state_id": "gamma_high"
         }
       ],
-      "target_population_ate": 2.3333333333333335
+      "target_population_ate": 2.5
     },
     {
       "world_state_id": "world_alpha_high_beta_mid_gamma_low",
@@ -490,7 +490,7 @@
           "family_state_id": "gamma_low"
         }
       ],
-      "target_population_ate": 1.3333333333333333
+      "target_population_ate": 2.5999999999999996
     },
     {
       "world_state_id": "world_alpha_high_beta_mid_gamma_mid",
@@ -509,7 +509,7 @@
           "family_state_id": "gamma_mid"
         }
       ],
-      "target_population_ate": 2
+      "target_population_ate": 2.8
     },
     {
       "world_state_id": "world_alpha_high_beta_mid_gamma_high",
@@ -528,7 +528,7 @@
           "family_state_id": "gamma_high"
         }
       ],
-      "target_population_ate": 3
+      "target_population_ate": 3.0999999999999996
     },
     {
       "world_state_id": "world_alpha_high_beta_high_gamma_low",
@@ -547,7 +547,7 @@
           "family_state_id": "gamma_low"
         }
       ],
-      "target_population_ate": 2.3333333333333335
+      "target_population_ate": 3.4999999999999996
     },
     {
       "world_state_id": "world_alpha_high_beta_high_gamma_mid",
@@ -566,7 +566,7 @@
           "family_state_id": "gamma_mid"
         }
       ],
-      "target_population_ate": 3
+      "target_population_ate": 3.6999999999999997
     },
     {
       "world_state_id": "world_alpha_high_beta_high_gamma_high",
@@ -585,346 +585,346 @@
           "family_state_id": "gamma_high"
         }
       ],
-      "target_population_ate": 4
+      "target_population_ate": 3.9999999999999996
     }
   ],
   "decisions": [
     {
-      "decision_id": "advance_application_validation",
+      "decision_id": "advance_beta_high_field",
       "losses": [
         {
           "world_state_id": "world_alpha_low_beta_low_gamma_low",
-          "loss": 7.050000000000001
+          "loss": 5
         },
         {
           "world_state_id": "world_alpha_low_beta_low_gamma_mid",
-          "loss": 6.05
+          "loss": 5
         },
         {
           "world_state_id": "world_alpha_low_beta_low_gamma_high",
-          "loss": 4.55
+          "loss": 5
         },
         {
           "world_state_id": "world_alpha_low_beta_mid_gamma_low",
-          "loss": 6.05
+          "loss": 5
         },
         {
           "world_state_id": "world_alpha_low_beta_mid_gamma_mid",
-          "loss": 5.05
+          "loss": 5
         },
         {
           "world_state_id": "world_alpha_low_beta_mid_gamma_high",
-          "loss": 3.55
+          "loss": 5
         },
         {
           "world_state_id": "world_alpha_low_beta_high_gamma_low",
-          "loss": 4.55
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_low_beta_high_gamma_mid",
-          "loss": 3.55
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_low_beta_high_gamma_high",
-          "loss": 0.5
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_mid_beta_low_gamma_low",
-          "loss": 6.05
+          "loss": 5
         },
         {
           "world_state_id": "world_alpha_mid_beta_low_gamma_mid",
-          "loss": 5.05
+          "loss": 5
         },
         {
           "world_state_id": "world_alpha_mid_beta_low_gamma_high",
-          "loss": 3.55
+          "loss": 5
         },
         {
           "world_state_id": "world_alpha_mid_beta_mid_gamma_low",
-          "loss": 5.05
+          "loss": 5
         },
         {
           "world_state_id": "world_alpha_mid_beta_mid_gamma_mid",
-          "loss": 4.05
+          "loss": 5
         },
         {
           "world_state_id": "world_alpha_mid_beta_mid_gamma_high",
-          "loss": 0.5
+          "loss": 5
         },
         {
           "world_state_id": "world_alpha_mid_beta_high_gamma_low",
-          "loss": 3.55
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_mid_beta_high_gamma_mid",
-          "loss": 0.5
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_mid_beta_high_gamma_high",
-          "loss": 0.5
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_high_beta_low_gamma_low",
-          "loss": 4.55
+          "loss": 5
         },
         {
           "world_state_id": "world_alpha_high_beta_low_gamma_mid",
-          "loss": 3.55
+          "loss": 5
         },
         {
           "world_state_id": "world_alpha_high_beta_low_gamma_high",
-          "loss": 0.5
+          "loss": 5
         },
         {
           "world_state_id": "world_alpha_high_beta_mid_gamma_low",
-          "loss": 3.55
+          "loss": 5
         },
         {
           "world_state_id": "world_alpha_high_beta_mid_gamma_mid",
-          "loss": 0.5
+          "loss": 5
         },
         {
           "world_state_id": "world_alpha_high_beta_mid_gamma_high",
-          "loss": 0.5
+          "loss": 5
         },
         {
           "world_state_id": "world_alpha_high_beta_high_gamma_low",
-          "loss": 0.5
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_high_beta_high_gamma_mid",
-          "loss": 0.5
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_high_beta_high_gamma_high",
-          "loss": 0.5
+          "loss": 0
         }
       ]
     },
     {
-      "decision_id": "continue_research",
+      "decision_id": "preserve_for_beta_validation",
       "losses": [
         {
           "world_state_id": "world_alpha_low_beta_low_gamma_low",
-          "loss": 1.4
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_low_beta_low_gamma_mid",
-          "loss": 1.4
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_low_beta_low_gamma_high",
-          "loss": 1.4
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_low_beta_mid_gamma_low",
-          "loss": 1.4
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_low_beta_mid_gamma_mid",
-          "loss": 1.4
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_low_beta_mid_gamma_high",
-          "loss": 1.4
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_low_beta_high_gamma_low",
-          "loss": 1.4
+          "loss": 3
         },
         {
           "world_state_id": "world_alpha_low_beta_high_gamma_mid",
-          "loss": 1.4
+          "loss": 3
         },
         {
           "world_state_id": "world_alpha_low_beta_high_gamma_high",
-          "loss": 1.4949999999999999
+          "loss": 3
         },
         {
           "world_state_id": "world_alpha_mid_beta_low_gamma_low",
-          "loss": 1.4
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_mid_beta_low_gamma_mid",
-          "loss": 1.4
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_mid_beta_low_gamma_high",
-          "loss": 1.4
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_mid_beta_mid_gamma_low",
-          "loss": 1.4
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_mid_beta_mid_gamma_mid",
-          "loss": 1.4
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_mid_beta_mid_gamma_high",
-          "loss": 1.4449999999999998
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_mid_beta_high_gamma_low",
-          "loss": 1.4
+          "loss": 3
         },
         {
           "world_state_id": "world_alpha_mid_beta_high_gamma_mid",
-          "loss": 1.4449999999999998
+          "loss": 3
         },
         {
           "world_state_id": "world_alpha_mid_beta_high_gamma_high",
-          "loss": 1.595
+          "loss": 3
         },
         {
           "world_state_id": "world_alpha_high_beta_low_gamma_low",
-          "loss": 1.4
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_high_beta_low_gamma_mid",
-          "loss": 1.4
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_high_beta_low_gamma_high",
-          "loss": 1.4949999999999999
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_high_beta_mid_gamma_low",
-          "loss": 1.4
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_high_beta_mid_gamma_mid",
-          "loss": 1.4449999999999998
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_high_beta_mid_gamma_high",
-          "loss": 1.595
+          "loss": 0
         },
         {
           "world_state_id": "world_alpha_high_beta_high_gamma_low",
-          "loss": 1.4949999999999999
+          "loss": 3
         },
         {
           "world_state_id": "world_alpha_high_beta_high_gamma_mid",
-          "loss": 1.595
+          "loss": 3
         },
         {
           "world_state_id": "world_alpha_high_beta_high_gamma_high",
-          "loss": 1.7449999999999999
+          "loss": 3
         }
       ]
     },
     {
-      "decision_id": "defer_and_preserve",
+      "decision_id": "defer",
       "losses": [
         {
           "world_state_id": "world_alpha_low_beta_low_gamma_low",
-          "loss": 1
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_low_beta_low_gamma_mid",
-          "loss": 1
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_low_beta_low_gamma_high",
-          "loss": 1.08
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_low_beta_mid_gamma_low",
-          "loss": 1
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_low_beta_mid_gamma_mid",
-          "loss": 1.04
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_low_beta_mid_gamma_high",
-          "loss": 1.16
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_low_beta_high_gamma_low",
-          "loss": 1.08
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_low_beta_high_gamma_mid",
-          "loss": 1.16
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_low_beta_high_gamma_high",
-          "loss": 1.28
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_mid_beta_low_gamma_low",
-          "loss": 1
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_mid_beta_low_gamma_mid",
-          "loss": 1.04
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_mid_beta_low_gamma_high",
-          "loss": 1.16
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_mid_beta_mid_gamma_low",
-          "loss": 1.04
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_mid_beta_mid_gamma_mid",
-          "loss": 1.12
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_mid_beta_mid_gamma_high",
-          "loss": 1.24
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_mid_beta_high_gamma_low",
-          "loss": 1.16
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_mid_beta_high_gamma_mid",
-          "loss": 1.24
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_mid_beta_high_gamma_high",
-          "loss": 1.3599999999999999
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_high_beta_low_gamma_low",
-          "loss": 1.08
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_high_beta_low_gamma_mid",
-          "loss": 1.16
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_high_beta_low_gamma_high",
-          "loss": 1.28
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_high_beta_mid_gamma_low",
-          "loss": 1.16
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_high_beta_mid_gamma_mid",
-          "loss": 1.24
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_high_beta_mid_gamma_high",
-          "loss": 1.3599999999999999
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_high_beta_high_gamma_low",
-          "loss": 1.28
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_high_beta_high_gamma_mid",
-          "loss": 1.3599999999999999
+          "loss": 1.2
         },
         {
           "world_state_id": "world_alpha_high_beta_high_gamma_high",
-          "loss": 1.48
+          "loss": 1.2
         }
       ]
     }
@@ -939,19 +939,19 @@
     {
       "resource_id": "cryostat_time",
       "unit": "minute",
-      "capacity": 90,
+      "capacity": 110,
       "semantics": "Synthetic booked cryostat time."
     },
     {
       "resource_id": "specimen_mass",
       "unit": "microgram",
-      "capacity": 5000,
+      "capacity": 6000,
       "semantics": "Synthetic total mass consumed across both matched aliquots."
     },
     {
       "resource_id": "magnetometer_time",
       "unit": "minute",
-      "capacity": 130,
+      "capacity": 160,
       "semantics": "Synthetic magnetometry time for paired outcomes."
     }
   ],
