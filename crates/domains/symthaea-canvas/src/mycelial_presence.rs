@@ -327,7 +327,7 @@ mod tests {
     }
 
     #[test]
-    fn runtime_activity_changes_the_visual_scene() {
+    fn associative_activity_and_playback_change_the_visual_scene() {
         let idle = EmbodimentSnapshot::default();
         let mut speaking = EmbodimentSnapshot::default();
         speaking.activity = Some(observed(EmbodimentActivity::Associating, 1));
@@ -344,6 +344,29 @@ mod tests {
         let speaking_svg = render_mycelial_presence(&speaking, SvgRenderOptions::default());
         assert_ne!(idle_svg, speaking_svg);
         assert!(speaking_svg.contains("activity-halo"));
+    }
+
+
+    #[test]
+    fn viseme_modulates_the_core_only_during_confirmed_playback() {
+        let mut snapshot = EmbodimentSnapshot::default();
+        snapshot.activity = Some(observed(EmbodimentActivity::Associating, 1));
+        snapshot.viseme = Some(observed(
+            VisemeSignal {
+                viseme: Viseme::Aa,
+                weight: 0.9,
+            },
+            2,
+        ));
+
+        let queued = render_mycelial_presence(&snapshot, SvgRenderOptions::default());
+        snapshot.speech_output = Some(observed(SpeechOutputState::Queued, 3));
+        let still_queued = render_mycelial_presence(&snapshot, SvgRenderOptions::default());
+        assert_eq!(queued, still_queued);
+
+        snapshot.speech_output = Some(observed(SpeechOutputState::Playing, 4));
+        let playing = render_mycelial_presence(&snapshot, SvgRenderOptions::default());
+        assert_ne!(still_queued, playing);
     }
 
     #[test]
