@@ -78,6 +78,10 @@ pub struct SolverIdentity {
     pub build_sha256: String,
     pub configuration_sha256: String,
     pub learned: bool,
+    /// True when the solver may abstain or fallback based on a calibrated risk bound.
+    pub selective: bool,
+    /// Required when selective is true; binds the exact model/preprocessing calibration artifact.
+    pub calibration_artifact_sha256: Option<String>,
 }
 
 /// Data split and model-training provenance.
@@ -316,6 +320,23 @@ pub fn validate_run(run: &RunManifest) -> Vec<Finding> {
             code: "train_test_case_leakage",
             detail: "the test initial state occurs in the recorded training cases".to_owned(),
         });
+    }
+
+    if run.solver.selective && !run.solver.learned {
+        findings.push(Finding {
+            code: "selective_solver_not_learned",
+            detail: "selective risk calibration is only admitted for learned solver identities".to_owned(),
+        });
+    }
+
+    if run.solver.selective {
+        match run.solver.calibration_artifact_sha256.as_deref() {
+            Some(digest) if is_hex(digest, 64) => {}
+            _ => findings.push(Finding {
+                code: "missing_calibration_artifact_digest",
+                detail: "selective learned solvers require a calibration artifact SHA-256 digest".to_owned(),
+            }),
+        }
     }
 
     if run.solver.learned {
@@ -592,6 +613,8 @@ mod tests {
                 build_sha256: DIGEST_A.to_owned(),
                 configuration_sha256: DIGEST_B.to_owned(),
                 learned: false,
+                selective: false,
+                calibration_artifact_sha256: None,
             },
             data: DataProvenance {
                 split_id: "heldout-test-2026-01".to_owned(),
