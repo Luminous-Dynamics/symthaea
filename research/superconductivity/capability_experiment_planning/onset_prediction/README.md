@@ -10,16 +10,16 @@ Walters et al., “Predicting solid-state reaction onset temperatures from high-
 
 The key semantics are easy to get wrong:
 - A verified inter-precursor product at dwell temperature T establishes onset at or below T (left-censored).
-- A verified absence of inter-precursor product at T establishes onset above T (right-censored).
+- A verified absence of inter-precursor product at T establishes onset above T (right-censored). Both an unreacted sample and a transformed-only sample can establish this *specific event absence*; transformed-only must never be described as chemically inert.
 - A lower-temperature non-reaction and higher-temperature reaction bracket onset (interval-censored).
 - An in-situ measurement can establish an exact onset or an interval according to its instrument resolution.
-- A transformed-only precursor or mechanically uncharacterizable sample is not evidence that the intended inter-precursor reaction occurred.
+- A transformed-only outcome is a valid negative observation for *cross-precursor product formation*, but is not evidence of chemical inertness. An uncharacterizable sample cannot establish either product detection or product absence.
 
 Do not replace one-sided bounds with point labels. That invents information and biases both training and evaluation.
 
 ## Contract and scoring
 
-The fixture schema uses absolute temperature in kelvin because the log-normal AFT likelihood operates on positive absolute temperatures. Each pair carries precursor IDs plus typed, sample-bound observation records: sample ID, execution-run ID, characterization conditions, method, outcome, dwell temperature, detection limit and raw-data digest. The auditor requires actual cross-precursor-product detection for the reaction endpoint and characterized no-product evidence for the non-reaction endpoint. `transformed_only` and `uncharacterizable` observations cannot be relabelled as no reaction. Exact observations additionally require a measured onset and instrument uncertainty. Each model carries an artifact digest, explicit uncertainty method, training pair IDs and one predictive log-normal distribution per evaluation pair.
+The fixture schema uses absolute temperature in kelvin because the log-normal AFT likelihood operates on positive absolute temperatures. Each pair carries precursor IDs plus typed, sample-bound observation records: sample ID, execution-run ID, characterization conditions, method, outcome, dwell temperature, detection limit and raw-data digest. The auditor requires actual cross-precursor-product detection for the reaction endpoint. For the specific event “cross-precursor product formed,” both `no_cross_precursor_product` and `transformed_only` are negative observations; the latter must not be generalized to chemical inertness. `uncharacterizable` observations cannot establish either event or non-event. Exact observations additionally require a measured onset and instrument uncertainty. Each model carries an artifact digest, explicit uncertainty method, training pair IDs and one predictive log-normal distribution per evaluation pair.
 
 For a predicted onset X distributed log-normally with median m and log-scale sigma:
 - left-censored evidence scores P(X <= upper bound);
@@ -32,7 +32,8 @@ The main metric is mean negative log-likelihood across the stated evidence class
 The auditor rejects:
 - malformed or inconsistent censoring bounds;
 - a censoring bound without matching sample/run/conditions/method-bound characterized evidence;
-- transformed-only or uncharacterizable outcomes used to assert no reaction;
+- an uncharacterizable outcome used to assert either product presence or absence;
+- transformed-only outcomes treated as chemically inert rather than only as absence of a cross-precursor product;
 - exact onset claims without an onset measurement and instrument uncertainty;
 - invalid evidence or model artifact digests;
 - duplicate evaluation pairs, model IDs or predictions;
@@ -40,6 +41,20 @@ The auditor rejects:
 - any evaluation pair listed in the model's training pair IDs.
 
 The bundled data is synthetic plumbing only. Digests are synthetic placeholders, and the fixture's predeclared uncertainty scales are not fitted to real material data.
+
+## Published baseline (held-out in-situ measurements)
+
+The paper reports the following results on its 26-pair held-out in-situ XRD set:
+
+| Method | Descriptors | MAE (°C) | RMSE (°C) | R² | 95% interval coverage |
+|---|---:|---:|---:|---:|---:|
+| Tammann rule | 1 heuristic | 131 | 152 | -0.59 | — |
+| Log-normal AFT | 3 | 88 | 101 | 0.30 | 25/26 |
+| Log-normal AFT | 32 | 84 | 122 | -0.02 | 21/26 |
+
+The 3-feature model’s paired MAE improvement over Tammann was 43 °C with a 95% interval of [2, 81] °C. The 32-feature model’s paired difference from the 3-feature model was -4 °C [-35, +33], not a demonstrated gain. On the combined training data, its held-out censored LOPO log score was also slightly better for the 3-feature model (-0.364 vs -0.379). The in-house-only model MAE degraded to 180 °C, showing that breadth and quality of training evidence—not just the regression algorithm—are major determinants.
+
+These are the paper’s results, not Symthaea results. The 26-pair held-out set is small, and its results are not a universal accuracy claim.
 
 ## Research programme and SOTA ladder
 
