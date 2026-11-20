@@ -1,0 +1,146 @@
+{
+  "aggregate_metrics": {
+    "in_support/exact_target_subset": {
+      "graph_brier_score_mean": 0.031175608311719376,
+      "graph_log_loss_bits_mean": 0.07616321096761239,
+      "graph_map_correct_mean": 0.9895833333333334,
+      "graph_true_posterior_mean": 0.9588903408803687,
+      "hard_do_graph_brier_score_mean": 0.29445371214651594,
+      "hard_do_graph_log_loss_bits_mean": 1.4306560128075458,
+      "hard_do_graph_map_correct_mean": 0.8229166666666666,
+      "mean_exact_kernel_posterior_mass_mean": 0.45675108934005615,
+      "mean_target_kernel_l1_mean": 0.2243148220874455,
+      "n_trials": 96,
+      "oracle_known_kernel_graph_brier_score_mean": 0.08558109781502023,
+      "oracle_known_kernel_graph_log_loss_bits_mean": 0.18216881101863125,
+      "oracle_known_kernel_graph_map_correct_mean": 0.9166666666666666
+    },
+    "in_support/noisy_target_flag": {
+      "graph_brier_score_mean": 0.09219088759271434,
+      "graph_log_loss_bits_mean": 0.1993505447583268,
+      "graph_map_correct_mean": 0.9270833333333334,
+      "graph_true_posterior_mean": 0.9237094835034414,
+      "hard_do_graph_brier_score_mean": 0.29445371214651594,
+      "hard_do_graph_log_loss_bits_mean": 1.4306560128075458,
+      "hard_do_graph_map_correct_mean": 0.8229166666666666,
+      "mean_exact_kernel_posterior_mass_mean": 0.11051672326304433,
+      "mean_target_kernel_l1_mean": 0.6620901414224488,
+      "n_trials": 96,
+      "oracle_known_kernel_graph_brier_score_mean": 0.08558109781502023,
+      "oracle_known_kernel_graph_log_loss_bits_mean": 0.18216881101863125,
+      "oracle_known_kernel_graph_map_correct_mean": 0.9166666666666666
+    },
+    "in_support/outcome_only": {
+      "graph_brier_score_mean": 0.1292391758841752,
+      "graph_log_loss_bits_mean": 0.3083483251238169,
+      "graph_map_correct_mean": 0.90625,
+      "graph_true_posterior_mean": 0.8607736323329059,
+      "hard_do_graph_brier_score_mean": 0.29445371214651594,
+      "hard_do_graph_log_loss_bits_mean": 1.4306560128075458,
+      "hard_do_graph_map_correct_mean": 0.8229166666666666,
+      "mean_exact_kernel_posterior_mass_mean": 0.054728968779638294,
+      "mean_target_kernel_l1_mean": 0.7900527027312134,
+      "n_trials": 96,
+      "oracle_known_kernel_graph_brier_score_mean": 0.08558109781502023,
+      "oracle_known_kernel_graph_log_loss_bits_mean": 0.18216881101863125,
+      "oracle_known_kernel_graph_map_correct_mean": 0.9166666666666666
+    },
+    "out_of_support/exact_target_subset": {
+      "graph_brier_score_mean": 0.08597353958440201,
+      "graph_log_loss_bits_mean": 0.1981965636911969,
+      "graph_map_correct_mean": 0.9166666666666666,
+      "graph_true_posterior_mean": 0.919693920440472,
+      "hard_do_graph_brier_score_mean": 0.4300563525058414,
+      "hard_do_graph_log_loss_bits_mean": 1.9467089089352738,
+      "hard_do_graph_map_correct_mean": 0.7291666666666666,
+      "mean_exact_kernel_posterior_mass_mean": null,
+      "mean_target_kernel_l1_mean": 0.20450246955517362,
+      "n_trials": 96,
+      "oracle_known_kernel_graph_brier_score_mean": 0.13906859672894656,
+      "oracle_known_kernel_graph_log_loss_bits_mean": 0.2988962398934379,
+      "oracle_known_kernel_graph_map_correct_mean": 0.8958333333333334
+    },
+    "out_of_support/noisy_target_flag": {
+      "graph_brier_score_mean": 0.10024536649202788,
+      "graph_log_loss_bits_mean": 0.22623741752409554,
+      "graph_map_correct_mean": 0.9270833333333334,
+      "graph_true_posterior_mean": 0.8953697271433882,
+      "hard_do_graph_brier_score_mean": 0.4300563525058414,
+      "hard_do_graph_log_loss_bits_mean": 1.9467089089352738,
+      "hard_do_graph_map_correct_mean": 0.7291666666666666,
+      "mean_exact_kernel_posterior_mass_mean": null,
+      "mean_target_kernel_l1_mean": 0.5861760904770227,
+      "n_trials": 96,
+      "oracle_known_kernel_graph_brier_score_mean": 0.13906859672894656,
+      "oracle_known_kernel_graph_log_loss_bits_mean": 0.2988962398934379,
+      "oracle_known_kernel_graph_map_correct_mean": 0.8958333333333334
+    },
+    "out_of_support/outcome_only": {
+      "graph_brier_score_mean": 0.1763004579940155,
+      "graph_log_loss_bits_mean": 0.3910173586227644,
+      "graph_map_correct_mean": 0.8854166666666666,
+      "graph_true_posterior_mean": 0.8225895941027077,
+      "hard_do_graph_brier_score_mean": 0.4300563525058414,
+      "hard_do_graph_log_loss_bits_mean": 1.9467089089352738,
+      "hard_do_graph_map_correct_mean": 0.7291666666666666,
+      "mean_exact_kernel_posterior_mass_mean": null,
+      "mean_target_kernel_l1_mean": 0.6902230859779174,
+      "n_trials": 96,
+      "oracle_known_kernel_graph_brier_score_mean": 0.13906859672894656,
+      "oracle_known_kernel_graph_log_loss_bits_mean": 0.2988962398934379,
+      "oracle_known_kernel_graph_map_correct_mean": 0.8958333333333334
+    }
+  },
+  "artifact": {
+    "bytes": 479709,
+    "filename": "action_subset_kernel_results_exact_2026-10-23.json",
+    "sha256": "dcf7b1e4417d93b5b889b0fe4b5a4496a2122f15bf8580eb0bf9374f5e659051",
+    "source_git_blob_bound": "ce19dccec3a81f4c6a18563de88152019b966f5d"
+  },
+  "branch": "research/causal-target-subset-kernel-v1",
+  "caveat": "No external benchmark or published Choo et al. baseline has been run; no SOTA claim.",
+  "date": "2026-10-23",
+  "expected_information_mean_by_mode": {
+    "exact_target_subset": {
+      "action_kernel_information_bits": 1.5896012879705728,
+      "graph_information_bits": 0.26639627631833873,
+      "joint_graph_kernel_information_bits": 1.8559975642889377
+    },
+    "noisy_target_flag": {
+      "action_kernel_information_bits": 0.399653911870713,
+      "graph_information_bits": 0.19515782629594072,
+      "joint_graph_kernel_information_bits": 0.6291641542611384
+    },
+    "outcome_only": {
+      "action_kernel_information_bits": 0.31074498099681946,
+      "graph_information_bits": 0.1886495876916925,
+      "joint_graph_kernel_information_bits": 0.5349324381244642
+    }
+  },
+  "parameters": {
+    "graphs": 4,
+    "kernel_grid_size": 330,
+    "observation_modes": 3,
+    "posterior_rows": 576,
+    "replicates_per_graph_kernel_regime": 24,
+    "samples_per_action": 12,
+    "variables": 3,
+    "worlds": 192
+  },
+  "repository": "Luminous-Dynamics/symthaea",
+  "schema": "symthaea-action-subset-kernel-summary-v1",
+  "source": {
+    "bytes": 25398,
+    "git_blob": "ce19dccec3a81f4c6a18563de88152019b966f5d",
+    "path": "validation/action_subset_kernel_benchmark.py",
+    "sha256": "9d000f97b9cd7f16e4e86e9089c1ff230c2fc4ee4624dc7a5836a7c1ebbf6526"
+  },
+  "status": "EXACT_LOCAL_PILOT_TESTS_PASSED_NOT_EXTERNAL_QUALIFICATION",
+  "tests": {
+    "count": 8,
+    "git_blob": "2397db9a9cd19e21e84c9e2dea1d2dd140b41477",
+    "path": "validation/test_action_subset_kernel_benchmark.py",
+    "result": "8/8_PASS_LOCAL",
+    "sha256": "3a5ddcfe3b684a29924f361572236ce56817cace391081f448545afe3b05a7d3"
+  }
+}

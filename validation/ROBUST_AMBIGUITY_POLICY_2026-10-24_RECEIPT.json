@@ -1,0 +1,66 @@
+{
+  "schema": "symthaea-robust-ambiguity-policy-receipt-v1",
+  "date": "2026-10-24",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "research/causal-target-subset-kernel-v1",
+  "status": "EXACT_LOCAL_ROBUST_POLICY_PILOT_NOT_EXTERNAL_QUALIFICATION",
+  "source": {
+    "path": "validation/robust_ambiguity_policy_benchmark.py",
+    "git_blob": "c511c9651de071458734e014137484d982c717dc",
+    "sha256": "890f2cd8598595bc37793d742d8af970b4e2cb4caa2d8daf8ac3f167cc0ba1c5",
+    "bytes": 12315
+  },
+  "test_source": {
+    "path": "validation/test_robust_ambiguity_policy_benchmark.py",
+    "git_blob": "a45fd468130890974e694b0f52c70686434ac04f",
+    "sha256": "b7b798dd1d22b52e789b6bd586426a2acaf56df157b257f812ee195cc006061e",
+    "bytes": 3159,
+    "tests": 8,
+    "result": "8/8_PASS_LOCAL"
+  },
+  "regression": {
+    "test_suites": 7,
+    "result": "51/51_PASS_LOCAL",
+    "python": "3.13.5"
+  },
+  "artifacts": {
+    "full_horizons_1_2": {
+      "filename": "robust_ambiguity_policy_results_full_h2.json",
+      "bytes": 675036,
+      "rows": 1080,
+      "sha256": "6997bb7f001bd7505e182293f73c8f6e993a548896d0173c07b70759cc9755e9",
+      "source_git_blob_bound": "c511c9651de071458734e014137484d982c717dc",
+      "local_only": true
+    },
+    "horizon_3_boundary": {
+      "filename": "robust_ambiguity_policy_results_h3_boundary.json",
+      "bytes": 111925,
+      "rows": 180,
+      "sha256": "b26d170e8f157cdec13702fcd63b6062a1d0c3254bc644ca481cf39c4cd79490",
+      "source_git_blob_bound": "c511c9651de071458734e014137484d982c717dc",
+      "local_only": true
+    }
+  },
+  "report": {
+    "path": "docs/research/ROBUST_AMBIGUITY_POLICY_BENCHMARK_2026-10-24.md",
+    "git_blob": "8f5d0ce31720e039e0d67657b42bf2b6dfc39879"
+  },
+  "summary": {
+    "path": "validation/robust_ambiguity_policy_summary_2026-10-24.json",
+    "git_blob": "36e7364fe95f0827bf1e0359909610bae8bbcf65"
+  },
+  "validation": {
+    "source_blob_matches_executed_file": true,
+    "test_blob_matches_executed_file": true,
+    "result_hashes_recomputed": true,
+    "external_benchmark_run": false,
+    "remote_ci": "inspect exact PR head separately; skipped is not pass"
+  },
+  "scientific_boundary": [
+    "16 hypotheses; chain/fork graph families only.",
+    "Finite six-candidate ambiguity set, not a calibrated confidence region.",
+    "Robust action rule is one-step minimax cross-entropy, not a multi-step robust Bellman optimum.",
+    "Exact target-subset telemetry; no costs, telemetry noise or disturbance.",
+    "No evidence for unrepresented graphs/mechanisms, no SOTA claim."
+  ]
+}

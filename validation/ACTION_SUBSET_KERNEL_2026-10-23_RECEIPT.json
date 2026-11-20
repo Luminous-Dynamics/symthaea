@@ -1,0 +1,45 @@
+{
+  "schema": "symthaea-action-subset-kernel-receipt-v1",
+  "date": "2026-10-23",
+  "status": "EXACT_LOCAL_ENUMERATION_TESTS_PASSED_NOT_EXTERNAL_QUALIFICATION",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "research/causal-target-subset-kernel-v1",
+  "source": {
+    "path": "validation/action_subset_kernel_benchmark.py",
+    "git_blob": "ce19dccec3a81f4c6a18563de88152019b966f5d",
+    "sha256": "9d000f97b9cd7f16e4e86e9089c1ff230c2fc4ee4624dc7a5836a7c1ebbf6526",
+    "bytes": 25398
+  },
+  "tests": {
+    "path": "validation/test_action_subset_kernel_benchmark.py",
+    "git_blob": "2397db9a9cd19e21e84c9e2dea1d2dd140b41477",
+    "sha256": "3a5ddcfe3b684a29924f361572236ce56817cace391081f448545afe3b05a7d3",
+    "count": 8,
+    "result": "8/8_PASS_LOCAL"
+  },
+  "artifact": {
+    "filename": "action_subset_kernel_results_exact_2026-10-23.json",
+    "bytes": 479709,
+    "sha256": "dcf7b1e4417d93b5b889b0fe4b5a4496a2122f15bf8580eb0bf9374f5e659051",
+    "source_git_blob_bound": "ce19dccec3a81f4c6a18563de88152019b966f5d",
+    "not_committed_to_repository": true
+  },
+  "summary": {
+    "path": "validation/action_subset_kernel_summary_2026-10-23.json",
+    "sha256": "49ab0d577894b7c3a669aae1d84d85cbed2f06685bf37c56e63309ea73bc7596",
+    "git_blob": "8ed2cb837fb0db82b8151b2c28d85dca595ce15a"
+  },
+  "report": {
+    "path": "docs/research/ACTION_SUBSET_KERNEL_BENCHMARK_2026-10-23.md",
+    "git_blob": "a51b1f7672edfe0f3e7dbab2791b94344118e7ad",
+    "bytes": 7721
+  },
+  "validation": {
+    "exact_scm_enumeration": "PASS_LOCAL",
+    "embedded_self_test": "PASS_LOCAL",
+    "unit_tests": "8/8_PASS_LOCAL",
+    "source_and_test_git_blobs_match_executed_bytes": true,
+    "remote_ci": "no checks returned for exact latest head; no remote pass claimed"
+  },
+  "scientific_boundary": "Prior art already includes arbitrary action-dependent subset distributions. This is an exact small-SCM telemetry ablation pilot; it is neither an external leaderboard result nor a state-of-the-art claim."
+}
