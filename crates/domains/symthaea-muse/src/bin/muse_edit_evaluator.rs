@@ -1,7 +1,7 @@
 //! CLI for the deterministic MUSE v1 velocity edit evaluator.
 
 use std::{env, fs, path::PathBuf};
-use symthaea_muse::edit_evidence::evaluate_velocity_case;
+use symthaea_muse::edit_evidence::evaluate_symbolic_case;
 
 fn path_after(args: &[String], flag: &str, required: bool) -> Result<Option<PathBuf>, String> {
     match args.iter().position(|arg| arg == flag) {
@@ -18,7 +18,7 @@ fn run() -> Result<(), String> {
         println!("{}", concat!(
             "muse_edit_evaluator --case FILE --source-score FILE --candidate-score FILE ",
             "[--candidate-audio FILE] [--output FILE]\n",
-            "Scores the deterministic v1 velocity-edit slice; unsupported families abstain."
+            "Scores the deterministic v1 symbolic velocity/pitch edit slice; unsupported families abstain."
         ));
         return Ok(());
     }
