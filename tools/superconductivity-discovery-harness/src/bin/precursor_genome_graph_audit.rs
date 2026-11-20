@@ -10,6 +10,9 @@ use std::process;
 
 const SOURCE_COMMIT: &str = "78cb026aa6c9b53aa0ec26ea5611d523bc3c320a";
 const SOURCE_BLOB_SHA1: &str = "a8ef03cee29670b22ed04b9cebb1686fe26e1acd";
+const SOURCE_RAW_URL: &str = "https://raw.githubusercontent.com/lauren-walters/precursor-genome/78cb026aa6c9b53aa0ec26ea5611d523bc3c320a/ledger_precursor_genome.json";
+const SOURCE_LICENSE: &str = "CC-BY-4.0";
+const SOURCE_LICENSE_URL: &str = "https://creativecommons.org/licenses/by/4.0/";
 const CONTRACT: &str = "SC-PRECURSOR-GENOME-GRAPH-0.1";
 
 #[derive(Clone, Debug, Default)]
@@ -252,6 +255,14 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
     let expected_blob = text_field(source, "ledger_git_blob_sha1")?;
     if source_commit != SOURCE_COMMIT || expected_blob != SOURCE_BLOB_SHA1 {
         return Err("manifest source commit/blob differs from the code-pinned release".to_owned());
+    }
+    if text_field(source, "raw_url")? != SOURCE_RAW_URL {
+        return Err("manifest source raw_url differs from the code-pinned immutable download".to_owned());
+    }
+    if text_field(source, "license")? != SOURCE_LICENSE
+        || text_field(source, "license_url")? != SOURCE_LICENSE_URL
+    {
+        return Err("manifest licence metadata differs from the pinned Precursor Genome release".to_owned());
     }
     let actual_blob = git_blob_sha1(ledger_bytes);
     if actual_blob != expected_blob {
