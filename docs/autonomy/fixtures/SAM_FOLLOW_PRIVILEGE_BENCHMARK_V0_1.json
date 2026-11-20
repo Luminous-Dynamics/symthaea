@@ -1,0 +1,175 @@
+{
+  "schema_id": "luminous.sam.follow-privilege-benchmark",
+  "schema_version": "0.1.0",
+  "status": "specification_only",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11258",
+  "claim_ceiling": "no_campaign_result_no_local_perception_no_physical_safety_claim",
+  "privilege_axes": {
+    "policy_observation": [
+      "simulator_derived",
+      "masked_simulator_peer",
+      "local_metric_track",
+      "remote_advisory",
+      "unknown"
+    ],
+    "teacher_blending": [
+      "enabled",
+      "disabled"
+    ],
+    "teacher_supervision": [
+      "enabled",
+      "disabled"
+    ],
+    "evaluator_truth": [
+      "post_commit_only",
+      "pre_commit_available",
+      "unavailable"
+    ],
+    "inference_state": [
+      "recurrent_evolution",
+      "normalization_evolution",
+      "fep_tau_evolution",
+      "none"
+    ]
+  },
+  "arms": [
+    {
+      "id": "A",
+      "name": "legacy_privileged",
+      "eligible_now": true,
+      "observation": "current_simulated_vehicle_state_with_declared_peer_channels",
+      "teacher_blend": "declared_factor",
+      "teacher_supervision": "declared_factor",
+      "updates": "training",
+      "evaluator_truth": "available"
+    },
+    {
+      "id": "B",
+      "name": "masked_observation_teacher",
+      "eligible_now": true,
+      "observation": "peer_oracle_channels_masked",
+      "teacher_blend": "factorial",
+      "teacher_supervision": "factorial",
+      "updates": "training",
+      "evaluator_truth": "available"
+    },
+    {
+      "id": "C",
+      "name": "no_teacher_frozen",
+      "eligible_now": true,
+      "observation": "declared_simulation_profile",
+      "teacher_blend": "disabled",
+      "teacher_supervision": "disabled",
+      "updates": "disabled",
+      "replay_updates": "disabled",
+      "exploration": "disabled",
+      "evaluator_truth": "post_commit_only",
+      "inference_state": [
+        "recurrent_evolution",
+        "normalization_evolution",
+        "fep_tau_evolution"
+      ]
+    },
+    {
+      "id": "D",
+      "name": "local_perception_follow",
+      "eligible_now": false,
+      "eligibility_gate": "qualified local metric tracked-actor adapter through SAM scene admission #11109"
+    },
+    {
+      "id": "E",
+      "name": "cooperative_v2x_advisory",
+      "eligible_now": false,
+      "eligibility_gate": "typed remote advisory; never local perception or actuator authority"
+    }
+  ],
+  "per_step_required": [
+    "scenario_id",
+    "episode_id",
+    "actor_policy_id",
+    "controller_digest",
+    "teacher_digest",
+    "evaluator_digest",
+    "observation_profile_id",
+    "policy_input_digest",
+    "teacher_action_computed",
+    "teacher_action_blended",
+    "teacher_blend_coefficient",
+    "teacher_action_supervised",
+    "teacher_evaluation_only",
+    "teacher_reference_only",
+    "optimizer_update",
+    "replay_inserted",
+    "replay_sampled",
+    "exploration_applied",
+    "parameter_digest_before",
+    "parameter_digest_after",
+    "recurrent_state_evolved",
+    "normalization_evolved",
+    "fep_tau_evolved",
+    "student_raw_action_digest",
+    "teacher_action_digest",
+    "post_blend_action_digest",
+    "executed_action_digest",
+    "action_commit_tick",
+    "evaluator_truth_delivery_tick",
+    "follow_target_available",
+    "follow_target_age_ms",
+    "source_disposition"
+  ],
+  "metrics": [
+    "oracle_observation_leakage_rate",
+    "teacher_blend_rate",
+    "teacher_supervision_rate",
+    "evaluator_to_policy_contamination_rate",
+    "frozen_parameter_digest_invariance",
+    "recurrent_state_evolution_rate",
+    "follow_target_availability_rate",
+    "stale_target_rate",
+    "missing_target_rate",
+    "gap_error_median",
+    "gap_error_p90",
+    "gap_error_p95",
+    "gap_error_worst_family",
+    "minimum_separation",
+    "minimum_ttc",
+    "contact_count",
+    "avoidability_classification",
+    "acceleration_jerk",
+    "braking_jerk",
+    "steering_jerk",
+    "lane_deviation",
+    "route_progress",
+    "intervention_rate",
+    "no_admissible_target_rate",
+    "false_intervention_rate",
+    "runtime_p50_ms",
+    "runtime_p95_ms",
+    "runtime_p99_ms",
+    "deadline_miss_rate"
+  ],
+  "negative_controls": [
+    "oracle_sidecar_mutation_is_invariant_under_local_only_profile",
+    "raw_v2x_mutation_does_not_change_local_track",
+    "post_commit_shadow_teacher_cannot_change_committed_action",
+    "zero_blend_with_bptt_is_still_supervised",
+    "unused_teacher_is_reference_only",
+    "frozen_weights_are_distinct_from_hidden_state_evolution",
+    "disabled_teacher_update_replay_exploration_preserve_digests",
+    "missing_or_stale_target_has_no_peer_distance_fallback",
+    "wrong_frame_scenario_future_or_stale_oracle_is_rejected",
+    "csv_header_and_rows_have_identical_width"
+  ],
+  "prospective_targets": {
+    "negative_control_pass_rate": 1,
+    "evaluator_to_policy_leakage_rate": 0,
+    "undeclared_teacher_use_in_arm_c": 0,
+    "arm_c_parameter_digest_change": 0
+  },
+  "not_a_result": true,
+  "external_benchmarks_complemented": [
+    "NAVSIM v2",
+    "ReactSim-Bench",
+    "Symtropy reciprocal loop #3532"
+  ]
+}
