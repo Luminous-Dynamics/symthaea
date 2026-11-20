@@ -748,6 +748,12 @@ fn verify_render_channel_binding(
     if component.status == GateStatusV1::Pass && evidence.verdict != "pass" {
         return Err(format!("{label} manifest says pass but render receipt channel is {}", evidence.verdict));
     }
+    if evidence.verdict == "fail" && component.status != GateStatusV1::Fail {
+        return Err(format!(
+            "{label} render receipt records a failure but the bundle component declares {}",
+            component.status.as_str()
+        ));
+    }
     if component.status == GateStatusV1::Fail && evidence.verdict != "fail" {
         return Err(format!("{label} manifest says fail but render receipt channel is {}", evidence.verdict));
     }
@@ -810,7 +816,10 @@ fn verify_render(
         ),
     ] {
         if let Err(error) = verify_render_channel_binding(label, evidence, component) {
-            return Ok(hard_binding(component.status, error));
+            return Ok(hard_binding(
+                manifest.components.render_execution.base.status,
+                format!("render verification channel {label}: {error}"),
+            ));
         }
     }
     if receipt.attempt_state == "failed" || receipt.execution.state == "failed" {
@@ -1163,6 +1172,49 @@ mod tests {
         object["receipt_sha256"] = Value::String(digest);
         let report = verify_evidence_bundle_v1(&serde_json::to_vec(&object).unwrap(), EvidenceInputsV1::default()).unwrap();
         assert_eq!(report.verified_status, BundleStatusV1::Fail);
+    }
+
+    #[test]
+    fn render_channel_failure_cannot_be_hidden_by_abstention() {
+        let evidence = muse_render_receipt::EvidenceResultV1 {
+            verdict: "fail".into(),
+            verifier_id: Some("unit-observer".into()),
+            verifier_version: Some("1".into()),
+            receipt_sha256: Some(d('f')),
+            reason: Some("protected audio changed".into()),
+        };
+        let component = ComponentBaseV1 {
+            status: GateStatusV1::Abstain,
+            receipt_sha256: Some(d('f')),
+            producer_id: Some("unit-observer".into()),
+            producer_version: Some("1".into()),
+        };
+        let error = verify_render_channel_binding(
+            "protected_audio_preservation",
+            &evidence,
+            &component,
+        ).unwrap_err();
+        assert!(error.contains("records a failure but the bundle component declares abstain"));
+    }
+
+    #[test]
+    fn declared_abstention_cannot_mask_a_known_gate_failure() {
+        let report = gate_report(
+            GateStatusV1::Abstain,
+            GateStatusV1::Fail,
+            Some("known negative control".into()),
+        );
+        assert_eq!(report.verified_status, GateStatusV1::Fail);
+    }
+
+    #[test]
+    fn declared_failure_is_never_upgraded_by_a_passing_observer() {
+        let report = gate_report(
+            GateStatusV1::Fail,
+            GateStatusV1::Pass,
+            Some("producer-declared failure".into()),
+        );
+        assert_eq!(report.verified_status, GateStatusV1::Fail);
     }
 
     #[test]
