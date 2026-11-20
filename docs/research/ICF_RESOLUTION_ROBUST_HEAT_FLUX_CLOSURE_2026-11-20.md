@@ -43,7 +43,7 @@ The article identifies the learned operator as Te(x) → d_x q_e(x), and the cou
 
 The studied cases use an implicit iterative scheme. The paper reports training samples over t in (0,20] and evaluating selected predictions through t=30. For the hot-spot case, selected Gaussian widths are used for training and intermediate widths for testing. The Epperlein–Short case varies perturbation wavenumber.
 
-The source uses its own notation for spatial and temporal downsampling factors. Do not infer or silently rename those factors. Obtain the exact supplement/configuration before a numerical reproduction.
+The article's hot-spot training widths are α ∈ {1, 1.25, 1.5, 1.75, 2}; the stated intermediate unseen-width tests are α ∈ {1.125, 1.375, 1.625, 1.875}. For Epperlein–Short perturbations, the article lists β ∈ {1, 4, 7, 10, 13, 16}, corresponding to kλ₀ ∈ {0.063, 0.251, 0.440, 0.628, 0.817, 1.000}. The paper denotes a model trained with spatial/temporal downsampling factors n,m as F(n,m), and discusses F(6,10) in its coarse-training / finer-deployment evaluation. Preserve this source notation and obtain the supplementary material/configuration before inferring any additional splits or numeric resolutions.
 
 ## 3. Research paradigm
 
