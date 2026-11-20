@@ -56,8 +56,8 @@ The Rust binary sc_risk_multiresource_audit:
 - validates capability prerequisites and eligibility as hard constraints;
 - enforces all resource capacities independently;
 - emits expected-loss EVSI, precommitment CVaR-EVSI, joint-world-state mutual information and resource-use receipts;
-- computes exact oracles and marginal-per-financial-resource greedy baselines;
-- emits an outcome-contingent decision policy and exact schema/fixture SHA-256 digests.
+- computes exact oracles, 32 deterministic seeded random-feasible trials, and marginal-per-financial-resource greedy baselines;
+- emits both the expected-loss and precommitment-CVaR outcome-contingent decision policies, regret under each reported policy, and exact schema/fixture SHA-256 digests.
 
 The exact oracle is exponential and is intended only for small contract fixtures. It is not a production-scale campaign scheduler.
 
@@ -77,3 +77,9 @@ Tests cover:
 ## Claim ceiling
 
 This is a synthetic software-contract result only. It does not prescribe physical experiments, authorize synthesis, establish a pairing mechanism, or prove a superconducting material or application property. Any transfer to historical or prospective campaigns requires rights-cleared, specimen-linked evidence, independent scientific review, and all required facility and safety approvals.
+
+## Baseline interpretation
+
+The deterministic random-feasible baseline samples uniformly from currently eligible next actions that preserve the full resource/capability constraints, continues until no further action fits, and uses 32 fixed SplitMix64 seeds. It is a simple reproducible random-policy comparator, not an optimal stopping policy. The current receipt reports its per-seed action sequence and mean synthetic-fixture scores; confidence intervals and paired multi-instance comparisons require a larger frozen benchmark suite.
+
+The expected-loss and CVaR receipts contain separate outcome-contingent decision policies. Expected regret is evaluated under the expected-loss policy; CVaR regret is evaluated under the displayed CVaR policy. The joint-world-state information objective is (I(W;Y_S)), where (W) is the composite world state, not only mechanism identity.
