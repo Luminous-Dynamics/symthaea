@@ -98,8 +98,7 @@
               },
               "cross_correlation_coefficient": {
                 "type": "number",
-                "exclusiveMinimum": -1,
-                "exclusiveMaximum": 1
+                "description": "Dimensionless cross-ion transport correlation. The Rust auditor rejects values with absolute value >= 1 because v0.1 requires a positive-definite transport matrix."
               }
             }
           },
