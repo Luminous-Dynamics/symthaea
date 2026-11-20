@@ -53,5 +53,18 @@
     },
     "reconciliation_status": "unresolved; preserve snapshot differences and do not silently select/drop records"
   },
-  "claim_ceiling": "Frozen identity and profile for the public Precursor Genome ledger. Counts are source-snapshot bookkeeping, not the paper's model-training cohort or raw in-situ onset measurements."
+  "claim_ceiling": "Frozen identity and profile for the public Precursor Genome ledger. Counts are source-snapshot bookkeeping, not the paper's model-training cohort or raw in-situ onset measurements.",
+  "measurement_units": {
+    "heating_temperature": {
+      "source_field": "synthesis.heating_temperature",
+      "unit": "degree_Celsius",
+      "provenance": "Walters et al., The Precursor Genome, arXiv:2607.09903v1, SampleEntry field description (heating temperature in °C)"
+    },
+    "heating_time": {
+      "source_field": "synthesis.heating_time",
+      "unit": "minute",
+      "provenance": "Walters et al., The Precursor Genome, arXiv:2607.09903v1, SampleEntry field description (heating time in min)"
+    },
+    "provenance_url": "https://arxiv.org/abs/2607.09903"
+  }
 }
