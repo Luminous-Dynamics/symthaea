@@ -8,15 +8,15 @@
 //! unsupported schema or invalid event rejects the whole trace.
 
 use std::fmt;
+use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 
 use crate::embodiment::{
     EmbodimentActivity, EmbodimentController, EmbodimentEvent, EmbodimentEventKind,
     EmbodimentEventSequencer, EmbodimentIngestError, EmbodimentSequenceError,
-    EmbodimentSnapshot, SpeechOutputState, SignalProvenance,
+    EmbodimentSnapshot, SignalProvenance, SpeechOutputState,
 };
-use std::time::Instant;
 
 /// Current serialized trace schema.
 pub const EMBODIMENT_TRACE_SCHEMA_VERSION: u16 = 1;
@@ -277,7 +277,11 @@ impl EmbodimentSession {
     }
 }
 
-/// Failure while atomically publishing an event into an embodiment session.
+/// Failure while publishing an event into an embodiment session.
+///
+/// A validation failure may consume a sequence number and timestamp in the
+/// producer, but never mutates the authoritative snapshot or recorded trace.
+/// Sequence gaps are explicitly permitted by the trace format.
 #[derive(Debug, Clone, PartialEq)]
 pub enum EmbodimentSessionError {
     Sequence(EmbodimentSequenceError),
