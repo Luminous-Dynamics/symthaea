@@ -12,7 +12,7 @@ struct EffectState { id: String, prior: f64, ate: f64 }
 #[derive(Clone, Debug)]
 struct Family { id: String, weight: f64, states: Vec<EffectState> }
 #[derive(Clone, Debug)]
-struct World { id: String, prior: f64, family_states: Vec<usize>, ate: f64 }
+struct World { prior: f64, family_states: Vec<usize>, ate: f64 }
 #[derive(Clone, Debug)]
 struct Decision { id: String, losses: Vec<f64> }
 #[derive(Clone, Debug)]
@@ -31,7 +31,6 @@ struct Candidate {
     randomization_probability: f64,
     historical_propensity: f64,
     domain_discrepancy: f64,
-    representation_weight: f64,
     consumption: Vec<u64>,
     likelihoods: Vec<[f64; 3]>,
 }
@@ -113,9 +112,6 @@ fn sum_cost(selected: &[usize], candidates: &[Candidate], resource_count: usize)
             .ok_or_else(|| "resource integer overflow while summing allocation".to_owned())?;
     }
     Ok(total)
-}
-fn mean(values: &[f64]) -> Option<f64> {
-    if values.is_empty() { None } else { Some(values.iter().sum::<f64>() / values.len() as f64) }
 }
 
 impl Instance {
@@ -253,7 +249,7 @@ impl Instance {
             if (expected_ate-supplied_ate).abs() > 1.0e-8 {
                 return Err(format!("world {world_id} target_population_ate does not match family CATE values and application weights"));
             }
-            worlds.push(World { id: world_id, prior, family_states, ate: supplied_ate });
+            worlds.push(World { prior, family_states, ate: supplied_ate });
         }
         if worlds.len() < 4 || worlds.len() > 125 || (world_prior_sum-1.0).abs() > 1.0e-9 {
             return Err("joint worlds must be in [4,125] and priors must sum to one".to_owned());
@@ -371,7 +367,7 @@ impl Instance {
             candidates.push(Candidate {
                 id:block_id,family,batch,specimens,matched,treatment_available,control_available,eligible,
                 exclusion_reason,randomization_probability,historical_propensity,domain_discrepancy,
-                representation_weight,consumption,likelihoods:likelihoods.into_iter().map(Option::unwrap).collect(),
+                consumption,likelihoods:likelihoods.into_iter().map(Option::unwrap).collect(),
             });
         }
         candidates.sort_by(|a,b|a.id.cmp(&b.id));
@@ -660,8 +656,8 @@ impl Instance {
             "selected_blocks":selected,
             "selected_block_count":plan.selected.len(),
             "metrics":{
-                "joint_cate_epig_nats":plan.metrics.joint_cate_epig,
-                "focused_ate_epig_nats":plan.metrics.focused_ate_epig,
+                "joint_family_cate_state_information_nats":plan.metrics.joint_cate_epig,
+                "focused_application_ate_information_nats":plan.metrics.focused_ate_epig,
                 "expected_ate_variance_reduction":plan.metrics.ate_variance_reduction,
                 "decision_evsi_loss_units":plan.metrics.decision_evsi,
                 "generic_predictive_entropy_sum_nats":plan.metrics.generic_predictive_entropy
@@ -674,8 +670,8 @@ impl Instance {
         let plans=self.enumerate_feasible_plans();
         if plans.is_empty(){return Err("no feasible RCT allocation satisfies family, batch, positivity and vector-resource constraints".to_owned());}
         let objectives=[
-            ("joint_cate_epig","joint_family_cate_epig_oracle"),
-            ("focused_ate_epig","focused_ate_epig_oracle"),
+            ("joint_cate_epig","joint_family_cate_state_information_oracle"),
+            ("focused_ate_epig","focused_application_ate_information_oracle"),
             ("ate_variance_reduction","ate_precision_oracle"),
             ("decision_evsi","decision_value_oracle"),
             ("generic_predictive_entropy","generic_predictive_entropy_oracle"),
@@ -693,7 +689,7 @@ impl Instance {
             ("ate_variance_reduction","greedy_ate_precision"),
             ("decision_evsi","greedy_decision_value"),
             ("generic_predictive_entropy","greedy_generic_predictive_entropy"),
-            ("budgeted_active_surrogate","greedy_budgeted_active_overlap_discrepancy"),
+            ("budgeted_active_surrogate","greedy_overlap_discrepancy_surrogate"),
         ];
         let greedy:Vec<Value>=greedy_objectives.iter().map(|(objective,name)|{
             json!({
@@ -719,6 +715,7 @@ impl Instance {
             "instance_id":self.id,
             "schema_sha256":self.schema_sha256,
             "fixture_sha256":self.fixture_sha256,
+            "outcome_labels":self.outcome_labels,
             "family_count":self.families.len(),
             "joint_world_state_count":self.worlds.len(),
             "candidate_block_count":self.candidates.len(),
@@ -822,7 +819,7 @@ mod tests{
         let receipt=audit(&schema,&fixture).unwrap();
         let oracles=receipt["exact_oracles"].as_array().unwrap();
         let find=|name:&str|oracles.iter().find(|x|x["oracle"]==name).unwrap();
-        let cate=find("joint_family_cate_epig_oracle");
+        let cate=find("joint_family_cate_state_information_oracle");
         let variance=find("ate_precision_oracle");
         let decision=find("decision_value_oracle");
         let cate_ids:HashSet<String>=cate["plan"]["selected_blocks"].as_array().unwrap().iter().map(|x|x["block_id"].as_str().unwrap().to_owned()).collect();
