@@ -347,6 +347,102 @@ impl Instance {
         }
     }
 
+    // Family-stratified AIPW comparator. This is a deliberately simple
+    // baseline for the tiny synthetic fixture, not a production nuisance model.
+    fn family_aipw_estimate(&self, cohort: &Cohort) -> Estimate {
+        let n_treated = cohort.records.iter().filter(|r| r.treatment).count();
+        let n_control = cohort.records.len() - n_treated;
+        if cohort.records.iter().any(|r| !r.outcome_observed) {
+            return Estimate {
+                value: None, n_treated, n_control,
+                n_observed: cohort.records.iter().filter(|r| r.outcome_observed).count(),
+                reason: Some("missing outcomes: v0.1 AIPW comparator abstains without a declared missingness model".to_owned()),
+            };
+        }
+        if cohort.records.iter().any(|r| r.propensity < 0.05 || r.propensity > 0.95) {
+            return Estimate {
+                value: None, n_treated, n_control, n_observed: cohort.records.len(),
+                reason: Some("assignment propensity violates the preregistered [0.05,0.95] overlap gate".to_owned()),
+            };
+        }
+        let mut groups: HashMap<&str, (Vec<f64>, Vec<f64>)> = HashMap::new();
+        for record in &cohort.records {
+            let entry = groups.entry(&record.family).or_default();
+            if record.treatment { entry.0.push(record.outcome); }
+            else { entry.1.push(record.outcome); }
+        }
+        let mut means: HashMap<&str, (f64, f64)> = HashMap::new();
+        for (family, (treated, control)) in groups {
+            let (Some(m1), Some(m0)) = (mean(&treated), mean(&control)) else {
+                return Estimate {
+                    value: None, n_treated, n_control, n_observed: cohort.records.len(),
+                    reason: Some(format!("family {family} lacks both assignment arms for the AIPW outcome model")),
+                };
+            };
+            means.insert(family, (m1, m0));
+        }
+        let total: f64 = cohort.records.iter().map(|record| {
+            let (m1, m0) = means[record.family.as_str()];
+            if record.treatment {
+                m1 - m0 + (record.outcome - m1) / record.propensity
+            } else {
+                m1 - m0 - (record.outcome - m0) / (1.0-record.propensity)
+            }
+        }).sum();
+        Estimate {
+            value: Some(total / cohort.records.len() as f64),
+            n_treated, n_control, n_observed: cohort.records.len(), reason: None,
+        }
+    }
+
+    fn propensity_diagnostics(&self, cohort: &Cohort) -> Value {
+        let mut treated_weights = Vec::new();
+        let mut control_weights = Vec::new();
+        for record in cohort.records.iter().filter(|r| r.outcome_observed) {
+            if record.treatment { treated_weights.push(1.0 / record.propensity); }
+            else { control_weights.push(1.0 / (1.0-record.propensity)); }
+        }
+        let effective_sample_size = |weights: &[f64]| -> Option<f64> {
+            if weights.is_empty() { return None; }
+            let sum: f64 = weights.iter().sum();
+            let sum_sq: f64 = weights.iter().map(|w| w*w).sum();
+            (sum_sq > 0.0).then_some(sum*sum/sum_sq)
+        };
+        let propensities: Vec<f64> = cohort.records.iter().map(|r| r.propensity).collect();
+        let min = propensities.iter().copied().fold(f64::INFINITY, f64::min);
+        let max = propensities.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        json!({
+            "minimum_assignment_probability":min,
+            "maximum_assignment_probability":max,
+            "preregistered_overlap_gate":[0.05,0.95],
+            "outside_overlap_gate_count":propensities.iter().filter(|p| **p<0.05 || **p>0.95).count(),
+            "treated_inverse_probability_effective_sample_size":effective_sample_size(&treated_weights),
+            "control_inverse_probability_effective_sample_size":effective_sample_size(&control_weights),
+            "interpretation":"Diagnostics only; empirical overlap does not prove absence of unmeasured confounding."
+        })
+    }
+
+    fn family_specific_descriptive_effects(&self, cohort: &Cohort) -> Value {
+        let mut groups: HashMap<&str, (Vec<f64>, Vec<f64>)> = HashMap::new();
+        for record in cohort.records.iter().filter(|r| r.outcome_observed) {
+            let entry=groups.entry(&record.family).or_default();
+            if record.treatment { entry.0.push(record.outcome); }
+            else { entry.1.push(record.outcome); }
+        }
+        let mut rows:Vec<_>=groups.into_iter().collect();
+        rows.sort_by(|a,b|a.0.cmp(b.0));
+        json!(rows.into_iter().map(|(family,(treated,control))|json!({
+            "material_family":family,
+            "treated_count":treated.len(),
+            "control_count":control.len(),
+            "complete_case_difference_in_means":match (mean(&treated),mean(&control)) {
+                (Some(t),Some(c))=>Some(t-c),
+                _=>None
+            },
+            "interpretation":"Descriptive within-family contrast; causal only under the relevant assignment and identification assumptions."
+        })).collect::<Vec<_>>())
+    }
+
     fn assignment_combinations(indices: &[usize], treated_count: usize) -> Vec<Vec<usize>> {
         fn walk(
             indices: &[usize],
@@ -542,6 +638,7 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         let blocked=instance.blocked_difference(cohort);
         let ht=instance.inverse_propensity_estimate(cohort);
         let hajek=instance.hajek_estimate(cohort);
+        let aipw=instance.family_aipw_estimate(cohort);
         let randomization=if cohort.assignment_mechanism=="blocked_randomized" {
             match instance.exact_blocked_randomization(cohort) {
                 Ok(result) => Some(json!({
@@ -573,6 +670,12 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
                 "interpretation":"Normalized weighting comparator; generally finite-sample biased. Requires the same assignment and missingness assumptions as inverse-probability estimation.",
                 "estimate":instance.estimate_receipt(&hajek,truth)
             },
+            "family_stratified_aipw_comparator":{
+                "interpretation":"Simple family-stratified outcome regression plus known assignment propensities. Requires conditional exchangeability given the adjustment set, correct propensity or outcome nuisance model, consistency, positivity and appropriate missingness handling. This tiny-fixture comparator is not cross-fitted.",
+                "estimate":instance.estimate_receipt(&aipw,truth)
+            },
+            "propensity_overlap_and_effective_sample_size":instance.propensity_diagnostics(cohort),
+            "family_specific_descriptive_contrasts":instance.family_specific_descriptive_effects(cohort),
             "baseline_balance_and_batch_counts":instance.baseline_balance(cohort),
             "exact_blocked_randomization_inference":randomization
         }));
@@ -762,5 +865,30 @@ mod tests{
         assert!(historical["hajek_normalized_inverse_propensity"]["estimate"]["estimate"].is_null());
         assert!(historical["horvitz_thompson_known_propensity"]["estimate"]["abstention_reason"].as_str().is_some());
     }
+    #[test]
+    fn aipw_comparator_and_overlap_diagnostics_are_reported() {
+        let (schema,fixture)=inputs();
+        let receipt=audit(&schema,&fixture).unwrap();
+        let historical=receipt["cohorts"].as_array().unwrap().iter()
+            .find(|x|x["cohort_id"]=="historical_targeting").unwrap();
+        assert!(historical["family_stratified_aipw_comparator"]["estimate"]["estimate"].as_f64().is_some());
+        assert!(historical["propensity_overlap_and_effective_sample_size"]["treated_inverse_probability_effective_sample_size"].as_f64().is_some());
+        assert_eq!(historical["family_specific_descriptive_contrasts"].as_array().unwrap().len(),2);
+    }
+
+    #[test]
+    fn missing_randomized_outcome_abstains_all_estimators_that_need_outcome_model() {
+        let (schema,fixture)=inputs();
+        let mut value:Value=serde_json::from_slice(&fixture).unwrap();
+        value["cohorts"][0]["records"][0]["outcome_observed"]=json!(false);
+        let receipt=audit(&schema,&serde_json::to_vec(&value).unwrap()).unwrap();
+        let randomized=receipt["cohorts"].as_array().unwrap().iter()
+            .find(|x|x["cohort_id"]=="blocked_randomized").unwrap();
+        assert!(randomized["horvitz_thompson_known_propensity"]["estimate"]["estimate"].is_null());
+        assert!(randomized["hajek_normalized_inverse_propensity"]["estimate"]["estimate"].is_null());
+        assert!(randomized["family_stratified_aipw_comparator"]["estimate"]["estimate"].is_null());
+        assert_eq!(randomized["exact_blocked_randomization_inference"]["status"],"abstained");
+    }
+
 
 }
