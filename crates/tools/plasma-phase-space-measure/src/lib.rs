@@ -327,7 +327,14 @@ pub fn compare_phase_space_measures(
     }
 
     let importance_total = total_importance.total();
-    let weighted_mean_square = weighted_squared_error.total() / importance_total;
+    let weighted_square_total = weighted_squared_error.total();
+    if !importance_total.is_finite()
+        || importance_total <= 0.0
+        || !weighted_square_total.is_finite()
+    {
+        return Err(MeasureError::NonFiniteOutput);
+    }
+    let weighted_mean_square = weighted_square_total / importance_total;
     let weighted_rms_relative_error = weighted_mean_square.sqrt();
     let net_weight_relative_error =
         (candidate_signature.net_weight - reference_signature.net_weight).abs() / normalization;
@@ -554,6 +561,30 @@ mod tests {
             evaluate_phase_space_signature(&invalid_weight, &config()).unwrap_err(),
             MeasureError::NonFiniteWeight { particle: 0 }
         );
+    }
+
+    #[test]
+    fn finite_mode_signatures_can_alias_distinct_measures() {
+        let mut finite_modes = config();
+        finite_modes.modes.retain(|mode| mode.position_mode <= 2);
+        let reference = vec![
+            particle(0.0, 0.0, 1.0),
+            particle(2.0, 0.0, 1.0),
+            particle(4.0, 0.0, 1.0),
+            particle(6.0, 0.0, 1.0),
+        ];
+        let candidate = vec![
+            particle(1.0, 0.0, 1.0),
+            particle(3.0, 0.0, 1.0),
+            particle(5.0, 0.0, 1.0),
+            particle(7.0, 0.0, 1.0),
+        ];
+        let comparison =
+            compare_phase_space_measures(&candidate, &reference, &finite_modes).unwrap();
+
+        // The supports differ, but the configured k=0,1,2 coefficients agree.
+        // This test documents why finite-feature error is not a proof of equality.
+        assert!(comparison.weighted_rms_relative_error <= 1.0e-14);
     }
 
     #[test]
