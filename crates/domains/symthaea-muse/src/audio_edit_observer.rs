@@ -502,7 +502,8 @@ mod tests {
         };
         let mut bytes = Vec::new();
         {
-            let mut writer = WavWriter::new(&mut bytes, spec).unwrap();
+            let cursor = Cursor::new(&mut bytes);
+            let mut writer = WavWriter::new(cursor, spec).unwrap();
             for &sample in samples {
                 writer.write_sample(sample).unwrap();
             }
