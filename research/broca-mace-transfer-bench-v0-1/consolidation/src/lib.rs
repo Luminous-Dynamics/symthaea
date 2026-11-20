@@ -1,3 +1,4 @@
+pub mod salience_learning;
 pub mod salience;
 
 // Copyright (C) 2026 Luminous Dynamics
