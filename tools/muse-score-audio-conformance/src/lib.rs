@@ -38,7 +38,7 @@ pub struct ScoreAudioContractV1 {
     /// Power-of-two FFT window; also the minimum supported note duration.
     pub analysis_window_frames: u32,
     pub minimum_signal_rms_dbfs: f64,
-    pub minimum_pitch_confidence: f64,
+    pub minimum_salience_margin: f64,
     pub pitch_tolerance_cents: f64,
 }
 
@@ -60,7 +60,7 @@ struct NoteObservation {
     observed_pitch_midi: Option<u8>,
     estimated_frequency_hz: Option<f64>,
     pitch_error_cents: Option<f64>,
-    pitch_confidence: Option<f64>,
+    pitch_salience_margin: Option<f64>,
     window_rms_dbfs: f64,
     window_start_frame: u64,
     window_end_frame: u64,
@@ -212,8 +212,8 @@ fn validate_contract(contract: &ScoreAudioContractV1) -> Result<(), String> {
     }
     if !contract.minimum_signal_rms_dbfs.is_finite()
         || !(-120.0..=0.0).contains(&contract.minimum_signal_rms_dbfs)
-        || !contract.minimum_pitch_confidence.is_finite()
-        || !(0.0..=1.0).contains(&contract.minimum_pitch_confidence)
+        || !contract.minimum_salience_margin.is_finite()
+        || !(0.0..=1.0).contains(&contract.minimum_salience_margin)
         || !contract.pitch_tolerance_cents.is_finite()
         || !(1.0..=100.0).contains(&contract.pitch_tolerance_cents)
     {
@@ -326,7 +326,7 @@ fn pitch_salience(window: &[f64], sample_rate_hz: u32) -> (u8, f64, f64) {
     candidates.sort_by(|left, right| right.1.partial_cmp(&left.1).unwrap_or(Ordering::Equal));
     let (best_midi, best_score) = candidates[0];
     let second_score = candidates.get(1).map(|item| item.1).unwrap_or(0.0);
-    let confidence = if best_score <= f64::EPSILON { 0.0 } else {
+    let salience_margin = if best_score <= f64::EPSILON { 0.0 } else {
         ((best_score - second_score).max(0.0) / best_score).clamp(0.0, 1.0)
     };
     let fundamental_bin = midi_frequency(best_midi) * n as f64 / sample_rate_hz as f64;
@@ -341,7 +341,7 @@ fn pitch_salience(window: &[f64], sample_rate_hz: u32) -> (u8, f64, f64) {
     } else {
         midi_frequency(best_midi)
     };
-    (best_midi, frequency, confidence)
+    (best_midi, frequency, salience_margin)
 }
 
 fn note_window(
@@ -362,7 +362,7 @@ fn note_window(
         observed_pitch_midi: None,
         estimated_frequency_hz: None,
         pitch_error_cents: None,
-        pitch_confidence: None,
+        pitch_salience_margin: None,
         window_rms_dbfs: rms,
         window_start_frame: start,
         window_end_frame: end,
@@ -390,7 +390,7 @@ fn note_window(
             observed_pitch_midi: None,
             estimated_frequency_hz: None,
             pitch_error_cents: None,
-            pitch_confidence: Some(0.0),
+            pitch_salience_margin: Some(0.0),
             window_rms_dbfs: level,
             window_start_frame: stable_start,
             window_end_frame: end,
@@ -403,7 +403,7 @@ fn note_window(
     }
     let (observed_midi, frequency, confidence) = pitch_salience(samples, audio.sample_rate_hz);
     let cents = 1200.0 * (frequency / midi_frequency(note.pitch.midi())).log2();
-    let status = if confidence < contract.minimum_pitch_confidence {
+    let status = if salience_margin < contract.minimum_salience_margin {
         "abstain"
     } else if observed_midi != note.pitch.midi() || cents.abs() > contract.pitch_tolerance_cents {
         "fail"
@@ -416,7 +416,7 @@ fn note_window(
         observed_pitch_midi: Some(observed_midi),
         estimated_frequency_hz: Some(frequency),
         pitch_error_cents: Some(cents),
-        pitch_confidence: Some(confidence),
+        pitch_salience_margin: Some(salience_margin),
         window_rms_dbfs: level,
         window_start_frame: stable_start,
         window_end_frame: end,
@@ -446,7 +446,7 @@ fn observation_value(item: &NoteObservation) -> Value {
         "observed_pitch_midi": item.observed_pitch_midi,
         "estimated_frequency_hz": item.estimated_frequency_hz,
         "pitch_error_cents": item.pitch_error_cents,
-        "pitch_confidence": item.pitch_confidence,
+        "pitch_salience_margin": item.pitch_salience_margin,
         "window_rms_dbfs": item.window_rms_dbfs,
         "window_start_frame": item.window_start_frame,
         "window_end_frame": item.window_end_frame,
@@ -540,7 +540,7 @@ pub fn evaluate_score_audio_conformance_v1(
             NoteObservation {
                 score_note_ordinal: ordinal, expected_pitch_midi: note.pitch.midi(),
                 observed_pitch_midi: None, estimated_frequency_hz: None,
-                pitch_error_cents: None, pitch_confidence: None,
+                pitch_error_cents: None, pitch_salience_margin: None,
                 window_rms_dbfs: MIN_REPORTABLE_DBFS, window_start_frame: 0,
                 window_end_frame: 0, status: "abstain",
                 reason: Some("score pitch is outside the calibrated v1 MIDI range".into()),
@@ -635,7 +635,7 @@ fn validate_result_wire_shape(result: &Value) -> Result<(), String> {
         let label = format!("events[{index}]");
         exact_fields(event,
             &["score_note_ordinal", "expected_pitch_midi", "observed_pitch_midi", "estimated_frequency_hz",
-              "pitch_error_cents", "pitch_confidence", "window_rms_dbfs", "window_start_frame",
+              "pitch_error_cents", "pitch_salience_margin", "window_rms_dbfs", "window_start_frame",
               "window_end_frame", "status", "reason"], &label)?;
         let ordinal = event.get("score_note_ordinal").and_then(Value::as_u64);
         let expected = event.get("expected_pitch_midi").and_then(Value::as_u64);
@@ -653,15 +653,15 @@ fn validate_result_wire_shape(result: &Value) -> Result<(), String> {
         {
             return Err(format!("{label} has invalid ordinal, pitch, window, level or status"));
         }
-        let confidence = event.get("pitch_confidence");
+        let margin = event.get("pitch_salience_margin");
         let cents = event.get("pitch_error_cents");
         let frequency = event.get("estimated_frequency_hz");
-        if let Some(value) = confidence.and_then(Value::as_f64) {
+        if let Some(value) = margin.and_then(Value::as_f64) {
             if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-                return Err(format!("{label}.pitch_confidence is out of range"));
+                return Err(format!("{label}.pitch_salience_margin is out of range"));
             }
-        } else if !confidence.is_some_and(Value::is_null) {
-            return Err(format!("{label}.pitch_confidence must be numeric or null"));
+        } else if !margin.is_some_and(Value::is_null) {
+            return Err(format!("{label}.pitch_salience_margin must be numeric or null"));
         }
         if let Some(value) = cents.and_then(Value::as_f64) {
             if !value.is_finite() {
@@ -774,7 +774,7 @@ mod tests {
             schema:SCORE_AUDIO_CONTRACT_SCHEMA_V1.into(), scope_kind:"isolated_stem".into(),
             scope_id:"stem-melody-001".into(), sample_rate_hz:16_000, channels:1,
             analysis_window_frames:4096, minimum_signal_rms_dbfs:-65.0,
-            minimum_pitch_confidence:0.15, pitch_tolerance_cents:35.0,
+            minimum_salience_margin:0.15, pitch_tolerance_cents:35.0,
         }
     }
 
@@ -902,10 +902,36 @@ mod tests {
     }
 
     #[test]
-    fn confidence_threshold_can_force_abstention() {
+    fn low_pitch_abstains_when_fft_resolution_cannot_separate_adjacent_semitones() {
+        let score = score(24, Duration::quarter());
+        let result = evaluate_score_audio_conformance_v1(
+            &serde_json::to_vec(&score).unwrap(),
+            &wav(&sine(24, 8_000, 16_000), 16_000),
+            &contract(),
+        ).unwrap();
+        assert_eq!(result["outcome"]["score_audio_status"], "abstain");
+        assert!(result["outcome"]["reasons"][0].as_str().unwrap().contains("resolution"));
+    }
+
+    #[test]
+    fn pitch_at_or_above_nyquist_abstains() {
+        let score = score(108, Duration::quarter());
+        let mut case = contract();
+        case.sample_rate_hz = 8_000;
+        let result = evaluate_score_audio_conformance_v1(
+            &serde_json::to_vec(&score).unwrap(),
+            &wav(&sine(108, 4_000, 8_000), 8_000),
+            &case,
+        ).unwrap();
+        assert_eq!(result["outcome"]["score_audio_status"], "abstain");
+        assert!(result["outcome"]["reasons"][0].as_str().unwrap().contains("Nyquist"));
+    }
+
+    #[test]
+    fn salience_margin_threshold_can_force_abstention() {
         let score = score(60, Duration::quarter());
         let mut contract = contract();
-        contract.minimum_pitch_confidence = 1.0;
+        contract.minimum_salience_margin = 1.0;
         let result = evaluate_score_audio_conformance_v1(
             &serde_json::to_vec(&score).unwrap(),
             &wav(&sine(60, 8_000, 16_000), 16_000),
