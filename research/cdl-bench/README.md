@@ -622,6 +622,21 @@ Its standalone reference compiled locally with strict GCC 14.2 warnings and pass
 
 Full-frame synthetic results and caveats are recorded in `docs/research/CDL_TYPED_TELEMETRY_JOINT_SEGMENTATION_V1_2026-11-19.md`. The current prototype remains an independent C++ research frame, not the Rust CDL codec or a production telemetry result. It uses a fixed eight-lane schema and synthetic keys, materializes the input, and has not yet measured bounded-memory streaming, throughput, RSS, random access, indexes, checkpoint recovery or schema-name costs.
 
+## Industry benchmark tracks
+
+The partitioned C++ reference is only a transform diagnostic. CDL-Bench now has two additional mandatory end-to-end competitor layers:
+
+**Storage / column encoding:** Parquet default Zstd(9), tuned per-column Zstd, tuned+ALP (Parquet 2.14 preview), Pco/PCODEC and tparquet's per-column PCODEC/Zstd selector. The tparquet snapshot `aperiodic-io/tparquet@d1a40f6fa5508c99ee95e9609f3c38b111e21cf6` reports 31 public datasets and 151.5M rows: 478.6 MB tparquet, 649.5 MB tuned+ALP, 700.7 MB tuned Zstd and 957.1 MB default Zstd. This is a published external baseline, not a CDL reproduction.
+
+**Transport / dataflow:** OTLP+Zstd versus OTAP (Arrow IPC over gRPC) and any future CDL transport. The audited OpenTelemetry Arrow Dataflow Engine is incubating and has continuous/nightly metrics for normal load (~100k records/sec per core), filtering, batch size, backpressure, saturation and multi-core scaling; its guide states a >0.90 scaling-efficiency target. These are transport results, not directly comparable with Parquet file bytes.
+
+Full pins, methods, and caveats:
+- `docs/research/CDL_EXTERNAL_CODEC_REPRO_MANIFEST_V1_2026-11-19.md`
+- `docs/research/CDL_BENCH_COMPETITIVE_LANDSCAPE_2026-11-18.md`
+- Tracking issue: https://github.com/Luminous-Dynamics/symthaea/issues/12950
+
+The benchmark rule is to compare complete storage frames and complete transport paths separately, with identical typed data and exact reconstruction. Report compression, encode/decode throughput, memory, access latency, CPU, network bytes and dropped-record counts; do not merge these into one score.
+
 ## Plugging in a custom predictor
 
 The library exposes:
