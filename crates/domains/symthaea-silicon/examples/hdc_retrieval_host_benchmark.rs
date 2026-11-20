@@ -165,57 +165,118 @@ fn run() -> Result<(), String> {
     let manifest_artifact = write_artifact(&output_dir, "input_manifest.json", &manifest_bytes)?;
     let expected_artifact = write_artifact(&output_dir, "expected_results.json", &expected_bytes)?;
 
-    // Warm-up runs are intentionally not part of the measured population.
+    // Both schedules use the same frozen store and query batch. Warm each
+    // schedule separately; warm-up observations are excluded from results.
     for _ in 0..config.warmup {
-        for query in &queries {
-            let _ = retrieve_top1(&store, &query.vector);
-        }
+        let _ = retrieve_batch_query_major(&store, &queries);
+        let _ = retrieve_batch_candidate_major(&store, &queries);
     }
 
-    let mut observations = Vec::with_capacity(config.repetitions * config.batch_size);
-    let mut batch_elapsed_ns = Vec::with_capacity(config.repetitions);
+    let mut query_major_batches = Vec::with_capacity(config.repetitions);
+    let mut candidate_major_batches = Vec::with_capacity(config.repetitions);
+    let mut query_major_batch_ns = Vec::with_capacity(config.repetitions);
+    let mut candidate_major_batch_ns = Vec::with_capacity(config.repetitions);
+    let mut query_major_observations = Vec::with_capacity(config.repetitions * config.batch_size);
     let wall_started = Instant::now();
+
+    // Alternate order to reduce systematic warm/cache/thermal order bias.
     for repetition in 0..config.repetitions {
-        let batch_started = Instant::now();
+        if repetition % 2 == 0 {
+            let started = Instant::now();
+            let results = retrieve_batch_query_major(&store, &queries);
+            let elapsed = started.elapsed().as_nanos();
+            query_major_batch_ns.push(elapsed);
+            query_major_batches.push(batch_result_json(repetition, elapsed, &queries, &results));
+
+            let started = Instant::now();
+            let results = retrieve_batch_candidate_major(&store, &queries);
+            let elapsed = started.elapsed().as_nanos();
+            candidate_major_batch_ns.push(elapsed);
+            candidate_major_batches.push(batch_result_json(repetition, elapsed, &queries, &results));
+        } else {
+            let started = Instant::now();
+            let results = retrieve_batch_candidate_major(&store, &queries);
+            let elapsed = started.elapsed().as_nanos();
+            candidate_major_batch_ns.push(elapsed);
+            candidate_major_batches.push(batch_result_json(repetition, elapsed, &queries, &results));
+
+            let started = Instant::now();
+            let results = retrieve_batch_query_major(&store, &queries);
+            let elapsed = started.elapsed().as_nanos();
+            query_major_batch_ns.push(elapsed);
+            query_major_batches.push(batch_result_json(repetition, elapsed, &queries, &results));
+        }
+    }
+    let paired_wall_elapsed_ns = wall_started.elapsed().as_nanos().max(1);
+
+    // Query-major single-query latency is a separate diagnostic pass so its
+    // per-query timer overhead cannot bias the paired throughput comparison.
+    for repetition in 0..config.repetitions {
         for query in &queries {
-            let query_started = Instant::now();
+            let started = Instant::now();
             let (actual_id, distance) = retrieve_top1(&store, &query.vector);
-            let latency_ns = query_started.elapsed().as_nanos();
-            observations.push(Observation {
+            query_major_observations.push(Observation {
                 repetition,
                 query_index: query.index,
                 expected_id: query.target_id,
                 actual_id,
                 distance,
-                latency_ns,
+                latency_ns: started.elapsed().as_nanos(),
             });
         }
-        batch_elapsed_ns.push(batch_started.elapsed().as_nanos());
     }
-    let wall_elapsed_ns = wall_started.elapsed().as_nanos().max(1);
 
-    let measured_queries = observations.len();
-    let mismatches = observations
+    let measured_queries_per_schedule = config.repetitions * config.batch_size;
+    let query_major_mismatches = count_batch_mismatches(&query_major_batches);
+    let candidate_major_mismatches = count_batch_mismatches(&candidate_major_batches);
+    let cross_schedule_mismatches = count_cross_schedule_mismatches(
+        &query_major_batches,
+        &candidate_major_batches,
+    );
+    let mismatches =
+        query_major_mismatches + candidate_major_mismatches + cross_schedule_mismatches;
+
+    let mut query_latency_samples: Vec<u128> = query_major_observations
         .iter()
-        .filter(|observation| observation.actual_id != observation.expected_id)
-        .count();
-    let mut latency_samples: Vec<u128> = observations.iter().map(|observation| observation.latency_ns).collect();
-    latency_samples.sort_unstable();
-    let throughput_qps = measured_queries as f64 / (wall_elapsed_ns as f64 / 1_000_000_000.0);
+        .map(|observation| observation.latency_ns)
+        .collect();
+    query_latency_samples.sort_unstable();
+    let mut query_major_batch_samples = query_major_batch_ns.clone();
+    query_major_batch_samples.sort_unstable();
+    let mut candidate_major_batch_samples = candidate_major_batch_ns.clone();
+    candidate_major_batch_samples.sort_unstable();
+
+    let query_major_elapsed_ns: u128 = query_major_batch_ns.iter().sum::<u128>().max(1);
+    let candidate_major_elapsed_ns: u128 = candidate_major_batch_ns.iter().sum::<u128>().max(1);
+    let query_major_throughput =
+        measured_queries_per_schedule as f64 / (query_major_elapsed_ns as f64 / 1_000_000_000.0);
+    let candidate_major_throughput =
+        measured_queries_per_schedule as f64 / (candidate_major_elapsed_ns as f64 / 1_000_000_000.0);
+
     let raw = json!({
-        "raw_observation_version": "neuro-silicon-003-observations-v0.1",
-        "measurement_boundary": "prebuilt query scan + canonical Hamming distance + deterministic top-1 selection",
-        "boundary_exclusions": ["vector-store construction", "query construction/encoding", "artifact serialization", "external host/device transfers (CPU-only profile)"],
-        "wall_elapsed_ns": wall_elapsed_ns,
-        "batch_elapsed_ns": batch_elapsed_ns,
-        "observations": observations.iter().map(|observation| json!({
+        "raw_observation_version": "neuro-silicon-003-schedule-comparison-v0.1",
+        "measurement_boundary": "prebuilt store + fixed query batch + exact canonical Hamming comparisons + deterministic Top-1 reductions",
+        "schedule_pairing": "same frozen store and query vectors; query-major/candidate-major order alternates by repetition",
+        "query_major_batch_elapsed_ns": query_major_batch_ns,
+        "candidate_major_batch_elapsed_ns": candidate_major_batch_ns,
+        "paired_wall_elapsed_ns": paired_wall_elapsed_ns,
+        "query_major_batches": query_major_batches,
+        "candidate_major_batches": candidate_major_batches,
+        "query_major_single_query_diagnostic": query_major_observations.iter().map(|observation| json!({
             "repetition": observation.repetition,
             "query_index": observation.query_index,
             "expected_id": observation.expected_id,
             "actual_id": observation.actual_id,
             "hamming_distance": observation.distance,
             "latency_ns": observation.latency_ns
-        })).collect::<Vec<_>>()
+        })).collect::<Vec<_>>(),
+        "boundary_exclusions": [
+            "vector-store construction",
+            "query construction/encoding",
+            "artifact serialization",
+            "external host/device transfers (CPU-only profile)",
+            "physical memory-controller and cache-counter observations"
+        ]
     });
     let raw_bytes = json_bytes(&raw)?;
     let raw_artifact = write_artifact(&output_dir, "raw_observations.json", &raw_bytes)?;
@@ -227,10 +288,16 @@ fn run() -> Result<(), String> {
     let working_set_bytes = config.store_size * VECTOR_BYTES + config.batch_size * VECTOR_BYTES;
     let latency_scope = "single query: full scan of prebuilt host-resident store, exact canonical Hamming scoring, deterministic top-1 selection; excludes store/query construction and serialization";
     let metrics = vec![
-        metric("latency_p50", percentile(&latency_samples, 0.50) as f64, "ns", "measured", latency_scope, measured_queries, "nearest-rank percentile over individually timed queries"),
-        metric("latency_p95", percentile(&latency_samples, 0.95) as f64, "ns", "measured", latency_scope, measured_queries, "nearest-rank percentile over individually timed queries"),
-        metric("latency_p99", percentile(&latency_samples, 0.99) as f64, "ns", "measured", latency_scope, measured_queries, "nearest-rank percentile over individually timed queries"),
-        metric("throughput", throughput_qps, "queries/s", "measured", "aggregate retrieval loop wall time, including per-query timing instrumentation; excludes warm-up and setup", measured_queries, "measured query count divided by aggregate loop wall time"),
+        metric("query_major_single_latency_p50", percentile(&query_latency_samples, 0.50) as f64, "ns", "measured", "separate diagnostic: one query scanned against the prebuilt host-resident store", query_major_observations.len(), "nearest-rank percentile; excluded from paired throughput timing"),
+        metric("query_major_single_latency_p95", percentile(&query_latency_samples, 0.95) as f64, "ns", "measured", "separate diagnostic: one query scanned against the prebuilt host-resident store", query_major_observations.len(), "nearest-rank percentile; excluded from paired throughput timing"),
+        metric("query_major_single_latency_p99", percentile(&query_latency_samples, 0.99) as f64, "ns", "measured", "separate diagnostic: one query scanned against the prebuilt host-resident store", query_major_observations.len(), "nearest-rank percentile; excluded from paired throughput timing"),
+        metric("query_major_batch_latency_p50", percentile(&query_major_batch_samples, 0.50) as f64, "ns", "measured", "complete batch: run one independent full store scan per query", query_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
+        metric("query_major_batch_latency_p95", percentile(&query_major_batch_samples, 0.95) as f64, "ns", "measured", "complete batch: run one independent full store scan per query", query_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
+        metric("candidate_major_batch_latency_p50", percentile(&candidate_major_batch_samples, 0.50) as f64, "ns", "measured", "complete batch: load each candidate and compare against all queries before advancing", candidate_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
+        metric("candidate_major_batch_latency_p95", percentile(&candidate_major_batch_samples, 0.95) as f64, "ns", "measured", "complete batch: load each candidate and compare against all queries before advancing", candidate_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
+        metric("query_major_throughput", query_major_throughput, "queries/s", "measured", "paired batch runs; excludes warm-up, store/query generation and diagnostic per-query timing pass", measured_queries_per_schedule, "query count divided by sum of query-major batch elapsed time"),
+        metric("candidate_major_throughput", candidate_major_throughput, "queries/s", "measured", "paired batch runs; excludes warm-up, store/query generation and diagnostic per-query timing pass", measured_queries_per_schedule, "query count divided by sum of candidate-major batch elapsed time"),
+        metric("candidate_major_amortized_batch_ns_per_query", percentile(&candidate_major_batch_samples, 0.50) as f64 / config.batch_size as f64, "ns/query", "derived", "median candidate-major batch completion time divided by query batch size; not individual request latency", candidate_major_batch_samples.len(), "batch latency / batch size"),
         metric("working_set_bytes", working_set_bytes as f64, "bytes", "derived", "logical vector-store plus one batch of query hypervectors; excludes allocator metadata and runtime overhead", 1, "derived from canonical 2048-byte vectors"),
         metric("other", setup_ns as f64, "ns", "measured", "setup duration for deterministic store and query generation; outside retrieval latency", 1, "monotonic wall clock around generation")
     ];
@@ -243,7 +310,7 @@ fn run() -> Result<(), String> {
         "Command stdout/stderr hashes are not captured by this in-process example; preserve external runner logs with any qualification package.".to_owned(),
     ];
     let status = if mismatches > 0 {
-        limitations.push("At least one known-target query did not return its declared target as top-1.".to_owned());
+        limitations.push("At least one query-major or candidate-major result disagreed with the declared target or the other schedule.".to_owned());
         "fail"
     } else {
         "incomplete"
@@ -265,10 +332,12 @@ fn run() -> Result<(), String> {
             "store_vector_count": config.store_size,
             "query_batch_size": config.batch_size,
             "query_count": config.batch_size,
+            "schedule_comparison": ["query_major", "candidate_major"],
+            "schedule_semantics": "both schedules process identical queries against identical candidate IDs and use exact Hamming plus lowest-index tie breaking",
             "operations": ["hamming_distance", "retrieve"],
             "tie_break_policy": "lowest stable vector-store index wins equal Hamming distance",
             "task_quality_metric": "synthetic target top-1 accuracy",
-            "task_quality_value": (measured_queries.saturating_sub(mismatches) as f64) / measured_queries as f64,
+            "task_quality_value": if mismatches == 0 { 1.0 } else { 0.0 },
             "task_quality_floor": "1.0"
         },
         "profile": {
@@ -291,8 +360,12 @@ fn run() -> Result<(), String> {
         "correctness": {
             "oracle_comparison": if mismatches == 0 { "exact_match" } else { "mismatch" },
             "oracle_identity": "frozen synthetic target IDs in expected_results.json; this is not an independent hardware differential oracle",
-            "fixtures_attempted": measured_queries,
-            "fixtures_passed": measured_queries.saturating_sub(mismatches),
+            "fixtures_attempted_per_schedule": measured_queries_per_schedule,
+            "query_major_mismatches": query_major_mismatches,
+            "candidate_major_mismatches": candidate_major_mismatches,
+            "cross_schedule_mismatches": cross_schedule_mismatches,
+            "fixtures_attempted": measured_queries_per_schedule * 2,
+            "fixtures_passed": measured_queries_per_schedule * 2 - mismatches,
             "mismatches": mismatches,
             "malformed_frames_accepted": Value::Null
         },
