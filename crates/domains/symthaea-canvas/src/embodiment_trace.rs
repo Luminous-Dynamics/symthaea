@@ -123,8 +123,8 @@ impl EmbodimentTrace {
             };
 
             if let Some(next_state) = playback_update {
-                if let Some((previous, started_at)) = previous_playback {
-                    if Some(previous) != next_state {
+                match (previous_playback, next_state) {
+                    (Some((previous, started_at)), Some(next)) if previous != next => {
                         speech_output_transitions = speech_output_transitions.saturating_add(1);
                         if previous == SpeechOutputState::Playing {
                             completed_playback_intervals =
@@ -133,12 +133,25 @@ impl EmbodimentTrace {
                             playback_duration_ns =
                                 playback_duration_ns.saturating_add(u128::from(duration));
                         }
-                        previous_playback =
-                            next_state.map(|state| (state, event.monotonic_ns));
+                        previous_playback = Some((next, event.monotonic_ns));
                     }
-                } else if let Some(state) = next_state {
-                    speech_output_transitions = speech_output_transitions.saturating_add(1);
-                    previous_playback = Some((state, event.monotonic_ns));
+                    (None, Some(next)) => {
+                        speech_output_transitions = speech_output_transitions.saturating_add(1);
+                        previous_playback = Some((next, event.monotonic_ns));
+                    }
+                    (Some((previous, started_at)), None) => {
+                        // Reset closes the lifecycle without fabricating another
+                        // SpeechOutputState transition.
+                        if previous == SpeechOutputState::Playing {
+                            completed_playback_intervals =
+                                completed_playback_intervals.saturating_add(1);
+                            let duration = event.monotonic_ns.saturating_sub(started_at);
+                            playback_duration_ns =
+                                playback_duration_ns.saturating_add(u128::from(duration));
+                        }
+                        previous_playback = None;
+                    }
+                    (Some(_), Some(_)) | (None, None) => {}
                 }
             }
 
@@ -431,6 +444,30 @@ mod tests {
                 started_at_ns: 210,
             })
         );
+    }
+
+
+    #[test]
+    fn reset_closes_playback_interval_without_counting_a_fake_state_transition() {
+        let mut trace = EmbodimentTrace::new("reset-closes-playback");
+        trace
+            .push(event(
+                1,
+                10,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Playing,
+                },
+            ))
+            .unwrap();
+        trace
+            .push(event(2, 110, EmbodimentEventKind::Reset))
+            .unwrap();
+
+        let summary = trace.summarize().unwrap();
+        assert_eq!(summary.speech_output_transitions, 1);
+        assert_eq!(summary.completed_playback_intervals, 1);
+        assert_eq!(summary.playback_duration_ns, 100);
+        assert_eq!(summary.open_playback, None);
     }
 
     #[test]
