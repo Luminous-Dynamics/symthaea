@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_spatial_reaction_diffusion_v0_1.schema.json",
+  "title": "One-dimensional conservative reaction-diffusion benchmark",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "benchmark_id",
+    "fixture_only",
+    "concentration_reference",
+    "cases",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SC-SPATIAL-REACTION-DIFFUSION-0.1"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_only": {
+      "const": true
+    },
+    "concentration_reference": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "length_m",
+          "grid_cells",
+          "duration_s",
+          "time_step_s",
+          "reservoir_a",
+          "reservoir_b",
+          "initial_a",
+          "initial_b",
+          "transport_matrix_m2_s",
+          "target_rate_s_inverse",
+          "competitor_rate_s_inverse",
+          "thermodynamic_preference"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "length_m": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "grid_cells": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 512
+          },
+          "duration_s": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "time_step_s": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "reservoir_a": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "reservoir_b": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "initial_a": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "initial_b": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "transport_matrix_m2_s": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "d_aa",
+              "d_ab",
+              "d_bb"
+            ],
+            "properties": {
+              "d_aa": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "d_ab": {
+                "type": "number"
+              },
+              "d_bb": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
+          },
+          "target_rate_s_inverse": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "competitor_rate_s_inverse": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "thermodynamic_preference": {
+            "enum": [
+              "target_favored",
+              "competitor_favored",
+              "overlapping_or_unknown"
+            ]
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "Synthetic one-dimensional reaction-diffusion reference only; no measured transport coefficient, phase yield, superconducting material or laboratory procedure is established."
+    }
+  }
+}
