@@ -346,6 +346,7 @@ fn audit(ledger_bytes: &[u8], schema_bytes: &[u8], manifest_bytes: &[u8]) -> Res
         "ledger_git_blob_sha1": actual_blob_sha1,
         "ledger_sha256": sha256_hex(ledger_bytes),
         "manifest_sha256": sha256_hex(manifest_bytes),
+        "measurement_units": manifest.get("measurement_units").cloned().unwrap_or(Value::Null),
         "manifest_schema_sha256": sha256_hex(schema_bytes),
         "counts": {
             "samples": samples.len(),
@@ -509,6 +510,19 @@ mod tests {
             "ledger_git_blob_sha1": git_blob_sha1(&ledger_bytes),
             "license": "CC-BY-4.0",
             "zenodo_raw_artifacts_doi": "10.5281/zenodo.21285546",
+            "measurement_units": {
+                "heating_temperature": {
+                    "source_field": "synthesis.heating_temperature",
+                    "unit": "degree_Celsius",
+                    "provenance": "Synthetic test authority: arXiv:2607.09903v1 SampleEntry field description."
+                },
+                "heating_time": {
+                    "source_field": "synthesis.heating_time",
+                    "unit": "minute",
+                    "provenance": "Synthetic test authority: arXiv:2607.09903v1 SampleEntry field description."
+                },
+                "provenance_url": "https://arxiv.org/abs/2607.09903"
+            },
             "expected_profile": {
                 "samples": 1,
                 "unique_sample_ids": 1,
