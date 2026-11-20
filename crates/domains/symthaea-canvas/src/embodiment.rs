@@ -451,6 +451,15 @@ mod tests {
             .ingest(event(
                 2,
                 20,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Playing,
+                },
+            ))
+            .unwrap();
+        controller
+            .ingest(event(
+                3,
+                30,
                 EmbodimentEventKind::VisemeChanged {
                     viseme: Viseme::Ee,
                     weight: 0.7,
@@ -572,7 +581,7 @@ mod tests {
                 1,
                 10,
                 EmbodimentEventKind::ActivityChanged {
-                    activity: EmbodimentActivity::Speaking,
+                    activity: EmbodimentActivity::Associating,
                 },
             ))
             .unwrap();
@@ -588,13 +597,13 @@ mod tests {
             .unwrap();
         controller
             .ingest(event(
-                3,
-                30,
+                4,
+                40,
                 EmbodimentEventKind::UncertaintyChanged { level: 0.3 },
             ))
             .unwrap();
         controller
-            .ingest(event(4, 40, EmbodimentEventKind::Reset))
+            .ingest(event(5, 50, EmbodimentEventKind::Reset))
             .unwrap();
 
         assert_eq!(
