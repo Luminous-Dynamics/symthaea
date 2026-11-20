@@ -217,7 +217,38 @@ Tracking: [NEOPIC periodic topology and normalization audit #12980](https://gith
 4. Compare the exact source implementation with fixed domain normalization plus periodic feature lifting. Keep open-boundary variants separate and use an explicitly padded domain / free-space treatment where appropriate.
 5. Re-run teacher-forced and in-loop particle-count scaling on independent teacher trajectories; do not claim the theorem transfers to a modified architecture without redoing the proof or qualifying the claim.
 
-## 9. Source identity and prior-art update (20 November 2026)
+## 9. Exact transform-path split: paper accuracy vs NUFFT cost
+
+The immutable source tags reveal an important apples-to-oranges risk in the published workflow.
+
+### Main paper accuracy configs (`neopic-arxiv-v1`, commit `2cf6a15e0ddb6c408a4ef6d162c31faf1deb9431`)
+
+The 2D multi-app training configuration and 3D five-mini-app training/evaluation configurations select:
+- `use_dse: true`
+- `use_kb: false`
+- `use_toeplitz: false`
+- 3D configurations set `matrix_free: true`
+
+The selected code path constructs `DSELayer` with `VandermondeTransformMatrixFree` in 3D. It forms per-axis phase factors `exp(-i k x)`, `exp(-i k y)`, `exp(-i k z)` and contracts them to evaluate the retained Fourier modes at particle positions. This is direct spectral evaluation (matrix-free Vandermonde/NUDFT), not the FINUFFT branch.
+
+### Separate NUFFT cost tag (`neopic-arxiv-v1-nufft`, commit `1222226acab272b8d78ba541cb67c1e877669785`)
+
+The cost tag's `config/electrostatic_plasma3d_pic.yaml` selects:
+- `use_dse: false`, `use_finufft: true`, `use_kb: false`, `use_toeplitz: false`;
+- (k_X=k_Y=k_Z=16), hence 32 retained modes on each axis;
+- (N_p=1,000,000), prediction-only evaluation.
+
+The `Finufft` adapter uses FINUFFT type-1 and type-2 with `eps=1e-6`, mode ordering 1, and GPU method 3 for type-1. It maps each coordinate axis from the per-sample min/max range to ([0,2\pi]), unless explicit bounds are supplied. The Python adapter fixes the retained mode lattice from (k_X,k_Y,k_Z); it does not define a physical Eulerian PIC field grid. FINUFFT may use internal gridding; keep that distinction at the library implementation level.
+
+The paper-scripts repository README identifies the `neopic-arxiv-v1-nufft` tag as the computational-cost implementation. Its cost scripts subset architectures from a trained checkpoint and use GPU timing after excluding the first warmup iteration. These are valuable architecture cost measurements, but they are not a paired accuracy result for the paper's DSE evaluation branch.
+
+**Therefore do not combine the DSE paper accuracy values with the FINUFFT cost timings as though they were measured on one unchanged executable path.** The source-paper accuracy results remain DSE unless a particular result config says otherwise. The FINUFFT cost result does not, by itself, establish the FINUFFT branch's accuracy.
+
+Tracking: [paired DSE accuracy / FINUFFT cost experiment #12988](https://github.com/Luminous-Dynamics/symthaea/issues/12988).
+
+Required experiment: paired same-input DSE and FINUFFT comparisons at matched modes, weights if compatible, numerical normalization, particle states, timestep and reference data; measure field error, closed-loop trajectory error, physical diagnostics, complete step cost, memory, energy, mode-count scaling and warmup amortization. If transform weights are incompatible, retrain both variants with matched data and compute budgets and label it a retrained-variant comparison.
+
+## 10. Source identity and prior-art update (20 November 2026)
 
 The immutable tag targets were resolved directly from the public Git references:
 
@@ -229,6 +260,6 @@ The immutable tag targets were resolved directly from the public Git references:
 
 These are annotated tags dereferenced to their commit targets. Dataset/checkpoint/HDF5 provenance and usage/redistribution rights still need independent admission.
 
-## 10. Claim ceiling
+## 11. Claim ceiling
 
 This is a reproduction protocol and source admission record. It does not claim NEOPIC was reproduced, trained, beaten, integrated into Symthaea or validated for plasma control.
