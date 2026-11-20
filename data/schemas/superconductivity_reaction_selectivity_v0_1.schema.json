@@ -180,6 +180,7 @@
                 "type": "object",
                 "additionalProperties": false,
                 "required": [
+                  "execution_run_id",
                   "sample_id",
                   "method",
                   "conditions_id",
@@ -199,7 +200,8 @@
                   },
                   "conditions_id": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "description": "Characterization measurement conditions; intentionally distinct from the synthesis reaction conditions ID."
                   },
                   "source_locator": {
                     "type": "string",
@@ -244,6 +246,11 @@
                         }
                       }
                     }
+                  },
+                  "execution_run_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Execution run ID joining this characterization event to the synthesis protocol execution record."
                   }
                 }
               }
