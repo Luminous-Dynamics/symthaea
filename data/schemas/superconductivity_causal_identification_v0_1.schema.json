@@ -86,7 +86,8 @@
         "required": [
           "cohort_id",
           "assignment_mechanism",
-          "records"
+          "records",
+          "allocation_design"
         ],
         "properties": {
           "cohort_id": {
@@ -147,6 +148,61 @@
                 },
                 "observed_outcome": {
                   "type": "number"
+                }
+              }
+            }
+          },
+          "allocation_design": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "randomization_unit",
+              "allocation_algorithm",
+              "blocking_variable",
+              "randomization_seed",
+              "assignment_receipt"
+            ],
+            "properties": {
+              "randomization_unit": {
+                "const": "specimen"
+              },
+              "allocation_algorithm": {
+                "enum": [
+                  "blocked_complete_randomization_fixed_counts",
+                  "historical_targeting_policy"
+                ]
+              },
+              "blocking_variable": {
+                "type": "string",
+                "minLength": 1
+              },
+              "randomization_seed": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "assignment_receipt": {
+                "type": "array",
+                "minItems": 8,
+                "maxItems": 40,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "sample_id",
+                    "treatment_assigned"
+                  ],
+                  "properties": {
+                    "sample_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "treatment_assigned": {
+                      "type": "boolean"
+                    }
+                  }
                 }
               }
             }
