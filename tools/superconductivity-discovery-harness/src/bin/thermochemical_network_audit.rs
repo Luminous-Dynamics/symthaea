@@ -489,15 +489,21 @@ impl Network {
 
     fn cycle_receipt(&self, cycle: &Cycle) -> Value {
         let mut total = Interval { lower: 0.0, upper: 0.0 };
+        let mut stoichiometric_residuals = vec![0.0; self.species.len()];
         let mut terms = Vec::new();
         for term in &cycle.terms {
             let reaction = &self.reactions[term.reaction_index];
+            let orientation = f64::from(term.orientation);
             let signed = if term.orientation == 1 {
                 reaction.delta_g
             } else {
                 negate_interval(reaction.delta_g)
             };
             total = add_intervals(total, signed);
+            for species_term in &reaction.terms {
+                stoichiometric_residuals[species_term.species_index] +=
+                    orientation * species_term.coefficient;
+            }
             terms.push(json!({
                 "reaction_id": reaction.id,
                 "orientation": term.orientation,
@@ -507,21 +513,41 @@ impl Network {
                 }
             }));
         }
-        let consistent = total.lower <= self.cycle_tolerance && total.upper >= -self.cycle_tolerance;
+        let stoichiometry_closed = stoichiometric_residuals
+            .iter()
+            .all(|residual| residual.abs() <= self.balance_tolerance);
+        let residuals: Vec<Value> = self.species.iter().enumerate().filter_map(|(index, species)| {
+            let residual = stoichiometric_residuals[index];
+            (residual.abs() > self.balance_tolerance).then(|| json!({
+                "species_id": species.id,
+                "net_coefficient": residual
+            }))
+        }).collect();
+        let energy_consistent =
+            total.lower <= self.cycle_tolerance && total.upper >= -self.cycle_tolerance;
+        let closure_status = if !stoichiometry_closed {
+            "cycle_stoichiometry_does_not_close"
+        } else if energy_consistent {
+            "interval_intersects_zero_closure_tolerance"
+        } else {
+            "interval_excludes_zero_thermodynamic_inconsistency"
+        };
         json!({
             "cycle_id": cycle.id,
             "terms": terms,
+            "stoichiometric_closure_status": if stoichiometry_closed {
+                "net_species_coefficients_close_within_tolerance"
+            } else {
+                "net_species_coefficients_do_not_close"
+            },
+            "stoichiometric_residuals": residuals,
             "cycle_delta_g_interval_eV": {
                 "lower": total.lower,
                 "upper": total.upper
             },
             "zero_closure_tolerance_eV": self.cycle_tolerance,
-            "closure_status": if consistent {
-                "interval_intersects_zero_closure_tolerance"
-            } else {
-                "interval_excludes_zero_thermodynamic_inconsistency"
-            },
-            "interpretation": "Cycle closure within intervals is a consistency check only; it does not validate the source energies or establish equilibrium."
+            "closure_status": closure_status,
+            "interpretation": "Stoichiometric closure is computed from the species ledger. Energy closure is interval-based and assumes the declared reaction extent; closure within uncertainty is a consistency check only, not proof that source energies are correct or that the system reaches equilibrium."
         })
     }
 
@@ -707,6 +733,23 @@ mod tests {
         let (schema, fixture) = inputs_for("thermochemical_network_disconnected_v0_1.json");
         let error = Network::from_bytes(&schema, &fixture).unwrap_err();
         assert!(error.contains("is disconnected"));
+    }
+
+    #[test]
+    fn cycle_stoichiometry_must_close_before_energy_closure_is_admitted() {
+        let (schema, fixture) = inputs();
+        let mut data: Value = serde_json::from_slice(&fixture).unwrap();
+        data["cycles"][0]["terms"][2]["orientation"] = json!(-1);
+        let network = Network::from_bytes(&schema, &serde_json::to_vec(&data).unwrap()).unwrap();
+        let receipt = network.receipt();
+        assert_eq!(
+            receipt["thermodynamic_cycles"][0]["stoichiometric_closure_status"],
+            "net_species_coefficients_do_not_close"
+        );
+        assert_eq!(
+            receipt["thermodynamic_cycles"][0]["closure_status"],
+            "cycle_stoichiometry_does_not_close"
+        );
     }
 
     #[test]
