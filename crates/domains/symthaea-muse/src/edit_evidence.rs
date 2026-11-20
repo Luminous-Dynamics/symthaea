@@ -32,6 +32,26 @@ fn sha256(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+fn canonical_json_bytes(value: &Value) -> Result<Vec<u8>, String> {
+    fn normalize(value: &Value) -> Value {
+        match value {
+            Value::Object(object) => {
+                let mut keys: Vec<&String> = object.keys().collect();
+                keys.sort_unstable();
+                let mut sorted = serde_json::Map::new();
+                for key in keys {
+                    sorted.insert(key.clone(), normalize(&object[key]));
+                }
+                Value::Object(sorted)
+            }
+            Value::Array(items) => Value::Array(items.iter().map(normalize).collect()),
+            _ => value.clone(),
+        }
+    }
+    serde_json::to_vec(&normalize(value))
+        .map_err(|error| format!("canonical JSON serialization failed: {error}"))
+}
+
 fn score_sha256(score: &Score) -> Result<String, String> {
     let bytes = serde_json::to_vec(score)
         .map_err(|error| format!("could not serialize typed Score: {error}"))?;
@@ -39,8 +59,7 @@ fn score_sha256(score: &Score) -> Result<String, String> {
 }
 
 fn case_sha256(case: &Value) -> Result<String, String> {
-    let bytes = serde_json::to_vec(case)
-        .map_err(|error| format!("could not serialize case for digest: {error}"))?;
+    let bytes = canonical_json_bytes(case)?;
     let mut hash = Sha256::new();
     hash.update(CASE_DIGEST_DOMAIN);
     hash.update([0]);
@@ -446,8 +465,7 @@ fn unavailable_metric(id: &str) -> Value {
 fn seal_digest(result: &Value) -> Result<String, String> {
     let mut unsealed = result.clone();
     unsealed["artifacts"]["evaluation_receipt_sha256"] = Value::Null;
-    let bytes = serde_json::to_vec(&unsealed)
-        .map_err(|error| format!("could not serialize result for sealing: {error}"))?;
+    let bytes = canonical_json_bytes(&unsealed)?;
     let mut hash = Sha256::new();
     hash.update(RESULT_DIGEST_DOMAIN);
     hash.update([0]);
@@ -803,7 +821,7 @@ pub fn evaluate_symbolic_case(
             "system_id": "muse-symbolic-edit-evaluator",
             "version": "0.3.0",
             "track": "symbolic_editor",
-            "compute_budget_ms": started.elapsed().as_millis(),
+            "compute_budget_ms": started.elapsed().as_millis().min(u64::MAX as u128) as u64,
             "candidate_budget": 1
         },
         "artifacts": {
@@ -938,6 +956,13 @@ mod tests {
     }
 
     #[test]
+    fn case_digest_is_independent_of_json_object_key_order() {
+        let first: Value = serde_json::from_str(r#"{"z":1,"a":{"y":2,"b":3},"items":[{"d":4,"c":5}]}"#).unwrap();
+        let second: Value = serde_json::from_str(r#"{"items":[{"c":5,"d":4}],"a":{"b":3,"y":2},"z":1}"#).unwrap();
+        assert_eq!(case_sha256(&first).unwrap(), case_sha256(&second).unwrap());
+    }
+
+    #[test]
     fn velocity_edit_passes_symbolic_gates_but_strict_emr_remains_false() {
         let source = score(false);
         let candidate = score(true);
@@ -949,6 +974,10 @@ mod tests {
         assert_eq!(result["instruction_compatibility"]["verdict"], "not_run");
         assert_eq!(result["integrity"]["verdict"], "not_run");
         verify_result_seal(&result).unwrap();
+        let reordered: Value = serde_json::from_str(
+            &serde_json::to_string(&result).unwrap()
+        ).unwrap();
+        verify_result_seal(&reordered).unwrap();
         let mut tampered = result.clone();
         tampered["artifacts"]["case_sha256"] = json!("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         assert!(verify_result_seal(&tampered).is_err());
