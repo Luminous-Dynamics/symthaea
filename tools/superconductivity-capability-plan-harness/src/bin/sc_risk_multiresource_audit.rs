@@ -854,14 +854,14 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
             "algorithm":"myopic marginal precommitment CVaR-EVSI per reference resource",
             "plan":instance.plan_receipt(&tail_greedy)
         },
-        "greedy_mutual_information_baseline":{
+        "greedy_joint_world_state_information_baseline":{
             "algorithm":"myopic marginal mutual information per reference resource",
             "plan":instance.plan_receipt(&information_greedy)
         },
         "comparison":{
             "expected_oracle_evsi":expected_oracle.expected_evsi,
             "tail_risk_oracle_evsi":tail_oracle.cvar_evsi,
-            "information_oracle_mutual_information_nats":information_oracle.mutual_information_nats,
+            "information_oracle_joint_world_state_information_nats":information_oracle.mutual_information_nats,
             "expected_oracle_and_tail_oracle_select_same_actions":instance.plan_ids(&expected_oracle)==instance.plan_ids(&tail_oracle),
             "tail_oracle_uses_less_reference_resource_than_information_oracle":instance.reference_cost(&tail_oracle)<instance.reference_cost(&information_oracle)
         },
