@@ -695,6 +695,37 @@ mod tests {
     }
 
     #[test]
+    fn no_op_scale_is_rejected() {
+        let source = score(false);
+        let mut case = case_for(&source);
+        case["edit_contract"]["parameters"]["scale_numerator"] = json!(1);
+        case["edit_contract"]["parameters"]["scale_denominator"] = json!(1);
+        let error = evaluate_velocity_case(
+            &bytes(&case),
+            &bytes(&source),
+            &bytes(&source),
+            None,
+        ).unwrap_err();
+        assert!(error.contains("different from 1"));
+    }
+
+    #[test]
+    fn wrong_direction_scale_fails_target_gate() {
+        let source = score(false);
+        let candidate = score(true);
+        let mut case = case_for(&source);
+        case["edit_contract"]["parameters"]["scale_numerator"] = json!(9);
+        case["edit_contract"]["parameters"]["scale_denominator"] = json!(8);
+        let result = evaluate_velocity_case(
+            &bytes(&case),
+            &bytes(&source),
+            &bytes(&candidate),
+            None,
+        ).unwrap();
+        assert!(!result["outcome"]["target_pass"].as_bool().unwrap());
+    }
+
+    #[test]
     fn unsupported_edit_family_abstains() {
         let source = score(false);
         let candidate = score(true);
