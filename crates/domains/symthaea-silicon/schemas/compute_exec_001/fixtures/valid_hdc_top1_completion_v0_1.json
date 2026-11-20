@@ -19,5 +19,7 @@
     "generation": "1",
     "offset_bytes": "0",
     "length_bytes": "16"
-  }
+  },
+  "operation_id": "hdc.top1.exact.v1",
+  "implementation_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
 }
