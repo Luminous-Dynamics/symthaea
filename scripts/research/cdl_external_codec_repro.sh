@@ -120,24 +120,24 @@ if [[ -n "$TPARQUET_DIR" ]]; then
   cp "$results_json" "$tparquet_out/results.json"
   sha256sum "$tparquet_out/RESULTS.md" "$tparquet_out/results.json" > "$tparquet_out/result-sha256.txt"
   {
-    printf 'repository=aperiodic-io/tparquet\\n'
-    printf 'commit=%s\\n' "$TPARQUET_COMMIT"
-    printf 'rustc=%s\\n' "$(rustc --version)"
-    printf 'cargo=%s\\n' "$(cargo --version)"
-    printf 'uv=%s\\n' "$(uv --version)"
-    printf 'host=%s\\n' "$(uname -a)"
-    printf 'cpu_model=%s\\n' "$(awk -F: '/model name/ {gsub(/^[ \\t]+/, "", $2); print $2; exit}' /proc/cpuinfo 2>/dev/null || true)"
-    printf 'worktree_status=\\n'
+    printf 'repository=aperiodic-io/tparquet\n'
+    printf 'commit=%s\n' "$TPARQUET_COMMIT"
+    printf 'rustc=%s\n' "$(rustc --version)"
+    printf 'cargo=%s\n' "$(cargo --version)"
+    printf 'uv=%s\n' "$(uv --version)"
+    printf 'host=%s\n' "$(uname -a)"
+    printf 'cpu_model=%s\n' "$(awk -F: '/model name/ {gsub(/^[ \t]+/, "", $2); print $2; exit}' /proc/cpuinfo 2>/dev/null || true)"
+    printf 'worktree_status=\n'
     git -C "$TPARQUET_DIR" status --short
   } > "$tparquet_out/reproduction.txt"
   if [[ -d "$TPARQUET_DIR/bench/data" ]]; then
     find "$TPARQUET_DIR/bench/data" -type f -print0 | sort -z | xargs -0 -r sha256sum > "$tparquet_out/dataset-sha256.txt"
   else
-    printf 'dataset_directory_missing=bench/data\\n' > "$tparquet_out/dataset-sha256.txt"
+    printf 'dataset_directory_missing=bench/data\n' > "$tparquet_out/dataset-sha256.txt"
   fi
-  printf 'tparquet reproduction completed: %s\\n' "$tparquet_out"
+  printf 'tparquet reproduction completed: %s\n' "$tparquet_out"
 else
-  printf 'SKIP tparquet: set TPARQUET_DIR to a checkout at %s\\n' "$TPARQUET_COMMIT"
+  printf 'SKIP tparquet: set TPARQUET_DIR to a checkout at %s\n' "$TPARQUET_COMMIT"
 fi
 
 if [[ -n "$TERSETS_DIR" ]]; then
