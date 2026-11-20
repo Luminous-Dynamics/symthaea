@@ -810,7 +810,7 @@ fn verify_render(
         ),
     ] {
         if let Err(error) = verify_render_channel_binding(label, evidence, component) {
-            return Ok(hard_binding(component.base.status, error));
+            return Ok(hard_binding(component.status, error));
         }
     }
     if receipt.attempt_state == "failed" || receipt.execution.state == "failed" {
