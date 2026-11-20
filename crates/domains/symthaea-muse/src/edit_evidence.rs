@@ -614,8 +614,8 @@ pub fn evaluate_symbolic_case(
     }
     let primary_metric = if operation == "velocity" { "velocity_accuracy" } else { "pitch_accuracy" };
     let has_primary_metric = requested_targets.iter().any(|request| request.as_str() == Some(primary_metric));
-    if !has_primary_metric && !requested_targets.iter().any(|request| request.as_str() == Some("exact_event_accuracy")) {
-        return Err(format!("evaluation.target_metrics must include exact_event_accuracy or {primary_metric}"));
+    if !has_primary_metric {
+        return Err(format!("evaluation.target_metrics must include {primary_metric}"));
     }
     let mut target_metrics = Vec::new();
     for request in requested_targets {
