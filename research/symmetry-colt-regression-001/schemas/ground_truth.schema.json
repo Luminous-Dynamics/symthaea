@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/symmetry-colt-regression-001/schemas/ground_truth.schema.json",
+  "title": "D4 regression ground truth v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "disclosure",
+    "ambient_group_id",
+    "feature_basis_id",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "benchmark_id": {
+      "const": "SYMM-COLT-D4-REGRESSION-001"
+    },
+    "disclosure": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ambient_group_id": {
+      "const": "D4"
+    },
+    "feature_basis_id": {
+      "const": "xy-monomials-total-degree-le-4-graded-lex-v1"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 900,
+      "maxItems": 900,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "split",
+          "target_subgroup_label",
+          "target_subgroup_element_ids",
+          "target_polynomial",
+          "generation_provenance"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^REG-[0-9a-f]{16}$"
+          },
+          "split": {
+            "enum": [
+              "discovery",
+              "calibration",
+              "final_holdout"
+            ]
+          },
+          "target_subgroup_label": {
+            "enum": [
+              "D4",
+              "C4",
+              "C2_R180",
+              "C2_FX",
+              "C2_FY",
+              "C2_FDIAG",
+              "C2_FANTI",
+              "V4_AXIS",
+              "V4_DIAG",
+              "C1"
+            ]
+          },
+          "target_subgroup_element_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "target_polynomial": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "variables",
+              "coefficient_denominator",
+              "terms"
+            ],
+            "properties": {
+              "variables": {
+                "const": [
+                  "x",
+                  "y"
+                ]
+              },
+              "coefficient_denominator": {
+                "type": "integer",
+                "enum": [
+                  1,
+                  2,
+                  4,
+                  8
+                ]
+              },
+              "terms": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "exponents",
+                    "coefficient_numerator",
+                    "coefficient_denominator"
+                  ],
+                  "properties": {
+                    "exponents": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "coefficient_numerator": {
+                      "type": "integer"
+                    },
+                    "coefficient_denominator": {
+                      "type": "integer",
+                      "enum": [
+                        1,
+                        2,
+                        4,
+                        8
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "generation_provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "generator_version",
+              "base_seed",
+              "accepted_attempt",
+              "reynolds_projection",
+              "exact_stabilizer_oracle"
+            ],
+            "properties": {
+              "generator_version": {
+                "const": "d4-reynolds-regression-v1"
+              },
+              "base_seed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "accepted_attempt": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "reynolds_projection": {
+                "type": "string",
+                "minLength": 1
+              },
+              "exact_stabilizer_oracle": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
