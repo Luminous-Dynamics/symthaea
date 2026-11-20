@@ -6,6 +6,18 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use broca_mace_consolidation::{
+    verify_and_release_promoted_experiences, ConsolidationPolicyV1,
+    ConsolidationProposalV1, ConsolidationReceiptContextV1,
+    ConsolidationReceiptProposalV1, ConsolidationReceiptVerifierV1,
+    VerifiedConsolidationReceiptV1 as CanonicalVerifiedConsolidationReceipt,
+};
+use broca_mace_ingress::{
+    build_consolidation_evidence_pack, ingest_batch_as_known, AsKnownQuery,
+    AuthorityStatus, EvidenceVerifier, RawInteractionV1, SourceLifecycleStatus,
+    SourceTrustStatus, VerifiedCausalAssessment, VerifiedLineage,
+    VerifiedMeasurement, VerifiedOutcome, VerifiedRawEvent,
+};
 use broca_mace_policy::{
     Action, Experience, Objective, Regime, Scope, SourceRootDigest,
 };
@@ -74,27 +86,30 @@ pub(super) struct VerifiedActionReceipt {
 }
 pub(super) type VerifiedActionRegistry = BTreeMap<String, VerifiedActionReceipt>;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum ConsolidationDisposition {
-    RetainRaw,
-    CompressWithSourceLinks,
-    PromoteToProcedure,
-    PromoteToRule,
-    Quarantine,
-    Supersede,
-    ForgetFromActiveIndex,
-    EraseForPrivacy,
-}
-
+/// Canonical proposal, source pack and verifier-issued receipt retained as one
+/// admission record. The old JSONL harness must not treat a boolean as proof.
 #[derive(Clone, Debug)]
-pub(super) struct VerifiedConsolidationReceipt {
-    pub disposition: ConsolidationDisposition,
-    pub source_event_ids: Vec<u32>,
-    pub decision_digest: String,
-    pub verified: bool,
+pub(super) struct CanonicalConsolidationAdmission {
+    pub proposal: ConsolidationReceiptProposalV1,
+    pub evidence_pack: broca_mace_ingress::ConsolidationEvidencePackV1,
+    pub verification: CanonicalVerifiedConsolidationReceipt,
+    pub transfer_known_at_ms: i64,
 }
 pub(super) type VerifiedConsolidationRegistry =
-    BTreeMap<u32, VerifiedConsolidationReceipt>;
+    BTreeMap<u32, CanonicalConsolidationAdmission>;
+
+struct RegisteredConsolidationVerifier {
+    receipt: CanonicalVerifiedConsolidationReceipt,
+}
+
+impl ConsolidationReceiptVerifierV1 for RegisteredConsolidationVerifier {
+    fn verify(
+        &self,
+        _proposal: &ConsolidationReceiptProposalV1,
+    ) -> Option<CanonicalVerifiedConsolidationReceipt> {
+        Some(self.receipt.clone())
+    }
+}
 
 #[derive(Clone, Debug)]
 pub(super) struct VerifiedOutcomeReceipt {
@@ -440,16 +455,30 @@ pub(super) fn derive_as_known(
             continue;
         }
 
-        let Some(consolidation) = verified_consolidations.get(&event.event_id).filter(|receipt| {
-            receipt.verified
-                && !receipt.decision_digest.is_empty()
-                && receipt.disposition == ConsolidationDisposition::PromoteToProcedure
-                && receipt.source_event_ids.contains(&event.event_id)
-        }) else {
+        let Some(admission) = verified_consolidations.get(&event.event_id) else {
             report.unpromoted_observation_count += 1;
             continue;
         };
-        let _consolidation_receipt_digest = &consolidation.decision_digest;
+        let verifier = RegisteredConsolidationVerifier {
+            receipt: admission.verification.clone(),
+        };
+        let Ok((_verified_receipt, released)) = verify_and_release_promoted_experiences(
+            &admission.proposal,
+            &admission.evidence_pack,
+            admission.transfer_known_at_ms,
+            &verifier,
+        ) else {
+            report.unpromoted_observation_count += 1;
+            continue;
+        };
+        let Some(promoted) = released
+            .iter()
+            .find(|experience| experience.event_id == event.event_id)
+            .copied()
+        else {
+            report.unpromoted_observation_count += 1;
+            continue;
+        };
 
         let source_key = event.string("source_artifact_digest").unwrap_or("");
         let source = verified_sources.get(source_key);
@@ -469,26 +498,26 @@ pub(super) fn derive_as_known(
             report.retracted_observation_count += 1;
         }
 
-        report.experiences.push(Experience {
-            event_id: event.event_id,
-            source_family,
-            source_root_id,
-            source_root_digest,
-            scope: plan.scope,
-            action: plan.action,
-            observed_utility: outcome.observed_utility,
-            measurement_error_bound,
-            intervention: execution_matches
-                && execution.is_some_and(|receipt| receipt.intervention),
-            prediction_pre_registered: pre_registered,
-            outcome_reconciled: outcome.reconciled,
-            source_trusted,
-            source_retracted,
-            confounders_controlled: execution_matches
-                && execution.is_some_and(|receipt| receipt.confounders_controlled),
-            delayed_horizon_complete: execution_matches
-                && execution.is_some_and(|receipt| receipt.delayed_horizon_complete),
-        });
+        // The legacy JSONL event must agree with the exact experience released
+        // from the canonical receipt-bound consolidation pack.
+        if promoted.scope != plan.scope
+            || promoted.action != plan.action
+            || promoted.observed_utility.to_bits() != outcome.observed_utility.to_bits()
+            || promoted.source_family != source_family
+            || promoted.source_root_id != source_root_id
+            || promoted.source_root_digest != source_root_digest
+            || promoted.measurement_error_bound.to_bits()
+                != measurement_error_bound.to_bits()
+            || promoted.source_trusted != source_trusted
+            || promoted.outcome_reconciled != outcome.reconciled
+        {
+            report.unpromoted_observation_count += 1;
+            continue;
+        }
+
+        let mut candidate = promoted;
+        candidate.source_retracted = source_retracted;
+        report.experiences.push(candidate);
     }
 
     let observed_action_ids: BTreeSet<&str> = report
@@ -654,21 +683,272 @@ mod tests {
             .collect()
     }
 
-    fn consolidation_registry() -> VerifiedConsolidationRegistry {
-        [3_u32, 6, 9, 12]
-            .into_iter()
-            .map(|event_id| {
-                (
-                    event_id,
-                    VerifiedConsolidationReceipt {
-                        disposition: ConsolidationDisposition::PromoteToProcedure,
-                        source_event_ids: vec![event_id],
-                        decision_digest: format!("decision-digest-{event_id}"),
-                        verified: true,
-                    },
-                )
+    struct CanonicalFixtureVerifier {
+        outcomes: BTreeMap<u32, f64>,
+    }
+
+    fn fixture_sha(value: &str) -> String {
+        sha256_hex(value.as_bytes())
+    }
+
+    impl EvidenceVerifier for CanonicalFixtureVerifier {
+        fn verify_raw_event(
+            &self,
+            receipt_id: &str,
+            raw: &RawInteractionV1,
+            _known_at_ms: i64,
+        ) -> Option<VerifiedRawEvent> {
+            (receipt_id == format!("raw-{}", raw.event_id)).then(|| VerifiedRawEvent {
+                event_id: raw.event_id,
+                session_id: raw.session_id.clone(),
+                task_id: raw.task_id.clone(),
+                payload_sha256: raw.payload_sha256.clone(),
+                canonical_event_hash: fixture_sha(&format!("canonical-{}", raw.event_id)),
+                authority_status: AuthorityStatus::ReceiptAttested,
+                authority_receipt_digest: fixture_sha(&format!("authority-{}", raw.event_id)),
+                valid_from_ms: raw.valid_from_ms,
+                valid_until_ms: raw.valid_until_ms,
+                occurred_at_ms: raw.occurred_at_ms,
+                received_at_ms: raw.outcome_observed_at_ms + 5,
+                receipt_digest: fixture_sha(&format!("raw-receipt-{}", raw.event_id)),
             })
-            .collect()
+        }
+
+        fn verify_lineage(
+            &self,
+            receipt_id: &str,
+            event_id: u32,
+            _scope: Scope,
+            _known_at_ms: i64,
+        ) -> Option<VerifiedLineage> {
+            if receipt_id != format!("lineage-{event_id}") {
+                return None;
+            }
+            let (family, root) = match event_id {
+                3 => (10, 100),
+                6 => (11, 101),
+                9 => (20, 200),
+                12 => (21, 201),
+                _ => return None,
+            };
+            Some(VerifiedLineage {
+                source_family: family,
+                source_root_id: root,
+                source_root_digest: fixture_root_digest(root),
+                trust_status: SourceTrustStatus::TrustedForScope,
+                trust_policy_digest: fixture_sha("fixture-trust-policy-v1"),
+                acquisition_mode: "fixture_signed_artifact".to_owned(),
+                upstream_source_id: format!("upstream-{root}"),
+                source_artifact_digest: fixture_sha(&format!("artifact-{root}")),
+                transformation_digest: fixture_sha(&format!("transform-{event_id}")),
+                issuer_id: "fixture-source-ledger".to_owned(),
+                receipt_digest: fixture_sha(&format!("lineage-receipt-{event_id}")),
+            })
+        }
+
+        fn verify_measurement(
+            &self,
+            receipt_id: &str,
+            expected_unit: &str,
+            _scope: Scope,
+            _observed_at_ms: i64,
+            _known_at_ms: i64,
+        ) -> Option<VerifiedMeasurement> {
+            if !receipt_id.starts_with("calibration-")
+                || expected_unit != "normalized_utility"
+            {
+                return None;
+            }
+            Some(VerifiedMeasurement {
+                absolute_error_bound: 0.02,
+                unit: expected_unit.to_owned(),
+                instrument_id: "fixture-utility-instrument".to_owned(),
+                method_id: "fixture-utility-method".to_owned(),
+                calibration_revision: "fixture-calibration-r1".to_owned(),
+                valid_from_ms: 0,
+                valid_until_ms: None,
+                calibration_digest: fixture_sha("fixture-calibration-digest"),
+            })
+        }
+
+        fn verify_causal_assessment(
+            &self,
+            receipt_id: &str,
+            _event_id: u32,
+            _scope: Scope,
+            _known_at_ms: i64,
+        ) -> Option<VerifiedCausalAssessment> {
+            receipt_id.starts_with("causal-").then(|| VerifiedCausalAssessment {
+                intervention_confirmed: true,
+                prediction_pre_registered: true,
+                confounders_controlled: true,
+                delayed_horizon_complete: true,
+                assessment_digest: fixture_sha("fixture-causal-assessment"),
+            })
+        }
+
+        fn verify_outcome(
+            &self,
+            receipt_id: &str,
+            event_id: u32,
+            _observed_at_ms: i64,
+            _known_at_ms: i64,
+        ) -> Option<VerifiedOutcome> {
+            if receipt_id != format!("outcome-{event_id}") {
+                return None;
+            }
+            Some(VerifiedOutcome {
+                reconciled: true,
+                success: true,
+                observed_utility: *self.outcomes.get(&event_id)?,
+                utility_unit: "normalized_utility".to_owned(),
+                outcome_digest: fixture_sha(&format!("outcome-digest-{event_id}")),
+            })
+        }
+
+        fn lifecycle_status_as_of(
+            &self,
+            _event_id: u32,
+            _known_at_ms: i64,
+        ) -> Option<SourceLifecycleStatus> {
+            Some(SourceLifecycleStatus::Active)
+        }
+    }
+
+    struct CanonicalFixtureConsolidationVerifier;
+
+    impl ConsolidationReceiptVerifierV1 for CanonicalFixtureConsolidationVerifier {
+        fn verify(
+            &self,
+            proposal: &ConsolidationReceiptProposalV1,
+        ) -> Option<CanonicalVerifiedConsolidationReceipt> {
+            Some(CanonicalVerifiedConsolidationReceipt {
+                proposal_digest: proposal.canonical_digest(),
+                verification_receipt_digest: fixture_sha("fixture-consolidation-verification"),
+                verifier_id: "fixture-consolidation-verifier".to_owned(),
+                verifier_role: "fixture_independent_verifier".to_owned(),
+                verified_at_ms: proposal.as_known.known_at_ms,
+                authority_scope: proposal.target_scope,
+            })
+        }
+    }
+
+    fn canonical_admission(
+        action: Action,
+        pack: &broca_mace_ingress::ConsolidationEvidencePackV1,
+    ) -> CanonicalConsolidationAdmission {
+        let evidence = pack.summarize_action_for_scope(
+            Scope {
+                regime: Regime::Baseline,
+                objective: Objective::Quality,
+            },
+            action,
+        );
+        let policy = ConsolidationPolicyV1 {
+            minimum_qualified_success_events: 2,
+            minimum_independent_source_families: 2,
+            minimum_independent_source_roots: 2,
+            maximum_measurement_error_bound: 0.05,
+        };
+        let ConsolidationProposalV1::ProposeProcedure(proposal) =
+            policy.decide_procedure_promotion(&evidence)
+        else {
+            panic!("fixture has two independently qualified sources per action");
+        };
+        let context = ConsolidationReceiptContextV1 {
+            consolidation_run_id: format!("legacy-jsonl-{}", action.name()),
+            principal_id: "fixture-consolidation-principal".to_owned(),
+            capability_receipt_digest: fixture_sha("fixture-capability"),
+            policy_digest: fixture_sha("fixture-consolidation-policy"),
+            destination_abstraction_id: format!("procedure-{}", action.name()),
+            output_artifact_digest: fixture_sha(&format!("procedure-output-{}", action.name())),
+            retention_policy_id: "retain-source-links-v1".to_owned(),
+        };
+        let receipt_proposal =
+            ConsolidationReceiptProposalV1::from_procedure_promotion(&proposal, pack, context)
+                .expect("canonical proposal must bind the exact source pack");
+        let verification = CanonicalFixtureConsolidationVerifier
+            .verify(&receipt_proposal)
+            .expect("fixture verifier issues a proposal-bound test receipt");
+        CanonicalConsolidationAdmission {
+            proposal: receipt_proposal,
+            evidence_pack: pack.clone(),
+            verification,
+            transfer_known_at_ms: pack.as_known().known_at_ms,
+        }
+    }
+
+    fn consolidation_registry(
+        valid_at_ms: u64,
+        known_at_ms: u64,
+    ) -> VerifiedConsolidationRegistry {
+        // No observation is eligible before its event/receipt time; do not
+        // construct an admission snapshot earlier than the raw evidence.
+        if valid_at_ms < 30 || known_at_ms < 35 {
+            return BTreeMap::new();
+        }
+
+        let rows = [
+            (3_u32, "a1", Action::A, 0.92),
+            (6_u32, "a2", Action::A, 0.90),
+            (9_u32, "b1", Action::B, 0.32),
+            (12_u32, "b2", Action::B, 0.34),
+        ];
+        let raw_events: Vec<RawInteractionV1> = rows
+            .iter()
+            .map(|(event_id, action_id, action, utility)| RawInteractionV1 {
+                event_id: *event_id,
+                session_id: "session-a".to_owned(),
+                task_id: format!("task-{action_id}"),
+                payload_sha256: fixture_sha(&format!("payload-{event_id}")),
+                raw_event_receipt_id: format!("raw-{event_id}"),
+                scope: Scope {
+                    regime: Regime::Baseline,
+                    objective: Objective::Quality,
+                },
+                action: *action,
+                observed_utility: *utility,
+                utility_unit: "normalized_utility".to_owned(),
+                valid_from_ms: 0,
+                valid_until_ms: None,
+                occurred_at_ms: 20,
+                prediction_registered_at_ms: Some(10),
+                action_dispatched_at_ms: Some(15),
+                outcome_observed_at_ms: 30,
+                lineage_receipt_id: format!("lineage-{event_id}"),
+                calibration_receipt_id: format!("calibration-{event_id}"),
+                causal_assessment_receipt_id: format!("causal-{event_id}"),
+                outcome_receipt_id: format!("outcome-{event_id}"),
+            })
+            .collect();
+        let verifier = CanonicalFixtureVerifier {
+            outcomes: rows
+                .iter()
+                .map(|(event_id, _, _, utility)| (*event_id, *utility))
+                .collect(),
+        };
+        let query = AsKnownQuery {
+            valid_at_ms: valid_at_ms as i64,
+            known_at_ms: known_at_ms as i64,
+        };
+        let batch = ingest_batch_as_known(&raw_events, query, &verifier)
+            .expect("raw evidence passes canonical ingress in fixture");
+        let pack = build_consolidation_evidence_pack(&batch, &[3, 6, 9, 12])
+            .expect("canonical pack preserves all source receipt bindings");
+        let mut registry = VerifiedConsolidationRegistry::new();
+        for action in [Action::A, Action::B] {
+            let admission = canonical_admission(action, &pack);
+            let ids = admission
+                .proposal
+                .source_bindings
+                .iter()
+                .map(|binding| binding.event_id)
+                .collect::<Vec<_>>();
+            for event_id in ids {
+                registry.insert(event_id, admission.clone());
+            }
+        }
+        registry
     }
 
     fn fixture_root_digest(seed: u32) -> SourceRootDigest {
@@ -726,7 +1006,7 @@ mod tests {
             &action_registry(),
             &outcome_registry(),
             &source_registry(),
-            &consolidation_registry(),
+            &consolidation_registry(valid_at, known_at),
         )
     }
 
@@ -743,7 +1023,7 @@ mod tests {
             &action_registry(),
             &outcome_registry(),
             sources,
-            &consolidation_registry(),
+            &consolidation_registry(valid_at, known_at),
         )
     }
 
