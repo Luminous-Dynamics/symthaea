@@ -13,8 +13,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::embodiment::{
     EmbodimentActivity, EmbodimentController, EmbodimentEvent, EmbodimentEventKind,
-    EmbodimentIngestError, EmbodimentSnapshot, SpeechOutputState,
+    EmbodimentEventSequencer, EmbodimentIngestError, EmbodimentSequenceError,
+    EmbodimentSnapshot, SpeechOutputState, SignalProvenance,
 };
+use std::time::Instant;
 
 /// Current serialized trace schema.
 pub const EMBODIMENT_TRACE_SCHEMA_VERSION: u16 = 1;
@@ -210,6 +212,110 @@ impl EmbodimentTrace {
     }
 }
 
+
+/// End-to-end semantic embodiment session.
+///
+/// A single publish operation sequences, validates, reduces, and records an
+/// event. Renderer code only reads the snapshot; runtime producers publish
+/// through this session or a shared event sequencer.
+pub struct EmbodimentSession {
+    sequencer: EmbodimentEventSequencer,
+    controller: EmbodimentController,
+    trace: EmbodimentTrace,
+}
+
+impl EmbodimentSession {
+    pub fn new(session_id: impl Into<String>) -> Result<Self, EmbodimentTraceError> {
+        let trace = EmbodimentTrace::new(session_id);
+        // Validate session metadata before accepting any runtime events.
+        trace.replay()?;
+        Ok(Self {
+            sequencer: EmbodimentEventSequencer::new(),
+            controller: EmbodimentController::new(),
+            trace,
+        })
+    }
+
+    pub fn snapshot(&self) -> &EmbodimentSnapshot {
+        self.controller.snapshot()
+    }
+
+    pub fn trace(&self) -> &EmbodimentTrace {
+        &self.trace
+    }
+
+    pub fn into_trace(self) -> EmbodimentTrace {
+        self.trace
+    }
+
+    pub fn publish(
+        &mut self,
+        provenance: SignalProvenance,
+        kind: EmbodimentEventKind,
+    ) -> Result<EmbodimentEvent, EmbodimentSessionError> {
+        self.publish_at(Instant::now(), provenance, kind)
+    }
+
+    pub fn publish_at(
+        &mut self,
+        observed_at: Instant,
+        provenance: SignalProvenance,
+        kind: EmbodimentEventKind,
+    ) -> Result<EmbodimentEvent, EmbodimentSessionError> {
+        if self.trace.events.len() >= MAX_EMBODIMENT_TRACE_EVENTS {
+            return Err(EmbodimentTraceError::TooManyEvents {
+                received: self.trace.events.len().saturating_add(1),
+                maximum: MAX_EMBODIMENT_TRACE_EVENTS,
+            }
+            .into());
+        }
+
+        let event = self.sequencer.emit_at(observed_at, provenance, kind)?;
+        self.controller.ingest(event.clone())?;
+        self.trace.push(event.clone())?;
+        Ok(event)
+    }
+}
+
+/// Failure while atomically publishing an event into an embodiment session.
+#[derive(Debug, Clone, PartialEq)]
+pub enum EmbodimentSessionError {
+    Sequence(EmbodimentSequenceError),
+    Ingest(EmbodimentIngestError),
+    Trace(EmbodimentTraceError),
+}
+
+impl fmt::Display for EmbodimentSessionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Sequence(error) => write!(f, "event sequencing failed: {error}"),
+            Self::Ingest(error) => write!(f, "event validation failed: {error}"),
+            Self::Trace(error) => write!(f, "event trace append failed: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for EmbodimentSessionError {}
+
+impl From<EmbodimentSequenceError> for EmbodimentSessionError {
+    fn from(value: EmbodimentSequenceError) -> Self {
+        Self::Sequence(value)
+    }
+}
+
+impl From<EmbodimentIngestError> for EmbodimentSessionError {
+    fn from(value: EmbodimentIngestError) -> Self {
+        Self::Ingest(value)
+    }
+}
+
+impl From<EmbodimentTraceError> for EmbodimentSessionError {
+    fn from(value: EmbodimentTraceError) -> Self {
+        Self::Trace(value)
+    }
+}
+
+
 /// An activity interval still open at the end of a trace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OpenActivityInterval {
@@ -380,6 +486,92 @@ mod tests {
             ))
             .unwrap();
         trace
+    }
+
+
+
+    #[test]
+    fn session_publish_updates_snapshot_and_trace_together() {
+        let mut session = EmbodimentSession::new("session-facade-test").unwrap();
+        let started = Instant::now();
+        let at1 = started + std::time::Duration::from_millis(1);
+        let at2 = started + std::time::Duration::from_millis(2);
+
+        let first = session
+            .publish_at(
+                at1,
+                SignalProvenance::RuntimeEvent,
+                EmbodimentEventKind::ActivityChanged {
+                    activity: EmbodimentActivity::Associating,
+                },
+            )
+            .unwrap();
+        let second = session
+            .publish_at(
+                at2,
+                SignalProvenance::RuntimeEvent,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Playing,
+                },
+            )
+            .unwrap();
+
+        assert_eq!(first.sequence, 1);
+        assert_eq!(second.sequence, 2);
+        assert_eq!(
+            session.snapshot().current_activity(),
+            Some(EmbodimentActivity::Associating)
+        );
+        assert_eq!(
+            session.snapshot().current_speech_output(),
+            Some(SpeechOutputState::Playing)
+        );
+        assert_eq!(session.trace().events.len(), 2);
+        assert_eq!(session.trace().replay().unwrap(), *session.snapshot());
+    }
+
+    #[test]
+    fn rejected_session_event_is_not_recorded_and_next_sequence_can_have_a_gap() {
+        let mut session = EmbodimentSession::new("session-rejected-event").unwrap();
+        let started = Instant::now();
+
+        let rejected = session.publish_at(
+            started + std::time::Duration::from_millis(1),
+            SignalProvenance::RuntimeDerived,
+            EmbodimentEventKind::SpeechOutputChanged {
+                state: SpeechOutputState::Playing,
+            },
+        );
+        assert!(matches!(
+            rejected,
+            Err(EmbodimentSessionError::Ingest(
+                EmbodimentIngestError::SignalProvenanceNotAllowed { .. }
+            ))
+        ));
+        assert!(session.trace().events.is_empty());
+        assert_eq!(session.snapshot().last_event_sequence, None);
+
+        let accepted = session
+            .publish_at(
+                started + std::time::Duration::from_millis(2),
+                SignalProvenance::RuntimeEvent,
+                EmbodimentEventKind::ActivityChanged {
+                    activity: EmbodimentActivity::Listening,
+                },
+            )
+            .unwrap();
+        assert_eq!(accepted.sequence, 2);
+        assert_eq!(session.trace().events.len(), 1);
+        assert_eq!(session.trace().events[0].sequence, 2);
+        assert_eq!(session.trace().replay().unwrap(), *session.snapshot());
+    }
+
+    #[test]
+    fn session_rejects_invalid_identifier_at_creation() {
+        assert!(matches!(
+            EmbodimentSession::new(" \n "),
+            Err(EmbodimentTraceError::InvalidSessionId)
+        ));
     }
 
 
