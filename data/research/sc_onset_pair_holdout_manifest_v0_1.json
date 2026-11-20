@@ -47,235 +47,235 @@
       "reference_id": "S8-01",
       "precursor_pair_key": "Li2CO3 + Nb2O5",
       "precursor_genome_screen_sample_id": "PG_2238",
-      "screen_temperature_c": 400,
       "screen_outcome": "transformed",
       "in_situ_onset_c": 500,
-      "reaction_energy_ev_per_atom": -0.039
+      "reaction_energy_ev_per_atom": -0.039,
+      "screen_heating_temperature_source_value": 400
     },
     {
       "reference_id": "S8-02",
       "precursor_pair_key": "Li2CO3 + MnO",
       "precursor_genome_screen_sample_id": "PG_2226",
-      "screen_temperature_c": 400,
       "screen_outcome": "partially_reacted",
       "in_situ_onset_c": 430,
-      "reaction_energy_ev_per_atom": -0.015
+      "reaction_energy_ev_per_atom": -0.015,
+      "screen_heating_temperature_source_value": 400
     },
     {
       "reference_id": "S8-03",
       "precursor_pair_key": "Li2CO3 + Mn3O4",
       "precursor_genome_screen_sample_id": "PG_2227",
-      "screen_temperature_c": 400,
       "screen_outcome": "partially_reacted",
       "in_situ_onset_c": 420,
-      "reaction_energy_ev_per_atom": 0
+      "reaction_energy_ev_per_atom": 0,
+      "screen_heating_temperature_source_value": 400
     },
     {
       "reference_id": "S8-04",
       "precursor_pair_key": "Li2CO3 + Mn2O3",
       "precursor_genome_screen_sample_id": "PG_2228",
-      "screen_temperature_c": 400,
       "screen_outcome": "partially_reacted",
       "in_situ_onset_c": 400,
-      "reaction_energy_ev_per_atom": -0.016
+      "reaction_energy_ev_per_atom": -0.016,
+      "screen_heating_temperature_source_value": 400
     },
     {
       "reference_id": "S8-05",
       "precursor_pair_key": "Li2CO3 + MnO2",
       "precursor_genome_screen_sample_id": "PG_2229",
-      "screen_temperature_c": 300,
       "screen_outcome": "unreacted",
       "in_situ_onset_c": 350,
-      "reaction_energy_ev_per_atom": -0.045
+      "reaction_energy_ev_per_atom": -0.045,
+      "screen_heating_temperature_source_value": 300
     },
     {
       "reference_id": "S8-06",
       "precursor_pair_key": "Fe3O4 + Li2CO3",
       "precursor_genome_screen_sample_id": "PG_1222",
-      "screen_temperature_c": 400,
       "screen_outcome": "completely_reacted",
       "in_situ_onset_c": 390,
-      "reaction_energy_ev_per_atom": -0.026
+      "reaction_energy_ev_per_atom": -0.026,
+      "screen_heating_temperature_source_value": 400
     },
     {
       "reference_id": "S8-07",
       "precursor_pair_key": "Li2CO3 + V2O5",
       "precursor_genome_screen_sample_id": "PG_2248",
-      "screen_temperature_c": 400,
       "screen_outcome": "partially_reacted",
       "in_situ_onset_c": 230,
-      "reaction_energy_ev_per_atom": -0.071
+      "reaction_energy_ev_per_atom": -0.071,
+      "screen_heating_temperature_source_value": 400
     },
     {
       "reference_id": "S8-08",
       "precursor_pair_key": "Co3O4 + Li2CO3",
       "precursor_genome_screen_sample_id": "PG_0922",
-      "screen_temperature_c": 400,
       "screen_outcome": "unreacted",
       "in_situ_onset_c": 410,
-      "reaction_energy_ev_per_atom": -0.011
+      "reaction_energy_ev_per_atom": -0.011,
+      "screen_heating_temperature_source_value": 400
     },
     {
       "reference_id": "S8-09",
       "precursor_pair_key": "Li2CO3 + ZrO2",
       "precursor_genome_screen_sample_id": "PG_2252",
-      "screen_temperature_c": 400,
       "screen_outcome": "unreacted",
       "in_situ_onset_c": 590,
-      "reaction_energy_ev_per_atom": -0.016
+      "reaction_energy_ev_per_atom": -0.016,
+      "screen_heating_temperature_source_value": 400
     },
     {
       "reference_id": "S8-10",
       "precursor_pair_key": "Li2CO3 + TiO2",
       "precursor_genome_screen_sample_id": "PG_2246",
-      "screen_temperature_c": 400,
       "screen_outcome": "unreacted",
       "in_situ_onset_c": 480,
-      "reaction_energy_ev_per_atom": -0.037
+      "reaction_energy_ev_per_atom": -0.037,
+      "screen_heating_temperature_source_value": 400
     },
     {
       "reference_id": "S8-11",
       "precursor_pair_key": "LiOH + Nb2O5",
       "precursor_genome_screen_sample_id": "PG_2438",
-      "screen_temperature_c": 200,
       "screen_outcome": "transformed",
       "in_situ_onset_c": 450,
-      "reaction_energy_ev_per_atom": -0.069
+      "reaction_energy_ev_per_atom": -0.069,
+      "screen_heating_temperature_source_value": 200
     },
     {
       "reference_id": "S8-12",
       "precursor_pair_key": "LiOH + MnO",
       "precursor_genome_screen_sample_id": "PG_2426",
-      "screen_temperature_c": 200,
       "screen_outcome": "transformed",
       "in_situ_onset_c": 450,
-      "reaction_energy_ev_per_atom": 0
+      "reaction_energy_ev_per_atom": 0,
+      "screen_heating_temperature_source_value": 200
     },
     {
       "reference_id": "S8-13",
       "precursor_pair_key": "LiOH + Mn3O4",
       "precursor_genome_screen_sample_id": "PG_2427",
-      "screen_temperature_c": 200,
       "screen_outcome": "transformed",
       "in_situ_onset_c": 430,
-      "reaction_energy_ev_per_atom": -0.028
+      "reaction_energy_ev_per_atom": -0.028,
+      "screen_heating_temperature_source_value": 200
     },
     {
       "reference_id": "S8-14",
       "precursor_pair_key": "LiOH + Mn2O3",
       "precursor_genome_screen_sample_id": "PG_2428",
-      "screen_temperature_c": 200,
       "screen_outcome": "transformed",
       "in_situ_onset_c": 400,
-      "reaction_energy_ev_per_atom": -0.063
+      "reaction_energy_ev_per_atom": -0.063,
+      "screen_heating_temperature_source_value": 200
     },
     {
       "reference_id": "S8-15",
       "precursor_pair_key": "LiOH + MnO2",
       "precursor_genome_screen_sample_id": "PG_2429",
-      "screen_temperature_c": 200,
       "screen_outcome": "transformed",
       "in_situ_onset_c": 204,
-      "reaction_energy_ev_per_atom": -0.115
+      "reaction_energy_ev_per_atom": -0.115,
+      "screen_heating_temperature_source_value": 200
     },
     {
       "reference_id": "S8-16",
       "precursor_pair_key": "Fe3O4 + LiOH",
       "precursor_genome_screen_sample_id": "PG_1224",
-      "screen_temperature_c": 200,
       "screen_outcome": "transformed",
       "in_situ_onset_c": 360,
-      "reaction_energy_ev_per_atom": -0.043
+      "reaction_energy_ev_per_atom": -0.043,
+      "screen_heating_temperature_source_value": 200
     },
     {
       "reference_id": "S8-17",
       "precursor_pair_key": "MnO + Na2CO3",
       "precursor_genome_screen_sample_id": "PG_2635",
-      "screen_temperature_c": 500,
       "screen_outcome": "partially_reacted",
       "in_situ_onset_c": 360,
-      "reaction_energy_ev_per_atom": 0
+      "reaction_energy_ev_per_atom": 0,
+      "screen_heating_temperature_source_value": 500
     },
     {
       "reference_id": "S8-18",
       "precursor_pair_key": "Mn3O4 + Na2CO3",
       "precursor_genome_screen_sample_id": "PG_2735",
-      "screen_temperature_c": 500,
       "screen_outcome": "completely_reacted",
       "in_situ_onset_c": 340,
-      "reaction_energy_ev_per_atom": 0
+      "reaction_energy_ev_per_atom": 0,
+      "screen_heating_temperature_source_value": 500
     },
     {
       "reference_id": "S8-19",
       "precursor_pair_key": "MnO2 + Na2CO3",
       "precursor_genome_screen_sample_id": "PG_2935",
-      "screen_temperature_c": 300,
       "screen_outcome": "transformed",
       "in_situ_onset_c": 470,
-      "reaction_energy_ev_per_atom": -0.042
+      "reaction_energy_ev_per_atom": -0.042,
+      "screen_heating_temperature_source_value": 300
     },
     {
       "reference_id": "S8-20",
       "precursor_pair_key": "Fe3O4 + Na2CO3",
       "precursor_genome_screen_sample_id": "PG_1235",
-      "screen_temperature_c": 500,
       "screen_outcome": "transformed",
       "in_situ_onset_c": 560,
-      "reaction_energy_ev_per_atom": -0.015
+      "reaction_energy_ev_per_atom": -0.015,
+      "screen_heating_temperature_source_value": 500
     },
     {
       "reference_id": "S8-21",
       "precursor_pair_key": "Na2CO3 + Nb2O5",
       "precursor_genome_screen_sample_id": "PG_3538",
-      "screen_temperature_c": 500,
       "screen_outcome": "completely_reacted",
       "in_situ_onset_c": 310,
-      "reaction_energy_ev_per_atom": -0.054
+      "reaction_energy_ev_per_atom": -0.054,
+      "screen_heating_temperature_source_value": 500
     },
     {
       "reference_id": "S8-22",
       "precursor_pair_key": "MoO3 + Na2CO3",
       "precursor_genome_screen_sample_id": "PG_3035",
-      "screen_temperature_c": 400,
       "screen_outcome": "partially_reacted",
       "in_situ_onset_c": 200,
-      "reaction_energy_ev_per_atom": -0.09
+      "reaction_energy_ev_per_atom": -0.09,
+      "screen_heating_temperature_source_value": 400
     },
     {
       "reference_id": "S8-23",
       "precursor_pair_key": "Na2CO3 + V2O5",
       "precursor_genome_screen_sample_id": "PG_3548",
-      "screen_temperature_c": 400,
       "screen_outcome": "completely_reacted",
       "in_situ_onset_c": 180,
-      "reaction_energy_ev_per_atom": -0.093
+      "reaction_energy_ev_per_atom": -0.093,
+      "screen_heating_temperature_source_value": 400
     },
     {
       "reference_id": "S8-24",
       "precursor_pair_key": "Na2CO3 + TiO2",
       "precursor_genome_screen_sample_id": "PG_3546",
-      "screen_temperature_c": null,
       "screen_outcome": "unreacted",
       "in_situ_onset_c": 560,
-      "reaction_energy_ev_per_atom": -0.043
+      "reaction_energy_ev_per_atom": -0.043,
+      "screen_heating_temperature_source_value": null
     },
     {
       "reference_id": "S8-25",
       "precursor_pair_key": "BaCO3 + TiO2",
       "precursor_genome_screen_sample_id": "PG_0446",
-      "screen_temperature_c": 400,
       "screen_outcome": "transformed",
       "in_situ_onset_c": 700,
-      "reaction_energy_ev_per_atom": -0.087
+      "reaction_energy_ev_per_atom": -0.087,
+      "screen_heating_temperature_source_value": 400
     },
     {
       "reference_id": "S8-26",
       "precursor_pair_key": "BaO2 + TiO2",
       "precursor_genome_screen_sample_id": "PG_0546",
-      "screen_temperature_c": 200,
       "screen_outcome": "transformed",
       "in_situ_onset_c": 380,
-      "reaction_energy_ev_per_atom": -0.149
+      "reaction_energy_ev_per_atom": -0.149,
+      "screen_heating_temperature_source_value": 200
     }
   ],
   "audit": {
@@ -283,7 +283,7 @@
     "unique_screen_sample_id_count": 26,
     "unmatched_pairs": 0,
     "duplicate_pair_keys": 0,
-    "warning": "Screen-row setpoint/outcome and in-situ measured onset are distinct observations. A one-temperature screen outcome is a censored bound, not an exact onset value."
+    "warning": "Screen-row setpoint/outcome and in-situ measured onset are distinct observations. A one-temperature screen outcome is a censored bound, not an exact onset value. The upstream SynthesisData schema does not declare a unit for heating_temperature; retain the source numeric value until units are confirmed."
   },
   "claim_ceiling": "A leakage exclusion manifest derived from published pair identities and the pinned public Precursor Genome ledger. It is not the full PG-LIT source dataset or a model training script."
 }
