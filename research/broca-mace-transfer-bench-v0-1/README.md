@@ -420,3 +420,33 @@ The consolidation salience planner pins each candidate to the exact source scope
 ### Predictive-salience calibration benchmark (authored, not runner-verified)
 
 A deterministic generated test evaluates 4,096 future-use forecasts over 256 task clusters with an equal 64-token context budget. It compares failure-only, recency-first, frequency-first and predicted-future-value selection. Forecasts are scored with Brier and ten-bin expected-calibration error; selectors are scored on hidden expected reuse value, one sampled realised outcome, value per token and regret against an oracle knapsack. Hidden future labels are held outside the selector inputs. This is a synthetic development/qualification fixture, not an AML or CL-Bench result. Future external-validity work must hold out task families, source roots, model versions and environment mechanisms.
+
+### Independently qualified predictive-salience forecasts (MACE v0.10)
+
+A raw `FutureUsePredictionV1` can no longer be placed directly into a memory-surfacing candidate. It must first pass `verify_future_use_prediction` and receive an opaque `VerifiedFutureUsePredictionV1` from a `SaliencePredictionVerifierV1`.
+
+The calibration receipt binds the exact prediction and evidence digests, model/version/configuration, target scope, `(valid_at, known_at)` snapshot, training/calibration/held-out dataset digests, task-family and source-root split digests, cluster counts, Brier score versus a base-rate comparator, ECE, worst-group ECE, verifier identity and validity interval.
+
+The current admission prototype requires at least 32 training clusters, 16 calibration clusters and 16 held-out clusters; calibration Brier must beat the base-rate Brier, ECE must be ≤0.05, worst-group ECE ≤0.10, and the verifier must attest task-family and source-root disjointness. The receipt must have been verified by the as-known time and remain valid at that snapshot. Surfacing-plan digests retain both the prediction digest and calibration-receipt digest.
+
+This creates an important separation:
+- model: proposes predicted future-use value;
+- independent verifier: qualifies its calibration and held-out evidence;
+- consolidation/salience: selects already-admitted memory under a token budget;
+- Mycelix: must own the production trust roots, signed receipt verification, source-root lineage and correction/revocation semantics.
+
+The current verifier is a synthetic fixture. There is no live Mycelix signature verification, production calibration registry or independently operated calibration service in this workspace. The interface is an assurance boundary, not a claim that cryptographic verification is implemented.
+
+### Predictive-salience benchmark claim boundary
+
+The 4,096-forecast development test is an **oracle-informed synthetic positive control**. Its generator uses a latent value to construct both hidden future-reuse probabilities and the candidate forecasts. It checks that a useful predictive signal can outperform fixed failure-only, recency-first and frequency-first heuristics under equal token budgets. It does **not** establish that a learned Symthaea model can infer that signal from real raw-session features, generalize to unseen tasks, or beat an external memory product.
+
+The next credible experiment must:
+1. train or fit the forecaster on a training split only;
+2. calibrate on separate task clusters;
+3. test on held-out task families, source roots, objectives, model versions and environment mechanisms;
+4. include common-cause, drift, stale-memory, delayed-outcome and adversarially misleading-history cases;
+5. compare Brier skill against base rate, ECE and worst-group ECE, selected realized utility, utility per token, regret, stale activation, and latency/cost;
+6. include a blinded external evaluator and publish all split digests and run manifests.
+
+No MACE salience SOTA result is claimed from the current synthetic positive control.

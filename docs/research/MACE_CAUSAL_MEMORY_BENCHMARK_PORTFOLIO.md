@@ -162,6 +162,7 @@ A different source-family string is not proof of independence. The production ga
 - **Statistics:** paired cluster-bootstrap utility lift versus no-memory (2,000 resamples); per-family reporting for causal-qualified, invariant transport and active probe; Session-B/Session-C known-retraction control; probe requests/resolutions and net utility after the 0.12 normalized-utility probe cost. The active policy emits a typed, scope-bound request with both actions, a replicate count and maximum normalized-utility budget; the evaluator rejects mismatched-scope, unsupported-action, unsupported-replicate and under-budget requests.
 - **Raw-native ingress and consolidation handoff:** broca-mace-ingress plus broca-mace-consolidation; ingress has 36 deterministic mock-verifier tests, the consolidation policy has 7 unit tests and 5 cross-crate raw-session integration tests, including the Session-A→B→C retraction chain and common-mode-shift treatment-effect transfer, tracked by [#12771](https://github.com/Luminous-Dynamics/symthaea/issues/12771). It admits only Mycelix-style `receipt_attested` authority, uses signed server `received_at` for `known_at`, distinguishes Active/Retracted/Superseded lifecycle, validates source/calibration/causal/outcome receipt material, re-verifies duplicates and compares full receipt bundles. Ingress results are non-constructible outside the crate. `build_consolidation_evidence_pack` produces a deterministic receipt-preserving pack with source-family/root counts derived from verified lineage. The MACE-specific proposal consumer now consumes action-scoped summaries and binds all promotion thresholds into each source-linked proposal; invalid policy configuration fails closed. #12731's broader retention/privacy/reversibility policy does **not yet consume the pack**. No live Mycelix cryptographic adapter is claimed.
 - **Raw-session replay:** the JSONL evaluator module has 26 authored tests for (valid_at, known_at), server-receipt chronology, A/B/C correction, late arrivals, retroactive/future-effective corrections, invalid targets and correction chronology.
+- **Predictive-salience forecast admission (MACE v0.10):** raw model forecasts are no longer eligible for candidate surfacing. They must be wrapped in an independently verified calibration receipt binding the prediction/evidence, model/configuration, scope and bitemporal snapshot, training/calibration/held-out datasets, disjoint task-family/source-root splits, minimum cluster counts, Brier-vs-base-rate, ECE/worst-group ECE, verifier and validity window. Surfacing-plan digests bind prediction and calibration-receipt digests. The current verifier is a fixture only, not live Mycelix cryptographic verification.
 - **Candidate/evaluator separation:** candidate policy and evaluator are separate Cargo packages; the evaluator source remains public in the same repository, so it is not a sealed independent evaluator.
 - **Cross-crate regression:** evaluator integration test `ingress_consolidation_transfer` composes receipt-verified raw ingress, action-specific proposal-only consolidation, an independently verified promotion receipt, Session-B choice, Session-C retraction, stale-receipt rejection, and refusal to re-promote Action A when only one source remains.
 - **Verification:** source-level checks have been performed and the integration test is authored. Rust compile/tests/rustfmt have not run in this environment (Cargo/rustc/rustfmt are unavailable); draft PR checks are skipped, not passes. Test counts are source inventory only. No SOTA or physical causal-discovery result is claimed.
@@ -341,3 +342,39 @@ A generated development control now specifies 256 task clusters × 16 memory can
 The selector receives only candidate-visible forecasts, source evidence, access telemetry and the fixed budget. Future reuse labels and true value remain evaluator-side. The development fixture has authored thresholds for forecast improvement, policy lift and oracle regret; no measured result is claimed until the Rust test runs. A credible external claim still requires held-out task-family, source-root, model-version and mechanism splits, with independent labels and paired uncertainty.
 
 Anthropic's *The components of agent memory* (November 6, 2026) motivates this research direction but is not a directly comparable benchmark. Its vendor-reported CL-Bench database task found that persistent memory raised Opus 5.5 from 0.655 to 0.838 and Sonnet 5.5 from 0.644 to 0.833; a fixed "record only failures" instruction reduced gains for stronger models. The lesson is not that predicted-value salience already wins, but that memory selection rules should be tested against downstream reuse instead of assuming failure-only or frequency-only retention is optimal.
+
+## 9. November 20, 2026 update: predictive salience and industry results
+
+### Anthropic: memory is future-oriented, not just failure logging
+
+Anthropic's November 6 engineering report, [The components of agent memory](https://www.anthropic.com/research/components-of-agent-memory), presents memory as a prediction about what future sessions will need. On its CL-Bench database task, the reported stateless → memory mean rewards were Opus 5.5 **0.655 → 0.838**, Sonnet 5.5 **0.644 → 0.833**, Opus 5 **0.564 → 0.828**, Opus 4.7 **0.383 → 0.700**, and Sonnet 5 **0.306 → 0.610**. These are Anthropic's own task results and are not directly comparable to AML, MemoryArena or MACE.
+
+The same report gives two important design lessons:
+- On Pokémon Red, Fable 5 wrote 9 memory files and earned four badges, while Sonnet 3.7 wrote 413 files across 225 folders and earned one badge; memory that duplicates currently observable state can become a maintenance burden.
+- A fixed instruction to “record only failures” reduced the memory gain for Opus 5 by 0.234 and Opus 4.7 by 0.150 on the evaluated task. Stronger models benefited from judging salience rather than following that hard-coded rule.
+
+For Symthaea, this supports testing predicted future-use value, but not trusting a model's own salience estimate. Keep failure-only, recency and frequency as baselines; require independent calibration evidence and held-out evaluation for predicted-value surfacing. See [Anthropic's report](https://www.anthropic.com/research/components-of-agent-memory).
+
+### OpenAI: memory, session and execution remain distinct
+
+OpenAI's Sandbox Agents documentation explicitly distinguishes durable memory files from conversational Session history. It documents progressive disclosure (summary first, detailed memory only when needed), separate read-only/generate-only modes, and per-agent memory layouts. The Nov 19 API changelog added GPT-Live-1.1 multilingual speech improvements and standby behavior; that is relevant to future voice-session capture, but not evidence of better long-term memory by itself. See [Sandbox Agents memory](https://developers.openai.com/api/docs/guides/agents/sandboxes) and the [API changelog](https://developers.openai.com/api/docs/changelog).
+
+Anthropic's Nov 12 release of self-hosted Managed Agents allows the full agent service, agents, sessions and session history to run on customer infrastructure, with a selectable model provider. Together, these developments reinforce the provider-neutral session/harness/sandbox architecture in this portfolio.
+
+### Agent Memory Challenge Cycle 2: November 19 announcement
+
+As of **November 20, 2026**, Gedo Memory has published a November 20 report stating that it placed third on the Cycle 2 Commercial Products Text Memory leaderboard with an overall score of **62.28**, and fifth on the Closed-Source Methods Text Memory leaderboard. This is a vendor-authored report of the announced results. At the time of this snapshot, the [official competition page](https://agentmemoryleaderboard.ai/competition/) still displays its November 19 expected-release notice rather than complete published result tables; therefore this portfolio does not treat 62.28 as an independently verified official leaderboard extraction or claim a ranking for MACE.
+
+Cycle 2's October 31 submission and November 4 evaluation deadlines have passed. Prepare the provider-neutral Add/Search contract for the next eligible cycle; do not imply that the current MACE harness entered Cycle 2. See [Gedo's report](https://gedo.ai/labs/aml-cycle-2).
+
+### Updated competitive interpretation
+
+The frontier is moving from static retrieval toward memory that helps models learn from feedback, maintain representations, predict future utility, and operate across long sessions. MACE's potential differentiator is to pair that adaptive salience with:
+- bitemporal, receipt-bound evidence;
+- explicit causal vs associational status;
+- independent source-root and task-family splits;
+- correction/retraction propagation;
+- calibrated forecasts that cannot self-certify;
+- matched-context downstream utility and regret.
+
+The goal is not another universal leaderboard score. It is to show, under independent evaluation, that these assurances improve future action quality without increasing stale or unsupported memory activation.
