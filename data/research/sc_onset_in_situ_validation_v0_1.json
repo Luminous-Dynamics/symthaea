@@ -25,7 +25,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 400
+        "screen_heating_temperature_c": 400,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -46,7 +47,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 400
+        "screen_heating_temperature_c": 400,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -67,7 +69,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 400
+        "screen_heating_temperature_c": 400,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -88,7 +91,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 400
+        "screen_heating_temperature_c": 400,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -109,7 +113,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 300
+        "screen_heating_temperature_c": 300,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -130,7 +135,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 400
+        "screen_heating_temperature_c": 400,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -151,7 +157,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 400
+        "screen_heating_temperature_c": 400,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -172,7 +179,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 400
+        "screen_heating_temperature_c": 400,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -193,7 +201,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 400
+        "screen_heating_temperature_c": 400,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -214,7 +223,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 400
+        "screen_heating_temperature_c": 400,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -235,7 +245,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 200
+        "screen_heating_temperature_c": 200,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -256,7 +267,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 200
+        "screen_heating_temperature_c": 200,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -277,7 +289,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 200
+        "screen_heating_temperature_c": 200,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -298,7 +311,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 200
+        "screen_heating_temperature_c": 200,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -319,7 +333,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 200
+        "screen_heating_temperature_c": 200,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -340,7 +355,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 200
+        "screen_heating_temperature_c": 200,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -361,7 +377,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 500
+        "screen_heating_temperature_c": 500,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -382,7 +399,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 500
+        "screen_heating_temperature_c": 500,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -403,7 +421,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 300
+        "screen_heating_temperature_c": 300,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -424,7 +443,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 500
+        "screen_heating_temperature_c": 500,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -445,7 +465,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 500
+        "screen_heating_temperature_c": 500,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -466,7 +487,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 400
+        "screen_heating_temperature_c": 400,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -487,7 +509,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 400
+        "screen_heating_temperature_c": 400,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -508,7 +531,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": null
+        "screen_heating_temperature_c": null,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -529,7 +553,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 400
+        "screen_heating_temperature_c": 400,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     },
     {
@@ -550,7 +575,8 @@
         "active_refinement_accepted": true,
         "physical_failure_recorded": false,
         "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace",
-        "screen_heating_temperature_source_value": 200
+        "screen_heating_temperature_c": 200,
+        "screen_heating_temperature_unit": "degree_Celsius"
       }
     }
   ],
