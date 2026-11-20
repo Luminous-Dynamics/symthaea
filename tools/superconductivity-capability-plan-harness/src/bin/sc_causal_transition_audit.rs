@@ -233,11 +233,12 @@ impl Instance {
         let initial_rows = fixture.get("initial_state_distribution").and_then(Value::as_array)
             .ok_or_else(|| "initial_state_distribution must be an array".to_owned())?;
         let mut initial = vec![0.0; states.len()];
+        let mut initial_seen = HashSet::new();
         let mut prior_sum = 0.0;
         for row in initial_rows {
             let id = text_field(row, "state_id")?;
             let index = *state_index.get(id).ok_or_else(|| format!("initial distribution references unknown state {id}"))?;
-            if initial[index] != 0.0 { return Err(format!("duplicate initial state {id}")); }
+            if !initial_seen.insert(id.to_owned()) { return Err(format!("duplicate initial state {id}")); }
             let probability = finite(row.get("probability").ok_or("missing initial probability")?, "initial probability")?;
             if !(0.0..=1.0).contains(&probability) { return Err("initial probabilities must be in [0,1]".to_owned()); }
             initial[index] = probability;
