@@ -761,12 +761,15 @@ fn main(){
 #[cfg(test)]
 mod tests{
     use super::*;
-    fn inputs()->(Vec<u8>,Vec<u8>){
+    fn inputs_for(filename:&str)->(Vec<u8>,Vec<u8>){
         let root=PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
         (
             fs::read(root.join("data/schemas/superconductivity_causal_identification_v0_1.schema.json")).unwrap(),
-            fs::read(root.join("data/research/superconductivity_causal_identification_fixture_v0_1.json")).unwrap()
+            fs::read(root.join("data/research").join(filename)).unwrap()
         )
+    }
+    fn inputs()->(Vec<u8>,Vec<u8>){
+        inputs_for("superconductivity_causal_identification_fixture_v0_1.json")
     }
 
     #[test]
@@ -890,5 +893,30 @@ mod tests{
         assert_eq!(randomized["exact_blocked_randomization_inference"]["status"],"abstained");
     }
 
+
+    #[test]
+    fn frozen_missing_outcome_fixture_abstains_without_dropping_specimens(){
+        let(schema,fixture)=inputs_for("superconductivity_causal_identification_fixture_missing_v0_1.json");
+        let receipt=audit(&schema,&fixture).unwrap();
+        let randomized=receipt["cohorts"].as_array().unwrap().iter()
+            .find(|x|x["cohort_id"]=="blocked_randomized").unwrap();
+        assert_eq!(randomized["assignment_counts"]["missing_outcomes"],1);
+        assert!(randomized["horvitz_thompson_known_propensity"]["estimate"]["estimate"].is_null());
+        assert!(randomized["hajek_normalized_inverse_propensity"]["estimate"]["estimate"].is_null());
+        assert!(randomized["family_stratified_aipw_comparator"]["estimate"]["estimate"].is_null());
+        assert_eq!(randomized["exact_blocked_randomization_inference"]["status"],"abstained");
+    }
+
+    #[test]
+    fn frozen_positivity_fixture_abstains_all_weighted_estimators(){
+        let(schema,fixture)=inputs_for("superconductivity_causal_identification_fixture_positivity_v0_1.json");
+        let receipt=audit(&schema,&fixture).unwrap();
+        let historical=receipt["cohorts"].as_array().unwrap().iter()
+            .find(|x|x["cohort_id"]=="historical_targeting").unwrap();
+        assert!(historical["horvitz_thompson_known_propensity"]["estimate"]["estimate"].is_null());
+        assert!(historical["hajek_normalized_inverse_propensity"]["estimate"]["estimate"].is_null());
+        assert!(historical["family_stratified_aipw_comparator"]["estimate"]["estimate"].is_null());
+        assert_eq!(historical["propensity_overlap_and_effective_sample_size"]["outside_overlap_gate_count"],1);
+    }
 
 }
