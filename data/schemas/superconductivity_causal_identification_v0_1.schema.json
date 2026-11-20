@@ -13,7 +13,8 @@
     "samples",
     "cohorts",
     "ground_truth",
-    "claim_ceiling"
+    "claim_ceiling",
+    "treatment_receipt_semantics"
   ],
   "properties": {
     "contract": {
@@ -181,6 +182,10 @@
     },
     "claim_ceiling": {
       "const": "Synthetic causal identification benchmark only; no empirical superconductivity treatment effect or laboratory claim is established."
+    },
+    "treatment_receipt_semantics": {
+      "type": "string",
+      "const": "Primary estimand is intention-to-treat under assignment policy. Delivered dose is separately recorded for compliance auditing; v0.1 does not estimate a dose-response effect."
     }
   }
 }
