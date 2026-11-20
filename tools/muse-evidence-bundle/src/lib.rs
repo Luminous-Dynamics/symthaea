@@ -578,9 +578,9 @@ fn declared_components_valid(manifest: &BundleManifestV1) -> Result<(), String> 
     Ok(())
 }
 
-fn hard_binding(reason: impl Into<String>) -> ComponentReportV1 {
+fn hard_binding(declared_status: GateStatusV1, reason: impl Into<String>) -> ComponentReportV1 {
     ComponentReportV1 {
-        declared_status: GateStatusV1::Fail,
+        declared_status,
         verified_status: GateStatusV1::Fail,
         reasons: vec![reason.into()],
     }
@@ -640,7 +640,7 @@ fn verify_symbolic(
         || component.source_score_sha256 != artifacts.source_score_sha256
         || component.candidate_score_sha256 != artifacts.candidate_score_sha256
     {
-        return Ok(hard_binding("symbolic component case/source/candidate Score binding mismatch"));
+        return Ok(hard_binding(component.base.status, "symbolic component case/source/candidate Score binding mismatch"));
     }
     let Some(bytes) = result_bytes else {
         return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("symbolic result bytes were not supplied".into())));
@@ -657,14 +657,14 @@ fn verify_symbolic(
     if component.base.producer_id.as_deref() != Some(actual_id)
         || component.base.producer_version.as_deref() != Some(actual_version)
     {
-        return Ok(hard_binding("symbolic producer identity/version does not match the sealed result"));
+        return Ok(hard_binding(component.base.status, "symbolic producer identity/version does not match the sealed result"));
     }
     if actual_id != "muse-symbolic-edit-evaluator" || actual_version != "0.3.0" {
         return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("symbolic evaluator version is not in the v1 verifier allowlist".into())));
     }
     let supplied_receipt = supplied.pointer("/artifacts/evaluation_receipt_sha256").and_then(Value::as_str);
     if supplied_receipt != component.base.receipt_sha256.as_deref() {
-        return Ok(hard_binding("symbolic result receipt digest does not match the bundle reference"));
+        return Ok(hard_binding(component.base.status, "symbolic result receipt digest does not match the bundle reference"));
     }
     let Some(case_bytes) = case_bytes else {
         return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("frozen case JSON is required to reproduce the symbolic edit".into())));
@@ -692,17 +692,17 @@ fn verify_symbolic(
         ("candidate_audio_sha256", artifacts.candidate_audio_sha256.as_str()),
     ] {
         if reproduced_artifacts.get(field).and_then(Value::as_str) != Some(expected) {
-            return Ok(hard_binding(format!("reproduced symbolic result {field} does not match the bundle")));
+            return Ok(hard_binding(component.base.status, format!("reproduced symbolic result {field} does not match the bundle")));
         }
     }
     let supplied_artifacts = supplied.get("artifacts").ok_or("symbolic result artifacts missing")?;
     if supplied_artifacts.get("candidate_audio_sha256").and_then(Value::as_str)
         != Some(artifacts.candidate_audio_sha256.as_str())
     {
-        return Ok(hard_binding("symbolic result is not bound to the exact rendered candidate WAV"));
+        return Ok(hard_binding(component.base.status, "symbolic result is not bound to the exact rendered candidate WAV"));
     }
     if comparable_symbolic_result(&supplied) != comparable_symbolic_result(&reproduced) {
-        return Ok(hard_binding("supplied symbolic receipt differs from independent reproduction"));
+        return Ok(hard_binding(component.base.status, "supplied symbolic receipt differs from independent reproduction"));
     }
     let outcome = reproduced.get("outcome").ok_or("reproduced symbolic outcome missing")?;
     let gates = ["target_pass", "preservation_pass", "correspondence_pass"];
@@ -766,7 +766,7 @@ fn verify_render(
         || component.candidate_midi_sha256 != artifacts.candidate_midi_sha256
         || component.candidate_audio_sha256 != artifacts.candidate_audio_sha256
     {
-        return Ok(hard_binding("render component source/candidate Score, MIDI or WAV binding mismatch"));
+        return Ok(hard_binding(component.base.status, "render component source/candidate Score, MIDI or WAV binding mismatch"));
     }
     let Some(bytes) = bytes else {
         return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("render receipt bytes were not supplied".into())));
@@ -779,7 +779,7 @@ fn verify_render(
     let receipt = verify_receipt_bytes(bytes)
         .map_err(|error| format!("render receipt failed public verification: {error}"))?;
     if component.base.receipt_sha256.as_deref() != Some(receipt.receipt_sha256.as_str()) {
-        return Ok(hard_binding("render receipt digest does not match the bundle reference"));
+        return Ok(hard_binding(component.base.status, "render receipt digest does not match the bundle reference"));
     }
     if component.attempt_id.as_deref() != Some(receipt.attempt_id.as_str())
         || receipt.source.source_score_sha256 != artifacts.source_score_sha256
@@ -790,7 +790,7 @@ fn verify_render(
         || receipt.execution.output_audio_sha256.as_deref() != Some(artifacts.candidate_audio_sha256.as_str())
         || receipt.audio.audio_sha256.as_deref() != Some(artifacts.candidate_audio_sha256.as_str())
     {
-        return Ok(hard_binding("render receipt has a source/candidate/MIDI/WAV cross-binding mismatch"));
+        return Ok(hard_binding(component.base.status, "render receipt has a source/candidate/MIDI/WAV cross-binding mismatch"));
     }
     for (label, evidence, component) in [
         (
@@ -810,7 +810,7 @@ fn verify_render(
         ),
     ] {
         if let Err(error) = verify_render_channel_binding(label, evidence, component) {
-            return Ok(hard_binding(error));
+            return Ok(hard_binding(component.base.status, error));
         }
     }
     if receipt.attempt_state == "failed" || receipt.execution.state == "failed" {
@@ -865,7 +865,7 @@ fn verify_acoustic(
     if component.source_audio_sha256 != artifacts.source_audio_sha256
         || component.candidate_audio_sha256 != artifacts.candidate_audio_sha256
     {
-        return Ok(hard_binding("acoustic component source/candidate WAV binding mismatch"));
+        return Ok(hard_binding(component.base.status, "acoustic component source/candidate WAV binding mismatch"));
     }
     let Some(result_bytes) = result_bytes else {
         return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("acoustic observation bytes were not supplied".into())));
@@ -876,7 +876,7 @@ fn verify_acoustic(
         .map_err(|error| format!("acoustic observation seal invalid: {error}"))?;
     let actual_receipt = supplied.get("receipt_sha256").and_then(Value::as_str);
     if actual_receipt != component.base.receipt_sha256.as_deref() {
-        return Ok(hard_binding("acoustic receipt digest does not match bundle reference"));
+        return Ok(hard_binding(component.base.status, "acoustic receipt digest does not match bundle reference"));
     }
     if supplied.get("schema").and_then(Value::as_str) != Some("muse-acoustic-observation-v1") {
         return Err("unsupported acoustic observation schema".into());
@@ -887,7 +887,7 @@ fn verify_acoustic(
     if component.base.producer_id.as_deref() != Some(observer_id)
         || component.base.producer_version.as_deref() != Some(observer_version)
     {
-        return Ok(hard_binding("acoustic observer identity/version does not match the sealed result"));
+        return Ok(hard_binding(component.base.status, "acoustic observer identity/version does not match the sealed result"));
     }
     if observer_id != "muse-windowed-rms-gain-observer" || observer_version != "0.1.0" {
         return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("acoustic observer version is not in the v1 verifier allowlist".into())));
@@ -906,7 +906,7 @@ fn verify_acoustic(
     if case_value.pointer("/source/audio/sha256").and_then(Value::as_str)
         != Some(artifacts.source_audio_sha256.as_str())
     {
-        return Ok(hard_binding("case source audio digest does not match the bundle source WAV"));
+        return Ok(hard_binding(component.base.status, "case source audio digest does not match the bundle source WAV"));
     }
     let Some(candidate_audio) = read_artifact(render_bundle_root, "output.wav", "candidate WAV")? else {
         return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("output.wav is missing from the render bundle".into())));
@@ -916,7 +916,7 @@ fn verify_acoustic(
     if observed_source_hash != artifacts.source_audio_sha256
         || observed_candidate_hash != artifacts.candidate_audio_sha256
     {
-        return Ok(hard_binding("source or candidate WAV bytes do not match the bundle artifact digests"));
+        return Ok(hard_binding(component.base.status, "source or candidate WAV bytes do not match the bundle artifact digests"));
     }
     let contract_value: Value = serde_json::from_slice(contract_bytes)
         .map_err(|error| format!("gain-envelope contract JSON invalid: {error}"))?;
@@ -927,17 +927,17 @@ fn verify_acoustic(
         .map_err(|error| format!("independent acoustic observer reproduction failed: {error}"))?;
     let reproduced_receipt = reproduced.get("receipt_sha256").and_then(Value::as_str);
     if reproduced_receipt != component.base.receipt_sha256.as_deref() {
-        return Ok(hard_binding("reproduced acoustic receipt does not match the bundle reference"));
+        return Ok(hard_binding(component.base.status, "reproduced acoustic receipt does not match the bundle reference"));
     }
     if supplied != reproduced {
-        return Ok(hard_binding("supplied acoustic observation differs from independent WAV/contract reproduction"));
+        return Ok(hard_binding(component.base.status, "supplied acoustic observation differs from independent WAV/contract reproduction"));
     }
     let bound = reproduced.get("artifacts").ok_or("reproduced acoustic artifacts missing")?;
     if bound.get("source_audio_sha256").and_then(Value::as_str) != Some(artifacts.source_audio_sha256.as_str())
         || bound.get("candidate_audio_sha256").and_then(Value::as_str) != Some(artifacts.candidate_audio_sha256.as_str())
         || bound.get("contract_sha256").and_then(Value::as_str) != component.contract_sha256.as_deref()
     {
-        return Ok(hard_binding("acoustic observation source/candidate/contract digest mismatch"));
+        return Ok(hard_binding(component.base.status, "acoustic observation source/candidate/contract digest mismatch"));
     }
     let scope_kind = reproduced.pointer("/scope/kind").and_then(Value::as_str).unwrap_or("");
     if scope_kind == "isolated_stem" {
