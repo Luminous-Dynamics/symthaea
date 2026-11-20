@@ -83,3 +83,11 @@ This is a synthetic software-contract result only. It does not prescribe physica
 The deterministic random-feasible baseline samples uniformly from currently eligible next actions that preserve the full resource/capability constraints, continues until no further action fits, and uses 32 fixed SplitMix64 seeds. It is a simple reproducible random-policy comparator, not an optimal stopping policy. The current receipt reports its per-seed action sequence and mean synthetic-fixture scores; confidence intervals and paired multi-instance comparisons require a larger frozen benchmark suite.
 
 The expected-loss and CVaR receipts contain separate outcome-contingent decision policies. Expected regret is evaluated under the expected-loss policy; CVaR regret is evaluated under the displayed CVaR policy. The joint-world-state information objective is (I(W;Y_S)), where (W) is the composite world state, not only mechanism identity.
+
+## Programme interfaces and current boundaries
+
+- [#12864 application-conditioned Pareto objectives](https://github.com/Luminous-Dynamics/symthaea/issues/12864) owns the application profiles and physical performance vectors (magnet conductors, power, RF, cryogenic devices, etc.). The current synthetic decision table is not a substitute for those application-specific profiles.
+- [#12634 prospective discovery tournament](https://github.com/Luminous-Dynamics/symthaea/issues/12634) owns the common prospective candidate tournament and fixed-budget discovery yield.
+- [#12966 intervention dynamics](https://github.com/Luminous-Dynamics/symthaea/issues/12966) owns state-changing interventions, path dependence, carryover and specimen-state transitions. The present contract conditions observations on a static joint world state; it does not simulate pressure/strain/light/annealing changing that state.
+
+The planner is therefore a risk/resource decision layer, not yet the whole campaign simulator. It becomes scientifically useful only when its losses and resources are populated from the reviewed application profiles and specimen/protocol evidence, with the causal state-transition layer handling interventions.
