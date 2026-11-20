@@ -12,13 +12,16 @@ fn read_optional(path: &Path) -> Result<Option<Vec<u8>>, String> {
 
 fn run() -> Result<i32, String> {
     let args: Vec<String> = env::args().collect();
-    if args.len() < 4 || args[1] != "verify" {
-        println!(
-            "muse-evidence-bundle verify MANIFEST.json EVIDENCE_DIR\n\
-             EVIDENCE_DIR may contain case.json, source-audio.wav, gain-envelope-contract.json,\n\
-             symbolic-result.json, render-receipt.json, render-bundle/,\n\
-             acoustic-result.json, score-audio-result.json, and human-acceptance.json."
-        );
+    let usage = "muse-evidence-bundle verify MANIFEST.json EVIDENCE_DIR\n\
+        EVIDENCE_DIR may contain case.json, source-audio.wav, gain-envelope-contract.json,\n\
+        symbolic-result.json, render-receipt.json, render-bundle/,\n\
+        acoustic-result.json, score-audio-result.json, and human-acceptance.json.";
+    if args.len() == 2 && matches!(args[1].as_str(), "-h" | "--help") {
+        println!("{usage}");
+        return Ok(0);
+    }
+    if args.len() != 4 || args[1] != "verify" {
+        println!("{usage}");
         return Ok(2);
     }
     let manifest_path = PathBuf::from(&args[2]);
