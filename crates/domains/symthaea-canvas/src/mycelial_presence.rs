@@ -125,7 +125,9 @@ pub fn build_mycelial_presence(snapshot: &EmbodimentSnapshot) -> SceneNode {
     let speech_weight = snapshot
         .viseme
         .as_ref()
-        .filter(|_| activity == EmbodimentActivity::Speaking)
+        .filter(|_| {
+            snapshot.current_speech_output() == Some(crate::embodiment::SpeechOutputState::Playing)
+        })
         .map(|observed| finite_unit(observed.value.weight))
         .unwrap_or(0.0);
 
@@ -205,7 +207,6 @@ fn color_for_activity(activity: EmbodimentActivity) -> Color {
         EmbodimentActivity::Associating => (151.0, 0.78, 0.61),
         EmbodimentActivity::Predicting => (43.0, 0.88, 0.64),
         EmbodimentActivity::Planning => (275.0, 0.66, 0.65),
-        EmbodimentActivity::Speaking => (174.0, 0.88, 0.64),
         EmbodimentActivity::ExecutingTool => (27.0, 0.90, 0.60),
         EmbodimentActivity::AwaitingTool => (263.0, 0.70, 0.64),
         EmbodimentActivity::Interrupted => (7.0, 0.78, 0.59),
@@ -298,7 +299,9 @@ fn finite_unit(value: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::embodiment::{EmbodimentActivity, Observed, SignalProvenance, Viseme, VisemeSignal};
+    use crate::embodiment::{
+        EmbodimentActivity, Observed, SignalProvenance, SpeechOutputState, Viseme, VisemeSignal,
+    };
 
     fn observed<T>(value: T, sequence: u64) -> Observed<T> {
         Observed {
@@ -327,13 +330,14 @@ mod tests {
     fn runtime_activity_changes_the_visual_scene() {
         let idle = EmbodimentSnapshot::default();
         let mut speaking = EmbodimentSnapshot::default();
-        speaking.activity = Some(observed(EmbodimentActivity::Speaking, 1));
+        speaking.activity = Some(observed(EmbodimentActivity::Associating, 1));
+        speaking.speech_output = Some(observed(SpeechOutputState::Playing, 2));
         speaking.viseme = Some(observed(
             VisemeSignal {
                 viseme: Viseme::Aa,
                 weight: 0.8,
             },
-            2,
+            3,
         ));
 
         let idle_svg = render_mycelial_presence(&idle, SvgRenderOptions::default());
