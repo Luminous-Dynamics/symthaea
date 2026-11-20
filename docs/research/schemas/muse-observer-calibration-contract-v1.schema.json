@@ -11,7 +11,10 @@
     "minimum_threshold_examples_per_class",
     "minimum_held_out_examples_per_class",
     "maximum_false_support_rate",
-    "ece_bins"
+    "ece_bins",
+    "minimum_held_out_groups",
+    "bootstrap_replicates",
+    "bootstrap_seed"
   ],
   "properties": {
     "schema": {
@@ -46,6 +49,20 @@
       "type": "integer",
       "minimum": 2,
       "maximum": 100
+    },
+    "minimum_held_out_groups": {
+      "type": "integer",
+      "minimum": 3,
+      "maximum": 10000
+    },
+    "bootstrap_replicates": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 5000
+    },
+    "bootstrap_seed": {
+      "type": "integer",
+      "minimum": 0
     }
   }
 }
