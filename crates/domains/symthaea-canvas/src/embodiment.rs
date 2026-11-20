@@ -540,8 +540,8 @@ mod tests {
             .ingest(event(
                 1,
                 10,
-                EmbodimentEventKind::ActivityChanged {
-                    activity: EmbodimentActivity::Speaking,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Playing,
                 },
             ))
             .unwrap();
@@ -670,6 +670,60 @@ mod tests {
             })
         ));
         assert_eq!(*controller.snapshot(), before);
+    }
+
+
+    #[test]
+    fn speech_playback_requires_runtime_event_provenance() {
+        let mut controller = EmbodimentController::new();
+        let mut event = event(
+            1,
+            10,
+            EmbodimentEventKind::SpeechOutputChanged {
+                state: SpeechOutputState::Playing,
+            },
+        );
+        event.provenance = SignalProvenance::RuntimeDerived;
+        assert!(matches!(
+            controller.ingest(event),
+            Err(EmbodimentIngestError::SignalProvenanceNotAllowed {
+                field: "speech output",
+                provenance: SignalProvenance::RuntimeDerived
+            })
+        ));
+        assert_eq!(controller.snapshot().current_speech_output(), None);
+    }
+
+    #[test]
+    fn cognitive_activity_and_speech_playback_are_orthogonal() {
+        let mut controller = EmbodimentController::new();
+        controller
+            .ingest(event(
+                1,
+                10,
+                EmbodimentEventKind::ActivityChanged {
+                    activity: EmbodimentActivity::Associating,
+                },
+            ))
+            .unwrap();
+        controller
+            .ingest(event(
+                2,
+                20,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Playing,
+                },
+            ))
+            .unwrap();
+
+        assert_eq!(
+            controller.snapshot().current_activity(),
+            Some(EmbodimentActivity::Associating)
+        );
+        assert_eq!(
+            controller.snapshot().current_speech_output(),
+            Some(SpeechOutputState::Playing)
+        );
     }
 
     #[test]
