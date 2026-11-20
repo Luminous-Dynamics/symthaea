@@ -238,7 +238,8 @@
         "false_support_rate_all_negatives",
         "false_support_rate_measured_negatives",
         "event_recall",
-        "cluster_bootstrap"
+        "cluster_bootstrap",
+        "negative_family_metrics"
       ],
       "properties": {
         "held_out_dataset_sha256": {
@@ -361,6 +362,12 @@
         },
         "cluster_bootstrap": {
           "$ref": "#/$defs/clusterBootstrap"
+        },
+        "negative_family_metrics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/negativeFamily"
+          }
         }
       }
     },
@@ -425,6 +432,53 @@
         },
         "false_support_rate_measured_negatives": {
           "$ref": "#/$defs/bootstrapInterval"
+        }
+      }
+    },
+    "negativeFamily": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "negative_family",
+        "total_negative_examples",
+        "measured_negative_examples",
+        "false_support_count",
+        "false_support_rate_all_negatives",
+        "false_support_rate_measured_negatives"
+      ],
+      "properties": {
+        "negative_family": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "total_negative_examples": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "measured_negative_examples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_support_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_support_rate_all_negatives": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "false_support_rate_measured_negatives": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
         }
       }
     }
