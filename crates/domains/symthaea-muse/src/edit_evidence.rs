@@ -177,9 +177,10 @@ fn score_metadata_equal(a: &Score, b: &Score) -> bool {
 
 fn metric(id: &str, numerator: usize, denominator: usize, threshold: f64, lower: bool) -> Value {
     let score = if denominator == 0 { None } else { Some(numerator as f64 / denominator as f64) };
+    // An empty denominator is missing evidence, never a free pass.
     let passed = score.map(|actual| {
         if lower { actual <= threshold } else { actual >= threshold }
-    }).unwrap_or(true);
+    }).unwrap_or(false);
     json!({
         "metric_id": id,
         "numerator": numerator,
@@ -723,6 +724,41 @@ mod tests {
             None,
         ).unwrap();
         assert!(!result["outcome"]["target_pass"].as_bool().unwrap());
+    }
+
+    #[test]
+    fn empty_protected_scope_does_not_vacuously_pass() {
+        let source = score(false);
+        let candidate = score(true);
+        let mut case = case_for(&source);
+        case["edit_contract"]["protected_scopes"] = json!([{
+            "part_id": 99,
+            "start": {"numerator": 0, "denominator": 1},
+            "end": {"numerator": 2, "denominator": 1}
+        }]);
+        let result = evaluate_velocity_case(
+            &bytes(&case),
+            &bytes(&source),
+            &bytes(&candidate),
+            None,
+        ).unwrap();
+        assert!(!result["outcome"]["preservation_pass"].as_bool().unwrap());
+        assert_eq!(result["preservation"][0]["score"], Value::Null);
+    }
+
+    #[test]
+    fn inserted_candidate_note_counts_as_collateral_change() {
+        let source = score(false);
+        let mut candidate = score(true);
+        candidate.push(note(30, 2, 0.4));
+        let result = evaluate_velocity_case(
+            &bytes(&case_for(&source)),
+            &bytes(&source),
+            &bytes(&candidate),
+            None,
+        ).unwrap();
+        assert!(!result["outcome"]["target_pass"].as_bool().unwrap());
+        assert!(!result["outcome"]["preservation_pass"].as_bool().unwrap());
     }
 
     #[test]
