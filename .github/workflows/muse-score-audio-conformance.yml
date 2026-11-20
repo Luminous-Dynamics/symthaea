@@ -1,0 +1,51 @@
+name: MUSE Score-Audio Conformance Observer
+
+on:
+  pull_request:
+    paths:
+      - "tools/muse-score-audio-conformance/**"
+      - "crates/domains/symthaea-music-theory/**"
+      - ".github/workflows/muse-score-audio-conformance.yml"
+  push:
+    branches:
+      - "research/muse-score-audio-conformance-v1-20261120"
+    paths:
+      - "tools/muse-score-audio-conformance/**"
+      - "crates/domains/symthaea-music-theory/**"
+      - ".github/workflows/muse-score-audio-conformance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-score-audio-conformance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  standalone:
+    name: Standalone Score-audio conformance observer
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Record exact source head
+        run: |
+          set -euo pipefail
+          echo "checked_out_sha=$(git rev-parse HEAD)"
+      - name: Format check
+        run: cargo fmt --manifest-path tools/muse-score-audio-conformance/Cargo.toml --all -- --check
+      - name: Unit and CLI target tests
+        run: cargo test --manifest-path tools/muse-score-audio-conformance/Cargo.toml --all-targets
+      - name: Clippy (warnings are errors)
+        run: cargo clippy --manifest-path tools/muse-score-audio-conformance/Cargo.toml --all-targets -- -D warnings
+      - name: CLI help smoke
+        run: cargo run --manifest-path tools/muse-score-audio-conformance/Cargo.toml -- --help
